@@ -13,6 +13,7 @@ from backend.inference.catalog_loader import (
 from backend.inference.reasoning import (
     WIRE_ANTHROPIC_EXTENDED,
     WIRE_OPENAI_REASONING_EFFORT,
+    WIRE_VERCEL_GATEWAY_REASONING,
     apply_reasoning_plan,
     infer_family,
     resolve_reasoning_plan,
@@ -108,6 +109,43 @@ class TestGatewayReasoningOptions:
         assert entry is not None
         options = reasoning_effort_options(entry, include_disabled=True)
         assert 'medium' in options
+
+    def test_vercel_deepseek_gateway_reasoning_wire(self):
+        from backend.inference.param_profiles import (
+            resolve_model_entry_for_capabilities,
+        )
+        from backend.inference.reasoning import resolve_reasoning_plan
+
+        entry = resolve_model_entry_for_capabilities(
+            'deepseek/deepseek-v4-pro',
+            'vercel',
+        )
+        assert entry is not None
+        assert 'max' not in (entry.reasoning_efforts or ())
+        plan = resolve_reasoning_plan(entry, 'max')
+        assert plan.wire == WIRE_VERCEL_GATEWAY_REASONING
+        assert plan.kwargs_patch == {'reasoning': {'effort': 'xhigh'}}
+        plan_high = resolve_reasoning_plan(entry, 'high')
+        assert plan_high.kwargs_patch == {'reasoning': {'effort': 'high'}}
+
+    def test_vercel_deepseek_reasoning_tunneled_via_extra_body(self):
+        from backend.inference.catalog_loader import (
+            apply_model_param_overrides,
+            sanitize_call_kwargs_for_provider,
+        )
+
+        kwargs = {'model': 'vercel/deepseek/deepseek-v4-pro', 'temperature': 0.5}
+        out = apply_model_param_overrides(
+            'vercel/deepseek/deepseek-v4-pro',
+            kwargs,
+            reasoning_effort='xhigh',
+            provider='vercel',
+        )
+        sanitized = sanitize_call_kwargs_for_provider(
+            'vercel/deepseek/deepseek-v4-pro', out
+        )
+        assert 'reasoning' not in sanitized
+        assert sanitized['extra_body']['reasoning'] == {'effort': 'xhigh'}
 
 
 class TestReasoningDisplayOptions:

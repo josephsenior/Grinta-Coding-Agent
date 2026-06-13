@@ -64,24 +64,18 @@ class _AppScreenSettingsMixin:
         self.notify(f'Autonomy: {level}', severity='information', timeout=2.0)
 
     def _apply_hud_reasoning_effort(self, effort_value: str) -> None:
-        effort = str(effort_value or '').strip()
+        if getattr(self, '_hud_reasoning_syncing', False):
+            return
+        effort = str(effort_value or '').strip().lower()
         from backend.cli.config_manager import (
             get_current_model,
             get_current_provider,
+            get_persisted_reasoning_effort,
             update_model,
         )
         from backend.core.config import load_app_config
 
-        current = ''
-        try:
-            current = (
-                (getattr(self._config.get_llm_config(), 'reasoning_effort', None) or '')
-                .strip()
-                .lower()
-            )
-        except Exception:
-            current = ''
-        if effort == current:
+        if effort == get_persisted_reasoning_effort().strip().lower():
             return
         try:
             update_model(

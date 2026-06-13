@@ -31,15 +31,12 @@ from backend.cli.tui.app import (
 from backend.cli.tui.main import GrintaTUIApp
 from backend.cli.tui.widgets.activity_card import (
     ActivityCard as TUIActivityCard,
-)
-from backend.cli.tui.widgets.activity_card import (
     AgentMessage,
-    DiffLine,
     LiveResponse,
-    SplitDiffLine,
     ThinkingIndicator,
     TurnCompletion,
 )
+from backend.cli.tui.widgets.unified_diff_view import UnifiedDiffRow, UnifiedDiffView
 from backend.cli.tui._app_small_widgets import ScrollTailBadge
 from backend.core.enums import AgentState, EventSource
 from backend.ledger.action import (
@@ -337,7 +334,6 @@ async def test_tui_transcript_autoscrolls_on_rapid_append(mock_config, monkeypat
 
         for idx in range(30):
             display.append_widget(Static(f'burst line {idx}'))
-        display.follow_tail()
         await pilot.pause()
         await pilot.pause()
 
@@ -422,6 +418,31 @@ async def test_tui_live_response_respects_user_scrolled_away(mock_config, monkey
 
         assert display._user_scrolled_away is True
         assert not display._was_at_bottom()
+
+
+@pytest.mark.asyncio
+async def test_tui_content_growth_does_not_mark_user_scrolled_away(
+    mock_config, monkeypatch
+):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(100, 24)) as pilot:
+        await pilot.pause()
+
+        display = _get_screen(app).query_one('#main-display')
+        display._suppress_mount_animation = True
+        await _fill_scrollable_transcript(display, pilot, count=40)
+
+        display._sync_scroll_state_from_position()
+        assert display._user_scrolled_away is False
+
+        display.append_widget(Static('new tail content'))
+        await pilot.pause()
+        display._sync_scroll_state_from_position()
+        assert display._user_scrolled_away is False
 
 
 @pytest.mark.asyncio
@@ -1564,6 +1585,56 @@ async def test_tui_sidebar_rows_expose_delete_for_mcp_and_skills(
         deletable = [row for row in rows if getattr(row, 'deletable', False)]
         assert any(getattr(row, 'item_id', '') == 'mcp:server-a' for row in deletable)
         assert any(getattr(row, 'item_id', '') == 'skill:skill-a' for row in deletable)
+
+
+@pytest.mark.asyncio
+async def test_tui_lsp_sidebar_lists_detected_servers(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+        from backend.cli.tui.widgets.collapsible import CollapsibleSection, SidebarRow
+        from types import SimpleNamespace
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        renderer._lsp_servers_cache = {
+            'pylsp': SimpleNamespace(
+                available=True,
+                spec=SimpleNamespace(language='python', extensions=('.py', '.pyw')),
+            ),
+            'gopls': SimpleNamespace(
+                available=False,
+                spec=SimpleNamespace(language='go', extensions=('.go',)),
+            ),
+        }
+        renderer._last_lsp_sidebar_signature = None
+        renderer._refresh_lsp_sidebar()
+        await pilot.pause()
+
+        lsp_section = s.query_one('#sidebar-lsp', CollapsibleSection)
+        assert lsp_section._section_title == 'LSP Servers (1)'
+
+        rows = [
+            row
+            for row in lsp_section.query(SidebarRow).results()
+            if getattr(row, 'item_id', '').startswith('lsp:')
+        ]
+        assert len(rows) == 1
+        assert rows[0]._label == 'python'
+        assert rows[0]._meta is None
+        assert rows[0].interactive is False
+        assert lsp_section.is_collapsed is True
 
 
 @pytest.mark.asyncio
@@ -3031,17 +3102,13 @@ async def test_tui_file_edit_observation_uses_unified_diff_rows(mock_config):
         )
         await pilot.pause()
 
-        split_rows = list(s.query(SplitDiffLine).results())
+        split_rows = list(s.query(UnifiedDiffRow).results())
         assert split_rows
         assert any(
-            row.left_text == ''
-            and row.right_text.startswith('+')
-            and 'gamma' in row.right_text
-            for row in split_rows
+            row._row.kind == 'add' and 'gamma' in row._row.text for row in split_rows
         )
-        assert any(
-            row.left_kind == 'ctx' and row.right_kind == 'ctx' for row in split_rows
-        )
+        assert any(row._row.kind == 'ctx' for row in split_rows)
+        assert s.query_one(UnifiedDiffView)
 
 
 @pytest.mark.asyncio
@@ -3122,10 +3189,11 @@ async def test_tui_file_edit_observation_uses_explicit_diff_rows(mock_config):
         )
         await pilot.pause()
 
-        diff_rows = list(s.query(DiffLine).results())
-        diff_text = [row.renderable.plain for row in diff_rows]
-        assert any(line.startswith('--- demo.txt') for line in diff_text)
-        assert any(line.startswith('+new') for line in diff_text)
+        diff_rows = list(s.query(UnifiedDiffRow).results())
+        assert s.query_one(UnifiedDiffView)
+        assert any(row._row.kind == 'hdr' and 'demo.txt' in row._row.text for row in diff_rows)
+        assert any(row._row.kind == 'add' and row._row.text == 'new' for row in diff_rows)
+        assert any(row._row.kind == 'rem' and row._row.text == 'old' for row in diff_rows)
 
         file_cards = [
             card
@@ -3170,10 +3238,11 @@ async def test_tui_file_edit_observation_uses_diff_preview_rows(mock_config):
         )
         await pilot.pause()
 
-        diff_rows = list(s.query(DiffLine).results())
-        diff_text = [row.renderable.plain for row in diff_rows]
-        assert any(line.startswith('--- demo.txt') for line in diff_text)
-        assert any(line.startswith('+new') for line in diff_text)
+        diff_rows = list(s.query(UnifiedDiffRow).results())
+        assert s.query_one(UnifiedDiffView)
+        assert any(row._row.kind == 'hdr' and 'demo.txt' in row._row.text for row in diff_rows)
+        assert any(row._row.kind == 'add' and row._row.text == 'new' for row in diff_rows)
+        assert any(row._row.kind == 'rem' and row._row.text == 'old' for row in diff_rows)
 
         file_cards = [
             card
@@ -3217,10 +3286,13 @@ async def test_tui_file_write_observation_uses_diff_preview_rows(mock_config):
         )
         await pilot.pause()
 
-        diff_rows = list(s.query(DiffLine).results())
-        diff_text = [row.renderable.plain for row in diff_rows]
-        assert any(line.startswith('--- config.toml') for line in diff_text)
-        assert any(line.startswith('+new') for line in diff_text)
+        diff_rows = list(s.query(UnifiedDiffRow).results())
+        assert s.query_one(UnifiedDiffView)
+        assert any(
+            row._row.kind == 'hdr' and 'config.toml' in row._row.text
+            for row in diff_rows
+        )
+        assert any(row._row.kind == 'add' and row._row.text == 'new' for row in diff_rows)
 
 
 @pytest.mark.asyncio

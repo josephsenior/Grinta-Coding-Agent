@@ -316,9 +316,11 @@ class _AppScreenCommunicateMixin:
             return
         self._suggestion_matches = matches
         lst.clear()
+        from backend.cli.tui.widgets.command_list import CommandListRow
+
         for name in matches:
             hint = self._SLASH_HINTS[name]
-            lst.append(ListItem(Label(f'[#eacb8a]{name}[/]  [#54597b]{hint}[/]')))
+            lst.append(ListItem(CommandListRow(name, hint)))
         lst.index = 0
         lst.remove_class('-hidden')
 
@@ -329,6 +331,7 @@ class _AppScreenCommunicateMixin:
                 event.text_area.text = text
                 return
             self._update_suggestions_list(text)
+            self._update_command_hint(text)
             try:
                 hint = self.query_one('#input-hint', Label)
                 hint.display = not bool(text.strip())

@@ -127,14 +127,24 @@ SidebarRow.-active-task {
     border-left: solid #5eead4;
 }
 
+SidebarRow.-read-only {
+    color: #969aad;
+}
+
+SidebarRow.-read-only:hover {
+    background: transparent;
+    color: #969aad;
+}
+
 /* ── Command Suggestions ────────────────────────────── */
 #suggestions-list {
     width: 100%;
     max-height: 14;
     height: auto;
-    background: #0d1a30;
-    border-top: solid #15233c;
-    border-bottom: solid #15233c;
+    background: #07101d;
+    border-top: solid #26324f;
+    border-bottom: solid #26324f;
+    border-left: heavy #5eead4;
     padding: 1 0;
     margin: 0;
 }
@@ -146,22 +156,33 @@ SidebarRow.-active-task {
 #suggestions-list > ListItem {
     height: auto;
     min-height: 2;
-    padding: 0 2 1 2;
-    margin: 0;
-    background: #0a1525;
-    color: #8f9fc1;
+    padding: 0;
+    margin: 0 1;
+    background: transparent;
+    border: none;
 }
 
-#suggestions-list > ListItem:hover {
-    background: #1a3055;
-}
-
-#suggestions-list > ListItem:focus {
-    background: #1a3055;
-}
-
+#suggestions-list > ListItem:hover,
+#suggestions-list > ListItem:focus,
 #suggestions-list > ListItem.-highlighted {
-    background: #1a3055;
+    background: #101c36;
+    border-left: solid #5eead4;
+}
+
+#suggestions-list CommandListRow {
+    padding: 0 1;
+}
+
+#suggestions-list > ListItem.-highlighted CommandListRow {
+    background: transparent;
+}
+
+#suggestions-list > ListItem.-highlighted CommandListRow .cmd-name {
+    color: #5eead4;
+}
+
+#suggestions-list > ListItem.-highlighted CommandListRow .cmd-detail {
+    color: #c8d4e8;
 }
 
 /* ── Welcome Widget ─────────────────────────────────── */
@@ -171,7 +192,8 @@ WelcomeWidget {
     padding: 3 4 2 4;
     margin: 2 1 0 0;
     background: #07101d;
-    border-left: heavy #32527a;
+    border: round #26324f;
+    border-left: heavy #5eead4;
 }
 
 #welcome-header {
@@ -193,7 +215,8 @@ WelcomeWidget {
 }
 
 .welcome-item:hover {
-    background: #0f1c31;
+    background: #101c36;
+    border-left: solid #5eead4;
 }
 
 #welcome-logo {
@@ -711,15 +734,6 @@ GrintaSettingsDialog TextArea:focus {
     border: none;
 }
 
-#sessions-preview {
-    height: auto;
-    max-height: 10;
-    border: round #1e293b;
-    padding: 1 2;
-    background: #060a14;
-    color: #cbd5e1;
-}
-
 #dialog-feedback {
     color: #8f9fc1;
     margin-top: 1;
@@ -727,10 +741,32 @@ GrintaSettingsDialog TextArea:focus {
 
 #help-body {
     height: auto;
+    max-height: 28;
+    overflow-y: auto;
     color: #cbd5e1;
-    border: round #1e293b;
-    background: #060a14;
+    padding: 0;
+    background: transparent;
+    border: none;
+}
+
+#dialog-subtitle {
+    color: #6f83aa;
+    height: auto;
+    margin-bottom: 1;
+}
+
+CommandListPanel {
+    margin-bottom: 1;
+}
+
+#sessions-preview {
+    height: auto;
+    max-height: 10;
+    border: round #26324f;
+    border-left: heavy #5eead4;
     padding: 1 2;
+    background: #07101d;
+    color: #cbd5e1;
 }
 
 /* ── Toast notifications ──────────────────────────── */

@@ -80,6 +80,7 @@ class _AppRendererDisplayMixin:
     def _refresh_display(self, *, skip_sidebar: bool = False) -> None:
         """Refresh derived sidebar state; transcript writes are incremental."""
         self._refresh_tasks_sidebar()
+        self._refresh_lsp_sidebar()
         if skip_sidebar:
             return
         mcp_count = self._hud.state.mcp_servers
@@ -104,6 +105,102 @@ class _AppRendererDisplayMixin:
             )
 
             self._last_sidebar_state = current_state
+
+    def schedule_lsp_detection(self) -> None:
+        """Probe installed language servers off the UI thread."""
+        if getattr(self, '_lsp_detection_scheduled', False):
+            return
+        self._lsp_detection_scheduled = True
+        try:
+            self._loop.create_task(
+                self._detect_lsp_servers_async(),
+                name='grinta-tui-lsp-detect',
+            )
+        except RuntimeError:
+            self._lsp_detection_scheduled = False
+
+    async def _detect_lsp_servers_async(self) -> None:
+        import asyncio
+        import os
+
+        if os.getenv('GRINTA_DISABLE_LSP_DETECTION') == '1':
+            self._lsp_servers_cache = {}
+            self._last_lsp_sidebar_signature = None
+            self._refresh_lsp_sidebar()
+            return
+
+        try:
+            from backend.utils.runtime_detect import detect_lsp_servers
+
+            self._lsp_servers_cache = await asyncio.to_thread(detect_lsp_servers)
+        except Exception:
+            self._lsp_servers_cache = {}
+        self._last_lsp_sidebar_signature = None
+        self._refresh_lsp_sidebar()
+
+    def _lsp_sidebar_signature(self) -> tuple[Any, ...]:
+        cache = getattr(self, '_lsp_servers_cache', None)
+        if cache is None:
+            return ('pending',)
+        languages: set[str] = set()
+        for _name, tool in cache.items():
+            if tool.available:
+                languages.add(tool.spec.language)
+        return tuple(sorted(languages))
+
+    def _refresh_lsp_sidebar(self) -> None:
+        from textual.widgets import Static
+
+        from backend.cli.tui.widgets.collapsible import CollapsibleSection
+
+        signature = self._lsp_sidebar_signature()
+        if signature == getattr(self, '_last_lsp_sidebar_signature', None):
+            return
+        self._last_lsp_sidebar_signature = signature
+
+        try:
+            section = self._tui.query_one('#sidebar-lsp', CollapsibleSection)
+        except Exception:
+            return
+
+        cache = getattr(self, '_lsp_servers_cache', None)
+        if cache is None:
+            section.set_title('LSP Servers')
+            try:
+                empty = section.query_one('#empty-text', Static)
+                empty.update('Scanning local PATH…')
+            except Exception:
+                section.set_content('Scanning local PATH…')
+            return
+
+        items = self._build_lsp_sidebar_items(cache)
+        available_count = len(items)
+        title = (
+            f'LSP Servers ({available_count})'
+            if available_count
+            else 'LSP Servers (0)'
+        )
+        section.set_title(title)
+        if items:
+            section.set_items(items)
+        else:
+            section.set_content('No language servers detected on PATH')
+
+    def _build_lsp_sidebar_items(self, servers: dict[str, Any]) -> list[tuple]:
+        seen_languages: set[str] = set()
+        items: list[tuple] = []
+        for _name, tool in sorted(
+            servers.items(),
+            key=lambda pair: (not pair[1].available, pair[1].spec.language, pair[0]),
+        ):
+            if not tool.available:
+                continue
+            language = tool.spec.language
+            if language in seen_languages:
+                continue
+            seen_languages.add(language)
+            items.append((language, f'lsp:{language}', False, 'ok', None, False))
+        return items
 
     def _refresh_tasks_sidebar(self) -> None:
         """Keep task rows live even while transcript streaming is throttled."""

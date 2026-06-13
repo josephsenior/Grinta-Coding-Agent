@@ -80,4 +80,6 @@ class _AppScreenWelcomeMixin:
         if widget_id == 'hud-autonomy':
             self._apply_autonomy_level(event.value)
         elif widget_id == 'hud-reasoning':
+            if getattr(self, '_hud_reasoning_syncing', False):
+                return
             self._apply_hud_reasoning_effort(str(event.value))

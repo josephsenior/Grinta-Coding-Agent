@@ -86,6 +86,13 @@ class _AppScreenLifecycleMixin:
                         id='sidebar-mcp',
                     )
                     yield CollapsibleSection(
+                        title='LSP Servers',
+                        content='Scanning local PATH…',
+                        collapsed=True,
+                        accent_color='#5eead4',
+                        id='sidebar-lsp',
+                    )
+                    yield CollapsibleSection(
                         title='Skills',
                         content='No skills available',
                         collapsed=True,
@@ -367,6 +374,7 @@ class _AppScreenLifecycleMixin:
         )
         self._hud.update_agent_state('awaiting_user_input')
         self._render_hud_bar()
+        self._renderer.schedule_lsp_detection()
 
         asyncio.create_task(
             self._bootstrap_finalize_renderer(),

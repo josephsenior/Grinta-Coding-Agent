@@ -33,8 +33,6 @@ from backend.cli.theme import (
     NAVY_READY,
     NAVY_TEXT_DIM,
     NAVY_TEXT_MUTED,
-    NAVY_TEXT_SECONDARY,
-    NAVY_TEXT_TERTIARY,
 )
 from backend.cli.tui.widgets.dialogs import ModalDialog
 
@@ -49,9 +47,10 @@ class ConfirmWidget(Widget):
     DEFAULT_CSS = """
     ConfirmWidget {
         height: auto;
-        background: #0a1222;
-        border-top: tall #1a2744;
-        border-bottom: tall #1a2744;
+        background: #07101d;
+        border-top: solid #26324f;
+        border-bottom: solid #26324f;
+        border-left: heavy #5eead4;
         padding: 1 1 0 1;
         display: none;
     }
@@ -246,27 +245,31 @@ class GrintaHelpDialog(ModalDialog[None]):
     """Dedicated help and shortcuts modal."""
 
     def compose(self) -> ComposeResult:
-        help_markup = (
-            f'[{NAVY_TEXT_SECONDARY}]/help[/]      [{NAVY_TEXT_TERTIARY}]Show help and shortcuts[/]\n'
-            f'[{NAVY_TEXT_SECONDARY}]/clear[/]     [{NAVY_TEXT_TERTIARY}]Clear transcript[/]\n'
-            f'[{NAVY_TEXT_SECONDARY}]/settings[/]  [{NAVY_TEXT_TERTIARY}]Open runtime settings[/]\n'
-            f'[{NAVY_TEXT_SECONDARY}]/sessions[/]  [{NAVY_TEXT_TERTIARY}]Browse and resume sessions[/]\n'
-            f'[{NAVY_TEXT_SECONDARY}]/resume[/]    [{NAVY_TEXT_TERTIARY}]Resume a session directly[/]\n'
-            f'[{NAVY_TEXT_SECONDARY}]/quit[/]      [{NAVY_TEXT_TERTIARY}]Exit Grinta[/]\n\n'
-            f'[{NAVY_TEXT_SECONDARY}]Ctrl+C[/]     [{NAVY_TEXT_TERTIARY}]Interrupt agent or copy[/]\n'
-            f'[{NAVY_TEXT_SECONDARY}]Ctrl+B[/]     [{NAVY_TEXT_TERTIARY}]Toggle sidebar[/]\n'
-            f'[{NAVY_TEXT_SECONDARY}]Ctrl+L[/]     [{NAVY_TEXT_TERTIARY}]Clear transcript[/]\n'
-            f'[{NAVY_TEXT_SECONDARY}]Ctrl+Space[/] [{NAVY_TEXT_TERTIARY}]Autocomplete slash commands[/]\n'
-            f'[{NAVY_TEXT_SECONDARY}]PageUp/Down[/] [{NAVY_TEXT_TERTIARY}]Scroll transcript[/]\n'
-            f'[{NAVY_TEXT_SECONDARY}]Home/End[/]   [{NAVY_TEXT_TERTIARY}]Jump transcript[/]'
+        from backend.cli.tui.app import GrintaScreen
+        from backend.cli.tui.widgets.command_list import (
+            KEYBOARD_SHORTCUTS,
+            CommandListPanel,
+            CommandListRow,
+            CommandListSection,
+            build_slash_command_rows,
         )
+
+        slash_rows = build_slash_command_rows(GrintaScreen._SLASH_HINTS)
         with Vertical(id='dialog-container'):
             yield Label('[bold]Help[/]', id='dialog-title')
             yield Static(
-                f'[{NAVY_TEXT_MUTED}]Use the transcript for evidence and the pinned strips for runtime state.[/]\n\n'
-                f'{help_markup}',
-                id='help-body',
+                f'[{NAVY_TEXT_MUTED}]Use the transcript for evidence and the HUD for runtime state.[/]',
+                id='dialog-subtitle',
             )
+            with Vertical(id='help-body'):
+                yield CommandListPanel(
+                    rows=slash_rows,
+                    section_title='Slash commands',
+                    id='help-commands',
+                )
+                yield CommandListSection('Keyboard shortcuts')
+                for key, detail in KEYBOARD_SHORTCUTS:
+                    yield CommandListRow(key, detail)
             with Horizontal(id='dialog-buttons'):
                 yield Button('Close', id='help-close', variant='primary')
 

@@ -2,12 +2,23 @@
 
 from __future__ import annotations
 
+import os
+
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.syntax import PygmentsSyntaxTheme, Syntax
 
-from backend.cli.syntax_theme import get_grinta_rich_syntax_theme
-from backend.cli.tui._render_prep import prep_markdown, prep_streaming_renderable
+from backend.cli.syntax_theme import (
+    GRINTA_SYNTAX_COLORS,
+    get_grinta_rich_syntax_theme,
+    invalidate_grinta_syntax_theme_cache,
+    resolve_syntax_colors,
+)
+from backend.cli.tui._render_prep import (
+    prep_markdown,
+    prep_streaming_renderable,
+    streaming_render_interval,
+)
 
 
 def _keyword_color(md: Markdown) -> str | None:
@@ -67,3 +78,34 @@ def test_grinta_rich_syntax_theme_differs_from_monokai():
         }
 
     assert colors(grinta) != colors(monokai)
+
+
+def test_syntax_colors_env_override(monkeypatch):
+    monkeypatch.setenv('GRINTA_SYNTAX_KEYWORD', '#112233')
+    invalidate_grinta_syntax_theme_cache()
+    colors = resolve_syntax_colors()
+    assert colors['keyword'] == '#112233'
+    invalidate_grinta_syntax_theme_cache()
+    monkeypatch.delenv('GRINTA_SYNTAX_KEYWORD', raising=False)
+
+
+def test_syntax_palette_has_extended_tokens():
+    assert 'name_function' in GRINTA_SYNTAX_COLORS
+    assert 'inline_code_bg' in GRINTA_SYNTAX_COLORS
+
+
+def test_prep_streaming_inline_code():
+    renderable = prep_streaming_renderable('Use `my_func` here')
+    console = Console(force_terminal=True, color_system='truecolor', width=80)
+    styles = {
+        str(style)
+        for _t, style, _ in console.render(renderable, console.options.update_width(80))
+        if style and _t.strip() == 'my_func'
+    }
+    assert any('101829' in style for style in styles)
+
+
+def test_streaming_render_interval_shortens_in_code_fence():
+    assert streaming_render_interval('plain prose') == 0.2
+    assert streaming_render_interval('`x`') == 0.12
+    assert streaming_render_interval('```python\nx') == 0.08

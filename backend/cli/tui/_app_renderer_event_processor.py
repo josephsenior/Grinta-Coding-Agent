@@ -380,7 +380,7 @@ def _write_multi_file_edit_card(
     file_diff: str,
 ) -> None:
     f_added, f_removed = _count_unified_diff_changes(file_diff)
-    encoded = _encode_unified_diff_text(file_diff)
+    encoded = _encode_unified_diff_text(file_diff, path=fp)
     if encoded:
         orch._write_tui_file_card(
             'Edited',
@@ -432,7 +432,14 @@ def _resolve_existing_file_edit_diff(
     diff_text = orch._extract_file_edit_diff(event)
     if not (added or removed):
         added, removed = _count_unified_diff_changes(diff_text)
-    encoded_diff = _encode_unified_diff_text(diff_text) if diff_text else None
+    encoded_diff = (
+        _encode_unified_diff_text(
+            diff_text,
+            path=str(getattr(event, 'path', '') or ''),
+        )
+        if diff_text
+        else None
+    )
     return encoded_diff, added, removed
 
 
@@ -516,7 +523,7 @@ def _handle_file_write_observation(
 ) -> None:
     diff_text = orch._extract_file_observation_diff(event)
     if diff_text:
-        encoded_diff = _encode_unified_diff_text(diff_text)
+        encoded_diff = _encode_unified_diff_text(diff_text, path=event.path)
         added, removed = _count_unified_diff_changes(diff_text)
         orch._write_tui_file_card(
             'Edited',

@@ -28,14 +28,24 @@ class ModalDialog(ModalScreen[_T]):
     }
     ModalDialog > #dialog-container {
         background: #080c18;
-        border: round #1e293b;
-        padding: 2 4;
-        align: center middle;
+        border: round #26324f;
+        border-left: heavy #5eead4;
+        padding: 2 3;
+        width: auto;
+        min-width: 52;
+        max-width: 90%;
+        height: auto;
+        max-height: 92%;
     }
     ModalDialog #dialog-title {
-        color: #91abec;
+        color: #c8d4e8;
         text-style: bold;
-        margin-bottom: 2;
+        margin-bottom: 1;
+    }
+    ModalDialog #dialog-subtitle {
+        color: #6f83aa;
+        margin-bottom: 1;
+        height: auto;
     }
     ModalDialog #dialog-body {
         color: #cbd5e1;
