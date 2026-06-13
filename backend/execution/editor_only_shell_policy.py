@@ -157,7 +157,7 @@ _BLOCK_MSG = (
     'accidental corruption and bypass of validation. Please use the dedicated editor tools instead:\n'
     '- `create` for new files or symbols.\n'
     '- `replace_string` for exact text edits, insertions by anchor, and deletions.\n'
-    '- `edit_symbols` or `multiedit` for code changes.\n'
+    '- `edit_symbol` or `multiedit` for code changes.\n'
     'Direct shell commands like `Set-Content`, `Out-File`, `tee`, or `>` / `>>` are only allowed for '
     '`.log` / `.tmp` files or files in temporary directories. To allow shell-level writes, set '
     'env var `GRINTA_ALLOW_SHELL_WRITES=1`.'

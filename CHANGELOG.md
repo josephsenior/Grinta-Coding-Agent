@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Model-facing file API:** public editing tools are consolidated to
-  `read`, `find_symbols`, `create`, `edit_symbols`, `replace_string`, and
+  `read`, `find_symbols`, `create`, `edit_symbol`, `replace_string`, and
   `multiedit`. Legacy public editor factories and compatibility handlers were
   removed; lower-level editor primitives remain internal.
 - **CI:** `py-tests` required jobs on Linux and Windows run the full

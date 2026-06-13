@@ -519,7 +519,7 @@ def _check_write_create_exists(
         return ToolResult(
             output='',
             error=(
-                'File already exists. Use edit_symbols or replace_string '
+                'File already exists. Use edit_symbol or replace_string '
                 'for modifications.'
             ),
             old_content=old_content,
@@ -593,7 +593,7 @@ def _check_large_existing_file_guard(
             error=(
                 'LARGE_EXISTING_CODE_FILE_OVERWRITE_BLOCKED: refusing a full-file '
                 f'overwrite of {file_path.name} ({len((old_content or "").splitlines())} lines). '
-                'Use edit_symbols or replace_string for targeted changes, or set '
+                'Use edit_symbol or replace_string for targeted changes, or set '
                 'overwrite_existing=true when a deliberate full rewrite is required.'
             ),
             old_content=old_content,

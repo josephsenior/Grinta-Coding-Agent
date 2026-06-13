@@ -514,7 +514,7 @@ class StepGuardService:
                 'MANDATORY NEXT ACTIONS:\n'
                 '1. If the error mentions a symbol, call `find_symbols` before editing again.\n'
                 '2. Re-read the affected file or symbol with `read` to confirm the live code shape.\n'
-                '3. Retry exactly one targeted edit with `edit_symbols` or `replace_string`.\n'
+                '3. Retry exactly one targeted edit with `edit_symbol` or `replace_string`.\n'
                 '4. Use `multiedit` only when the scope requires atomic multi-file changes.\n'
                 'Do NOT emit another near-identical edit without new evidence.',
                 'STUCK RECOVERY: find_symbols or read the file region, then one targeted edit retry max.',
@@ -533,7 +533,7 @@ class StepGuardService:
             'STUCK LOOP DETECTED — repeated file-edit failures were detected.\n'
             'MANDATORY NEXT ACTIONS:\n'
             '1. Read the target file again with `read` to refresh exact context.\n'
-            '2. Use `edit_symbols` for source symbols or `replace_string` for exact text.\n'
+            '2. Use `edit_symbol` for source symbols or `replace_string` for exact text.\n'
             '3. Retry once with corrected live context.\n'
             '4. If it fails again, switch tools instead of retrying the same edit shape.\n'
             'Do NOT emit another near-identical edit without new file evidence.',

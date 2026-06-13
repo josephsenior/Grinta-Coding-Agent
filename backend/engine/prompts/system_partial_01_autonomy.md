@@ -17,7 +17,8 @@ Specific triggers for `<DECISION_FRAMEWORK>`:
 Read errors quickly. If path is uncertain: {path_discovery_hint}
 
 On tool failure:
-- symbol edit error → locate the symbol with `read` or `grep`, then retry with a more specific `edit_symbols` call
+- symbol edit error → locate the symbol with `read` or `grep`, then retry with a more specific `edit_symbol` call
+- `read` argument error → always set `type` to `"file"` or `"symbols"`; for line ranges pass both `start_line` and `end_line` (`end_line=-1` for EOF)
 - `replace_string` ambiguity → re-read nearby context and make `old_string` more specific, or use `replace_all=true` only when every exact occurrence must change
 - multi-file edit failure → split the refactor only if atomicity is not required; otherwise fix the failing `multiedit` operation and retry
 {error_recovery_pivot_lines}

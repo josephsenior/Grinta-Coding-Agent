@@ -153,9 +153,9 @@ In earlier versions, file editing alone had at least ten different tools. There 
 
 The model was constantly confused. Should it use `edit_file` or `str_replace`? What about `append_to_file`? What about `write_new_file`? The overlap was enormous, and the LLM would regularly pick the wrong one, then hallucinate the parameters for the tool it chose.
 
-I crushed those choices into a compact file API: `read`, `find_symbols`, `create`, `edit_symbols`, `replace_string`, and `multiedit`. One small surface. One schema family. One mental model. The model chooses intent instead of choosing an editing transport.
+I crushed those choices into a compact file API: `read`, `find_symbols`, `create`, `edit_symbol`, `replace_string`, and `multiedit`. One small surface. One schema family. One mental model. The model chooses intent instead of choosing an editing transport.
 
-The details inside that surface matter. For code, `edit_symbols` avoids brittle substring matching. For prose and config, `replace_string` stays exact. Multi-file edits go through `multiedit` so rollback is part of the operation rather than a hope after the fact.
+The details inside that surface matter. For code, `edit_symbol` avoids brittle substring matching. For prose and config, `replace_string` stays exact. Multi-file edits go through `multiedit` so rollback is part of the operation rather than a hope after the fact.
 
 That level of design — making the tool smart enough that the model does not need to learn a library of alternatives — is what reduces hallucination in practice. The tool does not assume the model will always provide perfect input. It normalizes whitespace when matching, provides clear error messages when a match fails, and validates paths against the project root to prevent writes outside the workspace.
 
@@ -448,7 +448,7 @@ A detail that reveals a lot about how the system thinks at runtime is the tool a
 This is not a static list. It is a layered assembly:
 
 1. **Core tools** always present: `bash`, `think`, `finish`, the task tracker, the memory tools.
-2. **Edit and search tools**: `read`, `find_symbols`, `replace_string`, `edit_symbols`, `multiedit`, `grep`, `glob`, code structure exploration.
+2. **Edit and search tools**: `read`, `find_symbols`, `replace_string`, `edit_symbol`, `multiedit`, `grep`, `glob`, code structure exploration.
 3. **Terminal and special tools**: the terminal manager, checkpoint/rollback, delegation.
 4. **Optional feature tools**: LSP query (if the language server is available), signal progress (for external integrations), the blackboard (for state sharing).
 5. **Meta-cognition tools**: a communication tool for expressing uncertainty or asking the user for clarification. This is crucial because the model should always have a way to say "I am not sure" without being forced to guess.

@@ -18,7 +18,7 @@ _TOOL_HEADLINE: dict[str, tuple[str, str]] = {
     'read_file': ('', 'Files'),
     'create': ('', 'Files'),
     'replace_string': ('', 'Files'),
-    'edit_symbols': ('', 'Code edit'),
+    'edit_symbol': ('', 'Code edit'),
     'multiedit': ('', 'Files'),
     'find_symbols': ('', 'Code edit'),
     'agent_think': ('', 'Think'),

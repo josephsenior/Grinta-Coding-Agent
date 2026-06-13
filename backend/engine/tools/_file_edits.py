@@ -40,7 +40,7 @@ from backend.engine.tools._file_ops import (
 )
 from backend.inference.tool_names import (
     CREATE_TOOL_NAME,
-    EDIT_SYMBOLS_TOOL_NAME,
+    EDIT_SYMBOL_TOOL_NAME,
     FIND_SYMBOLS_TOOL_NAME,
     MULTIEDIT_TOOL_NAME,
     READ_TOOL_NAME,
@@ -562,7 +562,7 @@ def _handle_create_tool(arguments: Mapping[str, Any]) -> Action:
                     thought=(
                         f'File already exists at {path}. '
                         'Use replace_string to modify specific sections, '
-                        'or edit_symbols for targeted symbol-level changes. '
+                        'or edit_symbol for targeted symbol-level changes. '
                         'Only use create(type="file") for genuinely new files.'
                     ),
                 )
@@ -664,7 +664,7 @@ def _select_and_validate_symbol(
     if not candidates:
         target = symbol_id or symbol_name
         raise FunctionCallValidationError(
-            f'edit_symbols edits[{index}] could not find symbol {target!r}.'
+            f'edit_symbol could not find symbol {target!r}.'
         )
     if len(candidates) > 1:
         raise FunctionCallValidationError(
@@ -673,103 +673,61 @@ def _select_and_validate_symbol(
     return candidates[0]
 
 
-def _resolve_public_symbol_edit(
-    *,
-    item: Mapping[str, Any],
-    index: int,
-    default_path: str | None,
-) -> dict[str, Any]:
-    new_content = item.get('new_content')
+def _build_edit_symbol_target_spec(arguments: Mapping[str, Any]) -> dict[str, Any]:
+    """Build one deferred symbol edit spec from flat edit_symbol tool arguments."""
+    if arguments.get('edits') is not None:
+        raise FunctionCallValidationError(
+            'edit_symbol edits one symbol per call. '
+            'For multiple symbols, multiple ops on one file, or cross-file batches, use multiedit.'
+        )
+
+    new_content = arguments.get('new_content')
     if not isinstance(new_content, str):
-        raise FunctionCallValidationError(
-            f'edit_symbols edits[{index}] requires new_content.'
-        )
+        raise FunctionCallValidationError('edit_symbol requires new_content.')
 
-    symbol_id = str(item.get('symbol_id') or '').strip()
-    raw_path = str(item.get('path') or default_path or '').strip()
+    symbol_id = str(arguments.get('symbol_id') or '').strip()
     symbol_name = str(
-        item.get('qualified_name') or item.get('symbol_name') or ''
+        arguments.get('qualified_name') or arguments.get('symbol_name') or ''
     ).strip()
-    symbol_kind = cast(str | None, item.get('symbol_kind'))
-    parent_symbol = cast(str | None, item.get('parent_symbol'))
-    occurrence = _coerce_optional_int(
-        item.get('occurrence'), f'edits[{index}].occurrence'
-    )
-    requested_start: int | None = None
-    requested_end: int | None = None
+    if not symbol_id and not symbol_name:
+        raise FunctionCallValidationError(
+            'edit_symbol requires qualified_name, symbol_name, or symbol_id.'
+        )
 
+    spec: dict[str, Any] = {'new_content': new_content}
     if symbol_id:
-        raw_path, symbol_name, requested_start, requested_end = _resolve_symbol_by_id(
-            symbol_id
-        )
-        occurrence = None
-
-    if not symbol_name:
-        raise FunctionCallValidationError(
-            f'edit_symbols edits[{index}] requires qualified_name, symbol_name, or symbol_id.'
-        )
-
-    safe_path, candidates = _resolve_symbol_by_name(
-        symbol_name, symbol_kind, parent_symbol, occurrence, raw_path
-    )
-
-    candidate = _select_and_validate_symbol(
-        candidates, symbol_id, symbol_name, requested_start, requested_end, index
-    )
-
-    if not raw_path:
-        safe_path = _safe_workspace_path(str(candidate['path']), must_exist=True)
-
-    return {
-        'path': _relative_display_path(safe_path),
-        'operation': 'symbol_body_replacement',
-        'start_line': int(candidate['start_line']),
-        'end_line': int(candidate['end_line']),
-        'content': new_content,
-    }
+        spec['symbol_id'] = symbol_id
+    else:
+        if arguments.get('qualified_name'):
+            spec['qualified_name'] = str(arguments.get('qualified_name')).strip()
+        elif arguments.get('symbol_name'):
+            spec['symbol_name'] = str(arguments.get('symbol_name')).strip()
+        if arguments.get('symbol_kind') is not None:
+            spec['symbol_kind'] = arguments.get('symbol_kind')
+        if arguments.get('parent_symbol') is not None:
+            spec['parent_symbol'] = arguments.get('parent_symbol')
+        if arguments.get('occurrence') is not None:
+            spec['occurrence'] = arguments.get('occurrence')
+    return spec
 
 
-def _normalize_edit_symbols_public_edits(
-    edits: object,
-    *,
-    default_path: str | None = None,
-) -> list[dict[str, Any]]:
-    if not isinstance(edits, list) or not edits:
-        raise FunctionCallValidationError(
-            'edit_symbols requires a non-empty edits array.'
-        )
-    normalized: list[dict[str, Any]] = []
-    for index, item in enumerate(edits):
-        if not isinstance(item, Mapping):
-            raise FunctionCallValidationError(
-                f'edit_symbols edits[{index}] must be an object.'
-            )
-        normalized.append(
-            _resolve_public_symbol_edit(
-                item=item,
-                index=index,
-                default_path=default_path,
-            )
-        )
-
-    return sorted(
-        normalized,
-        key=lambda item: (str(item['path']), -int(item.get('start_line', 0))),
-    )
-
-
-def _handle_edit_symbols_tool(arguments: Mapping[str, Any]) -> Action:
-    validate_security_risk(arguments, EDIT_SYMBOLS_TOOL_NAME)
+def _handle_edit_symbol_tool(arguments: Mapping[str, Any]) -> Action:
+    validate_security_risk(arguments, EDIT_SYMBOL_TOOL_NAME)
     _guard_content_arguments(dict(arguments))
-    default_path = str(arguments.get('path') or '').strip() or None
-    edits = _normalize_edit_symbols_public_edits(
-        arguments.get('edits'),
-        default_path=default_path,
-    )
+    path = str(require_tool_argument(arguments, 'path', EDIT_SYMBOL_TOOL_NAME)).strip()
+    edit_spec = _build_edit_symbol_target_spec(arguments)
     action = FileEditAction(
         path='.',
         command='multi_edit',
-        structured_payload={'file_edits': edits},
+        structured_payload={
+            'file_edits': [
+                {
+                    'path': path,
+                    'operation': 'edit_symbol_deferred',
+                    'edits': [edit_spec],
+                }
+            ]
+        },
         impl_source=FileEditSource.FILE_EDITOR,
     )
     set_security_risk(action, arguments)
@@ -800,7 +758,7 @@ def _normalize_multiedit_replace_string(
     }
 
 
-def _normalize_multiedit_edit_symbols(
+def _normalize_multiedit_edit_symbol(
     raw: Mapping[str, Any],
     index: int,
 ) -> list[dict[str, Any]]:
@@ -821,11 +779,11 @@ def _normalize_multiedit_edit_symbols(
         ]
     if not isinstance(raw_edits, list) or not raw_edits:
         raise FunctionCallValidationError(
-            f'multiedit operations[{index}] edit_symbols requires a non-empty edits array.'
+            f'multiedit operations[{index}] edit_symbol requires a non-empty edits array.'
         )
     if not isinstance(path, str) or not path.strip():
         raise FunctionCallValidationError(
-            f'multiedit operations[{index}] edit_symbols requires path.'
+            f'multiedit operations[{index}] edit_symbol requires path.'
         )
     normalized_edits: list[dict[str, Any]] = []
     for edit_index, edit in enumerate(raw_edits):
@@ -837,7 +795,7 @@ def _normalize_multiedit_edit_symbols(
     return [
         {
             'path': path.strip(),
-            'operation': 'edit_symbols_deferred',
+            'operation': 'edit_symbol_deferred',
             'edits': normalized_edits,
         }
     ]
@@ -850,11 +808,11 @@ def _dispatch_multiedit_operation(
     command = str(raw.get('command') or '').strip().lower()
     if command == 'replace_string':
         return [_normalize_multiedit_replace_string(raw, index)]
-    if command == 'edit_symbols':
-        return _normalize_multiedit_edit_symbols(raw, index)
+    if command == 'edit_symbol':
+        return _normalize_multiedit_edit_symbol(raw, index)
     raise FunctionCallValidationError(
         f'multiedit operations[{index}] command {command!r} is unsupported. '
-        'Use replace_string or edit_symbols.'
+        'Use replace_string or edit_symbol.'
     )
 
 
@@ -934,16 +892,16 @@ def _parse_multi_edit_operation(
     idx: int,
 ) -> tuple[str, dict[str, Any]]:
     operation = str(raw_item.get('operation') or '').strip().lower()
-    if operation == 'edit_symbols_deferred':
+    if operation == 'edit_symbol_deferred':
         path = raw_item.get('path')
         edits = raw_item.get('edits')
         if not isinstance(path, str) or not path.strip():
             raise FunctionCallValidationError(
-                f'multi_edit item {idx} edit_symbols_deferred is missing path.'
+                f'multi_edit item {idx} edit_symbol_deferred is missing path.'
             )
         if not isinstance(edits, list) or not edits:
             raise FunctionCallValidationError(
-                f'multi_edit item {idx} edit_symbols_deferred requires edits.'
+                f'multi_edit item {idx} edit_symbol_deferred requires edits.'
             )
         return operation, dict(raw_item)
     allowed = {
@@ -953,7 +911,7 @@ def _parse_multi_edit_operation(
     if operation not in allowed:
         raise FunctionCallValidationError(
             f'multi_edit item {idx}: unsupported internal operation {operation!r}. '
-            f'Allowed operations: {sorted(allowed | {"edit_symbols_deferred"})}.'
+            f'Allowed operations: {sorted(allowed | {"edit_symbol_deferred"})}.'
         )
     return operation, dict(raw_item)
 
@@ -964,11 +922,11 @@ def _resolve_symbol_edit_on_temp_file(
     item: Mapping[str, Any],
     index: int,
 ) -> dict[str, Any]:
-    """Resolve one edit_symbols target against the current temp-file contents."""
+    """Resolve one edit_symbol target against the current temp-file contents."""
     new_content = item.get('new_content')
     if not isinstance(new_content, str):
         raise FunctionCallValidationError(
-            f'multiedit edit_symbols edits[{index}] requires new_content.'
+            f'multiedit edit_symbol edits[{index}] requires new_content.'
         )
 
     symbol_id = str(item.get('symbol_id') or '').strip()
@@ -991,7 +949,7 @@ def _resolve_symbol_edit_on_temp_file(
 
     if not symbol_name:
         raise FunctionCallValidationError(
-            f'multiedit edit_symbols edits[{index}] requires qualified_name, '
+            f'multiedit edit_symbol edits[{index}] requires qualified_name, '
             'symbol_name, or symbol_id.'
         )
 
@@ -1033,7 +991,7 @@ def _resolve_symbol_edit_on_temp_file(
     }
 
 
-def _resolve_deferred_edit_symbols(
+def _resolve_deferred_edit_symbol(
     temp_path: Path,
     display_path: str,
     edits: list[Mapping[str, Any]],
@@ -1062,7 +1020,7 @@ def _validate_symbol_range_on_temp(
         _multi_edit_raise(
             f'❌ multi_edit symbol range {start_line}-{end_line} is invalid for '
             f'{rel_path} ({line_count} lines after prior batch edits). '
-            'Use edit_symbols instead of line ranges when combining edits.',
+            'Use edit_symbol instead of line ranges when combining edits.',
             path=rel_path,
         )
 
@@ -1104,18 +1062,18 @@ def _apply_multi_edit_operation(
     item: dict[str, Any],
     temp_editor: Any,
 ) -> None:
-    if operation == 'edit_symbols_deferred':
+    if operation == 'edit_symbol_deferred':
         edits = item.get('edits')
         if not isinstance(edits, list) or not edits:
             raise FunctionCallValidationError(
-                'multi_edit edit_symbols_deferred requires a non-empty edits array.'
+                'multi_edit edit_symbol_deferred requires a non-empty edits array.'
             )
         if not temp_path.exists():
             _multi_edit_raise(
-                f'❌ multi_edit edit_symbols failed for {rel_path}: file not found.',
+                f'❌ multi_edit edit_symbol failed for {rel_path}: file not found.',
                 path=rel_path,
             )
-        resolved_ops = _resolve_deferred_edit_symbols(temp_path, rel_path, edits)
+        resolved_ops = _resolve_deferred_edit_symbol(temp_path, rel_path, edits)
         for resolved in resolved_ops:
             _apply_multi_edit_operation(
                 rel_path=rel_path,
@@ -1224,8 +1182,7 @@ def _apply_multi_edit_to_temp_files(
     """Apply multi_edit operations in declaration order against per-file temp copies.
 
     Each operation sees the temp file as left by all prior operations in the batch.
-    ``edit_symbols`` targets are resolved at apply time (identity-based). Syntax is
-    validated once per file after all operations complete.
+    ``edit_symbol`` targets are resolved at apply time (identity-based). Syntax is validated once per file after all operations complete.
     """
     original_snapshots: dict[str, str | None] = {}
     final_contents: dict[str, str] = {}
@@ -1324,7 +1281,7 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
 
     All edits commit together or all are rolled back from per-file backups.
     Side effects run synchronously inside this handler (same pattern as
-    ``edit_symbols``); the returned ``MessageAction`` summarizes the outcome.
+    ``edit_symbol``); the returned ``MessageAction`` summarizes the outcome.
     """
     raw_edits = arguments.get('file_edits')
     _validate_multi_edit_arguments(raw_edits)

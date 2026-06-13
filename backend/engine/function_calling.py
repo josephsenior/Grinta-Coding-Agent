@@ -38,7 +38,7 @@ from backend.engine.function_calling_helpers import combine_thought
 from backend.engine.tools import (
     create_cmd_run_tool,
     create_create_tool,
-    create_edit_symbols_tool,
+    create_edit_symbol_tool,
     create_find_symbols_tool,
     create_multiedit_tool,
     create_read_tool,
@@ -113,8 +113,8 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
             str, create_replace_string_tool().get('function', {}).get('name', '')
         ): _handle_replace_string_tool,
         cast(
-            str, create_edit_symbols_tool().get('function', {}).get('name', '')
-        ): _handle_edit_symbols_tool,
+            str, create_edit_symbol_tool().get('function', {}).get('name', '')
+        ): _handle_edit_symbol_tool,
         cast(
             str, create_multiedit_tool().get('function', {}).get('name', '')
         ): _handle_multiedit_tool,
@@ -226,7 +226,7 @@ def _validate_tool_mode(
 def _validate_tool_exists(tool_name: str) -> None:
     if tool_name == 'file_editor':
         raise FunctionCallValidationError(
-            'The legacy file_editor tool has been removed. Use read, create, replace_string, edit_symbols, or multiedit.'
+            'The legacy file_editor tool has been removed. Use read, create, replace_string, edit_symbol, or multiedit.'
         )
 
 
@@ -257,7 +257,7 @@ def _check_xml_syntax_errors(tool_name: str, arguments: dict[str, Any]) -> None:
 # ---------------------------------------------------------------------------
 # Symbols previously defined in this module have been moved to:
 #   - backend.engine.tools._file_ops       (read helpers + symbol search)
-#   - backend.engine.tools._file_edits     (read/create/replace/edit_symbols/multiedit)
+#   - backend.engine.tools._file_edits     (read/create/replace/edit_symbol/multiedit)
 #   - backend.engine.tools._tool_handlers  (ask_user/memory/search/task-tracker/mcp/...)
 # Kept as flat re-exports for in-repo callers. Will be removed once
 # downstream callers migrate to the new paths.
@@ -277,7 +277,7 @@ from backend.engine.tools._file_edits import (  # noqa: E402, F401
     _coerce_read_symbol_targets,
     _handle_create_symbol_public,
     _handle_create_tool,
-    _handle_edit_symbols_tool,
+    _handle_edit_symbol_tool,
     _handle_find_symbols_tool,
     _handle_multi_edit_command,
     _handle_multiedit_tool,
@@ -288,12 +288,11 @@ from backend.engine.tools._file_edits import (  # noqa: E402, F401
     _insert_line_for_symbol,
     _multi_edit_raise,
     _multi_edit_relative_path,
-    _normalize_edit_symbols_public_edits,
+    _build_edit_symbol_target_spec,
     _normalize_multiedit_operations,
     _parse_multi_edit_operation,
     _read_symbol_payload,
     _resolve_multi_edit_path,
-    _resolve_public_symbol_edit,
     _resolve_read_symbol_target,
 )
 from backend.engine.tools._file_ops import (  # noqa: E402, F401

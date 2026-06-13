@@ -2,7 +2,7 @@
 
 The public file API separates creation from editing: ``create`` creates new
 files/symbols, while editing existing content is limited to ``replace_string``,
-``edit_symbols``, and ``multiedit``.
+``edit_symbol``, and ``multiedit``.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from backend.engine.tools.common import (
 )
 from backend.inference.tool_names import (
     CREATE_TOOL_NAME,
-    EDIT_SYMBOLS_TOOL_NAME,
+    EDIT_SYMBOL_TOOL_NAME,
     FIND_SYMBOLS_TOOL_NAME,
     MULTIEDIT_TOOL_NAME,
     READ_TOOL_NAME,
@@ -157,7 +157,7 @@ def create_replace_string_tool() -> ChatCompletionToolParam:
         description=(
             'Exact text replacement in one file. Use for generic text edits, '
             'additions by replacing an anchor with anchor plus new content, and '
-            'deletions by replacing with an empty string.'
+            'deletions by replacing with an empty string. One replacement per call.'
         ),
         properties={
             'path': get_path_param('Project-relative path to edit.'),
@@ -179,42 +179,48 @@ def create_replace_string_tool() -> ChatCompletionToolParam:
     )
 
 
-def create_edit_symbols_tool() -> ChatCompletionToolParam:
+def create_edit_symbol_tool() -> ChatCompletionToolParam:
     return create_tool_definition(
-        name=EDIT_SYMBOLS_TOOL_NAME,
+        name=EDIT_SYMBOL_TOOL_NAME,
         description=(
-            'AST-aware edit/delete for one or more existing symbols. Writes must be anchored '
-            'by path+qualified_name+symbol_kind when possible, or another uniquely resolving target. '
-            'Ambiguous targets reject with candidates.'
+            'AST-aware edit or delete for one existing symbol in one file. '
+            'Anchor by path plus qualified_name/symbol_name when possible. '
+            'Ambiguous targets reject with candidates. '
+            'For multiple symbols, multiple ops on one file, or cross-file batches, use multiedit.'
         ),
         properties={
-            'path': get_path_param(
-                'Optional project-relative source file path. Strongly preferred for writes.'
-            ),
-            'edits': {
-                'type': 'array',
-                'description': 'Symbol replacements/deletions to apply atomically.',
-                'items': {
-                    'type': 'object',
-                    'properties': {
-                        'symbol_id': {'type': 'string'},
-                        'path': {'type': 'string'},
-                        'qualified_name': {'type': 'string'},
-                        'symbol_name': {'type': 'string'},
-                        'symbol_kind': {'type': 'string'},
-                        'parent_symbol': {'type': 'string'},
-                        'occurrence': {'type': 'integer'},
-                        'new_content': {
-                            'type': 'string',
-                            'description': 'Complete replacement symbol text; empty string deletes when syntax remains valid.',
-                        },
-                    },
-                    'required': ['new_content'],
-                },
+            'path': get_path_param('Project-relative source file path.'),
+            'symbol_id': {
+                'type': 'string',
+                'description': 'Optional stable symbol identifier from find_symbols or read.',
+            },
+            'qualified_name': {
+                'type': 'string',
+                'description': 'Preferred disambiguated symbol name (e.g. ClassName.method).',
+            },
+            'symbol_name': {
+                'type': 'string',
+                'description': 'Simple symbol name when qualified_name is unavailable.',
+            },
+            'symbol_kind': {
+                'type': 'string',
+                'description': 'Optional kind filter: function, class, or method.',
+            },
+            'parent_symbol': {
+                'type': 'string',
+                'description': 'Optional parent/container symbol for disambiguation.',
+            },
+            'occurrence': {
+                'type': 'integer',
+                'description': 'Optional 1-based occurrence index after candidate discovery.',
+            },
+            'new_content': {
+                'type': 'string',
+                'description': 'Complete replacement symbol text; empty string deletes when syntax remains valid.',
             },
             'security_risk': get_security_risk_param(),
         },
-        required=['edits', 'security_risk'],
+        required=['path', 'new_content', 'security_risk'],
     )
 
 
@@ -237,16 +243,16 @@ def create_multiedit_tool() -> ChatCompletionToolParam:
     return create_tool_definition(
         name=MULTIEDIT_TOOL_NAME,
         description=(
-            'Atomic multi-file refactoring across one or more files in a single call. '
-            'Use when implementation + tests, or multiple related symbols/files, must '
-            'change together. Each operation is either replace_string (path, old_string, '
-            'new_string) or edit_symbols (path, qualified_name/symbol_name, new_content). '
-            'Not for casual single-file edits — use replace_string or edit_symbols instead.'
+            'Atomic batch refactoring: multiple operations and/or multiple files in one call. '
+            'Use when several edits must land together (implementation + tests, multiple symbols, '
+            'ordered string replacements, or mixing replace_string with edit_symbol). '
+            'Each operation is either replace_string or edit_symbol. '
+            'Not for a single one-off edit — use replace_string or edit_symbol instead.'
         ),
         properties={
             'operations': {
                 'type': 'array',
-                'description': 'Atomic operations. Supported commands: edit_symbols, replace_string.',
+                'description': 'Atomic operations. Supported commands: edit_symbol, replace_string.',
                 'items': {
                     'type': 'object',
                     'properties': {
@@ -274,7 +280,7 @@ def create_multiedit_tool() -> ChatCompletionToolParam:
 
 __all__ = [
     'create_create_tool',
-    'create_edit_symbols_tool',
+    'create_edit_symbol_tool',
     'create_find_symbols_tool',
     'create_multiedit_tool',
     'create_read_tool',

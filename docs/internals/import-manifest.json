@@ -7100,7 +7100,7 @@
           "lineno": 3,
           "names": [
             "CREATE_TOOL_NAME",
-            "EDIT_SYMBOLS_TOOL_NAME",
+            "EDIT_SYMBOL_TOOL_NAME",
             "FIND_SYMBOLS_TOOL_NAME",
             "MULTIEDIT_TOOL_NAME",
             "READ_TOOL_NAME",

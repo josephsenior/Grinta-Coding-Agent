@@ -21,7 +21,7 @@ def _render_security(cli_mode: bool = True, *, enable_web: bool = True) -> str:
     return (
         '# 🔐 Security Risk Policy\n'
         '`security_risk` is **required** on every call to `execute_bash`/`execute_powershell`, '
-        'and the file write tools `create`, `replace_string`, `edit_symbols`, and `multiedit`. '
+        'and the file write tools `create`, `replace_string`, `edit_symbol`, and `multiedit`. '
         f'Read-only observation tools ({read_only_tools}) do **not** require it. '
         'Pick one of `LOW` / `MEDIUM` / `HIGH` based on the action you are about to take. '
         'The server may escalate your risk label; it never lowers it. Missing or invalid values '

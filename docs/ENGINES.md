@@ -55,7 +55,7 @@ The exact tool list is **configuration-dependent**. A typical Orchestrator sessi
 
 - reasoning and control tools: `think`, `finish`, `task_tracker`
 - project exploration tools: `grep`, `glob`, `analyze_project_structure`, `read`, `find_symbols`
-- editing tools: `create`, `replace_string`, `edit_symbols`, `multiedit`
+- editing tools: `create`, `replace_string`, `edit_symbol`, `multiedit`
 - execution tools: `bash`, `terminal_manager`
 - memory tool: `memory` (`working` | `persist` | `recall`)
 - external capability bridge: `call_mcp_tool`

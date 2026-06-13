@@ -324,7 +324,7 @@ class OrchestratorPlanner:
         if getattr(self._config, 'enable_editor', True):
             from backend.engine.tools.native_file_tools import (
                 create_create_tool,
-                create_edit_symbols_tool,
+                create_edit_symbol_tool,
                 create_multiedit_tool,
                 create_replace_string_tool,
                 create_undo_last_edit_tool,
@@ -332,7 +332,7 @@ class OrchestratorPlanner:
 
             tools.append(create_create_tool())
             tools.append(create_replace_string_tool())
-            tools.append(create_edit_symbols_tool())
+            tools.append(create_edit_symbol_tool())
             tools.append(create_multiedit_tool())
             tools.append(create_undo_last_edit_tool())
 
@@ -544,9 +544,10 @@ class OrchestratorPlanner:
             '- find_symbols discovers symbol candidates without reading full bodies.\n'
             '- read inspects a file (optional line range) or one/more symbol bodies via symbols[].\n'
             '- create creates a new file or a new code symbol.\n'
-            '- edit_symbols modifies or deletes existing symbols.\n'
-            '- replace_string performs exact one-file text replacement, insertion, or deletion.\n'
-            '- multiedit performs atomic multi-file refactoring with replace_string and edit_symbols operations.\n'
+            '- edit_symbol modifies or deletes one existing symbol in one file.\n'
+            '- replace_string performs one exact text replacement, insertion, or deletion in one file.\n'
+            '- multiedit performs atomic batch refactoring (multiple ops and/or files; may mix replace_string and edit_symbol).\n'
+            '- File API rule: one change on one file -> replace_string or edit_symbol; anything batched -> multiedit.\n'
             '</TOOL_CALL_FORMAT>'
         )
 

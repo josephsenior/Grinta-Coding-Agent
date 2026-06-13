@@ -9,7 +9,7 @@ The current editing facade keeps the backend responsible for path safety, AST lo
 - `read`
 - `find_symbols`
 - `create`
-- `edit_symbols`
+- `edit_symbol`
 - `replace_string`
 - `multiedit`
 
@@ -71,7 +71,7 @@ The rule manifests differently in each tool:
 | `read` | Auto-resolve file paths, accept symbol names, return symbol contents | N/A — read only |
 | `find_symbols` | Accept partial names, return all matches with locations | N/A — read only |
 | `create` | N/A | Must name the file and provide full content |
-| `edit_symbols` | Accept symbol names for location | Must provide the new body for a named symbol; no wildcard matching |
+| `edit_symbol` | Accept symbol names for location | Must provide the new body for a named symbol; no wildcard matching |
 | `replace_string` | N/A | Must provide exact old and new strings |
 | `multiedit` | N/A | Each sub-edit must meet its own write rule |
 
@@ -104,18 +104,18 @@ Takes a file path, optionally a symbol name filter. Returns a list of symbol nam
 Takes a file path and content. Creates the file if it does not exist.
 
 **Design decisions:**
-- Does not overwrite existing files. If the file exists, the model must use `edit_symbols` or `replace_string`.
+- Does not overwrite existing files. If the file exists, the model must use `edit_symbol` or `replace_string`.
 - `create` is deliberately not part of `multiedit`. Batch creation has different failure semantics from batch editing, and conflating them would complicate atomicity guarantees.
 
-### `edit_symbols` — Targeted Symbol Changes
+### `edit_symbol` — Targeted Symbol Changes
 
 Takes a file path and a list of symbol edits. Each edit names a symbol (function, class, method) and provides the new body.
 
 **Design decisions:**
-- The symbol must exist. `edit_symbols` does not create new symbols — that is `create`'s job.
+- The symbol must exist. `edit_symbol` does not create new symbols — that is `create`'s job.
 - Writes must be explicit. The model names the symbol; the backend finds it via tree-sitter and replaces the body. No path guessing, no content-based search.
-- If tree-sitter is not available, `edit_symbols` degrades gracefully but prefers `replace_string` as an alternative.
-- AST tools are the preferred path for code. `edit_symbols` is the primary code editing tool. `replace_string` exists for the cases where AST does not apply.
+- If tree-sitter is not available, `edit_symbol` degrades gracefully but prefers `replace_string` as an alternative.
+- AST tools are the preferred path for code. `edit_symbol` is the primary code editing tool. `replace_string` exists for the cases where AST does not apply.
 
 ### `replace_string` — Grounded Text Replacement
 
@@ -129,7 +129,7 @@ Takes a file path, an old string, a new string, and an optional match mode (`exa
 
 ### `multiedit` — Atomic Multi-File Refactoring
 
-Takes a list of `edit_symbols` and `replace_string` operations across multiple files. Applied as a single transaction.
+Takes a list of `edit_symbol` and `replace_string` operations across multiple files. Applied as a single transaction.
 
 **Design decisions:**
 - Every write commits or none do. On the first failure — uniqueness mismatch, parse error, write error — previous writes in the batch are rolled back from in-memory snapshots before any observation is returned to the model. The model never sees a half-applied state.
