@@ -1466,7 +1466,7 @@ uncalled-for==0.3.1
     # via fastmcp
 uritemplate==4.2.0
     # via google-api-python-client
-urllib3==2.6.3
+urllib3==2.7.0
     # via
     #   grinta-ai
     #   kubernetes
