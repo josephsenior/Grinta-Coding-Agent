@@ -175,7 +175,7 @@ class BasePlaybook(BaseModel):
             None,
         )
         if handle == INVALID_HANDLE_VALUE:
-            error = ctypes.GetLastError()
+            error = kernel32.GetLastError()  # type: ignore[attr-defined]
             raise PermissionError(
                 f'Unable to open locked file {path}: error {error}'
             )  # pragma: no cover
