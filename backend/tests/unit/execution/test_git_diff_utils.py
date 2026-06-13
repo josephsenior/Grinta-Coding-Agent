@@ -23,10 +23,24 @@ def test_get_closest_git_repo_returns_repo_root(tmp_path: Path) -> None:
     assert gd.get_closest_git_repo(file_path.resolve()) == repo.resolve()
 
 
-def test_get_closest_git_repo_returns_none_without_git(tmp_path: Path) -> None:
+def test_get_closest_git_repo_returns_none_without_git(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     isolated = tmp_path / 'no_git' / 'f.txt'
     isolated.parent.mkdir(parents=True)
     isolated.write_text('x', encoding='utf-8')
+
+    orig_is_dir = Path.is_dir
+
+    def mock_is_dir(self: Path) -> bool:
+        if self.name == '.git':
+            try:
+                self.relative_to(tmp_path)
+            except ValueError:
+                return False
+        return orig_is_dir(self)
+
+    monkeypatch.setattr(Path, 'is_dir', mock_is_dir)
     assert gd.get_closest_git_repo(isolated.resolve()) is None
 
 
