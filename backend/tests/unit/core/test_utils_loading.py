@@ -440,6 +440,25 @@ class TestLoadFromJson:
         load_from_json(cfg, str(json_file))
         assert cfg.mcp_host == 'custom-host:9999'
 
+    def test_load_from_json_applies_bench_top_level_fields(self, tmp_path):
+        json_file = tmp_path / 'settings.bench.json'
+        json_file.write_text(
+            json.dumps(
+                {
+                    'pending_action_timeout': 900,
+                    'max_iterations': 42,
+                    'save_trajectory_path': 'scripts/evals/results/trajectories',
+                    'log_level': 'DEBUG',
+                }
+            )
+        )
+        cfg = AppConfig()
+        load_from_json(cfg, str(json_file))
+        assert cfg.pending_action_timeout == 900.0
+        assert cfg.max_iterations == 42
+        assert cfg.save_trajectory_path == 'scripts/evals/results/trajectories'
+        assert cfg.log_level == 'DEBUG'
+
     def test_load_from_json_requires_provider_for_unprefixed_model(self, tmp_path):
         json_file = tmp_path / 'settings.json'
         json_file.write_text('{"llm_model": "gpt-4o"}')

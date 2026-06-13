@@ -1,0 +1,23 @@
+{
+  "pending_action_timeout": 900,
+  "max_budget_per_task": 15.0,
+  "save_trajectory_path": "scripts/evals/results/trajectories",
+  "log_level": "INFO",
+  "security": {
+    "execution_profile": "standard",
+    "enforce_security": true
+  },
+  "agent": {
+    "Orchestrator": {
+      "autonomy_level": "full",
+      "mode": "agent",
+      "enable_browsing": false,
+      "enable_web": false,
+      "enable_mcp": false,
+      "enable_swarming": false,
+      "enable_vector_memory": false,
+      "enable_hybrid_retrieval": false,
+      "confirm_actions": false
+    }
+  }
+}

@@ -70,6 +70,7 @@ class _AppRendererDisplayMixin:
         self._render_prep_cache = {}
         self._mounted_event_ids = set()
         self._event_order = []
+        self._last_task_sidebar_signature = None
         try:
             self._tui._get_display().clear()
         except (AttributeError, NoMatches):
@@ -78,36 +79,66 @@ class _AppRendererDisplayMixin:
 
     def _refresh_display(self, *, skip_sidebar: bool = False) -> None:
         """Refresh derived sidebar state; transcript writes are incremental."""
-        if not skip_sidebar:
-            mcp_count = self._hud.state.mcp_servers
-            skill_count = self._hud.bundled_skill_count
+        self._refresh_tasks_sidebar()
+        if skip_sidebar:
+            return
+        mcp_count = self._hud.state.mcp_servers
+        skill_count = self._hud.bundled_skill_count
 
-            mcp_servers = self._resolve_mcp_server_list(mcp_count)
+        mcp_servers = self._resolve_mcp_server_list(mcp_count)
 
-            task_signature = task_panel_signature(self._task_list)
-            current_state = (task_signature, mcp_servers, skill_count)
-            if current_state != self._last_sidebar_state:
-                task_items = self._build_task_sidebar_items(task_signature)
-                mcp_items = self._build_mcp_sidebar_items(mcp_servers)
-                skill_items = self._build_skills_sidebar_items()
+        current_state = (mcp_servers, skill_count)
+        if current_state != self._last_sidebar_state:
+            mcp_items = self._build_mcp_sidebar_items(mcp_servers)
+            skill_items = self._build_skills_sidebar_items()
 
-                self._update_sidebar_section(
-                    '#sidebar-tasks',
-                    f'Tasks ({len(task_signature)})',
-                    task_items,
-                )
-                self._update_sidebar_section(
-                    '#sidebar-mcp',
-                    f'MCP Servers ({len(mcp_servers) if mcp_servers else 0})',
-                    mcp_items,
-                )
-                self._update_sidebar_section(
-                    '#sidebar-skills',
-                    f'Skills ({len(skill_items)})',
-                    skill_items,
-                )
+            self._update_sidebar_section(
+                '#sidebar-mcp',
+                f'MCP Servers ({len(mcp_servers) if mcp_servers else 0})',
+                mcp_items,
+            )
+            self._update_sidebar_section(
+                '#sidebar-skills',
+                f'Skills ({len(skill_items)})',
+                skill_items,
+            )
 
-                self._last_sidebar_state = current_state
+            self._last_sidebar_state = current_state
+
+    def _refresh_tasks_sidebar(self) -> None:
+        """Keep task rows live even while transcript streaming is throttled."""
+        from backend.cli.tui.widgets.collapsible import CollapsibleSection, SidebarRow
+
+        task_signature = task_panel_signature(self._task_list)
+        signature_key = tuple(task_signature)
+        if signature_key == getattr(self, '_last_task_sidebar_signature', None):
+            return
+        self._last_task_sidebar_signature = signature_key
+
+        task_items = self._build_task_sidebar_items(task_signature)
+        self._update_sidebar_section(
+            '#sidebar-tasks',
+            f'Tasks ({len(task_signature)})',
+            task_items,
+        )
+
+        active_task_id: str | None = None
+        for task_id, status, _desc in task_signature:
+            if status == 'in_progress':
+                active_task_id = task_id
+                break
+
+        try:
+            section = self._tui.query_one('#sidebar-tasks', CollapsibleSection)
+            if active_task_id:
+                section.expand()
+            for row in section.query(SidebarRow):
+                if active_task_id and row.item_id == f'task:{active_task_id}':
+                    row.add_class('-active-task')
+                else:
+                    row.remove_class('-active-task')
+        except Exception:
+            pass
 
     def _update_sidebar_section(self, widget_id, title, items):
         from backend.cli.tui.widgets.collapsible import CollapsibleSection

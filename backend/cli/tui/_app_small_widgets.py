@@ -20,6 +20,65 @@ from textual.widgets import Label, Select, Static, TextArea
 from backend.core.interaction_modes import AGENT_MODE, VISIBLE_INTERACTION_MODES
 
 
+class ScrollTailBadge(Static):
+    """Clickable chip shown when the user scrolls away from live transcript tail."""
+
+    DEFAULT_CSS = """
+    ScrollTailBadge {
+        dock: bottom;
+        width: 100%;
+        height: 1;
+        content-align: center middle;
+        background: #0d162a;
+        color: #91abec;
+        border-top: solid #26324f;
+        text-style: bold;
+    }
+    ScrollTailBadge:hover {
+        background: #12203a;
+        color: #c8d4e8;
+    }
+    ScrollTailBadge:focus {
+        background: #152848;
+        color: #ffffff;
+        border-top: solid #5eead4;
+    }
+    ScrollTailBadge.-hidden {
+        display: none;
+    }
+    """
+
+    class FollowRequested(Message):
+        """User clicked or activated the follow-live chip."""
+
+    def __init__(self) -> None:
+        super().__init__('', id='scroll-badge', classes='-hidden')
+        self.can_focus = True
+        self._unread_count = 0
+
+    def set_unread_count(self, count: int) -> None:
+        self._unread_count = max(0, count)
+        if self._unread_count <= 0:
+            self.update('[#91abec]↓ Follow live[/]')
+        elif self._unread_count == 1:
+            self.update('[#91abec]↓[/] [#c8d4e8]1 new update[/]')
+        else:
+            self.update(
+                f'[#91abec]↓[/] [#c8d4e8]{self._unread_count} new updates[/]'
+            )
+
+    def on_click(self, event: events.Click) -> None:
+        self.post_message(self.FollowRequested())
+        event.prevent_default()
+        event.stop()
+
+    def on_key(self, event: events.Key) -> None:
+        if event.key in ('enter', 'space'):
+            self.post_message(self.FollowRequested())
+            event.prevent_default()
+            event.stop()
+
+
 class InfoSidebar(VerticalScroll):
     """Sidebar for Mission Control info (Tasks, MCPs, Skills)."""
 
@@ -36,16 +95,23 @@ class Transcript(VerticalScroll):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._user_scrolled_away = False
-        self._scroll_badge: Static | None = None
+        self._scroll_badge: ScrollTailBadge | None = None
+        self._tail_unread_count = 0
         self._suppress_mount_animation = False
         self._suppress_scroll_sync = False
         self._load_earlier_button: Static | None = None
 
     def compose(self) -> ComposeResult:
-        yield Static(id='scroll-badge', classes='-hidden')
+        yield ScrollTailBadge()
 
     def on_mount(self) -> None:
-        self._scroll_badge = self.query_one('#scroll-badge', Static)
+        self._scroll_badge = self.query_one('#scroll-badge', ScrollTailBadge)
+
+    def _update_scroll_badge(self) -> None:
+        badge = self._scroll_badge
+        if badge is None:
+            return
+        badge.set_unread_count(self._tail_unread_count)
 
     def _was_at_bottom(self, threshold: float = 0.5) -> bool:
         if self.max_scroll_y <= 0:
@@ -56,13 +122,29 @@ class Transcript(VerticalScroll):
 
     def _set_user_scrolled_away(self, value: bool) -> None:
         self._user_scrolled_away = value
+        if not value:
+            self._tail_unread_count = 0
         badge = self._scroll_badge
         if badge is None:
             return
+        self._update_scroll_badge()
         if value:
             badge.remove_class('-hidden')
         else:
             badge.add_class('-hidden')
+
+    def note_tail_activity(self) -> None:
+        """Record new transcript content while the user is not following the tail."""
+        if not self._user_scrolled_away:
+            return
+        self._tail_unread_count += 1
+        self._update_scroll_badge()
+
+    def on_scroll_tail_badge_follow_requested(
+        self, event: ScrollTailBadge.FollowRequested
+    ) -> None:
+        event.stop()
+        self.force_scroll_end()
 
     def _sync_scroll_state_from_position(self) -> None:
         self._set_user_scrolled_away(not self._was_at_bottom())
@@ -212,6 +294,8 @@ class Transcript(VerticalScroll):
                 widget.styles.offset = (0, 0)
         if should_follow:
             self._schedule_follow_tail()
+        else:
+            self.note_tail_activity()
 
     def write(self, renderable: Any) -> None:
         """Compatibility method for RichLog interface."""
@@ -230,8 +314,9 @@ class Transcript(VerticalScroll):
         self._scroll_badge = None
         self._user_scrolled_away = False
         self._load_earlier_button = None
-        self.mount(Static('', id='scroll-badge', classes='-hidden'))
-        self._scroll_badge = self.query_one('#scroll-badge', Static)
+        self._tail_unread_count = 0
+        self.mount(ScrollTailBadge())
+        self._scroll_badge = self.query_one('#scroll-badge', ScrollTailBadge)
 
     @property
     def child_widget_count(self) -> int:
@@ -346,6 +431,10 @@ class PromptTextArea(TextArea):
                 return
 
 
+class HudReasoningSelect(Select):
+    """Reasoning effort picker styled like other HUD selectors."""
+
+
 class HudModeSelect(Select):
     """Mode picker that propagates programmatic value changes to the screen."""
 
@@ -384,6 +473,15 @@ class HUD(Vertical):
                 [(c.capitalize(), c) for c in ('conservative', 'balanced', 'full')],
                 value='balanced',
                 id='hud-autonomy',
+                allow_blank=False,
+            )
+            yield Label('[#8f9fc1]Model:[/]', id='hud-label-model')
+            yield Static('(not set)', id='hud-model-display')
+            yield Label('[#8f9fc1]Reasoning:[/]', id='hud-label-reasoning')
+            yield HudReasoningSelect(
+                [('Default', '')],
+                value='',
+                id='hud-reasoning',
                 allow_blank=False,
             )
             yield Label(id='hud-line-2')

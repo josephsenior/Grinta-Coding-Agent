@@ -1,0 +1,97 @@
+{
+  "agent_id": "grinta",
+  "pack_id": "top_tier_agent_comparison",
+  "pack_version": "2026-04-24",
+  "metadata": {
+    "model": "",
+    "run_date": "",
+    "operator": "",
+    "notes": ""
+  },
+  "runs": [
+    {
+      "task_id": "bugfix_small_validation",
+      "success": false,
+      "verification_score": null,
+      "instruction_adherence_score": null,
+      "tool_discipline_score": null,
+      "code_quality_score": null,
+      "recovery_score": null,
+      "turn_count": null,
+      "latency_seconds": null,
+      "cost_usd": null,
+      "notes": "",
+      "evidence": []
+    },
+    {
+      "task_id": "feature_plus_tests",
+      "success": false,
+      "verification_score": null,
+      "instruction_adherence_score": null,
+      "tool_discipline_score": null,
+      "code_quality_score": null,
+      "recovery_score": null,
+      "turn_count": null,
+      "latency_seconds": null,
+      "cost_usd": null,
+      "notes": "",
+      "evidence": []
+    },
+    {
+      "task_id": "refactor_minimal_surface",
+      "success": false,
+      "verification_score": null,
+      "instruction_adherence_score": null,
+      "tool_discipline_score": null,
+      "code_quality_score": null,
+      "recovery_score": null,
+      "turn_count": null,
+      "latency_seconds": null,
+      "cost_usd": null,
+      "notes": "",
+      "evidence": []
+    },
+    {
+      "task_id": "read_only_code_review",
+      "success": false,
+      "verification_score": null,
+      "instruction_adherence_score": null,
+      "tool_discipline_score": null,
+      "code_quality_score": null,
+      "recovery_score": null,
+      "turn_count": null,
+      "latency_seconds": null,
+      "cost_usd": null,
+      "notes": "",
+      "evidence": []
+    },
+    {
+      "task_id": "tool_failure_recovery",
+      "success": false,
+      "verification_score": null,
+      "instruction_adherence_score": null,
+      "tool_discipline_score": null,
+      "code_quality_score": null,
+      "recovery_score": null,
+      "turn_count": null,
+      "latency_seconds": null,
+      "cost_usd": null,
+      "notes": "",
+      "evidence": []
+    },
+    {
+      "task_id": "multi_file_change_with_docs",
+      "success": false,
+      "verification_score": null,
+      "instruction_adherence_score": null,
+      "tool_discipline_score": null,
+      "code_quality_score": null,
+      "recovery_score": null,
+      "turn_count": null,
+      "latency_seconds": null,
+      "cost_usd": null,
+      "notes": "",
+      "evidence": []
+    }
+  ]
+}

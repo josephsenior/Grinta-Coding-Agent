@@ -49,6 +49,9 @@ class _AppRendererActionHandlersMixin:
         if not terminal:
             return
 
+        flush_render = getattr(self, '_flush_deferred_streaming_render', None)
+        if callable(flush_render):
+            flush_render()
         self._streaming_active = False
         self._sync_streaming_mount_mode()
         self._finalize_live_thinking()

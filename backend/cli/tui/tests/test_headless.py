@@ -35,10 +35,12 @@ from backend.cli.tui.widgets.activity_card import (
 from backend.cli.tui.widgets.activity_card import (
     AgentMessage,
     DiffLine,
+    LiveResponse,
     SplitDiffLine,
     ThinkingIndicator,
     TurnCompletion,
 )
+from backend.cli.tui._app_small_widgets import ScrollTailBadge
 from backend.core.enums import AgentState, EventSource
 from backend.ledger.action import (
     AgentThinkAction,
@@ -1295,7 +1297,7 @@ async def test_tui_hud_bar_shows_accumulated_and_context_tokens(mock_config):
 
         stats = s.query_one('#hud-line-2', Label)
         rendered = str(stats.renderable)
-        assert 'Ctx: 430/8,192' in rendered
+        assert 'Ctx: 430/8.2K' in rendered
         assert '%' in rendered
 
 
@@ -3868,3 +3870,100 @@ def test_no_pending_event_drop_under_burst(monkeypatch):
 
     assert orch._pending_events_dropped == 0
     assert len(orch._pending_events) <= 5
+
+
+@pytest.mark.asyncio
+async def test_tui_scroll_badge_shows_and_follows_tail(mock_config, monkeypatch):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(100, 24)) as pilot:
+        await pilot.pause()
+
+        display = _get_screen(app).query_one('#main-display')
+        await _fill_scrollable_transcript(display, pilot)
+        display.user_scroll_page_up(animate=False)
+        await pilot.pause()
+
+        badge = display.query_one('#scroll-badge', ScrollTailBadge)
+        assert display._user_scrolled_away is True
+        assert not badge.has_class('-hidden')
+
+        display.append_widget(Static('new activity'))
+        await pilot.pause()
+        assert display._tail_unread_count == 1
+
+        badge.post_message(ScrollTailBadge.FollowRequested())
+        await pilot.pause()
+        assert display._user_scrolled_away is False
+        assert badge.has_class('-hidden')
+
+
+@pytest.mark.asyncio
+async def test_tui_live_response_uses_streaming_widget(mock_config, monkeypatch):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(100, 24)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+        renderer.update_live_response('Streaming answer')
+        await pilot.pause()
+
+        assert isinstance(renderer._live_response_widget, LiveResponse)
+        assert renderer._live_response_widget.has_class('-streaming')
+
+
+@pytest.mark.asyncio
+async def test_tui_tasks_sidebar_refreshes_during_streaming_skip(
+    mock_config, monkeypatch
+):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_bootstrap', AsyncMock())
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.widgets.collapsible import CollapsibleSection, SidebarRow
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        renderer._task_list = [
+            {'id': '1', 'description': 'First task', 'status': 'todo'},
+        ]
+        renderer._refresh_display(skip_sidebar=True)
+
+        tasks_widget = s.query_one('#sidebar-tasks', CollapsibleSection)
+        assert tasks_widget._section_title == 'Tasks (1)'
+
+        renderer._task_list = [
+            {'id': '1', 'description': 'First task', 'status': 'in_progress'},
+        ]
+        renderer._refresh_display(skip_sidebar=True)
+        await pilot.pause()
+
+        tasks_widget = s.query_one('#sidebar-tasks', CollapsibleSection)
+        assert not tasks_widget.is_collapsed
+        rows = list(tasks_widget.query(SidebarRow).results())
+        assert any(row.has_class('-active-task') for row in rows)

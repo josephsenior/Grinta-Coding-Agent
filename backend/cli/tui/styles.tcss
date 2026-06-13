@@ -41,7 +41,11 @@ Screen {
 /* ── Transcript ────────────────────────────────────── */
 Transcript {
     background: #060a14;
-    scrollbar-size: 0 0;
+    scrollbar-size-vertical: 1;
+    scrollbar-size-horizontal: 0;
+    scrollbar-color: #334155 #060a14;
+    scrollbar-color-hover: #475569 #060a14;
+    scrollbar-color-active: #64748b #060a14;
     padding: 1 2 2 2;
     height: 1fr;
     layout: vertical;
@@ -115,6 +119,11 @@ SidebarRow:hover {
 SidebarRow:focus {
     background: #0e1a30;
     color: #e9eefc;
+    border-left: solid #5eead4;
+}
+
+SidebarRow.-active-task {
+    background: #0c1828;
     border-left: solid #5eead4;
 }
 
@@ -295,10 +304,84 @@ HUD,
 }
 
 #hud-label-autonomy,
-#hud-label-mode {
+#hud-label-mode,
+#hud-label-model,
+#hud-label-reasoning {
     height: 1;
     padding: 0 1 0 0;
     margin: 0;
+}
+
+#hud-model-display {
+    width: auto;
+    max-width: 22;
+    margin-right: 1;
+    background: #4a3a6a;
+    color: #060a14;
+    border: none;
+    padding: 0 2;
+    height: 1;
+    min-height: 1;
+    text-style: bold;
+}
+
+#hud-reasoning {
+    width: 16;
+    margin-right: 1;
+    background: transparent;
+    border: none;
+    padding: 0;
+    min-height: 1;
+    height: 1;
+}
+
+#hud-reasoning SelectCurrent {
+    background: #3a5a8c;
+    color: #060a14;
+    border: none;
+    padding: 0 2;
+    height: 1;
+    min-height: 1;
+}
+
+#hud-reasoning SelectCurrent:focus {
+    background: #5a8acc;
+}
+
+#hud-reasoning SelectCurrent #label {
+    color: #060a14;
+    padding: 0;
+    margin: 0;
+    height: 1;
+    text-style: bold;
+}
+
+#hud-reasoning SelectCurrent .arrow {
+    height: 1;
+    padding: 0;
+    margin: 0;
+    color: #060a14;
+}
+
+#hud-reasoning SelectOverlay {
+    background: #0d1a30;
+    border: solid #2a4a7a;
+}
+
+#hud-reasoning SelectOverlay .option-list--option {
+    background: #0d1a30;
+    color: #8f9fc1;
+    padding: 0 2;
+    margin: 0;
+}
+
+#hud-reasoning SelectOverlay .option-list--option:hover {
+    background: #1a3055;
+}
+
+#hud-reasoning SelectOverlay .option-list--option-highlighted {
+    background: #1a3055;
+    color: #e9eefc;
 }
 
 #hud-autonomy {
@@ -660,6 +743,21 @@ AgentMessage {
     color: #cbd5e1;
 }
 
+LiveResponse {
+    width: 100%;
+    height: auto;
+    margin: 0 0 1 0;
+    padding: 0 1 0 2;
+    background: #070b14;
+    border-left: solid #3d5a80;
+    color: #b8c4d8;
+}
+
+LiveResponse.-streaming {
+    color: #d5dee8;
+    border-left: solid #5eead4;
+}
+
 TranscriptNotice {
     width: 100%;
     height: auto;
@@ -668,11 +766,6 @@ TranscriptNotice {
     background: #12161f;
     border: none;
     color: #7a8299;
-}
-
-/* ── Scroll badge ──────────────────────────────────── */
-#scroll-badge {
-    display: none;
 }
 
 /* ── Utility ───────────────────────────────────────── */

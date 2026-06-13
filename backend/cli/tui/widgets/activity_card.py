@@ -23,6 +23,8 @@ from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
 from textual.widgets import Static
 
+from backend.cli.syntax_theme import get_grinta_rich_syntax_theme
+from backend.cli.syntax_theme import get_grinta_rich_syntax_theme
 from backend.cli.theme import (
     NAVY_BG,
     NAVY_BRAND,
@@ -30,7 +32,6 @@ from backend.cli.theme import (
     NAVY_READY,
     NAVY_TEXT_DIM,
     NAVY_TEXT_MUTED,
-    get_grinta_pygments_style,
 )
 
 DIFF_ADD_PREFIX = '\x1fgrinta-diff-add\x1f'
@@ -445,7 +446,7 @@ class ActivityCard(Container):
         return Syntax(
             content,
             language,
-            theme=get_grinta_pygments_style(),
+            theme=get_grinta_rich_syntax_theme(),
             background_color=NAVY_BG,
             line_numbers=line_numbers,
             padding=(0, 1),
@@ -844,6 +845,44 @@ class AgentMessage(Static):
         self.update(renderable)
 
 
+class LiveResponse(Static):
+    """In-flight assistant response with lightweight streaming affordances."""
+
+    DEFAULT_CSS = """
+    LiveResponse {
+        width: 100%;
+        height: auto;
+        margin: 0 0 1 0;
+        padding: 0 1 0 2;
+        background: #070b14;
+        border-left: solid #3d5a80;
+        color: #b8c4d8;
+    }
+    LiveResponse.-streaming {
+        color: #d5dee8;
+        border-left: solid #5eead4;
+    }
+    """
+
+    def set_streaming_renderable(self, renderable: Any) -> None:
+        """Update visible streaming content."""
+        if renderable is None or renderable == '':
+            self.update('')
+            self.remove_class('-streaming')
+            return
+        self.add_class('-streaming')
+        self.update(renderable)
+
+    def set_streaming_text(self, text: str) -> None:
+        """Fallback plain-text update when highlighted prep is unavailable."""
+        if not text:
+            self.update('')
+            self.remove_class('-streaming')
+            return
+        self.add_class('-streaming')
+        self.update(Text(text, style='#d5dee8'))
+
+
 class ThinkingIndicator(Container):
     """Thinking/reasoning indicator with inline prefix.
 
@@ -963,7 +1002,7 @@ class ThinkingIndicator(Container):
                 syntax = Syntax(
                     code,
                     language,
-                    theme=get_grinta_pygments_style(),
+                    theme=get_grinta_rich_syntax_theme(),
                     background_color='#0d1525',
                     padding=(0, 1),
                     word_wrap=True,
