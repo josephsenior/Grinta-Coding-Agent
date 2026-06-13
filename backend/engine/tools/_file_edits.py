@@ -27,6 +27,7 @@ from backend.engine.tools._file_ops import (
     _coerce_optional_int,
     _filter_symbol_candidates,
     _find_symbol_candidates,
+    _find_symbol_candidates_in_file,
     _guard_content_arguments,
     _parse_symbol_id,
     _read_text_for_tool,
@@ -801,6 +802,7 @@ def _normalize_multiedit_replace_string(
 
 def _normalize_multiedit_edit_symbols(
     raw: Mapping[str, Any],
+    index: int,
 ) -> list[dict[str, Any]]:
     path = raw.get('path')
     raw_edits = raw.get('edits')
@@ -817,10 +819,28 @@ def _normalize_multiedit_edit_symbols(
                 'new_content': raw.get('new_content'),
             }
         ]
-    return _normalize_edit_symbols_public_edits(
-        raw_edits,
-        default_path=str(path).strip() if isinstance(path, str) else None,
-    )
+    if not isinstance(raw_edits, list) or not raw_edits:
+        raise FunctionCallValidationError(
+            f'multiedit operations[{index}] edit_symbols requires a non-empty edits array.'
+        )
+    if not isinstance(path, str) or not path.strip():
+        raise FunctionCallValidationError(
+            f'multiedit operations[{index}] edit_symbols requires path.'
+        )
+    normalized_edits: list[dict[str, Any]] = []
+    for edit_index, edit in enumerate(raw_edits):
+        if not isinstance(edit, Mapping):
+            raise FunctionCallValidationError(
+                f'multiedit operations[{index}] edits[{edit_index}] must be an object.'
+            )
+        normalized_edits.append(dict(edit))
+    return [
+        {
+            'path': path.strip(),
+            'operation': 'edit_symbols_deferred',
+            'edits': normalized_edits,
+        }
+    ]
 
 
 def _dispatch_multiedit_operation(
@@ -831,7 +851,7 @@ def _dispatch_multiedit_operation(
     if command == 'replace_string':
         return [_normalize_multiedit_replace_string(raw, index)]
     if command == 'edit_symbols':
-        return _normalize_multiedit_edit_symbols(raw)
+        return _normalize_multiedit_edit_symbols(raw, index)
     raise FunctionCallValidationError(
         f'multiedit operations[{index}] command {command!r} is unsupported. '
         'Use replace_string or edit_symbols.'
@@ -914,6 +934,18 @@ def _parse_multi_edit_operation(
     idx: int,
 ) -> tuple[str, dict[str, Any]]:
     operation = str(raw_item.get('operation') or '').strip().lower()
+    if operation == 'edit_symbols_deferred':
+        path = raw_item.get('path')
+        edits = raw_item.get('edits')
+        if not isinstance(path, str) or not path.strip():
+            raise FunctionCallValidationError(
+                f'multi_edit item {idx} edit_symbols_deferred is missing path.'
+            )
+        if not isinstance(edits, list) or not edits:
+            raise FunctionCallValidationError(
+                f'multi_edit item {idx} edit_symbols_deferred requires edits.'
+            )
+        return operation, dict(raw_item)
     allowed = {
         'replace_string',
         'symbol_body_replacement',
@@ -921,9 +953,147 @@ def _parse_multi_edit_operation(
     if operation not in allowed:
         raise FunctionCallValidationError(
             f'multi_edit item {idx}: unsupported internal operation {operation!r}. '
-            f'Allowed operations: {sorted(allowed)}.'
+            f'Allowed operations: {sorted(allowed | {"edit_symbols_deferred"})}.'
         )
     return operation, dict(raw_item)
+
+
+def _resolve_symbol_edit_on_temp_file(
+    temp_path: Path,
+    display_path: str,
+    item: Mapping[str, Any],
+    index: int,
+) -> dict[str, Any]:
+    """Resolve one edit_symbols target against the current temp-file contents."""
+    new_content = item.get('new_content')
+    if not isinstance(new_content, str):
+        raise FunctionCallValidationError(
+            f'multiedit edit_symbols edits[{index}] requires new_content.'
+        )
+
+    symbol_id = str(item.get('symbol_id') or '').strip()
+    symbol_name = str(
+        item.get('qualified_name') or item.get('symbol_name') or ''
+    ).strip()
+    symbol_kind = cast(str | None, item.get('symbol_kind'))
+    parent_symbol = cast(str | None, item.get('parent_symbol'))
+    occurrence = _coerce_optional_int(
+        item.get('occurrence'), f'edits[{index}].occurrence'
+    )
+    requested_start: int | None = None
+    requested_end: int | None = None
+
+    if symbol_id:
+        _raw_path, symbol_name, requested_start, requested_end = _resolve_symbol_by_id(
+            symbol_id
+        )
+        occurrence = None
+
+    if not symbol_name:
+        raise FunctionCallValidationError(
+            f'multiedit edit_symbols edits[{index}] requires qualified_name, '
+            'symbol_name, or symbol_id.'
+        )
+
+    lookup_name = symbol_name.rsplit('.', 1)[-1]
+    if not parent_symbol and '.' in symbol_name:
+        maybe_parent, _, maybe_name = symbol_name.rpartition('.')
+        parent_symbol = maybe_parent or None
+        lookup_name = maybe_name
+
+    candidates = _find_symbol_candidates_in_file(
+        temp_path,
+        lookup_name,
+        symbol_kind=symbol_kind,
+        include_private=True,
+    )
+    candidates = _filter_symbol_candidates(
+        candidates,
+        symbol_name=lookup_name,
+        parent_symbol=parent_symbol,
+        occurrence=occurrence,
+    )
+    if requested_start is not None:
+        candidates = [
+            c
+            for c in candidates
+            if c.get('start_line') == requested_start
+            and c.get('end_line') == requested_end
+        ]
+
+    candidate = _select_and_validate_symbol(
+        candidates, symbol_id, symbol_name, requested_start, requested_end, index
+    )
+    return {
+        'path': display_path,
+        'operation': 'symbol_body_replacement',
+        'start_line': int(candidate['start_line']),
+        'end_line': int(candidate['end_line']),
+        'content': new_content,
+    }
+
+
+def _resolve_deferred_edit_symbols(
+    temp_path: Path,
+    display_path: str,
+    edits: list[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    resolved = [
+        _resolve_symbol_edit_on_temp_file(temp_path, display_path, item, index)
+        for index, item in enumerate(edits)
+    ]
+    return sorted(resolved, key=lambda item: -int(item.get('start_line', 0)))
+
+
+def _validate_symbol_range_on_temp(
+    temp_path: Path,
+    start_line: int,
+    end_line: int,
+    rel_path: str,
+) -> None:
+    """Reject stale line ranges after prior batch edits on the temp copy."""
+    if not temp_path.exists():
+        _multi_edit_raise(
+            f'❌ multi_edit symbol range failed for {rel_path}: file not found.',
+            path=rel_path,
+        )
+    line_count = len(temp_path.read_text(encoding='utf-8').splitlines())
+    if start_line < 1 or end_line < start_line or end_line > line_count:
+        _multi_edit_raise(
+            f'❌ multi_edit symbol range {start_line}-{end_line} is invalid for '
+            f'{rel_path} ({line_count} lines after prior batch edits). '
+            'Use edit_symbols instead of line ranges when combining edits.',
+            path=rel_path,
+        )
+
+
+def _validate_multi_edit_file_final(
+    temp_editor: Any,
+    temp_path: Path,
+    rel_path: str,
+    original_content: str | None,
+) -> None:
+    if not temp_path.exists():
+        return
+    final_content = temp_path.read_text(encoding='utf-8')
+    if final_content == (original_content or ''):
+        return
+
+    regression_error = temp_editor._detect_introduced_syntax_error(
+        temp_path, original_content, final_content
+    )
+    if regression_error is not None:
+        _multi_edit_raise(
+            f'❌ multi_edit syntax regression for {rel_path}: {regression_error}',
+            path=rel_path,
+        )
+
+    is_valid, msg = temp_editor._maybe_validate_syntax_for_file(temp_path, final_content)
+    if not is_valid:
+        _multi_edit_raise(
+            f'❌ multi_edit syntax validation failed for {rel_path}: {msg}',
+            path=rel_path,
+        )
 
 
 def _apply_multi_edit_operation(
@@ -934,6 +1104,28 @@ def _apply_multi_edit_operation(
     item: dict[str, Any],
     temp_editor: Any,
 ) -> None:
+    if operation == 'edit_symbols_deferred':
+        edits = item.get('edits')
+        if not isinstance(edits, list) or not edits:
+            raise FunctionCallValidationError(
+                'multi_edit edit_symbols_deferred requires a non-empty edits array.'
+            )
+        if not temp_path.exists():
+            _multi_edit_raise(
+                f'❌ multi_edit edit_symbols failed for {rel_path}: file not found.',
+                path=rel_path,
+            )
+        resolved_ops = _resolve_deferred_edit_symbols(temp_path, rel_path, edits)
+        for resolved in resolved_ops:
+            _apply_multi_edit_operation(
+                rel_path=rel_path,
+                temp_path=temp_path,
+                operation='symbol_body_replacement',
+                item=resolved,
+                temp_editor=temp_editor,
+            )
+        return
+
     if operation == 'replace_string':
         old_string = item.get('old_string')
         new_string = item.get('new_string')
@@ -963,12 +1155,15 @@ def _apply_multi_edit_operation(
             raise FunctionCallValidationError(
                 "multi_edit symbol_body_replacement operation requires 'start_line', 'end_line', and 'content'."
             )
+        start = int(start_line)
+        end = int(end_line)
+        _validate_symbol_range_on_temp(temp_path, start, end, rel_path)
         result = temp_editor(
             command='edit',
             path=rel_path,
             edit_mode='range',
-            start_line=int(start_line),
-            end_line=int(end_line),
+            start_line=start,
+            end_line=end,
             new_str=content,
         )
         if result.error:
@@ -1026,6 +1221,12 @@ def _apply_multi_edit_to_temp_files(
     temp_root: Path,
     temp_editor: Any,
 ) -> tuple[dict[str, str | None], dict[str, str]]:
+    """Apply multi_edit operations in declaration order against per-file temp copies.
+
+    Each operation sees the temp file as left by all prior operations in the batch.
+    ``edit_symbols`` targets are resolved at apply time (identity-based). Syntax is
+    validated once per file after all operations complete.
+    """
     original_snapshots: dict[str, str | None] = {}
     final_contents: dict[str, str] = {}
     temp_paths: dict[str, Path] = {}
@@ -1051,11 +1252,18 @@ def _apply_multi_edit_to_temp_files(
         )
 
     for item_path, temp_path in temp_paths.items():
+        rel_path = _multi_edit_relative_path(item_path, workspace_root)
         if not temp_path.exists():
             _multi_edit_raise(
-                f'❌ multi_edit produced no output file for {_multi_edit_relative_path(item_path, workspace_root)}.',
-                path=_multi_edit_relative_path(item_path, workspace_root),
+                f'❌ multi_edit produced no output file for {rel_path}.',
+                path=rel_path,
             )
+        _validate_multi_edit_file_final(
+            temp_editor,
+            temp_path,
+            rel_path,
+            original_snapshots.get(item_path),
+        )
         final_contents[item_path] = temp_path.read_text(encoding='utf-8')
 
     return original_snapshots, final_contents
@@ -1145,6 +1353,7 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
             ) as temp_root_str:
                 temp_root = Path(temp_root_str)
                 temp_editor = FileEditor(workspace_root=str(temp_root))
+                temp_editor._defer_syntax_validation = True
                 original_snapshots, final_contents = _apply_multi_edit_to_temp_files(
                     parsed,
                     seen_paths,

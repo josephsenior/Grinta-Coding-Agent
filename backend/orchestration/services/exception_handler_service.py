@@ -65,7 +65,7 @@ class ExceptionHandlerService:
         """
         self._ctrl.log(
             'error',
-            'Error while running the agent (session %s): %s',
+            f'Error while running the agent (session {self._ctrl.id}): {exc}',
             extra={'exception_type': type(exc).__name__},
         )
         logger.error(

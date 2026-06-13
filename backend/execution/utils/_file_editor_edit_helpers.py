@@ -384,6 +384,9 @@ def build_dry_run_result_impl(
 def _validate_edit_before_write(
     self, file_path: Path, old_content: str | None, new_content: str
 ) -> tuple[ToolResult | None, str]:
+    if getattr(self, '_defer_syntax_validation', False):
+        return None, ''
+
     if old_content is not None and file_path.exists():
         disk_now = self._read_file(file_path)
         if disk_now != old_content:
