@@ -240,7 +240,14 @@ class StreamingCheckpoint:
                 handle.write(json.dumps(asdict(record), default=str))
                 handle.flush()
                 os.fsync(handle.fileno())
-            temp_path.replace(self._wal_path)
+            for attempt in range(5):
+                try:
+                    temp_path.replace(self._wal_path)
+                    break
+                except PermissionError:
+                    if attempt == 4:
+                        raise
+                    time.sleep(0.01 * (attempt + 1))
             self._fsync_parent_dir(self._wal_path)
         except OSError:
             logger.exception('Failed to write streaming WAL')
