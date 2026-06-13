@@ -11,7 +11,6 @@ from textual.widgets import (
     Label,
     ListView,
     Select,
-    Static,
     TextArea,
 )
 
@@ -96,14 +95,16 @@ class _AppScreenStateMixin:
         self,
         display_state: str,
         state_color: str,
-        ws_display: str,
     ) -> str:
         parts = [
             '[#91abec bold]GRINTA[/]',
             f'[{state_color}]● {display_state}[/]',
-            f'[{NAVY_TEXT_DIM}]Ws: {ws_display}[/]',
         ]
         return '  '.join(parts)
+
+    @staticmethod
+    def _build_hud_line1_ws(ws_display: str) -> str:
+        return f'[{NAVY_TEXT_DIM}]Ws: {ws_display}[/]'
 
     @staticmethod
     def _build_context_display(used: int, limit: int) -> str:
@@ -143,64 +144,63 @@ class _AppScreenStateMixin:
             pass
 
     def _current_llm_provider(self) -> str:
-        llm = self._config.get_llm_config()
-        provider = getattr(llm, 'custom_llm_provider', None) or getattr(
-            llm, 'provider', None
-        )
-        return str(provider or '').strip().lower()
+        from backend.cli.config_manager import get_current_provider
+
+        return get_current_provider(self._config) or ''
 
     def _resolve_hud_model_entry(self) -> Any | None:
+        from backend.cli.config_manager import get_current_model
+        from backend.inference.param_profiles import resolve_model_entry_for_capabilities
         from backend.inference.registry import build_model_entries_by_provider
 
         provider = self._current_llm_provider()
-        if not provider:
-            return None
-        model = str(self._hud.state.model or '').strip()
+        model = (
+            get_current_model(self._config)
+            or str(self._hud.state.model or '').strip()
+        )
         if not model or model == '(not set)':
             return None
-        entries = build_model_entries_by_provider(provider=provider).get(provider, {})
-        if model in entries:
-            return entries[model]
-        _, short = HUDBar.describe_model(model)
-        for entry in entries.values():
-            if getattr(entry, 'model_id', None) == model:
-                return entry
-            if getattr(entry, 'display_name', None) == short:
-                return entry
-        return None
+
+        fallback = None
+        for candidate in build_model_entries_by_provider(provider=provider).get(
+            provider or '', []
+        ):
+            if candidate.name == model:
+                fallback = candidate
+                break
+
+        return resolve_model_entry_for_capabilities(
+            model,
+            provider,
+            fallback=fallback,
+        )
 
     def _hud_reasoning_select_options(self) -> list[tuple[str, str]]:
         from backend.inference.reasoning import reasoning_effort_display_options
 
-        return reasoning_effort_display_options(
-            self._resolve_hud_model_entry(),
-            include_disabled=True,
-        )
+        entry = self._resolve_hud_model_entry()
+        options = reasoning_effort_display_options(entry, include_disabled=True)
+        if options:
+            return options
+        return [('Default', '')]
 
     def _current_reasoning_effort(self) -> str:
-        llm = self._config.get_llm_config()
-        return str(getattr(llm, 'reasoning_effort', None) or '').strip()
-
-    def _sync_hud_model_display(self, hud_bar) -> None:
+        configured = ''
         try:
-            from backend.cli.config_manager import get_current_model
-
-            model = (
-                get_current_model(self._config)
-                or self._hud.state.model
-                or '(not set)'
+            configured = (
+                (getattr(self._config.get_llm_config(), 'reasoning_effort', None) or '')
+                .strip()
+                .lower()
             )
-            _, short = HUDBar.describe_model(model)
-            hud_bar.query_one('#hud-model-display', Static).update(short[:30])
         except Exception:
-            pass
+            configured = ''
+        allowed = {value for _label, value in self._hud_reasoning_select_options()}
+        return configured if configured in allowed else ''
 
     def _sync_hud_reasoning_select(self, hud_bar) -> None:
         try:
             reasoning_select = hud_bar.query_one('#hud-reasoning', Select)
             options = self._hud_reasoning_select_options()
-            if not options:
-                return
             current = self._current_reasoning_effort()
             values = {value for _label, value in options}
             if current not in values:
@@ -214,8 +214,10 @@ class _AppScreenStateMixin:
 
     def _sync_hud_reasoning_visibility(self, hud_bar) -> None:
         try:
-            options = self._hud_reasoning_select_options()
-            visible = bool(options)
+            entry = self._resolve_hud_model_entry()
+            from backend.inference.reasoning import supports_reasoning
+
+            visible = entry is not None and supports_reasoning(entry)
             hud_bar.query_one('#hud-reasoning').display = visible
             hud_bar.query_one('#hud-label-reasoning').display = visible
         except Exception:
@@ -237,11 +239,15 @@ class _AppScreenStateMixin:
 
         used = hud.state.context_tokens
         limit = hud.state.context_limit
+        _, model_short = HUDBar.describe_model(hud.state.model)
+        model_display = model_short if model_short != '(not set)' else '(not set)'
         autonomy = hud.state.autonomy_level
 
         workspace = self._resolve_workspace_display(hud.state.workspace_path)
         ws_display = HUDBar.ellipsize_path(workspace, 35)
-        line1 = self._build_hud_line1(display_state, state_color, ws_display)
+        line1 = self._build_hud_line1(display_state, state_color)
+        line1_ws = self._build_hud_line1_ws(ws_display)
+        model_label = f'[{NAVY_TEXT_SECONDARY}]{model_display}[/]'
 
         token_display = self._build_context_display(used, limit)
         help_hint = r'[#54597b]\[[/][#eacb8a bold]F1[/][#54597b]][/] [#969aad]Help[/]'
@@ -249,8 +255,9 @@ class _AppScreenStateMixin:
 
         hud_bar = self.query_one('#hud-bar', HUD)
         hud_bar.query_one('#hud-line-1', Label).update(line1)
+        hud_bar.query_one('#hud-model-name', Label).update(model_label)
+        hud_bar.query_one('#hud-line-1-ws', Label).update(line1_ws)
         hud_bar.query_one('#hud-line-2', Label).update(line2)
-        self._sync_hud_model_display(hud_bar)
         self._sync_hud_reasoning_select(hud_bar)
         self._sync_hud_autonomy_select(hud_bar, autonomy)
         self._sync_hud_mode_select(hud_bar)

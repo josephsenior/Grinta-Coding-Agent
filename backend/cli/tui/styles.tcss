@@ -285,6 +285,40 @@ HUD,
 #hud-line-1 {
     height: 1;
     text-style: bold;
+    margin-right: 1;
+}
+
+#hud-line-1-row {
+    height: 1;
+    layout: horizontal;
+    align-vertical: middle;
+    margin: 0;
+    padding: 0;
+}
+
+#hud-label-model,
+#hud-label-reasoning {
+    height: 1;
+    padding: 0 1 0 0;
+    margin: 0;
+}
+
+#hud-label-reasoning {
+    margin-left: 4;
+    padding-left: 2;
+}
+
+#hud-model-name {
+    height: 1;
+    margin-right: 2;
+    color: #c8d4e8;
+}
+
+#hud-line-1-ws {
+    width: 1fr;
+    height: 1;
+    text-align: right;
+    color: #8f9fc1;
 }
 
 #hud-line-2 {
@@ -305,24 +339,10 @@ HUD,
 
 #hud-label-autonomy,
 #hud-label-mode,
-#hud-label-model,
 #hud-label-reasoning {
     height: 1;
     padding: 0 1 0 0;
     margin: 0;
-}
-
-#hud-model-display {
-    width: auto;
-    max-width: 22;
-    margin-right: 1;
-    background: #4a3a6a;
-    color: #060a14;
-    border: none;
-    padding: 0 2;
-    height: 1;
-    min-height: 1;
-    text-style: bold;
 }
 
 #hud-reasoning {
@@ -336,7 +356,7 @@ HUD,
 }
 
 #hud-reasoning SelectCurrent {
-    background: #3a5a8c;
+    background: #8a6a2a;
     color: #060a14;
     border: none;
     padding: 0 2;
@@ -345,7 +365,7 @@ HUD,
 }
 
 #hud-reasoning SelectCurrent:focus {
-    background: #5a8acc;
+    background: #b8923a;
 }
 
 #hud-reasoning SelectCurrent #label {
@@ -365,7 +385,7 @@ HUD,
 
 #hud-reasoning SelectOverlay {
     background: #0d1a30;
-    border: solid #2a4a7a;
+    border: solid #6a5020;
 }
 
 #hud-reasoning SelectOverlay .option-list--option {

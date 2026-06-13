@@ -694,9 +694,10 @@ def get_current_provider(config: AppConfig) -> str | None:
         from backend.inference.provider_resolver import extract_provider_prefix
 
         llm_cfg = config.get_llm_config()
-        configured = (getattr(llm_cfg, 'custom_llm_provider', None) or '').strip()
+        raw_provider = getattr(llm_cfg, 'custom_llm_provider', None)
+        configured = _sanitize_llm_provider(raw_provider) or ''
         if configured:
-            return configured.lower()
+            return configured
         model = (getattr(llm_cfg, 'model', None) or '').strip()
         if not model:
             return None
@@ -787,6 +788,39 @@ def get_masked_api_key(config: AppConfig, provider: str | None = None) -> str:
         return '(not set)'
 
 
+def _sanitize_llm_provider(value: Any) -> str | None:
+    """Return a safe provider slug for settings.json, or None if invalid."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        module = getattr(type(value), '__module__', '')
+        if module.startswith('unittest.mock'):
+            return None
+        value = str(value)
+    text = value.strip().lower()
+    if not text or 'magicmock' in text or text.startswith('<'):
+        return None
+    return text
+
+
+def get_persisted_reasoning_effort() -> str:
+    """Return the user-configured reasoning effort from settings.json (empty = default)."""
+    raw = _load_raw_settings().get('llm_reasoning_effort')
+    if raw is None:
+        return ''
+    return str(raw).strip()
+
+
+def update_reasoning_effort(effort: str | None) -> None:
+    """Persist reasoning effort without touching model or provider fields."""
+    settings = _load_raw_settings()
+    if effort and str(effort).strip():
+        settings['llm_reasoning_effort'] = str(effort).strip()
+    else:
+        settings.pop('llm_reasoning_effort', None)
+    _save_raw_settings(settings)
+
+
 def update_model(
     model: str,
     provider: str | None = None,
@@ -796,6 +830,7 @@ def update_model(
 ) -> None:
     settings = _load_raw_settings()
     settings['llm_model'] = model
+    provider = _sanitize_llm_provider(provider)
     if provider:
         settings['llm_provider'] = provider
     if base_url:
