@@ -23,7 +23,9 @@ from backend.context.compactor.strategies.conversation_window_compactor import (
 from backend.engine.memory_manager import ContextMemoryManager
 from backend.engine.tools.working_memory import (
     build_working_memory_action,
+    execute_working_memory,
     get_working_memory_prompt_block,
+    set_current_session_id,
 )
 from backend.ledger.action import ActionSecurityRisk
 from backend.ledger.action.files import FileEditAction
@@ -409,12 +411,15 @@ class TestLongSessionCompactionInvariants:
             fake_workspace_agent_state_dir,
         )
 
-        build_working_memory_action(
-            {
-                'command': 'update',
-                'section': 'plan',
-                'content': 'Keep the parser fix moving forward.',
-            }
+        set_current_session_id('long-session')
+        execute_working_memory(
+            build_working_memory_action(
+                {
+                    'command': 'update',
+                    'section': 'plan',
+                    'content': 'Keep the parser fix moving forward.',
+                }
+            )
         )
 
         manager = ContextMemoryManager(MagicMock(compactor_config=None), MagicMock())

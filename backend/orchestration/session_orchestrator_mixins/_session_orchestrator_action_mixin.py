@@ -1,3 +1,11 @@
+"""_SessionOrchestratorActionMixin mixin for SessionOrchestrator.
+
+Pure code motion: extracted from
+``backend/orchestration/session_orchestrator.py`` to break the file past the
+40 KB cap. Methods here are bound to ``_SessionOrchestratorActionMixin`` and mixed into
+``SessionOrchestrator`` via its MRO.
+"""
+
 from __future__ import annotations
 
 import contextlib
@@ -43,24 +51,19 @@ if TYPE_CHECKING:
     from backend.ledger.event import EventSource
     from backend.orchestration.tool_pipeline import ToolInvocationContext
 
-"""_SessionOrchestratorActionMixin mixin for SessionOrchestrator.
-
-Pure code motion: extracted from
-``backend/orchestration/session_orchestrator.py`` to break the file past the
-40 KB cap. Methods here are bound to ``_SessionOrchestratorActionMixin`` and mixed into
-``SessionOrchestrator`` via its MRO.
-"""
-
 
 if TYPE_CHECKING:
-    from backend.orchestration.session_orchestrator_accessors import SessionOrchestratorAccessorsMixin
+    from backend.orchestration.session_orchestrator_accessors import (
+        SessionOrchestratorAccessorsMixin,
+    )
 else:
-    class SessionOrchestratorAccessorsMixin: pass
+
+    class SessionOrchestratorAccessorsMixin:
+        pass
 
 
 class _SessionOrchestratorActionMixin(SessionOrchestratorAccessorsMixin):
     """Mixin: action context registration/binding/cleanup, system messages, log."""
-
 
     def _sync_budget_flag_with_metrics(self) -> None:
         """Keep the budget control flag aligned with accumulated metrics."""

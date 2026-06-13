@@ -46,7 +46,7 @@ repos:
             pydantic,
             lxml,
           ]
-        args: [--ignore-missing-imports, --no-strict-optional]
+        args: [--config-file, mypy.ini]
         exclude: ^(tests/|backend/tests/)
 
   - repo: local

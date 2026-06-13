@@ -1,3 +1,11 @@
+"""_SessionOrchestratorStepMixin mixin for SessionOrchestrator.
+
+Pure code motion: extracted from
+``backend/orchestration/session_orchestrator.py`` to break the file past the
+40 KB cap. Methods here are bound to ``_SessionOrchestratorStepMixin`` and mixed into
+``SessionOrchestrator`` via its MRO.
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -45,14 +53,6 @@ if TYPE_CHECKING:
     from backend.utils.async_utils import (
         run_or_schedule,
     )
-
-"""_SessionOrchestratorStepMixin mixin for SessionOrchestrator.
-
-Pure code motion: extracted from
-``backend/orchestration/session_orchestrator.py`` to break the file past the
-40 KB cap. Methods here are bound to ``_SessionOrchestratorStepMixin`` and mixed into
-``SessionOrchestrator`` via its MRO.
-"""
 
 
 class _SessionOrchestratorStepMixin:

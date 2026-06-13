@@ -2,22 +2,8 @@
 
 Extracted from backend/inference/fn_call_converter.py to keep the
 parent module under the per-file LOC budget.
-"""
 
-from __future__ import annotations
-
-import hashlib
-import logging
-from threading import Lock
-
-from backend.inference.tool_names import (
-    CREATE_TOOL_NAME,
-)
-
-logger = logging.getLogger(__name__)
-
-# coverage: ignore file
-"""Convert function calling messages to non-function calling messages and vice versa.
+Convert function calling messages to non-function calling messages and vice versa.
 
 This will inject prompts so that models that doesn't support function calling
 can still be used with function calling agents.
@@ -56,6 +42,19 @@ messages instead of this pseudo-XML path.
 Tool result line syntax is shared via :mod:`backend.inference.tool_result_format`.
 """
 
+from __future__ import annotations
+
+import hashlib
+import logging
+from threading import Lock
+
+from backend.inference.tool_names import (
+    CREATE_TOOL_NAME,
+)
+
+logger = logging.getLogger(__name__)
+
+# coverage: ignore file
 
 SYSTEM_PROMPT_SUFFIX_TEMPLATE = '\nYou have access to the following functions:\n\n{description}\n\nIf you choose to call a function ONLY reply in the following format with NO suffix:\n\n<function=example_function_name>\n<parameter=example_parameter_1>value_1</parameter>\n<parameter=example_parameter_2>\nThis is the value for the second parameter\nthat can span\nmultiple lines\n</parameter>\n</function>\n\n<IMPORTANT>\nReminder:\n- Function calls MUST follow the specified format, start with <function= and end with </function>\n- Required parameters MUST be specified\n- In this fallback parser mode, call one function at a time\n- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after.\n- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls\n</IMPORTANT>\n'
 STOP_WORDS = ['</function']
