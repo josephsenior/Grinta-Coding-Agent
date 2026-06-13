@@ -18,7 +18,9 @@ from textual.app import App
 
 from backend.cli.hud import HUDBar
 from backend.cli.reasoning_display import ReasoningDisplay
+from backend.cli.syntax_theme import GRINTA_TERMINAL_THEME
 from backend.cli.theme import grinta_rich_theme_styles
+from textual.reactive import Reactive
 
 # ── Rich theme for consistent markup in RichLog/Static widgets ─────────────
 _RICH_THEME = RichTheme(grinta_rich_theme_styles())
@@ -32,6 +34,7 @@ class GrintaTUIApp(App):
 
     TITLE = 'GRINTA'
     SUB_TITLE = 'AI-Powered Development Platform'
+    ansi_theme_dark = Reactive(GRINTA_TERMINAL_THEME, init=False)
 
     def __init__(
         self,
@@ -118,6 +121,8 @@ async def run_tui(
 
     app = GrintaTUIApp(config=config, console=console, loop=loop)
     app._hud.update_model(config.get_llm_config().model or '(not set)')
+    model = config.get_llm_config().model or '(not set)'
+    app._hud.update_tokens(0, HUDBar.resolve_context_limit_for_model(model))
     app._hud.update_workspace(
         str(Path(os.getcwd()).resolve())
         if not getattr(config, 'project_root', None)

@@ -79,3 +79,5 @@ class _AppScreenWelcomeMixin:
         widget_id = event.select.id
         if widget_id == 'hud-autonomy':
             self._apply_autonomy_level(event.value)
+        elif widget_id == 'hud-reasoning':
+            self._apply_hud_reasoning_effort(str(event.value))

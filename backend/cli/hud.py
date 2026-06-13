@@ -221,15 +221,35 @@ class HUDBar:
     @staticmethod
     def _format_tokens(n: int) -> str:
         if n >= 1_000_000:
-            return f'{n / 1_000_000:.1f}M'
+            val = n / 1_000_000
+            return f'{int(val)}M' if val.is_integer() else f'{val:.1f}M'
         if n >= 1_000:
-            return f'{n / 1_000:.1f}K'
+            val = n / 1_000
+            return f'{int(val)}K' if val.is_integer() else f'{val:.1f}K'
         return str(n)
+
+    @staticmethod
+    def resolve_context_limit_for_model(model: str) -> int:
+        """Best-effort context window for HUD display before usage metrics arrive."""
+        raw = (model or '').strip()
+        if not raw or raw == '(not set)':
+            return 1_000_000
+        try:
+            from backend.inference.catalog_loader import get_context_window_tokens
+
+            limit = int(get_context_window_tokens(raw) or 0)
+            if limit > 0:
+                return limit
+        except Exception:
+            pass
+        return 1_000_000
 
     # -- update helpers ----------------------------------------------------
 
     def update_model(self, model: str) -> None:
         self.state.model = model
+        if self.state.context_limit <= 0:
+            self.state.context_limit = self.resolve_context_limit_for_model(model)
 
     def update_tokens(self, used: int, limit: int) -> None:
         self.state.context_tokens = used

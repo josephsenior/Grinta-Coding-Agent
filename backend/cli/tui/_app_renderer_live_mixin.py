@@ -21,6 +21,7 @@ from backend.ledger import (
 )
 
 _LIVE_SCROLL_PAINT_INTERVAL = 0.1
+_LIVE_STREAMING_RENDER_INTERVAL = 0.2
 
 
 class _AppRendererLiveMixin:
@@ -119,6 +120,25 @@ class _AppRendererLiveMixin:
         if should_follow:
             self._maybe_scroll_to_tail(display)
 
+    def _apply_live_response_render(self, text: str) -> None:
+        from backend.cli.tui._render_prep import prep_streaming_renderable
+
+        widget = self._live_response_widget
+        if widget is None:
+            return
+        try:
+            widget.set_streaming_renderable(prep_streaming_renderable(text))
+        except Exception:
+            widget.set_streaming_text(text)
+
+    def _flush_deferred_streaming_render(self) -> None:
+        self._streaming_render_timer_armed = False
+        text = getattr(self, '_live_response_pending_text', '')
+        if not text.strip():
+            return
+        self._last_streaming_render_at = time.monotonic()
+        self._apply_live_response_render(text)
+
     def update_live_response(self, text: str) -> None:
         """Update the in-flight assistant response in-place."""
         self._live_response = text
@@ -143,10 +163,27 @@ class _AppRendererLiveMixin:
         should_follow = display.should_follow_tail()
         in_place_update = self._live_response_widget is not None
         if not self._live_response_widget:
-            self._live_response_widget = Static(Text(text))
+            from backend.cli.tui.widgets.activity_card import LiveResponse
+
+            self._live_response_widget = LiveResponse()
             display.append_widget(self._live_response_widget)
-        else:
-            self._live_response_widget.update(Text(text))
+
+        self._live_response_pending_text = text
+        now = time.monotonic()
+        last_render = getattr(self, '_last_streaming_render_at', 0.0)
+        if last_render <= 0.0 or (now - last_render) >= _LIVE_STREAMING_RENDER_INTERVAL:
+            self._last_streaming_render_at = now
+            self._streaming_render_timer_armed = False
+            self._apply_live_response_render(text)
+        elif not getattr(self, '_streaming_render_timer_armed', False):
+            self._streaming_render_timer_armed = True
+            delay = max(_LIVE_STREAMING_RENDER_INTERVAL - (now - last_render), 0.01)
+            try:
+                self._loop.call_later(delay, self._flush_deferred_streaming_render)
+            except RuntimeError:
+                self._streaming_render_timer_armed = False
+                self._last_streaming_render_at = now
+                self._apply_live_response_render(text)
         if should_follow:
             follow_tail = getattr(display, 'follow_tail', None)
             if callable(follow_tail):
@@ -176,6 +213,9 @@ class _AppRendererLiveMixin:
         """Clear the in-flight response preview widget."""
         self._live_response = ''
         self._live_response_dirty = False
+        self._live_response_pending_text = ''
+        self._streaming_render_timer_armed = False
+        self._last_streaming_render_at = 0.0
 
         display = self._tui._get_display()
         if type(display).__name__ == 'MagicMock':

@@ -314,6 +314,24 @@ def _apply_json_top_level_fields(cfg: AppConfig, data: dict[str, object]) -> Non
                 cfg.max_budget_per_task = value if value > 0 else None
             except (ValueError, TypeError):
                 pass
+    if 'max_iterations' in data:
+        raw = data['max_iterations']
+        if raw is not None:
+            try:
+                cfg.max_iterations = max(1, int(str(raw)))
+            except (ValueError, TypeError):
+                pass
+    if 'pending_action_timeout' in data:
+        raw = data['pending_action_timeout']
+        if raw is not None:
+            try:
+                cfg.pending_action_timeout = float(str(raw))
+            except (ValueError, TypeError):
+                pass
+    if data.get('save_trajectory_path'):
+        cfg.save_trajectory_path = cast(str, data['save_trajectory_path'])
+    if data.get('log_level'):
+        cfg.log_level = cast(str, data['log_level'])
 
 
 def _parse_mcp_server_entry(entry: object):

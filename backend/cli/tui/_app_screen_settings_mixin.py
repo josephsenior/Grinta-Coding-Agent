@@ -6,6 +6,7 @@ from typing import Any
 
 from textual import events, work
 
+from backend.cli.hud import HUDBar
 from backend.cli._event_renderer.panels import task_panel_signature
 from backend.cli.tui._app_constants import _tui_logger
 from backend.cli.tui._app_dialogs import (  # noqa: F401
@@ -61,6 +62,37 @@ class _AppScreenSettingsMixin:
         self._hud.update_autonomy(level)
         self._render_hud_bar()
         self.notify(f'Autonomy: {level}', severity='information', timeout=2.0)
+
+    def _apply_hud_reasoning_effort(self, effort_value: str) -> None:
+        effort = str(effort_value or '').strip()
+        from backend.cli.config_manager import get_current_model, update_model
+        from backend.core.config import load_app_config
+
+        current = self._current_reasoning_effort()
+        if effort == current:
+            return
+        try:
+            update_model(
+                get_current_model(self._config),
+                provider=self._current_llm_provider() or None,
+                reasoning_effort=effort or None,
+            )
+        except Exception as exc:
+            self.notify(
+                f'Reasoning update failed: {type(exc).__name__}',
+                severity='error',
+                timeout=3.0,
+            )
+            return
+        self._config = load_app_config()
+        runtime_status = self._apply_llm_config_to_active_session(self._config)
+        self._render_hud_bar()
+        label = effort or 'default'
+        self.notify(
+            f'Reasoning: {label} ({runtime_status})',
+            severity='information',
+            timeout=2.5,
+        )
 
     def _propagate_mode_to_agent(self, mode: str) -> None:
         agent_config = self._active_agent_config()
@@ -255,7 +287,23 @@ class _AppScreenSettingsMixin:
                 if tid == task_id:
                     desc = description or desc
                     break
-            self.notify(f'Task {task_id}: {desc}', severity='info', timeout=3.0)
+            try:
+                from backend.cli.tui.widgets.collapsible import CollapsibleSection
+
+                section = self.query_one('#sidebar-tasks', CollapsibleSection)
+                section.expand()
+            except Exception:
+                pass
+            try:
+                display = self._get_display()
+                display.force_scroll_end()
+            except Exception:
+                pass
+            self.notify(
+                f'Following live activity · {desc}',
+                severity='info',
+                timeout=2.5,
+            )
         elif item_id.startswith('mcp:'):
             mcp_name = item_id.split(':', 1)[1]
             self.notify(

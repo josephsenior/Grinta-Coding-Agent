@@ -31,6 +31,7 @@ settings.json
 debug_backups/
 
 dummy_eval_output_dir/
+scripts/evals/results/
 
 tmp_snippet_workspace_script*/
 

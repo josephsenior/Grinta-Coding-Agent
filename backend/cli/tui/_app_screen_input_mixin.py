@@ -520,7 +520,11 @@ class _AppScreenInputMixin:
         )
         self._hud.update_mcp_servers(mcp_count)
         self._render_hud_bar()
-        self.add_success(f'Settings updated ({runtime_status}).')
+        self.notify(
+            f'Settings updated ({runtime_status})',
+            severity='information',
+            timeout=2.5,
+        )
 
     async def _run_sessions_tui(self, args: list[str]) -> None:
         parsed = _parse_sessions_tui_args(args)
