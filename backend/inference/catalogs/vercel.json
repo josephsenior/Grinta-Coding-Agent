@@ -1,9 +1,6 @@
 {
   "provider": "vercel",
   "client": "openai_compatible",
-  "metadata": {
-    "dynamic_listing": true
-  },
   "models": {
     "openai/gpt-4.1": {
       "runtime": {

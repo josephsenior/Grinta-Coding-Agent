@@ -1,9 +1,6 @@
 {
   "provider": "groq",
   "client": "openai_compatible",
-  "metadata": {
-    "dynamic_listing": true
-  },
   "models": {
     "llama-3.3-70b-versatile": {
       "runtime": {

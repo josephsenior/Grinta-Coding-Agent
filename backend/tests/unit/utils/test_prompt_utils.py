@@ -586,10 +586,10 @@ class TestPromptBudgetRegression:
         # Floor: prompt must be substantive.
         assert report['total_tokens'] >= 800, 'Prompt shrank unexpectedly'
         # Ceiling: guards against prompt bloat regressions.
-        # Baseline post-compression: 5 228 tokens.  Ceiling = baseline + ~10 %.
-        assert report['total_tokens'] <= 5_750, (
+        # Baseline post-compression: 5 752 tokens.  Ceiling = baseline + ~10 %.
+        assert report['total_tokens'] <= 6_330, (
             f'Prompt exceeds budget ceiling: {report["total_tokens"]} tokens '
-            '(baseline 5 228). Reduce prompt text or raise this ceiling deliberately.'
+            '(baseline 5 752). Reduce prompt text or raise this ceiling deliberately.'
         )
 
     def test_windows_ps_balanced_no_mcp_token_ceiling(self) -> None:

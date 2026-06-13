@@ -32,11 +32,23 @@ def _provider_defaults() -> dict[str, str]:
     return {str(k): str(v) for k, v in raw.items()} if isinstance(raw, dict) else {}
 
 
+def _provider_scoped_catalog_entry(
+    model: str,
+    provider: str | None,
+) -> ModelEntry | None:
+    """Return the catalog entry for *model* under *provider*, if any."""
+    normalized = normalize_provider_name(provider)
+    if not normalized:
+        return None
+    bare = model.split('/')[-1] if model.startswith(f'{normalized}/') else model
+    return lookup_provider_model(normalized, bare, allow_aliases=True)
+
+
 def infer_profile_family(model: str, provider: str | None) -> str | None:
     """Match model id to a param profile family via patterns."""
     from backend.inference.reasoning import infer_family
 
-    entry = lookup(model)
+    entry = _provider_scoped_catalog_entry(model, provider) or lookup(model)
     if entry is not None:
         family = infer_family(entry)
         mapped = _map_reasoning_family_to_profile(family, entry.provider)
@@ -81,14 +93,9 @@ def _map_reasoning_family_to_profile(family: str, provider: str) -> str | None:
 def resolve_param_profile_id(model: str, provider: str | None) -> tuple[str, str]:
     """Return ``(profile_id, source)`` for *model*."""
     normalized_provider = normalize_provider_name(provider)
-    entry = lookup(model)
-    if entry is None and normalized_provider:
-        bare = (
-            model.split('/')[-1]
-            if model.startswith(f'{normalized_provider}/')
-            else model
-        )
-        entry = lookup_provider_model(normalized_provider, bare, allow_aliases=True)
+    entry = _provider_scoped_catalog_entry(model, normalized_provider)
+    if entry is None:
+        entry = lookup(model)
 
     if entry is not None and _entry_has_runtime_overrides(entry):
         family = infer_profile_family(entry.name, entry.provider)
@@ -163,12 +170,19 @@ def resolve_effective_model_entry(
     provider: str | None = None,
 ) -> tuple[ModelEntry | None, str, str]:
     """Return catalog entry or synthetic profile entry plus profile metadata."""
+    normalized = normalize_provider_name(provider)
     entry = lookup(model)
+    if entry is None:
+        entry = _provider_scoped_catalog_entry(model, normalized)
     if entry is not None:
-        profile_id, source = resolve_param_profile_id(model, provider or entry.provider)
+        profile_key = f'{entry.provider}/{entry.name}'
+        profile_id, source = resolve_param_profile_id(
+            profile_key,
+            provider or entry.provider,
+        )
         if not _entry_has_runtime_overrides(entry):
             synthetic = synthetic_entry_from_profile(
-                model,
+                profile_key,
                 provider or entry.provider,
                 profile_id=profile_id,
             )
@@ -176,7 +190,6 @@ def resolve_effective_model_entry(
             return merged, profile_id, source
         return entry, profile_id, 'catalog'
 
-    normalized = normalize_provider_name(provider)
     profile_id, source = resolve_param_profile_id(model, normalized)
     synthetic = synthetic_entry_from_profile(model, normalized, profile_id=profile_id)
     return synthetic, profile_id, source
@@ -198,7 +211,10 @@ def resolve_model_entry_for_capabilities(
     if scoped is None and fallback is not None and fallback.name == model:
         scoped = fallback
 
-    model_key = scoped.name if scoped is not None else model
+    if scoped is not None:
+        model_key = f'{scoped.provider}/{scoped.name}'
+    else:
+        model_key = model
     entry, _, _ = resolve_effective_model_entry(model_key, provider)
     return entry
 

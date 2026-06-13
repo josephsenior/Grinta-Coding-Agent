@@ -58,7 +58,7 @@
     {"family": "openai_gpt5", "patterns": ["gpt-5*", "gpt-5.*", "*codex*"]},
     {"family": "openai_o_series", "patterns": ["o1*", "o3*", "o4*"]},
     {"family": "anthropic_claude4", "patterns": ["claude-*", "claude*"]},
-    {"family": "gemini_flash", "patterns": ["*gemini*flash*", "*flash*"]},
+    {"family": "gemini_flash", "patterns": ["*gemini*flash*", "gemini-*-flash*"]},
     {"family": "gemini_pro", "patterns": ["*gemini*pro*", "gemini-*"]}
   ]
 }

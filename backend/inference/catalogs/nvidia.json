@@ -1,9 +1,6 @@
 {
   "provider": "nvidia",
   "client": "openai_compatible",
-  "metadata": {
-    "dynamic_listing": true
-  },
   "models": {
     "meta/llama-3.1-70b-instruct": {
       "runtime": {

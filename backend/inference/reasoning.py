@@ -1,8 +1,14 @@
 """Family-driven reasoning wire mapping for LLM call kwargs.
 
-User config exposes a single ``reasoning_effort`` knob. Catalog ``metadata``
-(``capabilities.reasoning``, ``family``, ``variants``) plus a small wire registry
-select the provider-specific request fields automatically — no per-model Python.
+User config exposes a single ``reasoning_effort`` knob. Resolution is deterministic:
+
+1. Catalog ``metadata.variants`` or ``metadata.reasoning_efforts`` (per-model override)
+2. Family profile from ``reasoning_profiles.json`` (prefix inheritance — add once per family)
+3. Gateway vendor profile from ``reasoning_profiles.json``
+4. Wire default from ``reasoning_profiles.json``
+
+``_resolve_wire_schema`` still selects the provider-specific request wire; profiles only
+choose which effort tiers are legal for UI + runtime normalization.
 """
 
 from __future__ import annotations
@@ -16,6 +22,11 @@ from backend.inference.catalog_loader import (
     ModelEntry,
     _transport_client_for_entry,
 )
+from backend.inference.reasoning_profiles import (
+    normalize_effort_value,
+    resolve_allowed_efforts,
+    split_upstream_model_id as _split_upstream_model_id,
+)
 
 # Wire schema identifiers (family registry — not per-model).
 WIRE_OPENAI_REASONING_EFFORT = 'openai_reasoning_effort'
@@ -27,17 +38,6 @@ WIRE_GEMINI_NATIVE = 'gemini_native'
 WIRE_GEMINI_OPENAI_COMPAT = 'gemini_openai_compat'
 WIRE_GLM_THINKING = 'glm_thinking'
 WIRE_NONE = 'none'
-
-_DEFAULT_EFFORTS_BY_WIRE: dict[str, tuple[str, ...]] = {
-    WIRE_OPENAI_REASONING_EFFORT: ('minimal', 'low', 'medium', 'high'),
-    WIRE_OPENAI_THINKING_AND_EFFORT: ('low', 'medium', 'high'),
-    WIRE_OPENAI_THINKING_ENABLED: ('low', 'medium', 'high'),
-    WIRE_ANTHROPIC_ADAPTIVE: ('low', 'medium', 'high'),
-    WIRE_ANTHROPIC_EXTENDED: ('low', 'medium', 'high'),
-    WIRE_GEMINI_NATIVE: ('minimal', 'low', 'medium', 'high'),
-    WIRE_GEMINI_OPENAI_COMPAT: ('minimal', 'low', 'medium', 'high'),
-    WIRE_GLM_THINKING: ('low', 'medium', 'high'),
-}
 
 _EFFORT_TO_GEMINI_LEVEL: dict[str, str] = {
     'minimal': 'minimal',
@@ -91,17 +91,6 @@ _UPSTREAM_VENDOR_PREFIXES: frozenset[str] = frozenset(
 )
 
 
-def _split_upstream_model_id(model_id: str) -> tuple[str | None, str]:
-    """Split gateway ids like ``anthropic/claude-sonnet-4`` into vendor + bare id."""
-    if '/' not in model_id:
-        return None, model_id
-    prefix, rest = model_id.split('/', 1)
-    normalized = prefix.strip().lower()
-    if normalized in _UPSTREAM_VENDOR_PREFIXES and rest.strip():
-        return normalized, rest.strip()
-    return None, model_id
-
-
 def _logical_model_name(entry: ModelEntry) -> str:
     """Bare model id used for family and capability heuristics."""
     _vendor, bare = _split_upstream_model_id(entry.name)
@@ -120,6 +109,36 @@ def _capabilities(entry: ModelEntry) -> dict[str, Any]:
 def _variants(entry: ModelEntry) -> dict[str, Any]:
     variants = _metadata_dict(entry).get('variants')
     return variants if isinstance(variants, dict) else {}
+
+
+def _openai_logical_supports_reasoning(logical_lower: str) -> bool:
+    """Return True when an OpenAI-family model id is a known reasoning model."""
+    if logical_lower.startswith(('o1', 'o3', 'o4')):
+        return True
+    if 'codex' in logical_lower:
+        return True
+    if logical_lower.startswith('gpt-'):
+        version = logical_lower[4:]
+        return version.startswith('5') or version.startswith('5.')
+    return False
+
+
+def _model_name_supports_reasoning(entry: ModelEntry) -> bool:
+    """Best-effort reasoning detection from bare/upstream model ids."""
+    logical = _logical_model_name(entry).lower()
+    if _openai_logical_supports_reasoning(logical):
+        return True
+    if logical.startswith(('o1', 'o3', 'o4')):
+        return True
+    if logical.startswith('claude-'):
+        return True
+    if logical.startswith('grok-4'):
+        return True
+    if 'gemini' in logical and any(token in logical for token in ('2.5', '2-', '3', '3.')):
+        return True
+    if any(token in logical for token in ('reasoner', 'r1', 'thinking', 'qwq')):
+        return True
+    return False
 
 
 def infer_family(entry: ModelEntry) -> str:
@@ -174,39 +193,33 @@ def supports_reasoning(entry: ModelEntry) -> bool:
     if entry.supports_reasoning_effort:
         return True
 
-    family = infer_family(entry)
-    if entry.provider == 'anthropic' and family.startswith('claude'):
-        return True
-    if entry.provider == 'google' and family.startswith('gemini'):
-        return True
-    if entry.provider == 'openai' and family.startswith('gpt'):
-        return True
-    normalized = entry.name.lower()
-    if entry.provider == 'openai' and normalized.startswith(('o1', 'o3', 'o4', 'gpt-')):
-        return True
-    if entry.provider == 'xai' and normalized.startswith('grok-4'):
+    if entry.provider == 'anthropic':
+        return infer_family(entry).startswith('claude')
+    if entry.provider == 'google':
+        return infer_family(entry).startswith('gemini') and _model_name_supports_reasoning(
+            entry
+        )
+    if entry.provider == 'openai':
+        return entry.supports_reasoning_effort or _model_name_supports_reasoning(entry)
+    if entry.provider == 'xai' and _logical_model_name(entry).lower().startswith('grok-4'):
         return True
 
     vendor, logical = _split_upstream_model_id(entry.name)
     logical_lower = logical.lower()
     if vendor == 'anthropic' and logical_lower.startswith('claude'):
         return True
-    if vendor == 'openai' and logical_lower.startswith(
-        ('gpt-', 'o1', 'o3', 'o4', 'codex')
-    ):
-        return True
+    if vendor == 'openai':
+        return _openai_logical_supports_reasoning(logical_lower)
     if vendor == 'google' and 'gemini' in logical_lower:
-        return True
-    if vendor == 'xai' and logical_lower.startswith('grok-'):
+        return any(token in logical_lower for token in ('2.5', '2-', '3', '3.'))
+    if vendor == 'xai' and logical_lower.startswith('grok-4'):
         return True
     if vendor == 'deepseek' and any(
         token in logical_lower for token in ('reasoner', 'r1', 'thinking')
     ):
         return True
-    if any(token in logical_lower for token in ('qwq', 'reasoner', '-r1', 'thinking')):
-        return True
 
-    return logical_lower.startswith(('o1', 'o3', 'o4', 'gpt-'))
+    return _model_name_supports_reasoning(entry)
 
 
 def _resolve_wire_schema(entry: ModelEntry, family: str) -> str:
@@ -253,11 +266,62 @@ def _resolve_wire_schema(entry: ModelEntry, family: str) -> str:
     return WIRE_NONE
 
 
-def _allowed_efforts(entry: ModelEntry, wire: str) -> tuple[str, ...]:
+def _allowed_efforts(entry: ModelEntry, wire: str, family: str) -> tuple[str, ...]:
+    return resolve_allowed_efforts(entry, wire=wire, family=family)
+
+
+_EFFORT_DISPLAY_LABELS: dict[str, str] = {
+    'none': 'Off (omit)',
+    'minimal': 'Minimal',
+    'low': 'Low',
+    'medium': 'Medium',
+    'high': 'High',
+    'xhigh': 'Extra high',
+    'max': 'Max',
+}
+
+
+def reasoning_effort_label(value: str, entry: ModelEntry) -> str:
+    """Return a display label for one executable reasoning effort value."""
     variants = _variants(entry)
-    if variants:
-        return tuple(str(key).lower() for key in variants.keys())
-    return _DEFAULT_EFFORTS_BY_WIRE.get(wire, ('low', 'medium', 'high'))
+    variant = variants.get(value) if isinstance(variants, dict) else None
+    if isinstance(variant, dict):
+        effort = variant.get('effort') or variant.get('reasoningEffort')
+        if isinstance(effort, str) and effort.strip():
+            return effort.strip().replace('_', ' ').title()
+    return _EFFORT_DISPLAY_LABELS.get(value, value.replace('_', ' ').title())
+
+
+def reasoning_control_label(entry: ModelEntry | None) -> str:
+    """Return the settings-field title for the reasoning selector."""
+    if entry is None or not supports_reasoning(entry):
+        return 'Reasoning effort'
+    wire = _resolve_wire_schema(entry, infer_family(entry))
+    if wire in {WIRE_GEMINI_NATIVE, WIRE_GEMINI_OPENAI_COMPAT}:
+        return 'Thinking level'
+    if wire in {WIRE_ANTHROPIC_ADAPTIVE, WIRE_ANTHROPIC_EXTENDED}:
+        return 'Thinking effort'
+    if wire in {
+        WIRE_OPENAI_THINKING_AND_EFFORT,
+        WIRE_OPENAI_THINKING_ENABLED,
+        WIRE_GLM_THINKING,
+    }:
+        return 'Thinking mode'
+    return 'Reasoning effort'
+
+
+def reasoning_effort_display_options(
+    entry: ModelEntry | None,
+    *,
+    include_disabled: bool = False,
+) -> list[tuple[str, str]]:
+    """Return ``(label, value)`` pairs for UI selectors."""
+    values = reasoning_effort_options(entry, include_disabled=include_disabled)
+    if not values or entry is None:
+        return []
+    options: list[tuple[str, str]] = [('Default', '')]
+    options.extend((reasoning_effort_label(value, entry), value) for value in values)
+    return options
 
 
 def reasoning_effort_options(
@@ -272,10 +336,11 @@ def reasoning_effort_options(
     """
     if entry is None or not supports_reasoning(entry):
         return ()
-    wire = _resolve_wire_schema(entry, infer_family(entry))
+    family = infer_family(entry)
+    wire = _resolve_wire_schema(entry, family)
     if wire == WIRE_NONE:
         return ()
-    values = _allowed_efforts(entry, wire)
+    values = _allowed_efforts(entry, wire, family)
     if include_disabled:
         return ('none', *tuple(value for value in values if value != 'none'))
     return values
@@ -284,39 +349,7 @@ def reasoning_effort_options(
 def _normalize_effort(
     reasoning_effort: str | None, allowed: tuple[str, ...]
 ) -> str | None:
-    if reasoning_effort is None:
-        return allowed[-1] if allowed else 'medium'
-    effort = str(reasoning_effort).strip().lower()
-    if effort in ('', 'none', 'off', 'disabled'):
-        return None
-    if effort in allowed:
-        return effort
-    # Prefer exact case-insensitive match already handled; map common aliases.
-    aliases = {
-        'minimal': 'low',
-        'max': 'high',
-        'xhigh': 'high',
-    }
-    mapped = aliases.get(effort, effort)
-    if mapped in allowed:
-        return mapped
-    # Fall back to closest tier by position in default ordering.
-    default_order = ('minimal', 'low', 'medium', 'high', 'xhigh', 'max')
-    try:
-        target_idx = default_order.index(effort)
-    except ValueError:
-        return allowed[len(allowed) // 2] if allowed else 'medium'
-    best = allowed[0]
-    best_dist = 10
-    for candidate in allowed:
-        try:
-            dist = abs(default_order.index(candidate) - target_idx)
-        except ValueError:
-            continue
-        if dist < best_dist:
-            best = candidate
-            best_dist = dist
-    return best
+    return normalize_effort_value(reasoning_effort, allowed)
 
 
 def _variant_to_kwargs(variant: dict[str, Any]) -> dict[str, Any]:
@@ -456,7 +489,8 @@ def resolve_reasoning_plan(
     if wire == WIRE_NONE:
         return ReasoningPlan(enabled=False, wire=WIRE_NONE)
 
-    allowed = _allowed_efforts(entry, wire)
+    family = infer_family(entry)
+    allowed = _allowed_efforts(entry, wire, family)
     resolved = _normalize_effort(reasoning_effort, allowed)
     if resolved is None:
         return ReasoningPlan(

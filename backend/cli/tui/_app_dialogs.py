@@ -446,7 +446,6 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         return build_model_entries_by_provider(
             api_key=api_key,
             provider=provider,
-            include_remote=bool((api_key or '').strip()),
         )
 
     def _apply_model_list_to_ui(self, provider: str) -> None:
@@ -539,7 +538,7 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
             )
             yield Input(value=current_custom_model, id='settings-custom-model')
             yield Label('', id='settings-model-meta')
-            yield Label('Reasoning effort', classes='field-label')
+            yield Label('Reasoning effort', classes='field-label', id='settings-reasoning-label')
             yield Select(
                 options=self._reasoning_options(current_provider, current_model),
                 value=current_reasoning,
@@ -748,30 +747,15 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
     def _reasoning_options(
         self, provider: str | None, model: str | None
     ) -> list[tuple[str, str]]:
-        from backend.inference.reasoning import reasoning_effort_options
+        from backend.inference.reasoning import reasoning_effort_display_options
 
         entry = self._selected_entry(provider, model)
         if entry is None:
             return [('Default', '')]
-        values = reasoning_effort_options(entry, include_disabled=True)
-        if not values:
+        options = reasoning_effort_display_options(entry, include_disabled=True)
+        if not options:
             return [('Not supported by selected model', '')]
-        labels = [('Default', '')]
-        labels.extend((self._reasoning_label(value), value) for value in values)
-        return labels
-
-    @staticmethod
-    def _reasoning_label(value: str) -> str:
-        labels = {
-            'none': 'Off (omit)',
-            'minimal': 'Minimal',
-            'low': 'Low',
-            'medium': 'Medium',
-            'high': 'High',
-            'xhigh': 'Extra high',
-            'max': 'Max',
-        }
-        return labels.get(value, value.replace('_', ' ').title())
+        return options
 
     def _current_reasoning_for_model(self, provider: str, model: str) -> str:
         configured = ''
@@ -787,6 +771,12 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         return configured if configured in allowed else ''
 
     def _sync_reasoning_options(self, provider: str, model: str) -> None:
+        from backend.inference.reasoning import reasoning_control_label
+
+        entry = self._selected_entry(provider, model)
+        self.query_one('#settings-reasoning-label', Label).update(
+            reasoning_control_label(entry)
+        )
         select = self.query_one('#settings-reasoning', Select)
         options = self._reasoning_options(provider, model)
         select.set_options(options)
