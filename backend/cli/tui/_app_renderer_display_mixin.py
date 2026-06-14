@@ -23,6 +23,7 @@ from backend.cli._event_renderer.unified_renderer import (
     ActivityCard,
     ActivityRenderer,
 )
+from backend.cli.orient_tools import OrientLineModel
 
 
 class _AppRendererDisplayMixin:
@@ -52,6 +53,9 @@ class _AppRendererDisplayMixin:
         self._pending_shell_cards_by_command = defaultdict(deque)
         self._pending_file_read_cards_by_path = defaultdict(deque)
         self._pending_file_create_cards_by_path = defaultdict(deque)
+        self._orient_burst_lines = []
+        self._orient_burst_widgets = []
+        self._orient_burst_area = 'codebase'
         self._active_worker_tasks = []
         self._worker_recent_results.clear()
         self._worker_completed = 0
@@ -413,6 +417,7 @@ class _AppRendererDisplayMixin:
         """
         if collapsed is None:
             collapsed = True
+        self._flush_orient_burst()
         self.commit_live_thinking()
         self._clear_last_active_card_processing()
 
@@ -482,6 +487,53 @@ class _AppRendererDisplayMixin:
             display.append_widget(widget)
         self._sync_transcript_viewport()
         return widget
+
+    def _append_transcript_widget(self, widget: Any) -> None:
+        display = self._tui._get_display()
+        self._register_widget_event_id(widget)
+        if getattr(self, '_prepend_mode', False):
+            display.prepend_widget(widget)
+        else:
+            display.append_widget(widget)
+        self._sync_transcript_viewport()
+
+    def _write_orient_line(self, model: OrientLineModel) -> Any:
+        from backend.cli.tui.widgets.activity_card import OrientLine
+
+        self.commit_live_thinking()
+        self._clear_last_active_card_processing()
+        widget = OrientLine(model)
+        self._append_transcript_widget(widget)
+        self._orient_burst_lines.append(model)
+        self._orient_burst_widgets.append(widget)
+        self._orient_burst_area = model.area or self._orient_burst_area
+        self._tui.set_current_operation(
+            f'{model.verb} {model.target}'.strip(),
+            meta=model.result,
+            active=False,
+        )
+        return widget
+
+    def _flush_orient_burst(self) -> None:
+        lines = list(getattr(self, '_orient_burst_lines', []) or [])
+        widgets = list(getattr(self, '_orient_burst_widgets', []) or [])
+        if not lines:
+            return
+        self._orient_burst_lines = []
+        self._orient_burst_widgets = []
+        area = getattr(self, '_orient_burst_area', 'codebase')
+        self._orient_burst_area = 'codebase'
+        if len(lines) < 3:
+            return
+        for widget in widgets:
+            try:
+                widget.remove()
+            except Exception:
+                pass
+        from backend.cli.tui.widgets.activity_card import OrientBurst
+
+        burst = OrientBurst(area, lines, collapsed=True)
+        self._append_transcript_widget(burst)
 
     def _apply_card_final_state(
         self,
@@ -583,6 +635,7 @@ class _AppRendererDisplayMixin:
             ActivityCard as TUIActivityCard,
         )
 
+        self._flush_orient_burst()
         self.commit_live_thinking()
         self._clear_last_active_card_processing()
         status_map = {'ok': 'ok', 'err': 'err', 'warn': 'warn', 'neutral': 'neutral'}

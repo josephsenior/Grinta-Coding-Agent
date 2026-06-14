@@ -25,7 +25,17 @@ def _orient_path(path: str | None, max_len: int = 36) -> str:
     if not path:
         return ''
     from backend.cli.text_truncation import shorten_path
-    return shorten_path(path, max_len=max_len)
+
+    display = shorten_path(path, max_len=max_len)
+    if not display.startswith('…') or len(display) <= 1:
+        return display
+    if display[1] in '/\\':
+        return display
+    tail = display[1:]
+    separators = [idx for idx in (tail.find('/'), tail.find('\\')) if idx >= 0]
+    if not separators:
+        return display
+    return '…' + tail[min(separators):]
 
 
 def _pluralize_result_label(label: str, count: int) -> str:

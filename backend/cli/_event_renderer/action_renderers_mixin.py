@@ -54,6 +54,18 @@ from backend.cli.layout_tokens import (
     ACTIVITY_CARD_TITLE_TOOL,
     DECISION_PANEL_ACCENT_STYLE,
 )
+from backend.cli.orient_tools import (
+    ORIENT_MCP_TOOL_NAMES,
+    OrientLineModel,
+    analyze_action_model,
+    file_read_action_model,
+    find_symbols_action_model,
+    glob_action_model,
+    grep_action_model,
+    lsp_action_model,
+    mcp_action_model,
+    read_symbols_action_model,
+)
 from backend.cli.path_links import linkify_plain
 from backend.cli.theme import (
     CLR_OPTION_RECOMMENDED,
@@ -62,19 +74,7 @@ from backend.cli.theme import (
     MARK_INFO,
     STYLE_DIM,
 )
-from backend.cli.tool_call_display import (
-    friendly_verb_for_tool,
-    tool_headline,
-)
-
-# MCP tool name → (high-level tool name, icon, verb)
-_ORIENT_MCP_MAP: dict[str, tuple[str, str, str]] = {
-    'web_search_exa': ('web_search', '⚐', 'Searched'),
-    'web_fetch_exa': ('web_fetch', '⚐', 'Fetched'),
-    'resolve-library-id': ('docs_resolve', '⚐', 'Resolved'),
-    'query-docs': ('docs_query', '⚐', 'Queried'),
-}
-
+from backend.cli.tool_call_display import friendly_verb_for_tool, tool_headline
 from backend.cli.transcript import (  # noqa: E402
     format_activity_block,
     format_activity_secondary,
@@ -112,7 +112,7 @@ from backend.ledger.action import (  # noqa: E402
     UncertaintyAction,
 )
 
-_ORIENT_MCP_NAMES: frozenset[str] = frozenset(_ORIENT_MCP_MAP.keys())
+_ORIENT_MCP_NAMES: frozenset[str] = ORIENT_MCP_TOOL_NAMES
 
 
 class ActionRenderersMixin(_ActionRenderersBase):
@@ -127,6 +127,8 @@ class ActionRenderersMixin(_ActionRenderersBase):
     # Orient burst tracking — consecutive orient lines get grouped.
     _orient_burst_count: int
     _orient_burst_area: str
+    _pending_orient_line: OrientLineModel | None
+    _orient_burst_lines: list[OrientLineModel]
 
     # Dispatch table for :meth:`_handle_agent_action` — maps action class to
     # the method that knows how to render it.  Looked up via ``isinstance``
@@ -168,35 +170,42 @@ class ActionRenderersMixin(_ActionRenderersBase):
 
     # -- Orient tool helpers --------------------------------------------------
 
-    def _emit_orient_line(
-        self, icon: str, verb: str, target: str, result: str = '…'
-    ) -> None:
-        """Emit a flat orient tool line with burst tracking."""
-        count = getattr(self, '_orient_burst_count', 0)
-        # Flush any pending non-orient card before starting a burst
-        if count == 0:
-            self._flush_pending_activity_card()
-        # Track burst
-        setattr(self, '_orient_burst_count', count + 1)
-        # Print the orient line immediately
+    def _queue_orient_line(self, model: OrientLineModel) -> None:
+        """Queue an orient line until its observation supplies the metric."""
+        self._flush_pending_activity_card()
+        pending = getattr(self, '_pending_orient_line', None)
+        if pending is not None:
+            self._append_orient_line(pending)
+        self._pending_orient_line = model
+
+    def _append_orient_line(self, model: OrientLineModel) -> None:
+        lines = getattr(self, '_orient_burst_lines', None)
+        if lines is None:
+            lines = []
+            self._orient_burst_lines = lines
+        lines.append(model)
+        self._orient_burst_count = len(lines)
+        self._orient_burst_area = model.area or self._orient_burst_area
         self._emit_activity_turn_header()
-        line = format_orient_line(icon, verb, target, result)
+        line = format_orient_line(
+            model.icon,
+            model.verb,
+            model.target,
+            model.result,
+        )
         self._print_or_buffer(Padding(line, pad=ACTIVITY_BLOCK_BOTTOM_PAD))
 
     def _flush_orient_burst(self) -> None:
-        """Flush the orient burst — emit a summary header if ≥3 lines."""
-        count = getattr(self, '_orient_burst_count', 0)
-        setattr(self, '_orient_burst_count', 0)
-        setattr(self, '_orient_burst_area', 'codebase')
+        """Flush queued orient lines; group only when the finished burst is dense."""
+        pending = getattr(self, '_pending_orient_line', None)
+        if pending is not None:
+            self._pending_orient_line = None
+            self._append_orient_line(pending)
 
-        if count >= 3:
-            area = getattr(self, '_orient_burst_area', 'codebase')
-            from backend.cli.transcript import format_orient_burst_header
-
-            header = format_orient_burst_header(area, count)
-            self._print_or_buffer(
-                Padding(header, pad=ACTIVITY_BLOCK_BOTTOM_PAD)
-            )
+        self._orient_burst_lines = []
+        self._orient_burst_count = 0
+        self._orient_burst_area = 'codebase'
+        return
 
     _FILE_EDIT_VERBS: dict[str, tuple[str, bool]] = {
         # cmd → (verb, include_stats)
@@ -504,25 +513,13 @@ class ActionRenderersMixin(_ActionRenderersBase):
         self.refresh()
 
     def _render_file_read_action(self, action: FileReadAction) -> None:
-        self._flush_pending_tool_cards()
-        path = getattr(action, 'path', '')
-        view_range = getattr(action, 'view_range', None)
-        start = getattr(action, 'start', 0)
-        end = getattr(action, 'end', -1)
-        # Build target with left-ellipsis path
-        from backend.cli._tool_display.summarize import _orient_path
-
-        display_path = _orient_path(path, 36) if path else ''
-        if view_range and len(view_range) == 2:
-            target = f'{display_path} · lines {view_range[0]}–{view_range[1]}'
-        elif start not in (0, 1) or end != -1:
-            end_str = str(end) if end != -1 else 'end'
-            target = f'{display_path} · {start}:{end_str}'
-        else:
-            target = display_path
-        self._emit_orient_line('↳', 'Read', target)
+        self._queue_orient_line(file_read_action_model(action))
         thought = getattr(action, 'thought', '') or ''
-        _sync_reasoning_after_tool_line(self._reasoning, f'Read {path}', thought)
+        _sync_reasoning_after_tool_line(
+            self._reasoning,
+            f'Read {getattr(action, "path", "")}',
+            thought,
+        )
         self.refresh()
 
     @staticmethod
@@ -536,37 +533,17 @@ class ActionRenderersMixin(_ActionRenderersBase):
         return 'files'
 
     def _render_mcp_action(self, action: MCPAction) -> None:
-        self._flush_pending_tool_cards()
         name = getattr(action, 'name', 'tool')
         raw_args = getattr(action, 'arguments', None) or {}
-        # Emit flat orient line for orient MCP tools
         if name in _ORIENT_MCP_NAMES:
-            hl_name, icon, verb = _ORIENT_MCP_MAP[name]
-            # Build target from args
-            query = raw_args.get('query') or raw_args.get('pattern') or ''
-            url = ''
-            if isinstance(raw_args.get('urls'), list) and raw_args['urls']:
-                url = str(raw_args['urls'][0])
-            elif raw_args.get('url'):
-                url = str(raw_args['url'])
-            library = raw_args.get('library') or raw_args.get('library_name') or ''
-            if hl_name == 'web_search':
-                target = f'"{query}"' if query else 'search'
-            elif hl_name == 'web_fetch':
-                from backend.cli._tool_display.summarize import _orient_path
-
-                target = _orient_path(url) if url else 'fetch'
-            elif hl_name == 'docs_resolve':
-                target = f'{library} · "{query}"' if library and query else str(query or library or 'docs')
-            elif hl_name == 'docs_query':
-                target = f'{library} · "{query}"' if library and query else str(query or library or 'docs')
-            else:
-                target = str(query or url or name)
-            self._emit_orient_line(icon, verb, target)
+            model = mcp_action_model(action)
+            if model is not None:
+                self._queue_orient_line(model)
             thought = getattr(action, 'thought', '') or ''
             _sync_reasoning_after_tool_line(self._reasoning, f'{name}', thought)
             self.refresh()
             return
+        self._flush_pending_tool_cards()
         # Non-orient MCP tools use the existing card mechanism
         verb = friendly_verb_for_tool(name, raw_args)
         args_str = ', '.join(
@@ -635,49 +612,29 @@ class ActionRenderersMixin(_ActionRenderersBase):
         self.refresh()
 
     def _render_lsp_query_action(self, action: LspQueryAction) -> None:
-        self._flush_pending_tool_cards()
-        cmd = getattr(action, 'command', 'query')
-        symbol = getattr(action, 'symbol', '')
-        file = getattr(action, 'file', '')
-        target = f'{cmd} · {symbol or file}'.strip()
-        self._emit_orient_line('≡', 'Analyzed', target)
+        self._queue_orient_line(lsp_action_model(action))
         self.refresh()
 
     def _render_grep_action(self, action: GrepAction) -> None:
-        self._flush_pending_tool_cards()
-        target = f'"{action.pattern or ""}" in {action.path or ""}'.strip()
-        self._emit_orient_line('₡', 'Grepped', target)
+        self._queue_orient_line(grep_action_model(action))
         self.refresh()
 
     def _render_glob_action(self, action: GlobAction) -> None:
-        self._flush_pending_tool_cards()
-        target = f'{action.pattern or ""} in {action.path or ""}'.strip()
-        self._emit_orient_line('✻', 'Globbed', target)
+        self._queue_orient_line(glob_action_model(action))
         self.refresh()
 
     def _render_find_symbols_action(self, action: FindSymbolsAction) -> None:
-        self._flush_pending_tool_cards()
-        target = f'"{action.query or ""}"'
-        if action.path:
-            target += f' in {action.path}'
-        self._emit_orient_line('ƒ', 'Found', target)
+        self._queue_orient_line(find_symbols_action_model(action))
         self.refresh()
 
     def _render_read_symbols_action(self, action: ReadSymbolsAction) -> None:
-        self._flush_pending_tool_cards()
-        target_count = len(getattr(action, 'targets', []) or [])
-        target = f'{target_count} symbol{"s" if target_count != 1 else ""}'
-        if action.path:
-            target += f' in {action.path}'
-        self._emit_orient_line('↳', 'Read', target)
+        self._queue_orient_line(read_symbols_action_model(action))
         self.refresh()
 
     def _render_analyze_project_structure_action(
         self, action: AnalyzeProjectStructureAction
     ) -> None:
-        self._flush_pending_tool_cards()
-        target = f'{action.command} {action.path}'.strip()
-        self._emit_orient_line('≡', 'Analyzed', target or 'project structure')
+        self._queue_orient_line(analyze_action_model(action))
         self.refresh()
 
     def _render_task_tracking_action(self, action: TaskTrackingAction) -> None:

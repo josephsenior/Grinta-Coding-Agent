@@ -193,6 +193,8 @@ class CLIEventRenderer(
         #: Orient burst tracking — consecutive orient lines get grouped under a burst header.
         self._orient_burst_count: int = 0
         self._orient_burst_area: str = 'codebase'
+        self._pending_orient_line: Any | None = None
+        self._orient_burst_lines: list[Any] = []
 
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
