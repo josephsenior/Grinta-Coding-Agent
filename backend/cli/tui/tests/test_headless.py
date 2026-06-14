@@ -446,6 +446,61 @@ async def test_tui_content_growth_does_not_mark_user_scrolled_away(
 
 
 @pytest.mark.asyncio
+async def test_tui_user_scroll_wins_over_active_follow_tail(mock_config, monkeypatch):
+    """A user scroll must register even while a follow-tail scroll is in flight.
+
+    During streaming, _schedule_follow_tail keeps _suppress_scroll_sync True
+    almost continuously. Genuine user scroll input must still mark the
+    transcript as scrolled-away and must not be yanked back to the tail.
+    """
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(100, 24)) as pilot:
+        await pilot.pause()
+
+        display = _get_screen(app).query_one('#main-display')
+        display._suppress_mount_animation = True
+        await _fill_scrollable_transcript(display, pilot)
+
+        # Simulate an in-flight programmatic follow-tail scroll.
+        display._suppress_scroll_sync = True
+
+        display.user_scroll_page_up(animate=False)
+        await pilot.pause()
+
+        assert display._user_scrolled_away is True
+        assert not display._was_at_bottom()
+
+
+@pytest.mark.asyncio
+async def test_tui_backpressure_suppresses_mount_animation(mock_config, monkeypatch):
+    """set_backpressure(True) skips append_widget's mount offset animation."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(100, 24)) as pilot:
+        await pilot.pause()
+
+        display = _get_screen(app).query_one('#main-display')
+
+        display.set_backpressure(True)
+        assert display._under_backpressure is True
+        widget = Static('burst content')
+        display.append_widget(widget)
+        await pilot.pause()
+        # No offset animation was applied while under backpressure.
+        assert tuple(widget.styles.offset) == (0, 0)
+
+        display.set_backpressure(False)
+        assert display._under_backpressure is False
+
+
+@pytest.mark.asyncio
 async def test_tui_typing(mock_config):
     """Verify typing text into the input area works."""
     console = RichConsole()
