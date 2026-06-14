@@ -17,7 +17,20 @@ from backend.core.constants import DEFAULT_CONTINUITY_GATE_MIN_SCORE
 if TYPE_CHECKING:
     from backend.ledger.event import Event
 
-_CRITICAL_CONTINUITY_CATEGORIES = frozenset({'test_result'})
+# Categories whose loss from restored context ALWAYS degrades compaction
+# quality and is therefore blocking. ``failed_approach``/``failed_outcome``
+# encode "do not retry this" memory whose loss causes repeated-failure loops;
+# their survival is guaranteed by the deterministic fallback's canonical +
+# snapshot rendering, so blocking on them can only improve the quality of a
+# committed compaction, never replace a good summary with a worse one.
+#
+# ``error`` is intentionally NOT blocking: transient errors should be allowed
+# to drop on a later compaction, and forcing their retention would crowd out
+# current facts. Still-active failures are covered separately by the canonical
+# latest_verification validator.
+_CRITICAL_CONTINUITY_CATEGORIES = frozenset(
+    {'test_result', 'failed_approach', 'failed_outcome'}
+)
 
 
 @dataclass(frozen=True)
@@ -126,7 +139,22 @@ def compaction_passes_continuity_gate(
     )
     if critical_missing:
         return False, result
-    del min_score
+    # Non-critical text continuity is telemetry, not a hard gate: a fuzzy
+    # score must never reject a compaction that preserved every critical
+    # fact, since the deterministic fallback is not necessarily richer than
+    # the rejected summary for non-critical prose. We only surface a low
+    # score for observability.
+    if result.total and result.score < min_score:
+        from backend.core.logger import app_logger as logger
+
+        logger.info(
+            'Compaction continuity score below floor (score=%.2f < min=%.2f, '
+            'matched=%d/%d); non-critical, not blocking',
+            result.score,
+            min_score,
+            result.matched,
+            result.total,
+        )
     return True, result
 
 
@@ -154,7 +182,10 @@ def _fact_present(fact: ContinuityFact, normalized_context: str) -> bool:
         return True
     if expected in normalized_context:
         return True
-    # Long free-form notes are often clipped by the restored-context formatter.
+    # Long free-form notes may be clipped by the restored-context formatter.
+    # We still accept a sufficiently long head match, but require a
+    # substantial prefix (>=120 chars) so a heavily-truncated fragment does
+    # not get rubber-stamped as "present".
     return len(expected) > 120 and expected[:120] in normalized_context
 
 
