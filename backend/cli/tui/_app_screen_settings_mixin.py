@@ -6,7 +6,6 @@ from typing import Any
 
 from textual import events, work
 
-from backend.cli.hud import HUDBar
 from backend.cli._event_renderer.panels import task_panel_signature
 from backend.cli.tui._app_constants import _tui_logger
 from backend.cli.tui._app_dialogs import (  # noqa: F401

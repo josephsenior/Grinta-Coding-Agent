@@ -1042,7 +1042,9 @@ def _try_opencode_gemini_client(
 ) -> DirectLLMClient | None:
     if provider != 'opencode':
         return None
-    from backend.inference.direct_clients_opencode_gemini_ops import OpenCodeGeminiClient
+    from backend.inference.direct_clients_opencode_gemini_ops import (
+        OpenCodeGeminiClient,
+    )
     from backend.inference.provider_resolver import opencode_required_endpoint
 
     endpoint = opencode_required_endpoint(stripped_model)

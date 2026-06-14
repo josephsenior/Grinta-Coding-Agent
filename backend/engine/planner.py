@@ -26,6 +26,7 @@ CODE_PAYLOAD_TOOLS: frozenset[str] = frozenset()
 
 if TYPE_CHECKING:
     from backend.core.contracts.state import State
+    from backend.engine.safety import OrchestratorSafetyManager
     from backend.inference.llm import LLM
 
 
@@ -39,7 +40,6 @@ def _external_discovery_hint(*, enable_web: bool, enable_docs: bool) -> str:
         return ''
     return f' (including {" and ".join(parts)} when external context helps)'
 
-    from .safety import OrchestratorSafetyManager
 
 
 # Markers that appear only in system-injected user messages (workspace context,
@@ -133,7 +133,7 @@ class OrchestratorPlanner:
         self,
         config,
         llm: LLM,
-        safety_manager: OrchestratorSafetyManager,
+        safety_manager: 'OrchestratorSafetyManager',
         agent: Any = None,
     ) -> None:
         self._config = config

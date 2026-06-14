@@ -11,7 +11,6 @@ from backend.inference.tool_names import DOCS_QUERY_TOOL_NAME, DOCS_RESOLVE_TOOL
 from backend.integrations.mcp.native_backends import (
     CONTEXT7_QUERY_MCP_TOOL,
     CONTEXT7_RESOLVE_MCP_TOOL,
-    MCP_TOOLS_HIDDEN_BY_NATIVE_DOCS,
 )
 from backend.ledger.action.mcp import MCPAction
 

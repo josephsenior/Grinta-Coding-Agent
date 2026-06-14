@@ -17,9 +17,8 @@ from backend.cli.syntax_theme import (
     get_grinta_rich_syntax_theme,
     grinta_syntax_kwargs,
     inline_code_style,
-    invalidate_grinta_syntax_theme_cache,
 )
-from backend.cli.theme import NAVY_BG, NAVY_TEXT_PRIMARY
+from backend.cli.theme import NAVY_TEXT_PRIMARY
 from backend.cli.tui._app_helpers import _encode_unified_diff_text
 
 _COMPLETE_FENCE_RE = re.compile(r'```([^\n`]*)\n(.*?)```', re.DOTALL)

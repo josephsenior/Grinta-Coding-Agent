@@ -139,7 +139,8 @@ def test_compaction_continuity_gate_allows_missing_transient_error():
 
 def test_fallback_summary_retains_failed_approaches():
     """The snapshot injection (used by the deterministic fallback) keeps
-    failed-approach facts, so rejecting a lossy summary is quality-safe."""
+    failed-approach facts, so rejecting a lossy summary is quality-safe.
+    """
     events = _coding_session_events()
     snapshot = extract_snapshot(events)
     restored = format_snapshot_for_injection(snapshot)

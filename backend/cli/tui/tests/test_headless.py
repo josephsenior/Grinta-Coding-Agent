@@ -16,6 +16,7 @@ from backend.cli._event_renderer.unified_renderer import ActivityRenderer
 from backend.cli.hud import HUDBar
 from backend.cli.reasoning_display import ReasoningDisplay
 from backend.cli.theme import grinta_rich_theme_styles
+from backend.cli.tui._app_small_widgets import ScrollTailBadge
 from backend.cli.tui.app import (
     HUD,
     CommunicatePromptWidget,
@@ -31,13 +32,14 @@ from backend.cli.tui.app import (
 from backend.cli.tui.main import GrintaTUIApp
 from backend.cli.tui.widgets.activity_card import (
     ActivityCard as TUIActivityCard,
+)
+from backend.cli.tui.widgets.activity_card import (
     AgentMessage,
     LiveResponse,
     ThinkingIndicator,
     TurnCompletion,
 )
 from backend.cli.tui.widgets.unified_diff_view import UnifiedDiffRow, UnifiedDiffView
-from backend.cli.tui._app_small_widgets import ScrollTailBadge
 from backend.core.enums import AgentState, EventSource
 from backend.ledger.action import (
     AgentThinkAction,
@@ -1652,9 +1654,10 @@ async def test_tui_lsp_sidebar_lists_detected_servers(mock_config):
         await pilot.pause()
 
         s = _get_screen(app)
+        from types import SimpleNamespace
+
         from backend.cli.tui.app import TUIRenderer
         from backend.cli.tui.widgets.collapsible import CollapsibleSection, SidebarRow
-        from types import SimpleNamespace
 
         renderer = TUIRenderer(
             console=console,

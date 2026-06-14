@@ -91,8 +91,11 @@ def _resolve_prompt(task: dict[str, Any], prompt_file: str | None) -> str:
 
 
 def _load_bench_config():
-    from backend.core.config.config_loader import finalize_config, load_app_config
-    from backend.core.config.config_loader import load_from_json
+    from backend.core.config.config_loader import (
+        finalize_config,
+        load_app_config,
+        load_from_json,
+    )
 
     config = load_app_config(set_logging_levels=False)
     if _BENCH_SETTINGS.is_file():
@@ -202,7 +205,10 @@ def _update_results_file(
     metrics: dict[str, Any],
     notes: str,
 ) -> None:
-    from backend.evaluation.agent_eval_pack import build_results_template, load_results_document
+    from backend.evaluation.agent_eval_pack import (
+        build_results_template,
+        load_results_document,
+    )
 
     if results_path.is_file():
         results = load_results_document(results_path)

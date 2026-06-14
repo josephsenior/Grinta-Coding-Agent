@@ -75,14 +75,13 @@ _ORIENT_MCP_MAP: dict[str, tuple[str, str, str]] = {
     'query-docs': ('docs_query', '⚐', 'Queried'),
 }
 
-_ORIENT_MCP_NAMES: frozenset[str] = frozenset(_ORIENT_MCP_MAP.keys())
-from backend.cli.transcript import (
+from backend.cli.transcript import (  # noqa: E402
     format_activity_block,
     format_activity_secondary,
     format_callout_panel,
     format_orient_line,
 )
-from backend.ledger.action import (
+from backend.ledger.action import (  # noqa: E402
     Action,
     AgentThinkAction,
     AnalyzeProjectStructureAction,
@@ -112,6 +111,8 @@ from backend.ledger.action import (
     TerminalRunAction,
     UncertaintyAction,
 )
+
+_ORIENT_MCP_NAMES: frozenset[str] = frozenset(_ORIENT_MCP_MAP.keys())
 
 
 class ActionRenderersMixin(_ActionRenderersBase):

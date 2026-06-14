@@ -150,7 +150,9 @@ class _AppScreenStateMixin:
 
     def _resolve_hud_model_entry(self) -> Any | None:
         from backend.cli.config_manager import get_current_model
-        from backend.inference.param_profiles import resolve_model_entry_for_capabilities
+        from backend.inference.param_profiles import (
+            resolve_model_entry_for_capabilities,
+        )
         from backend.inference.registry import build_model_entries_by_provider
 
         provider = self._current_llm_provider()
