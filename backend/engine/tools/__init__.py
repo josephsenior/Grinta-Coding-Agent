@@ -4,7 +4,6 @@ from .analyze_project_structure import create_analyze_project_structure_tool
 from .bash import create_cmd_run_tool
 from .browser_native import create_browser_tool
 from .checkpoint import create_checkpoint_tool
-from .condensation_request import create_summarize_context_tool
 from .debugger import create_debugger_tool
 from .delegate_task import create_delegate_task_tool
 from .glob import create_glob_tool
@@ -29,7 +28,6 @@ from .terminal_manager import create_terminal_manager_tool
 
 __all__ = [
     'create_checkpoint_tool',
-    'create_summarize_context_tool',
     'create_ask_user_tool',
     'create_lsp_query_tool',
     'create_create_tool',

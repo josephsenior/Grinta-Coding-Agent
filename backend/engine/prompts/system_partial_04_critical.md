@@ -1,24 +1,9 @@
-<CRITICAL_TOOL_EXECUTION_RULES>
-MANDATORY:
-
-1. **File changes require tool calls** — never claim "I created/edited" without an editor tool invocation.
-2. To run commands, use `{terminal_command_tool}`; prose is not execution.
-3. {think_execution_rule}
-4. **Never fabricate outcomes** — if a tool fails, report it honestly.
-{terminal_manager_rule}6. **Verify before final summary** — run the narrowest relevant proof: reproducer, tests, lint, or typecheck. If verification cannot run, state the concrete blocker: no test/build harness exists, missing dependency or credential, environment cannot install/build/run, verification would be unsafe/destructive, or the task has no meaningful runnable check. Do not use vague excuses like "not applicable."
-{done_criteria_block}
-7. **No unchanged retries after failure** — change strategy or escalate with hypothesis, action/outcome, and ruled-out paths.
-8. **Tests must track real APIs** — Before adding or changing test code, **read** the implementation module(s) you are testing in this session and align mocks, fixtures, and calls with the **actual** signatures and return shapes. Do not assume parity with a different module or an earlier draft from memory.
-9. **Postmortem on failing tests** — After a test failure, state the likely root cause class (wrong assumed API vs mock shape vs implementation bug vs flake), then change **one** lever and re-run a **narrow** test command; avoid blind rewrite loops.
-10. **Tests are executable evidence, not absolute truth.** When tests fail, diagnose whether the failure indicates an implementation bug, stale/incorrect test expectation, fixture/mock mismatch, environment issue, or flake. Fix implementation when tests expose a real defect. Update tests only when evidence shows they are stale, incorrect, or inconsistent with the requested behavior/current API. Never edit tests merely to manufacture a pass.
-11. **Non-test failures** — After tool/build/lint/runtime failure, state the **root-cause class** in one phrase (wrong path/symbol vs stale assumption vs environment vs defect); then follow `<ERROR_RECOVERY>` (pivot tools, never rerun the same failing command unchanged, escalate with hypothesis / action-outcome / ruled-out paths). Rule 7 still applies.
-</CRITICAL_TOOL_EXECUTION_RULES>
+{execution_rules_body}
 
 <ANTI_PATTERNS>
 The following are *always wrong*. Avoid them even if they look like a shortcut.
 
-- **Editing existing content without current context.** Before mutating an existing file/symbol, inspect the relevant file, range, symbol, or anchor in this session. New file creation is exempt. New symbol creation requires reading the target file/anchor first. **Same bar for tests:** if you authored implementation earlier in the turn, **re-read it** before writing tests — memory drifts from the file on disk.
-{task_tracker_antipattern}
+{edit_context_antipattern}{task_tracker_antipattern}
 - **Inventing tool names or tool prefixes.** Pass tool names exactly as listed; if a name is not in the list, the tool is not available — pick a different approach.
 - {user_question_antipattern}
 - {destructive_ops_antipattern}

@@ -11,32 +11,49 @@ _RAW_URL_RE = re.compile(r'https?://\S+', re.IGNORECASE)
 # picking a preview line for the user-facing summary.
 _LOW_SIGNAL_MCP_LINES = frozenset({'search results', 'results', 'content', 'text'})
 
+# ── Orient tools ──────────────────────────────────────────────────────────────
+# These are the "looked at the world" tools: flat static line tier, no border,
+# no expansion, single fixed-width result column, left-ellipsis on paths.
+# They share one gutter color (dim accent) distinct from write/exec tools.
+ORIENT_TOOLS: frozenset[str] = frozenset({
+    'grep',
+    'glob',
+    'find_symbols',
+    'read_file',
+    'read_symbol',
+    'lsp',
+    'analyze_project_structure',
+    'web_search',
+    'web_fetch',
+    'docs_resolve',
+    'docs_query',
+})
+
 # (icon, short verb phrase for the activity line)
 _TOOL_HEADLINE: dict[str, tuple[str, str]] = {
     'execute_bash': ('', 'Shell'),
     'execute_powershell': ('', 'Shell'),
-    'read_file': ('', 'Files'),
+    'read_file': ('↳', 'Read'),
     'create': ('', 'Files'),
     'replace_string': ('', 'Files'),
     'edit_symbol': ('', 'Code edit'),
     'multiedit': ('', 'Files'),
-    'find_symbols': ('', 'Code edit'),
+    'find_symbols': ('ƒ', 'Found'),
     'agent_think': ('', 'Think'),
     'think': ('', 'Think'),
-    'summarize_context': ('', 'Summarize context'),
     'memory': ('', 'Memory'),
     'memory_manager': ('', 'Memory'),
     'task_tracker': ('', 'Tasks'),
-    'grep': ('', 'Search code'),
-    'glob': ('', 'List files'),
-    'lsp': ('', 'Code intelligence'),
-    'analyze_project_structure': ('', 'Analyze project'),
-    'read_symbol': ('', 'Read symbol'),
+    'grep': ('⌕', 'Grepped'),
+    'glob': ('✻', 'Globbed'),
+    'lsp': ('≡', 'Analyzed'),
+    'analyze_project_structure': ('≡', 'Analyzed'),
+    'read_symbol': ('↳', 'Read'),
     'browser': ('', 'Browser'),
-    'web_search': ('', 'Web search'),
-    'web_fetch': ('', 'Web fetch'),
-    'docs_resolve': ('', 'Docs resolve'),
-    'docs_query': ('', 'Docs query'),
+    'web_search': ('⚐', 'Searched'),
+    'web_fetch': ('⚐', 'Fetched'),
+    'docs_resolve': ('⚐', 'Resolved'),
+    'docs_query': ('⚐', 'Queried'),
     'delegate_task': ('', 'Delegate'),
     'shared_task_board': ('', 'Board'),
     'terminal_manager': ('', 'Terminal'),

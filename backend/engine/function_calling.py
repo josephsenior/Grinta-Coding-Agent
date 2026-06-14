@@ -43,7 +43,6 @@ from backend.engine.tools import (
     create_multiedit_tool,
     create_read_tool,
     create_replace_string_tool,
-    create_summarize_context_tool,
 )
 from backend.inference.tool_names import (
     ANALYZE_PROJECT_STRUCTURE_TOOL_NAME,
@@ -120,9 +119,6 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         cast(
             str, create_multiedit_tool().get('function', {}).get('name', '')
         ): _handle_multiedit_tool,
-        cast(
-            str, create_summarize_context_tool().get('function', {}).get('name', '')
-        ): _handle_summarize_context_tool,
         TASK_TRACKER_TOOL_NAME: _handle_task_tracker_tool,
         MEMORY_TOOL_NAME: _handle_memory_tool,
         GREP_TOOL_NAME: _handle_grep_tool,
@@ -335,7 +331,6 @@ from backend.engine.tools._tool_handlers import (  # noqa: E402, F401  # noqa: E
     _handle_mcp_tool,
     _handle_memory_manager_tool,
     _handle_memory_tool,
-    _handle_summarize_context_tool,
     _handle_task_tracker_tool,
     _handle_undo_last_edit_tool,
     _handle_docs_query_tool,

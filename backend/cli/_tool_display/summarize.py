@@ -17,7 +17,15 @@ def _trunc(s: str, max_len: int = 100) -> str:
     s = ' '.join(s.split())
     if len(s) <= max_len:
         return s
-    return s[: max_len - 1] + '…'
+    return s[: max_len - 1] + '\u2026'
+
+
+def _orient_path(path: str | None, max_len: int = 36) -> str:
+    """Format a path for orient tool target: left-ellipsis, no empty fallback."""
+    if not path:
+        return ''
+    from backend.cli.text_truncation import shorten_path
+    return shorten_path(path, max_len=max_len)
 
 
 def _pluralize_result_label(label: str, count: int) -> str:
@@ -202,10 +210,11 @@ def _summary_read_file(args: dict[str, Any]) -> str:
     path = _arg_str(args, 'path')
     if not path:
         return 'file…'
+    display_path = _orient_path(path)
     vr = args.get('view_range')
     if isinstance(vr, list) and len(vr) >= 2:
-        return f'{path} · lines {vr[0]}–{vr[1]}'
-    return path
+        return f'{display_path} · lines {vr[0]}–{vr[1]}'
+    return display_path
 
 
 def _summary_create(args: dict[str, Any]) -> str:
@@ -237,9 +246,13 @@ def _summary_multiedit(args: dict[str, Any]) -> str:
 
 def _summary_find_symbol(args: dict[str, Any]) -> str:
     path = _arg_str(args, 'path')
-    symbol = _arg_str(args, 'symbol_name')
-    bits = [b for b in (path, symbol) if b]
-    return ' · '.join(bits) if bits else 'find symbol…'
+    symbol = _arg_str(args, 'symbol_name', 'query')
+    parts: list[str] = []
+    if symbol:
+        parts.append(f'"{_trunc(symbol, 50)}"')
+    if path:
+        parts.append(f'in {_orient_path(path)}')
+    return ' '.join(parts) if parts else 'find symbol…'
 
 
 def _summary_think(args: dict[str, Any]) -> str:
@@ -268,45 +281,60 @@ def _summary_task_tracker(args: dict[str, Any]) -> str:
 def _summary_grep(args: dict[str, Any]) -> str:
     q = _arg_str(args, 'query', 'pattern')
     path = _arg_str(args, 'path', 'root', 'directory')
-    bits: list[str] = []
+    parts: list[str] = []
     if q:
-        bits.append(_trunc(q, 80))
+        parts.append(f'"{_trunc(q, 60)}"')
     if path:
-        bits.append(path)
-    return ' in '.join(bits) if bits else 'search…'
+        parts.append(f'in {_orient_path(path)}')
+    return ' '.join(parts) if parts else 'search…'
 
 
 def _summary_glob(args: dict[str, Any]) -> str:
     q = _arg_str(args, 'query', 'pattern')
     path = _arg_str(args, 'path', 'root', 'directory')
-    bits: list[str] = []
+    parts: list[str] = []
     if q:
-        bits.append(_trunc(q, 80))
+        parts.append(_trunc(q, 60))
     if path:
-        bits.append(path)
-    return ' in '.join(bits) if bits else 'list…'
+        parts.append(f'in {_orient_path(path)}')
+    return ' '.join(parts) if parts else 'list…'
 
 
 def _summary_lsp(args: dict[str, Any]) -> str:
     cmd = args.get('command') or args.get('query_type')
     path = args.get('file') or args.get('path')
     sym = args.get('symbol') or args.get('name')
-    bits = [str(x) for x in (cmd, sym or path) if x]
-    return _trunc(' · '.join(bits), 120) if bits else 'LSP…'
+    parts: list[str] = []
+    if cmd:
+        parts.append(str(cmd))
+    if sym:
+        parts.append(str(sym))
+    elif path:
+        parts.append(_orient_path(str(path)))
+    return _trunc(' · '.join(parts), 120) if parts else 'LSP…'
 
 
-def _summary_analyze_project(_args: dict[str, Any]) -> str:
-    return 'scan workspace'
+def _summary_analyze_project(args: dict[str, Any]) -> str:
+    cmd = args.get('command') or args.get('query_type')
+    path = args.get('path') or args.get('root')
+    parts: list[str] = []
+    if cmd:
+        parts.append(str(cmd))
+    if path:
+        parts.append(_orient_path(str(path)))
+    return _trunc(' · '.join(parts), 120) if parts else 'scan workspace'
 
 
 def _summary_read_symbol(args: dict[str, Any]) -> str:
+    path = _arg_str(args, 'path')
     entities = args.get('entity_names')
+    parts: list[str] = []
     if isinstance(entities, list) and entities:
-        first = str(entities[0])
-        if len(entities) == 1:
-            return _trunc(first, 60)
-        return f'{_trunc(first, 40)} (+{len(entities) - 1})'
-    return 'read symbol'
+        count = len(entities)
+        parts.append(f'{count} symbol{"s" if count != 1 else ""}')
+    if path:
+        parts.append(f'in {_orient_path(path)}')
+    return ' '.join(parts) if parts else 'read symbol'
 
 
 def _summary_verify_file(args: dict[str, Any]) -> str:
@@ -340,10 +368,6 @@ def _summary_checkpoint(args: dict[str, Any]) -> str:
     return _trunc(label, 80) if label else 'save state'
 
 
-def _summary_summarize_context(_args: dict[str, Any]) -> str:
-    return 'compress conversation'
-
-
 def _summary_shared_board(args: dict[str, Any]) -> str:
     op = args.get('operation') or args.get('command')
     return str(op) if op else 'board…'
@@ -373,7 +397,6 @@ _TOOL_SUMMARIZERS: dict[str, Callable[[dict[str, Any]], str]] = {
     'ask_user': _summary_ask_user,
     'call_mcp_tool': _summary_call_mcp,
     'checkpoint': _summary_checkpoint,
-    'summarize_context': _summary_summarize_context,
     'terminal_manager': _summarize_terminal_manager_args,
     'shared_task_board': _summary_shared_board,
 }

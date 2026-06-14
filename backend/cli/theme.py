@@ -98,6 +98,7 @@ def _apply_theme_overrides() -> None:
     global CLR_QUESTION_TEXT, CLR_OPTION_TEXT, CLR_OPTION_RECOMMENDED
     global CLR_OUTPUT_PANEL_BORDER, CLR_OUTPUT_PANEL_TITLE
     global CLR_RECOVERY_HINT, CLR_RECOVERY_HINT_DIM
+    global CLR_ORIENT_GUTTER
     global PT_DEFAULT_FG, PT_PLACEHOLDER_DIM
     global PT_FOOTER_BADGE_BRACKET, PT_FOOTER_BADGE_CORE, PT_FOOTER_KICKER
     global PT_FOOTER_WARN_BRACKET, PT_FOOTER_WARN_CORE, PT_FOOTER_WARN_KICKER
@@ -135,6 +136,7 @@ def _apply_theme_overrides() -> None:
         CLR_RISK_LOW = '#16a34a'
         CLR_SPLASH_FIGLET = 'bold #b91c1c'
         CLR_SPLASH_LOGO_ACCENT = '#b91c1c'
+        CLR_ORIENT_GUTTER = '#64748b'
         STYLE_BOLD_DIM = 'bold #475569'
         CLR_USER_BG = 'on #f8fafc'
 
@@ -167,6 +169,7 @@ def _apply_theme_overrides() -> None:
         CLR_RISK_LOW = 'bold green'
         CLR_SPLASH_FIGLET = 'bold white'
         CLR_SPLASH_LOGO_ACCENT = 'white'
+        CLR_ORIENT_GUTTER = 'bright_black'
         STYLE_BOLD_DIM = 'bold white'
         CLR_USER_BG = ''
 
@@ -199,6 +202,7 @@ def _apply_theme_overrides() -> None:
         CLR_RISK_LOW = '#22d3ee'
         CLR_SPLASH_FIGLET = 'bold #0ea5e9'
         CLR_SPLASH_LOGO_ACCENT = '#0ea5e9'
+        CLR_ORIENT_GUTTER = '#4a7a9a'
         STYLE_BOLD_DIM = 'bold #7dd3fc'
         CLR_USER_BG = 'on #0f1c2e'
 
@@ -231,6 +235,7 @@ def _apply_theme_overrides() -> None:
         CLR_RISK_LOW = 'bold green'
         CLR_SPLASH_FIGLET = 'bold white'
         CLR_SPLASH_LOGO_ACCENT = 'white'
+        CLR_ORIENT_GUTTER = 'bright_black'
         STYLE_BOLD_DIM = 'bold white'
         CLR_USER_BG = ''
 
@@ -312,6 +317,7 @@ def _apply_theme_overrides() -> None:
         CLR_OUTPUT_PANEL_TITLE = 'dim #969aad'
         CLR_RECOVERY_HINT = '#91abec'
         CLR_RECOVERY_HINT_DIM = 'dim #91abec'
+        CLR_ORIENT_GUTTER = '#5a6a8a'
         STYLE_BOLD_DIM = 'bold #969aad'
         CLR_MUTED_TEXT = '#1b233a'
 
@@ -495,6 +501,9 @@ CLR_STATE_RUNNING = '#91abec bold'  # running / active state badge (brand blue)
 CLR_AUTONOMY_BALANCED = '#54efae'  # balanced autonomy tag
 CLR_AUTONOMY_FULL = '#f6ff8f bold'  # full autonomy tag (lime yellow)
 CLR_AUTONOMY_CONSERVATIVE = '#91abec bold'  # conservative autonomy (blue)
+
+# ── Orient tool gutter (dim accent for the "looked at the world" category) ───
+CLR_ORIENT_GUTTER = '#5a6a8a'  # dim blue-gray — orient tool icon/verb gutter
 
 # ── Section divider ────────────────────────────────────────────────────────────
 CLR_SECTION_RULE = '#32416a'  # "Tools & commands" divider rule

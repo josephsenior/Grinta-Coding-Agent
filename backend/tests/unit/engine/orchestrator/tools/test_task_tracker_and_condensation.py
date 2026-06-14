@@ -1,13 +1,9 @@
-"""Tests for backend.engine.tools.task_tracker and condensation_request."""
+"""Tests for backend.engine.tools.task_tracker."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from backend.engine.tools.condensation_request import (
-    _CONDENSATION_REQUEST_DESCRIPTION,
-    create_summarize_context_tool,
-)
 from backend.engine.tools.task_tracker import (
     _TASK_TRACKER_DESCRIPTION,
     create_task_tracker_tool,
@@ -121,51 +117,3 @@ class TestTaskTrackerDescriptionConstant:
         desc = _TASK_TRACKER_DESCRIPTION
         assert 'view' in desc
         assert 'update' in desc.lower() or 'update' in desc
-
-
-# ---------------------------------------------------------------------------
-# create_summarize_context_tool
-# ---------------------------------------------------------------------------
-
-
-class TestCreateCondensationRequestTool:
-    def setup_method(self):
-        self.tool = create_summarize_context_tool()
-
-    def test_returns_dict(self):
-        assert isinstance(self.tool, dict)
-
-    def test_type_is_function(self):
-        assert self.tool.get('type') == 'function'
-
-    def test_name_is_summarize_context(self):
-        assert _func(self.tool)['name'] == 'summarize_context'
-
-    def test_description_set(self):
-        desc = _func(self.tool).get('description', '')
-        assert len(desc) > 10
-
-    def test_description_matches_constant(self):
-        assert _func(self.tool)['description'] == _CONDENSATION_REQUEST_DESCRIPTION
-
-    def test_no_required_parameters(self):
-        assert _required(self.tool) == []
-
-    def test_no_properties(self):
-        assert _props(self.tool) == {}
-
-    def test_params_type_is_object(self):
-        assert _params(self.tool)['type'] == 'object'
-
-
-# ---------------------------------------------------------------------------
-# _CONDENSATION_REQUEST_DESCRIPTION constant
-# ---------------------------------------------------------------------------
-
-
-class TestCondensationRequestDescriptionConstant:
-    def test_is_string(self):
-        assert isinstance(_CONDENSATION_REQUEST_DESCRIPTION, str)
-
-    def test_mentions_condensation(self):
-        assert 'condensa' in _CONDENSATION_REQUEST_DESCRIPTION.lower()

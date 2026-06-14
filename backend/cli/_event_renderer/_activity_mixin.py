@@ -223,6 +223,7 @@ class _EventRendererActivityMixin(CLIEventRenderer if TYPE_CHECKING else object)
         self._render_pending_activity_card(pending)
 
     def _flush_pending_tool_cards(self) -> None:
+        self._flush_orient_burst()
         self._flush_pending_activity_card()
         self._flush_pending_shell_action()
 

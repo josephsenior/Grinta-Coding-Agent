@@ -16,7 +16,6 @@ from backend.core.errors import (
 from backend.engine.function_calling import (
     _handle_cmd_run_tool,
     _handle_mcp_tool,
-    _handle_summarize_context_tool,
     _handle_task_tracker_tool,
     _process_single_tool_call,
     combine_thought,
@@ -32,7 +31,6 @@ from backend.ledger.action import (
     MessageAction,
     TaskTrackingAction,
 )
-from backend.ledger.action.agent import CondensationRequestAction
 from backend.ledger.action.mcp import MCPAction
 
 
@@ -238,17 +236,6 @@ class TestHandleCmdRunTool:
     def test_missing_security_risk_raises(self):
         with pytest.raises(FunctionCallValidationError, match='security_risk'):
             _handle_cmd_run_tool({'command': 'ls'})
-
-
-# ---------------------------------------------------------------------------
-# _handle_summarize_context_tool
-# ---------------------------------------------------------------------------
-
-
-class TestHandleCondensationRequestTool:
-    def test_creates_condensation_request_action(self):
-        action = _handle_summarize_context_tool({})
-        assert isinstance(action, CondensationRequestAction)
 
 
 # ---------------------------------------------------------------------------

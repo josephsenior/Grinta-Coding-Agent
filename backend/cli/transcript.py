@@ -30,6 +30,7 @@ from backend.cli.theme import (
     CLR_LIVE_PANEL_BORDER,
     CLR_OK_BODY,
     CLR_OK_ICON,
+    CLR_ORIENT_GUTTER,
     CLR_REASONING_COMMITTED,
     CLR_SHELL_BORDER,
     CLR_SHELL_OUTPUT,
@@ -387,4 +388,67 @@ def format_ground_truth_tool_line(label: str) -> Text:
     line = Text()
     line.append(_GROUND_PREFIX, style=STYLE_DIM)
     line.append((label or '').strip(), style=STYLE_EMPTY)
+    return line
+
+
+# ── Orient tool flat-line rendering ──────────────────────────────────────────
+# Line anatomy: │ [icon] [verb 9ch] [target — flex, ellipsis-left] · [result — right-aligned, dim]
+# One gutter color for all orient tools (CLR_ORIENT_GUTTER), no border, no expansion.
+
+_ORIENT_RESULT_WIDTH = 22  # fixed-width column for result metrics
+_ORIENT_VERB_WIDTH = 10  # fixed-width for verb (9ch + space)
+
+
+def format_orient_line(
+    icon: str,
+    verb: str,
+    target: str,
+    result: str,
+    *,
+    result_style: str = STYLE_DIM,
+) -> Text:
+    """Flat single-line render for orient tools.
+
+    Layout: ``│ [icon] [verb 9ch] [target — flex, ellipsis-left] · [result — right-aligned, dim]``
+    All orient tools share one gutter color (``CLR_ORIENT_GUTTER``).
+    """
+    line = Text()
+    # Gutter pipe
+    line.append('\u2502 ', style=CLR_ORIENT_GUTTER)
+    # Icon + verb in orient gutter color
+    verb_display = (verb or '').ljust(_ORIENT_VERB_WIDTH)[:_ORIENT_VERB_WIDTH]
+    if icon:
+        line.append(f'{icon} ', style=CLR_ORIENT_GUTTER)
+    line.append(verb_display, style=CLR_ORIENT_GUTTER)
+    # Target (flex, left-ellipsis)
+    target_str = (target or '').strip()
+    if target_str:
+        line.append(target_str, style=STYLE_EMPTY)
+    # Dot separator
+    line.append(' \u00b7 ', style=STYLE_DIM)
+    # Result (right-aligned, fixed-width, dim)
+    result_display = (result or '').rjust(_ORIENT_RESULT_WIDTH)[:_ORIENT_RESULT_WIDTH]
+    line.append(result_display, style=result_style)
+    return line
+
+
+def format_orient_line_raw(
+    icon: str,
+    verb: str,
+    target: str,
+    result: str,
+) -> Text:
+    """Orient line for zero/empty states — dim styling, no warning color."""
+    return format_orient_line(icon, verb, target, result, result_style=STYLE_DIM)
+
+
+def format_orient_burst_header(area: str, count: int) -> Text:
+    """Header for a burst of ≥3 consecutive orient lines.
+
+    Renders as: ``Exploring <area> · N lookups`` in dim orient gutter color.
+    """
+    line = Text()
+    line.append('  ▾ ', style=CLR_ORIENT_GUTTER)
+    line.append(f'Exploring {area}', style=f'dim {CLR_ORIENT_GUTTER}')
+    line.append(f' · {count} lookups', style=STYLE_DIM)
     return line

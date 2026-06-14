@@ -190,6 +190,9 @@ class CLIEventRenderer(
         self._last_committed_reasoning_lines: list[str] | None = None
         #: Hash of the last AgentThinkAction rendered to avoid duplicate consecutive cards.
         self._last_think_action_hash: str | None = None
+        #: Orient burst tracking — consecutive orient lines get grouped under a burst header.
+        self._orient_burst_count: int = 0
+        self._orient_burst_area: str = 'codebase'
 
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
