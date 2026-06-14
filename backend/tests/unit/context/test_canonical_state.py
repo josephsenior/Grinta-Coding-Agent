@@ -115,6 +115,54 @@ def test_reducer_tracks_latest_directive_and_verification() -> None:
     assert canonical.verification.exit_code == 0
 
 
+def test_explicit_pivot_records_superseding_directive() -> None:
+    events = [
+        _user('Refactor the parser module for readability', 1),
+        _user('actually, forget the refactor, just fix the failing test', 2),
+    ]
+    canonical = reduce_events_into_state(events, CanonicalTaskState(), persist=False)
+    rendered = render_canonical_state_for_prompt(canonical, char_budget=2000)
+
+    # Original objective is preserved verbatim ...
+    assert canonical.objective == 'Refactor the parser module for readability'
+    # ... and the pivot is surfaced separately, never overwriting it.
+    assert (
+        canonical.superseding_directive
+        == 'actually, forget the refactor, just fix the failing test'
+    )
+    assert 'Objective superseded by' in rendered
+    assert 'just fix the failing test' in canonical.next_action
+
+
+def test_additive_refinement_does_not_supersede_objective() -> None:
+    """Quality-safety: a clarification must NOT trigger supersession."""
+    events = [
+        _user('Build the export feature', 1),
+        _user('also add unit tests for it', 2),
+    ]
+    canonical = reduce_events_into_state(events, CanonicalTaskState(), persist=False)
+
+    assert canonical.objective == 'Build the export feature'
+    assert canonical.superseding_directive == ''
+
+
+def test_superseding_directive_survives_round_trip(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(
+        'backend.context.canonical_state.canonical_state_path',
+        lambda state=None: tmp_path / 'canonical_task_state.json',
+    )
+    events = [
+        _user('Add a caching layer', 1),
+        _user('scrap that, new task: migrate the database schema', 2),
+    ]
+    canonical = reduce_events_into_state(events, CanonicalTaskState(), persist=False)
+    save_canonical_state(canonical)
+    reloaded = load_canonical_state()
+
+    assert reloaded.objective == 'Add a caching layer'
+    assert 'migrate the database schema' in reloaded.superseding_directive
+
+
 def test_reducer_preserves_task_tracker_as_next_action_and_checkpoint() -> None:
     events = [
         _user('Build the demo app', 1),
