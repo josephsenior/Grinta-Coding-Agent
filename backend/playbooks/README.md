@@ -27,28 +27,25 @@
 | `address_pr_comments.md` | `/address_pr_comments` workflow |
 | `agent_memory.md` | `/remember` — lessons.md vs vector recall |
 | `api.md` | `/api` — REST/FastAPI/Express patterns |
-| `ci.md` | `/ci` — CI triage and stabilization workflow |
 | `code-review.md` | `/codereview` and `/codereview-roasted` |
 | `database.md` | `/database` |
 | `debug.md` | `/debug` |
+| `deps.md` | `/deps` and `/dependencies` — add, upgrade, audit dependencies |
 | `documentation.md` | `/docs` |
 | `feature.md` | `/feature` |
 | `git-wizard.md` | `/git` — commit surgery, rebase, bisect, reflog salvage |
-| `json-jitsu.md` | `/json` — jq recipes, filtering, aggregation, transformation |
-| `log-fu.md` | `/logs` — log analysis, timing, rate tracking, grep patterns |
-| `net-diag.md` | `/net` — DNS, TLS, HTTP, connectivity diagnostics |
 | `incident.md` | `/incident` and `/oncall` — live issue triage and recovery |
+| `log-fu.md` | `/logs` and `/json` — log/JSON analysis with rg and jq |
 | `migration.md` | `/migration` and `/upgrade` — staged upgrade workflow |
-| `python.md` | `/python` — Python coding best practices |
+| `net-diag.md` | `/net` and `/network` — DNS, TLS, HTTP, connectivity diagnostics |
+| `perf.md` | `/perf` and `/profile` — measure-first performance profiling |
+| `python.md` | `/python` and `/py` |
 | `react.md` | `/react` |
-| `shell.md` | `/shell` — Bash, terminal execution, non-interactive |
-| `typescript.md` | `/typescript` — TypeScript code generation rules |
-| `testing.md` | `/testing` |
-| `tool.md` | `/tool` |
-| `release.md` | `/release` — release readiness and rollout workflow |
 | `refactoring.md` | `/refactor` |
+| `shell.md` | `/shell` and `/bash` — non-interactive terminal execution |
 | `testing.md` | `/testing` |
 | `tool.md` | `/tool` — tool authoring and MCP integration |
+| `typescript.md` | `/typescript` and `/ts` — TypeScript code generation rules |
 | `update_pr_description.md` | `/update_pr_description` |
 | `update_test.md` | `/update_test` |
 

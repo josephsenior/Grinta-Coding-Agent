@@ -1,70 +1,86 @@
 ---
 name: log_fu
 type: knowledge
-version: 1.0.0
+version: 2.0.0
 agent: Orchestrator
 triggers:
   - /logs
+  - /json
 ---
 
-# Log analysis
+# Log and JSON analysis
 
-Find signal in noisy logs with grep, timing analysis, and rate tracking.
+Use when the user invokes **`/logs`** or **`/json`**. Find signal in noisy logs
+and reshape JSON on the command line with `rg` and `jq`. Prefer `rg` for plain
+text and `jq` for structured (JSON / NDJSON) data.
 
-## Search patterns
+## Search plain-text logs (ripgrep)
 
 ```bash
-# Time window
-rg "2026-05-25T21:1[0-5]" logs/          # 10-15 minute window
-rg "2026-05-25T21:10:0[0-9]" logs/       # first 10 seconds of minute 10
+# Time window (adjust the timestamp prefix to your format)
+rg "2024-01-15T21:1[0-5]" logs/         # the 21:10-21:15 window
 
 # Level filtering
-rg '"level": "ERROR"' logs/              # errors only
-rg '"level": "WARNING"' logs/            # warnings only
+rg '"level":\s*"ERROR"' logs/            # errors only
+rg -v '"level":\s*"INFO"' logs/          # everything except INFO
 
-# Exclude noise
-rg -v '"level": "INFO"' logs/ | rg '"level"'   # non-INFO entries
+# Correlate one request/session across files
+rg "<request-id>" logs/ | rg "ERROR|WARN" | head -20
+```
+
+## Extract fields (jq)
+
+```bash
+jq '.message' file.json                  # single field
+jq '.error.type' file.json               # nested field
+jq '.[].message' file.ndjson             # field across an array
+jq '{msg: .message, lvl: .level}' file.ndjson   # pick + rename
+```
+
+## Filter (jq)
+
+```bash
+jq 'select(.level == "ERROR")' file.ndjson
+jq 'select(.error.type == "timeout")' file.ndjson
+jq 'select(.level == "ERROR" and (.message | test("context")))' file.ndjson
+```
+
+## Aggregate and count
+
+```bash
+# Count by field value
+jq -r '.level' file.ndjson | sort | uniq -c | sort -rn
+
+# Group and count in pure jq
+jq 'group_by(.level) | map({level: .[0].level, count: length})' file.ndjson
+
+# Count occurrences of a pattern in text logs
+rg "timed out" logs/ -o --no-filename | sort | uniq -c | sort -rn
 ```
 
 ## Timing analysis
 
 ```bash
-# Extract timing between two log lines
-rg "async_execute done in" logs/ -o --no-filename | rg -o '\d+\.\d+s'
+# Pull durations out of a recurring log line
+rg "completed in" logs/ -o --no-filename | rg -o '[0-9]+\.[0-9]+s'
 
-# Find slowest operations
-rg "done in " logs/ -o --no-filename | sort -t' ' -k3 -n | tail -5
-
-# Trace a single session
-rg "df4ef495" logs/ | rg "ERROR|WARNING" | head -20
+# Slowest operations
+rg "completed in " logs/ -o --no-filename | sort -t' ' -k3 -n | tail -5
 ```
 
-## Rate and frequency
+## Format for humans
 
 ```bash
-# Count errors per minute
-rg '"level": "ERROR"' logs/ -c --no-filename
+# NDJSON to an aligned table
+jq -r '[.timestamp, .level, .message] | @tsv' file.ndjson | column -t -s $'\t'
 
-# Count event types
-rg "on_event received" logs/ -o --no-filename | sort | uniq -c | sort -rn
-
-# Poll frequency of a session
-rg "poll #" logs/ --no-filename -o | sed 's/poll #//' | awk 'NR>1{print $1-p}'
+# Pretty-print a single JSON document
+jq '.' file.json
 ```
 
-## Pattern cheat sheet
-
-| Pattern | What it finds |
-|---------|--------------|
-| `"cleared in-memory file store"` | Event persistence milestones |
-| `"Memory pressure WARNING"` | RSS approaching limit |
-| `"Agent-survivable error"` | Non-fatal error, agent kept running |
-| `"context window exceeds"` | Provider context overflow |
-| `"OrchestratorExecutor.async_execute done in"` | LLM step duration |
-
-## Example: find error bursts
+## Example: error summary from NDJSON
 
 ```bash
-grep -n '"level": "ERROR"' logs/app.log | cut -d: -f1 | \
-  awk 'NR>1{print $1-prev}{prev=$1}' | sort -rn | head -5
+jq -r 'select(.level == "ERROR") | "[\(.timestamp)] \(.message | split("\n")[0])"' \
+  app.ndjson | head -20
 ```

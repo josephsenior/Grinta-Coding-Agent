@@ -1,5 +1,5 @@
 ---
-name: Testing
+name: testing
 type: knowledge
 version: 2.0.0
 agent: Orchestrator
