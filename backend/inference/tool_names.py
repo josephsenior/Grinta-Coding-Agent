@@ -49,7 +49,6 @@ BROWSER_TOOL_NAME = 'browser'
 DEBUGGER_TOOL_NAME = 'debugger'
 DELEGATE_TASK_TOOL_NAME = 'delegate_task'
 SHARED_TASK_BOARD_TOOL_NAME = 'shared_task_board'
-SUMMARIZE_CONTEXT_TOOL_NAME = 'summarize_context'
 
 # ── Legacy aliases (prefer the canonical names above in new code) ─────
 CODE_INTELLIGENCE_TOOL_NAME = LSP_TOOL_NAME
@@ -85,7 +84,6 @@ __all__ = [
     'RECALL_TOOL_NAME',
     'REPLACE_STRING_TOOL_NAME',
     'SHARED_TASK_BOARD_TOOL_NAME',
-    'SUMMARIZE_CONTEXT_TOOL_NAME',
     'TASK_TRACKER_TOOL_NAME',
     'TERMINAL_MANAGER_TOOL_NAME',
     'UNDO_LAST_EDIT_TOOL_NAME',

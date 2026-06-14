@@ -75,6 +75,7 @@ def _render_system_capabilities(
     *,
     function_calling_mode: str | None,
     parallel_tool_calls_provider_flag: bool,
+    mode: str = 'agent',
 ) -> str:
     """Runtime-truth capability statement.
 
@@ -83,6 +84,13 @@ def _render_system_capabilities(
     add aspirational text here. If you change a default, this block updates
     automatically on the next prompt assembly.
     """
+    from backend.core.interaction_modes import (
+        is_chat_mode,
+        is_plan_mode,
+    )
+
+    can_edit = not (is_chat_mode(mode) or is_plan_mode(mode))
+
     parallel_enabled = bool(getattr(config, 'enable_parallel_tool_scheduling', False))
     web_on = bool(getattr(config, 'enable_web', True))
     docs_on = bool(getattr(config, 'enable_docs', True))
@@ -131,7 +139,7 @@ def _render_system_capabilities(
         )
 
     browser_line = ''
-    if bool(getattr(config, 'enable_browsing', True)):
+    if bool(getattr(config, 'enable_browsing', True)) and can_edit:
         web_fetch_hint = (
             'Use `web_fetch` for static URLs; `browser` when interaction is required.'
             if bool(getattr(config, 'enable_web', True))
@@ -143,7 +151,7 @@ def _render_system_capabilities(
         )
 
     memory_line = ''
-    if bool(getattr(config, 'enable_working_memory', True)):
+    if bool(getattr(config, 'enable_working_memory', True)) and can_edit:
         memory_line = (
             '- **Memory (`memory`)**: `working` for session reasoning, `persist` for rare workspace '
             'facts, `recall` for semantic search over indexed history. Task progress belongs in '
@@ -151,7 +159,7 @@ def _render_system_capabilities(
         )
 
     checkpoint_line = ''
-    if bool(getattr(config, 'enable_checkpoints', False)):
+    if bool(getattr(config, 'enable_checkpoints', False)) and can_edit:
         checkpoint_line = (
             '- **Checkpoints (`checkpoint`)**: risky edits/commands get automatic pre-action snapshots '
             '(rollback middleware). Use `save` for named phase milestones, `view` to list checkpoints, '
@@ -162,6 +170,8 @@ def _render_system_capabilities(
     # Runtime-detected language servers / debug adapters — only when those tools
     # are enabled in config (omit bullets entirely when gated off).
     lsp_line, dap_line = _render_runtime_detection_lines(config)
+    if not can_edit:
+        dap_line = ''  # debugger not available in Chat/Plan
     detection_block = '\n'.join(line for line in (lsp_line, dap_line) if line)
     runtime_discovery_hint = (
         '\nIn particular, **never run shell commands like `Get-Command`/`which`/`where` '

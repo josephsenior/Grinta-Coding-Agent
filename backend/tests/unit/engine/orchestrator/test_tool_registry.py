@@ -187,15 +187,6 @@ class TestFeatureFlagToolPresence:
         names = _build_toolset(enable_task_tracker_tool=False)
         assert 'task_tracker' not in names
 
-    def test_condensation_request_enabled(self):
-        names = _build_toolset(enable_condensation_request=True)
-        assert 'summarize_context' not in names
-        self._assert_dispatch_covered(names)
-
-    def test_condensation_request_disabled(self):
-        names = _build_toolset(enable_condensation_request=False)
-        assert 'summarize_context' not in names
-
     def test_working_memory_enabled(self):
         names = _build_toolset(enable_working_memory=True)
         assert 'memory' in names
@@ -246,7 +237,6 @@ class TestFeatureFlagToolPresence:
             enable_mcp=False,
             enable_meta_cognition=False,
             enable_task_tracker_tool=False,
-            enable_condensation_request=False,
             enable_working_memory=False,
             enable_swarming=False,
             enable_lsp_query=False,
@@ -269,7 +259,6 @@ class TestFeatureFlagToolPresence:
                 enable_mcp=True,
                 enable_meta_cognition=True,
                 enable_task_tracker_tool=True,
-                enable_condensation_request=True,
                 enable_working_memory=True,
                 enable_swarming=True,
                 enable_lsp_query=True,

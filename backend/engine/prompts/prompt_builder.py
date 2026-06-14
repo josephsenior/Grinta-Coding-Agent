@@ -194,6 +194,7 @@ def _render_critical(
     tracker_on: bool,
     checkpoints_on: bool,
     meta_cognition_on: bool,
+    mode: str = 'agent',
 ) -> str:
     return _render_critical_impl(
         _render_partial,
@@ -202,6 +203,7 @@ def _render_critical(
         tracker_on=tracker_on,
         checkpoints_on=checkpoints_on,
         meta_cognition_on=meta_cognition_on,
+        mode=mode,
     )
 
 
@@ -495,6 +497,7 @@ def _collect_system_prompt_sections(
                 parallel_tool_calls_provider_flag=_provider_parallel_tool_calls_supported(
                     model_id
                 ),
+                mode=mode,
             ),
         ),
     ]
@@ -542,6 +545,7 @@ def _collect_system_prompt_sections(
                 tracker_on=bool(getattr(config, 'enable_task_tracker_tool', False)),
                 checkpoints_on=bool(getattr(config, 'enable_checkpoints', False)),
                 meta_cognition_on=bool(getattr(config, 'enable_meta_cognition', False)),
+                mode=mode,
             ),
         ),
     )

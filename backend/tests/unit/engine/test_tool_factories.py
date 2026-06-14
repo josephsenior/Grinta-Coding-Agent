@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from backend.engine.tools.condensation_request import (
-    create_summarize_context_tool,
-)
 from backend.engine.tools.meta_cognition import ASK_USER_TOOL_NAME, create_ask_user_tool
 from backend.engine.tools.task_tracker import (
     create_task_tracker_tool,
@@ -61,17 +58,4 @@ class TestCreateTaskTrackerTool:
         assert params['properties']['task_list']['type'] == 'array'
 
 
-class TestCreateCondensationRequestTool:
-    def test_type(self):
-        tool = create_summarize_context_tool()
-        assert tool['type'] == 'function'
 
-    def test_name(self):
-        tool = create_summarize_context_tool()
-        assert tool['function']['name'] == 'summarize_context'
-
-    def test_no_required_params(self):
-        tool = create_summarize_context_tool()
-        params = tool['function']['parameters']
-        assert params['required'] == []
-        assert params['properties'] == {}

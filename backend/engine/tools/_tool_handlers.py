@@ -47,7 +47,6 @@ from backend.ledger.action import (
     MemoryRecallAction,
     TaskTrackingAction,
 )
-from backend.ledger.action.agent import CondensationRequestAction
 from backend.ledger.action.mcp import MCPAction
 from backend.ledger.action.search import GlobAction, GrepAction
 from backend.ledger.observation.memory_tools import (
@@ -298,13 +297,6 @@ def _handle_analyze_project_structure_tool(
         AnalyzeProjectStructureAction,
         build_analyze_project_structure_action(dict(arguments)),
     )
-
-
-def _handle_summarize_context_tool(
-    arguments: Mapping[str, Any],
-) -> CondensationRequestAction:
-    """Handle Summarize Context tool call."""
-    return CondensationRequestAction()
 
 
 def _normalize_task_tracker_step(s: Mapping[str, Any], idx: int) -> dict[str, Any]:

@@ -10,15 +10,17 @@ from backend.cli._tool_display.constants import _TOOL_HEADLINE
 def tool_headline(tool_name: str, *, use_icons: bool = True) -> tuple[str, str]:
     """Return (icon, category label) for *tool_name*.
 
-    *use_icons* is currently informational only — every entry in
-    :data:`_TOOL_HEADLINE` ships an empty icon so terminals without emoji
-    rendering remain professional and ASCII-friendly.
+    *use_icons* controls whether the spec icon is emitted.  Orient tools
+    get distinct icons (₡, ◆, ƒ, ↳, ≡, ⌐) while non-orient tools get
+    no icon (empty string).
     """
     if not tool_name:
         return '', 'Tool'
     info = _TOOL_HEADLINE.get(tool_name.strip())
     if info:
-        _icon, headline = info
+        icon, headline = info
+        if use_icons:
+            return icon, headline
         return '', headline
     pretty = tool_name.replace('_', ' ').strip() or 'tool'
     return '', pretty.title()
@@ -43,13 +45,12 @@ _SIMPLE_VERB_MAP = {
     'find_symbols': 'Found',
     'agent_think': 'Thinking',
     'think': 'Thinking',
-    'summarize_context': 'Compressed',
     'memory_manager': 'Managed',
     'task_tracker': 'Tracked',
-    'grep': 'Searched',
-    'glob': 'Listed',
+    'grep': 'Grepped',
+    'glob': 'Globbed',
     'lsp': 'Analyzed',
-    'analyze_project_structure': 'Explored',
+    'analyze_project_structure': 'Analyzed',
     'read_symbol': 'Read',
     'browser': 'Browser',
     'delegate_task': 'Delegated',

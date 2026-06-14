@@ -206,26 +206,6 @@ class TestOrchestratorPromptManager:
         assert '`communicate_with_user`' not in result
         assert '<ASK_USER_TOOL>' in result
 
-    def test_get_system_message_omits_summarize_context_when_disabled(self, tmp_path):
-        from backend.utils.prompt import OrchestratorPromptManager
-
-        config = SimpleNamespace(
-            autonomy_level='balanced',
-            enable_checkpoints=False,
-            enable_lsp_query=False,
-            enable_task_tracker_tool=False,
-            enable_permissions=False,
-            enable_meta_cognition=False,
-            enable_working_memory=True,
-            enable_condensation_request=False,
-        )
-
-        opm = OrchestratorPromptManager(prompt_dir=str(tmp_path), config=config)
-        result = opm.get_system_message()
-
-        assert '`summarize_context`' not in result
-        assert 'You are Grinta' in result
-
     def test_get_system_message_omits_working_memory_tool_when_disabled(self, tmp_path):
         from backend.utils.prompt import OrchestratorPromptManager
 

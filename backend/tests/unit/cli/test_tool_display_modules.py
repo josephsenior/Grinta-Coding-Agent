@@ -361,10 +361,6 @@ class TestSummarizeToolArguments(unittest.TestCase):
         s = summarize_tool_arguments('checkpoint', {})
         self.assertEqual(s, 'save state')
 
-    def test_summarize_context(self) -> None:
-        s = summarize_tool_arguments('summarize_context', {})
-        self.assertEqual(s, 'compress conversation')
-
     def test_shared_task_board(self) -> None:
         s = summarize_tool_arguments('shared_task_board', {'operation': 'list'})
         self.assertEqual(s, 'list')

@@ -705,28 +705,31 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         content = getattr(obs, 'content', '') or ''
         file_path = getattr(obs, 'path', None)
         n_lines = len(content.splitlines()) if content else 0
-        pending = cast(Any, self._take_pending_activity_card('file_read'))
-        result_message = self._file_read_result_message(content, n_lines)
+        start_line = getattr(obs, 'start', None) or 1
+        end_line = getattr(obs, 'end', None)
+        if start_line == 1 and (end_line is None or end_line == -1):
+            result = f'lines 1–{n_lines}' if n_lines else ''
+        elif end_line and end_line != -1:
+            result = f'lines {start_line}–{end_line}'
+        else:
+            result = f'lines {start_line}–{n_lines}' if n_lines else ''
 
         # Try to add syntax highlighting
         extra_lines = None
         if n_lines > 0:
             extra_lines = _file_read_syntax_highlight(content, file_path)
 
-        if pending is not None:
-            self._render_pending_activity_card(
-                pending,
-                result_message=result_message,
-                result_kind='neutral',
-                extra_lines=extra_lines,
+        if result:
+            self._emit_activity_turn_header()
+            self._print_or_buffer(
+                Padding(
+                    format_activity_result_secondary(result, kind='neutral'),
+                    pad=ACTIVITY_BLOCK_BOTTOM_PAD,
+                )
             )
-        elif n_lines:
-            self._append_history(
-                format_activity_result_secondary(result_message, kind='neutral')
-            )
-            if extra_lines:
-                for line in extra_lines:
-                    self._append_history(line)
+        if extra_lines:
+            for line in extra_lines:
+                self._append_history(line)
 
     @staticmethod
     def _file_read_result_message(content: str, n_lines: int) -> str:
@@ -735,6 +738,20 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
     def _render_mcp_observation(self, obs: MCPObservation) -> None:
         self._stop_reasoning()
         content = getattr(obs, 'content', '')
+        name = getattr(obs, 'name', '')
+        # Orient MCP tools — emit result metric as dim line
+        _orient_mcp_names = {'web_search_exa', 'web_fetch_exa', 'resolve-library-id', 'query-docs'}
+        if name in _orient_mcp_names:
+            result = self._orient_mcp_result(name, content)
+            if result:
+                self._emit_activity_turn_header()
+                self._print_or_buffer(
+                    Padding(
+                        format_activity_result_secondary(result, kind='neutral'),
+                        pad=ACTIVITY_BLOCK_BOTTOM_PAD,
+                    )
+                )
+            return
         friendly = mcp_result_user_preview(content)
         extras = mcp_result_syntax_extras(content)
         pending = cast(Any, self._take_pending_activity_card('mcp'))
@@ -749,6 +766,43 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
             self._append_history(
                 format_activity_result_secondary(friendly, kind='neutral')
             )
+
+    @staticmethod
+    def _orient_mcp_result(name: str, content: str) -> str | None:
+        """Extract result metric from orient MCP tool responses."""
+        s = (content or '').strip()
+        if not s:
+            return None
+        try:
+            data = json.loads(s)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            return None
+        if isinstance(data, dict):
+            # Check for error payload
+            error = data.get('error') or data.get('isError')
+            if error:
+                return 'failed'
+            # Try to extract count from various payload shapes
+            for key in ('total_count', 'count', 'matches', 'total'):
+                v = data.get(key)
+                if isinstance(v, int):
+                    if v == 0:
+                        return 'no results' if name in ('web_search',) else 'no results'
+                    return f'{v} results'
+            # Check items/results array
+            for key in ('items', 'results', 'entries', 'documents', 'content'):
+                items = data.get(key)
+                if isinstance(items, list):
+                    count = len(items)
+                    if count == 0:
+                        return 'no results'
+                    return f'{count} results'
+        if isinstance(data, list):
+            count = len(data)
+            if count == 0:
+                return 'no results'
+            return f'{count} results'
+        return None
 
     def _render_terminal_observation(self, obs: TerminalObservation) -> None:
         raw = getattr(obs, 'content', '') or ''
@@ -810,159 +864,264 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         self._stop_reasoning()
         available = getattr(obs, 'available', True)
         content = getattr(obs, 'content', '') or ''
-        pending = cast(Any, self._take_pending_activity_card('lsp'))
-        result_message = self._lsp_result_message(available=available, content=content)
-        if pending is not None:
-            self._render_pending_activity_card(
-                pending,
-                result_message=result_message,
-                result_kind='neutral',
+        result = self._orient_lsp_result(available=available, content=content)
+        if result:
+            self._emit_activity_turn_header()
+            self._print_or_buffer(
+                Padding(
+                    format_activity_result_secondary(result, kind='neutral'),
+                    pad=ACTIVITY_BLOCK_BOTTOM_PAD,
+                )
             )
-        elif result_message:
-            self._append_history(
-                format_activity_result_secondary(result_message, kind='neutral')
-            )
+
+    @staticmethod
+    def _orient_lsp_result(*, available: bool, content: str) -> str | None:
+        if not available:
+            return 'unavailable'
+        if not content.strip():
+            return None
+        try:
+            data = json.loads(content)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            data = None
+        if isinstance(data, dict):
+            # definitions/references → N results
+            for key in ('definitions', 'references'):
+                items = data.get(key)
+                if isinstance(items, list):
+                    count = len(items)
+                    if count == 0:
+                        return None
+                    noun = key.rstrip('s')
+                    return f'{count} {noun}{"s" if count != 1 else ""}'
+            # hover → completed
+            if 'hover' in data or 'contents' in data:
+                return 'completed'
+            # list_symbols → N symbols
+            symbols = data.get('symbols') or data.get('symbol_list')
+            if isinstance(symbols, list):
+                return f'{len(symbols)} symbols'
+            # diagnostics → N issues / clean
+            diagnostics = data.get('diagnostics') or data.get('issues')
+            if isinstance(diagnostics, list):
+                count = len(diagnostics)
+                if count == 0:
+                    return 'clean'
+                return f'{count} issue{"s" if count != 1 else ""}'
+            # code_action → N actions
+            actions = data.get('actions')
+            if isinstance(actions, list):
+                return f'{len(actions)} actions'
+        if isinstance(data, list):
+            return f'{len(data)} results'
+        lines = [l for l in content.split('\n') if l.strip()]
+        if not lines:
+            return None
+        return f'{len(lines)} results'
 
     def _render_grep_observation(self, obs: GrepObservation) -> None:
         self._stop_reasoning()
         content = obs.error or obs.content or ''
-        pending = cast(Any, self._take_pending_activity_card('grep'))
-        result_message = self._search_result_message(
+        result = self._orient_grep_result(
             query=obs.pattern,
             content=content,
             match_count=obs.match_count,
             file_count=obs.file_count,
+            output_mode=getattr(obs, 'output_mode', 'files_with_matches'),
+            error=obs.error,
         )
-        if pending is not None:
-            self._render_pending_activity_card(
-                pending,
-                result_message=result_message,
-                result_kind='neutral' if obs.error else 'ok',
+        if result:
+            self._emit_activity_turn_header()
+            self._print_or_buffer(
+                Padding(
+                    format_activity_result_secondary(result, kind='neutral'),
+                    pad=ACTIVITY_BLOCK_BOTTOM_PAD,
+                )
             )
-        elif result_message:
-            self._append_history(
-                format_activity_result_secondary(result_message, kind='neutral')
-            )
+
+    @staticmethod
+    def _orient_grep_result(
+        *,
+        query: str,
+        content: str,
+        match_count: int,
+        file_count: int,
+        output_mode: str,
+        error: str | None,
+    ) -> str | None:
+        if error:
+            return f'failed · {error[:60]}'
+        if output_mode == 'files_with_matches':
+            if file_count == 0:
+                return 'no matches'
+            return f'{file_count} file{"s" if file_count != 1 else ""}'
+        if output_mode == 'count':
+            if match_count == 0:
+                return 'no matches'
+            return f'{match_count} match{"es" if match_count != 1 else ""}'
+        if output_mode == 'content':
+            if match_count == 0 and file_count == 0:
+                return 'no matches'
+            if file_count:
+                return f'{match_count} match{"es" if match_count != 1 else ""} · {file_count} file{"s" if file_count != 1 else ""}'
+            return f'{match_count} match{"es" if match_count != 1 else ""}'
+        # Default
+        if match_count == 0 and file_count == 0:
+            return 'no matches'
+        if file_count:
+            return f'{file_count} file{"s" if file_count != 1 else ""}'
+        return f'{match_count} match{"es" if match_count != 1 else ""}'
 
     def _render_glob_observation(self, obs: GlobObservation) -> None:
         self._stop_reasoning()
         content = obs.error or obs.content or ''
-        pending = cast(Any, self._take_pending_activity_card('glob'))
-        result_message = self._search_result_message(
-            query=obs.pattern,
+        result = self._orient_glob_result(
             content=content,
-            match_count=0,
             file_count=obs.file_count,
+            error=obs.error,
         )
-        if pending is not None:
-            self._render_pending_activity_card(
-                pending,
-                result_message=result_message,
-                result_kind='neutral' if obs.error else 'ok',
+        if result:
+            self._emit_activity_turn_header()
+            self._print_or_buffer(
+                Padding(
+                    format_activity_result_secondary(result, kind='neutral'),
+                    pad=ACTIVITY_BLOCK_BOTTOM_PAD,
+                )
             )
-        elif result_message:
-            self._append_history(
-                format_activity_result_secondary(result_message, kind='neutral')
-            )
+
+    @staticmethod
+    def _orient_glob_result(
+        *,
+        content: str,
+        file_count: int,
+        error: str | None,
+    ) -> str | None:
+        if error:
+            return f'failed · {error[:60]}'
+        if file_count == 0:
+            return 'no files'
+        return f'{file_count} file{"s" if file_count != 1 else ""}'
 
     def _render_find_symbols_observation(self, obs: FindSymbolsObservation) -> None:
         self._stop_reasoning()
-        pending = cast(Any, self._take_pending_activity_card('find_symbols'))
-        result_message = self._search_result_message(
-            query=obs.query,
-            content=obs.error or obs.content or '',
-            match_count=len(obs.candidates),
-            file_count=len(
-                {
-                    str(item.get('path') or '')
-                    for item in obs.candidates
-                    if item.get('path')
-                }
-            ),
+        result = self._orient_find_symbols_result(
+            candidates=obs.candidates,
+            error=obs.error,
         )
-        if pending is not None:
-            self._render_pending_activity_card(
-                pending,
-                result_message=result_message,
-                result_kind='neutral' if obs.error else 'ok',
+        if result:
+            self._emit_activity_turn_header()
+            self._print_or_buffer(
+                Padding(
+                    format_activity_result_secondary(result, kind='neutral'),
+                    pad=ACTIVITY_BLOCK_BOTTOM_PAD,
+                )
             )
-        elif result_message:
-            self._append_history(
-                format_activity_result_secondary(result_message, kind='neutral')
-            )
+
+    @staticmethod
+    def _orient_find_symbols_result(
+        *,
+        candidates: list[Any],
+        error: str | None,
+    ) -> str | None:
+        if error:
+            return f'failed · {error[:60]}'
+        symbol_count = len(candidates)
+        file_count = len({
+            str(item.get('path') or '')
+            for item in candidates
+            if item.get('path')
+        })
+        if symbol_count == 0:
+            return 'no symbols'
+        if file_count <= 1:
+            return f'{symbol_count} symbol{"s" if symbol_count != 1 else ""}'
+        return f'{symbol_count} symbol{"s" if symbol_count != 1 else ""} · {file_count} file{"s" if file_count != 1 else ""}'
 
     def _render_read_symbols_observation(self, obs: ReadSymbolsObservation) -> None:
         self._stop_reasoning()
-        pending = cast(Any, self._take_pending_activity_card('read_symbols'))
-        result_message = self._lsp_result_message(
+        result = self._orient_read_symbols_result(
             available=not bool(obs.error),
             content=obs.error or obs.content or '',
         )
-        if pending is not None:
-            self._render_pending_activity_card(
-                pending,
-                result_message=result_message,
-                result_kind='neutral' if obs.error else 'ok',
-            )
-        elif result_message:
-            self._append_history(
-                format_activity_result_secondary(result_message, kind='neutral')
+        if result:
+            self._emit_activity_turn_header()
+            self._print_or_buffer(
+                Padding(
+                    format_activity_result_secondary(result, kind='neutral'),
+                    pad=ACTIVITY_BLOCK_BOTTOM_PAD,
+                )
             )
 
     def _render_analyze_project_structure_observation(
         self, obs: AnalyzeProjectStructureObservation
     ) -> None:
         self._stop_reasoning()
-        pending = cast(
-            Any,
-            self._take_pending_activity_card('analyze_project_structure'),
-        )
-        result_message = self._lsp_result_message(
+        result = self._orient_analyze_result(
             available=not bool(obs.error),
             content=obs.error or obs.content or '',
         )
-        if pending is not None:
-            self._render_pending_activity_card(
-                pending,
-                result_message=result_message,
-                result_kind='neutral' if obs.error else 'ok',
-            )
-        elif result_message:
-            self._append_history(
-                format_activity_result_secondary(result_message, kind='neutral')
+        if result:
+            self._emit_activity_turn_header()
+            self._print_or_buffer(
+                Padding(
+                    format_activity_result_secondary(result, kind='neutral'),
+                    pad=ACTIVITY_BLOCK_BOTTOM_PAD,
+                )
             )
 
     @staticmethod
-    def _search_result_message(
-        *,
-        query: str,
-        content: str,
-        match_count: int,
-        file_count: int,
-    ) -> str | None:
-        if not content.strip():
-            return None
-        if match_count or file_count:
-            return f'{query!r}: {match_count} matches in {file_count} files'
-        lines = [line for line in content.splitlines() if line.strip()]
-        if not lines:
-            return None
-        preview = lines[0][:80]
-        suffix = f' · {len(lines)} lines' if len(lines) > 1 else ''
-        return f'{preview}{suffix}'
-
-    @staticmethod
-    def _lsp_result_message(*, available: bool, content: str) -> str | None:
+    def _orient_read_symbols_result(*, available: bool, content: str) -> str | None:
         if not available:
-            return 'code navigation unavailable'
+            return 'unavailable'
         if not content.strip():
             return None
-        lines = [line for line in content.split('\n') if line.strip()]
+        # Parse summary from content
+        lines = [line.strip() for line in content.split('\n') if line.strip()]
         if not lines:
             return None
-        preview = lines[0][:80]
-        suffix = f' · {len(lines)} lines' if len(lines) > 1 else ''
-        return f'{preview}{suffix}'
+        # Try to count resolved vs ambiguous vs not_found
+        resolved = sum(1 for l in lines if l.startswith('resolved') or '->' in l)
+        ambiguous = sum(1 for l in lines if l.startswith('ambiguous') or '~>' in l)
+        not_found = sum(1 for l in lines if l.startswith('not found') or l.startswith('not_found'))
+        total = resolved + ambiguous + not_found
+        if total == 0:
+            return None
+        parts = []
+        if resolved:
+            parts.append(f'{resolved} resolved')
+        if ambiguous:
+            parts.append(f'{ambiguous} ambiguous')
+        if not_found:
+            parts.append(f'{not_found} not found')
+        return ' · '.join(parts) if parts else None
+
+    @staticmethod
+    def _orient_analyze_result(*, available: bool, content: str) -> str | None:
+        if not available:
+            return 'unavailable'
+        if not content.strip():
+            return 'no output'
+        lines = [line.strip() for line in content.split('\n') if line.strip()]
+        if not lines:
+            return None
+        # Extract metric based on common payload patterns
+        body = '\n'.join(lines[:20])
+        body_lower = body.lower()
+        if 'callers' in body_lower or 'caller of' in body_lower:
+            # Count callers
+            caller_lines = [l for l in lines if '::' in l or ' -> ' in l or '  ' in l and '(' in l and ')' in l]
+            return f'{len(caller_lines)} callers' if caller_lines else 'completed'
+        if 'dependency' in body_lower or 'depend on' in body_lower or 'import' in body_lower:
+            dep_count = sum(1 for l in lines if l.strip() and ('<-' in l or '->' in l or 'import' in l.lower()))
+            return f'{dep_count} deps' if dep_count else 'completed'
+        if 'symbol' in body_lower:
+            symbol_lines = [l for l in lines if l.strip() and not l.startswith('#') and not l.startswith('//')]
+            return f'{len(symbol_lines)} symbols' if symbol_lines else 'completed'
+        if 'tree' in body_lower or 'file_outline' in body_lower or 'recent' in body_lower:
+            return 'completed'
+        if 'semantic_search' in body_lower:
+            return 'completed'
+        return 'completed'
 
     def _render_server_ready_observation(self, obs: ServerReadyObservation) -> None:
         self._flush_pending_tool_cards()
