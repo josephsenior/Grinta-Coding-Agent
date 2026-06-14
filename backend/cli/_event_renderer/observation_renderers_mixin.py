@@ -914,7 +914,7 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
                 return f'{len(actions)} actions'
         if isinstance(data, list):
             return f'{len(data)} results'
-        lines = [l for l in content.split('\n') if l.strip()]
+        lines = [line for line in content.split('\n') if line.strip()]
         if not lines:
             return None
         return f'{len(lines)} results'
@@ -1080,9 +1080,9 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         if not lines:
             return None
         # Try to count resolved vs ambiguous vs not_found
-        resolved = sum(1 for l in lines if l.startswith('resolved') or '->' in l)
-        ambiguous = sum(1 for l in lines if l.startswith('ambiguous') or '~>' in l)
-        not_found = sum(1 for l in lines if l.startswith('not found') or l.startswith('not_found'))
+        resolved = sum(1 for line in lines if line.startswith('resolved') or '->' in line)
+        ambiguous = sum(1 for line in lines if line.startswith('ambiguous') or '~>' in line)
+        not_found = sum(1 for line in lines if line.startswith('not found') or line.startswith('not_found'))
         total = resolved + ambiguous + not_found
         if total == 0:
             return None
@@ -1109,13 +1109,13 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         body_lower = body.lower()
         if 'callers' in body_lower or 'caller of' in body_lower:
             # Count callers
-            caller_lines = [l for l in lines if '::' in l or ' -> ' in l or '  ' in l and '(' in l and ')' in l]
+            caller_lines = [line for line in lines if '::' in line or ' -> ' in line or '  ' in line and '(' in line and ')' in line]
             return f'{len(caller_lines)} callers' if caller_lines else 'completed'
         if 'dependency' in body_lower or 'depend on' in body_lower or 'import' in body_lower:
-            dep_count = sum(1 for l in lines if l.strip() and ('<-' in l or '->' in l or 'import' in l.lower()))
+            dep_count = sum(1 for line in lines if line.strip() and ('<-' in line or '->' in line or 'import' in line.lower()))
             return f'{dep_count} deps' if dep_count else 'completed'
         if 'symbol' in body_lower:
-            symbol_lines = [l for l in lines if l.strip() and not l.startswith('#') and not l.startswith('//')]
+            symbol_lines = [line for line in lines if line.strip() and not line.startswith('#') and not line.startswith('//')]
             return f'{len(symbol_lines)} symbols' if symbol_lines else 'completed'
         if 'tree' in body_lower or 'file_outline' in body_lower or 'recent' in body_lower:
             return 'completed'

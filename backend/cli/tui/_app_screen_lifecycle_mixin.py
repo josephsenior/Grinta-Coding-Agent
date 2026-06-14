@@ -343,7 +343,9 @@ class _AppScreenLifecycleMixin:
             from backend.core.bootstrap.main import _setup_mcp_tools
 
             await _setup_mcp_tools(agent, runtime, memory)
-            from backend.integrations.mcp.native_backends import count_user_visible_mcp_servers
+            from backend.integrations.mcp.native_backends import (
+                count_user_visible_mcp_servers,
+            )
 
             self._hud.update_mcp_servers(count_user_visible_mcp_servers(self._config))
         except Exception:

@@ -514,7 +514,9 @@ class _AppScreenInputMixin:
         self._config = load_app_config()
         runtime_status = self._apply_llm_config_to_active_session(self._config)
         self._hud.update_model(get_current_model(self._config))
-        from backend.integrations.mcp.native_backends import count_user_visible_mcp_servers
+        from backend.integrations.mcp.native_backends import (
+            count_user_visible_mcp_servers,
+        )
 
         self._hud.update_mcp_servers(count_user_visible_mcp_servers(self._config))
         self._render_hud_bar()

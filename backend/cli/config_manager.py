@@ -882,7 +882,9 @@ def get_budget(config: AppConfig) -> str:
 
 
 def get_mcp_servers(config: AppConfig) -> list[dict[str, Any]]:
-    from backend.integrations.mcp.native_backends import filter_user_visible_mcp_server_dicts
+    from backend.integrations.mcp.native_backends import (
+        filter_user_visible_mcp_server_dicts,
+    )
 
     try:
         if config.mcp and config.mcp.servers:

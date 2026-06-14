@@ -101,7 +101,9 @@ def _apply_mcp_tools(orch: Orchestrator, mcp_tools: list[dict]) -> None:
     )
     pm = getattr(orch, '_prompt_manager', None)
     if pm and hasattr(pm, 'mcp_tool_names'):
-        from backend.integrations.mcp.native_backends import MCP_TOOLS_HIDDEN_BY_NATIVE_FACADES
+        from backend.integrations.mcp.native_backends import (
+            MCP_TOOLS_HIDDEN_BY_NATIVE_FACADES,
+        )
 
         native_facades_on = bool(getattr(orch.config, 'enable_web', True)) or bool(
             getattr(orch.config, 'enable_docs', True)

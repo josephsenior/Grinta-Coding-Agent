@@ -92,7 +92,7 @@ def clip_with_marker(
         return text
     omitted = len(text)
     if prefer == 'tail':
-        marker = f'... ({{}} chars omitted) ...\n'
+        marker = '... ({} chars omitted) ...\n'
         body_len = max(0, limit - len(marker.format(omitted)))
         tail = text[-body_len:] if body_len else ''
         kept = len(tail)
@@ -108,7 +108,7 @@ def clip_with_marker(
         kept = len(head) + len(tail)
         return head + marker.format(omitted - kept) + tail
     # head (default)
-    marker = f'\n... ({{}} chars omitted) ...'
+    marker = '\n... ({} chars omitted) ...'
     body_len = max(0, limit - len(marker.format(omitted)))
     head = text[:body_len] if body_len else ''
     kept = len(head)

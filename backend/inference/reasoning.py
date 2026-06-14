@@ -21,6 +21,8 @@ from backend.inference.catalog_loader import (
 from backend.inference.reasoning_profiles import (
     normalize_effort_value,
     resolve_allowed_efforts,
+)
+from backend.inference.reasoning_profiles import (
     split_upstream_model_id as _split_upstream_model_id,
 )
 

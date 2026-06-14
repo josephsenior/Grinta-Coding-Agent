@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import os
-
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.syntax import PygmentsSyntaxTheme, Syntax

@@ -13,9 +13,6 @@ from backend.integrations.mcp.native_backends import (
     EXA_WEB_FETCH_MCP_TOOL,
     EXA_WEB_SEARCH_MCP_TOOL,
     FALLBACK_FETCH_MCP_TOOL,
-    MCP_TOOLS_HIDDEN_BY_NATIVE_DOCS,
-    MCP_TOOLS_HIDDEN_BY_NATIVE_FACADES,
-    MCP_TOOLS_HIDDEN_BY_NATIVE_WEB,
 )
 from backend.ledger.action.mcp import MCPAction
 

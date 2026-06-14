@@ -15,7 +15,6 @@ from textual.containers import Horizontal, VerticalScroll
 from textual.widgets import Static
 
 from backend.cli.syntax_theme import get_grinta_rich_syntax_theme
-from backend.cli.theme import NAVY_TEXT_MUTED
 
 DIFF_VIEW_PREFIX = '\x1fgrinta-diff-view\x1f'
 

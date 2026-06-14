@@ -15,12 +15,12 @@ from typing import TYPE_CHECKING, Any
 from rich.console import Console as RichConsole
 from rich.theme import Theme as RichTheme
 from textual.app import App
+from textual.reactive import Reactive
 
 from backend.cli.hud import HUDBar
 from backend.cli.reasoning_display import ReasoningDisplay
 from backend.cli.syntax_theme import GRINTA_TERMINAL_THEME
 from backend.cli.theme import grinta_rich_theme_styles
-from textual.reactive import Reactive
 
 # ── Rich theme for consistent markup in RichLog/Static widgets ─────────────
 _RICH_THEME = RichTheme(grinta_rich_theme_styles())

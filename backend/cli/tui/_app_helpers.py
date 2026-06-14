@@ -6,8 +6,6 @@ the per-file LOC budget. Pure code motion.
 
 from __future__ import annotations
 
-import difflib
-
 from rich.text import Text
 
 from backend.cli.tui._app_constants import (
@@ -15,7 +13,6 @@ from backend.cli.tui._app_constants import (
     _TERMINAL_MOUSE_REPORT_RE,
     _TERMINAL_ORPHAN_PARAM_TOKEN_RE,
     _WELCOME_FIGLET_CACHE,
-    _WELCOME_FIGLET_FALLBACK,
 )
 from backend.cli.tui.widgets.unified_diff_view import encode_diff_view_payload
 
@@ -316,12 +313,12 @@ def _get_welcome_figlet() -> str:
     global _WELCOME_FIGLET_CACHE
     if _WELCOME_FIGLET_CACHE is not None:
         return _WELCOME_FIGLET_CACHE
-    try:
-        import pyfiglet as _pyfiglet
-
-        _WELCOME_FIGLET_CACHE = _pyfiglet.figlet_format('GRINTA', font='slant').rstrip(
-            '\n'
-        )
-    except Exception:
-        _WELCOME_FIGLET_CACHE = '\n'.join(_WELCOME_FIGLET_FALLBACK)
+    _WELCOME_FIGLET_CACHE = '\n'.join([
+        '[#78FFF0]██[/][#6F86B6 bold]████╗ ██████╗ ██╗███╗   ██╗████████╗ █████╗[/]',
+        '[#78FFF0]██[/][#6F86B6 bold]╔════╝ ██╔══██╗██║████╗  ██║╚══██╔══╝██╔══██╗[/]',
+        '[#78FFF0]██[/][#6F86B6 bold]║  ███╗██████╔╝██║██╔██╗ ██║   ██║   ███████║[/]',
+        '[#78FFF0]██[/][#6F86B6 bold]║   ██║██╔══██╗██║██║╚██╗██║   ██║   ██╔══██║[/]',
+        '[#78FFF0]╚█[/][#6F86B6 bold]█████╔╝██║  ██║██║██║ ╚████║   ██║   ██║  ██║[/]',
+        '[#78FFF0] ╚[/][#6F86B6 bold]═════╝ ╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝   ╚═╝   ╚═╝  ╚═╝[/]',
+    ])
     return _WELCOME_FIGLET_CACHE

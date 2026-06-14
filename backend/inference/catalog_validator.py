@@ -8,14 +8,15 @@ from pathlib import Path
 from typing import Any
 
 from backend.inference.catalog_loader import (
-    ModelEntry,
     _CATALOG_DIR,
+    ModelEntry,
     get_catalog,
     lookup,
     lookup_provider_model,
     runtime_model_id,
     validate_model_transport,
 )
+from backend.inference.prompt_caching import VALID_PROMPT_CACHE_MODES
 from backend.inference.reasoning import (
     WIRE_ANTHROPIC_ADAPTIVE,
     WIRE_ANTHROPIC_EXTENDED,
@@ -28,7 +29,6 @@ from backend.inference.reasoning import (
     WIRE_OPENAI_THINKING_ENABLED,
     supports_reasoning,
 )
-from backend.inference.prompt_caching import VALID_PROMPT_CACHE_MODES
 from backend.inference.reasoning_profiles import tier_order
 
 VALID_REASONING_WIRES: frozenset[str] = frozenset(
@@ -283,7 +283,7 @@ def validate_catalog_file(path: Path) -> list[CatalogValidationIssue]:
                 CatalogValidationIssue(
                     provider,
                     model_name,
-                    f"runtime.provider {declared!r} != file provider {provider!r}",
+                    f'runtime.provider {declared!r} != file provider {provider!r}',
                 )
             )
 
