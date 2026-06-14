@@ -495,6 +495,75 @@ def test_async_execute_preserves_reasoning_details_delta(monkeypatch):
     assert resp.reasoning_content == 'Plan the fix. hidden thought'
 
 
+def test_async_execute_preserves_redacted_thinking_in_content(monkeypatch):
+    """MiniMax native format embeds thinking in content when reasoning_split is off."""
+    import backend.engine.function_calling as fc
+    from backend.engine.executor import OrchestratorExecutor
+
+    sys.modules.setdefault('app.engine.function_calling', fc)
+
+    from backend.engine import executor as executor_module
+
+    monkeypatch.setattr(
+        executor_module.orchestrator_function_calling,
+        'response_to_actions',
+        lambda *args, **kwargs: [],
+    )
+
+    async def fake_astream(**kwargs):
+        yield {
+            'id': 'chatcmpl-inline-think',
+            'model': 'minimax/minimax-m3',
+            'choices': [
+                {
+                    'delta': {
+                        'content': '<think>Plan step one. ',
+                    },
+                    'finish_reason': None,
+                }
+            ],
+        }
+        yield {
+            'id': 'chatcmpl-inline-think',
+            'model': 'minimax/minimax-m3',
+            'choices': [
+                {
+                    'delta': {
+                        'content': 'Step two.</think>Answer.',
+                    },
+                    'finish_reason': None,
+                }
+            ],
+        }
+        yield {
+            'id': 'chatcmpl-inline-think',
+            'model': 'minimax/minimax-m3',
+            'choices': [{'delta': {}, 'finish_reason': 'stop'}],
+        }
+
+    llm = MagicMock()
+    llm.astream = fake_astream
+
+    executor = OrchestratorExecutor(
+        llm=llm,
+        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        planner=MagicMock(),
+        mcp_tools_provider=lambda: {},
+    )
+
+    result = asyncio.run(
+        executor.async_execute(
+            {'messages': []},
+            _event_stream('test-redacted-thinking-inline'),
+        )
+    )
+
+    resp = result.response
+    assert resp is not None
+    assert resp.content == 'Answer.'
+    assert resp.reasoning_content == 'Plan step one. Step two.'
+
+
 def test_async_execute_clamps_completion_budget_before_stream_call(monkeypatch):
     import backend.engine.function_calling as fc
     from backend.engine.executor import OrchestratorExecutor

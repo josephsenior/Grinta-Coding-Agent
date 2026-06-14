@@ -13,9 +13,7 @@ sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 
 async def main():
-    fc = ActivityRenderer.file_create(
-        'demo.txt', line_count=2, preview_content='alpha\nbeta'
-    )
+    fc = ActivityRenderer.file_create('demo.txt', line_count=2)
     fr = ActivityRenderer.file_read('src/main.py', line_range='1:50')
     fe = ActivityRenderer.file_edit(
         'Edited', 'src/main.py', line_range='10:20', added=3, removed=1

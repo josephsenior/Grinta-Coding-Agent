@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
+from backend.persistence.atomic_write import replace_file_with_retry
 from backend.persistence.local_file_store import LocalFileStore
 
 
@@ -69,6 +70,45 @@ class TestWriteAndRead:
     def test_read_nonexistent_raises(self, store):
         with pytest.raises(FileNotFoundError):
             store.read('no_such_file.txt')
+
+    def test_write_retries_transient_permission_error_on_replace(self, store):
+        store.write('locked.txt', 'v1')
+        real_replace = os.replace
+        calls = {'count': 0}
+
+        def flaky_replace(src, dst):
+            calls['count'] += 1
+            if calls['count'] == 1:
+                raise PermissionError(5, 'Access is denied')
+            return real_replace(src, dst)
+
+        with patch('backend.persistence.atomic_write.os.replace', side_effect=flaky_replace):
+            store.write('locked.txt', 'v2')
+
+        assert calls['count'] >= 2
+        assert store.read('locked.txt') == 'v2'
+
+
+class TestReplaceFileWithRetry:
+    def test_retries_transient_permission_error(self, tmp_path):
+        dest = tmp_path / 'plan.json'
+        dest.write_text('old', encoding='utf-8')
+        tmp = tmp_path / 'plan.json.tmp'
+        tmp.write_text('new', encoding='utf-8')
+        real_replace = os.replace
+        calls = {'count': 0}
+
+        def flaky_replace(src, dst):
+            calls['count'] += 1
+            if calls['count'] == 1:
+                raise PermissionError(5, 'Access is denied')
+            return real_replace(src, dst)
+
+        with patch('backend.persistence.atomic_write.os.replace', side_effect=flaky_replace):
+            replace_file_with_retry(tmp, dest)
+
+        assert calls['count'] >= 2
+        assert dest.read_text(encoding='utf-8') == 'new'
 
 
 class TestList:

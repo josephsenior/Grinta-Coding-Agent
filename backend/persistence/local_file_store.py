@@ -10,6 +10,7 @@ import time
 from contextlib import suppress
 
 from backend.core.logger import app_logger as logger
+from backend.persistence.atomic_write import replace_file_with_retry
 from backend.persistence.files import FileStore
 
 
@@ -109,7 +110,12 @@ class LocalFileStore(FileStore):
             if fsync:
                 os.fsync(tmpf.fileno())
 
-        os.replace(tmp_path, full_path)
+        try:
+            replace_file_with_retry(tmp_path, full_path)
+        except Exception:
+            with suppress(OSError):
+                os.remove(tmp_path)
+            raise
         if fsync:
             self._fsync_directory(dir_name)
 

@@ -21,6 +21,7 @@ from backend.cli._event_renderer.panels import (
 )
 from backend.cli._event_renderer.unified_renderer import (
     ActivityCard,
+    ActivityRenderer,
 )
 
 
@@ -415,13 +416,7 @@ class _AppRendererDisplayMixin:
         self.commit_live_thinking()
         self._clear_last_active_card_processing()
 
-        extra_content = None
-        if card.extra_lines:
-            extra_parts = []
-            for extra in card.extra_lines:
-                indent = '  ' * extra.indent
-                extra_parts.append(f'{indent}{extra.text}')
-            extra_content = '\n'.join(extra_parts)
+        extra_content = ActivityRenderer.format_extra_lines(card.extra_lines)
 
         from backend.cli.tui.widgets.activity_card import (
             ActivityCard as TUIActivityCard,
@@ -444,7 +439,10 @@ class _AppRendererDisplayMixin:
             collapsed=collapsed,
             collapsible=card.is_collapsible,
             syntax_language=card.syntax_language,
+            show_meta=bool(card.meta_lines),
         )
+        if card.meta_lines:
+            widget.set_meta(*card.meta_lines)
 
         is_tool = card.badge_category in (
             'tool',
@@ -494,6 +492,8 @@ class _AppRendererDisplayMixin:
         extra_content: str | None,
         collapse: bool,
         syntax_language: str | None,
+        meta_lines: list[str] | None = None,
+        diff_encoded: bool | None = None,
     ) -> None:
         try:
             widget.set_processing(False)
@@ -513,6 +513,16 @@ class _AppRendererDisplayMixin:
                 widget.update_content(extra_content)
             except Exception:
                 pass
+        if diff_encoded is not None:
+            try:
+                widget.set_diff_encoded(diff_encoded)
+            except Exception:
+                pass
+        if meta_lines:
+            try:
+                widget.set_meta(*meta_lines)
+            except Exception:
+                pass
         if collapse:
             try:
                 widget.collapse()
@@ -529,6 +539,8 @@ class _AppRendererDisplayMixin:
         collapse: bool = True,
         operation_label: str | None = None,
         syntax_language: str | None = None,
+        meta_lines: list[str] | None = None,
+        diff_encoded: bool | None = None,
     ) -> None:
         """Update an in-flight activity card to its final state in-place.
 
@@ -547,6 +559,8 @@ class _AppRendererDisplayMixin:
             extra_content=extra_content,
             collapse=collapse,
             syntax_language=syntax_language,
+            meta_lines=meta_lines,
+            diff_encoded=diff_encoded,
         )
         if operation_label is not None:
             self._tui.set_current_operation(
@@ -581,8 +595,9 @@ class _AppRendererDisplayMixin:
             outcome=secondary,
             extra_content=extra_content,
             collapsed=collapsed,
-            diff_encoded=True,
-            syntax_language='diff',
+            collapsible=bool(extra_content),
+            diff_encoded=bool(extra_content),
+            syntax_language='diff' if extra_content else None,
         )
         self._tui.set_current_operation(
             f'{verb} {detail}'.strip(),

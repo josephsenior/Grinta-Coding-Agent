@@ -11,7 +11,7 @@ class TestApp(App):
         print(f'\n=== TestApp starting (terminal size {s}) ===\n')
 
         fc = ActivityRenderer.file_create(
-            path='demo.txt', line_count=2, preview_content='alpha\nbeta'
+            path='demo.txt', line_count=2
         )
         print('file_create card:')
         print('  verb:', fc.verb)

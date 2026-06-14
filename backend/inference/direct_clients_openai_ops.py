@@ -543,6 +543,64 @@ async def acompletion(client: Any, messages: list[dict[str, Any]], **kwargs) -> 
     )
 
 
+def _reasoning_details_text(details: Any) -> str:
+    if not isinstance(details, list):
+        return ''
+    parts: list[str] = []
+    for item in details:
+        if isinstance(item, str):
+            if item:
+                parts.append(item)
+            continue
+        if not isinstance(item, dict):
+            continue
+        detail_type = str(item.get('type') or '').lower()
+        if 'encrypted' in detail_type:
+            continue
+        for key in ('text', 'summary', 'content'):
+            value = item.get(key)
+            if isinstance(value, str) and value:
+                parts.append(value)
+                break
+    return ''.join(parts)
+
+
+def _coalesce_stream_delta_reasoning(delta: dict[str, Any]) -> dict[str, Any]:
+    """Normalize vendor-specific reasoning fields onto ``reasoning_content``."""
+    if not isinstance(delta, dict):
+        return delta
+    if isinstance(delta.get('reasoning_content'), str) and delta['reasoning_content']:
+        return delta
+
+    for key in ('reasoning', 'thinking'):
+        value = delta.get(key)
+        if isinstance(value, str) and value:
+            return {**delta, 'reasoning_content': value}
+
+    details_text = _reasoning_details_text(delta.get('reasoning_details'))
+    if details_text:
+        return {**delta, 'reasoning_content': details_text}
+    return delta
+
+
+def _enrich_openai_stream_chunk(chunk: dict[str, Any]) -> dict[str, Any]:
+    choices = chunk.get('choices')
+    if not isinstance(choices, list) or not choices:
+        return chunk
+    choice = choices[0]
+    if not isinstance(choice, dict):
+        return chunk
+    delta = choice.get('delta')
+    if not isinstance(delta, dict):
+        return chunk
+    enriched_delta = _coalesce_stream_delta_reasoning(delta)
+    if enriched_delta is delta:
+        return chunk
+    enriched_choice = {**choice, 'delta': enriched_delta}
+    enriched_choices = [enriched_choice, *choices[1:]]
+    return {**chunk, 'choices': enriched_choices}
+
+
 async def astream(
     client: Any, messages: list[dict[str, Any]], **kwargs
 ) -> AsyncIterator[dict[str, Any]]:
@@ -567,6 +625,6 @@ async def astream(
         raise client._map_openai_error(e) from e
     try:
         async for chunk in stream:  # type: ignore[attr-defined]
-            yield chunk.model_dump()
+            yield _enrich_openai_stream_chunk(chunk.model_dump())
     except Exception as e:
         raise client._map_openai_error(e) from e

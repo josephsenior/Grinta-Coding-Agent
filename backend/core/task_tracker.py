@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -57,6 +58,7 @@ class TaskTracker:
         import os
 
         from backend.core.contracts.state import normalize_plan_step_payload
+        from backend.persistence.atomic_write import replace_file_with_retry
 
         normalized = [
             normalize_plan_step_payload(task, i + 1) for i, task in enumerate(task_list)
@@ -67,7 +69,12 @@ class TaskTracker:
             json.dump(normalized, f, indent=2, ensure_ascii=False)
             f.flush()
             os.fsync(f.fileno())
-        os.replace(tmp, self.path)
+        try:
+            replace_file_with_retry(tmp, self.path)
+        except Exception:
+            with suppress(OSError):
+                tmp.unlink(missing_ok=True)
+            raise
 
     def update_task_status(
         self, task_id: str, status: str, result: str | None = None

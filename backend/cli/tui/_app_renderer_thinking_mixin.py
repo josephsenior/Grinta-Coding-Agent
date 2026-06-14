@@ -266,10 +266,17 @@ class _AppRendererThinkingMixin:
         )
 
         display_text = sanitize_streaming_thinking_text(intent.text)
-        if self._should_render_thinking_text(display_text):
-            self._tui.add_thinking(display_text)
+        if not self._is_visible_thinking_text(display_text):
+            if finalize:
+                self._tui.finalize_thinking()
+            return
         if finalize:
+            if self._should_render_thinking_text(display_text):
+                self._tui.add_thinking(display_text)
             self._tui.finalize_thinking()
+            return
+        # Live stream snapshots must always refresh — hash dedup is for finalize only.
+        self._tui.add_thinking(display_text)
 
     def _render_error_intent(self, intent: ThinkingRenderIntent) -> None:
         message = intent.detail or intent.text

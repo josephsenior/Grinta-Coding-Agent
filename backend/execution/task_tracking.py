@@ -88,26 +88,9 @@ class TaskTrackingMixin:
             return ErrorObservation(f'Invalid task list: {e!s}')
         n = len(action.task_list)
 
-        try:
-            assert self.event_stream is not None
-            self.event_stream.file_store.write(task_file_path, content)
-        except Exception as e:
-            return ErrorObservation(
-                f'Failed to write task list to session directory {task_file_path}: {e!s}'
-            )
-
-        try:
-            from backend.core.task_tracker import TaskTracker
-
-            TaskTracker().save_to_file(list(action.task_list))
-        except Exception as e:
-            try:
-                self.event_stream.file_store.delete(task_file_path)
-            except Exception:
-                pass
-            return ErrorObservation(
-                f'Failed to persist active_plan.json after TASKS.md write: {e!s}'
-            )
+        persist_error = self._persist_task_plan(action, task_file_path, content=content)
+        if persist_error is not None:
+            return persist_error
 
         self._consecutive_task_view_count = 0
 
@@ -175,17 +158,48 @@ class TaskTrackingMixin:
         msg = thought if thought else '✅ Task status updated.'
         try:
             content = self._generate_task_list_content(action.task_list)
+        except ValueError as e:
+            return ErrorObservation(f'Invalid task list: {e!s}')
+
+        persist_error = self._persist_task_plan(action, task_file_path, content=content)
+        if persist_error is not None:
+            return persist_error
+
+        return TaskTrackingObservation(
+            content=msg,
+            command=action.command,
+            task_list=action.task_list,
+        )
+
+    def _persist_task_plan(
+        self,
+        action: TaskTrackingAction,
+        task_file_path: str,
+        *,
+        content: str,
+    ) -> ErrorObservation | None:
+        """Write TASKS.md and active_plan.json; roll back markdown on JSON failure."""
+        try:
             assert self.event_stream is not None
             self.event_stream.file_store.write(task_file_path, content)
         except Exception as e:
             return ErrorObservation(
                 f'Failed to write task list to session directory {task_file_path}: {e!s}'
             )
-        return TaskTrackingObservation(
-            content=msg,
-            command=action.command,
-            task_list=action.task_list,
-        )
+
+        try:
+            from backend.core.task_tracker import TaskTracker
+
+            TaskTracker().save_to_file(list(action.task_list))
+        except Exception as e:
+            try:
+                self.event_stream.file_store.delete(task_file_path)
+            except Exception:
+                pass
+            return ErrorObservation(
+                f'Failed to persist active_plan.json after TASKS.md write: {e!s}'
+            )
+        return None
 
     # ------------------------------------------------------------------
     # Helpers
