@@ -11,6 +11,7 @@ changed — only structural decomposition.
 
 from __future__ import annotations
 
+import json
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -23,6 +24,7 @@ from backend.cli.transcript import strip_tool_result_validation_annotations
 from backend.cli.tui._app_helpers import (
     _count_text_lines,
     _count_unified_diff_changes,
+    _encode_diff_view_from_contents,
     _encode_unified_diff_text,
     _format_diff_summary,
     _join_secondary_parts,
@@ -177,6 +179,58 @@ def _resolve_file_read_line_range(view_range: Any, start: int, end: int) -> str:
     return _file_read_range_from_bounds(start, end)
 
 
+def _create_file_line_count(new_content: str, added: int | None = None) -> int:
+    if added:
+        return added
+    return _count_text_lines(new_content)
+
+
+def _encode_create_file_diff(path: str, new_content: str) -> str | None:
+    if not (new_content or '').strip():
+        return None
+    return _encode_diff_view_from_contents('', new_content, path=path)
+
+
+def _write_create_file_diff_card(
+    orch: '_AppRendererEventProcessorMixin',
+    path: str,
+    new_content: str,
+    *,
+    added: int | None = None,
+) -> None:
+    line_count = _create_file_line_count(new_content, added)
+    encoded = _encode_create_file_diff(path, new_content)
+    orch._write_tui_file_card(
+        'Created',
+        orch._compact_file_card_path(path),
+        secondary=f'+{line_count}' if line_count else None,
+        secondary_kind='ok' if line_count else 'neutral',
+        extra_content=encoded,
+        collapsed=True,
+    )
+
+
+def _finalize_pending_create_file_card(
+    orch: '_AppRendererEventProcessorMixin',
+    widget: Any,
+    path: str,
+    new_content: str,
+    *,
+    added: int | None = None,
+) -> None:
+    line_count = _create_file_line_count(new_content, added)
+    encoded = _encode_create_file_diff(path, new_content)
+    orch._update_activity_card_outcome(
+        widget,
+        status='ok',
+        outcome=f'+{line_count}' if line_count else None,
+        extra_content=encoded,
+        diff_encoded=bool(encoded),
+        collapse=True,
+        operation_label=f'Created {orch._compact_file_card_path(path)}'.strip(),
+    )
+
+
 def _handle_file_read_action(
     orch: '_AppRendererEventProcessorMixin', event: FileReadAction
 ) -> None:
@@ -308,12 +362,20 @@ def _handle_file_edit_action(
 def _handle_file_write_action(
     orch: '_AppRendererEventProcessorMixin', event: FileWriteAction
 ) -> None:
+    path = event.path
+    if orch._has_pending_file_card('_pending_file_create_cards_by_path', path):
+        return
     content = getattr(event, 'content', '') or ''
     card = ActivityRenderer.file_create(
-        orch._compact_file_card_path(event.path),
+        orch._compact_file_card_path(path),
         line_count=_count_text_lines(content),
     )
-    orch._write_card(card)
+    widget = orch._write_card(card)
+    orch._remember_pending_file_card(
+        '_pending_file_create_cards_by_path',
+        path,
+        widget,
+    )
 
 
 def _handle_file_read_observation(
@@ -350,12 +412,12 @@ def _resolve_file_edit_pending_create(
     if pending_create is None:
         return False
     new_content = getattr(event, 'new_content', '') or ''
-    line_count = added or _count_text_lines(new_content)
-    orch._update_activity_card_outcome(
+    _finalize_pending_create_file_card(
+        orch,
         pending_create,
-        status='ok',
-        outcome=f'+{line_count}' if line_count else None,
-        operation_label=f'Created {orch._compact_file_card_path(path)}'.strip(),
+        path,
+        new_content,
+        added=added,
     )
     return True
 
@@ -367,11 +429,12 @@ def _handle_file_edit_new_file(
     added: int,
 ) -> None:
     new_content = getattr(event, 'new_content', '') or ''
-    card = ActivityRenderer.file_create(
-        orch._compact_file_card_path(path or event.path),
-        line_count=added or _count_text_lines(new_content),
+    _write_create_file_diff_card(
+        orch,
+        path or event.path,
+        new_content,
+        added=added,
     )
-    orch._write_card(card)
 
 
 def _write_multi_file_edit_card(
@@ -521,25 +584,45 @@ def _handle_file_edit_observation(
 def _handle_file_write_observation(
     orch: '_AppRendererEventProcessorMixin', event: FileWriteObservation
 ) -> None:
-    diff_text = orch._extract_file_observation_diff(event)
-    if diff_text:
-        encoded_diff = _encode_unified_diff_text(diff_text, path=event.path)
-        added, removed = _count_unified_diff_changes(diff_text)
-        orch._write_tui_file_card(
-            'Edited',
-            event.path,
-            secondary=_format_diff_summary(added, removed),
-            secondary_kind='ok' if added or removed else 'neutral',
-            extra_content=encoded_diff,
-        )
+    path = event.path
+    new_content = getattr(event, 'new_content', None)
+    if new_content is None:
+        new_content = getattr(event, 'content', '') or ''
+    pending = orch._take_pending_file_card(
+        '_pending_file_create_cards_by_path',
+        path,
+    )
+    if pending is not None:
+        _finalize_pending_create_file_card(orch, pending, path, new_content)
+        return
+    _write_create_file_diff_card(orch, path, new_content)
+
+
+def _mcp_content_is_error(content: str) -> bool:
+    s = (content or '').strip()
+    if not s:
+        return False
+    if s.startswith('Error'):
+        return True
+    if s.startswith('{'):
+        try:
+            data = json.loads(s)
+        except json.JSONDecodeError:
+            return False
+        if isinstance(data, dict) and (
+            data.get('isError') or data.get('ok') is False
+        ):
+            return True
+    return False
 
 
 def _handle_mcp_action(
     orch: '_AppRendererEventProcessorMixin', event: MCPAction
 ) -> None:
-    card = ActivityRenderer.mcp_tool(event.name, event.arguments)
+    card = ActivityRenderer.mcp_activity_card(event.name, event.arguments)
     widget = orch._write_card(card)
     orch._pending_mcp_card = widget
+    orch._pending_exploration_meta = card.meta_lines or None
 
 
 def _handle_cmd_run_action(
@@ -553,28 +636,30 @@ def _handle_cmd_run_action(
 def _handle_mcp_observation(
     orch: '_AppRendererEventProcessorMixin', event: MCPObservation
 ) -> None:
-    card = ActivityRenderer.mcp_tool(
+    content = event.content or ''
+    is_error = _mcp_content_is_error(content)
+    card = ActivityRenderer.mcp_activity_card(
         event.name,
         event.arguments,
-        result=event.content or '',
-        success=True,
+        result=content,
+        success=not is_error,
+        error=content if is_error else None,
     )
-    preview = None
-    if event.content:
-        truncated = event.content[:200] + ('...' if len(event.content) > 200 else '')
-        preview = f'  {truncated}'
-    pending = orch._pending_mcp_card
-    if pending is not None:
-        orch._update_activity_card_outcome(
-            pending,
-            status='ok',
-            outcome='completed',
-            extra_content=preview,
-            operation_label=f'Called {event.name}'.strip(),
-        )
-        orch._pending_mcp_card = None
+    if card.meta_lines:
+        meta = list(card.meta_lines)
     else:
-        orch._write_card(card)
+        meta = getattr(orch, '_pending_exploration_meta', None)
+    if meta:
+        card.meta_lines = meta
+    orch._render_exploration_card(
+        card,
+        content=content,
+        pending_attr='_pending_mcp_card',
+        operation_label=card.detail,
+        force_err=is_error,
+    )
+    orch._pending_mcp_card = None
+    orch._pending_exploration_meta = None
 
 
 def _resolve_cmd_output_cwd(event: CmdOutputObservation) -> str | None:
@@ -776,13 +861,22 @@ def _update_browser_screenshot_card(
     last_cmd: str,
     url: str,
     content: str,
+    *,
+    image_path: str = '',
 ) -> None:
-    preview = _build_screenshot_preview(url, content)
+    card = ActivityRenderer.browser_action(
+        last_cmd or 'screenshot',
+        url,
+        result=content or 'captured',
+        image_path=image_path,
+    )
+    extra_content = ActivityRenderer.format_extra_lines(card.extra_lines)
     orch._update_activity_card_outcome(
         prev,
         status='ok',
-        outcome='done',
-        extra_content=preview,
+        outcome=card.secondary or 'captured',
+        extra_content=extra_content,
+        meta_lines=card.meta_lines or None,
         operation_label=f'Browser {last_cmd}'.strip(),
     )
     orch._last_browser_action_card = None
@@ -809,39 +903,131 @@ def _handle_browser_screenshot_observation(
     orch: '_AppRendererEventProcessorMixin', event: BrowserScreenshotObservation
 ) -> None:
     url, content, prev, last_cmd = _extract_screenshot_details(orch, event)
+    image_path = getattr(event, 'image_path', '') or ''
+    screenshot_cmd = 'screenshot'
     card = ActivityRenderer.browser_action(
-        'screenshot', url, result=content or 'captured'
+        screenshot_cmd,
+        url,
+        result=content or 'captured',
+        image_path=image_path,
     )
     if _should_update_browser_card(prev, last_cmd):
-        _update_browser_screenshot_card(orch, prev, last_cmd, url, content)
+        _update_browser_screenshot_card(
+            orch,
+            prev,
+            screenshot_cmd,
+            url,
+            content,
+            image_path=image_path,
+        )
     else:
         orch._write_card(card)
+
+
+def _exploration_meta_line(tokens: list[str]) -> list[str]:
+    cleaned = [token for token in tokens if token]
+    if not cleaned:
+        return []
+    return [' · '.join(cleaned)]
+
+
+def _grep_exploration_meta(event: GrepAction | GrepObservation) -> list[str]:
+    tokens: list[str] = []
+    mode = (getattr(event, 'output_mode', '') or '').strip()
+    if mode:
+        tokens.append(f'mode: {mode}')
+    file_pattern = (getattr(event, 'file_pattern', '') or '').strip()
+    if file_pattern:
+        tokens.append(f'filter: {file_pattern}')
+    head_limit = getattr(event, 'head_limit', None)
+    if head_limit:
+        tokens.append(f'limit: {head_limit}')
+    offset = getattr(event, 'offset', 0) or 0
+    if offset:
+        tokens.append(f'offset: {offset}')
+    if getattr(event, 'case_sensitive', False):
+        tokens.append('case-sensitive')
+    return _exploration_meta_line(tokens)
+
+
+def _glob_exploration_meta(event: GlobAction | GlobObservation) -> list[str]:
+    tokens: list[str] = []
+    head_limit = getattr(event, 'head_limit', None)
+    if head_limit:
+        tokens.append(f'limit: {head_limit}')
+    offset = getattr(event, 'offset', 0) or 0
+    if offset:
+        tokens.append(f'offset: {offset}')
+    return _exploration_meta_line(tokens)
+
+
+def _find_symbols_exploration_meta(
+    event: FindSymbolsAction | FindSymbolsObservation,
+) -> list[str]:
+    tokens: list[str] = []
+    symbol_kind = (getattr(event, 'symbol_kind', '') or '').strip()
+    if symbol_kind:
+        tokens.append(f'kind: {symbol_kind}')
+    if getattr(event, 'include_private', False):
+        tokens.append('include-private')
+    return _exploration_meta_line(tokens)
+
+
+def _read_symbols_exploration_meta(event: ReadSymbolsAction) -> list[str]:
+    tokens: list[str] = []
+    symbol_kind = (getattr(event, 'symbol_kind', '') or '').strip()
+    if symbol_kind:
+        tokens.append(f'kind: {symbol_kind}')
+    return _exploration_meta_line(tokens)
+
+
+def _analyze_exploration_meta(
+    event: AnalyzeProjectStructureAction | AnalyzeProjectStructureObservation,
+) -> list[str]:
+    tokens: list[str] = []
+    depth = getattr(event, 'depth', None)
+    if depth is not None:
+        tokens.append(f'depth: {depth}')
+    direction = (getattr(event, 'direction', '') or '').strip()
+    if direction:
+        tokens.append(f'direction: {direction}')
+    symbol = (getattr(event, 'symbol', '') or '').strip()
+    if symbol:
+        tokens.append(f'symbol: {symbol}')
+    return _exploration_meta_line(tokens)
 
 
 def _handle_grep_action(
     orch: '_AppRendererEventProcessorMixin', event: GrepAction
 ) -> None:
+    meta = _grep_exploration_meta(event)
     card = ActivityRenderer.search_results(
         query=event.pattern or 'code search',
         scope=event.path or '',
         source_tool='grep',
+        meta_lines=meta,
+        output_mode=event.output_mode or None,
     )
     widget = orch._write_card(card)
     orch._pending_search_card = widget
     orch._pending_search_tool = 'grep'
+    orch._pending_exploration_meta = meta
 
 
 def _handle_glob_action(
     orch: '_AppRendererEventProcessorMixin', event: GlobAction
 ) -> None:
+    meta = _glob_exploration_meta(event)
     card = ActivityRenderer.search_results(
         query=event.pattern or 'file listing',
         scope=event.path or '',
         source_tool='glob',
+        meta_lines=meta,
     )
     widget = orch._write_card(card)
     orch._pending_search_card = widget
     orch._pending_search_tool = 'glob'
+    orch._pending_exploration_meta = meta
 
 
 def _handle_lsp_query_action(
@@ -904,7 +1090,11 @@ def _handle_grep_observation(
         pending_attr='_pending_search_card'
         if orch._pending_search_tool == 'grep'
         else None,
+        meta_lines=getattr(orch, '_pending_exploration_meta', None)
+        or _grep_exploration_meta(event),
+        output_mode=event.output_mode or None,
     )
+    orch._pending_exploration_meta = None
 
 
 def _handle_glob_observation(
@@ -912,19 +1102,23 @@ def _handle_glob_observation(
 ) -> None:
     content = event.error or event.content or ''
     files = event.files or [line for line in content.splitlines() if line.strip()]
+    displayed_files = files[:10]
     orch._render_search_card(
         query=event.pattern or 'file listing',
         content=content,
         match_count=0,
         file_count=event.file_count or len(files),
-        file_list=[(path, 1) for path in files[:5]],
-        result_lines=files,
+        file_list=[(path, 0) for path in displayed_files],
+        result_lines=None,
         source_tool='glob',
         scope=event.path or '',
         pending_attr='_pending_search_card'
         if orch._pending_search_tool == 'glob'
         else None,
+        meta_lines=getattr(orch, '_pending_exploration_meta', None)
+        or _glob_exploration_meta(event),
     )
+    orch._pending_exploration_meta = None
 
 
 def _handle_lsp_query_observation(
@@ -968,13 +1162,16 @@ def _find_symbols_result_lines(
 def _handle_find_symbols_action(
     orch: '_AppRendererEventProcessorMixin', event: FindSymbolsAction
 ) -> None:
+    meta = _find_symbols_exploration_meta(event)
     card = ActivityRenderer.search_results(
         query=event.query or 'symbol search',
         scope=event.path or '',
-        source_tool='search',
+        source_tool='find_symbols',
+        meta_lines=meta,
     )
     widget = orch._write_card(card)
     orch._pending_find_symbols_card = widget
+    orch._pending_exploration_meta = meta
 
 
 def _handle_find_symbols_observation(
@@ -994,19 +1191,28 @@ def _handle_find_symbols_observation(
         file_count=len(all_paths),
         file_list=file_list,
         result_lines=result_lines,
-        source_tool='search',
+        source_tool='find_symbols',
         scope=event.path or '',
         pending_attr='_pending_find_symbols_card',
+        meta_lines=getattr(orch, '_pending_exploration_meta', None)
+        or _find_symbols_exploration_meta(event),
     )
+    orch._pending_exploration_meta = None
 
 
 def _handle_read_symbols_action(
     orch: '_AppRendererEventProcessorMixin', event: ReadSymbolsAction
 ) -> None:
-    label = f'{len(event.targets)} symbol{"s" if len(event.targets) != 1 else ""}'
-    card = ActivityRenderer.lsp_query(label)
+    meta = _read_symbols_exploration_meta(event)
+    card = ActivityRenderer.read_symbols_results(
+        event.path or '',
+        [],
+        target_count=len(event.targets),
+        meta_lines=meta,
+    )
     widget = orch._write_card(card)
     orch._pending_read_symbols_card = widget
+    orch._pending_exploration_meta = meta
 
 
 def _read_symbols_preview(event: ReadSymbolsObservation) -> str:
@@ -1038,34 +1244,34 @@ def _read_symbols_preview(event: ReadSymbolsObservation) -> str:
 def _handle_read_symbols_observation(
     orch: '_AppRendererEventProcessorMixin', event: ReadSymbolsObservation
 ) -> None:
-    preview = _read_symbols_preview(event)
-    card = ActivityRenderer.lsp_query(
-        f'{len(event.results)} symbol{"s" if len(event.results) != 1 else ""}',
-        result=preview,
-        available=not bool(event.error),
+    card = ActivityRenderer.read_symbols_results(
+        event.path or '',
+        event.results,
+        meta_lines=getattr(orch, '_pending_exploration_meta', None),
     )
-    pending = orch._pending_read_symbols_card
-    if pending is not None:
-        orch._update_activity_card_outcome(
-            pending,
-            status='err' if event.error else 'ok',
-            outcome=card.secondary or 'completed',
-            extra_content=_build_lsp_preview(preview),
-            operation_label=f'Read {len(event.results)} symbol{"s" if len(event.results) != 1 else ""}',
-        )
-        orch._pending_read_symbols_card = None
-    else:
-        orch._write_card(card)
+    orch._render_exploration_card(
+        card,
+        content=event.error or event.content or '',
+        pending_attr='_pending_read_symbols_card',
+        operation_label=f'Read {len(event.results)} symbol{"s" if len(event.results) != 1 else ""}',
+        force_err=bool(event.error),
+    )
+    orch._pending_exploration_meta = None
 
 
 def _handle_analyze_project_structure_action(
     orch: '_AppRendererEventProcessorMixin', event: AnalyzeProjectStructureAction
 ) -> None:
-    card = ActivityRenderer.lsp_query(
-        f'{event.command} {event.path}'.strip() or 'project structure'
+    meta = _analyze_exploration_meta(event)
+    card = ActivityRenderer.analyze_structure_results(
+        event.command,
+        event.path,
+        '',
+        meta_lines=meta,
     )
     widget = orch._write_card(card)
     orch._pending_analyze_project_structure_card = widget
+    orch._pending_exploration_meta = meta
 
 
 def _handle_analyze_project_structure_observation(
@@ -1073,24 +1279,22 @@ def _handle_analyze_project_structure_observation(
     event: AnalyzeProjectStructureObservation,
 ) -> None:
     content = (event.error or event.content or '').strip()
-    preview = _build_lsp_preview(content)
-    card = ActivityRenderer.lsp_query(
-        f'{event.command} {event.path}'.strip() or 'project structure',
-        result=content,
-        available=not bool(event.error),
+    card = ActivityRenderer.analyze_structure_results(
+        event.command,
+        event.path,
+        content,
+        meta_lines=getattr(orch, '_pending_exploration_meta', None)
+        or _analyze_exploration_meta(event),
+        error=event.error or '',
     )
-    pending = orch._pending_analyze_project_structure_card
-    if pending is not None:
-        orch._update_activity_card_outcome(
-            pending,
-            status='err' if event.error else 'ok',
-            outcome=card.secondary or 'completed',
-            extra_content=preview,
-            operation_label=f'Analyzed {event.command}'.strip(),
-        )
-        orch._pending_analyze_project_structure_card = None
-    else:
-        orch._write_card(card)
+    orch._render_exploration_card(
+        card,
+        content=content,
+        pending_attr='_pending_analyze_project_structure_card',
+        operation_label=f'Analyzed {event.command}'.strip(),
+        force_err=bool(event.error),
+    )
+    orch._pending_exploration_meta = None
 
 
 def _handle_terminal_run_action(

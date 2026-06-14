@@ -10,6 +10,7 @@ from backend.cli._event_renderer.text_utils import (
     sanitize_visible_transcript_text,
 )
 from backend.cli._event_renderer.unified_renderer import (
+    ActivityCard,
     ActivityRenderer,
 )
 from backend.core.enums import (
@@ -62,6 +63,41 @@ class _AppRendererActionHandlersMixin:
             else:
                 self.clear_live_response()
 
+    def _render_exploration_card(
+        self,
+        card: ActivityCard,
+        *,
+        content: str = '',
+        pending_attr: str | None = None,
+        operation_label: str | None = None,
+        force_err: bool = False,
+    ) -> None:
+        """Render or finalize an exploration activity card in-place."""
+        if pending_attr is not None:
+            pending = getattr(self, pending_attr, None)
+            if pending is not None:
+                status = (
+                    'err'
+                    if force_err
+                    or content.startswith('Error')
+                    or 'does not exist' in content
+                    else 'ok'
+                )
+                extra_content = ActivityRenderer.format_extra_lines(card.extra_lines)
+                if extra_content is None and content:
+                    extra_content = content[:200]
+                self._update_activity_card_outcome(
+                    pending,
+                    status=status,
+                    outcome=card.secondary or 'completed',
+                    extra_content=extra_content,
+                    meta_lines=card.meta_lines or None,
+                    operation_label=operation_label or card.detail,
+                )
+                setattr(self, pending_attr, None)
+                return
+        self._write_card(card)
+
     def _render_search_card(
         self,
         *,
@@ -74,6 +110,9 @@ class _AppRendererActionHandlersMixin:
         source_tool: str = 'search',
         scope: str = '',
         pending_attr: str | None = None,
+        detail: str | None = None,
+        meta_lines: list[str] | None = None,
+        output_mode: str | None = None,
     ) -> None:
         """Render a grep/glob/search activity card from structured fields."""
         card = ActivityRenderer.search_results(
@@ -84,25 +123,16 @@ class _AppRendererActionHandlersMixin:
             result_lines=result_lines,
             scope=scope,
             source_tool=source_tool,
+            detail=detail,
+            meta_lines=meta_lines,
+            output_mode=output_mode,
         )
-        if pending_attr is not None:
-            pending = getattr(self, pending_attr, None)
-            if pending is not None:
-                status = (
-                    'err'
-                    if content.startswith('Error') or 'does not exist' in content
-                    else 'ok'
-                )
-                self._update_activity_card_outcome(
-                    pending,
-                    status=status,
-                    outcome=card.secondary or 'completed',
-                    extra_content=content[:200] if content else None,
-                    operation_label=query,
-                )
-                setattr(self, pending_attr, None)
-                return
-        self._write_card(card)
+        self._render_exploration_card(
+            card,
+            content=content,
+            pending_attr=pending_attr,
+            operation_label=query,
+        )
 
     @staticmethod
     def _is_user_source(source: Any) -> bool:

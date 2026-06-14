@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+from unittest.mock import patch
 
 from backend.context.compactor.strategies.smart_compactor import SmartCompactor
 from backend.engine.tools import working_memory as wm
@@ -121,6 +123,29 @@ def test_task_tracker_persists_active_plan_under_app_dir(tmp_path, monkeypatch) 
             'subtasks': [],
         }
     ]
+
+
+def test_task_tracker_save_retries_transient_replace_error(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(
+        'backend.core.workspace_resolution.workspace_agent_state_dir',
+        lambda project_root=None: tmp_path,
+    )
+    tracker = TaskTracker(tmp_path)
+    task_list = [{'id': '1', 'description': 'Do it', 'status': 'in_progress'}]
+    real_replace = os.replace
+    calls = {'count': 0}
+
+    def flaky_replace(src, dst):
+        calls['count'] += 1
+        if calls['count'] == 1:
+            raise PermissionError(5, 'Access is denied')
+        return real_replace(src, dst)
+
+    with patch('backend.persistence.atomic_write.os.replace', side_effect=flaky_replace):
+        tracker.save_to_file(task_list)
+
+    assert calls['count'] >= 2
+    assert tracker.load_from_file()[0]['description'] == 'Do it'
 
 
 def test_smart_compactor_reads_in_progress_ids_from_app_plan(

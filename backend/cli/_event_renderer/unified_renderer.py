@@ -7,13 +7,16 @@ and structured content instead of heavy bordered panels.
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
+from typing import Any
 
 from pygments.lexers import guess_lexer_for_filename
 from pygments.util import ClassNotFound
 from rich.text import Text
 
+from backend.cli._tool_display.preview import mcp_result_user_preview
 from backend.cli._tool_display.renderers.badge import badge_for_tool_name
 from backend.cli.theme import (
     NAVY_BRAND,
@@ -55,7 +58,41 @@ _SEARCH_CARD_PRESETS: dict[str, tuple[str, str, str]] = {
     'grep': ('grep', 'Grep', 'Grepped'),
     'glob': ('glob', 'Glob', 'Globbed'),
     'search': ('search', 'Search', 'Searched'),
+    'find_symbols': ('find_symbols', 'Find Symbols', 'Found'),
+    'read_symbols': ('read_symbols', 'Read Symbols', 'Read'),
+    'analyze': ('analyze', 'Analyze', 'Analyzed'),
 }
+
+_WEB_MCP_KINDS: dict[str, str] = {
+    'web_search_exa': 'web_search',
+    'web_fetch_exa': 'web_fetch',
+    '__native_web_fetch__': 'web_fetch',
+    'fetch': 'web_fetch',
+}
+
+_WEB_CARD_PRESETS: dict[str, tuple[str, str, str]] = {
+    'web_search': ('web_search', 'Web Search', 'Searched'),
+    'web_fetch': ('web_fetch', 'Web Fetch', 'Fetched'),
+}
+
+_BROWSER_OUTCOMES: dict[str, str] = {
+    'navigate': 'loaded',
+    'screenshot': 'captured',
+    'snapshot': 'ready',
+    'click': 'clicked',
+    'type': 'typed',
+    'browse': 'done',
+    'start': 'started',
+    'close': 'closed',
+}
+
+
+def _exploration_meta_line(tokens: list[str]) -> list[str]:
+    """Return a single meta row line when any tokens are present."""
+    cleaned = [token for token in tokens if token]
+    if not cleaned:
+        return []
+    return [' · '.join(cleaned)]
 
 
 def _extract_search_query(command: str) -> str:
@@ -125,6 +162,7 @@ class ActivityCard:
     secondary: str | None = None
     secondary_kind: str = 'neutral'
     extra_lines: list[ActivityLine] = field(default_factory=list)
+    meta_lines: list[str] = field(default_factory=list)
     is_collapsible: bool = False
     start_collapsed: bool = False
     syntax_language: str | None = None
@@ -462,20 +500,6 @@ class ActivityRenderer:
     def file_create(
         path: str,
         line_count: int = 0,
-        preview_content: str | None = None,
-    ) -> ActivityCard:
-        """Create an activity card for file creation."""
-        return ActivityRenderer.file_create_with_preview(
-            path,
-            line_count=line_count,
-            preview_content=preview_content,
-        )
-
-    @staticmethod
-    def file_create_with_preview(
-        path: str,
-        line_count: int = 0,
-        preview_content: str | None = None,
     ) -> ActivityCard:
         """Create an activity card for file creation."""
         secondary = f'+{line_count}' if line_count else None
@@ -487,6 +511,241 @@ class ActivityRenderer:
             secondary=secondary,
             secondary_kind='ok' if secondary else 'neutral',
             syntax_language=_lexer_for_path(path),
+        )
+
+    @staticmethod
+    def resolve_native_web_tool_kind(mcp_name: str) -> str | None:
+        return _WEB_MCP_KINDS.get((mcp_name or '').strip())
+
+    @staticmethod
+    def _coerce_mcp_result_payload(content: str) -> Any:
+        s = (content or '').strip()
+        if not s:
+            return None
+        if s.startswith('{') or s.startswith('['):
+            try:
+                return json.loads(s)
+            except json.JSONDecodeError:
+                return s
+        return s
+
+    @staticmethod
+    def _count_collection_in_mcp_content(content: str) -> int:
+        payload = ActivityRenderer._coerce_mcp_result_payload(content)
+        if isinstance(payload, list):
+            return len(payload)
+        if not isinstance(payload, dict):
+            return 0
+        for key in ('results', 'items', 'documents', 'matches'):
+            value = payload.get(key)
+            if isinstance(value, list):
+                return len(value)
+        blocks = payload.get('content')
+        if not isinstance(blocks, list):
+            return 0
+        total = 0
+        for block in blocks:
+            if not isinstance(block, dict):
+                continue
+            raw = block.get('text')
+            if not isinstance(raw, str) or not raw.strip():
+                continue
+            inner = raw.strip()
+            if not (inner.startswith('{') or inner.startswith('[')):
+                continue
+            try:
+                parsed = json.loads(inner)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(parsed, list):
+                total += len(parsed)
+            elif isinstance(parsed, dict):
+                for key in ('results', 'items', 'documents', 'matches'):
+                    value = parsed.get(key)
+                    if isinstance(value, list):
+                        total += len(value)
+        return total
+
+    @staticmethod
+    def _build_mcp_extra_lines_from_content(content: str) -> list[ActivityLine]:
+        from backend.cli._tool_display.renderers.mcp import _format_mcp_result
+
+        payload = ActivityRenderer._coerce_mcp_result_payload(content)
+        if payload is None:
+            return []
+        formatted = _format_mcp_result(payload)
+        extra_lines: list[ActivityLine] = []
+        for line in formatted[:12]:
+            extra_lines.append(
+                ActivityLine(str(line), style=NAVY_TEXT_MUTED, indent=1)
+            )
+        if len(formatted) > 12:
+            extra_lines.append(
+                ActivityLine(
+                    f'... {len(formatted) - 12} more lines',
+                    style=NAVY_TEXT_DIM,
+                    indent=1,
+                )
+            )
+        if extra_lines:
+            return extra_lines
+        preview = mcp_result_user_preview(content)
+        if preview:
+            extra_lines.append(
+                ActivityLine(preview, style=NAVY_TEXT_MUTED, indent=1)
+            )
+        return extra_lines
+
+    @staticmethod
+    def _web_tool_secondary(
+        kind: str,
+        content: str,
+        *,
+        error: str | None = None,
+    ) -> tuple[str, str]:
+        if error:
+            return 'failed', 'err'
+        count = ActivityRenderer._count_collection_in_mcp_content(content)
+        if kind == 'web_search':
+            if count:
+                label = 'result' if count == 1 else 'results'
+                return f'{count} {label}', 'ok'
+            preview = mcp_result_user_preview(content)
+            if preview:
+                return preview[:80], 'ok'
+            return 'no results', 'neutral'
+        if kind == 'web_fetch':
+            if count:
+                label = 'page' if count == 1 else 'pages'
+                return f'{count} {label}', 'ok'
+            preview = mcp_result_user_preview(content)
+            if preview:
+                return preview[:80], 'ok'
+            return 'no content', 'neutral'
+        return 'completed', 'ok'
+
+    @staticmethod
+    def _web_search_meta(arguments: dict[str, Any] | None) -> list[str]:
+        tokens: list[str] = []
+        args = arguments or {}
+        num_results = args.get('numResults')
+        if num_results is not None:
+            tokens.append(f'limit: {num_results}')
+        return _exploration_meta_line(tokens)
+
+    @staticmethod
+    def _web_fetch_meta(
+        arguments: dict[str, Any] | None,
+        content: str = '',
+    ) -> list[str]:
+        tokens: list[str] = []
+        args = arguments or {}
+        max_chars = args.get('max_characters')
+        if max_chars is not None:
+            tokens.append(f'max: {max_chars}')
+        payload = ActivityRenderer._coerce_mcp_result_payload(content)
+        if isinstance(payload, dict):
+            backend = payload.get('backend')
+            if isinstance(backend, str) and backend:
+                tokens.append(f'backend: {backend}')
+        return _exploration_meta_line(tokens)
+
+    @staticmethod
+    def web_search_card(
+        arguments: dict[str, Any] | None = None,
+        *,
+        result: str | None = None,
+        error: str | None = None,
+    ) -> ActivityCard:
+        badge_category, title, verb = _WEB_CARD_PRESETS['web_search']
+        query = str((arguments or {}).get('query') or '').strip()
+        detail = f'"{query}"' if query else 'web'
+        secondary, secondary_kind = ActivityRenderer._web_tool_secondary(
+            'web_search',
+            result or '',
+            error=error,
+        )
+        extra_lines = ActivityRenderer._build_mcp_extra_lines_from_content(
+            result or error or ''
+        )
+        return ActivityCard(
+            verb=verb,
+            detail=detail,
+            badge_category=badge_category,
+            title=title,
+            secondary=secondary,
+            secondary_kind=secondary_kind,
+            extra_lines=extra_lines,
+            meta_lines=ActivityRenderer._web_search_meta(arguments),
+            is_collapsible=bool(extra_lines),
+        )
+
+    @staticmethod
+    def web_fetch_card(
+        arguments: dict[str, Any] | None = None,
+        *,
+        result: str | None = None,
+        error: str | None = None,
+    ) -> ActivityCard:
+        badge_category, title, verb = _WEB_CARD_PRESETS['web_fetch']
+        urls = (arguments or {}).get('urls') or []
+        if isinstance(urls, str):
+            urls = [urls] if urls.strip() else []
+        if len(urls) == 1:
+            detail = str(urls[0])[:80]
+        elif urls:
+            detail = f'{len(urls)} URLs'
+        else:
+            detail = 'web pages'
+        secondary, secondary_kind = ActivityRenderer._web_tool_secondary(
+            'web_fetch',
+            result or '',
+            error=error,
+        )
+        extra_lines = ActivityRenderer._build_mcp_extra_lines_from_content(
+            result or error or ''
+        )
+        return ActivityCard(
+            verb=verb,
+            detail=detail,
+            badge_category=badge_category,
+            title=title,
+            secondary=secondary,
+            secondary_kind=secondary_kind,
+            extra_lines=extra_lines,
+            meta_lines=ActivityRenderer._web_fetch_meta(arguments, result or ''),
+            is_collapsible=bool(extra_lines),
+        )
+
+    @staticmethod
+    def mcp_activity_card(
+        name: str,
+        arguments: dict | None = None,
+        *,
+        result: str | None = None,
+        success: bool | None = None,
+        error: str | None = None,
+    ) -> ActivityCard:
+        """Build the best activity card for an MCP invocation."""
+        kind = ActivityRenderer.resolve_native_web_tool_kind(name)
+        if kind == 'web_search':
+            return ActivityRenderer.web_search_card(
+                arguments,
+                result=result,
+                error=error,
+            )
+        if kind == 'web_fetch':
+            return ActivityRenderer.web_fetch_card(
+                arguments,
+                result=result,
+                error=error,
+            )
+        return ActivityRenderer.mcp_tool(
+            name,
+            arguments,
+            result=result,
+            success=success,
+            error=error,
         )
 
     @staticmethod
@@ -512,14 +771,17 @@ class ActivityRenderer:
         if error:
             secondary = 'failed'
             secondary_kind = 'err'
+        elif result:
+            preview = mcp_result_user_preview(result)
+            secondary = (preview[:80] if preview else 'completed') or 'completed'
+            secondary_kind = 'ok' if success is not False else 'err'
         elif success is True:
             secondary = 'completed'
             secondary_kind = 'ok'
 
-        extra_lines: list[ActivityLine] = []
-        if result:
-            preview = result[:200] + ('...' if len(result) > 200 else '')
-            extra_lines.append(ActivityLine(preview, style=NAVY_TEXT_MUTED, indent=1))
+        extra_lines = ActivityRenderer._build_mcp_extra_lines_from_content(
+            result or error or ''
+        )
 
         return ActivityCard(
             verb='Called',
@@ -529,7 +791,7 @@ class ActivityRenderer:
             secondary=secondary,
             secondary_kind=secondary_kind,
             extra_lines=extra_lines,
-            is_collapsible=bool(result) or bool(error),
+            is_collapsible=bool(extra_lines) or bool(error),
             start_collapsed=not bool(error),
         )
 
@@ -539,8 +801,16 @@ class ActivityRenderer:
         url: str = '',
         result: str | None = None,
         error: str | None = None,
+        *,
+        image_path: str = '',
     ) -> ActivityCard:
         """Create an activity card for a browser action."""
+        from backend.cli._tool_display.renderers.browser import (
+            render_browser_navigation,
+            render_browser_page,
+        )
+
+        action_key = (action_name or 'browser').strip().lower()
         detail = url[:80] if url else action_name
 
         secondary = None
@@ -549,17 +819,33 @@ class ActivityRenderer:
             secondary = 'error' if len(error) > 60 else error
             secondary_kind = 'err'
         elif result:
-            secondary = 'done'
+            secondary = _BROWSER_OUTCOMES.get(action_key, 'done')
             secondary_kind = 'ok'
 
         extra_lines: list[ActivityLine] = []
-        if url:
-            extra_lines.append(ActivityLine(f'URL: {url}', indent=0))
-        extra_lines.append(ActivityLine(f'Action: {action_name}', indent=0))
+        if result and action_key in {'screenshot', 'snapshot', 'browse'}:
+            rich_lines = render_browser_page(
+                url,
+                content_preview=result,
+            )
+        else:
+            rich_lines = render_browser_navigation(action_key, url)
+        for line in rich_lines[1:]:
+            extra_lines.append(ActivityLine(str(line), indent=0))
+        if image_path:
+            extra_lines.append(
+                ActivityLine(f'Screenshot: {image_path}', style=NAVY_TEXT_DIM, indent=0)
+            )
         if error:
             extra_lines.append(
                 ActivityLine(f'Error: {error}', style=NAVY_ERROR, indent=0)
             )
+
+        meta_tokens: list[str] = []
+        if url:
+            meta_tokens.append(f'url: {url[:60]}')
+        if image_path:
+            meta_tokens.append('screenshot saved')
 
         return ActivityCard(
             verb=action_name.title(),
@@ -569,6 +855,7 @@ class ActivityRenderer:
             secondary=secondary,
             secondary_kind=secondary_kind,
             extra_lines=extra_lines,
+            meta_lines=_exploration_meta_line(meta_tokens),
             is_collapsible=bool(extra_lines),
             start_collapsed=not bool(error),
         )
@@ -793,7 +1080,48 @@ class ActivityRenderer:
         )
 
     @staticmethod
-    def _build_search_results_secondary(match_count: int, file_count: int) -> str:
+    def format_extra_lines(extra_lines: list[ActivityLine]) -> str | None:
+        """Join activity card extra lines into TUI/Rich markup text."""
+        if not extra_lines:
+            return None
+        parts: list[str] = []
+        for extra in extra_lines:
+            indent = '  ' * extra.indent
+            parts.append(f'{indent}{extra.text}')
+        return '\n'.join(parts)
+
+    @staticmethod
+    def _build_search_results_secondary(
+        match_count: int,
+        file_count: int,
+        *,
+        source_tool: str = 'search',
+        output_mode: str | None = None,
+    ) -> str:
+        if source_tool == 'glob':
+            if file_count == 1:
+                return '1 file'
+            if file_count:
+                return f'{file_count} files'
+            return 'no files'
+        if source_tool == 'find_symbols':
+            if match_count == 1:
+                suffix = f' · {file_count} files' if file_count else ''
+                return f'1 symbol{suffix}'
+            if match_count:
+                suffix = f' · {file_count} files' if file_count else ''
+                return f'{match_count} symbols{suffix}'
+            return 'no symbols'
+        if source_tool == 'grep' and output_mode == 'files_with_matches':
+            if file_count == 1:
+                return '1 file'
+            if file_count:
+                return f'{file_count} files'
+            return 'no files'
+        if source_tool == 'grep' and output_mode == 'count':
+            if match_count:
+                return f'{match_count} total matches'
+            return 'no matches'
         if match_count and file_count:
             return f'{match_count} matches · {file_count} files'
         if match_count:
@@ -807,9 +1135,11 @@ class ActivityRenderer:
         file_list: list[tuple[str, int]] | None,
         file_count: int,
         match_count: int,
+        *,
+        source_tool: str = 'search',
     ) -> list[ActivityLine]:
         extra_lines: list[ActivityLine] = []
-        if result_lines:
+        if result_lines and source_tool not in {'glob', 'find_symbols'}:
             from backend.cli._tool_display.renderers.search import (
                 render_search_results,
             )
@@ -823,7 +1153,46 @@ class ActivityRenderer:
             for rl in rich_lines:
                 extra_lines.append(ActivityLine(rl, indent=0))
             return extra_lines
+        if result_lines and source_tool == 'find_symbols':
+            for line in result_lines[:10]:
+                extra_lines.append(
+                    ActivityLine(
+                        f'• {line}',
+                        style=NAVY_TEXT_MUTED,
+                        indent=1,
+                    )
+                )
+            if len(result_lines) > 10:
+                extra_lines.append(
+                    ActivityLine(
+                        f'... {len(result_lines) - 10} more symbols',
+                        style=NAVY_TEXT_DIM,
+                        indent=1,
+                    )
+                )
+            return extra_lines
         if not file_list:
+            return extra_lines
+        max_displayed = 10
+        if source_tool == 'glob':
+            for filepath, _count in file_list[:max_displayed]:
+                extra_lines.append(
+                    ActivityLine(
+                        f'• {filepath}',
+                        style=NAVY_TEXT_MUTED,
+                        indent=1,
+                    )
+                )
+            total_displayed = len(file_list[:max_displayed])
+            if file_count > total_displayed:
+                remaining_files = file_count - total_displayed
+                extra_lines.append(
+                    ActivityLine(
+                        f'... {remaining_files} more files',
+                        style=NAVY_TEXT_DIM,
+                        indent=1,
+                    )
+                )
             return extra_lines
         for filepath, count in file_list:
             extra_lines.append(
@@ -856,6 +1225,9 @@ class ActivityRenderer:
         scope: str = '',
         *,
         source_tool: str = 'search',
+        detail: str | None = None,
+        meta_lines: list[str] | None = None,
+        output_mode: str | None = None,
     ) -> ActivityCard:
         """Create an activity card for search results.
 
@@ -866,17 +1238,22 @@ class ActivityRenderer:
             file_list: List of (filepath, match_count) tuples for display
             result_lines: Raw ripgrep-style result lines (file:line:content)
             scope: Optional search path scope (e.g. 'src/runtime')
-            source_tool: ``'grep'`` or ``'glob'`` to render as the dedicated
-                tool card; anything else renders as the generic ``'search'``
-                card.
+            source_tool: Tool-specific card preset (``grep``, ``glob``, etc.)
+            detail: Optional override for the collapsed detail text
+            meta_lines: Optional metadata shown in the expanded card footer
+            output_mode: Grep output mode for tailored collapsed summaries
         """
         badge_category, title, verb = _SEARCH_CARD_PRESETS.get(
             source_tool, _SEARCH_CARD_PRESETS['search']
         )
-        quoted = f'"{query}"'
-        detail = f'{quoted} in {scope}' if scope else quoted
+        if detail is None:
+            quoted = f'"{query}"'
+            detail = f'{quoted} in {scope}' if scope else quoted
         secondary = ActivityRenderer._build_search_results_secondary(
-            match_count, file_count
+            match_count,
+            file_count,
+            source_tool=source_tool,
+            output_mode=output_mode,
         )
         extra_lines = ActivityRenderer._build_search_results_extra_lines(
             query,
@@ -884,7 +1261,9 @@ class ActivityRenderer:
             file_list,
             file_count,
             match_count,
+            source_tool=source_tool,
         )
+        has_results = bool(match_count or file_count)
 
         return ActivityCard(
             verb=verb,
@@ -892,7 +1271,146 @@ class ActivityRenderer:
             badge_category=badge_category,
             title=title,
             secondary=secondary,
-            secondary_kind='ok' if match_count else 'neutral',
+            secondary_kind='ok' if has_results else 'neutral',
             extra_lines=extra_lines,
+            meta_lines=list(meta_lines or []),
+            is_collapsible=bool(extra_lines),
+        )
+
+    @staticmethod
+    def _build_read_symbols_secondary(
+        results: list[dict[str, object]],
+    ) -> str:
+        if not results:
+            return 'no symbols'
+        statuses: dict[str, int] = {}
+        for item in results:
+            status = str(item.get('status') or 'unknown')
+            statuses[status] = statuses.get(status, 0) + 1
+        if len(statuses) == 1:
+            status, count = next(iter(statuses.items()))
+            label = 'symbol' if count == 1 else 'symbols'
+            return f'{count} {status} {label}'
+        parts = [f'{count} {status}' for status, count in sorted(statuses.items())]
+        return ' · '.join(parts)
+
+    @staticmethod
+    def _build_read_symbols_extra_lines(
+        results: list[dict[str, object]],
+    ) -> list[ActivityLine]:
+        extra_lines: list[ActivityLine] = []
+        for item in results[:8]:
+            status = str(item.get('status') or 'unknown')
+            target = str(
+                item.get('qualified_name')
+                or item.get('symbol_name')
+                or item.get('target')
+                or item.get('name')
+                or ''
+            ).strip()
+            path = str(item.get('path') or '').strip()
+            if target and path:
+                line = f'{status}: {target} ({path})'
+            elif target:
+                line = f'{status}: {target}'
+            else:
+                line = status
+            extra_lines.append(ActivityLine(line, style=NAVY_TEXT_MUTED, indent=1))
+        if len(results) > 8:
+            extra_lines.append(
+                ActivityLine(
+                    f'... {len(results) - 8} more symbols',
+                    style=NAVY_TEXT_DIM,
+                    indent=1,
+                )
+            )
+        return extra_lines
+
+    def read_symbols_results(
+        scope: str,
+        results: list[dict[str, object]],
+        *,
+        target_count: int | None = None,
+        meta_lines: list[str] | None = None,
+    ) -> ActivityCard:
+        """Create an activity card for ``read_symbols`` tool results."""
+        badge_category, title, verb = _SEARCH_CARD_PRESETS['read_symbols']
+        count = len(results) if results else (target_count or 0)
+        detail = f'{count} symbol{"s" if count != 1 else ""}'
+        if scope:
+            detail = f'{detail} in {scope}'
+        extra_lines = ActivityRenderer._build_read_symbols_extra_lines(results)
+        secondary = (
+            ActivityRenderer._build_read_symbols_secondary(results)
+            if results
+            else None
+        )
+        return ActivityCard(
+            verb=verb,
+            detail=detail,
+            badge_category=badge_category,
+            title=title,
+            secondary=secondary,
+            secondary_kind='ok' if results else 'neutral',
+            extra_lines=extra_lines,
+            meta_lines=list(meta_lines or []),
+            is_collapsible=bool(extra_lines),
+        )
+
+    @staticmethod
+    def _build_analyze_structure_extra_lines(content: str) -> list[ActivityLine]:
+        if not content:
+            return []
+        lines = content.splitlines()
+        extra_lines: list[ActivityLine] = []
+        for line in lines[:12]:
+            extra_lines.append(
+                ActivityLine(
+                    line[:120] + ('…' if len(line) > 120 else ''),
+                    style=NAVY_TEXT_MUTED,
+                    indent=1,
+                )
+            )
+        if len(lines) > 12:
+            extra_lines.append(
+                ActivityLine(
+                    f'... {len(lines) - 12} more lines',
+                    style=NAVY_TEXT_DIM,
+                    indent=1,
+                )
+            )
+        return extra_lines
+
+    @staticmethod
+    def analyze_structure_results(
+        command: str,
+        path: str,
+        content: str,
+        *,
+        meta_lines: list[str] | None = None,
+        error: str = '',
+    ) -> ActivityCard:
+        """Create an activity card for ``analyze_project_structure`` results."""
+        badge_category, title, verb = _SEARCH_CARD_PRESETS['analyze']
+        detail = f'{command} · {path}'.strip(' ·')
+        extra_lines = ActivityRenderer._build_analyze_structure_extra_lines(content)
+        if error:
+            secondary = 'failed'
+            secondary_kind = 'err'
+        elif content:
+            secondary = 'completed'
+            secondary_kind = 'ok'
+        else:
+            secondary = 'no output'
+            secondary_kind = 'neutral'
+        return ActivityCard(
+            verb=verb,
+            detail=detail or 'project structure',
+            badge_category=badge_category,
+            title=title,
+            secondary=secondary,
+            secondary_kind=secondary_kind,
+            extra_lines=extra_lines,
+            meta_lines=list(meta_lines or []),
             is_collapsible=bool(extra_lines),
         )

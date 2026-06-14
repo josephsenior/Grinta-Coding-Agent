@@ -246,9 +246,25 @@ class ActivityCard(Container):
     }
     ActivityCard.-category-grep,
     ActivityCard.-category-glob,
-    ActivityCard.-category-search {
+    ActivityCard.-category-search,
+    ActivityCard.-category-find_symbols,
+    ActivityCard.-category-read_symbols,
+    ActivityCard.-category-analyze {
         border: round #2d4a6a;
         background: #050c14;
+    }
+    ActivityCard.-category-web_search,
+    ActivityCard.-category-web_fetch {
+        border: round #3a4a6a;
+        background: #060d18;
+    }
+    ActivityCard.-category-browser {
+        border: round #3d5a4a;
+        background: #060f0c;
+    }
+    ActivityCard.-category-mcp {
+        border: round #3a3d5a;
+        background: #080a14;
     }
     ActivityCard #collapsed-row-container {
         width: 100%;
@@ -733,6 +749,8 @@ class ActivityCard(Container):
         """Update or set the extra content."""
         self._extra_content = extra_content
         self.can_focus = True
+        if extra_content:
+            self._ensure_collapsible_for_extra()
         if not self.is_mounted:
             return
 
@@ -770,6 +788,25 @@ class ActivityCard(Container):
         self._syntax_language = language
         if not self.is_mounted or self._extra_content is None:
             return
+        try:
+            body = self.query_one('#expanded-body', Container)
+            body.remove_children()
+            for renderable in self._extra_renderables():
+                body.mount(renderable)
+            body.display = not self._collapsed
+        except Exception:
+            pass
+
+    def set_diff_encoded(self, diff_encoded: bool) -> None:
+        """Switch expanded body rendering to the unified diff widget."""
+        if self._diff_encoded == diff_encoded:
+            return
+        self._diff_encoded = diff_encoded
+        if diff_encoded:
+            self._syntax_language = 'diff'
+        if not self.is_mounted or not self._extra_content:
+            return
+        self._ensure_collapsible_for_extra()
         try:
             body = self.query_one('#expanded-body', Container)
             body.remove_children()

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import cast
 from unittest import TestCase
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from backend.execution.task_tracking import TaskTrackingMixin
 from backend.ledger.action import TaskTrackingAction
@@ -130,6 +130,43 @@ class TestTaskTrackingMixin(TestCase):
         self.assertIsInstance(result, ErrorObservation)
         self.assertIn('Failed to write', result.content)
         self.assertIn(task_file_path, result.content)
+
+    def test_handle_task_update_status_action_syncs_active_plan(self):
+        """update_status must persist active_plan.json as well as TASKS.md."""
+        task_list = [
+            {'id': '1', 'description': 'Task 1', 'status': 'done', 'result': 'Shipped'},
+        ]
+        action = TaskTrackingAction(command='update_status', task_list=task_list)
+        task_file_path = '/path/to/TASKS.md'
+
+        with self.assertPathHandling():
+            with patch('backend.core.task_tracker.TaskTracker') as mock_tracker_cls:
+                mock_tracker = mock_tracker_cls.return_value
+                result = self.mixin._handle_task_update_status_action(
+                    action, task_file_path
+                )
+
+        self.assertIsInstance(result, TaskTrackingObservation)
+        self.mixin.event_stream.file_store.write.assert_called_once()
+        mock_tracker.save_to_file.assert_called_once_with(task_list)
+
+    def test_handle_task_update_status_action_json_failure_rolls_back_tasks_md(self):
+        """JSON persistence failure should roll back TASKS.md like full update."""
+        task_list = [{'id': '1', 'description': 'Task 1', 'status': 'done'}]
+        action = TaskTrackingAction(command='update_status', task_list=task_list)
+        task_file_path = '/path/to/TASKS.md'
+
+        with patch('backend.core.task_tracker.TaskTracker') as mock_tracker_cls:
+            mock_tracker_cls.return_value.save_to_file.side_effect = OSError(
+                'disk full'
+            )
+            result = self.mixin._handle_task_update_status_action(
+                action, task_file_path
+            )
+
+        self.assertIsInstance(result, ErrorObservation)
+        self.assertIn('active_plan.json', result.content)
+        self.mixin.event_stream.file_store.delete.assert_called_once_with(task_file_path)
 
     def test_handle_task_update_action_empty_task_list(self):
         """Test task update action with empty task list."""

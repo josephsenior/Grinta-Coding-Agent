@@ -147,7 +147,60 @@ class TestGatewayReasoningOptions:
         assert plan.wire == WIRE_VERCEL_GATEWAY_REASONING
         assert plan.kwargs_patch == {
             'reasoning': {'effort': 'medium', 'enabled': True},
+            'thinking': {'type': 'adaptive'},
             'reasoning_split': True,
+        }
+
+    def test_vercel_minimax_m25_gateway_reasoning_split_only(self):
+        from backend.inference.param_profiles import (
+            resolve_model_entry_for_capabilities,
+        )
+        from backend.inference.reasoning import resolve_reasoning_plan
+
+        entry = resolve_model_entry_for_capabilities(
+            'minimax/minimax-m2.5',
+            'vercel',
+        )
+        assert entry is not None
+        plan = resolve_reasoning_plan(entry, 'high')
+        assert plan.kwargs_patch == {
+            'reasoning': {'effort': 'high', 'enabled': True},
+            'reasoning_split': True,
+        }
+
+    def test_vercel_kimi_k25_gateway_reasoning_wire(self):
+        from backend.inference.param_profiles import (
+            resolve_model_entry_for_capabilities,
+        )
+        from backend.inference.reasoning import resolve_reasoning_plan
+
+        entry = resolve_model_entry_for_capabilities(
+            'moonshotai/kimi-k2.5',
+            'vercel',
+        )
+        assert entry is not None
+        plan = resolve_reasoning_plan(entry, 'medium')
+        assert plan.wire == WIRE_VERCEL_GATEWAY_REASONING
+        assert plan.kwargs_patch == {
+            'reasoning': {'effort': 'medium', 'enabled': True},
+            'thinking': {'type': 'enabled', 'keep': None},
+        }
+
+    def test_vercel_gemini_pro_gateway_reasoning_wire(self):
+        from backend.inference.param_profiles import (
+            resolve_model_entry_for_capabilities,
+        )
+        from backend.inference.reasoning import resolve_reasoning_plan
+
+        entry = resolve_model_entry_for_capabilities(
+            'google/gemini-3.1-pro',
+            'vercel',
+        )
+        assert entry is not None
+        plan = resolve_reasoning_plan(entry, 'high')
+        assert plan.wire == WIRE_VERCEL_GATEWAY_REASONING
+        assert plan.kwargs_patch == {
+            'reasoning': {'effort': 'high', 'enabled': True},
         }
 
     def test_vercel_deepseek_reasoning_tunneled_via_extra_body(self):

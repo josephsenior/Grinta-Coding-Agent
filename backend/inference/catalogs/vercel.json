@@ -321,7 +321,7 @@
           "medium",
           "high"
         ],
-        "reasoning_wire": "gemini_openai_compat"
+        "reasoning_wire": "vercel_gateway_reasoning"
       },
       "metadata": {
         "display_name": "Gemini 3.5 Flash (Vercel Gateway)"
@@ -350,7 +350,7 @@
           "medium",
           "high"
         ],
-        "reasoning_wire": "gemini_openai_compat"
+        "reasoning_wire": "vercel_gateway_reasoning"
       },
       "metadata": {
         "display_name": "Gemini 3.1 Flash Lite (Vercel Gateway)"
@@ -379,7 +379,7 @@
           "medium",
           "high"
         ],
-        "reasoning_wire": "gemini_openai_compat"
+        "reasoning_wire": "vercel_gateway_reasoning"
       },
       "metadata": {
         "display_name": "Gemini 3 Flash (Vercel Gateway)"
@@ -388,7 +388,9 @@
     "google/gemini-3.1-pro-preview": {
       "runtime": {
         "aliases": [
-          "vercel/google/gemini-3.1-pro-preview"
+          "vercel/google/gemini-3.1-pro-preview",
+          "vercel/google/gemini-3.1-pro",
+          "google/gemini-3.1-pro"
         ],
         "context_window_tokens": 1000000,
         "max_input_tokens": 930368,
@@ -408,10 +410,10 @@
           "medium",
           "high"
         ],
-        "reasoning_wire": "gemini_openai_compat"
+        "reasoning_wire": "vercel_gateway_reasoning"
       },
       "metadata": {
-        "display_name": "Gemini 3.1 Pro Preview (Vercel Gateway)"
+        "display_name": "Gemini 3.1 Pro (Vercel Gateway)"
       }
     },
     "deepseek/deepseek-v4-flash": {
@@ -517,7 +519,16 @@
         "supports_function_calling": true,
         "supports_parallel_tool_calls": true,
         "supports_vision": true,
-        "supports_stop_words": true
+        "supports_reasoning_effort": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "reasoning_wire": "vercel_gateway_reasoning"
       },
       "metadata": {
         "display_name": "Grok Build 0.1 (Vercel Gateway)"
@@ -544,10 +555,38 @@
           "medium",
           "high"
         ],
-        "reasoning_wire": "openai_thinking_enabled"
+        "reasoning_wire": "vercel_gateway_reasoning"
       },
       "metadata": {
         "display_name": "Kimi K2.7 Code (Vercel Gateway)"
+      }
+    },
+    "moonshotai/kimi-k2.5": {
+      "runtime": {
+        "aliases": [
+          "vercel/moonshotai/kimi-k2.5"
+        ],
+        "context_window_tokens": 262114,
+        "max_input_tokens": 196578,
+        "max_output_tokens": 65536,
+        "input_price_per_m": 0.6,
+        "output_price_per_m": 3.0,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_vision": true,
+        "supports_reasoning_effort": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "reasoning_wire": "vercel_gateway_reasoning"
+      },
+      "metadata": {
+        "display_name": "Kimi K2.5 (Vercel Gateway)"
       }
     },
     "moonshotai/kimi-k2.6": {
@@ -571,7 +610,7 @@
           "medium",
           "high"
         ],
-        "reasoning_wire": "openai_thinking_enabled"
+        "reasoning_wire": "vercel_gateway_reasoning"
       },
       "metadata": {
         "display_name": "Kimi K2.6 (Vercel Gateway)"
@@ -615,6 +654,60 @@
       },
       "metadata": {
         "display_name": "Qwen 3.7 Max (Vercel Gateway)"
+      }
+    },
+    "minimax/minimax-m2.7": {
+      "runtime": {
+        "aliases": [
+          "vercel/minimax/minimax-m2.7"
+        ],
+        "context_window_tokens": 204800,
+        "max_input_tokens": 73728,
+        "max_output_tokens": 131072,
+        "input_price_per_m": 0.3,
+        "output_price_per_m": 1.2,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_reasoning_effort": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "reasoning_wire": "vercel_gateway_reasoning"
+      },
+      "metadata": {
+        "display_name": "MiniMax M2.7 (Vercel Gateway)"
+      }
+    },
+    "minimax/minimax-m2.5": {
+      "runtime": {
+        "aliases": [
+          "vercel/minimax/minimax-m2.5"
+        ],
+        "context_window_tokens": 204800,
+        "max_input_tokens": 73728,
+        "max_output_tokens": 131072,
+        "input_price_per_m": 0.3,
+        "output_price_per_m": 1.2,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_reasoning_effort": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "reasoning_wire": "vercel_gateway_reasoning"
+      },
+      "metadata": {
+        "display_name": "MiniMax M2.5 (Vercel Gateway)"
       }
     },
     "minimax/minimax-m3": {

@@ -1978,7 +1978,115 @@ async def test_tui_mcp_call_merges_action_and_observation_into_single_card(
         rendered = str(collapsed.renderable)
         assert 'Called' in rendered
         assert 'search_docs' in rendered
-        assert 'completed' in rendered
+        assert 'ranking' in rendered.lower()
+
+
+@pytest.mark.asyncio
+async def test_tui_web_search_merges_into_dedicated_card(mock_config):
+    from backend.engine.tools.web_tools import build_web_search_action
+    from backend.ledger.observation.mcp import MCPObservation
+
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+
+        action = build_web_search_action(
+            {'query': 'Next.js 15 release notes', 'num_results': 3}
+        )
+        renderer._process_event(action)
+        renderer._process_event(
+            MCPObservation(
+                name=action.name,
+                arguments=action.arguments,
+                content=(
+                    '{"results": ['
+                    '{"title": "Next.js Blog", "url": "https://nextjs.org/blog"},'
+                    '{"title": "Release notes", "url": "https://example.com/notes"}'
+                    ']}'
+                ),
+            )
+        )
+        await pilot.pause()
+
+        cards = [
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-web_search' in card.classes
+        ]
+        assert len(cards) == 1
+        card = cards[0]
+        collapsed = str(card.query_one('#collapsed-row').renderable)
+        assert 'Searched' in collapsed
+        assert 'Next.js 15 release notes' in collapsed
+        assert '2 results' in collapsed
+        assert card._meta_lines
+        assert 'limit: 3' in card._meta_lines[0]
+
+
+@pytest.mark.asyncio
+async def test_tui_web_fetch_merges_into_dedicated_card(mock_config):
+    from backend.engine.tools.web_tools import build_web_fetch_action
+    from backend.ledger.observation.mcp import MCPObservation
+
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+
+        action = build_web_fetch_action(
+            {'urls': ['https://example.com/docs'], 'max_characters': 4000}
+        )
+        renderer._process_event(action)
+        renderer._process_event(
+            MCPObservation(
+                name=action.name,
+                arguments=action.arguments,
+                content='{"backend":"exa","content":[{"text":"# Docs\\nHello world"}]}',
+            )
+        )
+        await pilot.pause()
+
+        cards = [
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-web_fetch' in card.classes
+        ]
+        assert len(cards) == 1
+        card = cards[0]
+        collapsed = str(card.query_one('#collapsed-row').renderable)
+        assert 'Fetched' in collapsed
+        assert 'example.com' in collapsed
+        assert card._meta_lines
+        assert 'max: 4000' in card._meta_lines[0]
+        extra = card._extra_content or ''
+        assert 'Hello' in extra or 'Docs' in extra
 
 
 @pytest.mark.asyncio
@@ -2073,7 +2181,7 @@ async def test_tui_browser_screenshot_merges_with_action_card(mock_config):
         collapsed = browser_cards[0].query_one('#collapsed-row')
         rendered = str(collapsed.renderable)
         assert 'Navigate' in rendered
-        assert 'done' in rendered
+        assert 'captured' in rendered
 
 
 @pytest.mark.asyncio
@@ -2430,11 +2538,12 @@ async def test_tui_find_symbols_observation_renders_card(mock_config):
         search_cards = [
             card
             for card in s.query(TUIActivityCard).results()
-            if 'category-search' in card.classes or 'category-code' in card.classes
+            if 'category-find_symbols' in card.classes
         ]
         assert len(search_cards) == 1
         collapsed = search_cards[0].query_one('#collapsed-row')
         rendered = str(collapsed.renderable)
+        assert 'Found' in rendered
         assert 'render' in rendered
 
 
@@ -2533,12 +2642,13 @@ async def test_tui_read_symbols_observation_updates_pending_card(mock_config):
         cards = [
             card
             for card in s.query(TUIActivityCard).results()
-            if 'category-code' in card.classes
+            if 'category-read_symbols' in card.classes
         ]
         assert len(cards) == 1
         collapsed = cards[0].query_one('#collapsed-row')
         rendered = str(collapsed.renderable)
-        assert 'symbol' in rendered.lower() or 'UserService.login' in rendered
+        assert 'Read' in rendered
+        assert 'UserService.login' in rendered or 'symbol' in rendered.lower()
 
 
 @pytest.mark.asyncio
@@ -2586,6 +2696,177 @@ async def test_tui_glob_observation_renders_glob_card(mock_config):
         rendered = str(collapsed.renderable)
         assert 'Glob' in rendered
         assert '**/*.py' in rendered
+
+
+@pytest.mark.asyncio
+async def test_tui_grep_pending_card_keeps_grouped_extra_content(mock_config):
+    """Action→observation merge should preserve formatted grep result lines."""
+    from backend.ledger.action.search import GrepAction
+    from backend.ledger.observation.search import GrepObservation
+
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        renderer._process_event(
+            GrepAction(
+                pattern='_start_election',
+                path='raftkv/node.py',
+                output_mode='content',
+            )
+        )
+        renderer._process_event(
+            GrepObservation(
+                content='raftkv/node.py:194:async def _start_election',
+                pattern='_start_election',
+                path='raftkv/node.py',
+                output_mode='content',
+                lines=['raftkv/node.py:194:async def _start_election'],
+                match_count=1,
+                file_count=1,
+            )
+        )
+        await pilot.pause()
+
+        grep_cards = [
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-grep' in card.classes
+        ]
+        assert len(grep_cards) == 1
+        card = grep_cards[0]
+        collapsed = card.query_one('#collapsed-row')
+        assert '1 matches' in str(collapsed.renderable)
+
+        extra = card._extra_content or ''
+        assert 'raftkv/node.py' in extra
+        assert '194' in extra
+        assert '_start_election' in extra
+
+
+@pytest.mark.asyncio
+async def test_tui_glob_pending_card_uses_file_labels_not_matches(mock_config):
+    """Glob cards should summarize files, not grep-style match counts."""
+    from backend.ledger.action.search import GlobAction
+    from backend.ledger.observation.search import GlobObservation
+
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        renderer._process_event(GlobAction(pattern='**/*.py', path='backend'))
+        renderer._process_event(
+            GlobObservation(
+                content='backend/app.py\nbackend/cli.py',
+                pattern='**/*.py',
+                path='backend',
+                files=['backend/app.py', 'backend/cli.py'],
+                file_count=2,
+            )
+        )
+        await pilot.pause()
+
+        glob_cards = [
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-glob' in card.classes
+        ]
+        assert len(glob_cards) == 1
+        card = glob_cards[0]
+        collapsed = str(card.query_one('#collapsed-row').renderable)
+        assert '2 files' in collapsed
+        assert 'matches' not in collapsed.lower()
+
+        extra = card._extra_content or ''
+        assert 'backend/app.py' in extra
+        assert 'backend/cli.py' in extra
+        assert 'matches' not in extra.lower()
+
+
+@pytest.mark.asyncio
+async def test_tui_grep_files_with_matches_shows_file_count(mock_config):
+    from backend.ledger.action.search import GrepAction
+    from backend.ledger.observation.search import GrepObservation
+
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        renderer._process_event(
+            GrepAction(
+                pattern='TODO',
+                path='backend',
+                output_mode='files_with_matches',
+                file_pattern='*.py',
+                head_limit=25,
+            )
+        )
+        renderer._process_event(
+            GrepObservation(
+                content='backend/app.py\nbackend/cli.py',
+                pattern='TODO',
+                path='backend',
+                output_mode='files_with_matches',
+                lines=['backend/app.py', 'backend/cli.py'],
+                match_count=0,
+                file_count=2,
+            )
+        )
+        await pilot.pause()
+
+        grep_cards = [
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-grep' in card.classes
+        ]
+        assert len(grep_cards) == 1
+        card = grep_cards[0]
+        collapsed = str(card.query_one('#collapsed-row').renderable)
+        assert '2 files' in collapsed
+        assert 'matches' not in collapsed.lower()
+        assert card._meta_lines
+        assert 'mode: files_with_matches' in card._meta_lines[0]
+        assert 'filter: *.py' in card._meta_lines[0]
+        assert 'limit: 25' in card._meta_lines[0]
 
 
 @pytest.mark.asyncio
@@ -2834,7 +3115,12 @@ async def test_tui_file_write_renders_compact_create_card(mock_config):
             loop=loop,
         )
 
-        renderer._process_event(FileWriteAction(path='demo.txt', content='alpha\nbeta'))
+        renderer._process_event(
+            FileWriteAction(path='demo.txt', content='alpha\nbeta')
+        )
+        renderer._process_event(
+            FileWriteObservation(path='demo.txt', content='alpha\nbeta')
+        )
         await pilot.pause()
 
         file_cards = [
@@ -2847,7 +3133,8 @@ async def test_tui_file_write_renders_compact_create_card(mock_config):
         collapsed = card.query_one('#collapsed-row')
         assert 'demo.txt' in str(collapsed.renderable)
         assert '+2' in str(collapsed.renderable)
-        assert card._collapsible is False
+        assert card._collapsible is True
+        assert card._diff_encoded is True
         assert card.query_one('#expanded-body').display is False
 
 
@@ -2949,6 +3236,13 @@ async def test_tui_file_edit_create_action_renders_non_expandable_card(mock_conf
             if 'category-files' in card.classes
         ]
         assert len(file_cards) == 1
+        card = file_cards[0]
+        assert card._collapsible is True
+        assert card._diff_encoded is True
+        split_rows = list(s.query(UnifiedDiffRow).results())
+        assert split_rows
+        assert all(row._row.kind == 'add' for row in split_rows)
+        assert any('alpha' in row._row.text for row in split_rows)
 
 
 @pytest.mark.asyncio

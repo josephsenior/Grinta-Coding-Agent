@@ -227,11 +227,13 @@ def supports_reasoning(entry: ModelEntry) -> bool:
 def _resolve_wire_schema(entry: ModelEntry, family: str) -> str:
     if entry.reasoning_wire == WIRE_VERCEL_GATEWAY_REASONING:
         return WIRE_VERCEL_GATEWAY_REASONING
-    if (
-        entry.provider == 'vercel'
-        and entry.reasoning_wire == WIRE_OPENAI_REASONING_EFFORT
-    ):
-        return WIRE_VERCEL_GATEWAY_REASONING
+    if entry.provider == 'vercel' and entry.supports_reasoning_effort:
+        if entry.reasoning_wire in {
+            WIRE_OPENAI_REASONING_EFFORT,
+            WIRE_GEMINI_OPENAI_COMPAT,
+            WIRE_OPENAI_THINKING_ENABLED,
+        }:
+            return WIRE_VERCEL_GATEWAY_REASONING
 
     if entry.reasoning_wire:
         return entry.reasoning_wire
@@ -439,19 +441,52 @@ def _map_vercel_gateway_effort(effort: str) -> str:
     return 'high'
 
 
+def _vercel_gateway_provider_passthrough(entry: ModelEntry) -> dict[str, Any]:
+    """Provider-native knobs tunneled alongside Vercel ``reasoning`` (extra_body).
+
+    Vercel gateway maps ``reasoning.effort`` for most vendors automatically
+    (see Advanced Configuration).  MiniMax and Moonshot Kimi also accept
+    OpenAI-compat ``thinking`` / ``reasoning_split`` per their official APIs.
+    """
+    family = infer_family(entry)
+    name_lower = _logical_model_name(entry).lower()
+
+    if family == 'minimax' or 'minimax' in name_lower:
+        # platform.minimax.io/docs/api-reference/text-chat-openai
+        passthrough: dict[str, Any] = {
+            'thinking': {'type': 'adaptive'},
+            'reasoning_split': True,
+        }
+        # M2.x cannot disable thinking; omit disabled when not M3.
+        if 'minimax-m3' not in name_lower and 'm3' not in name_lower.split('/')[-1]:
+            passthrough.pop('thinking', None)
+        return passthrough
+
+    if family.startswith('kimi') or 'kimi' in name_lower:
+        thinking: dict[str, Any] = {'type': 'enabled'}
+        thinking['keep'] = None
+        return {'thinking': thinking}
+
+    return {}
+
+
 def _build_wire_kwargs(wire: str, effort: str, entry: ModelEntry) -> dict[str, Any]:
     family = infer_family(entry)
     if wire == WIRE_VERCEL_GATEWAY_REASONING:
         api_effort = _map_vercel_gateway_effort(effort)
         if api_effort == 'none':
+            name_lower = _logical_model_name(entry).lower()
+            if family == 'minimax' and (
+                'minimax-m3' in name_lower or name_lower.endswith('/m3')
+            ):
+                return {'thinking': {'type': 'disabled'}}
             return {}
+        # Vercel AI Gateway (OpenAI Chat Completions advanced):
+        # https://vercel.com/docs/ai-gateway/sdks-and-apis/openai-chat-completions/advanced
         patch: dict[str, Any] = {
             'reasoning': {'effort': api_effort, 'enabled': True},
         }
-        # MiniMax M3 exposes thinking in reasoning_content / reasoning_details only
-        # when reasoning_split is enabled on the upstream request.
-        if family == 'minimax':
-            patch['reasoning_split'] = True
+        patch.update(_vercel_gateway_provider_passthrough(entry))
         return patch
 
     if wire == WIRE_OPENAI_REASONING_EFFORT:
