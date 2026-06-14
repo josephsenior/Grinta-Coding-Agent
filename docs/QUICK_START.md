@@ -5,7 +5,22 @@
 - Python 3.12+
 - `uv` (required)
 
-## Option 1: Windows bootstrap script (Recommended)
+## Option 1: Direct source startup (recommended)
+
+From the repo root:
+
+```powershell
+python scripts/bootstrap_env.py base
+uv run python -m backend.cli.entry init
+uv run python -m backend.cli.entry
+```
+
+That is the canonical contributor path. It creates or updates the project-local
+`.venv`, writes source-checkout settings to `settings.json`, and starts the
+interactive terminal app. If stdin is not a TTY, Grinta uses the non-interactive
+runner instead of the Textual app.
+
+## Option 2: Windows convenience script
 
 From PowerShell in the repo root:
 
@@ -13,29 +28,32 @@ From PowerShell in the repo root:
 .\START_HERE.ps1
 ```
 
-This script handles everything:
+This script is a convenience wrapper around dependency sync and startup:
 
 - Checks for `uv` and Python versions
 - Syncs dependencies
-- Discovers local models (Ollama/LM Studio)
-- Starts the Grinta terminal CLI
+- Attempts local model discovery
+- Starts the Grinta terminal app
 
-## Option 2: Manual start
+## Optional: local model discovery
 
-### 1) Sync dependencies and create local settings
+If you run Ollama, LM Studio, or vLLM locally, start the local server and run:
 
 ```powershell
-python scripts/bootstrap_env.py base
-uv run python -m backend.cli.entry init
+uv run python -m backend.inference.discover_models
+uv run python -m backend.inference.discover_models status
 ```
 
-### 2) Start the CLI
+Then use a provider-qualified model id such as `ollama/llama3.2` in
+`settings.json` or `/model`.
+
+## Useful source commands
 
 ```powershell
 uv run python -m backend.cli.entry
+uv run python -m backend.cli.entry --help
+uv run python -m backend.cli.entry sessions list
 ```
-
-This is the canonical local startup path.
 
 ## Common issues
 
@@ -49,7 +67,8 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 
 ### Locally hosted models
 
-Ensure **Ollama** or **LM Studio** is running. Grinta auto-discovers them on startup.
+Ensure **Ollama**, **LM Studio**, or **vLLM** is running, then use the discovery
+commands above or choose the provider-qualified model id during setup.
 
 ### Port already in use
 

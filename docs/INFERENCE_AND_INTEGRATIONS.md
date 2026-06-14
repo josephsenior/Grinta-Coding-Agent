@@ -26,16 +26,16 @@ Configuration keys and param validation live in [`backend/core/config/`](../back
 
 Grinta uses **catalog-only listing** for hosted providers and **live probes** for local runtimes:
 
-1. **Static catalog (hosted providers)** — [`catalogs/*.json`](backend/inference/catalogs/) are the single source of truth for picker models, pricing, limits, capability flags, reasoning tiers/wires, param overrides, and aliases.
-2. **Local probe (Ollama / LM Studio / vLLM)** — [`registry.get_local_model_names()`](backend/inference/registry.py) discovers installed models when the local server is running.
-3. **Conservative fallback** — uncataloged manual/local model ids use safe defaults (tools on, reasoning off) via [`param_profiles.py`](backend/inference/param_profiles.py).
-4. **Session pinning** — [`runtime_profile.py`](backend/inference/runtime_profile.py) pins limits on the LLM instance; `settings.json` overrides still win.
+1. **Static catalog (hosted providers)** — [`catalogs/*.json`](../backend/inference/catalogs/) are the single source of truth for picker models, pricing, limits, capability flags, reasoning tiers/wires, param overrides, and aliases.
+2. **Local probe (Ollama / LM Studio / vLLM)** — [`registry.get_local_model_names()`](../backend/inference/registry.py) discovers installed models when the local server is running.
+3. **Conservative fallback** — uncataloged manual/local model ids use safe defaults (tools on, reasoning off) via [`param_profiles.py`](../backend/inference/param_profiles.py).
+4. **Session pinning** — [`runtime_profile.py`](../backend/inference/runtime_profile.py) pins limits on the LLM instance; `settings.json` overrides still win.
 
 ### Catalog maintenance
 
 When a hosted provider ships a model you want in pickers or docs:
 
-1. Add a row under the provider file in [`catalogs/*.json`](backend/inference/catalogs/) with a full `runtime` block:
+1. Add a row under the provider file in [`catalogs/*.json`](../backend/inference/catalogs/) with a full `runtime` block:
    - limits, pricing, tool flags (`supports_*`)
    - param overrides (`strip_temperature`, `use_max_completion_tokens`, …)
    - reasoning config (`reasoning_efforts`, `reasoning_wire`) when the model supports thinking/reasoning

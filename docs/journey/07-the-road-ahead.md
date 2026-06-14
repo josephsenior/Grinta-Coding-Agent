@@ -22,7 +22,7 @@ There was definitely a version of me that wanted this chapter to sound more triu
 
 Right now, Grinta is a serious local-first coding agent with:
 
-- structured task execution with a 21-service orchestration layer
+- structured task execution with a 23-service orchestration layer
 - multi-step planning and model-agnostic inference across three direct client families
 - explicit tool use with 30+ tools and a tree-sitter structural editor
 - event-sourced persistence with Write-Ahead Logging and replay
@@ -31,7 +31,7 @@ Right now, Grinta is a serious local-first coding agent with:
 - risk-aware execution policies with 40+ threat patterns across four severity tiers
 - a codebase that has been repeatedly decomposed to stay maintainable
 
-Concretely, that means 21 orchestration services, a 12-middleware operation pipeline, 9 compactor implementations plus a selector, support for 18 provider prefixes, a security layer that would rather be explicit than pretend it is magical, and a HUD that tracks cost, tokens, and latency in real time.
+Concretely, that means 23 orchestration service files, a 15-step middleware/validator operation pipeline, 11 compactor strategy modules including selectors and pipelines, 19 provider catalog files, a security layer that would rather be explicit than pretend it is magical, and a terminal UI that keeps cost, tokens, model, MCP/skill counts, and runtime state visible.
 
 That is already far beyond a toy.
 
@@ -271,4 +271,4 @@ It will look like what it really is:
 
 ---
 
-← [The Facade Pattern and the Smaller File API](40-the-facade-pattern-and-the-smaller-file-api.md) | [The Book of Grinta](README.md)
+← [The Product Surface Became Real](45-the-product-surface-became-real.md) | [The Book of Grinta](README.md)

@@ -1,4 +1,4 @@
-# Grinta v1.0.0-rc1 Release Notes (Draft)
+# Grinta v1.0.0-rc1 Release Notes
 
 `v1.0.0-rc1` is the public release candidate for Grinta's 1.0 line.
 This build is intended for real usage and focused feedback before final GA.
@@ -19,7 +19,7 @@ This build is intended for real usage and focused feedback before final GA.
 
 ## Notable release-candidate improvements
 
-- Restored `read_symbol_definition` as a tree-sitter-backed retrieval primitive.
+- Restored symbol-aware reading through the current `read` / `find_symbols` file API.
 - Added release polish docs and governance/support materials:
   - `docs/RELEASE_CHECKLIST.md`
   - `docs/REGRESSION_TESTS.md`

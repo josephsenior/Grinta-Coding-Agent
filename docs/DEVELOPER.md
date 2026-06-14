@@ -28,7 +28,7 @@ Related docs:
 
 ```text
 backend/
-  cli/            Terminal UI, entrypoint, interaction loop
+  cli/            Console entrypoint, Textual TUI, non-interactive runner, slash commands
   context/        Conversation memory and compaction
   core/           Config, constants, app paths, logging
   engine/         Prompt assembly, model interaction flow, and agent tools
@@ -56,13 +56,15 @@ backend/
 Canonical local flow:
 
 ```text
-CLI input
-  -> SessionOrchestrator step loop
-    -> engine decides next action
-      -> execution layer runs action
-        -> observation emitted
-          -> orchestrator updates state
-            -> task validation gate controls completion
+Console script
+  -> backend.cli.entry
+    -> Textual TUI or non-interactive runner
+      -> SessionOrchestrator step loop
+        -> engine decides next action
+          -> execution layer runs action
+            -> observation emitted
+              -> orchestrator updates state
+                -> task validation gate controls completion
 ```
 
 ---
@@ -106,8 +108,11 @@ Execution internals live under `backend/execution/`.
 
 Important entrypoints:
 
-- CLI runtime usage through orchestrator
+- console runtime usage through orchestrator
 - runtime executor implementation in `backend.execution.action_execution_server`
+- native browser helpers in `backend.execution.browser`
+- DAP/debugger helpers in `backend.execution.dap`
+- MCP runtime/proxy helpers in `backend.execution.mcp`
 
 ---
 
@@ -133,6 +138,12 @@ Common examples:
 - `APP_ROOT`
 
 Runtime/session state is stored under `~/.grinta/workspaces/<id>/storage`, not under the repository tree.
+
+### Interface paths
+
+- TTY startup path: `launch/entry.py` -> `backend/cli/entry.py` -> `backend/cli/main.py` -> `backend/cli/tui/main.py`.
+- Non-interactive path: `backend/cli/main.py` -> `backend/cli/repl_noninteractive.py`.
+- Prompt-toolkit REPL support remains in `backend/cli/repl.py` and `backend/cli/_repl/`; keep it working when changing shared slash-command behavior.
 
 ### Security boundary
 

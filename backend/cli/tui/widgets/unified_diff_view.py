@@ -32,8 +32,8 @@ _CLR_LINE_REM = '#ffc0c0'
 _CLR_BG_CTX = 'transparent'
 _CLR_BG_ADD = '#0f2f22'
 _CLR_BG_REM = '#351818'
-_CLR_INLINE_ADD = '#54efae bold'
-_CLR_INLINE_REM = '#fd8383 bold'
+_CLR_INLINE_ADD = '#54efae'
+_CLR_INLINE_REM = '#fd8383'
 _CLR_HDR = '#91abec'
 
 

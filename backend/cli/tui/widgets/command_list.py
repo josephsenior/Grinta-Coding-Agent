@@ -38,7 +38,6 @@ class CommandListSection(Static):
         margin: 1 0 0 0;
         padding: 0 1;
         color: #91abec;
-        text-style: bold;
     }
     CommandListSection:first-of-type {
         margin-top: 0;
@@ -61,7 +60,6 @@ class CommandListRow(Horizontal):
         width: 18;
         min-width: 18;
         color: #eacb8a;
-        text-style: bold;
     }
     CommandListRow .cmd-detail {
         width: 1fr;

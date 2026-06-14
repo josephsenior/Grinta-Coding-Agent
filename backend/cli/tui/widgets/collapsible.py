@@ -38,7 +38,7 @@ SIDEBAR_BULLET = '●'
 class SidebarRow(Static):
     """An interactive, hoverable, and focusable row inside sidebar panels.
 
-    Renders in compact format: [status icon] [bold label] [muted meta]
+    Renders in compact format: [status icon] [label] [muted meta]
     matching the ActivityCard collapsed-row visual language.
     """
 
@@ -86,8 +86,8 @@ class SidebarRow(Static):
 
     def _build_markup(self) -> str:
         color = self._bullet_color()
-        bullet_part = f'[bold {color}]{SIDEBAR_BULLET}[/]'
-        label_part = f'[bold #c8d4e8]{self._label}[/]'
+        bullet_part = f'[{color}]{SIDEBAR_BULLET}[/]'
+        label_part = f'[#c8d4e8]{self._label}[/]'
         meta_part = f'  [#54597b]{self._meta}[/]' if self._meta else ''
         return f'{bullet_part} {label_part}{meta_part}'
 
@@ -180,7 +180,6 @@ class CollapsibleSection(Container):
     }
     CollapsibleSection .collapsible-header.expanded {
         color: #c8d4e8;
-        text-style: bold;
     }
     CollapsibleSection .collapsible-header-caret {
         width: auto;
@@ -190,7 +189,6 @@ class CollapsibleSection(Container):
         width: auto;
         height: 1;
         color: #5eead4;
-        text-style: bold;
         padding-right: 1;
     }
     CollapsibleSection .collapsible-action:hover {
@@ -242,14 +240,13 @@ class CollapsibleSection(Container):
     def _header_icon_markup(self) -> str:
         if not self._section_icon:
             return ''
-        return f'[bold {self._accent_color}]{self._section_icon}[/]'
+        return f'[{self._accent_color}]{self._section_icon}[/]'
 
     def _header_title_markup(self) -> str:
         caret_icon = '▸' if self._collapsed else '▾'
         caret = f'[#54597b]{caret_icon}[/]'
         title_color = '#6f83aa' if self._collapsed else self._accent_color
-        title_style = '' if self._collapsed else ' bold'
-        title_part = f'[{title_color}{title_style}]{self._section_title}[/]'
+        title_part = f'[{title_color}]{self._section_title}[/]'
         return f'{caret} {title_part}'
 
     @property
@@ -268,7 +265,7 @@ class CollapsibleSection(Container):
         )
 
     def _empty_markup(self, text: str) -> str:
-        return f'[bold #54597b]{SIDEBAR_BULLET}[/] [#54597b]{text}[/]'
+        return f'[#54597b]{SIDEBAR_BULLET}[/] [#54597b]{text}[/]'
 
     def compose(self) -> ComposeResult:
         with Horizontal(classes='collapsible-header-row', id='header-row'):

@@ -13,7 +13,7 @@ This document reflects the engines that are actually present in the current repo
 | Engine / Capability | Status | Best For |
 | --- | --- | --- |
 | **Orchestrator** | Production engine | Coding, debugging, refactoring, multi-step task execution |
-| **MCP-powered browsing** | Capability used by the Orchestrator | Web research, browser automation, remote tools |
+| **Native browser + MCP capabilities** | Capabilities used by the Orchestrator | Web research, browser automation, remote tools |
 | **Echo** | Test-support agent | Deterministic testing, pipeline debugging, custom-agent examples |
 
 ---
@@ -74,16 +74,20 @@ See:
 
 ---
 
-## 2. MCP-Powered Browsing and Remote Capabilities
+## 2. Native Browser and MCP Remote Capabilities
 
 Browsing is a capability, not a separate built-in agent class in the main engine tree.
 
-The Orchestrator reaches external capabilities through the Model Context Protocol layer in `backend/integrations/mcp/`. That includes browser automation when the appropriate MCP server is configured, but it also includes any other external tool the MCP gateway exposes.
+Grinta has native browser plumbing under `backend/execution/browser/` and a
+model-facing browser tool under `backend/engine/tools/browser_native.py`.
+Separately, the Orchestrator can reach external capabilities through the Model
+Context Protocol layer in `backend/integrations/mcp/`.
 
 ### How It Works
 
 ```text
-Orchestrator -> call_mcp_tool(...) -> MCP integration layer -> connected server -> result back to agent
+Orchestrator -> browser_tool(...) -> native browser runtime -> observation
+Orchestrator -> call_mcp_tool(...) -> MCP integration layer -> connected server -> observation
 ```
 
 ### When to Use
@@ -95,7 +99,7 @@ Orchestrator -> call_mcp_tool(...) -> MCP integration layer -> connected server 
 
 ### Important Clarification
 
-Earlier drafts of this documentation treated "MCP Browser" like a standalone first-class engine. In the current codebase, it is more accurate to describe browsing as a capability surfaced through MCP, not a separate production agent peer to the Orchestrator.
+Earlier drafts of this documentation treated "MCP Browser" like a standalone first-class engine. In the current codebase, it is more accurate to describe browsing as native and MCP-backed capabilities used by the Orchestrator, not a separate production agent peer.
 
 ---
 

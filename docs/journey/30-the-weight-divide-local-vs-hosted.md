@@ -40,7 +40,9 @@ You build against the frontier APIs because they work. But you architect the sys
 
 ## The Circuit Breaker as Model-Agnostic Insurance
 
-The circuit breaker service (`backend/orchestration/agent_circuit_breaker.py`) is where this philosophy becomes concrete. It tracks consecutive errors, adapts thresholds based on task complexity, and can halt the loop when the model is clearly not recovering. It does not care *which* model is failing — it only cares that the failure pattern matches a known stuck signature.
+The circuit breaker service (`backend/orchestration/agent_circuit_breaker.py`) is where this philosophy first became concrete. It tracks consecutive errors, adapts thresholds based on task complexity, and can halt the loop when the model is clearly not recovering. It does not care *which* model is failing — it only cares that the failure pattern matches a known stuck signature.
+
+Current note: that logic is now also part of the broader operation pipeline through `backend/orchestration/services/circuit_breaker_service.py` and `backend/orchestration/middleware/circuit_breaker.py`. The responsibility did not disappear; it moved from "one clever guard" toward a layered control-plane concern.
 
 This is the model-agnostic principle in action: the system's reliability layer is indifferent to the model. It measures behavior, not capability. A local model that recovers quickly gets more rope. A frontier model that loops gets cut off sooner. The circuit breaker treats them identically because the failure pattern is the same.
 

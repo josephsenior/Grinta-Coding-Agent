@@ -12,7 +12,6 @@ from backend.engine.tools._tool_handlers import (
 from backend.engine.tools.web_tools import (
     EXA_WEB_SEARCH_MCP_TOOL,
     FALLBACK_FETCH_MCP_TOOL,
-    MCP_TOOLS_HIDDEN_BY_NATIVE_WEB,
     NATIVE_WEB_FETCH_ROUTER,
     build_web_fetch_action,
     build_web_search_action,
@@ -20,6 +19,7 @@ from backend.engine.tools.web_tools import (
     create_web_search_tool,
     native_web_fetch_wrapper,
 )
+from backend.integrations.mcp.native_backends import MCP_TOOLS_HIDDEN_BY_NATIVE_WEB
 from backend.ledger.action.mcp import MCPAction
 
 

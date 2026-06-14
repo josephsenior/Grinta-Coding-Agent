@@ -26,6 +26,7 @@ from textual.widgets import Static
 from backend.cli.orient_tools import OrientLineModel
 from backend.cli.syntax_theme import get_grinta_rich_syntax_theme
 from backend.cli.theme import (
+    CLR_REASONING_SNAP,
     NAVY_BG,
     NAVY_BRAND,
     NAVY_ERROR,
@@ -426,7 +427,7 @@ class ActivityCard(Container):
             color = '#5eead4'
 
         icon_part = f'[{color}]{icon}[/]'
-        verb_part = f'[bold {NAVY_BRAND}]{self._verb}[/]'
+        verb_part = f'[{NAVY_BRAND}]{self._verb}[/]'
         detail_part = self._detail
         outcome_part = ''
         if self._outcome:
@@ -1014,7 +1015,7 @@ class TurnCompletion(Static):
         id: str | None = None,
     ) -> None:
         super().__init__(id=id)
-        self.update(f'[bold #5eead4]Finished in:[/] [#c8d4e8]{duration}[/]')
+        self.update(f'[#5eead4]Finished in:[/] [#c8d4e8]{duration}[/]')
 
 
 class UserMessage(Static):
@@ -1192,14 +1193,14 @@ class ThinkingIndicator(Container):
 
         prefix = f'{self._current_action}: '
         prefix_color = '#42a394'
-        text_color = '#8c8c94'
+        text_color = CLR_REASONING_SNAP
         children: list[Any] = []
 
         for seg_type, seg_content in segments:
             if seg_type == 'plain':
                 if not children:
                     parts = [
-                        (prefix, f'bold {prefix_color}'),
+                        (prefix, prefix_color),
                         (seg_content, text_color),
                     ]
                     text_widget = TextualStatic(Text.assemble(*parts))
@@ -1228,12 +1229,12 @@ class ThinkingIndicator(Container):
         """
         prefix = f'{self._current_action}: '
         prefix_color = '#42a394'
-        text_color = '#8c8c94'
+        text_color = CLR_REASONING_SNAP
 
         segments = self._parse_text_segments(text)
 
         if not segments:
-            parts = [(prefix, f'bold {prefix_color}'), (text, text_color)]
+            parts = [(prefix, prefix_color), (text, text_color)]
             return Text.assemble(*parts), []
 
         from textual.containers import Vertical
@@ -1245,10 +1246,10 @@ class ThinkingIndicator(Container):
     def _build_thoughts_text_parts(self) -> list[tuple[str, str]]:
         prefix = f'{self._current_action}: '
         prefix_color = '#42a394'
-        text_color = '#8c8c94'
+        text_color = CLR_REASONING_SNAP
         lines = self._thoughts
         parts: list[tuple[str, str]] = [
-            (prefix, f'bold {prefix_color}'),
+            (prefix, prefix_color),
             (lines[0], text_color),
         ]
         for line in lines[1:]:
@@ -1268,7 +1269,7 @@ class ThinkingIndicator(Container):
 
         full_text = '\n'.join(self._thoughts)
         prefix_color = '#42a394'
-        prefix = Text.assemble((f'{self._current_action}: ', f'bold {prefix_color}'))
+        prefix = Text.assemble((f'{self._current_action}: ', prefix_color))
 
         if '```' in full_text or '`' in full_text:
             body = prep_streaming_renderable(full_text)

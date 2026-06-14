@@ -1,13 +1,13 @@
 # Installing Grinta
 
-Grinta is a local-first CLI coding agent. Three installation paths — pick whichever you already use.
+Grinta is a local-first terminal coding agent. Pick the installation path that matches how you work.
 
 ## 1. `pipx` (recommended for most users)
 
 ```bash
 pipx install grinta-ai
 grinta init           # First-run wizard: pick provider, paste key
-grinta                # Start the REPL
+grinta                # Start the terminal app
 ```
 
 Works on Windows, macOS, Linux. Requires Python 3.12+. Installed runs store settings at `~/.grinta/settings.json` and runtime state under `~/.grinta/workspaces/<id>/storage`.
@@ -23,6 +23,14 @@ uv run python -m backend.cli.entry
 ```
 
 Source checkouts use the repository `settings.json` by default so contributors can keep project-local development config.
+Interactive TTY sessions launch the Textual UI; piped stdin uses the non-interactive runner.
+
+Optional local model discovery from source:
+
+```bash
+uv run python -m backend.inference.discover_models
+uv run python -m backend.inference.discover_models status
+```
 
 ## 3. Homebrew (macOS / Linuxbrew)
 
@@ -63,7 +71,7 @@ Docker, run the container image directly and treat this path as community-suppor
 - Run `grinta init` to configure your LLM provider interactively.
 - For manual settings, reference secrets as `${LLM_API_KEY}` and put the real value in `.env` or your shell environment.
 - Run `grinta --help` to see CLI flags and subcommands.
-- Inside the REPL, type `/help` for slash commands.
+- Inside the terminal app, type `/help` for slash commands.
 - Read [docs/SECURITY_CHECKLIST.md](SECURITY_CHECKLIST.md) before pointing Grinta at untrusted code.
 
 ## Uninstall

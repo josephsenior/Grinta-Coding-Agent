@@ -47,6 +47,7 @@ as supported (same bar as Linux/Windows in this matrix).
 
 ## Product Surface
 
-Grinta is supported as a **CLI-first coding agent**. Legacy server-era references in
-historical docs/changelog entries should not be treated as current supported product
-surfaces.
+Grinta is supported as a **terminal-first coding agent**. Interactive TTY runs use
+the Textual TUI; piped stdin uses the non-interactive runner. Legacy server-era
+references in historical docs/changelog entries should not be treated as current
+supported product surfaces.

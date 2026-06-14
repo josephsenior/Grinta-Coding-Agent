@@ -29,9 +29,11 @@ def _make_controller():
     ctrl.observation_service.handle_observation = AsyncMock()
     ctrl.task_validation_service = MagicMock()
     ctrl.task_validation_service.handle_finish = AsyncMock(return_value=True)
+    ctrl.task_validation_service.validate_completion_quality = AsyncMock()
     ctrl.log = MagicMock()
     ctrl.log_task_audit = AsyncMock()
     ctrl.state = MagicMock()
+    ctrl.state.extra_data = {}
     ctrl.event_stream = MagicMock()
     ctrl._pending_action = None
     ctrl._first_user_message = MagicMock(return_value=None)
@@ -140,6 +142,49 @@ class TestHandleAction:
         action.source = EventSource.AGENT
         action.wait_for_response = False
         await svc._handle_action(action)
+        ctrl.set_agent_state_to.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_chat_plain_agent_message_without_final_flag_finishes(self):
+        ctrl = _make_controller()
+        ctrl.agent = SimpleNamespace(config=SimpleNamespace(mode='chat'))
+        svc = EventRouterService(ctrl)
+        action = MessageAction(content='plain answer')
+        action.source = EventSource.AGENT
+
+        await svc._handle_action(action)
+
+        assert action.final_response is True
+        ctrl.state.set_outputs.assert_called_once()
+        ctrl.set_agent_state_to.assert_called_once_with(AgentState.FINISHED)
+
+    @pytest.mark.asyncio
+    async def test_plan_plain_agent_message_without_final_flag_finishes(self):
+        ctrl = _make_controller()
+        ctrl.agent = SimpleNamespace(config=SimpleNamespace(mode='agent'))
+        ctrl.state.extra_data['active_run_mode'] = 'plan'
+        svc = EventRouterService(ctrl)
+        action = MessageAction(content='plain plan')
+        action.source = EventSource.AGENT
+
+        await svc._handle_action(action)
+
+        assert action.final_response is True
+        ctrl.state.set_outputs.assert_called_once()
+        ctrl.set_agent_state_to.assert_called_once_with(AgentState.FINISHED)
+
+    @pytest.mark.asyncio
+    async def test_plan_transcript_preface_without_final_flag_keeps_running(self):
+        ctrl = _make_controller()
+        ctrl.agent = SimpleNamespace(config=SimpleNamespace(mode='agent'))
+        ctrl.state.extra_data['active_run_mode'] = 'plan'
+        svc = EventRouterService(ctrl)
+        action = MessageAction(content='I will inspect files.', transcript_only=True)
+        action.source = EventSource.AGENT
+
+        await svc._handle_action(action)
+
+        assert action.final_response is False
         ctrl.set_agent_state_to.assert_not_called()
 
 

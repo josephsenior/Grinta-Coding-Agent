@@ -24,7 +24,7 @@ It worked. It was also a NetworkX dependency plus a full knowledge graph index p
 
 The original vector store used sentence-transformers with a cross-encoder model for re-ranking hybrid search results. The pipeline was: retrieve 20 candidates from the vector backend, retrieve 20 from BM25, deduplicate, then re-rank all 40 through the cross-encoder and return the top 5.
 
-The cross-encoder was accurate. It was also a PyTorch dependency that added hundreds of megabytes to the install footprint. For a project that ships as a ~1.4 MB wheel, that was unacceptable. The cross-encoder was killed and replaced with an optional flashrank reranker using TinyBERT — ONNX-based, fast, and only loaded when the `[rag]` extra is installed.
+The cross-encoder was accurate. It was also a PyTorch dependency that added hundreds of megabytes to the install footprint. For a project whose base install was deliberately slimmed down from its old heavyweight shape, that was unacceptable. The cross-encoder was killed and replaced with an optional flashrank reranker using TinyBERT — ONNX-based, fast, and only loaded when the `[rag]` extra is installed.
 
 ### The Semantic Condenser
 

@@ -27,6 +27,7 @@ from backend.inference.reasoning import (
     WIRE_OPENAI_REASONING_EFFORT,
     WIRE_OPENAI_THINKING_AND_EFFORT,
     WIRE_OPENAI_THINKING_ENABLED,
+    WIRE_VERCEL_GATEWAY_REASONING,
     supports_reasoning,
 )
 from backend.inference.reasoning_profiles import tier_order
@@ -42,6 +43,7 @@ VALID_REASONING_WIRES: frozenset[str] = frozenset(
         WIRE_GEMINI_NATIVE,
         WIRE_GEMINI_OPENAI_COMPAT,
         WIRE_GLM_THINKING,
+        WIRE_VERCEL_GATEWAY_REASONING,
     }
 )
 

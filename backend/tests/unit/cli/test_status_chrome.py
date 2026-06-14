@@ -23,7 +23,7 @@ def test_status_fields_token_display_matches_hud_style() -> None:
     bar.state.context_limit = 8000
     bar.state.token_usage_estimated = True
     fields = status_fields_from_hud(bar.state, bar.bundled_skill_count)
-    assert fields.token_display_compact == '1.5K/8.0K~'
+    assert fields.token_display_compact == '1.5K/8K~'
 
 
 def test_workspace_path_display_max_tiers() -> None:

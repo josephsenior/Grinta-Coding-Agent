@@ -13,9 +13,18 @@ from backend.ledger.observation.agent import RecallObservation
 from backend.orchestration.services.step_decision_service import StepDecisionService
 
 
-def _make_ctrl(agent_state: AgentState = AgentState.RUNNING):
+def _make_ctrl(
+    agent_state: AgentState = AgentState.RUNNING,
+    *,
+    mode: str = 'agent',
+    active_run_mode: str | None = None,
+):
     ctrl = MagicMock()
     ctrl.get_agent_state.return_value = agent_state
+    ctrl.agent.config.mode = mode
+    ctrl.state.extra_data = {}
+    if active_run_mode:
+        ctrl.state.extra_data['active_run_mode'] = active_run_mode
     return ctrl
 
 
@@ -40,6 +49,31 @@ class TestStepDecisionService:
         svc = StepDecisionService(_make_ctrl(AgentState.RUNNING))
         action = MessageAction(content='thinking')
         action.source = EventSource.AGENT
+        assert svc.should_step(action) is True
+
+    def test_chat_agent_plain_message_without_final_flag_does_not_step(self):
+        svc = StepDecisionService(_make_ctrl(AgentState.RUNNING, mode='chat'))
+        action = MessageAction(content='plain answer')
+        action.source = EventSource.AGENT
+
+        assert svc.should_step(action) is False
+
+    def test_plan_agent_plain_message_without_final_flag_does_not_step(self):
+        svc = StepDecisionService(
+            _make_ctrl(AgentState.RUNNING, mode='agent', active_run_mode='plan')
+        )
+        action = MessageAction(content='plain plan')
+        action.source = EventSource.AGENT
+
+        assert svc.should_step(action) is False
+
+    def test_plan_agent_transcript_preface_still_steps(self):
+        svc = StepDecisionService(
+            _make_ctrl(AgentState.RUNNING, mode='agent', active_run_mode='plan')
+        )
+        action = MessageAction(content='I will inspect files.', transcript_only=True)
+        action.source = EventSource.AGENT
+
         assert svc.should_step(action) is True
 
     def test_agent_message_no_step_when_awaiting_input(self):

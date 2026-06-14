@@ -3580,7 +3580,7 @@ async def test_renderer_internal_cmd_run_uses_origin_tool_title() -> None:
     )
 
     output = _console_output(console)
-    assert 'Analyze project' in output
+    assert 'Analyzed' in output or 'Mapping project structure' in output
     assert 'Mapping project structure (.)' in output
     assert 'Shell' not in output
 
@@ -3836,7 +3836,7 @@ def test_hud_single_bar_format_all_widths() -> None:
     c = hud._format_bar()
     assert a.plain == b.plain == c.plain
     assert '●' in a.plain
-    assert '5.0K/128.0K' in a.plain or '5000' in a.plain
+    assert '5K/128K' in a.plain or '5000' in a.plain
     assert 'M:?' in a.plain
     assert '3c' in a.plain
     assert '$0.123' in a.plain

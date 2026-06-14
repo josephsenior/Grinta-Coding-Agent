@@ -19,7 +19,7 @@ Install path for end users: `pipx install grinta-ai`. Contributors should use
 
 | If you are changing… | Start here | Tests nearby |
 | --- | --- | --- |
-| CLI commands, REPL, slash commands | `launch/entry.py` → `backend/cli/entry.py` → `backend/cli/repl.py` | `backend/tests/unit/cli/` |
+| CLI commands, startup, slash commands | `launch/entry.py` → `backend/cli/entry.py` → `backend/cli/main.py`; shared slash-command code under `backend/cli/_repl/` | `backend/tests/unit/cli/` |
 | TUI screens and rendering | `backend/cli/tui/app.py`, mixins under `backend/cli/tui/` | `backend/tests/unit/cli/tui/` |
 | Agent step loop (core control plane) | `backend/orchestration/session_orchestrator.py` + mixins in `session_orchestrator_mixins/` | `backend/tests/unit/orchestration/` |
 | Middleware (safety, cost, rollback) | `backend/orchestration/session_orchestrator.py` (pipeline list), files under `backend/orchestration/middleware/` | `backend/tests/unit/orchestration/test_*middleware*` |
@@ -37,7 +37,9 @@ Install path for end users: `pipx install grinta-ai`. Contributors should use
 Typical user message through the stack:
 
 ```text
-backend/cli/repl.py (input)
+backend/cli/entry.py (startup)
+  → backend/cli/main.py
+  → backend/cli/tui/main.py or repl_noninteractive.py
   → SessionOrchestrator.step()          backend/orchestration/session_orchestrator.py
     → middleware pipeline               backend/orchestration/middleware/
     → engine plans next Action          backend/engine/
@@ -56,7 +58,7 @@ mixins over growing them further. Split work belongs in focused follow-up PRs.
 
 | Module | ~LOC | Role |
 | --- | ---: | --- |
-| `backend/cli/tui/_app_renderer_event_processor.py` | 1,700 | TUI event rendering |
+| `backend/cli/tui/_app_renderer_event_processor.py` | 1,700+ | TUI event rendering |
 | `backend/context/context_pipeline.py` | 1,350 | Compaction orchestration |
 | `backend/inference/llm.py` | 1,215 | LLM call surface |
 | `backend/engine/tools/_file_edits.py` | 1,175 | File edit tools |

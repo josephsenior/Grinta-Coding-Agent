@@ -51,7 +51,8 @@ These are already clear and broadly understood in the codebase:
 | `backend/playbooks` | Playbook assets and loaders |
 | `backend/security` | Command risk analysis and policy checks |
 | `backend/telemetry` | Lightweight instrumentation |
-| `backend/tools` | Tool implementations |
+| `backend/tools` | Repository maintenance utilities |
+| `backend/engine/tools` | Model-facing agent tool definitions and handlers |
 | `backend/validation` | Validation and quality checks |
 
 ## Naming Guidance for New Code

@@ -5,11 +5,12 @@ For historical context and design rationale (not current spec), see `docs/journe
 
 ## High-Level Shape
 
-Grinta is a local-first autonomous coding agent with three core layers:
+Grinta is a local-first terminal coding agent with four visible layers:
 
-1. Orchestration: session loop, safeguards, retries, finish validation.
-2. Execution: local runtime actions (commands, file ops, tool interaction).
-3. Durability: event stream and persisted state for recovery/replay.
+1. Interface: console-script launcher, Textual TUI for TTYs, non-interactive runner for piped input.
+2. Orchestration: session loop, safeguards, retries, finish validation.
+3. Execution: local runtime actions (commands, file ops, tool interaction).
+4. Durability: event stream and persisted state for recovery/replay.
 
 ## Runtime Boundary
 
@@ -24,22 +25,24 @@ Use Grinta in trusted environments.
 ## System Overview
 
 ```text
-User (CLI)
+User (terminal)
   -> backend.cli.entry
-    -> SessionOrchestrator
-      -> Engine (planning + tool intent)
-      -> Operation pipeline and safety checks
-      -> RuntimeExecutor (commands/files/tools)
-      -> Observations
-      -> EventStream (durable history)
-      -> Task validation before finish
+    -> Textual TUI when stdin is a TTY
+    -> non-interactive runner when stdin is piped
+      -> SessionOrchestrator
+        -> Engine (planning + tool intent)
+        -> Operation pipeline and safety checks
+        -> RuntimeExecutor (commands/files/tools)
+        -> Observations
+        -> EventStream (durable history)
+        -> Task validation before finish
 ```
 
 ## Package Topology
 
 ```text
 backend/
-  cli/            CLI entrypoints and rendering
+  cli/            Console entrypoints, Textual TUI, non-interactive runner, slash commands
   context/        Memory and compaction
   core/           Config, constants, logging, shared utilities
   engine/         Agent reasoning, prompt assembly, and tool implementations
@@ -54,10 +57,32 @@ backend/
   playbooks/      Playbook definitions and helpers
   security/       Command risk analysis and policies
   telemetry/      Lightweight instrumentation
-  tools/          Repo maintenance utilities (not agent-facing tools)
+  tools/          Repo maintenance utilities (not the model-facing tool API)
   utils/          Shared helpers (imports, LSP, HTTP, etc.)
   validation/     Completion and quality validation
 ```
+
+## Interface Layer
+
+The public console script is `launch.entry:main`, which resolves the installed
+or editable project entry file without relying on whatever `backend/` package
+may be present in the user's working directory. The resolved path runs
+`backend.cli.entry`.
+
+`backend.cli.entry` handles global flags and subcommands:
+
+- `grinta` starts the app in the current project.
+- `grinta init` writes user configuration.
+- `grinta sessions ...` lists, shows, exports, deletes, and prunes persisted sessions.
+- `--project`, `--model`, `--theme`, `--minimal`, `--accessible`, and `--cleanup-storage` customize startup.
+
+`backend.cli.main` then selects the runtime surface:
+
+- TTY stdin -> `backend.cli.tui.main`, the Textual application with transcript cards, HUD, dialogs, and keyboard shortcuts.
+- Non-TTY stdin -> `backend.cli.repl_noninteractive`, for scripted/piped one-shot runs.
+
+The legacy prompt-toolkit REPL still exists as support code and fallback logic,
+but the current interactive product surface is the Textual TUI.
 
 ## Orchestration Layer
 
@@ -76,6 +101,7 @@ Current service modules include:
 - `iteration_service.py` - Manages iteration counting and limits
 - `lifecycle_service.py` - Manages agent lifecycle transitions
 - `observation_service.py` - Processes observations from actions
+- `orchestration_context.py` - Shared service wiring and context object
 - `pending_action_service.py` - Tracks in-flight actions
 - `recovery_service.py` - Error recovery and retry logic
 - `retry_service.py` - Handles retry policies
@@ -95,23 +121,27 @@ Design intent:
 
 ### Middleware Pipeline
 
-The orchestrator uses a middleware pipeline (defined in `session_orchestrator.py` lines 218-235) for cross-cutting concerns:
+The orchestrator uses a middleware pipeline (assembled in
+`backend/orchestration/session_orchestrator_mixins/_session_orchestrator_lifecycle_mixin.py`)
+for cross-cutting concerns:
 
 ```python
 middlewares = [
     SafetyValidatorMiddleware(self),      # Validate action safety
-    BlackboardMiddleware(self),         # Track action context
-    CircuitBreakerMiddleware(self),     # Prevent cascading failures  
-    ProgressPolicyMiddleware(),            # Progress indicators
-    CostQuotaMiddleware(self),          # Budget tracking
+    BlackboardMiddleware(self),           # Track action context
+    CircuitBreakerMiddleware(self),       # Prevent cascading failures
+    ProgressPolicyMiddleware(),          # Progress indicators
+    CostQuotaMiddleware(self),            # Budget tracking
     ContextWindowMiddleware(self),       # Context window management
-    RollbackMiddleware(),               # State rollback support
-    DestructiveCommandMiddleware(),      # Block dangerous commands
-    PreExecDiffMiddleware(),             # Generate diffs before edits
-    AutoCheckMiddleware(),               # Post-execution validation
-    LoggingMiddleware(self),            # Request/response logging
-    TelemetryMiddleware(self),          # Metrics collection
-    ToolResultValidator(),             # Validate tool outputs
+    RollbackMiddleware(),                 # State rollback support
+    DestructiveCommandMiddleware(),       # Block dangerous commands
+    PreExecDiffMiddleware(),              # Generate diffs before edits
+    AutoCheckMiddleware(),                # Post-execution validation
+    PostEditDiagnosticsMiddleware(),      # Diagnostics after edits
+    FileStateMiddleware(),                # File-state tracking
+    LoggingMiddleware(self),              # Request/response logging
+    TelemetryMiddleware(self),            # Metrics collection
+    ToolResultValidator(),                # Validate tool outputs
 ]
 ```
 
@@ -149,6 +179,9 @@ Important components:
 
 - `action_execution_server.py`: runtime executor implementation used by the local runtime
 - `security_enforcement.py`: policy checks for command/path behavior
+- `browser/`: native browser session and CDP helpers
+- `dap/`: debugger adapter protocol integration
+- `mcp/`: MCP bootstrap/proxy support for runtime-connected external tools
 - `utils/`: command helpers, diffing, session handling, monitoring
 
 ## Durability Layer
@@ -176,6 +209,9 @@ Minimal fields in `settings.template.json`:
 - `llm_model`
 - `llm_api_key`
 - `llm_base_url`
+
+The package metadata currently reports `1.0.0rc1`; release notes and support
+claims should treat the project as an RC until the GA checklist is satisfied.
 
 ## Reliability and Safety
 

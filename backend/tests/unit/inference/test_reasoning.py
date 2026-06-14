@@ -319,7 +319,7 @@ class TestApplyModelParamOverridesIntegration:
             out,
         )
         assert 'thinking' not in sanitized
-        assert sanitized['reasoning_effort'] == 'max'
+        assert sanitized.get('extra_body', {}).get('reasoning_effort') == 'max'
 
     def test_gpt5_strips_temperature_when_catalog_requires(self):
         kwargs = {'model': 'openai/gpt-5', 'temperature': 0.5, 'max_tokens': 1000}
