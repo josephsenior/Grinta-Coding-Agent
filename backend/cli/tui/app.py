@@ -215,6 +215,11 @@ class GrintaScreen(
         self._history_index: int = -1
         self._welcome_visible = False
         self._active_communicate_card: Any | None = None
+        self._hud_autonomy_syncing = False
+        self._hud_mode_syncing = False
+        self._hud_reasoning_syncing = False
+        self._hud_controls_ready = False
+        self._hud_select_sync_values: dict[str, tuple[set[str], float]] = {}
 
 
 class TUIRenderer(

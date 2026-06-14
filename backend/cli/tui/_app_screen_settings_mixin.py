@@ -46,21 +46,31 @@ class _AppScreenSettingsMixin:
         self._resize_input_bar()
 
     def _apply_autonomy_level(self, new_level: str) -> None:
-        level = (new_level or '').strip().lower()
+        level = self._visible_autonomy_level(new_level)
         if level not in {'conservative', 'balanced', 'full'}:
+            return
+        previous = self._current_autonomy_level()
+        if previous == level and self._hud.state.autonomy_level == level:
             return
         controller = self._controller
         if controller is not None:
             ac = getattr(controller, 'autonomy_controller', None)
             if ac is not None:
                 ac.autonomy_level = level
+        agent_config = self._active_agent_config()
+        if agent_config is not None:
+            try:
+                agent_config.autonomy_level = level
+            except Exception:
+                pass
         try:
             setattr(self._config, 'autonomy_level', level)
         except Exception:
             pass
         self._hud.update_autonomy(level)
         self._render_hud_bar()
-        self.notify(f'Autonomy: {level}', severity='information', timeout=2.0)
+        if previous != level:
+            self.notify(f'Autonomy: {level}', severity='information', timeout=2.0)
 
     def _apply_hud_reasoning_effort(self, effort_value: str) -> None:
         if getattr(self, '_hud_reasoning_syncing', False):

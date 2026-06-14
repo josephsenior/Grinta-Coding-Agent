@@ -77,9 +77,19 @@ class _AppScreenWelcomeMixin:
     def on_select_changed(self, event: Select.Changed) -> None:
         event.stop()
         widget_id = event.select.id
+        if widget_id in {'hud-autonomy', 'hud-reasoning'} and not getattr(
+            self, '_hud_controls_ready', False
+        ):
+            return
         if widget_id == 'hud-autonomy':
+            if self._consume_hud_select_sync_event(widget_id, event.value):
+                return
+            if getattr(self, '_hud_autonomy_syncing', False):
+                return
             self._apply_autonomy_level(event.value)
         elif widget_id == 'hud-reasoning':
+            if self._consume_hud_select_sync_event(widget_id, event.value):
+                return
             if getattr(self, '_hud_reasoning_syncing', False):
                 return
             self._apply_hud_reasoning_effort(str(event.value))

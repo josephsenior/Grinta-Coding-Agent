@@ -110,6 +110,7 @@ class _AppScreenLifecycleMixin:
         self._is_unmounted = False
 
         self._render_hud_bar()
+        self.call_after_refresh(self._mark_hud_controls_ready)
         self._update_input_identity()
         self._hud_tick = self.set_interval(1.0, self._refresh_runtime_feedback)
         ta = self.query_one('#input', TextArea)
@@ -119,6 +120,9 @@ class _AppScreenLifecycleMixin:
         _tui_logger.debug('on_mount: done')
         self._start_background_bootstrap()
         self.set_timer(0.5, self._show_welcome)
+
+    def _mark_hud_controls_ready(self) -> None:
+        self._hud_controls_ready = True
 
     async def on_renderer_drain_requested(
         self, _message: RendererDrainRequested

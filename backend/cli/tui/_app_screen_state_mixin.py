@@ -124,12 +124,84 @@ class _AppScreenStateMixin:
             f'[{ctx_color}]●[/][/]'
         )
 
+    @staticmethod
+    def _visible_autonomy_level(value: object, *, default: str = '') -> str:
+        from backend.orchestration.autonomy import normalize_autonomy_level
+
+        level = normalize_autonomy_level(value)
+        return level if level in {'conservative', 'balanced', 'full'} else default
+
+    def _current_autonomy_level(self) -> str:
+        controller = self._controller
+        if controller is not None:
+            ac = getattr(controller, 'autonomy_controller', None)
+            if ac is not None:
+                level = self._visible_autonomy_level(
+                    getattr(ac, 'autonomy_level', None)
+                )
+                if level:
+                    return level
+
+        agent_config = self._active_agent_config()
+        if agent_config is not None:
+            level = self._visible_autonomy_level(
+                getattr(agent_config, 'autonomy_level', None)
+            )
+            if level:
+                return level
+
+        level = self._visible_autonomy_level(getattr(self._config, 'autonomy_level', None))
+        if level:
+            return level
+
+        return self._visible_autonomy_level(
+            getattr(self._hud.state, 'autonomy_level', None),
+            default='balanced',
+        )
+
+    def _mark_hud_select_sync(self, widget_id: str, *values: object) -> None:
+        pending = getattr(self, '_hud_select_sync_values', None)
+        if not isinstance(pending, dict):
+            pending = {}
+            self._hud_select_sync_values = pending
+        value_set = {str(value) for value in values if value is not Select.BLANK}
+        if value_set:
+            pending[widget_id] = (value_set, time.monotonic() + 0.5)
+
+    def _consume_hud_select_sync_event(self, widget_id: str, value: object) -> bool:
+        pending = getattr(self, '_hud_select_sync_values', None)
+        if not isinstance(pending, dict):
+            return False
+        entry = pending.get(widget_id)
+        if entry is None:
+            return False
+        values, expires_at = entry
+        if time.monotonic() > expires_at:
+            pending.pop(widget_id, None)
+            return False
+        text = str(value)
+        if text not in values:
+            return False
+        values.discard(text)
+        if values:
+            pending[widget_id] = (values, expires_at)
+        else:
+            pending.pop(widget_id, None)
+        return True
+
     def _sync_hud_autonomy_select(self, hud_bar, autonomy: str) -> None:
         try:
             autonomy_select = hud_bar.query_one('#hud-autonomy', Select)
             if autonomy_select.value != autonomy:
-                autonomy_select.value = autonomy
+                self._mark_hud_select_sync('hud-autonomy', autonomy)
+                self._hud_autonomy_syncing = True
+                try:
+                    with autonomy_select.prevent(Select.Changed):
+                        autonomy_select.value = autonomy
+                finally:
+                    self._hud_autonomy_syncing = False
         except Exception:
+            self._hud_autonomy_syncing = False
             pass
 
     def _sync_hud_mode_select(self, hud_bar) -> None:
@@ -139,8 +211,15 @@ class _AppScreenStateMixin:
             if current_mode not in VISIBLE_INTERACTION_MODES:
                 current_mode = CHAT_MODE if is_chat_mode(current_mode) else AGENT_MODE
             if mode_select.value != current_mode:
-                mode_select.value = current_mode
+                self._mark_hud_select_sync('hud-mode', current_mode)
+                self._hud_mode_syncing = True
+                try:
+                    with mode_select.prevent(Select.Changed):
+                        mode_select.value = current_mode
+                finally:
+                    self._hud_mode_syncing = False
         except Exception:
+            self._hud_mode_syncing = False
             pass
 
     def _current_llm_provider(self) -> str:
@@ -217,12 +296,23 @@ class _AppScreenStateMixin:
             values = {value for _label, value in options}
             if current not in values:
                 current = options[0][1]
+            options_changed = tuple(reasoning_select._options) != tuple(options)
+            value_changed = reasoning_select.value != current
+            if options_changed or value_changed:
+                first_option = options[0][1] if options else ''
+                self._mark_hud_select_sync(
+                    'hud-reasoning',
+                    reasoning_select.value,
+                    first_option,
+                    current,
+                )
             self._hud_reasoning_syncing = True
             try:
-                if tuple(reasoning_select._options) != tuple(options):
-                    reasoning_select.set_options(options)
-                if reasoning_select.value != current:
-                    reasoning_select.value = current
+                with reasoning_select.prevent(Select.Changed):
+                    if options_changed:
+                        reasoning_select.set_options(options)
+                    if value_changed:
+                        reasoning_select.value = current
             finally:
                 self._hud_reasoning_syncing = False
         except Exception:
@@ -257,7 +347,8 @@ class _AppScreenStateMixin:
         limit = hud.state.context_limit
         _, model_short = HUDBar.describe_model(hud.state.model)
         model_display = model_short if model_short != '(not set)' else '(not set)'
-        autonomy = hud.state.autonomy_level
+        autonomy = self._current_autonomy_level()
+        hud.update_autonomy(autonomy)
 
         workspace = self._resolve_workspace_display(hud.state.workspace_path)
         ws_display = HUDBar.ellipsize_path(workspace, 35)

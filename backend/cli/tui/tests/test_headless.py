@@ -1426,6 +1426,41 @@ async def test_tui_hud_reasoning_select_syncs_from_config(mock_config, monkeypat
 
 
 @pytest.mark.asyncio
+async def test_tui_hud_reasoning_sync_does_not_apply_setting(
+    mock_config, monkeypatch
+):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    mock_config.get_llm_config.return_value.reasoning_effort = 'high'
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+    monkeypatch.setattr(
+        GrintaScreen,
+        '_hud_reasoning_select_options',
+        lambda self: [('XHigh', 'xhigh'), ('High', 'high')],
+    )
+    update_calls = []
+    monkeypatch.setattr(
+        'backend.cli.config_manager.update_model',
+        lambda *args, **kwargs: update_calls.append((args, kwargs)),
+    )
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        s.notify = MagicMock()  # type: ignore[method-assign]
+        s._config = mock_config
+        s._render_hud_bar()
+        await pilot.pause()
+        await pilot.pause()
+
+        reasoning = s.query_one('#hud-reasoning', Select)
+        assert reasoning.value == 'high'
+        assert update_calls == []
+        s.notify.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_tui_hud_reasoning_effort_persists(mock_config, monkeypatch):
     console = RichConsole()
     loop = asyncio.get_running_loop()
@@ -1469,6 +1504,34 @@ async def test_tui_hud_autonomy_selector_updates_controller(mock_config):
 
         assert controller.autonomy_controller.autonomy_level == 'full'
         assert s._hud.state.autonomy_level == 'full'
+
+
+@pytest.mark.asyncio
+async def test_tui_hud_autonomy_sync_uses_agent_config_without_applying_default(
+    mock_config, monkeypatch
+):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    agent_config = SimpleNamespace(mode='agent', autonomy_level='full')
+    mock_config.get_agent_config.return_value = agent_config
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        s.notify = MagicMock()  # type: ignore[method-assign]
+        s._hud.update_autonomy('balanced')
+        s._render_hud_bar()
+        await pilot.pause()
+        await pilot.pause()
+
+        autonomy = s.query_one('#hud-autonomy', Select)
+        assert autonomy.value == 'full'
+        assert s._hud.state.autonomy_level == 'full'
+        assert agent_config.autonomy_level == 'full'
+        s.notify.assert_not_called()
 
 
 @pytest.mark.asyncio

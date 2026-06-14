@@ -485,6 +485,10 @@ class HudModeSelect(Select):
         screen = self.screen
         if screen is None:
             return
+        if not getattr(screen, '_hud_controls_ready', False):
+            return
+        if getattr(screen, '_hud_mode_syncing', False):
+            return
         active_config = getattr(screen, '_active_agent_config', None)
         if callable(active_config):
             agent_config = active_config()
