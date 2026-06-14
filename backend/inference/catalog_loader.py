@@ -129,6 +129,7 @@ _OPENAI_PASSTHROUGH_KWARGS: frozenset[str] = frozenset(
         'output_config',
         'reasoning',
         'reasoning_effort',
+        'reasoning_split',
     }
 )
 

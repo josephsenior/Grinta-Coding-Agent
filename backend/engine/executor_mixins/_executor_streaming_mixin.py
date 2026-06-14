@@ -538,15 +538,77 @@ class _ExecutorStreamingMixin:
                 )
 
     @staticmethod
-    def _extract_delta_reasoning(delta: dict[str, Any]) -> str:
-        for alt_key in ('reasoning_content', 'reasoning'):
+    def _is_reasoning_content_part(part: Any) -> bool:
+        if isinstance(part, str) or not isinstance(part, dict):
+            return False
+        part_type = str(part.get('type') or '').lower()
+        if 'reasoning' in part_type or part_type == 'thinking':
+            return True
+        if part.get('thought') is True or part.get('thinking') is True:
+            return True
+        return False
+
+    @staticmethod
+    def _extract_reasoning_details_text(details: Any) -> str:
+        if not isinstance(details, list):
+            return ''
+
+        parts: list[str] = []
+        for item in details:
+            if isinstance(item, str):
+                if item:
+                    parts.append(item)
+                continue
+            if not isinstance(item, dict):
+                continue
+            detail_type = str(item.get('type') or '').lower()
+            if 'encrypted' in detail_type:
+                continue
+            for key in ('text', 'summary', 'content'):
+                value = item.get(key)
+                if isinstance(value, str) and value:
+                    parts.append(value)
+                    break
+        return ''.join(parts)
+
+    @classmethod
+    def _extract_reasoning_from_content_parts(cls, content_parts: list[Any]) -> str:
+        parts: list[str] = []
+        for part in content_parts:
+            if not cls._is_reasoning_content_part(part):
+                continue
+            if isinstance(part, str):
+                parts.append(part)
+                continue
+            for key in ('text', 'summary', 'content', 'reasoning'):
+                value = part.get(key)
+                if isinstance(value, str) and value:
+                    parts.append(value)
+                    break
+        return ''.join(parts)
+
+    @classmethod
+    def _extract_delta_reasoning(cls, delta: dict[str, Any]) -> str:
+        for alt_key in ('reasoning_content', 'reasoning', 'thinking'):
             alt_val = delta.get(alt_key)
             if isinstance(alt_val, str) and alt_val:
                 return alt_val
+
+        details_text = cls._extract_reasoning_details_text(
+            delta.get('reasoning_details')
+        )
+        if details_text:
+            return details_text
+
+        delta_content = delta.get('content')
+        if isinstance(delta_content, list):
+            reasoning_text = cls._extract_reasoning_from_content_parts(delta_content)
+            if reasoning_text:
+                return reasoning_text
         return ''
 
-    @staticmethod
-    def _extract_delta_text(delta: dict[str, Any]) -> str:
+    @classmethod
+    def _extract_delta_text(cls, delta: dict[str, Any]) -> str:
         delta_content = delta.get('content')
         if isinstance(delta_content, str):
             return delta_content
@@ -555,6 +617,8 @@ class _ExecutorStreamingMixin:
 
         parts: list[str] = []
         for part in delta_content:
+            if cls._is_reasoning_content_part(part):
+                continue
             if isinstance(part, str):
                 parts.append(part)
                 continue
@@ -590,21 +654,31 @@ class _ExecutorStreamingMixin:
             return first_choice.get('message')
         return getattr(first_choice, 'message', None)
 
-    @staticmethod
+    @classmethod
     def _extract_fallback_reasoning(
+        cls,
         fallback: Any,
         fallback_message: Any | None,
     ) -> str:
         for candidate in (fallback_message, fallback):
             if candidate is None:
                 continue
-            reasoning = (
-                candidate.get('reasoning_content')
+            for key in ('reasoning_content', 'reasoning', 'thinking'):
+                reasoning = (
+                    candidate.get(key)
+                    if isinstance(candidate, dict)
+                    else getattr(candidate, key, None)
+                )
+                if isinstance(reasoning, str) and reasoning:
+                    return reasoning
+            details = (
+                candidate.get('reasoning_details')
                 if isinstance(candidate, dict)
-                else getattr(candidate, 'reasoning_content', None)
+                else getattr(candidate, 'reasoning_details', None)
             )
-            if isinstance(reasoning, str) and reasoning:
-                return reasoning
+            details_text = cls._extract_reasoning_details_text(details)
+            if details_text:
+                return details_text
         return ''
 
     @staticmethod

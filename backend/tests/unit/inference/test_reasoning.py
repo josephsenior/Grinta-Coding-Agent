@@ -124,9 +124,31 @@ class TestGatewayReasoningOptions:
         assert 'max' not in (entry.reasoning_efforts or ())
         plan = resolve_reasoning_plan(entry, 'max')
         assert plan.wire == WIRE_VERCEL_GATEWAY_REASONING
-        assert plan.kwargs_patch == {'reasoning': {'effort': 'xhigh'}}
+        assert plan.kwargs_patch == {
+            'reasoning': {'effort': 'xhigh', 'enabled': True},
+        }
         plan_high = resolve_reasoning_plan(entry, 'high')
-        assert plan_high.kwargs_patch == {'reasoning': {'effort': 'high'}}
+        assert plan_high.kwargs_patch == {
+            'reasoning': {'effort': 'high', 'enabled': True},
+        }
+
+    def test_vercel_minimax_gateway_reasoning_split(self):
+        from backend.inference.param_profiles import (
+            resolve_model_entry_for_capabilities,
+        )
+        from backend.inference.reasoning import resolve_reasoning_plan
+
+        entry = resolve_model_entry_for_capabilities(
+            'minimax/minimax-m3',
+            'vercel',
+        )
+        assert entry is not None
+        plan = resolve_reasoning_plan(entry, 'medium')
+        assert plan.wire == WIRE_VERCEL_GATEWAY_REASONING
+        assert plan.kwargs_patch == {
+            'reasoning': {'effort': 'medium', 'enabled': True},
+            'reasoning_split': True,
+        }
 
     def test_vercel_deepseek_reasoning_tunneled_via_extra_body(self):
         from backend.inference.catalog_loader import (
@@ -145,7 +167,10 @@ class TestGatewayReasoningOptions:
             'vercel/deepseek/deepseek-v4-pro', out
         )
         assert 'reasoning' not in sanitized
-        assert sanitized['extra_body']['reasoning'] == {'effort': 'xhigh'}
+        assert sanitized['extra_body']['reasoning'] == {
+            'effort': 'xhigh',
+            'enabled': True,
+        }
 
 
 class TestReasoningDisplayOptions:

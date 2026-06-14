@@ -445,7 +445,14 @@ def _build_wire_kwargs(wire: str, effort: str, entry: ModelEntry) -> dict[str, A
         api_effort = _map_vercel_gateway_effort(effort)
         if api_effort == 'none':
             return {}
-        return {'reasoning': {'effort': api_effort}}
+        patch: dict[str, Any] = {
+            'reasoning': {'effort': api_effort, 'enabled': True},
+        }
+        # MiniMax M3 exposes thinking in reasoning_content / reasoning_details only
+        # when reasoning_split is enabled on the upstream request.
+        if family == 'minimax':
+            patch['reasoning_split'] = True
+        return patch
 
     if wire == WIRE_OPENAI_REASONING_EFFORT:
         patch: dict[str, Any] = {'reasoning_effort': effort}
@@ -565,6 +572,7 @@ def apply_reasoning_plan(call_kwargs: dict[str, Any], plan: ReasoningPlan) -> No
         'output_config',
         'enable_thinking',
         'thinking_config',
+        'reasoning_split',
     ):
         call_kwargs.pop(key, None)
 
@@ -575,6 +583,7 @@ def apply_reasoning_plan(call_kwargs: dict[str, Any], plan: ReasoningPlan) -> No
         call_kwargs.pop('output_config', None)
         call_kwargs.pop('enable_thinking', None)
         call_kwargs.pop('thinking_config', None)
+        call_kwargs.pop('reasoning_split', None)
         return
 
     for key in plan.keys_to_strip:
