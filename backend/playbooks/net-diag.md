@@ -1,7 +1,7 @@
 ---
 name: net_diag
 type: knowledge
-version: 1.0.0
+version: 1.1.0
 agent: Orchestrator
 triggers:
   - /net
@@ -90,6 +90,6 @@ curl -sv --proxy http://proxy:8080 https://api.example.com
 ```bash
 curl -sv "https://$BASE_URL/v1/chat/completions" \
   -H "Authorization: Bearer $API_KEY" \
-  -d '{"model":"minimax-m2.7","messages":[{"role":"user","content":"ping"}]}' \
+  -d '{"model":"$MODEL","messages":[{"role":"user","content":"ping"}]}' \
   -w "\n---\ntime: %{time_total}s\ncode: %{http_code}\n"
 ```
