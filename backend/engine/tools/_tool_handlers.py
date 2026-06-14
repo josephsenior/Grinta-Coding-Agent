@@ -102,6 +102,20 @@ def _handle_web_fetch_tool(arguments: Mapping[str, Any]) -> MCPAction:
     return build_web_fetch_action(dict(arguments))
 
 
+def _handle_docs_resolve_tool(arguments: Mapping[str, Any]) -> MCPAction:
+    """Handle native docs_resolve — delegates to Context7 resolve-library-id."""
+    from backend.engine.tools.docs_tools import build_docs_resolve_action
+
+    return build_docs_resolve_action(dict(arguments))
+
+
+def _handle_docs_query_tool(arguments: Mapping[str, Any]) -> MCPAction:
+    """Handle native docs_query — delegates to Context7 query-docs."""
+    from backend.engine.tools.docs_tools import build_docs_query_action
+
+    return build_docs_query_action(dict(arguments))
+
+
 def _handle_cmd_run_tool(arguments: Mapping[str, Any]) -> CmdRunAction:
     """Handle CmdRunTool (Bash) tool call."""
     from backend.engine.tools.bash import (
@@ -457,15 +471,10 @@ def _merge_mcp_gateway_inner_arguments(arguments: Mapping[str, Any]) -> dict[str
 
 
 def _apply_context7_resolve_library_defaults(inner: dict[str, Any]) -> None:
-    """Context7 ``resolve-library-id`` requires both ``libraryName`` and ``query``."""
-    if not inner.get('libraryName') or inner.get('query') not in (None, ''):
-        return
-    ln = str(inner['libraryName']).strip()
-    if not ln:
-        return
-    inner['query'] = (
-        f'Documentation, setup, and API reference for {ln} — pick the best-matching library.'
-    )
+    """Backward-compatible alias for gateway calls to resolve-library-id."""
+    from backend.engine.tools.docs_tools import apply_docs_resolve_defaults
+
+    apply_docs_resolve_defaults(inner)
 
 
 def _handle_execute_mcp_tool_tool(arguments: dict[str, Any]) -> MCPAction:

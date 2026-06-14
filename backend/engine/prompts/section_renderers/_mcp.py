@@ -23,9 +23,7 @@ def _append_mcp_connected_catalog_sections(
         (
             '<CURATED_MCP_CAPABILITIES>\n'
             'Grinta has a curated first-party MCP capability layer. Think in capabilities first, then call the matching MCP tool by its exact listed name.\n\n'
-            '- Web: use native `web_search` and `web_fetch` (not MCP names here).\n'
             '- GitHub: inspect repositories, issues, PRs, commits, releases, and upstream context. Remote write actions require explicit user intent.\n'
-            '- Docs / Context7: use for reliable library/framework documentation when the library is known.\n'
             '- UI / shadcn: use only for React/Tailwind/shadcn component work.\n'
             '- Quality Gates: use for tests, lint, typecheck, formatting checks, and completion-readiness validation.\n\n'
             f'{mode_rule}\n'

@@ -307,6 +307,8 @@ class TestModeToolVisibility:
             'lsp',
             'web_search',
             'web_fetch',
+            'docs_resolve',
+            'docs_query',
             'ask_user',
             'task_tracker',
         }
@@ -382,6 +384,8 @@ class TestModeToolVisibility:
             'lsp',
             'web_search',
             'web_fetch',
+            'docs_resolve',
+            'docs_query',
             'ask_user',
         }
         assert {

@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 
-def _render_security(cli_mode: bool = True, *, enable_web: bool = True) -> str:
+def _render_security(cli_mode: bool = True, *, enable_web: bool = True, enable_docs: bool = True) -> str:
     read_only_tools = (
         '`read`, `grep`, `glob`, `find_symbols`, `analyze_project_structure`, `lsp`'
     )
     if enable_web:
         read_only_tools += ', `web_search`, `web_fetch`'
+    if enable_docs:
+        read_only_tools += ', `docs_resolve`, `docs_query`'
     risk_block = (
         '- **LOW**: Safe, read-only actions.\n'
         '  - Viewing/summarizing content, reading project files, simple in-memory calculations.\n'

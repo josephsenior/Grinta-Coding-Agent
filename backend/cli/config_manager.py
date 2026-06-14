@@ -882,17 +882,21 @@ def get_budget(config: AppConfig) -> str:
 
 
 def get_mcp_servers(config: AppConfig) -> list[dict[str, Any]]:
+    from backend.integrations.mcp.native_backends import filter_user_visible_mcp_server_dicts
+
     try:
         if config.mcp and config.mcp.servers:
-            return [
-                {
-                    'name': s.name,
-                    'type': s.type,
-                    'url': getattr(s, 'url', None),
-                    'command': getattr(s, 'command', None),
-                }
-                for s in config.mcp.servers
-            ]
+            return filter_user_visible_mcp_server_dicts(
+                [
+                    {
+                        'name': s.name,
+                        'type': s.type,
+                        'url': getattr(s, 'url', None),
+                        'command': getattr(s, 'command', None),
+                    }
+                    for s in config.mcp.servers
+                ]
+            )
     except Exception:
         logger.debug('Could not read MCP server list', exc_info=True)
     return []

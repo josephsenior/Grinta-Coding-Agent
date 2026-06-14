@@ -28,6 +28,17 @@ if TYPE_CHECKING:
     from backend.core.contracts.state import State
     from backend.inference.llm import LLM
 
+
+def _external_discovery_hint(*, enable_web: bool, enable_docs: bool) -> str:
+    parts: list[str] = []
+    if enable_web:
+        parts.append('`web_search` / `web_fetch`')
+    if enable_docs:
+        parts.append('`docs_resolve` / `docs_query`')
+    if not parts:
+        return ''
+    return f' (including {" and ".join(parts)} when external context helps)'
+
     from .safety import OrchestratorSafetyManager
 
 
@@ -142,6 +153,7 @@ class OrchestratorPlanner:
         self._add_core_tools(tools)
         self._add_browsing_tool(tools)
         self._add_web_tools(tools)
+        self._add_docs_tools(tools)
         self._add_editor_tools(tools)
         self._add_execute_mcp_tool_tool(tools)
 
@@ -319,6 +331,17 @@ class OrchestratorPlanner:
 
         tools.append(create_web_search_tool())
         tools.append(create_web_fetch_tool())
+
+    def _add_docs_tools(self, tools: list) -> None:
+        if not getattr(self._config, 'enable_docs', True):
+            return
+        from backend.engine.tools.docs_tools import (
+            create_docs_query_tool,
+            create_docs_resolve_tool,
+        )
+
+        tools.append(create_docs_resolve_tool())
+        tools.append(create_docs_query_tool())
 
     def _add_editor_tools(self, tools: list) -> None:
         if getattr(self._config, 'enable_editor', True):
@@ -701,11 +724,15 @@ class OrchestratorPlanner:
         return self._inject_agent_mode_instructions(messages, state)
 
     def _inject_plan_mode_instructions(self, messages: list, state: State) -> list:
+        hint = _external_discovery_hint(
+            enable_web=bool(getattr(self._config, 'enable_web', True)),
+            enable_docs=bool(getattr(self._config, 'enable_docs', True)),
+        )
         instruction = (
             '\n\n=== CURRENT MODE: PLAN ===\n'
             'This is the authoritative current-mode instruction for this turn.\n'
             'Current mode: PLAN\n\n'
-            '- Use discovery tools (including `web_search` / `web_fetch` when external context helps) '
+            f'- Use discovery tools{hint} '
             'to inspect and search the codebase.\n'
             '- Use `ask_user` only when user input is required to continue.\n'
             '- Use `task_tracker` to structure the plan when committing to multi-step work.\n'
@@ -722,11 +749,15 @@ class OrchestratorPlanner:
         return self._apply_control_message(messages, instruction)
 
     def _inject_chat_mode_instructions(self, messages: list, state: State) -> list:
+        hint = _external_discovery_hint(
+            enable_web=bool(getattr(self._config, 'enable_web', True)),
+            enable_docs=bool(getattr(self._config, 'enable_docs', True)),
+        )
         instruction = (
             '\n\n=== CURRENT MODE: CHAT ===\n'
             'This is the authoritative current-mode instruction for this turn.\n'
             'Current mode: CHAT\n\n'
-            '- Use discovery tools (including `web_search` / `web_fetch` when external context helps) '
+            f'- Use discovery tools{hint} '
             'to investigate the codebase when grounding helps.\n'
             '- Use `ask_user` only when user input is required to continue.\n'
             '- Do not edit files or run shell commands.\n'

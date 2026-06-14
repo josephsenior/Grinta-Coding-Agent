@@ -22,7 +22,9 @@ def _lsp_available(config: Any = None) -> bool:
         return False
 
 
-def _discovery_decision_table(*, lsp_available: bool, web_on: bool = True) -> str:
+def _discovery_decision_table(
+    *, lsp_available: bool, web_on: bool = True, docs_on: bool = True
+) -> str:
     """Canonical routing table for overlapping search/discovery tools."""
     lines = [
         '<DISCOVERY_ROUTING>',
@@ -50,6 +52,14 @@ def _discovery_decision_table(*, lsp_available: bool, web_on: bool = True) -> st
         )
     else:
         lines.append('- Interactive/JS-heavy pages → `browser`')
+    if docs_on:
+        docs_lines = [
+            '- Library/framework/SDK docs (API syntax, setup, migrations) → `docs_resolve` then `docs_query`',
+            '- Known corpus ID `/org/project` or `/org/project/version` → `docs_query` only',
+        ]
+        if web_on:
+            docs_lines.append('- Prefer `docs_*` over `web_search` when the library is known')
+        lines.extend(docs_lines)
     lines.extend(
         [
             '- Directed exploration (1–3 targeted searches): use `grep`, `glob`, or `find_symbols` directly',

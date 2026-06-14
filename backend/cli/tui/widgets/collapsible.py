@@ -32,6 +32,8 @@ STATUS_ICONS = {
     'running': '…',
 }
 
+SIDEBAR_BULLET = '●'
+
 
 class SidebarRow(Static):
     """An interactive, hoverable, and focusable row inside sidebar panels.
@@ -77,13 +79,17 @@ class SidebarRow(Static):
         if not interactive:
             self.add_class('-read-only')
 
+    def _bullet_color(self) -> str:
+        if not self.interactive:
+            return '#8b95a8'
+        return STATUS_COLORS.get(self._status, '#969aad')
+
     def _build_markup(self) -> str:
-        color = STATUS_COLORS.get(self._status, '#969aad')
-        icon = STATUS_ICONS.get(self._status, '•')
-        icon_part = f'[{color}]{icon}[/]'
+        color = self._bullet_color()
+        bullet_part = f'[bold {color}]{SIDEBAR_BULLET}[/]'
         label_part = f'[bold #c8d4e8]{self._label}[/]'
         meta_part = f'  [#54597b]{self._meta}[/]' if self._meta else ''
-        return f'{icon_part} {label_part}{meta_part}'
+        return f'{bullet_part} {label_part}{meta_part}'
 
     def update_status(self, status: str, meta: str | None = None) -> None:
         """Update the row status icon and optional meta text."""
@@ -160,6 +166,11 @@ class CollapsibleSection(Container):
         width: 100%;
         margin-bottom: 1;
     }
+    CollapsibleSection .section-icon {
+        width: auto;
+        height: 1;
+        padding-right: 1;
+    }
     CollapsibleSection .collapsible-header {
         width: 1fr;
         height: 1;
@@ -213,6 +224,7 @@ class CollapsibleSection(Container):
         *,
         collapsed: bool = True,
         accent_color: str = '#91abec',
+        section_icon: str = '',
         action_label: str | None = None,
         id: str | None = None,
         is_thinking: bool = False,
@@ -222,22 +234,54 @@ class CollapsibleSection(Container):
         self._content = content
         self._collapsed = collapsed
         self._accent_color = accent_color
+        self._section_icon = section_icon
         self._action_label = action_label
         self._items: list[tuple[Any, str, bool, str | None, str | None, bool]] = []
         self._is_thinking = is_thinking
+
+    def _header_icon_markup(self) -> str:
+        if not self._section_icon:
+            return ''
+        return f'[bold {self._accent_color}]{self._section_icon}[/]'
+
+    def _header_title_markup(self) -> str:
+        caret_icon = '▸' if self._collapsed else '▾'
+        caret = f'[#54597b]{caret_icon}[/]'
+        title_color = '#6f83aa' if self._collapsed else self._accent_color
+        title_style = '' if self._collapsed else ' bold'
+        title_part = f'[{title_color}{title_style}]{self._section_title}[/]'
+        return f'{caret} {title_part}'
 
     @property
     def is_collapsed(self) -> bool:
         return self._collapsed
 
-    def compose(self) -> ComposeResult:
-        icon = '▸' if self._collapsed else '▾'
-        caret = f'[#54597b]{icon}[/]'
-        title_part = f'[{self._accent_color}]{self._section_title}[/]'
-        header_text = f'{caret} {title_part}'
+    def _refresh_header(self) -> None:
+        icon = self.query_one('#header-icon', Static)
+        header = self.query_one('#header', Static)
+        icon.update(self._header_icon_markup())
+        header.update(self._header_title_markup())
+        header.classes = (
+            'collapsible-header collapsed'
+            if self._collapsed
+            else 'collapsible-header expanded'
+        )
 
+    def _empty_markup(self, text: str) -> str:
+        return f'[bold #54597b]{SIDEBAR_BULLET}[/] [#54597b]{text}[/]'
+
+    def compose(self) -> ComposeResult:
         with Horizontal(classes='collapsible-header-row', id='header-row'):
-            yield Static(header_text, id='header')
+            yield Static(self._header_icon_markup(), classes='section-icon', id='header-icon')
+            yield Static(
+                self._header_title_markup(),
+                id='header',
+                classes=(
+                    'collapsible-header collapsed'
+                    if self._collapsed
+                    else 'collapsible-header expanded'
+                ),
+            )
             if self._action_label:
                 yield Static(
                     self._action_label, classes='collapsible-action', id='action-btn'
@@ -262,24 +306,16 @@ class CollapsibleSection(Container):
                 if self._is_thinking:
                     content_classes += ' thinking-content'
                 yield Static(
-                    self._content or '', id='empty-text', classes=content_classes
+                    self._empty_markup(self._content or ''),
+                    id='empty-text',
+                    classes=content_classes,
                 )
 
     def toggle(self) -> None:
         """Toggle the collapsed state."""
         self._collapsed = not self._collapsed
-        header = self.query_one('#header', Static)
         body = self.query_one('#body', Vertical)
-
-        icon = '▸' if self._collapsed else '▾'
-        caret = f'[#54597b]{icon}[/]'
-        header_text = f'{caret} [{self._accent_color}]{self._section_title}[/]'
-        header.update(header_text)
-        header.classes = (
-            'collapsible-header collapsed'
-            if self._collapsed
-            else 'collapsible-header expanded'
-        )
+        self._refresh_header()
 
         if self._collapsed:
             body.add_class('-hidden')
@@ -299,7 +335,8 @@ class CollapsibleSection(Container):
             return
 
         if event.widget and (
-            event.widget.id in ('header', 'header-row') or event.widget == self
+            event.widget.id in ('header', 'header-row', 'header-icon')
+            or event.widget == self
         ):
             self.toggle()
             event.prevent_default()
@@ -311,16 +348,12 @@ class CollapsibleSection(Container):
         self._items = []
         body = self.query_one('#body', Vertical)
         body.remove_children()
-        body.mount(Static(content, id='empty-text'))
+        body.mount(Static(self._empty_markup(content), id='empty-text'))
 
     def set_title(self, title: str) -> None:
         """Update the section title."""
         self._section_title = title
-        header = self.query_one('#header', Static)
-        icon = '▸' if self._collapsed else '▾'
-        caret = f'[#54597b]{icon}[/]'
-        header_text = f'{caret} [{self._accent_color}]{title}[/]'
-        header.update(header_text)
+        self._refresh_header()
 
     def set_items(
         self,
@@ -368,7 +401,7 @@ class CollapsibleSection(Container):
                     )
                 )
         else:
-            body.mount(Static(self._content or 'No items', id='empty-text'))
+            body.mount(Static(self._empty_markup(self._content or 'No items'), id='empty-text'))
 
     def expand(self) -> None:
         """Expand the section."""

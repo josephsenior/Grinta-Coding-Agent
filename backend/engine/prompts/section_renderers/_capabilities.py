@@ -85,11 +85,14 @@ def _render_system_capabilities(
     """
     parallel_enabled = bool(getattr(config, 'enable_parallel_tool_scheduling', False))
     web_on = bool(getattr(config, 'enable_web', True))
+    docs_on = bool(getattr(config, 'enable_docs', True))
     parallel_read_only_tools = (
         '`read`, `grep`, `glob`, `find_symbols`, `analyze_project_structure`, `lsp`'
     )
     if web_on:
         parallel_read_only_tools += ', `web_search`, `web_fetch`'
+    if docs_on:
+        parallel_read_only_tools += ', `docs_resolve`, `docs_query`'
     parallel_line = (
         (
             '- **Parallel tool scheduling**: ENABLED for read-only batches '
@@ -116,6 +119,15 @@ def _render_system_capabilities(
             '- **Web (`web_search` / `web_fetch`)**: native tools backed by bundled Exa MCP '
             '(search + markdown fetch). `EXA_API_KEY` is optional — preferred for higher limits, '
             'not required. `web_fetch` falls back to fetch MCP when Exa cannot read a URL.'
+        )
+
+    docs_line = ''
+    if bool(getattr(config, 'enable_docs', True)):
+        docs_line = (
+            '- **Library docs (`docs_resolve` / `docs_query`)**: native tools backed by bundled '
+            'Context7 MCP for current framework/SDK documentation. `CONTEXT7_API_KEY` is optional '
+            '— preferred for higher limits, not required. Call `docs_resolve` first unless you '
+            'already have a `/org/project` corpus ID.'
         )
 
     browser_line = ''
@@ -170,6 +182,8 @@ def _render_system_capabilities(
         parts.append(f'{parallel_line}\n')
     if web_line:
         parts.append(f'{web_line}\n')
+    if docs_line:
+        parts.append(f'{docs_line}\n')
     if browser_line:
         parts.append(f'{browser_line}\n')
     if memory_line:

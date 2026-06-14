@@ -9,24 +9,18 @@ from backend.core.enums import ActionSecurityRisk
 from backend.engine.contracts import ChatCompletionToolParam
 from backend.engine.tools.common import create_tool_definition
 from backend.inference.tool_names import WEB_FETCH_TOOL_NAME, WEB_SEARCH_TOOL_NAME
+from backend.integrations.mcp.native_backends import (
+    EXA_WEB_FETCH_MCP_TOOL,
+    EXA_WEB_SEARCH_MCP_TOOL,
+    FALLBACK_FETCH_MCP_TOOL,
+    MCP_TOOLS_HIDDEN_BY_NATIVE_DOCS,
+    MCP_TOOLS_HIDDEN_BY_NATIVE_FACADES,
+    MCP_TOOLS_HIDDEN_BY_NATIVE_WEB,
+)
 from backend.ledger.action.mcp import MCPAction
-
-EXA_WEB_SEARCH_MCP_TOOL = 'web_search_exa'
-EXA_WEB_FETCH_MCP_TOOL = 'web_fetch_exa'
-FALLBACK_FETCH_MCP_TOOL = 'fetch'
 
 # Internal router name — not exposed to the model; handled by WRAPPER_TOOL_REGISTRY.
 NATIVE_WEB_FETCH_ROUTER = '__native_web_fetch__'
-
-MCP_TOOLS_HIDDEN_BY_NATIVE_WEB = frozenset(
-    {
-        EXA_WEB_SEARCH_MCP_TOOL,
-        EXA_WEB_FETCH_MCP_TOOL,
-        FALLBACK_FETCH_MCP_TOOL,
-        'crawling_exa',
-        'deep_search_exa',
-    }
-)
 
 
 def create_web_search_tool() -> ChatCompletionToolParam:

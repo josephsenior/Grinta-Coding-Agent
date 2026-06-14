@@ -55,6 +55,8 @@ from backend.inference.tool_names import (
     CODE_INTELLIGENCE_TOOL_NAME,
     DEBUGGER_TOOL_NAME,
     DELEGATE_TASK_TOOL_NAME,
+    DOCS_QUERY_TOOL_NAME,
+    DOCS_RESOLVE_TOOL_NAME,
     GLOB_TOOL_NAME,
     GREP_TOOL_NAME,
     MEMORY_TOOL_NAME,
@@ -140,6 +142,8 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         BROWSER_TOOL_NAME: _handle_browser_tool,
         WEB_SEARCH_TOOL_NAME: _handle_web_search_tool,
         WEB_FETCH_TOOL_NAME: _handle_web_fetch_tool,
+        DOCS_RESOLVE_TOOL_NAME: _handle_docs_resolve_tool,
+        DOCS_QUERY_TOOL_NAME: _handle_docs_query_tool,
     }
 
 
@@ -334,6 +338,8 @@ from backend.engine.tools._tool_handlers import (  # noqa: E402, F401  # noqa: E
     _handle_summarize_context_tool,
     _handle_task_tracker_tool,
     _handle_undo_last_edit_tool,
+    _handle_docs_query_tool,
+    _handle_docs_resolve_tool,
     _handle_web_fetch_tool,
     _handle_web_search_tool,
     _maybe_noop_task_tracker_action,

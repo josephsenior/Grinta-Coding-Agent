@@ -319,6 +319,7 @@ DEFAULT_AGENT_MEMORY_ENABLED = True
 DEFAULT_AGENT_PROMPT_EXTENSIONS_ENABLED = True
 DEFAULT_AGENT_BROWSING_ENABLED = True
 DEFAULT_AGENT_WEB_ENABLED = True
+DEFAULT_AGENT_DOCS_ENABLED = True
 # Vector memory & hybrid retrieval require the optional `[rag]` extra
 # (chromadb + bundled ONNX MiniLM). Off by default to keep the base install
 # lean (~150 MB vs ~400 MB). Enable via `--rag` CLI flag, agent config, or

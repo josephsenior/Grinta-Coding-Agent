@@ -280,6 +280,21 @@ class TestAddWebTools:
         assert tools == []
 
 
+class TestAddDocsTools:
+    def test_adds_docs_resolve_and_docs_query(self):
+        p = _make_planner()
+        tools: list[Any] = []
+        p._add_docs_tools(tools)
+        names = {t['function']['name'] for t in tools}
+        assert names == {'docs_resolve', 'docs_query'}
+
+    def test_docs_disabled_adds_nothing(self):
+        p = _make_planner(config=_make_config(enable_docs=False))
+        tools: list[Any] = []
+        p._add_docs_tools(tools)
+        assert tools == []
+
+
 # ---------------------------------------------------------------------------
 # build_llm_params — cache logic
 # ---------------------------------------------------------------------------
