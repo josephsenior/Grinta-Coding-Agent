@@ -23,6 +23,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from backend.context.canonical_state import clip_with_marker
 from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
@@ -410,7 +411,9 @@ def _extract_errors(event: Event, snapshot: dict) -> None:
         if exit_code != 0:
             content = str(getattr(event, 'content', ''))
             lines = content.strip().split('\n')
-            error_tail = '\n'.join(lines[-5:])[:_MAX_CONTENT_LENGTH]
+            error_tail = clip_with_marker(
+                '\n'.join(lines[-5:]), _MAX_CONTENT_LENGTH, prefer='tail'
+            )
             if _is_recoverable_tool_error_text(error_tail):
                 return
             if error_tail:
@@ -691,7 +694,7 @@ def _summarize_command_output(content: str) -> str:
     lines = content.strip().split('\n')
     if len(lines) > 8:
         lines = lines[:2] + ['... (truncated) ...'] + lines[-3:]
-    return '\n'.join(lines)[:_MAX_CONTENT_LENGTH]
+    return clip_with_marker('\n'.join(lines), _MAX_CONTENT_LENGTH, prefer='tail')
 
 
 def _extract_test_results(events: list[Event], snapshot: dict) -> None:
@@ -997,7 +1000,7 @@ def _format_errors_section(errors: list) -> list[str]:
         return []
     lines = [f'\nRecent errors ({len(errors)}):']
     for err in errors[-5:]:
-        lines.append(f'  • {err[:200]}')
+        lines.append('  • ' + clip_with_marker(str(err), 200, prefer='tail'))
     # #region agent log
     if lines:
         _agent_debug_log(
@@ -1058,7 +1061,9 @@ def _format_test_results_section(results: list) -> list[str]:
         lines.append(f'  {status} (exit={exit_code}): {command}')
         output = str(result.get('output', '')).strip()
         if output:
-            lines.append(f'    output: {output[:200]}')
+            lines.append(
+                '    output: ' + clip_with_marker(output, 200, prefer='tail')
+            )
     return lines
 
 

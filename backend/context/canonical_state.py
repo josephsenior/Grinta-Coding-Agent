@@ -30,6 +30,68 @@ _MAX_INVALIDATED = 10
 _MAX_RECENT_WORK = 16
 _MAX_TASK_PLAN_ITEMS = 20
 _MAX_OUTPUT_CHARS = 360
+# Durable storage cap for verification output. Larger than the rendered slice
+# so the full-enough failure tail survives in the canonical JSON for the
+# continuity gate and post-compact recovery to consult, even though the
+# prompt render itself stays bounded.
+_MAX_VERIFICATION_OUTPUT_CHARS = 2000
+# Rendered slice of verification output inside the prompt packet. Kept small so
+# render char-budgets are respected; tail-preferred so the assertion/error line
+# (which lives at the end of a traceback) is what survives.
+_RENDER_VERIFICATION_OUTPUT_CHARS = 220
+
+
+def clip_with_marker(
+    text: str,
+    limit: int,
+    *,
+    prefer: str = 'head',
+) -> str:
+    """Clip *text* to *limit* chars leaving a visible omission marker.
+
+    Unlike a bare ``text[:limit]`` slice, this never cuts silently: when
+    content is dropped an explicit ``... (N chars omitted) ...`` marker is
+    inserted so the model knows it is reading a fragment and can choose to
+    re-read the source.
+
+    Args:
+        text: The text to clip.
+        limit: Maximum length of the returned string (including the marker).
+        prefer: ``'tail'`` keeps the END of the text (use for tracebacks /
+            failure output, where the actionable line is last); ``'head'``
+            keeps the BEGINNING (use for forward-reading prose). ``'both'``
+            keeps head and tail around a central marker.
+
+    Returns:
+        The original text when it already fits, otherwise a clipped string
+        with an omission marker.
+    """
+    text = str(text)
+    if limit <= 0 or len(text) <= limit:
+        return text
+    omitted = len(text)
+    if prefer == 'tail':
+        marker = f'... ({{}} chars omitted) ...\n'
+        body_len = max(0, limit - len(marker.format(omitted)))
+        tail = text[-body_len:] if body_len else ''
+        kept = len(tail)
+        return marker.format(omitted - kept) + tail
+    if prefer == 'both':
+        marker = '\n... ({} chars omitted) ...\n'
+        body_len = max(0, limit - len(marker.format(omitted)))
+        half = body_len // 2
+        if half <= 0:
+            return text[:limit]
+        head = text[:half]
+        tail = text[-half:]
+        kept = len(head) + len(tail)
+        return head + marker.format(omitted - kept) + tail
+    # head (default)
+    marker = f'\n... ({{}} chars omitted) ...'
+    body_len = max(0, limit - len(marker.format(omitted)))
+    head = text[:body_len] if body_len else ''
+    kept = len(head)
+    return head + marker.format(omitted - kept)
 
 
 @dataclass
@@ -383,7 +445,15 @@ def render_canonical_state_for_prompt(
             f'- Latest verification: {status} '
             f'(exit={canonical.verification.exit_code}): {canonical.verification.command}',
         )
-        _append(lines, f'  Output: {canonical.verification.output[:220]}')
+        _append(
+            lines,
+            '  Output: '
+            + clip_with_marker(
+                canonical.verification.output,
+                _RENDER_VERIFICATION_OUTPUT_CHARS,
+                prefer='tail',
+            ),
+        )
     _append(lines, f'- Active plan: {canonical.active_plan}')
     if canonical.task_plan:
         _append(lines, '- Task tracker:')
@@ -561,7 +631,11 @@ def _update_verification(
         exit_code=result.get('exit_code')
         if isinstance(result.get('exit_code'), int)
         else None,
-        output=str(result.get('output', ''))[:_MAX_OUTPUT_CHARS],
+        output=clip_with_marker(
+            str(result.get('output', '')),
+            _MAX_VERIFICATION_OUTPUT_CHARS,
+            prefer='tail',
+        ),
         event_id=result_event_id,
         updated_at=_now(),
     )

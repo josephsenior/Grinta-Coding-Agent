@@ -5,6 +5,7 @@ from __future__ import annotations
 from backend.context.canonical_state import (
     CanonicalTaskState,
     apply_canonical_patch,
+    clip_with_marker,
     load_canonical_state,
     reduce_events_into_state,
     reduce_snapshot_into_state,
@@ -42,6 +43,58 @@ def _tasks(task_list: list[dict], event_id: int) -> TaskTrackingAction:
     event = TaskTrackingAction(command='update', task_list=task_list)
     event.id = event_id
     return event
+
+
+def test_clip_with_marker_passthrough_when_fits() -> None:
+    text = 'short output'
+    assert clip_with_marker(text, 100, prefer='tail') == text
+    assert clip_with_marker(text, 100, prefer='head') == text
+
+
+def test_clip_with_marker_tail_keeps_end_and_marks() -> None:
+    # The actionable assertion line lives at the END of a traceback.
+    body = 'noise line\n' * 200 + 'AssertionError: expected 3 got 4'
+    clipped = clip_with_marker(body, 120, prefer='tail')
+    assert len(clipped) <= 120
+    assert 'AssertionError: expected 3 got 4' in clipped
+    assert 'chars omitted' in clipped
+
+
+def test_clip_with_marker_head_keeps_start_and_marks() -> None:
+    body = 'START-MARKER' + ('x' * 500)
+    clipped = clip_with_marker(body, 100, prefer='head')
+    assert len(clipped) <= 100
+    assert clipped.startswith('START-MARKER')
+    assert 'chars omitted' in clipped
+
+
+def test_verification_output_clip_preserves_failing_assertion() -> None:
+    """A long failing verification output must keep its final assertion line."""
+    long_output = (
+        'collecting ...\n' * 400
+        + 'E   AssertionError: parser dropped the trailing token'
+    )
+    events = [
+        _user('Fix the parser', 1),
+        _cmd('pytest backend/tests/unit/test_parser.py', 2),
+        _output(
+            'pytest backend/tests/unit/test_parser.py',
+            long_output,
+            3,
+            1,
+        ),
+    ]
+    canonical = reduce_events_into_state(events, CanonicalTaskState(), persist=False)
+
+    # The durable canonical output keeps the actionable failing line + marker.
+    assert 'AssertionError: parser dropped the trailing token' in (
+        canonical.verification.output
+    )
+    assert 'chars omitted' in canonical.verification.output
+
+    # The prompt render stays bounded and still surfaces the failing tail.
+    rendered = render_canonical_state_for_prompt(canonical, char_budget=2000)
+    assert 'AssertionError: parser dropped the trailing token' in rendered
 
 
 def test_reducer_tracks_latest_directive_and_verification() -> None:
