@@ -374,6 +374,14 @@ class _AppScreenSettingsMixin:
             self.notify(f'Failed to delete skill: {e}', severity='error')
 
     def _delete_mcp_server(self, name: str) -> None:
+        from backend.integrations.mcp.native_backends import is_user_visible_mcp_server
+
+        if not is_user_visible_mcp_server(name):
+            self.notify(
+                f"'{name}' is a bundled internal backend and cannot be removed.",
+                severity='warning',
+            )
+            return
         from backend.cli.config_manager import remove_mcp_server
 
         try:

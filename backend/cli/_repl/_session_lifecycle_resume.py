@@ -217,12 +217,9 @@ async def _wire_resume_runtime_state(
             )
         return False
     host._memory = memory
-    mcp_status = getattr(agent, 'mcp_capability_status', None) or {}
-    try:
-        mcp_n = int(mcp_status.get('connected_client_count') or 0)
-    except (TypeError, ValueError):
-        mcp_n = 0
-    host._hud.update_mcp_servers(mcp_n)
+    from backend.integrations.mcp.native_backends import count_user_visible_mcp_servers
+
+    host._hud.update_mcp_servers(count_user_visible_mcp_servers(host._config))
 
     # Subscribe renderer to the new event stream.
     if host._renderer is not None:

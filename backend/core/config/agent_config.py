@@ -30,6 +30,7 @@ from backend.core.constants import (
     DEFAULT_AGENT_CONDENSATION_REQUEST_ENABLED,
     DEFAULT_AGENT_CONFIRM_ACTIONS,
     DEFAULT_AGENT_DEBUGGER_ENABLED,
+    DEFAULT_AGENT_DOCS_ENABLED,
     DEFAULT_AGENT_DYNAMIC_ITERATIONS_ENABLED,
     DEFAULT_AGENT_ENABLE_FIRST_TURN_ORIENTATION_PROMPT,
     DEFAULT_AGENT_ERROR_RATE_WINDOW,
@@ -90,6 +91,7 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         enable_prompt_extensions: Whether to allow agent-specific prompt extensions (agent suffix)
         enable_browsing: Whether to expose the native browser tool
         enable_web: Whether to expose native web_search and web_fetch tools
+        enable_docs: Whether to expose native docs_resolve and docs_query tools
         enable_auto_lint: Whether to enable automatic linting after edits
         confirm_actions: Whether to require user confirmation before executing actions
         llm_draft_config: LLM configuration for draft operations
@@ -137,6 +139,13 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         description=(
             'Expose native web_search and web_fetch tools (backed by bundled Exa/fetch MCP). '
             'When false, web tools are omitted from the tool list and discovery routing.'
+        ),
+    )
+    enable_docs: bool = Field(
+        default=DEFAULT_AGENT_DOCS_ENABLED,
+        description=(
+            'Expose native docs_resolve and docs_query tools (backed by bundled Context7 MCP). '
+            'When false, docs tools are omitted from the tool list and discovery routing.'
         ),
     )
     enable_vector_memory: bool = Field(

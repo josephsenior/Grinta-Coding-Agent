@@ -1634,7 +1634,7 @@ async def test_tui_lsp_sidebar_lists_detected_servers(mock_config):
         assert rows[0]._label == 'python'
         assert rows[0]._meta is None
         assert rows[0].interactive is False
-        assert lsp_section.is_collapsed is True
+        assert lsp_section.is_collapsed is False
 
 
 @pytest.mark.asyncio

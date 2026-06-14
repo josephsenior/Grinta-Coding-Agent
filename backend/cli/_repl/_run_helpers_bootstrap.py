@@ -310,6 +310,12 @@ def _announce_chat_ready(
 
 
 def _update_mcp_count_from_agent(host: 'RunHelpersHost', agent: Any) -> None:
+    from backend.integrations.mcp.native_backends import count_user_visible_mcp_servers
+
+    config = getattr(host, '_config', None)
+    if config is not None:
+        host._hud.update_mcp_servers(count_user_visible_mcp_servers(config))
+        return
     mcp_status = getattr(agent, 'mcp_capability_status', None) or {}
     try:
         mcp_n = int(mcp_status.get('connected_client_count') or 0)

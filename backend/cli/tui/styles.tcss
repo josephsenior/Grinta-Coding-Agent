@@ -109,6 +109,16 @@ SidebarRow {
     transition: background 150ms, color 150ms;
     width: 100%;
     height: auto;
+    text-style: none;
+}
+
+CollapsibleSection .section-icon {
+    text-style: bold;
+}
+
+CollapsibleSection .collapsible-header.expanded {
+    color: #c8d4e8;
+    text-style: bold;
 }
 
 SidebarRow:hover {
@@ -147,6 +157,11 @@ SidebarRow.-read-only:hover {
     border-left: heavy #5eead4;
     padding: 1 0;
     margin: 0;
+    scrollbar-size-vertical: 1;
+    scrollbar-size-horizontal: 0;
+    scrollbar-color: #64748b #0f172a;
+    scrollbar-color-hover: #94a3b8 #0f172a;
+    scrollbar-color-active: #cbd5e1 #0f172a;
 }
 
 #suggestions-list.-hidden {
@@ -747,6 +762,11 @@ GrintaSettingsDialog TextArea:focus {
     padding: 0;
     background: transparent;
     border: none;
+    scrollbar-size-vertical: 1;
+    scrollbar-size-horizontal: 0;
+    scrollbar-color: #64748b #0f172a;
+    scrollbar-color-hover: #94a3b8 #0f172a;
+    scrollbar-color-active: #cbd5e1 #0f172a;
 }
 
 #dialog-subtitle {

@@ -168,7 +168,7 @@ class _AppRendererDisplayMixin:
             section.set_title('LSP Servers')
             try:
                 empty = section.query_one('#empty-text', Static)
-                empty.update('Scanning local PATH…')
+                empty.update(section._empty_markup('Scanning local PATH…'))
             except Exception:
                 section.set_content('Scanning local PATH…')
             return
@@ -299,6 +299,8 @@ class _AppRendererDisplayMixin:
         return skill_items
 
     def _resolve_mcp_server_list(self, mcp_count):
+        from backend.integrations.mcp.native_backends import is_user_visible_mcp_server
+
         mcp_servers = None
         if (
             self._tui._config
@@ -308,7 +310,7 @@ class _AppRendererDisplayMixin:
             mcp_servers = [
                 {'name': s.name, 'type': s.type}
                 for s in self._tui._config.mcp.servers
-                if s.name != 'app-mcp'
+                if is_user_visible_mcp_server(s.name)
             ]
 
         if not mcp_servers and mcp_count:

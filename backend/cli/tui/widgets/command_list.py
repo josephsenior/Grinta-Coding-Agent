@@ -40,7 +40,7 @@ class CommandListSection(Static):
         color: #91abec;
         text-style: bold;
     }
-    CommandListSection:first-child {
+    CommandListSection:first-of-type {
         margin-top: 0;
     }
     """

@@ -606,7 +606,7 @@ class TestPromptBudgetRegression:
         )
         assert report['total_tokens'] >= 800, 'Prompt shrank unexpectedly'
         # Baseline post-compression: 5 321 tokens.  Ceiling = baseline + ~10 %.
-        assert report['total_tokens'] <= 5_850, (
+        assert report['total_tokens'] <= 6_100, (
             f'Prompt exceeds budget ceiling: {report["total_tokens"]} tokens '
             '(baseline 4 379). Reduce prompt text or raise this ceiling deliberately.'
         )
@@ -629,7 +629,7 @@ class TestPromptBudgetRegression:
         )
         assert report['total_tokens'] >= 1_000, 'Prompt shrank unexpectedly'
         # Baseline post-compression: 5 663 tokens.  Ceiling = baseline + ~10 %.
-        assert report['total_tokens'] <= 6_230, (
+        assert report['total_tokens'] <= 6_500, (
             f'Prompt exceeds budget ceiling: {report["total_tokens"]} tokens '
             '(baseline 5 663). Reduce prompt text or raise this ceiling deliberately.'
         )
@@ -657,6 +657,7 @@ def _base_config(**overrides: object) -> SimpleNamespace:
         ),
         enable_terminal=bool(overrides.get('enable_terminal', True)),
         enable_web=bool(overrides.get('enable_web', True)),
+        enable_docs=bool(overrides.get('enable_docs', True)),
         enable_browsing=bool(overrides.get('enable_browsing', True)),
     )
 
@@ -1127,6 +1128,30 @@ class TestBuildSystemPromptRenders:
         assert 'Test files for a module' in result
         assert 'web_search' in result
         assert 'web_fetch' in result
+        assert 'docs_resolve' in result
+        assert 'docs_query' in result
+
+    def test_capabilities_documents_docs_and_optional_context7_key(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(enable_docs=True),
+            function_calling_mode='native',
+        )
+        assert 'docs_resolve' in result
+        assert 'docs_query' in result
+        assert 'CONTEXT7_API_KEY' in result
+
+    def test_docs_disabled_omits_docs_from_discovery_and_capabilities(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(enable_docs=False),
+            function_calling_mode='native',
+        )
+        assert '→ `docs_resolve`' not in result
+        assert '→ `docs_query`' not in result
+        assert 'Library docs (`docs_resolve` / `docs_query`)' not in result
 
     def test_capabilities_documents_web_and_optional_exa_key(self) -> None:
         result = self._assert_renders_cleanly(

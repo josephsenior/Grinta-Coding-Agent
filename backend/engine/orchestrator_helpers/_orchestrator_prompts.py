@@ -57,16 +57,20 @@ def _set_prompt_tier_from_recent_history(orch: Orchestrator, state: State) -> No
 
 def _mcp_server_prompt_hints(orch: Orchestrator) -> list[dict[str, str]]:
     """Build ``[{"server": name, "hint": text}, ...]`` from MCP ``usage_hint`` fields."""
+    from backend.integrations.mcp.native_backends import is_user_visible_mcp_server
+
     try:
         app_cfg = getattr(orch.llm_registry, 'config', None)
         mcp = getattr(app_cfg, 'mcp', None) if app_cfg is not None else None
         servers = getattr(mcp, 'servers', None) or []
         rows: list[dict[str, str]] = []
         for s in servers:
+            name = (getattr(s, 'name', None) or '').strip() or 'unknown'
+            if not is_user_visible_mcp_server(name):
+                continue
             hint = (getattr(s, 'usage_hint', None) or '').strip()
             if not hint:
                 continue
-            name = (getattr(s, 'name', None) or '').strip() or 'unknown'
             rows.append({'server': name, 'hint': hint})
         return rows
     except Exception:
@@ -97,16 +101,27 @@ def _apply_mcp_tools(orch: Orchestrator, mcp_tools: list[dict]) -> None:
     )
     pm = getattr(orch, '_prompt_manager', None)
     if pm and hasattr(pm, 'mcp_tool_names'):
-        from backend.engine.tools.web_tools import MCP_TOOLS_HIDDEN_BY_NATIVE_WEB
+        from backend.integrations.mcp.native_backends import MCP_TOOLS_HIDDEN_BY_NATIVE_FACADES
 
-        native_web_on = bool(getattr(orch.config, 'enable_web', True))
+        native_facades_on = bool(getattr(orch.config, 'enable_web', True)) or bool(
+            getattr(orch.config, 'enable_docs', True)
+        )
         visible_names = list(orch.mcp_tools.keys())
-        if native_web_on:
-            visible_names = [
-                name
-                for name in visible_names
-                if name not in MCP_TOOLS_HIDDEN_BY_NATIVE_WEB
-            ]
+        if native_facades_on:
+            hidden = MCP_TOOLS_HIDDEN_BY_NATIVE_FACADES
+            if not getattr(orch.config, 'enable_web', True):
+                from backend.integrations.mcp.native_backends import (
+                    MCP_TOOLS_HIDDEN_BY_NATIVE_WEB,
+                )
+
+                hidden = hidden - MCP_TOOLS_HIDDEN_BY_NATIVE_WEB
+            if not getattr(orch.config, 'enable_docs', True):
+                from backend.integrations.mcp.native_backends import (
+                    MCP_TOOLS_HIDDEN_BY_NATIVE_DOCS,
+                )
+
+                hidden = hidden - MCP_TOOLS_HIDDEN_BY_NATIVE_DOCS
+            visible_names = [name for name in visible_names if name not in hidden]
         pm.mcp_tool_names = visible_names
         descriptions = _mcp_tool_descriptions_from_specs(mcp_tools)
         if hasattr(pm, 'mcp_tool_descriptions'):

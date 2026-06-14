@@ -75,6 +75,7 @@ class _AppScreenLifecycleMixin:
                         content='No tasks yet',
                         collapsed=False,
                         accent_color='#91abec',
+                        section_icon='▣',
                         id='sidebar-tasks',
                     )
                     yield CollapsibleSection(
@@ -82,21 +83,24 @@ class _AppScreenLifecycleMixin:
                         content='No MCP servers configured',
                         collapsed=False,
                         accent_color='#eacb8a',
+                        section_icon='⬡',
                         action_label='+',
                         id='sidebar-mcp',
                     )
                     yield CollapsibleSection(
                         title='LSP Servers',
                         content='Scanning local PATH…',
-                        collapsed=True,
+                        collapsed=False,
                         accent_color='#5eead4',
+                        section_icon='◈',
                         id='sidebar-lsp',
                     )
                     yield CollapsibleSection(
                         title='Skills',
                         content='No skills available',
-                        collapsed=True,
-                        accent_color='#7a849c',
+                        collapsed=False,
+                        accent_color='#c792ea',
+                        section_icon='✦',
                         action_label='+',
                         id='sidebar-skills',
                     )
@@ -339,12 +343,9 @@ class _AppScreenLifecycleMixin:
             from backend.core.bootstrap.main import _setup_mcp_tools
 
             await _setup_mcp_tools(agent, runtime, memory)
-            mcp_status = getattr(agent, 'mcp_capability_status', None) or {}
-            try:
-                mcp_n = int(mcp_status.get('connected_client_count') or 0)
-            except (TypeError, ValueError):
-                mcp_n = 0
-            self._hud.update_mcp_servers(mcp_n)
+            from backend.integrations.mcp.native_backends import count_user_visible_mcp_servers
+
+            self._hud.update_mcp_servers(count_user_visible_mcp_servers(self._config))
         except Exception:
             _tui_logger.debug('_bootstrap: MCP warmup failed (non-fatal)')
             self._hud.update_mcp_servers(0)

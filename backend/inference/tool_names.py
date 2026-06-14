@@ -42,6 +42,8 @@ MEMORY_MANAGER_TOOL_NAME = MEMORY_TOOL_NAME
 # ── Web & MCP ───────────────────────────────────────────────────────
 WEB_SEARCH_TOOL_NAME = 'web_search'
 WEB_FETCH_TOOL_NAME = 'web_fetch'
+DOCS_RESOLVE_TOOL_NAME = 'docs_resolve'
+DOCS_QUERY_TOOL_NAME = 'docs_query'
 CALL_MCP_TOOL_NAME = 'call_mcp_tool'
 BROWSER_TOOL_NAME = 'browser'
 DEBUGGER_TOOL_NAME = 'debugger'
@@ -64,6 +66,8 @@ __all__ = [
     'CODE_INTELLIGENCE_TOOL_NAME',
     'CREATE_TOOL_NAME',
     'DEBUGGER_TOOL_NAME',
+    'DOCS_QUERY_TOOL_NAME',
+    'DOCS_RESOLVE_TOOL_NAME',
     'DELEGATE_TASK_TOOL_NAME',
     'EDIT_SYMBOL_TOOL_NAME',
     'EXECUTE_BASH_TOOL_NAME',

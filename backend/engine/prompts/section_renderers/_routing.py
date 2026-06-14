@@ -62,9 +62,11 @@ def _render_routing(
     )
 
     web_on = bool(getattr(config, 'enable_web', True))
+    docs_on = bool(getattr(config, 'enable_docs', True))
     discovery_decision_table = _discovery_decision_table(
         lsp_available=lsp_available,
         web_on=web_on,
+        docs_on=docs_on,
     )
 
     if not can_edit:

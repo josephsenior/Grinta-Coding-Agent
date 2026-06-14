@@ -21,10 +21,8 @@ def create_execute_mcp_tool_tool() -> dict:
                 'using the exact keys from that tool schema (camelCase as given). '
                 'Do not place parameter keys at the top level next to ``tool_name`` — '
                 'that yields empty args and MCP validation errors (-32602). '
-                'Context7 example: '
-                '``{"tool_name":"resolve-library-id","arguments":{"libraryName":"React","query":"useEffect cleanup"}}`` '
-                'then '
-                '``{"tool_name":"query-docs","arguments":{"libraryId":"/facebook/react","query":"useEffect patterns"}}``.'
+                'Use native `docs_resolve` / `docs_query` and `web_search` / `web_fetch` '
+                'for bundled capabilities — not this gateway.'
             ),
             'parameters': {
                 'type': 'object',
@@ -36,9 +34,7 @@ def create_execute_mcp_tool_tool() -> dict:
                     'arguments': {
                         'type': 'object',
                         'description': (
-                            'Required. Object of argument names to values exactly as the MCP tool schema defines '
-                            '(e.g. Context7 resolve-library-id needs both libraryName and query; '
-                            'query-docs needs libraryId and query).'
+                            'Required. Object of argument names to values exactly as the MCP tool schema defines.'
                         ),
                     },
                 },

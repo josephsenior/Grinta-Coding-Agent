@@ -35,6 +35,8 @@ _TOOL_HEADLINE: dict[str, tuple[str, str]] = {
     'browser': ('', 'Browser'),
     'web_search': ('', 'Web search'),
     'web_fetch': ('', 'Web fetch'),
+    'docs_resolve': ('', 'Docs resolve'),
+    'docs_query': ('', 'Docs query'),
     'delegate_task': ('', 'Delegate'),
     'shared_task_board': ('', 'Board'),
     'terminal_manager': ('', 'Terminal'),

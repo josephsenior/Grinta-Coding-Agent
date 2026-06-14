@@ -4,7 +4,7 @@
     "context7": {
       "command": "npx",
       "args": ["-y", "@upstash/context7-mcp"],
-      "usage_hint": "Context7 docs MCP. Two-step: (1) ``resolve-library-id`` with **both** ``libraryName`` and ``query`` strings. (2) ``query-docs`` with ``libraryId`` (e.g. /facebook/react) from step 1 plus ``query``. Optional: CONTEXT7_API_KEY in env for higher limits."
+      "usage_hint": "Internal — powers native `docs_resolve` / `docs_query`. Not listed in MCP UI."
     },
     "shadcn": {
       "command": "npx",
@@ -22,7 +22,7 @@
     "fetch": {
       "command": "uvx",
       "args": ["mcp-server-fetch"],
-      "usage_hint": "Bundled fetch MCP — used internally by native `web_fetch` as a fallback. Prefer `web_fetch` in the agent tool list."
+      "usage_hint": "Internal — fallback backend for native `web_fetch`. Not listed in MCP UI."
     },
     "rigour": {
       "command": "npx",
@@ -36,7 +36,7 @@
       "type": "shttp",
       "transport": "shttp",
       "url": "https://mcp.exa.ai/mcp",
-      "usage_hint": "**Exa** hosted MCP — powers native `web_search` / `web_fetch` (do not call `web_search_exa` / `web_fetch_exa` directly). **EXA_API_KEY** in ``.env`` is optional but preferred for higher limits; Grinta appends ``exaApiKey=`` when set."
+      "usage_hint": "Internal — powers native `web_search` / `web_fetch`. Not listed in MCP UI. Optional **EXA_API_KEY** in ``.env``."
     }
   },
   "tools": []

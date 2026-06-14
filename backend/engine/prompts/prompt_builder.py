@@ -396,16 +396,22 @@ def _collect_system_prompt_sections(
 
     mode = normalize_interaction_mode(getattr(config, 'mode', 'agent'))
     web_on = bool(getattr(config, 'enable_web', True))
-    web_discovery_hint = (
-        ' (including `web_search` / `web_fetch` when external context helps)'
-        if web_on
+    docs_on = bool(getattr(config, 'enable_docs', True))
+    external_discovery_parts: list[str] = []
+    if web_on:
+        external_discovery_parts.append('`web_search` / `web_fetch`')
+    if docs_on:
+        external_discovery_parts.append('`docs_resolve` / `docs_query`')
+    external_discovery_hint = (
+        f' (including {" and ".join(external_discovery_parts)} when external context helps)'
+        if external_discovery_parts
         else ''
     )
     if is_plan_mode(mode):
         sections.append(
             (
                 'simplified_plan_protocol',
-                f'You are in Plan mode. Use discovery tools{web_discovery_hint} '
+                f'You are in Plan mode. Use discovery tools{external_discovery_hint} '
                 'to inspect the codebase.\n\n'
                 'Use `task_tracker` when committing to structured multi-step planning.\n'
                 'Do **not** edit files or run shell commands in Plan mode.\n\n'
@@ -418,7 +424,7 @@ def _collect_system_prompt_sections(
         sections.append(
             (
                 'simplified_chat_protocol',
-                f'You are in Chat mode. Use discovery tools{web_discovery_hint} '
+                f'You are in Chat mode. Use discovery tools{external_discovery_hint} '
                 'to investigate when grounding helps.\n\n'
                 'Do **not** edit files or run shell commands in Chat mode.\n\n'
                 'When you need input from the user to continue, see `<ASK_USER_TOOL>`.\n\n'
@@ -461,7 +467,7 @@ def _collect_system_prompt_sections(
         ),
         (
             'security_risk_policy',
-            _render_security(cli_mode, enable_web=web_on),
+            _render_security(cli_mode, enable_web=web_on, enable_docs=docs_on),
         ),
         (
             'system_partial_01_autonomy',
