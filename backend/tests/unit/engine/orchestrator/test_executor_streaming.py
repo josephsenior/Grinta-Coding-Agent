@@ -347,6 +347,154 @@ def test_async_execute_preserves_streamed_reasoning_content(monkeypatch):
     )
 
 
+def test_async_execute_preserves_vercel_gateway_reasoning_delta(monkeypatch):
+    """Vercel AI Gateway streams reasoning in delta.reasoning."""
+    import backend.engine.function_calling as fc
+    from backend.engine.executor import OrchestratorExecutor
+
+    sys.modules.setdefault('app.engine.function_calling', fc)
+
+    from backend.engine import executor as executor_module
+
+    monkeypatch.setattr(
+        executor_module.orchestrator_function_calling,
+        'response_to_actions',
+        lambda *args, **kwargs: [],
+    )
+
+    async def fake_astream(**kwargs):
+        yield {
+            'id': 'chatcmpl-vercel-reasoning',
+            'model': 'minimax/minimax-m3',
+            'choices': [
+                {
+                    'delta': {'reasoning': 'Let me think. '},
+                    'finish_reason': None,
+                }
+            ],
+        }
+        yield {
+            'id': 'chatcmpl-vercel-reasoning',
+            'model': 'minimax/minimax-m3',
+            'choices': [
+                {
+                    'delta': {'reasoning': 'Step two.'},
+                    'finish_reason': None,
+                }
+            ],
+        }
+        yield {
+            'id': 'chatcmpl-vercel-reasoning',
+            'model': 'minimax/minimax-m3',
+            'choices': [{'delta': {'content': 'Answer.'}, 'finish_reason': None}],
+        }
+        yield {
+            'id': 'chatcmpl-vercel-reasoning',
+            'model': 'minimax/minimax-m3',
+            'choices': [{'delta': {}, 'finish_reason': 'stop'}],
+        }
+
+    llm = MagicMock()
+    llm.astream = fake_astream
+
+    executor = OrchestratorExecutor(
+        llm=llm,
+        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        planner=MagicMock(),
+        mcp_tools_provider=lambda: {},
+    )
+
+    result = asyncio.run(
+        executor.async_execute(
+            {'messages': []},
+            _event_stream('test-vercel-gateway-reasoning-delta'),
+        )
+    )
+
+    resp = result.response
+    assert resp is not None
+    assert resp.content == 'Answer.'
+    assert resp.reasoning_content == 'Let me think. Step two.'
+
+
+def test_async_execute_preserves_reasoning_details_delta(monkeypatch):
+    """Gateway reasoning_details chunks must route to thinking, not visible text."""
+    import backend.engine.function_calling as fc
+    from backend.engine.executor import OrchestratorExecutor
+
+    sys.modules.setdefault('app.engine.function_calling', fc)
+
+    from backend.engine import executor as executor_module
+
+    monkeypatch.setattr(
+        executor_module.orchestrator_function_calling,
+        'response_to_actions',
+        lambda *args, **kwargs: [],
+    )
+
+    async def fake_astream(**kwargs):
+        yield {
+            'id': 'chatcmpl-reasoning-details',
+            'model': 'minimax/minimax-m3',
+            'choices': [
+                {
+                    'delta': {
+                        'reasoning_details': [
+                            {
+                                'type': 'reasoning.text',
+                                'text': 'Plan the fix. ',
+                                'index': 0,
+                            }
+                        ],
+                    },
+                    'finish_reason': None,
+                }
+            ],
+        }
+        yield {
+            'id': 'chatcmpl-reasoning-details',
+            'model': 'minimax/minimax-m3',
+            'choices': [
+                {
+                    'delta': {
+                        'content': [
+                            {'type': 'reasoning.text', 'text': 'hidden thought'},
+                            {'type': 'text', 'text': 'Visible answer.'},
+                        ],
+                    },
+                    'finish_reason': None,
+                }
+            ],
+        }
+        yield {
+            'id': 'chatcmpl-reasoning-details',
+            'model': 'minimax/minimax-m3',
+            'choices': [{'delta': {}, 'finish_reason': 'stop'}],
+        }
+
+    llm = MagicMock()
+    llm.astream = fake_astream
+
+    executor = OrchestratorExecutor(
+        llm=llm,
+        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        planner=MagicMock(),
+        mcp_tools_provider=lambda: {},
+    )
+
+    result = asyncio.run(
+        executor.async_execute(
+            {'messages': []},
+            _event_stream('test-reasoning-details-delta'),
+        )
+    )
+
+    resp = result.response
+    assert resp is not None
+    assert resp.content == 'Visible answer.'
+    assert resp.reasoning_content == 'Plan the fix. hidden thought'
+
+
 def test_async_execute_clamps_completion_budget_before_stream_call(monkeypatch):
     import backend.engine.function_calling as fc
     from backend.engine.executor import OrchestratorExecutor
