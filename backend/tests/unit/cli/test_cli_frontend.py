@@ -2747,7 +2747,7 @@ async def test_renderer_handles_mcp_action() -> None:
     await renderer.handle_event(MCPObservation(content='{"text": "found 3 matches"}'))
 
     output = _console_output(console)
-    assert 'Searched' in output
+    assert 'Grepped' in output
     assert 'test' in output
     assert 'found 3 matches' in output
 

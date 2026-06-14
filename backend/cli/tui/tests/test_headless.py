@@ -36,6 +36,8 @@ from backend.cli.tui.widgets.activity_card import (
 from backend.cli.tui.widgets.activity_card import (
     AgentMessage,
     LiveResponse,
+    OrientBurst,
+    OrientLine,
     ThinkingIndicator,
     TurnCompletion,
 )
@@ -496,7 +498,8 @@ async def test_tui_backpressure_suppresses_mount_animation(mock_config, monkeypa
         display.append_widget(widget)
         await pilot.pause()
         # No offset animation was applied while under backpressure.
-        assert tuple(widget.styles.offset) == (0, 0)
+        offset = tuple(getattr(part, 'value', part) for part in widget.styles.offset)
+        assert offset == (0, 0)
 
         display.set_backpressure(False)
         assert display._under_backpressure is False
@@ -2002,7 +2005,7 @@ async def test_tui_shell_command_reuses_single_card(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_tui_lsp_query_merges_action_and_observation_into_single_card(
+async def test_tui_lsp_query_renders_orient_line(
     mock_config,
 ):
     console = RichConsole()
@@ -2040,18 +2043,12 @@ async def test_tui_lsp_query_merges_action_and_observation_into_single_card(
         )
         await pilot.pause()
 
-        code_cards = [
-            card
-            for card in s.query(TUIActivityCard).results()
-            if 'category-code' in card.classes
-        ]
-        assert len(code_cards) == 1
-        assert 'processing' not in code_cards[0].classes
-        collapsed = code_cards[0].query_one('#collapsed-row')
-        rendered = str(collapsed.renderable)
-        assert 'Analyzed' in rendered
-        assert 'MyClass' in rendered
-        assert 'completed' in rendered
+        lines = list(s.query(OrientLine).results())
+        assert len(lines) == 1
+        assert lines[0].model.icon == '≡'
+        assert lines[0].model.verb == 'Analyzed'
+        assert lines[0].model.target == 'find_definition · MyClass'
+        assert lines[0].model.result == '1 result'
 
 
 @pytest.mark.asyncio
@@ -2103,7 +2100,7 @@ async def test_tui_mcp_call_merges_action_and_observation_into_single_card(
 
 
 @pytest.mark.asyncio
-async def test_tui_web_search_merges_into_dedicated_card(mock_config):
+async def test_tui_web_search_renders_orient_line(mock_config):
     from backend.engine.tools.web_tools import build_web_search_action
     from backend.ledger.observation.mcp import MCPObservation
 
@@ -2143,23 +2140,16 @@ async def test_tui_web_search_merges_into_dedicated_card(mock_config):
         )
         await pilot.pause()
 
-        cards = [
-            card
-            for card in s.query(TUIActivityCard).results()
-            if 'category-web_search' in card.classes
-        ]
-        assert len(cards) == 1
-        card = cards[0]
-        collapsed = str(card.query_one('#collapsed-row').renderable)
-        assert 'Searched' in collapsed
-        assert 'Next.js 15 release notes' in collapsed
-        assert '2 results' in collapsed
-        assert card._meta_lines
-        assert 'limit: 3' in card._meta_lines[0]
+        lines = list(s.query(OrientLine).results())
+        assert len(lines) == 1
+        assert lines[0].model.icon == '⚐'
+        assert lines[0].model.verb == 'Searched'
+        assert lines[0].model.target == '"Next.js 15 release notes"'
+        assert lines[0].model.result == '2 results'
 
 
 @pytest.mark.asyncio
-async def test_tui_web_fetch_merges_into_dedicated_card(mock_config):
+async def test_tui_web_fetch_renders_orient_line(mock_config):
     from backend.engine.tools.web_tools import build_web_fetch_action
     from backend.ledger.observation.mcp import MCPObservation
 
@@ -2194,20 +2184,12 @@ async def test_tui_web_fetch_merges_into_dedicated_card(mock_config):
         )
         await pilot.pause()
 
-        cards = [
-            card
-            for card in s.query(TUIActivityCard).results()
-            if 'category-web_fetch' in card.classes
-        ]
-        assert len(cards) == 1
-        card = cards[0]
-        collapsed = str(card.query_one('#collapsed-row').renderable)
-        assert 'Fetched' in collapsed
-        assert 'example.com' in collapsed
-        assert card._meta_lines
-        assert 'max: 4000' in card._meta_lines[0]
-        extra = card._extra_content or ''
-        assert 'Hello' in extra or 'Docs' in extra
+        lines = list(s.query(OrientLine).results())
+        assert len(lines) == 1
+        assert lines[0].model.icon == '⚐'
+        assert lines[0].model.verb == 'Fetched'
+        assert lines[0].model.target == 'example.com/docs'
+        assert lines[0].model.result == '1 result'
 
 
 @pytest.mark.asyncio
@@ -2617,7 +2599,7 @@ async def test_tui_thinking_indicator_shows_content_without_collapse(mock_config
 
 
 @pytest.mark.asyncio
-async def test_tui_find_symbols_observation_renders_card(mock_config):
+async def test_tui_find_symbols_observation_renders_orient_line(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -2656,21 +2638,17 @@ async def test_tui_find_symbols_observation_renders_card(mock_config):
         await pilot.pause()
 
         assert list(s.query(ThinkingIndicator).results()) == []
-        search_cards = [
-            card
-            for card in s.query(TUIActivityCard).results()
-            if 'category-find_symbols' in card.classes
-        ]
-        assert len(search_cards) == 1
-        collapsed = search_cards[0].query_one('#collapsed-row')
-        rendered = str(collapsed.renderable)
-        assert 'Found' in rendered
-        assert 'render' in rendered
+        lines = list(s.query(OrientLine).results())
+        assert len(lines) == 1
+        assert lines[0].model.icon == 'ƒ'
+        assert lines[0].model.verb == 'Found'
+        assert lines[0].model.target == '"render" in backend'
+        assert lines[0].model.result == '1 symbol'
 
 
 @pytest.mark.asyncio
-async def test_tui_grep_observation_renders_grep_card(mock_config):
-    """``GrepObservation`` renders a Grep card with the action pattern."""
+async def test_tui_grep_observation_renders_orient_line(mock_config):
+    """``GrepObservation`` renders a flat grep row with the action pattern."""
     from backend.ledger.action.search import GrepAction
     from backend.ledger.observation.search import GrepObservation
 
@@ -2706,16 +2684,12 @@ async def test_tui_grep_observation_renders_grep_card(mock_config):
         )
         await pilot.pause()
 
-        grep_cards = [
-            card
-            for card in s.query(TUIActivityCard).results()
-            if 'category-grep' in card.classes
-        ]
-        assert len(grep_cards) == 1
-        collapsed = grep_cards[0].query_one('#collapsed-row')
-        rendered = str(collapsed.renderable)
-        assert 'Grep' in rendered
-        assert '_start_election' in rendered
+        lines = list(s.query(OrientLine).results())
+        assert len(lines) == 1
+        assert lines[0].model.icon == '⌕'
+        assert lines[0].model.verb == 'Grepped'
+        assert lines[0].model.target == '"_start_election" in raftkv/node.py'
+        assert lines[0].model.result == '1 file'
 
 
 @pytest.mark.asyncio
@@ -2760,21 +2734,17 @@ async def test_tui_read_symbols_observation_updates_pending_card(mock_config):
         )
         await pilot.pause()
 
-        cards = [
-            card
-            for card in s.query(TUIActivityCard).results()
-            if 'category-read_symbols' in card.classes
-        ]
-        assert len(cards) == 1
-        collapsed = cards[0].query_one('#collapsed-row')
-        rendered = str(collapsed.renderable)
-        assert 'Read' in rendered
-        assert 'UserService.login' in rendered or 'symbol' in rendered.lower()
+        lines = list(s.query(OrientLine).results())
+        assert len(lines) == 1
+        assert lines[0].model.icon == '↳'
+        assert lines[0].model.verb == 'Read'
+        assert lines[0].model.target == '1 symbol in auth.py'
+        assert lines[0].model.result == '1 resolved'
 
 
 @pytest.mark.asyncio
-async def test_tui_glob_observation_renders_glob_card(mock_config):
-    """``GlobObservation`` renders a Glob card with the action pattern."""
+async def test_tui_glob_observation_renders_orient_line(mock_config):
+    """``GlobObservation`` renders a flat glob row with the action pattern."""
     from backend.ledger.action.search import GlobAction
     from backend.ledger.observation.search import GlobObservation
 
@@ -2807,21 +2777,17 @@ async def test_tui_glob_observation_renders_glob_card(mock_config):
         )
         await pilot.pause()
 
-        glob_cards = [
-            card
-            for card in s.query(TUIActivityCard).results()
-            if 'category-glob' in card.classes
-        ]
-        assert len(glob_cards) == 1
-        collapsed = glob_cards[0].query_one('#collapsed-row')
-        rendered = str(collapsed.renderable)
-        assert 'Glob' in rendered
-        assert '**/*.py' in rendered
+        lines = list(s.query(OrientLine).results())
+        assert len(lines) == 1
+        assert lines[0].model.icon == '◆'
+        assert lines[0].model.verb == 'Globbed'
+        assert lines[0].model.target == '**/*.py in backend'
+        assert lines[0].model.result == '2 files'
 
 
 @pytest.mark.asyncio
-async def test_tui_grep_pending_card_keeps_grouped_extra_content(mock_config):
-    """Action→observation merge should preserve formatted grep result lines."""
+async def test_tui_grep_content_mode_uses_match_and_file_metric(mock_config):
+    """Content-mode grep rows name both matches and files."""
     from backend.ledger.action.search import GrepAction
     from backend.ledger.observation.search import GrepObservation
 
@@ -2862,25 +2828,15 @@ async def test_tui_grep_pending_card_keeps_grouped_extra_content(mock_config):
         )
         await pilot.pause()
 
-        grep_cards = [
-            card
-            for card in s.query(TUIActivityCard).results()
-            if 'category-grep' in card.classes
-        ]
-        assert len(grep_cards) == 1
-        card = grep_cards[0]
-        collapsed = card.query_one('#collapsed-row')
-        assert '1 matches' in str(collapsed.renderable)
-
-        extra = card._extra_content or ''
-        assert 'raftkv/node.py' in extra
-        assert '194' in extra
-        assert '_start_election' in extra
+        lines = list(s.query(OrientLine).results())
+        assert len(lines) == 1
+        assert lines[0].model.verb == 'Grepped'
+        assert lines[0].model.result == '1 match · 1 file'
 
 
 @pytest.mark.asyncio
-async def test_tui_glob_pending_card_uses_file_labels_not_matches(mock_config):
-    """Glob cards should summarize files, not grep-style match counts."""
+async def test_tui_glob_orient_line_uses_file_labels_not_matches(mock_config):
+    """Glob rows summarize files, not grep-style match counts."""
     from backend.ledger.action.search import GlobAction
     from backend.ledger.observation.search import GlobObservation
 
@@ -2913,21 +2869,10 @@ async def test_tui_glob_pending_card_uses_file_labels_not_matches(mock_config):
         )
         await pilot.pause()
 
-        glob_cards = [
-            card
-            for card in s.query(TUIActivityCard).results()
-            if 'category-glob' in card.classes
-        ]
-        assert len(glob_cards) == 1
-        card = glob_cards[0]
-        collapsed = str(card.query_one('#collapsed-row').renderable)
-        assert '2 files' in collapsed
-        assert 'matches' not in collapsed.lower()
-
-        extra = card._extra_content or ''
-        assert 'backend/app.py' in extra
-        assert 'backend/cli.py' in extra
-        assert 'matches' not in extra.lower()
+        lines = list(s.query(OrientLine).results())
+        assert len(lines) == 1
+        assert lines[0].model.result == '2 files'
+        assert 'matches' not in lines[0].model.result.lower()
 
 
 @pytest.mark.asyncio
@@ -2974,20 +2919,76 @@ async def test_tui_grep_files_with_matches_shows_file_count(mock_config):
         )
         await pilot.pause()
 
-        grep_cards = [
-            card
-            for card in s.query(TUIActivityCard).results()
-            if 'category-grep' in card.classes
-        ]
-        assert len(grep_cards) == 1
-        card = grep_cards[0]
-        collapsed = str(card.query_one('#collapsed-row').renderable)
-        assert '2 files' in collapsed
-        assert 'matches' not in collapsed.lower()
-        assert card._meta_lines
-        assert 'mode: files_with_matches' in card._meta_lines[0]
-        assert 'filter: *.py' in card._meta_lines[0]
-        assert 'limit: 25' in card._meta_lines[0]
+        lines = list(s.query(OrientLine).results())
+        assert len(lines) == 1
+        assert lines[0].model.result == '2 files'
+        assert 'matches' not in lines[0].model.result.lower()
+
+
+@pytest.mark.asyncio
+async def test_tui_orient_burst_groups_three_consecutive_lookups(mock_config):
+    from backend.ledger.action.search import FindSymbolsAction, GlobAction, GrepAction
+    from backend.ledger.observation.search import (
+        FindSymbolsObservation,
+        GlobObservation,
+        GrepObservation,
+    )
+
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        renderer._process_event(GrepAction(pattern='TODO', path='backend'))
+        renderer._process_event(
+            GrepObservation(
+                pattern='TODO',
+                path='backend',
+                lines=['backend/app.py'],
+                match_count=1,
+                file_count=1,
+            )
+        )
+        renderer._process_event(GlobAction(pattern='**/*.py', path='backend'))
+        renderer._process_event(
+            GlobObservation(
+                pattern='**/*.py',
+                path='backend',
+                files=['backend/app.py'],
+                file_count=1,
+            )
+        )
+        renderer._process_event(FindSymbolsAction(query='render', path='backend'))
+        renderer._process_event(
+            FindSymbolsObservation(
+                content='{"status":"ok"}',
+                query='render',
+                path='backend',
+                candidates=[{'qualified_name': 'render', 'path': 'backend/app.py'}],
+            )
+        )
+        renderer._flush_orient_burst()
+        await pilot.pause()
+
+        bursts = list(s.query(OrientBurst).results())
+        assert len(bursts) == 1
+        burst = bursts[0]
+        assert burst._collapsed is True
+        assert len(burst._lines) == 3
+        assert str(burst.query_one('#orient-burst-header').renderable)
+        assert '-hidden' in burst.query_one('#orient-burst-body').classes
 
 
 @pytest.mark.asyncio
@@ -3367,7 +3368,7 @@ async def test_tui_file_edit_create_action_renders_non_expandable_card(mock_conf
 
 
 @pytest.mark.asyncio
-async def test_tui_file_read_card_completes_without_expanded_body(mock_config):
+async def test_tui_file_read_renders_flat_orient_line(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -3388,20 +3389,20 @@ async def test_tui_file_read_card_completes_without_expanded_body(mock_config):
             'backend/cli/tui/some/really/long/path/that/should/not/stretch/read_card.py'
         )
         renderer._process_event(FileReadAction(path=long_path))
+        renderer._process_event(FileReadObservation(path=long_path, content='alpha'))
         await pilot.pause()
 
-        file_cards = [
-            card
-            for card in s.query(TUIActivityCard).results()
-            if 'category-files' in card.classes
-        ]
-        assert len(file_cards) == 1
-        assert file_cards[0]._collapsible is False
-        assert file_cards[0].query_one('#expanded-body').display is False
+        lines = list(s.query(OrientLine).results())
+        assert len(lines) == 1
+        assert lines[0].model.icon == '↳'
+        assert lines[0].model.verb == 'Read'
+        assert lines[0].model.target.endswith('read_card.py')
+        assert lines[0].model.result == 'lines 1–EOF'
+        assert not list(s.query(TUIActivityCard).results())
 
 
 @pytest.mark.asyncio
-async def test_tui_file_read_observation_updates_card_collapsed_markup(mock_config):
+async def test_tui_file_read_observation_keeps_filename_visible(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -3427,26 +3428,17 @@ async def test_tui_file_read_observation_updates_card_collapsed_markup(mock_conf
         )
         await pilot.pause()
 
-        file_cards = [
-            card
-            for card in s.query(TUIActivityCard).results()
-            if 'category-files' in card.classes
-        ]
-        assert len(file_cards) == 1
-        card = file_cards[0]
-        collapsed_markup = card._build_collapsed_markup()
-        assert 'Read' in collapsed_markup
-        assert 'lines' not in collapsed_markup.lower()
-        assert '#f6ff8f' not in collapsed_markup
-        assert '[blink' not in collapsed_markup
-        assert len(card._detail) <= 80
-        assert card._collapsible is False
-        assert not list(card.query('#caret').results())
-        assert card.query_one('#expanded-body').display is False
+        lines = list(s.query(OrientLine).results())
+        assert len(lines) == 1
+        assert lines[0].model.verb == 'Read'
+        assert lines[0].model.target.startswith('…/')
+        assert lines[0].model.target.endswith('read_card.py')
+        assert lines[0].model.result == 'lines 1–EOF'
+        assert not list(lines[0].query('#caret').results())
 
 
 @pytest.mark.asyncio
-async def test_tui_file_read_ranged_card_shows_range_info(mock_config):
+async def test_tui_file_read_ranged_line_shows_range_metric(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -3474,16 +3466,10 @@ async def test_tui_file_read_ranged_card_shows_range_info(mock_config):
         )
         await pilot.pause()
 
-        ranged_cards = [
-            card
-            for card in s.query(TUIActivityCard).results()
-            if 'category-files' in card.classes and 'ranged_read.py' in card._detail
-        ]
-        assert len(ranged_cards) == 1
-        ranged_markup = ranged_cards[0]._build_collapsed_markup()
-        assert '50:100' in ranged_markup
-        assert '#f6ff8f' in ranged_markup
-        assert 'lines' not in ranged_markup.lower()
+        lines = list(s.query(OrientLine).results())
+        assert len(lines) == 1
+        assert lines[0].model.target.endswith('ranged_read.py')
+        assert lines[0].model.result == 'lines 50–100'
 
 
 @pytest.mark.asyncio

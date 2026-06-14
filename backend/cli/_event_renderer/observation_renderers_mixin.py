@@ -50,11 +50,20 @@ from backend.cli._event_renderer.text_utils import (
 from backend.cli._event_renderer.text_utils import (
     summarize_cmd_failure as _summarize_cmd_failure,
 )
-from backend.cli._tool_display.preview import (
-    file_read_syntax_highlight as _file_read_syntax_highlight,
-)
 from backend.cli._typing import ObservationRenderersHost
 from backend.cli.layout_tokens import ACTIVITY_BLOCK_BOTTOM_PAD
+from backend.cli.orient_tools import (
+    ORIENT_MCP_TOOL_NAMES,
+    OrientLineModel,
+    analyze_observation_model,
+    file_read_observation_model,
+    find_symbols_observation_model,
+    glob_observation_model,
+    grep_observation_model,
+    lsp_observation_model,
+    mcp_observation_model,
+    read_symbols_observation_model,
+)
 from backend.cli.theme import (
     CLR_OUTPUT_PANEL_BORDER,
     CLR_OUTPUT_PANEL_TITLE,
@@ -702,34 +711,12 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
 
     def _render_file_read_observation(self, obs: FileReadObservation) -> None:
         self._stop_reasoning()
-        content = getattr(obs, 'content', '') or ''
-        file_path = getattr(obs, 'path', None)
-        n_lines = len(content.splitlines()) if content else 0
-        start_line = getattr(obs, 'start', None) or 1
-        end_line = getattr(obs, 'end', None)
-        if start_line == 1 and (end_line is None or end_line == -1):
-            result = f'lines 1–{n_lines}' if n_lines else ''
-        elif end_line and end_line != -1:
-            result = f'lines {start_line}–{end_line}'
-        else:
-            result = f'lines {start_line}–{n_lines}' if n_lines else ''
-
-        # Try to add syntax highlighting
-        extra_lines = None
-        if n_lines > 0:
-            extra_lines = _file_read_syntax_highlight(content, file_path)
-
-        if result:
-            self._emit_activity_turn_header()
-            self._print_or_buffer(
-                Padding(
-                    format_activity_result_secondary(result, kind='neutral'),
-                    pad=ACTIVITY_BLOCK_BOTTOM_PAD,
-                )
-            )
-        if extra_lines:
-            for line in extra_lines:
-                self._append_history(line)
+        pending = getattr(self, '_pending_orient_line', None)
+        if pending is not None and getattr(pending, 'tool', '') == 'read_file':
+            self._pending_orient_line = None
+            self._append_orient_line(pending)
+            return
+        self._append_orient_line(file_read_observation_model(obs))
 
     @staticmethod
     def _file_read_result_message(content: str, n_lines: int) -> str:
@@ -739,18 +726,13 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
         self._stop_reasoning()
         content = getattr(obs, 'content', '')
         name = getattr(obs, 'name', '')
-        # Orient MCP tools — emit result metric as dim line
-        _orient_mcp_names = {'web_search_exa', 'web_fetch_exa', 'resolve-library-id', 'query-docs'}
-        if name in _orient_mcp_names:
-            result = self._orient_mcp_result(name, content)
-            if result:
-                self._emit_activity_turn_header()
-                self._print_or_buffer(
-                    Padding(
-                        format_activity_result_secondary(result, kind='neutral'),
-                        pad=ACTIVITY_BLOCK_BOTTOM_PAD,
-                    )
-                )
+        if name in ORIENT_MCP_TOOL_NAMES:
+            pending = getattr(self, '_pending_orient_line', None)
+            pending_model = pending if isinstance(pending, OrientLineModel) else None
+            model = mcp_observation_model(obs, pending_model)
+            if model is not None:
+                self._pending_orient_line = None
+                self._append_orient_line(model)
             return
         friendly = mcp_result_user_preview(content)
         extras = mcp_result_syntax_extras(content)
@@ -862,17 +844,13 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
 
     def _render_lsp_query_observation(self, obs: LspQueryObservation) -> None:
         self._stop_reasoning()
-        available = getattr(obs, 'available', True)
-        content = getattr(obs, 'content', '') or ''
-        result = self._orient_lsp_result(available=available, content=content)
-        if result:
-            self._emit_activity_turn_header()
-            self._print_or_buffer(
-                Padding(
-                    format_activity_result_secondary(result, kind='neutral'),
-                    pad=ACTIVITY_BLOCK_BOTTOM_PAD,
-                )
-            )
+        pending = getattr(self, '_pending_orient_line', None)
+        pending_model = pending if isinstance(pending, OrientLineModel) else None
+        if pending_model is not None and pending_model.tool == 'lsp':
+            self._pending_orient_line = None
+        else:
+            pending_model = None
+        self._append_orient_line(lsp_observation_model(obs, pending_model))
 
     @staticmethod
     def _orient_lsp_result(*, available: bool, content: str) -> str | None:
@@ -921,23 +899,7 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
 
     def _render_grep_observation(self, obs: GrepObservation) -> None:
         self._stop_reasoning()
-        content = obs.error or obs.content or ''
-        result = self._orient_grep_result(
-            query=obs.pattern,
-            content=content,
-            match_count=obs.match_count,
-            file_count=obs.file_count,
-            output_mode=getattr(obs, 'output_mode', 'files_with_matches'),
-            error=obs.error,
-        )
-        if result:
-            self._emit_activity_turn_header()
-            self._print_or_buffer(
-                Padding(
-                    format_activity_result_secondary(result, kind='neutral'),
-                    pad=ACTIVITY_BLOCK_BOTTOM_PAD,
-                )
-            )
+        self._complete_or_append_orient('grep', grep_observation_model(obs))
 
     @staticmethod
     def _orient_grep_result(
@@ -974,20 +936,7 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
 
     def _render_glob_observation(self, obs: GlobObservation) -> None:
         self._stop_reasoning()
-        content = obs.error or obs.content or ''
-        result = self._orient_glob_result(
-            content=content,
-            file_count=obs.file_count,
-            error=obs.error,
-        )
-        if result:
-            self._emit_activity_turn_header()
-            self._print_or_buffer(
-                Padding(
-                    format_activity_result_secondary(result, kind='neutral'),
-                    pad=ACTIVITY_BLOCK_BOTTOM_PAD,
-                )
-            )
+        self._complete_or_append_orient('glob', glob_observation_model(obs))
 
     @staticmethod
     def _orient_glob_result(
@@ -1004,18 +953,10 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
 
     def _render_find_symbols_observation(self, obs: FindSymbolsObservation) -> None:
         self._stop_reasoning()
-        result = self._orient_find_symbols_result(
-            candidates=obs.candidates,
-            error=obs.error,
+        self._complete_or_append_orient(
+            'find_symbols',
+            find_symbols_observation_model(obs),
         )
-        if result:
-            self._emit_activity_turn_header()
-            self._print_or_buffer(
-                Padding(
-                    format_activity_result_secondary(result, kind='neutral'),
-                    pad=ACTIVITY_BLOCK_BOTTOM_PAD,
-                )
-            )
 
     @staticmethod
     def _orient_find_symbols_result(
@@ -1039,35 +980,31 @@ class ObservationRenderersMixin(_ObservationRenderersBase):
 
     def _render_read_symbols_observation(self, obs: ReadSymbolsObservation) -> None:
         self._stop_reasoning()
-        result = self._orient_read_symbols_result(
-            available=not bool(obs.error),
-            content=obs.error or obs.content or '',
+        self._complete_or_append_orient(
+            'read_symbols',
+            read_symbols_observation_model(obs),
         )
-        if result:
-            self._emit_activity_turn_header()
-            self._print_or_buffer(
-                Padding(
-                    format_activity_result_secondary(result, kind='neutral'),
-                    pad=ACTIVITY_BLOCK_BOTTOM_PAD,
-                )
-            )
 
     def _render_analyze_project_structure_observation(
         self, obs: AnalyzeProjectStructureObservation
     ) -> None:
         self._stop_reasoning()
-        result = self._orient_analyze_result(
-            available=not bool(obs.error),
-            content=obs.error or obs.content or '',
+        self._complete_or_append_orient(
+            'analyze_project_structure',
+            analyze_observation_model(obs),
         )
-        if result:
-            self._emit_activity_turn_header()
-            self._print_or_buffer(
-                Padding(
-                    format_activity_result_secondary(result, kind='neutral'),
-                    pad=ACTIVITY_BLOCK_BOTTOM_PAD,
-                )
-            )
+
+    def _complete_or_append_orient(
+        self,
+        expected_tool: str,
+        fallback: OrientLineModel,
+    ) -> None:
+        pending = getattr(self, '_pending_orient_line', None)
+        if isinstance(pending, OrientLineModel) and pending.tool == expected_tool:
+            self._pending_orient_line = None
+            self._append_orient_line(pending.with_result(fallback.result))
+            return
+        self._append_orient_line(fallback)
 
     @staticmethod
     def _orient_read_symbols_result(*, available: bool, content: str) -> str | None:

@@ -313,6 +313,9 @@ class TUIRenderer(
         self._pending_analyze_project_structure_card: Any | None = None
         self._pending_mcp_card: Any | None = None
         self._pending_delegate_card: Any | None = None
+        self._orient_burst_lines: list[Any] = []
+        self._orient_burst_widgets: list[Any] = []
+        self._orient_burst_area: str = 'codebase'
 
         # Event ID tracking for virtual scrolling (viewport + replay)
         self._min_rendered_event_id: int = -1
