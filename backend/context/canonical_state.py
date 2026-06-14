@@ -19,8 +19,29 @@ if TYPE_CHECKING:
     from backend.ledger.event import Event
     from backend.orchestration.state.state import State
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 CANONICAL_STATE_MARKER = '<CANONICAL_TASK_STATE>'
+
+# High-precision phrases that signal an EXPLICIT task pivot (not a refinement
+# or clarification). Kept deliberately narrow so that additive clarifications
+# ("also add tests", "make it faster") never trigger objective supersession.
+_PIVOT_MARKERS = (
+    'actually, forget',
+    'actually forget',
+    'forget the',
+    'forget about',
+    'scrap that',
+    'scrap the',
+    'never mind the',
+    'nevermind the',
+    'change of plan',
+    'new task:',
+    'new objective:',
+    'instead of',
+    'stop working on',
+    'drop the',
+    'abandon the',
+)
 _MAX_ACTIVE_FILES = 30
 _MAX_BLOCKERS = 12
 _MAX_DECISIONS = 12
@@ -169,6 +190,7 @@ class CanonicalTaskState:
     schema_version: int = SCHEMA_VERSION
     objective: str = ''
     latest_directive: str = ''
+    superseding_directive: str = ''
     active_plan: str = ''
     next_action: str = ''
     implementation_checkpoint: str = ''
@@ -197,6 +219,7 @@ class CanonicalTaskState:
             'schema_version',
             'objective',
             'latest_directive',
+            'superseding_directive',
             'active_plan',
             'next_action',
             'implementation_checkpoint',
@@ -341,6 +364,18 @@ def reduce_snapshot_into_state(
     latest_directive = _clean(snapshot.get('latest_directive'))
     if latest_directive:
         _set_field(canonical, 'latest_directive', latest_directive, event_id, source)
+        if (
+            canonical.objective
+            and _normalize(latest_directive) != _normalize(canonical.objective)
+            and _is_pivot_directive(latest_directive)
+        ):
+            _set_field(
+                canonical,
+                'superseding_directive',
+                latest_directive,
+                event_id,
+                source,
+            )
 
     files = snapshot.get('files_touched', {})
     if isinstance(files, dict) and files:
@@ -432,6 +467,11 @@ def render_canonical_state_for_prompt(
 ) -> str:
     lines = [CANONICAL_STATE_MARKER, 'Canonical task state:']
     _append(lines, f'- Objective: {canonical.objective}')
+    if canonical.superseding_directive:
+        _append(
+            lines,
+            f'- \u26a0 Objective superseded by: {canonical.superseding_directive}',
+        )
     if canonical.latest_directive and canonical.latest_directive != canonical.objective:
         _append(lines, f'- Latest directive: {canonical.latest_directive}')
     _append(lines, f'- Next action: {canonical.next_action}')
@@ -1008,9 +1048,25 @@ def _infer_next_action(canonical: CanonicalTaskState) -> str:
         return task.next_action or f'Read background terminal {task.session_id}.'
     if canonical.verification.command and canonical.verification.status != 'passed':
         return f'Use the latest failing output from {canonical.verification.command} to make the next fix.'
+    if canonical.superseding_directive:
+        return f'Switch to the superseding directive: {canonical.superseding_directive}'[
+            :240
+        ]
     if canonical.latest_directive:
         return 'Continue from the latest user directive.'
     return ''
+
+
+def _is_pivot_directive(text: str) -> bool:
+    """True only for explicit task pivots, not refinements/clarifications.
+
+    Uses a narrow allow-list of high-precision phrases so additive requests
+    ("also add tests", "make it faster") never trigger objective supersession.
+    """
+    lowered = _normalize(text)
+    if not lowered:
+        return False
+    return any(marker in lowered for marker in _PIVOT_MARKERS)
 
 
 def _latest_event_id(events: list[Event]) -> int | None:
