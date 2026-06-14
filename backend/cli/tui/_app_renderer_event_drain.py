@@ -38,6 +38,28 @@ if TYPE_CHECKING:
 _TUI_DRAIN_DEBOUNCE_SECONDS = 0.016
 
 
+def _set_display_backpressure(
+    orch: '_AppRendererEventProcessorMixin', active: bool
+) -> None:
+    """Propagate drain backpressure to the transcript display widget.
+
+    Skips mount animations during streaming bursts to avoid event-loop
+    freezes. No-op for mock displays or displays without the hook.
+    """
+    try:
+        display = orch._tui._get_display()
+    except (AttributeError, Exception):
+        return
+    if type(display).__name__ == 'MagicMock':
+        return
+    set_backpressure = getattr(display, 'set_backpressure', None)
+    if callable(set_backpressure):
+        try:
+            set_backpressure(active)
+        except Exception:
+            pass
+
+
 def _is_streaming_only_batch(events: list[Any]) -> bool:
     from backend.ledger.action.message import StreamingChunkAction
 
@@ -390,6 +412,8 @@ async def drain_events_async(orch: '_AppRendererEventProcessorMixin') -> None:
                 if has_pending:
                     orch._drain_scheduled = True
 
+            _set_display_backpressure(orch, has_pending)
+
             _flush_and_refresh(
                 orch,
                 events,
@@ -412,6 +436,7 @@ async def drain_events_async(orch: '_AppRendererEventProcessorMixin') -> None:
             await asyncio.sleep(0)
     finally:
         orch._async_drain_active = False
+        _set_display_backpressure(orch, False)
 
     elapsed_ms = (time.monotonic() - invocation_started) * 1000.0
     pending_depth = 0

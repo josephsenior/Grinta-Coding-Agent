@@ -98,6 +98,7 @@ class Transcript(VerticalScroll):
         self._scroll_badge: ScrollTailBadge | None = None
         self._tail_unread_count = 0
         self._suppress_mount_animation = False
+        self._under_backpressure = False
         self._suppress_scroll_sync = False
         self._last_scroll_y = 0.0
         self._last_max_scroll_y = 0.0
@@ -174,6 +175,15 @@ class Transcript(VerticalScroll):
         if not self._was_at_bottom():
             self._set_user_scrolled_away(True)
 
+    def set_backpressure(self, active: bool) -> None:
+        """Mark whether the renderer is draining a backlog.
+
+        While active, ``append_widget`` skips its mount animation so bursts
+        of cards mount instantly instead of queueing 0.2s animations on the
+        event loop, which otherwise causes visible freezes during streaming.
+        """
+        self._under_backpressure = bool(active)
+
     def should_follow_tail(self) -> bool:
         """Return True when live updates should keep the transcript pinned.
 
@@ -184,7 +194,13 @@ class Transcript(VerticalScroll):
         return not self._user_scrolled_away
 
     def pause_auto_scroll(self) -> None:
-        """Stop live updates from pulling the transcript back to the bottom."""
+        """Stop live updates from pulling the transcript back to the bottom.
+
+        Triggered by genuine user scroll input, so it must register the
+        scroll-away even while a programmatic follow-tail scroll is in
+        progress (``_suppress_scroll_sync`` True). Otherwise rapid streaming
+        keeps the suppression flag set and the user's scroll is ignored.
+        """
         if self.max_scroll_y > 0:
             self._set_user_scrolled_away(True)
 
@@ -247,6 +263,10 @@ class Transcript(VerticalScroll):
         self._maybe_prefetch_earlier()
 
     def _on_mouse_scroll_up(self, event: events.MouseScrollUp) -> None:
+        # Register the user scroll-away before delegating, and bypass the
+        # programmatic-scroll guard so an in-flight follow-tail cannot
+        # swallow this input during active streaming.
+        self._suppress_scroll_sync = False
         self.pause_auto_scroll()
         super()._on_mouse_scroll_up(event)
 
@@ -255,6 +275,7 @@ class Transcript(VerticalScroll):
         self.call_after_refresh(self._sync_scroll_state_from_position)
 
     def user_scroll_page_up(self, *, animate: bool = True) -> None:
+        self._suppress_scroll_sync = False
         self.pause_auto_scroll()
         self.scroll_page_up(animate=animate)
 
@@ -266,6 +287,7 @@ class Transcript(VerticalScroll):
         self.call_after_refresh(self._sync_scroll_state_from_position)
 
     def user_scroll_home(self, *, animate: bool = True) -> None:
+        self._suppress_scroll_sync = False
         self.pause_auto_scroll()
         self.scroll_home(
             animate=animate,
@@ -302,7 +324,10 @@ class Transcript(VerticalScroll):
         use_animation = (
             animate
             if animate is not None
-            else not getattr(self, '_suppress_mount_animation', False)
+            else not (
+                getattr(self, '_suppress_mount_animation', False)
+                or getattr(self, '_under_backpressure', False)
+            )
         )
         if use_animation:
             widget.styles.offset = (0, -1)
