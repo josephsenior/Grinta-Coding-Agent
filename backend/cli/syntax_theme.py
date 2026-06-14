@@ -18,58 +18,58 @@ from backend.cli.theme import NAVY_BG as _NAVY_BG_DEFAULT
 
 # Named syntax palette — extend here to customize highlighting across CLI/TUI.
 GRINTA_SYNTAX_COLORS: dict[str, str] = {
-    'background': '#0a1224',
-    'highlight': '#1b233a',
-    'text': '#e9e9e9',
-    'comment': '#7f8aa3',
-    'comment_preproc': '#c792ea',
-    'keyword': '#91abec',
-    'keyword_constant': '#f6ff8f',
-    'keyword_declaration': '#7dcfff',
-    'keyword_namespace': '#7dcfff',
+    'background': '#07101d',
+    'highlight': '#17233a',
+    'text': '#d7e2f2',
+    'comment': '#71809c',
+    'comment_preproc': '#b997ff',
+    'keyword': '#7dcfff',
+    'keyword_constant': '#f6c177',
+    'keyword_declaration': '#5eead4',
+    'keyword_namespace': '#91abec',
     'keyword_pseudo': '#c792ea',
     'keyword_type': '#4fd6be',
-    'name': '#e9e9e9',
-    'name_attribute': '#7dcfff',
-    'name_builtin': '#4fd6be',
+    'name': '#d7e2f2',
+    'name_attribute': '#a6e3ff',
+    'name_builtin': '#5eead4',
     'name_builtin_pseudo': '#c792ea',
     'name_class': '#ffd580',
-    'name_constant': '#f6ff8f',
-    'name_decorator': '#c792ea',
-    'name_entity': '#fd8383',
-    'name_exception': '#fd8383',
+    'name_constant': '#f6c177',
+    'name_decorator': '#b997ff',
+    'name_entity': '#ff9a9a',
+    'name_exception': '#ff9a9a',
     'name_function': '#82aaff',
-    'name_function_magic': '#4fd6be',
+    'name_function_magic': '#5eead4',
     'name_label': '#ffd580',
-    'name_namespace': '#7dcfff',
-    'name_property': '#7dcfff',
-    'name_tag': '#4fd6be',
+    'name_namespace': '#91abec',
+    'name_property': '#a6e3ff',
+    'name_tag': '#5eead4',
     'name_variable': '#e9e9e9',
-    'name_variable_class': '#ffcb6b',
-    'name_variable_global': '#ffcb6b',
-    'literal_date': '#f6c177',
-    'string': '#a3e635',
-    'string_affix': '#f6c177',
+    'name_variable_class': '#f6c177',
+    'name_variable_global': '#f6c177',
+    'literal_date': '#ffcb8b',
+    'string': '#b9f27c',
+    'string_affix': '#ffcb8b',
     'string_delimiter': '#8f9fc1',
     'string_doc': '#8f9fc1',
-    'string_escape': '#ff9e64',
+    'string_escape': '#ffb86c',
     'string_interpol': '#82aaff',
-    'string_regex': '#4fd6be',
-    'string_symbol': '#f6c177',
-    'number': '#f6c177',
-    'operator': '#c0caf5',
-    'operator_word': '#91abec',
-    'punctuation': '#969aad',
-    'generic_deleted': '#fd8383',
-    'generic_inserted': '#54efae',
+    'string_regex': '#5eead4',
+    'string_symbol': '#ffcb8b',
+    'number': '#ffcb8b',
+    'operator': '#c8d3f5',
+    'operator_word': '#7dcfff',
+    'punctuation': '#7f8aa3',
+    'generic_deleted': '#ff8f8f',
+    'generic_inserted': '#7de6a1',
     'generic_heading': '#91abec',
     'generic_output': '#8f9fc1',
     'generic_prompt': '#91abec',
-    'generic_error': '#fd8383',
-    'error': '#fd8383',
-    'inline_code_fg': '#e9e9e9',
+    'generic_error': '#ff8f8f',
+    'error': '#ff8f8f',
+    'inline_code_fg': '#d7e2f2',
     'inline_code_bg': '#101829',
-    'whitespace': '#5a6a8a',
+    'whitespace': '#4f5f7d',
 }
 
 _SYNTAX_ENV_PREFIX = 'GRINTA_SYNTAX_'
@@ -87,14 +87,6 @@ def resolve_syntax_colors() -> dict[str, str]:
 
 def _italic(color: str) -> str:
     return f'{color} italic'
-
-
-def _bold(color: str) -> str:
-    return f'{color} bold'
-
-
-def _bold_italic(color: str) -> str:
-    return f'{color} bold italic'
 
 
 def _bg(color: str, background: str) -> str:
@@ -132,24 +124,24 @@ def build_grinta_pygments_style() -> type:
             Whitespace: c['whitespace'],
             Comment: _italic(c['comment']),
             Comment.Preproc: c['comment_preproc'],
-            Comment.Special: _bold(c['comment_preproc']),
-            Keyword: _bold(c['keyword']),
+            Comment.Special: c['comment_preproc'],
+            Keyword: c['keyword'],
             Keyword.Constant: c['keyword_constant'],
-            Keyword.Declaration: _bold(c['keyword_declaration']),
+            Keyword.Declaration: c['keyword_declaration'],
             Keyword.Namespace: c['keyword_namespace'],
             Keyword.Pseudo: c['keyword_pseudo'],
-            Keyword.Reserved: _bold(c['keyword']),
+            Keyword.Reserved: c['keyword'],
             Keyword.Type: c['keyword_type'],
             Name: c['name'],
             Name.Attribute: c['name_attribute'],
             Name.Builtin: c['name_builtin'],
             Name.Builtin.Pseudo: c['name_builtin_pseudo'],
-            Name.Class: _bold(c['name_class']),
+            Name.Class: c['name_class'],
             Name.Constant: c['keyword_constant'],
             Name.Decorator: c['name_decorator'],
             Name.Entity: c['name_entity'],
             Name.Exception: c['name_exception'],
-            Name.Function: _bold(c['name_function']),
+            Name.Function: c['name_function'],
             Name.Function.Magic: c['name_function_magic'],
             Name.Label: c['name_label'],
             Name.Namespace: c['name_namespace'],
@@ -170,7 +162,7 @@ def build_grinta_pygments_style() -> type:
             String.Delimiter: c['string_delimiter'],
             String.Doc: c['string_doc'],
             String.Double: c['string'],
-            String.Escape: _bold(c['string_escape']),
+            String.Escape: c['string_escape'],
             String.Heredoc: c['string'],
             String.Interpol: c['string_interpol'],
             String.Other: c['string'],
@@ -185,16 +177,16 @@ def build_grinta_pygments_style() -> type:
             Number.Integer.Long: c['number'],
             Number.Oct: c['number'],
             Operator: c['operator'],
-            Operator.Word: _bold(c['operator_word']),
+            Operator.Word: c['operator_word'],
             Punctuation: c['punctuation'],
             Generic.Deleted: c['generic_deleted'],
             Generic.Emph: _italic(c['text']),
-            Generic.Error: _bold(c['generic_error']),
-            Generic.Heading: _bold(c['generic_heading']),
+            Generic.Error: c['generic_error'],
+            Generic.Heading: c['generic_heading'],
             Generic.Inserted: c['generic_inserted'],
             Generic.Output: c['generic_output'],
-            Generic.Prompt: _bold(c['generic_prompt']),
-            Generic.Strong: _bold(c['text']),
+            Generic.Prompt: c['generic_prompt'],
+            Generic.Strong: c['text'],
             Generic.Subheading: c['generic_heading'],
             Generic.Traceback: c['generic_error'],
             Error: _bg(c['error'], '#2e0d0d'),
@@ -263,11 +255,10 @@ def grinta_syntax_kwargs(*, background_color: str = _NAVY_BG_DEFAULT) -> dict[st
     }
 
 
-def inline_code_style(*, bold: bool = True) -> str:
+def inline_code_style() -> str:
     """Rich style for inline ``code`` spans during streaming markdown."""
     c = resolve_syntax_colors()
-    base = f"{c['inline_code_fg']} on {c['inline_code_bg']}"
-    return f'bold {base}' if bold else base
+    return f"{c['inline_code_fg']} on {c['inline_code_bg']}"
 
 
 def invalidate_grinta_syntax_theme_cache() -> None:

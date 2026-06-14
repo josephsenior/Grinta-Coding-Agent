@@ -84,4 +84,4 @@ If you want to try the same task: start with an empty directory, give the prompt
 
 ---
 
-← [The Plugin Boundary](43-the-plugin-boundary.md) | [The Book of Grinta](README.md) | [The Road Ahead](07-the-road-ahead.md) →
+← [The Plugin Boundary](43-the-plugin-boundary.md) | [The Book of Grinta](README.md) | [The Product Surface Became Real](45-the-product-surface-became-real.md) →

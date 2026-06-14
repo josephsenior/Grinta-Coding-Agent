@@ -18,7 +18,7 @@ I learned more watching them die than I ever learned in a lecture hall. Universi
 
 It is not the fanciest architecture I ever drew on a whiteboard. But it is the architecture that survived the trenches of solo development.
 
-Grinta is an agent that does not rely on massive context windows or magical intelligence. It relies on 21 decomposed orchestration services, a 12-middleware operation pipeline, a security analyzer with 40+ threat patterns across four severity tiers, 9 compactor implementations with an auto-selector that adapts strategy to the shape of the conversation, and 10 stuck-detection heuristics—each born from a specific, agonizing real-world failure I encountered while testing it alone.
+Grinta is an agent that does not rely on massive context windows or magical intelligence. It relies on 23 decomposed orchestration service files, a 15-step middleware/validator operation pipeline, a security analyzer with 40+ threat patterns across four severity tiers, 11 compactor strategy modules including selectors and pipelines, and stuck-detection heuristics born from specific, agonizing real-world failures I encountered while testing it alone.
 
 It fails fast. It iterates faster. It possesses the exact mechanical equivalent of the word it is named after.
 

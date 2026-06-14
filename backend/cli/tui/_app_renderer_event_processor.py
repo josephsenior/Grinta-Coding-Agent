@@ -1895,7 +1895,7 @@ def _handle_file_download_dispatch(
 ) -> None:
     url = getattr(event, 'url', '') or ''
     orch._tui._write_log(
-        Text(f'  [bold #91abec]Downloaded[/] {url}', style=NAVY_TEXT_PRIMARY)
+        Text(f'  [#91abec]Downloaded[/] {url}', style=NAVY_TEXT_PRIMARY)
     )
 
 

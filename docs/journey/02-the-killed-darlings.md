@@ -344,7 +344,7 @@ This is one of the ways Grinta became more honest as a tool.
 
 At one stage, Grinta had a Textual TUI story alongside the web-oriented experience.
 
-Eventually, that did not survive as a core direction.
+Eventually, that did not survive as a core direction in that phase.
 
 Why? Because maintaining multiple primary interaction models is expensive, especially in a project where the real engineering battle is already happening in orchestration, persistence, context handling, inference abstraction, safety, and runtime control.
 
@@ -356,6 +356,13 @@ The moment you keep too many front doors alive, the cost multiplies:
 - more maintenance overhead for functionality that is not the core engine
 
 So the non-essential pieces had to lose.
+
+Current note: the Textual interface later returned, but not as the same
+product-theater surface described here. It came back as the primary terminal
+app: transcript cards, HUD, settings/sessions dialogs, keyboard shortcuts, and
+backpressure-aware rendering around the existing local agent engine. The
+historical deletion still matters because the returned interface had to earn
+its place as operational infrastructure, not as a second product fantasy.
 
 ---
 

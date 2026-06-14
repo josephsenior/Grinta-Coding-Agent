@@ -32,7 +32,6 @@ class ScrollTailBadge(Static):
         background: #0d162a;
         color: #91abec;
         border-top: solid #26324f;
-        text-style: bold;
     }
     ScrollTailBadge:hover {
         background: #12203a;

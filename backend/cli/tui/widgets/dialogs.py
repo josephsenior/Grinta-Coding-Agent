@@ -39,7 +39,6 @@ class ModalDialog(ModalScreen[_T]):
     }
     ModalDialog #dialog-title {
         color: #c8d4e8;
-        text-style: bold;
         margin-bottom: 1;
     }
     ModalDialog #dialog-subtitle {

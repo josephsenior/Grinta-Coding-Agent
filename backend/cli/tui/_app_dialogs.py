@@ -91,7 +91,6 @@ class ConfirmWidget(Widget):
     }
     ConfirmWidget .confirm-type {
         color: #7dd3fc;
-        text-style: bold;
     }
     ConfirmWidget .confirm-target {
         color: #e2e8f0;
@@ -222,7 +221,7 @@ class GrintaConfirmDialog(ModalDialog[str | None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id='dialog-container'):
-            yield Label(f'[bold]{self._dialog_title}[/]', id='dialog-title')
+            yield Label(self._dialog_title, id='dialog-title')
             yield Static(self._dialog_body, id='dialog-body')
             with Horizontal(id='dialog-buttons'):
                 for i, (key, label) in enumerate(self._options):
@@ -256,7 +255,7 @@ class GrintaHelpDialog(ModalDialog[None]):
 
         slash_rows = build_slash_command_rows(GrintaScreen._SLASH_HINTS)
         with Vertical(id='dialog-container'):
-            yield Label('[bold]Help[/]', id='dialog-title')
+            yield Label('Help', id='dialog-title')
             yield Static(
                 f'[{NAVY_TEXT_MUTED}]Use the transcript for evidence and the HUD for runtime state.[/]',
                 id='dialog-subtitle',
@@ -291,7 +290,7 @@ class GrintaAddSkillDialog(ModalDialog[dict[str, str] | None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id='dialog-container'):
-            yield Label('[bold]Add Custom Skill[/]', id='dialog-title')
+            yield Label('Add Custom Skill', id='dialog-title')
             yield Label('Skill Name (e.g. react_best_practices)', classes='field-label')
             yield Input(id='skill-name')
             yield Label('Instructions (Markdown)', classes='field-label')
@@ -339,7 +338,7 @@ class GrintaAddMCPDialog(ModalDialog[dict[str, str] | None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id='dialog-container'):
-            yield Label('[bold]Add MCP Server[/]', id='dialog-title')
+            yield Label('Add MCP Server', id='dialog-title')
             yield Label('Server Name', classes='field-label')
             yield Input(id='mcp-name')
             yield Label(
@@ -498,7 +497,7 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         masked_key = get_masked_api_key(self._config, current_provider)
 
         with Vertical(id='dialog-container'):
-            yield Label('[bold]Settings[/]', id='dialog-title')
+            yield Label('Settings', id='dialog-title')
             yield Label(
                 f'Current {self._provider_label(current_provider)} API key: {masked_key}',
                 id='settings-current-key',
@@ -903,7 +902,7 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
             ('Model', 'model'),
         ]
         with Vertical(id='dialog-container'):
-            yield Label('[bold]Sessions[/]', id='dialog-title')
+            yield Label('Sessions', id='dialog-title')
             with Horizontal(id='sessions-filters'):
                 yield Input(
                     value=self._search, placeholder='Search…', id='sessions-search'
@@ -1088,7 +1087,7 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
     def _build_preview_line(self, label: str, value: str) -> str | None:
         if not value:
             return None
-        return f'[bold]{label}:[/] {value}'
+        return f'[#c8d4e8]{label}:[/] {value}'
 
     def _build_preview_tokens_line(self, meta: dict[str, Any]) -> str | None:
         total_tokens = int(meta.get('total_tokens') or 0)
@@ -1097,7 +1096,7 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
         prompt_tokens = int(meta.get('prompt_tokens') or 0)
         completion_tokens = int(meta.get('completion_tokens') or 0)
         return (
-            f'[bold]Tokens:[/] {total_tokens:,} total'
+            f'[#c8d4e8]Tokens:[/] {total_tokens:,} total'
             f'  [{NAVY_TEXT_DIM}](p:{prompt_tokens:,} c:{completion_tokens:,})[/]'
         )
 
@@ -1116,20 +1115,20 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
     def _build_preview_lines(
         self, sid: str, meta: dict[str, Any], event_count: int
     ) -> list[str]:
-        lines = [f'[bold]ID:[/] {sid}']
+        lines = [f'[#c8d4e8]ID:[/] {sid}']
         lines.extend(self._build_preview_metadata_lines(meta))
-        lines.append(f'[bold]Events:[/] {event_count}')
+        lines.append(f'[#c8d4e8]Events:[/] {event_count}')
         cost = float(meta.get('accumulated_cost') or 0)
         if cost:
-            lines.append(f'[bold]Cost:[/] ${cost:.4f}')
+            lines.append(f'[#c8d4e8]Cost:[/] ${cost:.4f}')
         if line := self._build_preview_tokens_line(meta):
             lines.append(line)
         updated = str(meta.get('last_updated_at') or meta.get('created_at') or '')
         if updated:
-            lines.append(f'[bold]Updated:[/] {updated[:19]}')
+            lines.append(f'[#c8d4e8]Updated:[/] {updated[:19]}')
         created = str(meta.get('created_at') or '')
         if created and str(meta.get('last_updated_at') or '') != created:
-            lines.append(f'[bold]Created:[/] {created[:19]}')
+            lines.append(f'[#c8d4e8]Created:[/] {created[:19]}')
         return lines
 
     def _update_preview(self, row_index: int) -> None:

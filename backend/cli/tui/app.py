@@ -161,7 +161,7 @@ class GrintaScreen(
         'UNKNOWN': ('Unknown', 'dim'),
         'LOW': ('Low', 'green'),
         'MEDIUM': ('Medium', 'yellow'),
-        'HIGH': ('High', 'bold red'),
+        'HIGH': ('High', 'red'),
     }
 
     def __init__(

@@ -13,6 +13,7 @@ from textual.widgets import (
     Static,
 )
 
+from backend.cli.theme import CLR_REASONING_SNAP
 from backend.cli.tui._app_constants import (
     _TUI_HISTORY_RENDER_LIMIT,
 )
@@ -262,7 +263,7 @@ class _AppRendererLiveMixin:
                 snapshot = Text.assemble(
                     ('Thinking:', '#42a394'),
                     '  ',
-                    Text('\n  '.join(thoughts), style='#c8c8d4'),
+                    Text('\n  '.join(thoughts), style=CLR_REASONING_SNAP),
                 )
                 self._history.append(snapshot)
                 self._history.append(Text(''))

@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 from rich.text import Text
 
+from backend.cli.theme import CLR_REASONING_SNAP
 from backend.cli.tui import _app_renderer_event_drain as _drain_mod
 from backend.cli.tui import _app_renderer_event_processor_mixin as _ep_mod
 from backend.cli.tui import _app_renderer_live_mixin as _live_mod
@@ -117,6 +118,47 @@ async def test_tui_renderer_live_thinking_renders_in_main_panel_until_commit():
     assert display.write.called
     assert renderer._live_thinking_dirty is False
     assert renderer._live_thinking == ''
+
+
+def test_tui_renderer_committed_thinking_uses_muted_reasoning_style():
+    class Display:
+        @staticmethod
+        def should_follow_tail():
+            return True
+
+    class ThinkingWidget:
+        _thoughts = ['dim thought']
+
+        def finalize(self):
+            pass
+
+        def remove(self):
+            pass
+
+    fake_tui = SimpleNamespace(
+        _config=None,
+        _get_display=lambda: Display(),
+        _get_sidebar=lambda: MagicMock(),
+        query_one=MagicMock(),
+        refresh=MagicMock(),
+    )
+    renderer = tui_app.TUIRenderer(
+        console=SimpleNamespace(width=100),
+        hud=SimpleNamespace(
+            state=SimpleNamespace(mcp_servers=0), bundled_skill_count=0
+        ),
+        reasoning=SimpleNamespace(),
+        tui=fake_tui,
+        loop=MagicMock(),
+    )
+    renderer._live_thinking_widget = ThinkingWidget()
+    renderer._live_thinking_dirty = True
+
+    renderer.commit_live_thinking()
+
+    snapshot = renderer._history[0]
+    assert isinstance(snapshot, Text)
+    assert any(span.style == CLR_REASONING_SNAP for span in snapshot.spans)
 
 
 @pytest.mark.asyncio

@@ -12,9 +12,9 @@
 [![CLI Regression](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/e2e-tests.yml/badge.svg)](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/e2e-tests.yml)
 [![Release Stage: RC](https://img.shields.io/badge/release_stage-RC-orange)](https://github.com/josephsenior/Grinta-Coding-Agent/releases/tag/v1.0.0-rc1)
 
-> **Local-first. Provider-agnostic. Ships with real LSP + DAP. ~1.4 MB wheel.**
+> **Local-first. Provider-agnostic. Ships with real LSP + DAP. Small base wheel.**
 >
-> A CLI coding agent that plans, executes, validates, and finishes — without a cloud control plane, without lock-in to one model vendor, and without a 1.6 GB install.
+> A terminal coding agent that plans, executes, validates, and finishes — without a cloud control plane, without lock-in to one model vendor, and without the old heavyweight install footprint.
 >
 > **Current status:** `v1.0.0-rc1` public release candidate. Intended for real-world use, with focused community feedback requested before GA.
 
@@ -37,7 +37,7 @@ Direct link if the player does not load: [`grinta-demo.mp4`](https://github.com/
 
 |                                                                                   | **Grinta**          | Aider   | Claude Code       | Codex CLI      |
 | --------------------------------------------------------------------------------- | ------------------- | ------- | ----------------- | -------------- |
-| Install size (base wheel)                                                         | **1.4 MB**          | ~80 MB  | ~15 MB            | ~12 MB         |
+| Install footprint                                                                 | **small wheel; ~150 MB base env** | ~80 MB  | ~15 MB            | ~12 MB         |
 | Provider-agnostic (OpenAI / Anthropic / Google / Ollama / LM Studio / OpenRouter) | ✅                  | ✅      | ❌ Anthropic only | ❌ OpenAI only |
 | Local-first (works fully offline w/ Ollama)                                       | ✅ auto-detected    | partial | ❌                | ❌             |
 | LSP integration (auto-discovers 17 servers)                                       | ✅                  | ❌      | partial           | ❌             |
@@ -54,9 +54,9 @@ The pitch in one sentence: **everything Aider's local-first ethos gives you, plu
 ## Install in 30 seconds
 
 ```bash
-pipx install grinta-ai          # lean install (~few MB) — all you need for coding
+pipx install grinta-ai          # base install; optional extras stay opt-in
 grinta init                     # one-time wizard: pick provider + paste key
-grinta                          # launch the REPL in the current directory
+grinta                          # launch the terminal app in the current directory
 ```
 
 Optional extras (install only what you need):
@@ -68,7 +68,7 @@ pipx install "grinta-ai[browser]"    # adds browser-use for web automation
 pipx install "grinta-ai[all]"        # everything
 ```
 
-That is the whole setup. The `grinta init` wizard auto-detects local Ollama and LM Studio servers and writes a working settings file for you. Installed runs use `~/.grinta/settings.json`; source checkouts use the repository `settings.json`; `APP_ROOT` can intentionally override that root. Other install paths (uv, Homebrew, Scoop, and experimental Docker image usage) are in [docs/INSTALL.md](docs/INSTALL.md).
+That is the whole setup. The `grinta init` wizard configures provider, model, and key; local Ollama, LM Studio, and vLLM models can also be discovered with `python -m backend.inference.discover_models` from a source checkout. Installed runs use `~/.grinta/settings.json`; source checkouts use the repository `settings.json`; `APP_ROOT` can intentionally override that root. Other install paths (uv, Homebrew, Scoop, and experimental Docker image usage) are in [docs/INSTALL.md](docs/INSTALL.md).
 
 ## What you get
 
@@ -77,7 +77,7 @@ That is the whole setup. The `grinta init` wizard auto-detects local Ollama and 
 - **Local-first.** Code stays in your workspace; sessions, checkpoints, and audit logs live under `~/.grinta/workspaces/<id>/storage`.
 - **Strong safety rails.** Risk-classified actions, CRITICAL refusal gate, secret masking, and a session-wide audit trail.
 - **Durable long sessions.** Event-stream ledger, automatic compaction, manual `/checkpoint`, and revert.
-- **Lean TUI.** Cost / tokens / latency / breaker state visible in the HUD; rich slash commands (`/help`).
+- **Terminal UI.** Interactive TTY sessions launch the Textual app with HUD, transcript cards, settings/sessions dialogs, and slash commands; piped input uses a non-interactive fallback.
 
 ## Common slash commands
 
@@ -88,8 +88,10 @@ That is the whole setup. The `grinta init` wizard auto-detects local Ollama and 
 | `/diff`       | Workspace git changes (`--stat`, `--name-only`, `--patch`) |
 | `/sessions`   | Recent sessions, with optional limit (`/sessions list 10`) |
 | `/think`      | Toggle the optional reasoning scratchpad                   |
+| `/model`      | Show or switch the active provider/model                   |
+| `/health`     | Fast self-check for debugpy, ripgrep, git, and model setup |
 | `/checkpoint` | Snapshot the workspace (revertable)                        |
-| `/status`     | Full HUD snapshot                                          |
+| `/status`     | HUD snapshot; `/status verbose` adds diagnostics           |
 | `/compact`    | Force context compaction now                               |
 
 ## Security boundary
@@ -101,7 +103,10 @@ Grinta executes actions on the local host. `hardened_local` adds stricter policy
 ```mermaid
 graph TB
     User([User]) --> CLI[CLI: backend.cli.entry]
-    CLI --> Orch[SessionOrchestrator]
+    CLI --> TUI[TTY: Textual TUI]
+    CLI --> NonInteractive[Piped input: non-interactive runner]
+    TUI --> Orch[SessionOrchestrator]
+    NonInteractive --> Orch
     Orch --> Engine[Engine\nplanning + tool intent]
     Orch --> Pipe[Operation pipeline\nsafety + validation]
     Pipe --> Runtime[RuntimeExecutor\nlocal execution]
@@ -117,7 +122,7 @@ Contributors: CI runs the full unit corpus on Linux and Windows ([docs/CI.md](do
 
 ## The story behind Grinta
 
-Grinta is a single-author project, written and rewritten in public. The journey — what was killed, what was wrong, what got rebuilt — is **The Book of Grinta**: start at [Preface](docs/journey/preface-why-this-story-matters.md) → [00 · Meaning of Grinta](docs/journey/00-the-meaning-of-grinta.md) through the numbered chapters to [44 · The Empty Folder Trials](docs/journey/44-the-empty-folder-trials.md), then the epilogue [07 · The Road Ahead](docs/journey/07-the-road-ahead.md). Full index and act structure: [docs/journey/README.md](docs/journey/README.md). Stable shortcut from the repo root: [BOOK_OF_GRINTA.md](BOOK_OF_GRINTA.md).
+Grinta is a single-author project, written and rewritten in public. The journey — what was killed, what was wrong, what got rebuilt — is **The Book of Grinta**: start at [Preface](docs/journey/preface-why-this-story-matters.md) → [00 · Meaning of Grinta](docs/journey/00-the-meaning-of-grinta.md) through the numbered chapters to [45 · The Product Surface Became Real](docs/journey/45-the-product-surface-became-real.md), then the epilogue [07 · The Road Ahead](docs/journey/07-the-road-ahead.md). Full index and act structure: [docs/journey/README.md](docs/journey/README.md). Stable shortcut from the repo root: [BOOK_OF_GRINTA.md](BOOK_OF_GRINTA.md).
 
 ## Quick start (from source)
 
@@ -129,7 +134,7 @@ Grinta is a single-author project, written and rewritten in public. The journey 
 
 ### Linux / macOS / manual
 
-1. Install dependencies **in this repo’s environment only** (creates/updates `.venv/`; do not rely on a global `pip install` mixed with unrelated tools):
+1. Install dependencies **in this repo's environment only** (creates/updates `.venv/`; do not rely on a global `pip install` mixed with unrelated tools):
 
 ```bash
 python scripts/bootstrap_env.py browser

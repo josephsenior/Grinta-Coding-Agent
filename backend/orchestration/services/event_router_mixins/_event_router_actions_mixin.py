@@ -18,6 +18,11 @@ from backend.core.agent_protocol import (
     reset_terminal_cycle,
     tracker_terminal,
 )
+from backend.core.interaction_modes import (
+    CHAT_MODE,
+    PLAN_MODE,
+    normalize_interaction_mode,
+)
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
 from backend.ledger.action import (
@@ -45,6 +50,32 @@ logger = logging.getLogger(__name__)
 
 class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
     """Mixin class — see module docstring."""
+
+    def _active_interaction_mode(self) -> str:
+        state = getattr(self._ctrl, 'state', None)
+        extra = getattr(state, 'extra_data', {}) or {}
+        if isinstance(extra, dict):
+            active_mode = extra.get('active_run_mode')
+            if active_mode:
+                return normalize_interaction_mode(active_mode)
+        agent = getattr(self._ctrl, 'agent', None)
+        config = getattr(agent, 'config', None)
+        return normalize_interaction_mode(getattr(config, 'mode', 'agent'))
+
+    def _is_plain_terminal_agent_message(self, action: MessageAction) -> bool:
+        if action.source != EventSource.AGENT:
+            return False
+        if not str(getattr(action, 'content', '') or '').strip():
+            return False
+        if bool(getattr(action, 'wait_for_response', False)):
+            return False
+        if bool(getattr(action, 'transcript_only', False)):
+            return False
+        if bool(getattr(action, 'protocol_status', False)):
+            return False
+        if bool(getattr(action, 'suppress_cli', False)):
+            return False
+        return self._active_interaction_mode() in {CHAT_MODE, PLAN_MODE}
 
     @staticmethod
     def _record_agent_transcript(event: Event) -> None:
@@ -180,7 +211,11 @@ class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
                     return
                 await self._ctrl.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
                 return
-            if bool(getattr(action, 'final_response', False)):
+            is_final_response = bool(
+                getattr(action, 'final_response', False)
+            ) or self._is_plain_terminal_agent_message(action)
+            if is_final_response:
+                action.final_response = True
                 # Optional LLM-judge quality check; emits a warning on
                 # failure but never blocks the transition.
                 await self._ctrl.task_validation_service.validate_completion_quality(

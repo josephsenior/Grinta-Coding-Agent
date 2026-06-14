@@ -1,6 +1,6 @@
 # Grinta User Guide
 
-This guide reflects the current CLI-first Grinta workflow.
+This guide reflects the current terminal-first Grinta workflow.
 
 Canonical startup:
 
@@ -10,7 +10,7 @@ Canonical startup:
 ## Table of Contents
 
 1. Installation
-2. Configuration (incl. pending actions, terminal, Stop/Cancel, Ctrl+C)
+2. Interface and configuration
 3. First Task
 4. LLM Provider Setup
 5. Safety and Runtime Model
@@ -40,9 +40,15 @@ For source development:
 
 ```bash
 python scripts/bootstrap_env.py base
+uv run python -m backend.cli.entry init
+uv run python -m backend.cli.entry
 ```
 
-### Create local settings
+Interactive TTY sessions start the Textual app. If you pipe input into Grinta,
+it uses the non-interactive runner so scripts can call it without a full-screen
+terminal.
+
+### Create or update local settings
 
 ```bash
 uv run python -m backend.cli.entry init
@@ -55,6 +61,17 @@ uv run python -m backend.cli.entry init
 ```
 
 ---
+
+## Interface and Configuration
+
+### Terminal surfaces
+
+Grinta has two runtime surfaces:
+
+- **Interactive TTY:** `grinta` or `uv run python -m backend.cli.entry` opens the Textual terminal app with transcript cards, HUD, dialogs, and slash commands.
+- **Non-interactive stdin:** piped input runs through `backend.cli.repl_noninteractive` and prints results without the Textual app.
+
+The same orchestrator, safety checks, provider routing, and event stream back both surfaces.
 
 ## Configuration
 
@@ -96,12 +113,12 @@ If you still see timeouts for other tools, or you need an even longer global
 window, increase `pending_action_timeout` in `settings.json` (or set it to `0` to
 disable the watchdog, which is not recommended for routine use).
 
-### REPL: Ctrl+C
+### Textual app: Ctrl+C and interruption
 
-At the **input prompt**, Ctrl+C is ignored as an exit (use `/quit` or `exit` to
-leave). **While the agent is running**, Ctrl+C is intended to cancel the run; on
-Windows with some terminals, you may need to press it more than once for the
-interrupt to register.
+In the Textual app, Ctrl+C is bound to copy-or-interrupt behavior and Escape is
+available for interrupting the active agent run. Use `/exit` to leave the app.
+The prompt-toolkit fallback may handle Ctrl+C differently depending on terminal
+and platform.
 
 ### Stop, Ctrl+C, and in-flight tool calls
 
@@ -187,6 +204,13 @@ Ollama local:
 
 If you use local providers, start them first (for example `ollama serve`).
 
+From a source checkout, you can inspect local provider availability with:
+
+```bash
+uv run python -m backend.inference.discover_models
+uv run python -m backend.inference.discover_models status
+```
+
 ---
 
 ## Safety and Runtime Model
@@ -199,7 +223,7 @@ Grinta executes locally on your host machine.
 
 Use Grinta in trusted repositories and environments.
 
-### Modes (`/mode`)
+### Interaction modes
 
 Grinta has three interaction modes that change the conversational contract:
 
@@ -207,7 +231,9 @@ Grinta has three interaction modes that change the conversational contract:
 - **Plan** — read-only investigation plus structured planning. The agent clarifies requirements and produces an actionable plan before any execution. Use this for complex or ambiguous tasks where you want to review the approach first.
 - **Agent** — full task execution. The agent plans, runs tools, validates results, and finishes. This is the default mode when you give a direct task.
 
-Switch between them at any time with `/mode chat`, `/mode plan`, or `/mode agent`. The current mode is visible in the HUD bar.
+In the Textual app, the current mode is visible and selectable in the HUD. The
+mode is also stored on the active agent config for startup/default behavior. The
+current slash-command registry does not expose a `/mode` command.
 
 ### Autonomy levels (`/autonomy`)
 
@@ -237,6 +263,21 @@ CLI help:
 ```bash
 uv run python -m backend.cli.entry --help
 ```
+
+Common slash commands:
+
+| Command | Purpose |
+| --- | --- |
+| `/help [command|--all]` | Show commands and shortcuts |
+| `/settings` | Open model, API key, and MCP settings |
+| `/sessions` / `/resume <N|id>` | List or resume past sessions |
+| `/model [provider/model]` | Show or switch the active model |
+| `/autonomy [conservative|balanced|full]` | View or set confirmation behavior |
+| `/status [verbose]` | Show HUD state and optional diagnostics |
+| `/health` | Check debugpy, ripgrep, git, and model setup |
+| `/diff [--stat|--name-only|--patch] [path]` | Show workspace git changes |
+| `/checkpoint [label]` | Save a manual workspace checkpoint |
+| `/compact` / `/retry` | Compact context or resend the last message |
 
 ---
 

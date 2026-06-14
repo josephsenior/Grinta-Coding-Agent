@@ -2,16 +2,22 @@
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.syntax import PygmentsSyntaxTheme, Syntax
+from rich.theme import Theme
 
 from backend.cli.syntax_theme import (
     GRINTA_SYNTAX_COLORS,
+    get_grinta_pygments_style,
     get_grinta_rich_syntax_theme,
     invalidate_grinta_syntax_theme_cache,
     resolve_syntax_colors,
 )
+from backend.cli.theme import grinta_rich_theme_styles
 from backend.cli.tui._render_prep import (
     prep_markdown,
     prep_streaming_renderable,
@@ -38,7 +44,7 @@ def hello():
 
     color = _keyword_color(md)
     assert color is not None
-    assert '91abec' in color
+    assert '7dcfff' in color
     assert '66d9ef' not in color
 
 
@@ -57,7 +63,7 @@ def stream_me():
         for _text, style, _ in console.render(renderable, console.options.update_width(80))
         if style and style.color and _text.strip()
     }
-    assert any('91abec' in color for color in colors)
+    assert any('7dcfff' in color for color in colors)
     assert not any('66d9ef' in color for color in colors)
 
 
@@ -95,12 +101,71 @@ def test_syntax_palette_has_extended_tokens():
 def test_prep_streaming_inline_code():
     renderable = prep_streaming_renderable('Use `my_func` here')
     console = Console(force_terminal=True, color_system='truecolor', width=80)
-    styles = {
-        str(style)
+    styles = [
+        style
         for _t, style, _ in console.render(renderable, console.options.update_width(80))
         if style and _t.strip() == 'my_func'
-    }
-    assert any('101829' in style for style in styles)
+    ]
+    assert any('101829' in str(style) for style in styles)
+    assert all(style.bold is not True for style in styles)
+
+
+def test_grinta_syntax_theme_has_no_bold_tokens():
+    style_cls = get_grinta_pygments_style()
+    assert not any('bold' in value.split() for value in style_cls.styles.values())
+
+    code = 'class Greeter:\n    def hello(self):\n        return "hi"'
+    syntax = Syntax(code, 'python', theme=get_grinta_rich_syntax_theme())
+    console = Console(force_terminal=True, color_system='truecolor', width=80)
+    rendered_styles = [
+        style
+        for text, style, _ in console.render(syntax, console.options.update_width(80))
+        if text.strip() and style is not None
+    ]
+    assert rendered_styles
+    assert all(style.bold is not True for style in rendered_styles)
+
+
+def test_tui_markdown_theme_disables_rich_default_bold():
+    theme = Theme(grinta_rich_theme_styles())
+    console = Console(
+        force_terminal=True,
+        color_system='truecolor',
+        width=80,
+        theme=theme,
+    )
+    md = Markdown('# Head\n\n**strong** and `code`')
+    rendered_styles = [
+        style
+        for text, style, _ in console.render(md, console.options.update_width(80))
+        if text.strip() and style is not None
+    ]
+    assert rendered_styles
+    assert all(style.bold is not True for style in rendered_styles)
+
+
+def test_prep_markdown_renderable_applies_grinta_theme():
+    md = prep_markdown('# Head\n\n**strong** and `code`')
+    console = Console(force_terminal=True, color_system='truecolor', width=80)
+    rendered_styles = [
+        style
+        for text, style, _ in console.render(md, console.options.update_width(80))
+        if text.strip() and style is not None
+    ]
+    assert rendered_styles
+    assert all(style.bold is not True for style in rendered_styles)
+
+
+def test_tui_sources_do_not_request_bold_text():
+    tui_root = Path('backend/cli/tui')
+    offenders: list[str] = []
+    for path in tui_root.rglob('*'):
+        if path.suffix not in {'.py', '.tcss'} or 'tests' in path.parts:
+            continue
+        content = path.read_text(encoding='utf-8')
+        if re.search(r'\bbold\b|text-style:\s*bold', content):
+            offenders.append(str(path))
+    assert offenders == []
 
 
 def test_streaming_render_interval_shortens_in_code_fence():

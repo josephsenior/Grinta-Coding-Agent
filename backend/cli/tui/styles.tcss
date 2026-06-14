@@ -113,12 +113,12 @@ SidebarRow {
 }
 
 CollapsibleSection .section-icon {
-    text-style: bold;
+    text-style: none;
 }
 
 CollapsibleSection .collapsible-header.expanded {
     color: #c8d4e8;
-    text-style: bold;
+    text-style: none;
 }
 
 SidebarRow:hover {
@@ -214,7 +214,7 @@ WelcomeWidget {
 #welcome-header {
     height: 1;
     color: #c8d4e8;
-    text-style: bold;
+    text-style: none;
 }
 
 #welcome-subheader {
@@ -242,7 +242,7 @@ WelcomeWidget {
 #welcome-slogan {
     height: 1;
     color: #c8d4e8;
-    text-style: bold;
+    text-style: none;
 }
 
 #welcome-tagline {
@@ -322,7 +322,7 @@ HUD,
 
 #hud-line-1 {
     height: 1;
-    text-style: bold;
+    text-style: none;
     margin-right: 1;
 }
 
@@ -411,7 +411,7 @@ HUD,
     padding: 0;
     margin: 0;
     height: 1;
-    text-style: bold;
+    text-style: none;
 }
 
 #hud-reasoning SelectCurrent .arrow {
@@ -470,7 +470,7 @@ HUD,
     padding: 0;
     margin: 0;
     height: 1;
-    text-style: bold;
+    text-style: none;
 }
 
 #hud-autonomy SelectCurrent .arrow {
@@ -529,7 +529,7 @@ HUD,
     padding: 0;
     margin: 0;
     height: 1;
-    text-style: bold;
+    text-style: none;
 }
 
 #hud-mode SelectCurrent .arrow {
@@ -671,7 +671,7 @@ DataTable {
 DataTable > .datatable--header {
     background: #0f1c30;
     color: #ffffff;
-    text-style: bold;
+    text-style: none;
 }
 
 DataTable > .datatable--row-hover {

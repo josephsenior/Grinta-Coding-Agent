@@ -2,7 +2,8 @@
 
 This guide targets the current Grinta runtime:
 
-- CLI-first local execution
+- terminal-first local execution
+- Textual TUI for interactive TTY runs, non-interactive runner for piped stdin
 - installed `~/.grinta/settings.json` or source-checkout `settings.json` for default local config
 
 ## Table of Contents
@@ -83,6 +84,23 @@ If startup fails, check:
 2. `llm_model` and `llm_api_key` are set correctly.
 3. Current directory is the project root for source runs, or set `APP_ROOT` intentionally.
 
+### Textual UI does not appear
+
+Grinta only starts the full Textual app when stdin is an interactive TTY. If you
+pipe input, redirect stdin, or run from a tool that does not expose a real TTY,
+Grinta uses the non-interactive runner.
+
+Useful checks:
+
+```bash
+uv run python -m backend.cli.entry --help
+uv run python -m backend.cli.entry --no-splash
+uv run python -m backend.cli.entry --accessible
+```
+
+Use `--minimal` for a reduced HUD and `--theme <preset>` to test a different
+theme.
+
 ### Invalid configuration
 
 Symptom:
@@ -140,6 +158,13 @@ See [USER_GUIDE.md](USER_GUIDE.md#llm-provider-setup) for configuration examples
 - `anthropic/claude-sonnet-4-20250514`
 - `google/gemini-2.5-pro`
 - `ollama/llama3.2`
+
+From a source checkout, inspect local providers with:
+
+```bash
+uv run python -m backend.inference.discover_models
+uv run python -m backend.inference.discover_models status
+```
 
 ### Ollama unavailable
 

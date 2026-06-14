@@ -97,7 +97,7 @@ class _AppScreenStateMixin:
         state_color: str,
     ) -> str:
         parts = [
-            '[#91abec bold]GRINTA[/]',
+            '[#91abec]GRINTA[/]',
             f'[{state_color}]● {display_state}[/]',
         ]
         return '  '.join(parts)
@@ -357,7 +357,7 @@ class _AppScreenStateMixin:
         model_label = f'[{NAVY_TEXT_SECONDARY}]{model_display}[/]'
 
         token_display = self._build_context_display(used, limit)
-        help_hint = r'[#54597b]\[[/][#eacb8a bold]F1[/][#54597b]][/] [#969aad]Help[/]'
+        help_hint = r'[#54597b]\[[/][#eacb8a]F1[/][#54597b]][/] [#969aad]Help[/]'
         line2 = f'{token_display}   {help_hint}'
 
         hud_bar = self.query_one('#hud-bar', HUD)

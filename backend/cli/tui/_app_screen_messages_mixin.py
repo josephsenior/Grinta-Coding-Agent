@@ -116,9 +116,9 @@ class _AppScreenMessagesMixin:
         self._emit_transcript_notice(text)
 
     def add_success(self, text: str) -> None:
-        icon = Text('✓ ', style=f'bold {NAVY_READY}')
+        icon = Text('✓ ', style=NAVY_READY)
         body = _rich_text(text)
-        body.stylize(f'bold {NAVY_READY}')
+        body.stylize(NAVY_READY)
         self._write_log(Text.assemble(icon, body))
 
     def add_protocol_status(self, text: str) -> None:

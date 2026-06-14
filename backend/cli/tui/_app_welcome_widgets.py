@@ -56,7 +56,7 @@ class WelcomeWidget(Vertical):
                 id='welcome-divider',
             )
             yield Static(
-                '[#78FFF0]►[/] [#D7E2F2 bold]Autonomous coding agent runtime[/]',
+                '[#78FFF0]►[/] [#D7E2F2]Autonomous coding agent runtime[/]',
                 id='welcome-slogan',
             )
             yield Static(
@@ -80,7 +80,7 @@ class WelcomeWidget(Vertical):
             if width >= 80:
                 logo_static.update(_get_welcome_figlet())
             else:
-                logo_static.update('[#6F86B6 bold]GRINTA[/]')
+                logo_static.update('[#6F86B6]GRINTA[/]')
         # Preserve any selection set before mount (e.g. by a pre-selection
         # call on the active communicate card). Default to 0 otherwise.
         self._selected = getattr(self, '_selected', 0)
@@ -122,7 +122,7 @@ class WelcomeWidget(Vertical):
 
     def _render_suggestion(self, index: int, *, selected: bool) -> str:
         icon = '▶' if selected else '▸'
-        label_style = '#5eead4 bold' if selected else '#8ea2c8'
+        label_style = '#5eead4' if selected else '#8ea2c8'
         detail = (self._suggestion_details[index] or '').strip()
         text = f'  {icon} [{label_style}]{self._suggestions[index]}[/]'
         if detail:

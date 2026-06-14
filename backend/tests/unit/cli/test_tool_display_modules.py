@@ -106,8 +106,8 @@ class TestFriendlyVerbForTool(unittest.TestCase):
         self.assertEqual(friendly_verb_for_tool('edit_symbol', {}), 'Edited')
         self.assertEqual(friendly_verb_for_tool('multiedit', {}), 'Edited')
         self.assertEqual(friendly_verb_for_tool('find_symbols', {}), 'Found')
-        self.assertEqual(friendly_verb_for_tool('grep', {}), 'Searched')
-        self.assertEqual(friendly_verb_for_tool('glob', {}), 'Listed')
+        self.assertEqual(friendly_verb_for_tool('grep', {}), 'Grepped')
+        self.assertEqual(friendly_verb_for_tool('glob', {}), 'Globbed')
         self.assertEqual(friendly_verb_for_tool('think', {}), 'Thinking')
         self.assertEqual(friendly_verb_for_tool('checkpoint', {}), 'Saved')
 

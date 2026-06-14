@@ -16,13 +16,13 @@ When the agent ran for ten minutes on a complex task, the user had no idea what 
 
 That is not a UX problem. It is a reliability problem. If the user cannot tell whether the agent is making progress, they cannot decide whether to intervene. And if they cannot decide whether to intervene, they either watch the budget burn or abort prematurely.
 
-The TUI came back as a HUD.
+The TUI first came back as a HUD.
 
 ---
 
 ## What the HUD Shows
 
-The current interface is not the Textual TUI I removed. It is a lean, dependency-light terminal layer that shows:
+At the time of this chapter, the interface was not the Textual TUI I removed. It was a lean terminal layer that showed:
 
 - **Cost** — running USD total for the session. No surprises at billing time.
 - **Tokens** — prompt, completion, and total token counts.
@@ -31,7 +31,9 @@ The current interface is not the Textual TUI I removed. It is a lean, dependency
 
 These four numbers replaced dozens of lines of scrolling log output. They give the user a dashboard-level view of agent health without requiring transcript reading.
 
-The mode switch (`/mode`) and autonomy level (`/autonomy chat/plan/agent`) are also visible in the HUD bar, so the user can see at a glance what contract the agent is operating under.
+The mode selector and autonomy level (`/autonomy` in the slash-command surface) are also visible in the HUD bar, so the user can see at a glance what contract the agent is operating under.
+
+Current note: the interface has since completed the return to a Textual app for TTY sessions. That app is not the same old TUI. It now carries transcript cards, settings and sessions dialogs, keyboard bindings, load-earlier/replay behavior, sidebar state, terminal cards, streaming response widgets, and backpressure-aware rendering. Piped input still bypasses the full-screen UI through the non-interactive runner.
 
 ---
 
@@ -59,9 +61,9 @@ These are not cosmetic changes. They are answers to specific confusion points th
 
 ## Pretty UI vs Operational UI
 
-The difference between the old Textual TUI and the current HUD is the difference between making something look good and making something useful.
+The difference between the old Textual TUI and the operational interface that replaced it is the difference between making something look good and making something useful.
 
-The Textual TUI made Grinta look like a polished product. The current HUD makes Grinta explain itself. One was about perception. The other is about trust.
+The old Textual TUI made Grinta look like a polished product. The current terminal UI makes Grinta explain itself. One was about perception. The other is about trust.
 
 The interface returned because I stopped treating it as a cosmetic layer and started treating it as a reliability layer. If the user cannot see what the agent is doing, they cannot trust what the agent has done. And an agent the user does not trust will be interrupted, overridden, and eventually abandoned.
 

@@ -48,7 +48,7 @@ Eight months. Several distinct phases. One principle.
 
 **Month 7 (March–April 2026):** The Refinement. Decomposing monoliths into focused modules, pushing orchestration responsibilities into clearer service boundaries, and consolidating the context subsystem after a wave of exploratory variants. Hardening the local security profile. Building the CLI with tab completion, fuzzy command matching, slash commands, and an animated ASCII splash screen. Writing this document. Alongside that work, the terminal story grew a deliberate second layer: a native, OS-agnostic PTY path for **opt-in** interactive shells (no Docker required), sitting next to the original batch/tmux model instead of replacing it — because growing means adding truth, not erasing the chapter you already wrote about the console wars.
 
-**Current Phase (May 2026 onward):** Productization and Runtime UX. The architecture was always serious. Now the interface caught up. The mode split stabilized — Chat, Plan, and Agent as three distinct conversational contracts instead of one overloaded prompt. The autonomy knob separated from execution mode. The Textual TUI returned, no longer as product theater but as operational HUD — cost, tokens, latency, breaker state, and mode switch visible at a glance. Tool cards replaced raw JSON observations. The file editing facade collapsed into six intent-oriented tools with a single rule: read may search, write must target. XML and JSON transport formats died; only model intent remains. MCP servers were curated as deliberate capability extensions rather than infinite plugin soup. The quality gate before finish is becoming automatic. And the agent succeeded twice on a Raft/RFT consensus task from an empty directory — a serious receipt for what the architecture can do when given hard problems. The project is not finished, but it is no longer just an engine. It is becoming a coherent product.
+**Current Phase (May-June 2026 onward):** Productization and Runtime UX. The architecture was always serious. Now the interface caught up. The mode split stabilized — Chat, Plan, and Agent as three distinct conversational contracts instead of one overloaded prompt. The autonomy knob separated from execution mode. The Textual TUI returned, no longer as product theater but as operational UI: transcript cards, HUD, settings/sessions dialogs, keyboard shortcuts, replay/load-earlier behavior, and backpressure-aware rendering. Piped stdin uses a non-interactive runner instead of pretending every use case is full-screen. The file editing facade collapsed into six intent-oriented tools with a single rule: read may search, write must target. XML and JSON transport formats died; only model intent remains. MCP servers were curated as deliberate capability extensions rather than infinite plugin soup. The launch path was hardened so installed Grinta does not collide with a user's unrelated `backend/` package. Model catalogs grew into a broader provider matrix, with local discovery handled under `backend.inference`. And the agent succeeded twice on a Raft/RFT consensus task from an empty directory — a serious receipt for what the architecture can do when given hard problems. The project is not finished, but it is no longer just an engine. It is becoming a coherent product.
 
 ---
 
@@ -77,6 +77,7 @@ The file names stay stable for repository sanity, but the strongest reading arc 
 - **Act XIV — The Interface Returned:** [42](42-the-interface-returned.md)
 - **Act XV — The Plugin Boundary:** [43](43-the-plugin-boundary.md)
 - **Act XVI — The Empty Folder Trials:** [44](44-the-empty-folder-trials.md)
+- **Act XVII — The Product Surface Became Real:** [45](45-the-product-surface-became-real.md)
 - **Epilogue:** [07](07-the-road-ahead.md)
 
 Chapter 07 was written earlier in the repo's life, but it now reads best as the closing chapter after the rest of the system has been laid bare.
@@ -124,6 +125,7 @@ Chapter 07 was written earlier in the repo's life, but it now reads best as the 
 | [42](42-the-interface-returned.md) | **The Interface Returned** | Why the Textual TUI was removed as product theater and brought back as operational UI — HUD bar, mode switch, cost observability, and the difference between pretty and useful. |
 | [43](43-the-plugin-boundary.md) | **The Plugin Boundary** | Why MCP is dangerous as infinite tool soup, and how Grinta treats selected MCP servers as deliberate capability extensions rather than identity replacements. |
 | [44](44-the-empty-folder-trials.md) | **The Empty Folder Trials** | Lab notes from the Raft/RFT consensus stress test: what Grinta built from an empty directory, where it struggled, and what the receipts actually prove. |
+| [45](45-the-product-surface-became-real.md) | **The Product Surface Became Real** | Why the current repo is no longer just an engine with a prompt, how Textual became the primary TTY surface, why non-interactive runs got their own path, and what launch hardening taught me about packaging trust. |
 | [07](07-the-road-ahead.md) | **The Road Ahead** | What is still experimental, what deserves improvement, and why the most honest ending for this project is still unfinished. |
 
 ### Short reading paths
@@ -147,7 +149,7 @@ Use these when a chapter names a subsystem and you want current behavior in pros
 | Terms and symbols | [Vocabulary](../VOCABULARY.md) |
 | Security posture | [Security checklist](../SECURITY_CHECKLIST.md), [Reliability](../RELIABILITY.md) |
 | Memory and RAG stack | [39 · Semantic Memory That Survived](39-the-semantic-memory-that-survived.md); implementation under `backend/context/` |
-| Tool design and the editing facade | [40 · The Facade Pattern and the Smaller File API](40-the-facade-pattern-and-the-smaller-file-api.md); implementation under `backend/tools/` |
+| Tool design and the editing facade | [40 · The Facade Pattern and the Smaller File API](40-the-facade-pattern-and-the-smaller-file-api.md); implementation under `backend/engine/tools/` |
 
 ---
 

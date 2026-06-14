@@ -90,7 +90,7 @@ def test_verification_output_clip_preserves_failing_assertion() -> None:
     assert 'AssertionError: parser dropped the trailing token' in (
         canonical.verification.output
     )
-    assert 'chars omitted' in canonical.verification.output
+    assert '... (truncated) ...' in canonical.verification.output
 
     # The prompt render stays bounded and still surfaces the failing tail.
     rendered = render_canonical_state_for_prompt(canonical, char_budget=2000)

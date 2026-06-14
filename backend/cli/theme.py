@@ -640,17 +640,30 @@ def grinta_rich_theme_styles() -> dict[str, str]:
     """Return Rich theme overrides used by CLI and TUI renderables."""
     if no_color_enabled():
         return {
-            'markdown.code': 'bold',
-            'repr.number': 'bold',
-            'repr.string': 'bold',
-            'repr.bool': 'bold',
+            'markdown.strong': 'not bold',
+            'markdown.code': 'not bold',
+            'markdown.code_block': 'not bold',
+            'markdown.item.bullet': 'not bold',
+            'markdown.h1': 'not bold underline',
+            'markdown.h3': 'not bold',
+            'markdown.table.header': 'not bold',
+            'repr.number': 'not bold',
+            'repr.string': 'not bold',
+            'repr.bool': 'not bold',
             'repr.none': 'dim',
             'repr.url': 'underline',
             'repr.uuid': 'dim',
         }
 
     return {
-        'markdown.code': f'bold {NAVY_TEXT_PRIMARY} on #101829',
+        'markdown.strong': 'not bold',
+        'markdown.code': f'not bold {NAVY_TEXT_PRIMARY} on #101829',
+        'markdown.code_block': f'not bold {NAVY_TEXT_PRIMARY} on #101829',
+        'markdown.item.bullet': NAVY_BRAND,
+        'markdown.h1': f'not bold underline {NAVY_TEXT_SECONDARY}',
+        'markdown.h2': f'underline {NAVY_BRAND}',
+        'markdown.h3': f'not bold {NAVY_BRAND}',
+        'markdown.table.header': f'not bold {NAVY_BRAND}',
         'repr.number': NAVY_TEXT_PRIMARY,
         'repr.string': NAVY_READY,
         'repr.bool': NAVY_BRAND,

@@ -12,19 +12,29 @@ from rich.console import Group
 from rich.markdown import Markdown
 from rich.syntax import Syntax
 from rich.text import Text
+from rich.theme import Theme
 
 from backend.cli.syntax_theme import (
     get_grinta_rich_syntax_theme,
     grinta_syntax_kwargs,
     inline_code_style,
 )
-from backend.cli.theme import NAVY_TEXT_PRIMARY
+from backend.cli.theme import NAVY_TEXT_PRIMARY, grinta_rich_theme_styles
 from backend.cli.tui._app_helpers import _encode_unified_diff_text
 
 _COMPLETE_FENCE_RE = re.compile(r'```([^\n`]*)\n(.*?)```', re.DOTALL)
 _OPEN_FENCE_RE = re.compile(r'```([^\n`]*)\n(.*)$', re.DOTALL)
 _OPEN_FENCE_START_RE = re.compile(r'```([^\n`]*)$')
 _INLINE_CODE_RE = re.compile(r'`([^`\n]+)`')
+
+
+class GrintaMarkdown(Markdown):
+    def __rich_console__(self, console, options):
+        console.push_theme(Theme(grinta_rich_theme_styles()))
+        try:
+            yield from super().__rich_console__(console, options)
+        finally:
+            console.pop_theme()
 
 
 def _prep_inline_code_text(text: str) -> Text:
@@ -103,7 +113,7 @@ class RenderArtifact:
 
 def prep_markdown(text: str) -> Markdown:
     theme = get_grinta_rich_syntax_theme()
-    return Markdown(
+    return GrintaMarkdown(
         text,
         code_theme=theme,
         inline_code_theme=theme,
