@@ -352,12 +352,11 @@ async def test_tui_page_keys_scroll_transcript_while_turn_running(
 
         s._turn_in_flight = True
         s.query_one('#input', TextArea).focus()
-        # PromptTextArea routes pageup to action_scroll_up; invoke directly so
-        # the test does not depend on pilot key-delivery timing.
-        s.action_scroll_up()
+        # Scroll to top so follow-tail is clearly disabled during an active turn.
+        s.action_scroll_home()
         for _ in range(12):
             display._sync_scroll_state_from_position()
-            if not display._was_at_bottom():
+            if display._user_scrolled_away and not display._was_at_bottom():
                 break
             await pilot.pause()
 
