@@ -37,21 +37,21 @@ class GrintaMarkdown(Markdown):
             console.pop_theme()
 
 
-def _prep_inline_code_text(text: str) -> Text:
+def _prep_inline_code_text(text: str, *, base_text_style: str = NAVY_TEXT_PRIMARY) -> Text:
     """Lightweight inline-code styling without full Markdown parsing."""
     parts: list[Any] = []
     pos = 0
     for match in _INLINE_CODE_RE.finditer(text):
         before = text[pos : match.start()]
         if before:
-            parts.append((before, NAVY_TEXT_PRIMARY))
+            parts.append((before, base_text_style))
         parts.append((match.group(1), inline_code_style()))
         pos = match.end()
     tail = text[pos:]
     if tail:
-        parts.append((tail, NAVY_TEXT_PRIMARY))
+        parts.append((tail, base_text_style))
     if not parts:
-        return Text(text, style=NAVY_TEXT_PRIMARY)
+        return Text(text, style=base_text_style)
     return Text.assemble(*parts)
 
 
@@ -88,18 +88,20 @@ def _split_streaming_fences(content: str) -> tuple[list[Any], str, bool]:
     return parts, tail, has_open_fence
 
 
-def _render_streaming_segment(segment: str) -> Any:
+def _render_streaming_segment(
+    segment: str, *, base_text_style: str = NAVY_TEXT_PRIMARY
+) -> Any:
     if not segment.strip():
         return None
     if '`' in segment and '```' not in segment:
-        return _prep_inline_code_text(segment)
-    if len(segment) < 600 and any(
+        return _prep_inline_code_text(segment, base_text_style=base_text_style)
+    if base_text_style == NAVY_TEXT_PRIMARY and len(segment) < 600 and any(
         marker in segment for marker in ('**', '__', '`', '\n#', '\n- ', '\n* ')
     ):
         return prep_markdown(segment)
     if '`' in segment:
-        return _prep_inline_code_text(segment)
-    return Text(segment, style=NAVY_TEXT_PRIMARY)
+        return _prep_inline_code_text(segment, base_text_style=base_text_style)
+    return Text(segment, style=base_text_style)
 
 
 @dataclass(frozen=True)
@@ -130,7 +132,9 @@ def _syntax_block(code: str, language: str) -> Syntax:
     )
 
 
-def prep_streaming_renderable(text: str) -> Any:
+def prep_streaming_renderable(
+    text: str, *, base_text_style: str = NAVY_TEXT_PRIMARY
+) -> Any:
     """Best-effort highlighted renderable for in-flight assistant markdown.
 
     Complete and in-progress fenced code blocks are highlighted as tokens
@@ -144,12 +148,12 @@ def prep_streaming_renderable(text: str) -> Any:
 
     if '```' not in content:
         if '`' in content:
-            return _prep_inline_code_text(content)
-        if len(content) < 600 and any(
+            return _prep_inline_code_text(content, base_text_style=base_text_style)
+        if base_text_style == NAVY_TEXT_PRIMARY and len(content) < 600 and any(
             marker in content for marker in ('**', '__', '`', '\n#', '\n- ', '\n* ')
         ):
             return prep_markdown(content)
-        return Text(content, style=NAVY_TEXT_PRIMARY)
+        return Text(content, style=base_text_style)
 
     raw_parts, _tail, _has_open = _split_streaming_fences(content)
     parts: list[Any] = []
@@ -157,12 +161,14 @@ def prep_streaming_renderable(text: str) -> Any:
         if isinstance(segment, Syntax):
             parts.append(segment)
             continue
-        rendered = _render_streaming_segment(segment)
+        rendered = _render_streaming_segment(
+            segment, base_text_style=base_text_style
+        )
         if rendered is not None:
             parts.append(rendered)
 
     if not parts:
-        return Text(content, style=NAVY_TEXT_PRIMARY)
+        return Text(content, style=base_text_style)
     if len(parts) == 1:
         return parts[0]
     return Group(*parts)

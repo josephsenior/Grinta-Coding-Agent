@@ -480,6 +480,35 @@ async def test_tui_user_scroll_wins_over_active_follow_tail(mock_config, monkeyp
 
 
 @pytest.mark.asyncio
+async def test_tui_page_keys_scroll_transcript_while_turn_running(
+    mock_config, monkeypatch
+):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(100, 24)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        display = s.query_one('#main-display')
+        display._suppress_mount_animation = True
+        await _fill_scrollable_transcript(display, pilot)
+        display.force_scroll_end()
+        await pilot.pause()
+        assert display._was_at_bottom()
+
+        s._turn_in_flight = True
+        s.query_one('#input', TextArea).focus()
+        await pilot.press('pageup')
+        await pilot.pause()
+
+        assert display._user_scrolled_away is True
+        assert not display._was_at_bottom()
+
+
+@pytest.mark.asyncio
 async def test_tui_backpressure_suppresses_mount_animation(mock_config, monkeypatch):
     """set_backpressure(True) skips append_widget's mount offset animation."""
     console = RichConsole()

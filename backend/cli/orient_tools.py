@@ -281,7 +281,7 @@ def file_read_observation_model(obs: Any) -> OrientLineModel:
         icon='↳',
         verb='Read',
         target=_display_path(path) or 'file',
-        result='lines 1–EOF',
+        result='',
     )
 
 
