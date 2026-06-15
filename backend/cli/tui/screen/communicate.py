@@ -1,3 +1,13 @@
+"""TUI surface for ``communicate_with_user`` structured actions.
+
+Renders interactive cards (clarification, proposal, confirm, inform, escalate)
+via :class:`~backend.cli.tui.widgets.welcome.CommunicatePromptWidget`.
+
+Newer flows may use ``ask_user`` elsewhere in the screen stack; this module
+remains the handler for legacy communicate action types and is covered by
+``backend/tests/unit/cli/tui/test_communicate.py``.
+"""
+
 from __future__ import annotations
 
 import shlex
@@ -39,7 +49,7 @@ def _stringify_attempt(attempt: object) -> str:
     return str(attempt)
 
 
-class _AppScreenCommunicateMixin:
+class ScreenCommunicateMixin:
     """Communicate-related methods of GrintaScreen."""
 
     def add_communicate_clarification(self, action: ClarificationRequestAction) -> None:

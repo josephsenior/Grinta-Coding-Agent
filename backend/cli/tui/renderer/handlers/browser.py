@@ -14,12 +14,12 @@ from backend.ledger.observation import BrowserScreenshotObservation
 
 if TYPE_CHECKING:
     from backend.cli.tui.renderer.mixins.event_processor import (
-        _AppRendererEventProcessorMixin,
+        RendererEventProcessorMixin,
     )
 
 
 def _update_browser_screenshot_card(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     prev: Any,
     last_cmd: str,
     url: str,
@@ -46,7 +46,7 @@ def _update_browser_screenshot_card(
 
 
 def _extract_screenshot_details(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     event: BrowserScreenshotObservation,
 ) -> tuple[str, str, Any, str]:
     url = getattr(event, 'image_path', '') or ''
@@ -57,7 +57,7 @@ def _extract_screenshot_details(
 
 
 def _handle_browser_tool_action(
-    orch: '_AppRendererEventProcessorMixin', event: BrowserToolAction
+    orch: 'RendererEventProcessorMixin', event: BrowserToolAction
 ) -> None:
     action_name = getattr(event, 'command', 'browser') or 'browser'
     url = resolve_browser_action_url(action_name, event)
@@ -68,7 +68,7 @@ def _handle_browser_tool_action(
 
 
 def _handle_browse_interactive_action(
-    orch: '_AppRendererEventProcessorMixin', event: BrowseInteractiveAction
+    orch: 'RendererEventProcessorMixin', event: BrowseInteractiveAction
 ) -> None:
     actions = getattr(event, 'browser_actions', '') or ''
     detail = actions[:80] + ('...' if len(actions) > 80 else '') if actions else ''
@@ -79,7 +79,7 @@ def _handle_browse_interactive_action(
 
 
 def _handle_browser_screenshot_observation(
-    orch: '_AppRendererEventProcessorMixin', event: BrowserScreenshotObservation
+    orch: 'RendererEventProcessorMixin', event: BrowserScreenshotObservation
 ) -> None:
     url, content, prev, last_cmd = _extract_screenshot_details(orch, event)
     image_path = getattr(event, 'image_path', '') or ''

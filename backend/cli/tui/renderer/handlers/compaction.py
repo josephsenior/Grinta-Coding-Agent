@@ -9,11 +9,11 @@ from backend.ledger.observation import AgentCondensationObservation
 
 if TYPE_CHECKING:
     from backend.cli.tui.renderer.mixins.event_processor import (
-        _AppRendererEventProcessorMixin,
+        RendererEventProcessorMixin,
     )
 
 
-def show_compaction_started_card(orch: '_AppRendererEventProcessorMixin') -> None:
+def show_compaction_started_card(orch: 'RendererEventProcessorMixin') -> None:
     """Ensure an in-progress compaction is visible in the transcript."""
     if getattr(orch, '_compaction_transcript_active', False):
         return
@@ -26,7 +26,7 @@ def show_compaction_started_card(orch: '_AppRendererEventProcessorMixin') -> Non
 
 
 def _handle_agent_condensation_observation(
-    orch: '_AppRendererEventProcessorMixin', event: AgentCondensationObservation
+    orch: 'RendererEventProcessorMixin', event: AgentCondensationObservation
 ) -> None:
     orch._compaction_transcript_active = False
     orch._update_runtime_strip(
@@ -42,7 +42,7 @@ def _handle_agent_condensation_observation(
 
 
 def _handle_compaction_trigger(
-    orch: '_AppRendererEventProcessorMixin', event: Any
+    orch: 'RendererEventProcessorMixin', event: Any
 ) -> None:
     del event
     show_compaction_started_card(orch)

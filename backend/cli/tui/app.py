@@ -25,56 +25,56 @@ from backend.cli.theme import (
     NAVY_WAITING,
 )
 from backend.cli.tui.renderer.mixins.action_handlers import (
-    _AppRendererActionHandlersMixin,  # noqa: F401
+    RendererActionHandlersMixin,  # noqa: F401
 )
 from backend.cli.tui.renderer.mixins.display import (
-    _AppRendererDisplayMixin,  # noqa: F401
+    RendererDisplayMixin,  # noqa: F401
 )
 from backend.cli.tui.renderer.mixins.event_processor import (
-    _AppRendererEventProcessorMixin,  # noqa: F401
+    RendererEventProcessorMixin,  # noqa: F401
 )
 
 # ── TUIRenderer mixin imports ──
-from backend.cli.tui.renderer.mixins.live import _AppRendererLiveMixin  # noqa: F401
+from backend.cli.tui.renderer.mixins.live import RendererLiveMixin  # noqa: F401
 from backend.cli.tui.renderer.mixins.terminal import (
-    _AppRendererTerminalMixin,  # noqa: F401
+    RendererTerminalMixin,  # noqa: F401
 )
 from backend.cli.tui.renderer.mixins.thinking import (
-    _AppRendererThinkingMixin,  # noqa: F401
+    RendererThinkingMixin,  # noqa: F401
 )
 from backend.cli.tui.screen.actions import (
-    _AppScreenActionsMixin,  # noqa: F401
+    ScreenActionsMixin,  # noqa: F401
 )
 from backend.cli.tui.screen.communicate import (
-    _AppScreenCommunicateMixin,  # noqa: F401
+    ScreenCommunicateMixin,  # noqa: F401
 )
-from backend.cli.tui.screen.input import _AppScreenInputMixin  # noqa: F401
+from backend.cli.tui.screen.input import ScreenInputMixin  # noqa: F401
 
 # ── GrintaScreen mixin imports ──
 from backend.cli.tui.screen.lifecycle import (
-    _AppScreenLifecycleMixin,  # noqa: F401
+    ScreenLifecycleMixin,  # noqa: F401
 )
 from backend.cli.tui.screen.messages import (
-    _AppScreenMessagesMixin,  # noqa: F401
+    ScreenMessagesMixin,  # noqa: F401
 )
 from backend.cli.tui.screen.settings import (
-    _AppScreenSettingsMixin,  # noqa: F401
+    ScreenSettingsMixin,  # noqa: F401
 )
-from backend.cli.tui.screen.state import _AppScreenStateMixin  # noqa: F401
+from backend.cli.tui.screen.state import ScreenStateMixin  # noqa: F401
 from backend.cli.tui.screen.welcome import (
-    _AppScreenWelcomeMixin,  # noqa: F401
+    ScreenWelcomeMixin,  # noqa: F401
 )
 
 
 class GrintaScreen(
-    _AppScreenLifecycleMixin,
-    _AppScreenStateMixin,
-    _AppScreenMessagesMixin,
-    _AppScreenCommunicateMixin,
-    _AppScreenWelcomeMixin,
-    _AppScreenSettingsMixin,
-    _AppScreenInputMixin,
-    _AppScreenActionsMixin,
+    ScreenLifecycleMixin,
+    ScreenStateMixin,
+    ScreenMessagesMixin,
+    ScreenCommunicateMixin,
+    ScreenWelcomeMixin,
+    ScreenSettingsMixin,
+    ScreenInputMixin,
+    ScreenActionsMixin,
     Screen,
 ):
     """Main TUI screen — Mission Control layout."""
@@ -223,12 +223,12 @@ class GrintaScreen(
 
 
 class TUIRenderer(
-    _AppRendererLiveMixin,
-    _AppRendererDisplayMixin,
-    _AppRendererTerminalMixin,
-    _AppRendererThinkingMixin,
-    _AppRendererEventProcessorMixin,
-    _AppRendererActionHandlersMixin,
+    RendererLiveMixin,
+    RendererDisplayMixin,
+    RendererTerminalMixin,
+    RendererThinkingMixin,
+    RendererEventProcessorMixin,
+    RendererActionHandlersMixin,
 ):
     """Rich-driven renderer for Textual — manages history and real-time display."""
 

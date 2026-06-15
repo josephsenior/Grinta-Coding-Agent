@@ -1,4 +1,4 @@
-"""File-diff extraction helpers for :class:`_AppRendererEventProcessorMixin`.
+"""File-diff extraction helpers for :class:`RendererEventProcessorMixin`.
 
 These helpers decide what text to render in the ``Edited`` card when a
 file-edit/file-write observation arrives. The four entry points correspond
@@ -20,7 +20,7 @@ from backend.core.workspace_resolution import resolve_cli_workspace_directory
 
 if TYPE_CHECKING:
     from backend.cli.tui.renderer.mixins.event_processor import (
-        _AppRendererEventProcessorMixin,
+        RendererEventProcessorMixin,
     )
 
 
@@ -37,7 +37,7 @@ def _text_contains_clear_marker(text: str) -> bool:
 
 
 def _should_replace_task_list_from_event(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     event: Any,
 ) -> bool:
     """Ignore empty task payloads unless they clearly mean to clear the plan."""
@@ -60,7 +60,7 @@ def _should_replace_task_list_from_event(
 
 
 def _extract_file_observation_diff(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     event: Any,
 ) -> str | None:
     """Extract unified diff text from any file edit/write observation."""
@@ -68,7 +68,7 @@ def _extract_file_observation_diff(
 
 
 def _extract_file_edit_group_rows(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     event: Any,
 ) -> str | None:
     """Extract two-pane diff rows from before/after edit groups."""
@@ -111,7 +111,7 @@ def _try_compute_diff_from_old_new(event: Any) -> str | None:
 
 
 def _extract_file_edit_diff(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     event: Any,
 ) -> str | None:
     """Extract unified diff from a FileEditObservation for TUI display."""
@@ -173,7 +173,7 @@ def _try_git_diff_subprocess(workspace: Path, clean_path: str) -> str | None:
 
 
 def _extract_git_file_diff(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     path: str,
 ) -> str | None:
     """Best-effort fallback when observations omit inline diff payloads."""

@@ -25,7 +25,7 @@ from backend.core.interaction_modes import (
 )
 
 
-class _AppScreenSettingsMixin:
+class ScreenSettingsMixin:
     """Settings-related methods of GrintaScreen."""
 
     def on_focus(self, event: events.Focus) -> None:

@@ -1,4 +1,4 @@
-"""Event-dispatch state machine for :class:`_AppRendererEventProcessorMixin`.
+"""Event-dispatch state machine for :class:`RendererEventProcessorMixin`.
 
 This module is the heart of the TUI event pipeline: a single ``_process_event``
 function that examines an incoming ledger event/action and routes it to the
@@ -184,11 +184,11 @@ from backend.ledger.observation.memory_tools import (
 
 if TYPE_CHECKING:
     from backend.cli.tui.renderer.mixins.event_processor import (
-        _AppRendererEventProcessorMixin,
+        RendererEventProcessorMixin,
     )
 
 
-# Re-export for _AppRendererEventProcessorMixin.
+# Re-export for RendererEventProcessorMixin.
 _show_compaction_started_card = show_compaction_started_card
 
 
@@ -198,7 +198,7 @@ _show_compaction_started_card = show_compaction_started_card
 
 
 def _handle_message_action(
-    orch: '_AppRendererEventProcessorMixin', event: MessageAction
+    orch: 'RendererEventProcessorMixin', event: MessageAction
 ) -> None:
     source = getattr(event, 'source', None)
     if orch._is_user_source(source):
@@ -268,7 +268,7 @@ def _is_orient_event(event: Any) -> bool:
 
 
 def _maybe_flush_orient_burst(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     event: Any,
 ) -> None:
     if _is_orient_event(event):
@@ -287,7 +287,7 @@ def _process_event_is_noop(event: Any) -> bool:
 
 
 def _process_event_check_user_message(
-    orch: '_AppRendererEventProcessorMixin', event: Any
+    orch: 'RendererEventProcessorMixin', event: Any
 ) -> None:
     source = getattr(event, 'source', None)
     if isinstance(event, MessageAction) and orch._is_user_source(source):
@@ -296,7 +296,7 @@ def _process_event_check_user_message(
 
 
 def _process_event_maybe_start_turn(
-    orch: '_AppRendererEventProcessorMixin', event: Any
+    orch: 'RendererEventProcessorMixin', event: Any
 ) -> None:
     if orch._in_agent_turn:
         return
@@ -312,7 +312,7 @@ def _process_event_maybe_start_turn(
 
 
 def _process_event_finalize_thinking(
-    orch: '_AppRendererEventProcessorMixin', event: Any
+    orch: 'RendererEventProcessorMixin', event: Any
 ) -> None:
     if orch._is_live_thinking_event(event):
         return
@@ -322,7 +322,7 @@ def _process_event_finalize_thinking(
 
 
 def _process_event_commit_response(
-    orch: '_AppRendererEventProcessorMixin', event: Any, is_tool: bool
+    orch: 'RendererEventProcessorMixin', event: Any, is_tool: bool
 ) -> None:
     if isinstance(event, (MessageAction, StreamingChunkAction)):
         return
@@ -335,7 +335,7 @@ def _process_event_commit_response(
         orch.clear_live_response()
 
 
-def _process_event(orch: '_AppRendererEventProcessorMixin', event: Any) -> None:
+def _process_event(orch: 'RendererEventProcessorMixin', event: Any) -> None:
     event_id = getattr(event, 'id', -1)
     replay_mode = getattr(orch, '_replay_mode', False)
     if (
@@ -373,7 +373,7 @@ def _process_event(orch: '_AppRendererEventProcessorMixin', event: Any) -> None:
             flush_sync()
 
 
-def _dispatch_event(orch: '_AppRendererEventProcessorMixin', event: Any) -> None:
+def _dispatch_event(orch: 'RendererEventProcessorMixin', event: Any) -> None:
     event_type = type(event)
     handler = _EVENT_HANDLERS.get(event_type)
     if handler is not None:

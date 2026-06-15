@@ -2512,13 +2512,13 @@ async def test_tui_recoverable_error_routes_to_add_warning(mock_config):
 async def test_tui_add_error_and_warning_omit_hardcoded_wrap(mock_config):
     """add_error/add_warning must not pre-wrap text — let the container wrap."""
     from backend.cli.tui.screen.messages import (
-        _AppScreenMessagesMixin,
+        ScreenMessagesMixin,
     )
     from backend.cli.tui.widgets.transcript_notice import TranscriptNotice
 
     long_text = 'recoverable ' + ('x' * 200)
     # Use a stub class to exercise the helper without spinning up Textual.
-    stub = _AppScreenMessagesMixin.__new__(_AppScreenMessagesMixin)
+    stub = ScreenMessagesMixin.__new__(ScreenMessagesMixin)
     captured: list[object] = []
     stub._write_log = lambda renderable: captured.append(renderable)  # type: ignore[attr-defined]
 
@@ -2539,10 +2539,10 @@ async def test_tui_add_error_and_warning_omit_hardcoded_wrap(mock_config):
 @pytest.mark.asyncio
 async def test_tui_protocol_status_is_unlabeled_dim_text(mock_config):
     from backend.cli.tui.screen.messages import (
-        _AppScreenMessagesMixin,
+        ScreenMessagesMixin,
     )
 
-    stub = _AppScreenMessagesMixin.__new__(_AppScreenMessagesMixin)
+    stub = ScreenMessagesMixin.__new__(ScreenMessagesMixin)
     captured: list[object] = []
     stub.finalize_thinking = lambda: None  # type: ignore[attr-defined]
     stub._write_log = lambda renderable: captured.append(renderable)  # type: ignore[attr-defined]

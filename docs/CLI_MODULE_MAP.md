@@ -84,10 +84,16 @@ These files are over the soft limit but kept whole:
 - `tui/screen/lifecycle.py` (~800)
 - `tui/renderer/drain.py`, `tui/screen/input.py`, `tui/renderer/mixins/display.py`
 
+## Mixin conventions
+
+TUI and file-editor splits use `{Host}{Concern}Mixin` class names aligned with
+their module (`screen/lifecycle.py` → `ScreenLifecycleMixin`,
+`renderer/mixins/display.py` → `RendererDisplayMixin`).
+
 ## Future work
 
 | Area | Notes |
 |------|-------|
-| `screen/communicate.py` | Legacy; `ask_user` supersedes some flows but tests remain |
+| `screen/communicate.py` | Maintained for `communicate_with_user` action types; `ask_user` covers newer flows |
 | Integration-fast CI | Optional speedup |
 | Mypy ratchet | Type-check tightening |

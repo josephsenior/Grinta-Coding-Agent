@@ -1,4 +1,4 @@
-"""_AppRendererEventProcessorMixin: event drain/activity + per-event processing + diff extraction."""
+"""RendererEventProcessorMixin: event drain/activity + per-event processing + diff extraction."""
 
 from __future__ import annotations
 
@@ -38,13 +38,13 @@ from backend.cli.tui.renderer.processor import (
 )
 
 __all__ = [
-    '_AppRendererEventProcessorMixin',
+    'RendererEventProcessorMixin',
     '_TUI_HISTORY_RENDER_LIMIT',
     '_TUI_PENDING_EVENT_LIMIT',
 ]
 
 
-class _AppRendererEventProcessorMixin:
+class RendererEventProcessorMixin:
     """event drain/activity + per-event processing + diff extraction."""
 
     @staticmethod

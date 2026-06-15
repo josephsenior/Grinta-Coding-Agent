@@ -38,12 +38,12 @@ from backend.ledger.observation import (
 
 if TYPE_CHECKING:
     from backend.cli.tui.renderer.mixins.event_processor import (
-        _AppRendererEventProcessorMixin,
+        RendererEventProcessorMixin,
     )
 
 
 def _update_or_write_lsp_card(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     card: Any,
     symbol: str,
     available: bool,
@@ -67,7 +67,7 @@ def _update_or_write_lsp_card(
 
 
 def _handle_grep_action(
-    orch: '_AppRendererEventProcessorMixin', event: GrepAction
+    orch: 'RendererEventProcessorMixin', event: GrepAction
 ) -> None:
     model = grep_action_model(event)
     orch._pending_search_card = model
@@ -81,7 +81,7 @@ def _handle_grep_action(
 
 
 def _handle_glob_action(
-    orch: '_AppRendererEventProcessorMixin', event: GlobAction
+    orch: 'RendererEventProcessorMixin', event: GlobAction
 ) -> None:
     model = glob_action_model(event)
     orch._pending_search_card = model
@@ -95,7 +95,7 @@ def _handle_glob_action(
 
 
 def _handle_lsp_query_action(
-    orch: '_AppRendererEventProcessorMixin', event: LspQueryAction
+    orch: 'RendererEventProcessorMixin', event: LspQueryAction
 ) -> None:
     model = lsp_action_model(event)
     orch._pending_lsp_card = model
@@ -107,7 +107,7 @@ def _handle_lsp_query_action(
 
 
 def _handle_grep_observation(
-    orch: '_AppRendererEventProcessorMixin', event: GrepObservation
+    orch: 'RendererEventProcessorMixin', event: GrepObservation
 ) -> None:
     fallback = grep_observation_model(event)
     pending = orch._pending_search_card
@@ -121,7 +121,7 @@ def _handle_grep_observation(
 
 
 def _handle_glob_observation(
-    orch: '_AppRendererEventProcessorMixin', event: GlobObservation
+    orch: 'RendererEventProcessorMixin', event: GlobObservation
 ) -> None:
     fallback = glob_observation_model(event)
     pending = orch._pending_search_card
@@ -135,7 +135,7 @@ def _handle_glob_observation(
 
 
 def _handle_lsp_query_observation(
-    orch: '_AppRendererEventProcessorMixin', event: LspQueryObservation
+    orch: 'RendererEventProcessorMixin', event: LspQueryObservation
 ) -> None:
     pending = orch._pending_lsp_card
     pending_model = pending if isinstance(pending, OrientLineModel) else None
@@ -144,7 +144,7 @@ def _handle_lsp_query_observation(
 
 
 def _handle_find_symbols_action(
-    orch: '_AppRendererEventProcessorMixin', event: FindSymbolsAction
+    orch: 'RendererEventProcessorMixin', event: FindSymbolsAction
 ) -> None:
     model = find_symbols_action_model(event)
     orch._pending_find_symbols_card = model
@@ -157,7 +157,7 @@ def _handle_find_symbols_action(
 
 
 def _handle_find_symbols_observation(
-    orch: '_AppRendererEventProcessorMixin', event: FindSymbolsObservation
+    orch: 'RendererEventProcessorMixin', event: FindSymbolsObservation
 ) -> None:
     fallback = find_symbols_observation_model(event)
     pending = orch._pending_find_symbols_card
@@ -170,7 +170,7 @@ def _handle_find_symbols_observation(
 
 
 def _handle_read_symbols_action(
-    orch: '_AppRendererEventProcessorMixin', event: ReadSymbolsAction
+    orch: 'RendererEventProcessorMixin', event: ReadSymbolsAction
 ) -> None:
     model = read_symbols_action_model(event)
     orch._pending_read_symbols_card = model
@@ -183,7 +183,7 @@ def _handle_read_symbols_action(
 
 
 def _handle_read_symbols_observation(
-    orch: '_AppRendererEventProcessorMixin', event: ReadSymbolsObservation
+    orch: 'RendererEventProcessorMixin', event: ReadSymbolsObservation
 ) -> None:
     fallback = read_symbols_observation_model(event)
     pending = orch._pending_read_symbols_card
@@ -196,7 +196,7 @@ def _handle_read_symbols_observation(
 
 
 def _handle_analyze_project_structure_action(
-    orch: '_AppRendererEventProcessorMixin', event: AnalyzeProjectStructureAction
+    orch: 'RendererEventProcessorMixin', event: AnalyzeProjectStructureAction
 ) -> None:
     model = analyze_action_model(event)
     orch._pending_analyze_project_structure_card = model
@@ -209,7 +209,7 @@ def _handle_analyze_project_structure_action(
 
 
 def _handle_analyze_project_structure_observation(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     event: AnalyzeProjectStructureObservation,
 ) -> None:
     content = (event.error or event.content or '').strip()

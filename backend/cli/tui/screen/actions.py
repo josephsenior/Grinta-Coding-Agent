@@ -1,4 +1,4 @@
-"""_AppScreenActionsMixin: scroll/copy/suspend/confirmation methods."""
+"""ScreenActionsMixin: scroll/copy/suspend/confirmation methods."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from backend.cli.tui.widgets.small import Transcript
 from backend.orchestration.autonomy import normalize_autonomy_level
 
 
-class _AppScreenActionsMixin:
+class ScreenActionsMixin:
     """Action methods of GrintaScreen (scroll/copy/suspend/confirmation)."""
 
     def action_suspend(self) -> None:

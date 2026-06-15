@@ -11,12 +11,12 @@ from backend.ledger.observation import ErrorObservation, StatusObservation, Succ
 
 if TYPE_CHECKING:
     from backend.cli.tui.renderer.mixins.event_processor import (
-        _AppRendererEventProcessorMixin,
+        RendererEventProcessorMixin,
     )
 
 
 def _handle_error_observation(
-    orch: '_AppRendererEventProcessorMixin', event: ErrorObservation
+    orch: 'RendererEventProcessorMixin', event: ErrorObservation
 ) -> None:
     orch._compaction_transcript_active = False
     content = event.content or 'An unknown error occurred'
@@ -31,7 +31,7 @@ def _handle_error_observation(
 
 
 def _handle_success_observation(
-    orch: '_AppRendererEventProcessorMixin', event: SuccessObservation
+    orch: 'RendererEventProcessorMixin', event: SuccessObservation
 ) -> None:
     orch._compaction_transcript_active = False
     orch._clear_retry_strip('Recovered')
@@ -40,7 +40,7 @@ def _handle_success_observation(
 
 
 def _handle_status_retry(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     status_type: str,
     extras: dict,
 ) -> None:
@@ -52,7 +52,7 @@ def _handle_status_retry(
 
 
 def _handle_status_compaction(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
 ) -> None:
     orch._clear_retry_strip('Idle')
     orch._hud.update_agent_state('Compacting')
@@ -66,7 +66,7 @@ def _handle_status_compaction(
 
 
 def _handle_status_notice(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     event: StatusObservation,
     status_type: str,
 ) -> None:
@@ -82,7 +82,7 @@ def _handle_status_notice(
 
 
 def _handle_status_observation(
-    orch: '_AppRendererEventProcessorMixin', event: StatusObservation
+    orch: 'RendererEventProcessorMixin', event: StatusObservation
 ) -> None:
     status_type = str(getattr(event, 'status_type', '') or '')
     extras = getattr(event, 'extras', None) or {}

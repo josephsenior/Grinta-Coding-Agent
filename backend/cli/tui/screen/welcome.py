@@ -10,7 +10,7 @@ from backend.cli.tui.widgets.welcome import (
 )
 
 
-class _AppScreenWelcomeMixin:
+class ScreenWelcomeMixin:
     """Welcome-related methods of GrintaScreen."""
 
     def _get_welcome_widget(self) -> WelcomeWidget | None:

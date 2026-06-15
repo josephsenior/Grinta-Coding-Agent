@@ -1,4 +1,4 @@
-"""Event-classification helpers for :class:`_AppRendererEventProcessorMixin`.
+"""Event-classification helpers for :class:`RendererEventProcessorMixin`.
 
 These two predicates decide whether an event belongs to the live-thinking
 stream (so the renderer should not yet commit its buffered response) and
@@ -16,12 +16,12 @@ from backend.orchestration.autonomy import normalize_autonomy_level
 
 if TYPE_CHECKING:
     from backend.cli.tui.renderer.mixins.event_processor import (
-        _AppRendererEventProcessorMixin,
+        RendererEventProcessorMixin,
     )
 
 
 def _is_live_thinking_event(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     event: Any,
 ) -> bool:
     if isinstance(event, AgentThinkAction):
@@ -42,7 +42,7 @@ def _is_live_thinking_event(
     return isinstance(event, StreamingChunkAction)
 
 
-def _is_full_autonomy(orch: '_AppRendererEventProcessorMixin') -> bool:
+def _is_full_autonomy(orch: 'RendererEventProcessorMixin') -> bool:
     controller = getattr(orch._tui, '_controller', None)
     ac = getattr(controller, 'autonomy_controller', None)
     if ac is not None:

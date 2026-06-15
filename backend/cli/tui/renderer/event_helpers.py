@@ -1,4 +1,4 @@
-"""File-card pending-queue helpers extracted from :class:`_AppRendererEventProcessorMixin`.
+"""File-card pending-queue helpers extracted from :class:`RendererEventProcessorMixin`.
 
 These three small helpers manage the per-path queues that pair an in-flight
 file-action card with its corresponding observation card. They are kept
@@ -12,11 +12,11 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from backend.cli.tui.renderer.mixins.event_processor import (
-        _AppRendererEventProcessorMixin,
+        RendererEventProcessorMixin,
     )
 
 
-def _compact_file_card_path(_orch: '_AppRendererEventProcessorMixin', path: str) -> str:
+def _compact_file_card_path(_orch: 'RendererEventProcessorMixin', path: str) -> str:
     """Keep file tool card headlines to one compact row."""
     from backend.cli.event_rendering.text_utils import truncate_activity_detail
 
@@ -24,7 +24,7 @@ def _compact_file_card_path(_orch: '_AppRendererEventProcessorMixin', path: str)
 
 
 def _remember_pending_file_card(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     attr: str,
     path: str,
     widget: Any,
@@ -36,7 +36,7 @@ def _remember_pending_file_card(
 
 
 def _take_pending_file_card(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     attr: str,
     path: str,
 ) -> Any | None:
@@ -54,7 +54,7 @@ def _take_pending_file_card(
 
 
 def _has_pending_file_card(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     attr: str,
     path: str,
 ) -> bool:

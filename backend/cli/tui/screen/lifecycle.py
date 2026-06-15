@@ -53,7 +53,7 @@ from backend.persistence import get_file_store
 from backend.persistence.locations import get_local_data_root
 
 
-class _AppScreenLifecycleMixin:
+class ScreenLifecycleMixin:
     """Lifecycle-related methods of GrintaScreen."""
 
     def compose(self) -> ComposeResult:

@@ -22,7 +22,7 @@ class ToolError(Exception):
         self.message = message
 
 
-class _FileEditorRollbackMixin:
+class FileEditorRollbackMixin:
     def _handle_undo_last_edit(self, file_path: Path, display_path: str) -> ToolResult:
         try:
             file_path = self._validate_rollback_target(file_path)

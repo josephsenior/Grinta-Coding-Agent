@@ -1,4 +1,4 @@
-"""_AppRendererLiveMixin: subscribe + live thinking/response streaming."""
+"""RendererLiveMixin: subscribe + live thinking/response streaming."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ def _streaming_render_interval(text: str) -> float:
     return streaming_render_interval(text)
 
 
-class _AppRendererLiveMixin:
+class RendererLiveMixin:
     """subscribe + live thinking/response streaming."""
 
     def _maybe_scroll_to_tail(self, display: Any) -> None:

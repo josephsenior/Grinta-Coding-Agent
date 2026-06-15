@@ -4,7 +4,7 @@ No instance state — these helpers deal with byte/text round-tripping,
 disk-payload encoding, write-success messages, and the ``_FileReadMeta``
 dataclass that captures per-file encoding/newline metadata.
 
-Extracted from ``backend.execution.utils._file_editor_ops_mixin`` to
+Extracted from ``backend.execution.utils.file_editor_ops_mixin`` to
 keep that module focused on the ops mixin class.
 """
 

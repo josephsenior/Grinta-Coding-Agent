@@ -1,4 +1,4 @@
-"""_AppRendererActionHandlersMixin: action handlers (search/message/streaming/state)."""
+"""RendererActionHandlersMixin: action handlers (search/message/streaming/state)."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from backend.ledger.action import (
 )
 
 
-class _AppRendererActionHandlersMixin:
+class RendererActionHandlersMixin:
     """action handlers (search/message/streaming/state)."""
 
     _LIVE_STREAM_PAINT_INTERVAL = 0.033

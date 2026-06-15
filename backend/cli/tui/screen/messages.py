@@ -32,7 +32,7 @@ from backend.cli.tui.widgets.welcome import (
 from backend.core.enums import AgentState
 
 
-class _AppScreenMessagesMixin:
+class ScreenMessagesMixin:
     """Messages-related methods of GrintaScreen."""
 
     def _get_display(self) -> Transcript:

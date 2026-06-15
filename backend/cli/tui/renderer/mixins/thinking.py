@@ -1,4 +1,4 @@
-"""_AppRendererThinkingMixin: classify and render thinking-like payloads."""
+"""RendererThinkingMixin: classify and render thinking-like payloads."""
 
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ class ThinkingRenderIntent:
     severity: ThinkingIntentSeverity = 'error'
 
 
-class _AppRendererThinkingMixin:
+class RendererThinkingMixin:
     """Classify thinking payloads so only pure reasoning uses thinking blocks."""
 
     _MEMORY_THINK_TAGS = {

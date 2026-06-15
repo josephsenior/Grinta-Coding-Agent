@@ -141,7 +141,7 @@ def _parse_positional_limit_arg(
     return i + 1, False
 
 
-class _AppScreenInputMixin:
+class ScreenInputMixin:
     """Input-related methods of GrintaScreen."""
 
     def action_history_prev(self) -> None:
