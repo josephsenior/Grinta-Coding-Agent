@@ -35,7 +35,7 @@ def _orient_path(path: str | None, max_len: int = 36) -> str:
     separators = [idx for idx in (tail.find('/'), tail.find('\\')) if idx >= 0]
     if not separators:
         return display
-    return '…' + tail[min(separators):]
+    return '…' + tail[min(separators) :]
 
 
 def _pluralize_result_label(label: str, count: int) -> str:

@@ -2,9 +2,13 @@
 
 from backend.tests.unit.cli.tui import _shared
 from backend.tests.unit.cli.tui._shared import *  # noqa: F403
+
 for _name in dir(_shared):
-    if _name.startswith("_") and not _name.startswith("__"):
+    if _name.startswith('_') and not _name.startswith('__'):
         globals()[_name] = getattr(_shared, _name)
+
+from backend.tests.unit.cli.tui._shared import _get_screen
+
 
 @pytest.mark.asyncio
 async def test_tui_communicate_clarification_supports_keyboard_selection(
@@ -55,6 +59,7 @@ async def test_tui_communicate_clarification_supports_keyboard_selection(
         assert len(captured) == 1
         assert 'Refactor the public API' in captured[0]
         assert 'Which direction should I take?' in captured[0]
+
 
 @pytest.mark.asyncio
 async def test_tui_communicate_proposal_click_submits_selected_option(
@@ -113,6 +118,7 @@ async def test_tui_communicate_proposal_click_submits_selected_option(
         assert len(captured) == 1
         assert 'Patch the current flow' in captured[0]
 
+
 @pytest.mark.asyncio
 async def test_tui_communicate_proposal_marks_recommended_in_label(
     mock_config, monkeypatch
@@ -158,6 +164,7 @@ async def test_tui_communicate_proposal_marks_recommended_in_label(
         # The default selection is the first option, as before.
         assert card.current_value == 'Option A'
 
+
 @pytest.mark.asyncio
 async def test_tui_communicate_uncertainty_renders_informational_card(
     mock_config, monkeypatch
@@ -198,6 +205,7 @@ async def test_tui_communicate_uncertainty_renders_informational_card(
         # Uncertainty is non-blocking: the active communicate card is None.
         assert s._active_communicate_card is None
 
+
 @pytest.mark.asyncio
 async def test_tui_communicate_escalate_renders_structured_attempts(
     mock_config, monkeypatch
@@ -236,6 +244,7 @@ async def test_tui_communicate_escalate_renders_structured_attempts(
         assert 'rg --files' in card._subheader_text
         assert 'permission denied' in card._subheader_text
         assert 'Help needed' in card._subheader_text
+
 
 @pytest.mark.asyncio
 async def test_tui_communicate_confirm_renders_with_safe_default_selected(
@@ -285,6 +294,7 @@ async def test_tui_communicate_confirm_renders_with_safe_default_selected(
         assert len(captured) == 1
         assert 'No, abort' in captured[0]
 
+
 @pytest.mark.asyncio
 async def test_tui_communicate_inform_renders_without_blocking(
     mock_config, monkeypatch
@@ -320,6 +330,7 @@ async def test_tui_communicate_inform_renders_without_blocking(
 
         # Inform never blocks; the active card is None.
         assert s._active_communicate_card is None
+
 
 @pytest.mark.asyncio
 async def test_tui_communicate_selection_scaffolds_user_reply_with_question(
@@ -367,6 +378,7 @@ async def test_tui_communicate_selection_scaffolds_user_reply_with_question(
         assert 'Which direction should I take?' in reply
         assert 'user answered the prompt' in reply
 
+
 @pytest.mark.asyncio
 async def test_tui_communicate_clarification_supports_structured_options(
     mock_config, monkeypatch
@@ -403,6 +415,7 @@ async def test_tui_communicate_clarification_supports_structured_options(
         assert card.has_options is True
         assert 'requests' in card._values
         assert 'httpx' in card._values
+
 
 @pytest.mark.asyncio
 async def test_tui_communicate_prompt_blocks_welcome_empty_state(

@@ -13,6 +13,7 @@ from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
 
+from backend.cli.display.transcript import format_live_panel
 from backend.cli.layout_tokens import (
     LIVE_PANEL_ACCENT_STYLE,
     WORKER_LABEL_WIDTH,
@@ -42,7 +43,6 @@ from backend.cli.theme import (
     STYLE_SYSTEM_TAG_WARNING,
     get_grinta_pygments_style,
 )
-from backend.cli.display.transcript import format_live_panel
 from backend.core.task_status import (
     TASK_STATUS_PANEL_STYLES,
     TASK_STATUS_TODO,

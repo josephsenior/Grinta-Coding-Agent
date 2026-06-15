@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from backend.cli.event_rendering.unified_renderer.types import ActivityCard, ActivityLine
+from backend.cli.event_rendering.unified_renderer.types import (
+    ActivityCard,
+    ActivityLine,
+)
 from backend.cli.event_rendering.unified_renderer.utils import (
     _looks_error_heavy,
     _strip_ansi,

@@ -5,7 +5,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from backend.cli.event_rendering.unified_renderer import ActivityRenderer
-from backend.cli.orient_tools import OrientLineModel, file_read_action_model, file_read_observation_model
+from backend.cli.orient_tools import (
+    OrientLineModel,
+    file_read_action_model,
+    file_read_observation_model,
+)
 from backend.cli.tui.helpers import (
     _count_text_lines,
     _count_unified_diff_changes,
@@ -22,7 +26,11 @@ from backend.cli.tui.renderer.helpers.file import (
     resolve_no_cmd_line_range,
 )
 from backend.ledger.action import FileEditAction, FileReadAction, FileWriteAction
-from backend.ledger.observation import FileEditObservation, FileReadObservation, FileWriteObservation
+from backend.ledger.observation import (
+    FileEditObservation,
+    FileReadObservation,
+    FileWriteObservation,
+)
 
 if TYPE_CHECKING:
     from backend.cli.tui.renderer.mixins.event_processor import (

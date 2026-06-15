@@ -41,8 +41,6 @@ def _handle_agent_condensation_observation(
     orch._write_card(card)
 
 
-def _handle_compaction_trigger(
-    orch: 'RendererEventProcessorMixin', event: Any
-) -> None:
+def _handle_compaction_trigger(orch: 'RendererEventProcessorMixin', event: Any) -> None:
     del event
     show_compaction_started_card(orch)

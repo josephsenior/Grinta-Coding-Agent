@@ -43,12 +43,18 @@ IMPORT_REPLACEMENTS: list[tuple[str, str]] = [
 ]
 
 FILE_RENAMES: list[tuple[str, str]] = [
-    ('execution/utils/_file_editor_ops_mixin.py', 'execution/utils/file_editor_ops_mixin.py'),
+    (
+        'execution/utils/_file_editor_ops_mixin.py',
+        'execution/utils/file_editor_ops_mixin.py',
+    ),
     (
         'execution/utils/_file_editor_rollback_mixin.py',
         'execution/utils/file_editor_rollback_mixin.py',
     ),
-    ('execution/utils/_file_editor_view_mixin.py', 'execution/utils/file_editor_view_mixin.py'),
+    (
+        'execution/utils/_file_editor_view_mixin.py',
+        'execution/utils/file_editor_view_mixin.py',
+    ),
 ]
 
 

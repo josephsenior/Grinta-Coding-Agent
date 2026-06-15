@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
+from backend.cli.display.transcript import format_activity_primary
 from backend.cli.theme import (
     CLR_BRAND_HUE,
     CLR_SECONDARY,
     CLR_STATUS_ERR,
     CLR_STATUS_OK,
 )
-from backend.cli.display.transcript import format_activity_primary
 
 
 def _count_by_status(tasks: list[dict[str, str]], status: str) -> int:

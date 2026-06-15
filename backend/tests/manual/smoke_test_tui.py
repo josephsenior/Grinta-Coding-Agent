@@ -10,9 +10,7 @@ class TestApp(App):
         s = self.console.size
         print(f'\n=== TestApp starting (terminal size {s}) ===\n')
 
-        fc = ActivityRenderer.file_create(
-            path='demo.txt', line_count=2
-        )
+        fc = ActivityRenderer.file_create(path='demo.txt', line_count=2)
         print('file_create card:')
         print('  verb:', fc.verb)
         print('  detail:', fc.detail)

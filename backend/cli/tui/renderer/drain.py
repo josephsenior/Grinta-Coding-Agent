@@ -279,9 +279,7 @@ def _collect_pending_events(
     return events, dropped
 
 
-def _record_dropped_events(
-    orch: 'RendererEventProcessorMixin', dropped: int
-) -> None:
+def _record_dropped_events(orch: 'RendererEventProcessorMixin', dropped: int) -> None:
     notice = Text(
         f'... {dropped} stale TUI event(s) skipped while the renderer caught up ...',
         style=NAVY_TEXT_DIM,

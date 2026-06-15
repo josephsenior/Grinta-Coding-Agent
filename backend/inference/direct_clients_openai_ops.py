@@ -567,8 +567,6 @@ def _reasoning_details_text(details: Any) -> str:
 
 def _coalesce_stream_delta_reasoning(delta: dict[str, Any]) -> dict[str, Any]:
     """Normalize vendor-specific reasoning fields onto ``reasoning_content``."""
-    if not isinstance(delta, dict):
-        return delta
     if isinstance(delta.get('reasoning_content'), str) and delta['reasoning_content']:
         return delta
 

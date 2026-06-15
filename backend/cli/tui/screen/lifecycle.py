@@ -18,6 +18,7 @@ from textual.widgets import (
 
 from backend.cli.tui.constants import _tui_logger
 from backend.cli.tui.dialogs import ConfirmWidget, GrintaHelpDialog
+from backend.cli.tui.widgets.collapsible import CollapsibleSection
 from backend.cli.tui.widgets.small import (
     HUD,
     InfoSidebar,
@@ -27,7 +28,6 @@ from backend.cli.tui.widgets.small import (
     RendererDrainRequested,
     Transcript,
 )
-from backend.cli.tui.widgets.collapsible import CollapsibleSection
 from backend.core.bootstrap.agent_control_loop import run_agent_until_done
 from backend.core.bootstrap.main import (
     create_agent,

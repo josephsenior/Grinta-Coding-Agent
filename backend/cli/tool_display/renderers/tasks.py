@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from backend.cli.display.transcript import format_activity_primary
 from backend.cli.theme import (
     CLR_BRAND_HUE,
     CLR_DETAIL,
@@ -11,7 +12,6 @@ from backend.cli.theme import (
     CLR_STATUS_ERR,
     CLR_STATUS_OK,
 )
-from backend.cli.display.transcript import format_activity_primary
 
 _ACTIVE_STATUSES = ('active', 'in_progress', 'running')
 _DONE_STATUSES = ('done', 'completed', 'finished')

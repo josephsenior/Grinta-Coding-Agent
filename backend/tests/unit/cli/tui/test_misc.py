@@ -2,9 +2,13 @@
 
 from backend.tests.unit.cli.tui import _shared
 from backend.tests.unit.cli.tui._shared import *  # noqa: F403
+
 for _name in dir(_shared):
-    if _name.startswith("_") and not _name.startswith("__"):
+    if _name.startswith('_') and not _name.startswith('__'):
         globals()[_name] = getattr(_shared, _name)
+
+from backend.tests.unit.cli.tui._shared import _fill_scrollable_transcript, _get_screen
+
 
 @pytest.mark.asyncio
 async def test_tui_composer_placeholder_changes_by_mode(mock_config):
@@ -31,6 +35,7 @@ async def test_tui_composer_placeholder_changes_by_mode(mock_config):
         s._apply_mode('agent')
         await pilot.pause()
         assert 'Describe a task for Grinta to execute...' in str(hint.renderable)
+
 
 @pytest.mark.asyncio
 async def test_tui_agent_message_action_renders_response(mock_config):
@@ -60,6 +65,7 @@ async def test_tui_agent_message_action_renders_response(mock_config):
         assert len(renderer._history) == 2
         assert isinstance(renderer._history[0], AgentMessage)
         assert isinstance(renderer._history[0].renderable, Markdown)
+
 
 @pytest.mark.asyncio
 async def test_tui_renderer_receives_queued_agent_message_events(mock_config):
@@ -102,6 +108,7 @@ async def test_tui_renderer_receives_queued_agent_message_events(mock_config):
         assert isinstance(renderer._history[0], AgentMessage)
         assert isinstance(renderer._history[0].renderable, Markdown)
 
+
 @pytest.mark.asyncio
 async def test_tui_turn_completion_uses_full_width_thin_widget(mock_config):
     console = RichConsole()
@@ -136,6 +143,7 @@ async def test_tui_turn_completion_uses_full_width_thin_widget(mock_config):
         assert 'Finished in:' in rendered
         assert 'tool' not in rendered.lower()
 
+
 def test_activity_renderer_keeps_failed_delegation_open() -> None:
     card = ActivityRenderer.delegation(
         'Fix parser',
@@ -145,6 +153,7 @@ def test_activity_renderer_keeps_failed_delegation_open() -> None:
     assert card.secondary == 'failed'
     assert card.secondary_kind == 'err'
     assert card.start_collapsed is False
+
 
 @pytest.mark.asyncio
 async def test_tui_run_agent_loop_is_awaitable(mock_config):
@@ -158,6 +167,7 @@ async def test_tui_run_agent_loop_is_awaitable(mock_config):
 
         s = _get_screen(app)
         assert asyncio.iscoroutinefunction(s._run_agent_loop)
+
 
 @pytest.mark.asyncio
 async def test_tui_dispatch_enqueues_user_message_before_starting_agent(mock_config):
@@ -197,6 +207,7 @@ async def test_tui_dispatch_enqueues_user_message_before_starting_agent(mock_con
         assert event_stream.events[0][1] == EventSource.USER
         assert event_stream.events[0][0].content == 'hello'
 
+
 @pytest.mark.asyncio
 async def test_tui_handle_input_does_not_bootstrap_twice_after_background_ready(
     mock_config,
@@ -232,6 +243,7 @@ async def test_tui_handle_input_does_not_bootstrap_twice_after_background_ready(
         assert calls == 1
         s._dispatch_to_agent.assert_awaited_once_with('hello')
 
+
 @pytest.mark.asyncio
 async def test_tui_drain_events_noop_when_empty(mock_config, monkeypatch):
     """Verify drain_events is safe to call with no pending events."""
@@ -265,6 +277,7 @@ async def test_tui_drain_events_noop_when_empty(mock_config, monkeypatch):
                 loop=loop,
             )
             renderer.drain_events()
+
 
 @pytest.mark.asyncio
 async def test_handle_input_releases_lock_during_dispatch(mock_config, monkeypatch):
@@ -314,6 +327,7 @@ async def test_handle_input_releases_lock_during_dispatch(mock_config, monkeypat
         await asyncio.wait_for(task, timeout=10)
         assert s._turn_in_flight is False
 
+
 @pytest.mark.asyncio
 async def test_tui_stats_panel_exists(mock_config):
     """Verify stats panel in input bar is present."""
@@ -327,6 +341,7 @@ async def test_tui_stats_panel_exists(mock_config):
         s = _get_screen(app)
         stats = s.query_one('#hud-bar')
         assert stats is not None
+
 
 @pytest.mark.asyncio
 async def test_bootstrap_setup_renderer_marks_ready_before_hydrate(mock_config):
@@ -363,6 +378,7 @@ async def test_bootstrap_setup_renderer_marks_ready_before_hydrate(mock_config):
 
         assert s._hud.state.agent_state_label == 'awaiting_user_input'
         await asyncio.wait_for(hydrate_started.wait(), timeout=2.0)
+
 
 @pytest.mark.asyncio
 async def test_drain_invocation_budget_reschedules_with_backlog(
@@ -408,6 +424,7 @@ async def test_drain_invocation_budget_reschedules_with_backlog(
     assert post_drain.called
     assert len(orch._pending_events) > 0
 
+
 @pytest.mark.asyncio
 async def test_drain_respects_frame_budget(mock_config, monkeypatch):
     from backend.cli.tui.renderer import drain as drain_mod
@@ -433,6 +450,7 @@ async def test_drain_respects_frame_budget(mock_config, monkeypatch):
     count = await drain_mod._process_events_with_frame_budget(orch, events)
     assert count < len(events)
     assert count >= 1
+
 
 @pytest.mark.asyncio
 async def test_viewport_keeps_bounded_child_count(mock_config):
@@ -462,6 +480,7 @@ async def test_viewport_keeps_bounded_child_count(mock_config):
         await pilot.pause()
         assert display.child_widget_count <= _TUI_VIEWPORT_MAX_MOUNTED
 
+
 def test_no_pending_event_drop_under_burst(monkeypatch):
     from backend.cli.tui.renderer import drain as drain_mod
     from backend.ledger.observation.terminal import TerminalObservation
@@ -490,6 +509,7 @@ def test_no_pending_event_drop_under_burst(monkeypatch):
 
     assert orch._pending_events_dropped == 0
     assert len(orch._pending_events) <= 5
+
 
 @pytest.mark.asyncio
 async def test_tui_scroll_badge_shows_and_follows_tail(mock_config, monkeypatch):

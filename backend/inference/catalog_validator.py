@@ -109,7 +109,11 @@ def _validate_runtime_block(
     context = runtime.get('context_window_tokens')
     max_in = runtime.get('max_input_tokens')
     max_out = runtime.get('max_output_tokens')
-    if isinstance(context, int) and isinstance(max_in, int) and isinstance(max_out, int):
+    if (
+        isinstance(context, int)
+        and isinstance(max_in, int)
+        and isinstance(max_out, int)
+    ):
         if max_in + max_out > context:
             issues.append(
                 CatalogValidationIssue(
@@ -191,7 +195,9 @@ def _validate_runtime_block(
     aliases = runtime.get('aliases', [])
     if not isinstance(aliases, list):
         issues.append(
-            CatalogValidationIssue(provider, model_name, 'runtime.aliases must be a list')
+            CatalogValidationIssue(
+                provider, model_name, 'runtime.aliases must be a list'
+            )
         )
     else:
         prefixed = f'{provider}/{model_name}'
@@ -259,7 +265,9 @@ def validate_catalog_file(path: Path) -> list[CatalogValidationIssue]:
 
         if not isinstance(info, dict):
             issues.append(
-                CatalogValidationIssue(provider, model_name, 'model entry must be an object')
+                CatalogValidationIssue(
+                    provider, model_name, 'model entry must be an object'
+                )
             )
             continue
 
@@ -275,7 +283,9 @@ def validate_catalog_file(path: Path) -> list[CatalogValidationIssue]:
             metadata = {}
         if not isinstance(metadata, dict):
             issues.append(
-                CatalogValidationIssue(provider, model_name, 'metadata must be an object')
+                CatalogValidationIssue(
+                    provider, model_name, 'metadata must be an object'
+                )
             )
             metadata = {}
 

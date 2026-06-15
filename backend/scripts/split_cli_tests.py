@@ -9,7 +9,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 
 
-def _parse_module(path: Path) -> tuple[str, list[ast.stmt], list[str]]:
+def _parse_module(path: Path) -> tuple[str, list[ast.stmt], list[str], str]:
     text = path.read_text(encoding='utf-8')
     tree = ast.parse(text)
     lines = text.splitlines(keepends=True)
@@ -18,17 +18,23 @@ def _parse_module(path: Path) -> tuple[str, list[ast.stmt], list[str]]:
 
 
 def _node_source(lines: list[str], node: ast.AST) -> str:
-    start = node.lineno - 1
-    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.decorator_list:
-        start = min(decorator.lineno for decorator in node.decorator_list) - 1
-    end = node.end_lineno or node.lineno
+    start = getattr(node, 'lineno', 1) - 1
+    if (
+        isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.decorator_list
+    ):
+        start = (
+            min(getattr(decorator, 'lineno', 1) for decorator in node.decorator_list)
+            - 1
+        )
+    end = getattr(node, 'end_lineno', None) or getattr(node, 'lineno', 1)
     return ''.join(lines[start:end])
 
 
 def _is_test(node: ast.stmt) -> bool:
-    return isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith(
-        'test_'
-    )
+    return isinstance(
+        node, (ast.FunctionDef, ast.AsyncFunctionDef)
+    ) and node.name.startswith('test_')
 
 
 def _is_fixture(node: ast.stmt) -> bool:
@@ -170,7 +176,9 @@ def _split_file(
 
     for node in body:
         if _is_test(node):
-            buckets[bucket_fn(node.name)].append(_node_source(lines, node))
+            buckets[bucket_fn(getattr(node, 'name', ''))].append(
+                _node_source(lines, node)
+            )
         elif _is_fixture(node):
             fixture_parts.append(_node_source(lines, node))
         elif isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
@@ -188,8 +196,7 @@ def _split_file(
     conftest = (
         f'"""Pytest fixtures for {module_doc}."""\n\n'
         'from backend.tests.unit.cli.'
-        f'{dest_dir.name}._shared import *  # noqa: F403\n\n'
-        + ''.join(fixture_parts)
+        f'{dest_dir.name}._shared import *  # noqa: F403\n\n' + ''.join(fixture_parts)
     )
     (dest_dir / 'conftest.py').write_text(conftest, encoding='utf-8')
 
@@ -201,8 +208,7 @@ def _split_file(
             f'from {pkg}._shared import *  # noqa: F403\n'
             'for _name in dir(_shared):\n'
             '    if _name.startswith("_") and not _name.startswith("__"):\n'
-            '        globals()[_name] = getattr(_shared, _name)\n\n'
-            + '\n'.join(parts)
+            '        globals()[_name] = getattr(_shared, _name)\n\n' + '\n'.join(parts)
         )
         (dest_dir / f'test_{bucket}.py').write_text(content, encoding='utf-8')
         print(f'  {dest_dir.relative_to(REPO)}/test_{bucket}.py ({len(parts)} tests)')

@@ -58,7 +58,9 @@ def _discovery_decision_table(
             '- Known corpus ID `/org/project` or `/org/project/version` → `docs_query` only',
         ]
         if web_on:
-            docs_lines.append('- Prefer `docs_*` over `web_search` when the library is known')
+            docs_lines.append(
+                '- Prefer `docs_*` over `web_search` when the library is known'
+            )
         lines.extend(docs_lines)
     lines.extend(
         [

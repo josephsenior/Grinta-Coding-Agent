@@ -13,10 +13,10 @@ from backend.cli.tui.dialogs import (  # noqa: F401
     GrintaAddSkillDialog,
     GrintaConfirmDialog,
 )
+from backend.cli.tui.widgets.collapsible import SidebarRow
 from backend.cli.tui.widgets.small import (
     InputBar,
 )
-from backend.cli.tui.widgets.collapsible import SidebarRow
 from backend.core.interaction_modes import (
     AGENT_MODE,
     VISIBLE_INTERACTION_MODES,

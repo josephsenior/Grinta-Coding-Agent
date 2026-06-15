@@ -11,9 +11,10 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, Input, Label, Select
 
-from backend.core.config import AppConfig
 from backend.cli.theme import NAVY_ERROR, NAVY_READY, NAVY_TEXT_MUTED
 from backend.cli.tui.widgets.dialogs import ModalDialog
+from backend.core.config import AppConfig
+
 
 class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
     """Native settings modal for full-screen TUI."""
@@ -164,7 +165,9 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
             )
             yield Input(value=current_custom_model, id='settings-custom-model')
             yield Label('', id='settings-model-meta')
-            yield Label('Reasoning effort', classes='field-label', id='settings-reasoning-label')
+            yield Label(
+                'Reasoning effort', classes='field-label', id='settings-reasoning-label'
+            )
             yield Select(
                 options=self._reasoning_options(current_provider, current_model),
                 value=current_reasoning,
@@ -232,9 +235,7 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         }
         current = get_current_provider(config)
         if current:
-            by_provider.update(
-                build_model_entries_by_provider(provider=current)
-            )
+            by_provider.update(build_model_entries_by_provider(provider=current))
         return by_provider
 
     @staticmethod
@@ -496,4 +497,3 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
                 'api_key': api_key,
             }
         )
-

@@ -2,29 +2,16 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import os
-from pathlib import Path
 from typing import Any
 
 from rich.console import Console
-from rich.panel import Panel
-from rich.prompt import Prompt
-from rich.text import Text
 
 from backend.cli.theme import (
-    CLR_BRAND,
-    CLR_CARD_BORDER,
-    CLR_META,
-    CLR_SPINNER,
-    CLR_STATUS_ERR,
-    CLR_STATUS_OK,
-    CLR_STATUS_WARN,
     no_color_enabled,
 )
-from backend.core.app_paths import get_app_settings_root
-from backend.core.config import AppConfig, load_app_config
+from backend.core.config import AppConfig
 from backend.core.config.dotenv_keys import (
     persist_llm_api_key_to_dotenv,
     persist_provider_api_key_to_dotenv,
@@ -34,7 +21,6 @@ from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
 logger = logging.getLogger(__name__)
 _console = Console(no_color=no_color_enabled())
 
-from backend.cli.settings.constants import DEFAULT_ONBOARDING_MODEL
 from backend.cli.settings.onboarding import (
     _default_model_for_api_key,
     _default_model_from_environment,
@@ -44,6 +30,7 @@ from backend.cli.settings.storage import (
     _save_raw_settings,
     _settings_path,
 )
+
 
 def ensure_default_model(config: AppConfig) -> str | None:
     """Ensure the active LLM config has a usable model when a key exists."""
@@ -63,6 +50,7 @@ def ensure_default_model(config: AppConfig) -> str | None:
         return None
     llm_cfg.model = env_model
     return env_model
+
 
 def get_current_model(config: AppConfig) -> str:
     try:
@@ -262,4 +250,3 @@ def get_budget(config: AppConfig) -> str:
     if budget is None:
         return 'unlimited'
     return f'${budget:.2f}'
-

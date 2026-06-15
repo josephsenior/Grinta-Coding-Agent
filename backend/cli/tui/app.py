@@ -14,7 +14,6 @@ from textual.app import App
 from textual.binding import Binding
 from textual.screen import Screen
 
-from backend.core.config import AppConfig
 from backend.cli.display.hud import HUDBar
 from backend.cli.display.reasoning_display import ReasoningDisplay
 from backend.cli.theme import (
@@ -64,6 +63,7 @@ from backend.cli.tui.screen.state import ScreenStateMixin  # noqa: F401
 from backend.cli.tui.screen.welcome import (
     ScreenWelcomeMixin,  # noqa: F401
 )
+from backend.core.config import AppConfig
 
 
 class GrintaScreen(

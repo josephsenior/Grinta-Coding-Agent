@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 
-def _render_security(cli_mode: bool = True, *, enable_web: bool = True, enable_docs: bool = True) -> str:
+def _render_security(
+    cli_mode: bool = True, *, enable_web: bool = True, enable_docs: bool = True
+) -> str:
     read_only_tools = (
         '`read`, `grep`, `glob`, `find_symbols`, `analyze_project_structure`, `lsp`'
     )

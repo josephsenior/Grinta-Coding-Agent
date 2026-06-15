@@ -10,6 +10,7 @@ from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
 
+from backend.cli.display.hud import HUDBar
 from backend.cli.settings import (
     _PROVIDERS,
     _settings_path,
@@ -23,7 +24,6 @@ from backend.cli.settings import (
     update_cli_tool_icons,
     update_model,
 )
-from backend.cli.display.hud import HUDBar
 from backend.cli.theme import (
     CLR_BRAND,
     CLR_CARD_BORDER,

@@ -115,14 +115,14 @@ def _apply_task_budgets(config, task: dict[str, Any]) -> None:
 
 
 def _print_tasks(pack: dict[str, Any]) -> None:
-    print(f"Pack: {pack['pack_id']} ({pack['version']})")
+    print(f'Pack: {pack["pack_id"]} ({pack["version"]})')
     for task in pack['tasks']:
         budgets = task.get('budgets') or {}
         print(
-            f"  - {task['id']}: {task['title']} "
-            f"[{task['category']}] "
-            f"(turns<={budgets.get('turns', '?')}, "
-            f"cost<=${budgets.get('cost_usd', '?')})"
+            f'  - {task["id"]}: {task["title"]} '
+            f'[{task["category"]}] '
+            f'(turns<={budgets.get("turns", "?")}, '
+            f'cost<=${budgets.get("cost_usd", "?")})'
         )
 
 
@@ -226,7 +226,9 @@ def _update_results_file(
             run['notes'] = notes
         break
     else:
-        raise SystemExit(f'Task {task_id!r} not found in results document {results_path}')
+        raise SystemExit(
+            f'Task {task_id!r} not found in results document {results_path}'
+        )
 
     metadata = results.setdefault('metadata', {})
     if not metadata.get('run_date'):
@@ -313,7 +315,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f'  project_root: {project_root}')
         print(f'  max_iterations: {config.max_iterations}')
         print(f'  max_budget_per_task: {config.max_budget_per_task}')
-        print(f'  autonomy: {config.get_agent_config(config.default_agent).autonomy_level}')
+        print(
+            f'  autonomy: {config.get_agent_config(config.default_agent).autonomy_level}'
+        )
         print(f'  task: {task["id"]} ({task["title"]})')
         print('  prompt:')
         print(prompt)
@@ -357,8 +361,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     finished = _agent_finished_successfully(state)
     print(f'Task {task["id"]} finished: agent_state={metrics["agent_state"]}')
-    print(f'  turns={metrics["turn_count"]}  cost=${metrics["cost_usd"]}  '
-          f'latency={latency_seconds:.1f}s')
+    print(
+        f'  turns={metrics["turn_count"]}  cost=${metrics["cost_usd"]}  '
+        f'latency={latency_seconds:.1f}s'
+    )
     print(f'  manifest: {manifest_path}')
     if trajectory_path:
         print(f'  trajectory: {trajectory_path}')

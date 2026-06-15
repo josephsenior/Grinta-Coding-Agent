@@ -8,6 +8,7 @@ from typing import Any
 
 from rich.syntax import Syntax
 
+from backend.cli.theme import NAVY_BG, get_grinta_pygments_style
 from backend.cli.tool_display.constants import _TOOL_CALL_PREFIX
 from backend.cli.tool_display.summarize import (
     _preview_result_item,
@@ -17,7 +18,6 @@ from backend.cli.tool_display.summarize import (
     format_tool_invocation_line,
     parse_tool_arguments_json,
 )
-from backend.cli.theme import NAVY_BG, get_grinta_pygments_style
 from backend.inference.tool_history import (
     flatten_tool_call_for_history as _flatten_tool_call_plain,
 )

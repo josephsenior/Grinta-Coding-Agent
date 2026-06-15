@@ -7,6 +7,10 @@ from typing import Any
 
 from rich.text import Text
 
+from backend.cli.display.transcript import (
+    format_activity_result_secondary,
+    strip_tool_result_validation_annotations,
+)
 from backend.cli.event_rendering.text_utils import truncate_activity_detail
 from backend.cli.theme import (
     CLR_ERR_ICON,
@@ -15,10 +19,6 @@ from backend.cli.theme import (
     CLR_WORKER_LABEL_DONE,
     CLR_WORKER_LABEL_FAILED,
     CLR_WORKER_TIMER,
-)
-from backend.cli.display.transcript import (
-    format_activity_result_secondary,
-    strip_tool_result_validation_annotations,
 )
 from backend.ledger.action import DelegateTaskAction
 from backend.ledger.observation import DelegateTaskObservation

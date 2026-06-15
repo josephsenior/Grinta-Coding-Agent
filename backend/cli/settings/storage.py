@@ -9,32 +9,17 @@ from pathlib import Path
 from typing import Any
 
 from rich.console import Console
-from rich.panel import Panel
-from rich.prompt import Prompt
-from rich.text import Text
 
 from backend.cli.theme import (
-    CLR_BRAND,
-    CLR_CARD_BORDER,
-    CLR_META,
-    CLR_SPINNER,
-    CLR_STATUS_ERR,
-    CLR_STATUS_OK,
-    CLR_STATUS_WARN,
     no_color_enabled,
 )
 from backend.core.app_paths import get_app_settings_root
-from backend.core.config import AppConfig, load_app_config
-from backend.core.config.dotenv_keys import (
-    persist_llm_api_key_to_dotenv,
-    persist_provider_api_key_to_dotenv,
-)
-from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
 
 logger = logging.getLogger(__name__)
 _console = Console(no_color=no_color_enabled())
 
 from backend.cli.settings.constants import *  # noqa: F403
+
 
 def _settings_path() -> Path:
     """Resolve canonical settings path anchored to repository root."""

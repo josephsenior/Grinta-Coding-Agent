@@ -4,10 +4,10 @@ from pathlib import Path
 from typing import cast
 from unittest.mock import MagicMock
 
-from backend.cli.repl import Repl
 from backend.cli.display.status_chrome import StatusFields, pt_stats_row2_fragments
-from backend.cli.theme import mark_err, mark_info, mark_ok, mark_prompt
 from backend.cli.display.transcript import format_activity_result_secondary
+from backend.cli.repl import Repl
+from backend.cli.theme import mark_err, mark_info, mark_ok, mark_prompt
 from backend.core.config import AppConfig
 
 

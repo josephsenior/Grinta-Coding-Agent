@@ -9,6 +9,7 @@ from rich.syntax import Syntax
 
 from backend.cli.theme import NAVY_BG, get_grinta_pygments_style
 
+
 def _terminal_output_lexer(body: str) -> str:
     """Pick a Pygments lexer for PTY/shell output (JSON, tracebacks, plain)."""
     raw = body or ''
@@ -66,4 +67,3 @@ def _looks_like_command_echo(line: str) -> bool:
     ):
         return True
     return False
-

@@ -179,7 +179,9 @@ class TestCmdList:
 
     def test_with_sessions(self) -> None:
         console = _make_console()
-        with patch('backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS):
+        with patch(
+            'backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS
+        ):
             rc = cmd_list(console, limit=10)
         assert rc == 0
 
@@ -195,7 +197,9 @@ class TestCmdList:
 
     def test_limit_respected(self) -> None:
         console = _make_console()
-        with patch('backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS):
+        with patch(
+            'backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS
+        ):
             rc = cmd_list(console, limit=1)
         assert rc == 0
 
@@ -209,31 +213,41 @@ class TestCmdShow:
 
     def test_found_by_prefix(self) -> None:
         console = _make_console()
-        with patch('backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS):
+        with patch(
+            'backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS
+        ):
             rc = cmd_show(console, 'session-aa')
         assert rc == 0
 
     def test_found_by_index(self) -> None:
         console = _make_console()
-        with patch('backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS):
+        with patch(
+            'backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS
+        ):
             rc = cmd_show(console, '1')
         assert rc == 0
 
     def test_ambiguous_target(self) -> None:
         console = _make_console()
-        with patch('backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS):
+        with patch(
+            'backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS
+        ):
             rc = cmd_show(console, 'session-')
         assert rc == 2
 
     def test_not_found(self) -> None:
         console = _make_console()
-        with patch('backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS):
+        with patch(
+            'backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS
+        ):
             rc = cmd_show(console, 'zzz-not-there')
         assert rc == 2
 
     def test_shows_metadata(self, capsys) -> None:
         console = Console()
-        with patch('backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS):
+        with patch(
+            'backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS
+        ):
             cmd_show(console, 'session-aabbcc')
         # No error = success
 
@@ -269,13 +283,17 @@ class TestCmdExport:
 
     def test_not_found(self, tmp_path: Path) -> None:
         console = _make_console()
-        with patch('backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS):
+        with patch(
+            'backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS
+        ):
             rc = cmd_export(console, 'zzz', str(tmp_path / 'out'))
         assert rc == 2
 
     def test_ambiguous(self, tmp_path: Path) -> None:
         console = _make_console()
-        with patch('backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS):
+        with patch(
+            'backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS
+        ):
             rc = cmd_export(console, 'session-', str(tmp_path / 'out'))
         assert rc == 2
 
@@ -321,13 +339,17 @@ class TestCmdDelete:
 
     def test_delete_not_found(self) -> None:
         console = _make_console()
-        with patch('backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS):
+        with patch(
+            'backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS
+        ):
             rc = cmd_delete(console, 'zzz', yes=True)
         assert rc == 2
 
     def test_delete_ambiguous(self) -> None:
         console = _make_console()
-        with patch('backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS):
+        with patch(
+            'backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS
+        ):
             rc = cmd_delete(console, 'session-', yes=True)
         assert rc == 2
 
@@ -335,7 +357,9 @@ class TestCmdDelete:
 class TestCmdPrune:
     def test_negative_days(self) -> None:
         console = _make_console()
-        with patch('backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS):
+        with patch(
+            'backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS
+        ):
             rc = cmd_prune(console, days=-1)
         assert rc == 2
 

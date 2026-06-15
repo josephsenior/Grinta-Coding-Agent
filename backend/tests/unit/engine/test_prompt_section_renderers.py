@@ -110,19 +110,35 @@ class TestRenderCriticalModeSpecific:
 
     def test_agent_mode_contains_exactly_10_rules(self):
         body = self._render_critical(mode='agent', terminal_manager_available=False)
-        lines = [line for line in body.split('\n') if line.strip().startswith(('1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.', '10.', '11.'))]
+        lines = [
+            line
+            for line in body.split('\n')
+            if line.strip().startswith(
+                ('1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.', '10.', '11.')
+            )
+        ]
         # 6 core + 1 verify + 1 terminal_manager = 8 when terminal_manager is available
         # Without terminal_manager: 6 core + 1 verify = 7 (with verify and done_criteria on same line)
         # Actually the verify rule has a newline in it for done_criteria_block
         # The numbered rules are: 1-4 (core), 5 (verify+criteria), 6-10 (retry, test rules, non-test)
         # So 10 rules without terminal_manager, 11 with terminal_manager
-        assert len(lines) == 10, f'Expected 10 numbered rules, got {len(lines)}:\n{body}'
+        assert len(lines) == 10, (
+            f'Expected 10 numbered rules, got {len(lines)}:\n{body}'
+        )
 
     def test_agent_mode_with_terminal_manager_adds_rule(self):
         body = self._render_critical(mode='agent', terminal_manager_available=True)
         self._assert_contains_body(body, 'Interactive sessions use `terminal_manager`')
-        lines = [line for line in body.split('\n') if line.strip().startswith(('1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.', '10.', '11.'))]
-        assert len(lines) == 11, f'Expected 11 numbered rules with terminal_manager, got {len(lines)}'
+        lines = [
+            line
+            for line in body.split('\n')
+            if line.strip().startswith(
+                ('1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.', '10.', '11.')
+            )
+        ]
+        assert len(lines) == 11, (
+            f'Expected 11 numbered rules with terminal_manager, got {len(lines)}'
+        )
 
     def test_agent_mode_has_mandatory_header(self):
         body = self._render_critical(mode='agent')
@@ -135,7 +151,8 @@ class TestRenderCriticalModeSpecific:
     def test_agent_rules_numbered_sequentially(self):
         body = self._render_critical(mode='agent', terminal_manager_available=False)
         numbered_lines = [
-            line.strip() for line in body.split('\n')
+            line.strip()
+            for line in body.split('\n')
             if line.strip() and line.strip()[0].isdigit() and '. ' in line[:4]
         ]
         for i, line in enumerate(numbered_lines, 1):
@@ -149,10 +166,13 @@ class TestRenderCriticalModeSpecific:
     def test_chat_mode_has_only_three_rules(self):
         body = self._render_critical_body(mode='chat')
         numbered_lines = [
-            line.strip() for line in body.split('\n')
+            line.strip()
+            for line in body.split('\n')
             if line.strip() and line.strip()[0].isdigit() and '. ' in line[:4]
         ]
-        assert len(numbered_lines) == 3, f'Expected 3 rules for chat, got {len(numbered_lines)}'
+        assert len(numbered_lines) == 3, (
+            f'Expected 3 rules for chat, got {len(numbered_lines)}'
+        )
 
     def test_chat_mode_rules(self):
         body = self._render_critical_body(mode='chat')
@@ -170,10 +190,13 @@ class TestRenderCriticalModeSpecific:
     def test_plan_mode_has_only_three_rules(self):
         body = self._render_critical_body(mode='plan')
         numbered_lines = [
-            line.strip() for line in body.split('\n')
+            line.strip()
+            for line in body.split('\n')
             if line.strip() and line.strip()[0].isdigit() and '. ' in line[:4]
         ]
-        assert len(numbered_lines) == 3, f'Expected 3 rules for plan, got {len(numbered_lines)}'
+        assert len(numbered_lines) == 3, (
+            f'Expected 3 rules for plan, got {len(numbered_lines)}'
+        )
 
     def test_plan_mode_rules(self):
         body = self._render_critical_body(mode='plan')
@@ -197,11 +220,14 @@ class TestRenderCriticalModeSpecific:
         for mode in ('chat', 'plan'):
             body = self._render_critical_body(mode=mode)
             numbered_lines = [
-                line.strip() for line in body.split('\n')
+                line.strip()
+                for line in body.split('\n')
                 if line.strip() and line.strip()[0].isdigit() and '. ' in line[:4]
             ]
             for i, line in enumerate(numbered_lines, 1):
-                assert line.startswith(f'{i}.'), f'[{mode}] Expected rule {i}, got: {line!r}'
+                assert line.startswith(f'{i}.'), (
+                    f'[{mode}] Expected rule {i}, got: {line!r}'
+                )
 
 
 # ---------------------------------------------------------------------------
@@ -318,7 +344,9 @@ class TestSystemCapabilitiesModeSpecific:
     def test_all_modes_have_capabilities_header(self):
         for mode in ('agent', 'chat', 'plan'):
             body = self._render_caps(mode=mode)
-            assert 'System Capabilities (verified at runtime)' in body, f'Missing header in {mode}'
+            assert 'System Capabilities (verified at runtime)' in body, (
+                f'Missing header in {mode}'
+            )
 
     def test_condensation_shown_in_all_modes(self):
         for mode in ('agent', 'chat', 'plan'):

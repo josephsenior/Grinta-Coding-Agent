@@ -108,7 +108,9 @@ class ScreenStateMixin:
 
     @staticmethod
     def _build_context_display(used: int, limit: int) -> str:
-        display_limit = limit if limit > 0 else HUDBar.resolve_context_limit_for_model('')
+        display_limit = (
+            limit if limit > 0 else HUDBar.resolve_context_limit_for_model('')
+        )
         pct = min(100, (used * 100 // display_limit) if display_limit else 0)
         ctx_color = (
             NAVY_GREEN_ACCENT
@@ -150,7 +152,9 @@ class ScreenStateMixin:
             if level:
                 return level
 
-        level = self._visible_autonomy_level(getattr(self._config, 'autonomy_level', None))
+        level = self._visible_autonomy_level(
+            getattr(self._config, 'autonomy_level', None)
+        )
         if level:
             return level
 
@@ -236,8 +240,7 @@ class ScreenStateMixin:
 
         provider = self._current_llm_provider()
         model = (
-            get_current_model(self._config)
-            or str(self._hud.state.model or '').strip()
+            get_current_model(self._config) or str(self._hud.state.model or '').strip()
         )
         if not model or model == '(not set)':
             return None
@@ -273,9 +276,7 @@ class ScreenStateMixin:
             try:
                 configured = (
                     (
-                        getattr(
-                            self._config.get_llm_config(), 'reasoning_effort', None
-                        )
+                        getattr(self._config.get_llm_config(), 'reasoning_effort', None)
                         or ''
                     )
                     .strip()

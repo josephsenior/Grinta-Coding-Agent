@@ -8,11 +8,11 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from backend.cli.display.transcript import format_activity_primary
 from backend.cli.theme import (
     CLR_STATUS_ERR,
     CLR_STATUS_OK,
 )
-from backend.cli.display.transcript import format_activity_primary
 
 _PATH_RE = re.compile(r'["\']?path["\']?\s*[:=]\s*["\']([^"\']+)["\']')
 _URL_RE = re.compile(r'https?://\S+')

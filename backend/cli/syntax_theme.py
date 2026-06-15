@@ -258,7 +258,7 @@ def grinta_syntax_kwargs(*, background_color: str = _NAVY_BG_DEFAULT) -> dict[st
 def inline_code_style() -> str:
     """Rich style for inline ``code`` spans during streaming markdown."""
     c = resolve_syntax_colors()
-    return f"{c['inline_code_fg']} on {c['inline_code_bg']}"
+    return f'{c["inline_code_fg"]} on {c["inline_code_bg"]}'
 
 
 def invalidate_grinta_syntax_theme_cache() -> None:

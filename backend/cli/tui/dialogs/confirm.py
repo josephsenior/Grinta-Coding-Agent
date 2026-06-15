@@ -12,6 +12,7 @@ from textual.widgets import Button, Label, Static
 
 from backend.cli.tui.widgets.dialogs import ModalDialog
 
+
 class ConfirmWidget(Widget):
     """Inline confirmation bar that appears when the agent needs approval.
 
@@ -213,4 +214,3 @@ class GrintaConfirmDialog(ModalDialog[str | None]):
             if event.button.id == f'confirm-{key}':
                 self.dismiss(key)
                 return
-

@@ -10,11 +10,11 @@ from typing import Any
 
 from rich.markup import escape as markup_escape
 
+from backend.cli.display.transcript import format_activity_primary
 from backend.cli.theme import (
     CLR_BRAND_HUE,
     CLR_SECONDARY,
 )
-from backend.cli.display.transcript import format_activity_primary
 
 _LINE_NUM_RE = re.compile(r'^([^:]+):(\d+)(?::(.*))?$')
 

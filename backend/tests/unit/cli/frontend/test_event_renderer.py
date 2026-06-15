@@ -2,9 +2,18 @@
 
 from backend.tests.unit.cli.frontend import _shared
 from backend.tests.unit.cli.frontend._shared import *  # noqa: F403
+
 for _name in dir(_shared):
-    if _name.startswith("_") and not _name.startswith("__"):
+    if _name.startswith('_') and not _name.startswith('__'):
         globals()[_name] = getattr(_shared, _name)
+
+
+from backend.tests.unit.cli.frontend._shared import (
+    _console_output,
+    _make_console,
+    _transcript_needle_count,
+)
+
 
 @pytest.mark.asyncio
 async def test_event_renderer_updates_metrics_and_streaming_preview() -> None:
@@ -42,6 +51,7 @@ async def test_event_renderer_updates_metrics_and_streaming_preview() -> None:
     output = _console_output(console)
     assert 'Hello' in output
 
+
 @pytest.mark.asyncio
 async def test_event_renderer_emits_each_duplicate_command_line() -> None:
     """Each CmdRunAction produces a Ran row; command is shown when observation or next action arrives."""
@@ -70,6 +80,7 @@ async def test_event_renderer_emits_each_duplicate_command_line() -> None:
     # CmdOutputObservation printed run2’s combined card; run3 is buffered (flushed when run4 or obs arrives)
     assert _transcript_needle_count(console, '$ ls -F') == 2
 
+
 @pytest.mark.asyncio
 async def test_event_renderer_repeats_identical_file_read_rows() -> None:
     """Same read path after another tool still gets a new activity row each time."""
@@ -97,6 +108,7 @@ async def test_event_renderer_repeats_identical_file_read_rows() -> None:
     assert _transcript_needle_count(console, 'pkg/a.py') == 2
     assert _transcript_needle_count(console, 'Read') == 2
 
+
 @pytest.mark.asyncio
 async def test_event_renderer_message_action_between_reads_both_emit_rows() -> None:
     """Assistant MessageAction between two identical reads does not suppress either row."""
@@ -122,6 +134,7 @@ async def test_event_renderer_message_action_between_reads_both_emit_rows() -> N
     renderer._process_event_data(r2)
     renderer._process_event_data(FileReadObservation(content='beta', path='x.py'))
     assert _transcript_needle_count(console, 'x.py') == 2
+
 
 @pytest.mark.asyncio
 async def test_event_renderer_repeat_command_after_error_still_two_rows() -> None:

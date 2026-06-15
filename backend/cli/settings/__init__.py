@@ -1,12 +1,15 @@
 """App settings I/O, onboarding, and programmatic updates."""
 
 from backend.cli.settings.constants import (
+    _PROVIDERS,
     DEFAULT_MODEL_BY_PROVIDER,
     DEFAULT_ONBOARDING_MODEL,
-    _PROVIDERS,
 )
 from backend.cli.settings.mcp import add_mcp_server, get_mcp_servers, remove_mcp_server
+
+# Test hook
 from backend.cli.settings.onboarding import (
+    _test_llm_call,  # noqa: F401
     auto_detect_api_keys,
     needs_onboarding,
     run_onboarding,
@@ -30,9 +33,6 @@ from backend.cli.settings.storage import (
     _save_raw_settings,
     _settings_path,
 )
-
-# Test hook
-from backend.cli.settings.onboarding import _test_llm_call  # noqa: F401
 
 __all__ = [
     'DEFAULT_MODEL_BY_PROVIDER',

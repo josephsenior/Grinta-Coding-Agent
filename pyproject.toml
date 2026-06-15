@@ -61,7 +61,7 @@ dependencies = [
   "textual>=1,<2",
   "tree-sitter>=0.24,<0.25",
   "tree-sitter-language-pack>=0.7.3,<0.8",
-  "urllib3>=2.7.0,<3",
+  "urllib3>=2.7,<3",
   "uvicorn>=0.30,<1",
 ]
 
@@ -103,7 +103,7 @@ dev = [
   "grpcio>=1.70",
   "grpcio-tools>=1.70",
   "mypy==1.17",
-  "pre-commit==4.6.0",
+  "pre-commit==4.6",
   "pylint>=4.0.5,<5",
   "pytest>=8.4",
   "pytest-asyncio>=0.26",
@@ -189,9 +189,9 @@ lint.ignore = [
   "D1",   # Ignore warnings for missing docstrings
   "E501",
 ]
-lint.per-file-ignores."backend/cli/settings/storage.py" = [ "E402" ]
 lint.per-file-ignores."backend/cli/event_renderer.py" = [ "E402" ]
 lint.per-file-ignores."backend/cli/repl/session.py" = [ "E402" ]
+lint.per-file-ignores."backend/cli/settings/storage.py" = [ "E402" ]
 lint.per-file-ignores."backend/integrations/mcp/mcp_utils.py" = [ "E402" ]
 lint.per-file-ignores."backend/persistence/data_models/settings.py" = [ "E402" ]
 lint.per-file-ignores."backend/scripts/**" = [ "ASYNC" ]

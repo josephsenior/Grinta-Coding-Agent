@@ -321,7 +321,8 @@ async def _get_postgresql_schema(conn) -> dict[str, Any]:
 
         # Get row count
         try:
-            count = await conn.fetchval(f'SELECT COUNT(*) FROM "{table_name}"')  # nosec B608
+            _query = f'SELECT COUNT(*) FROM "{table_name}"'  # nosec B608
+            count = await conn.fetchval(_query)
         except Exception:
             count = None
 

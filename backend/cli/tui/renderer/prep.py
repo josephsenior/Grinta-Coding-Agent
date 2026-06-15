@@ -37,7 +37,9 @@ class GrintaMarkdown(Markdown):
             console.pop_theme()
 
 
-def _prep_inline_code_text(text: str, *, base_text_style: str = NAVY_TEXT_PRIMARY) -> Text:
+def _prep_inline_code_text(
+    text: str, *, base_text_style: str = NAVY_TEXT_PRIMARY
+) -> Text:
     """Lightweight inline-code styling without full Markdown parsing."""
     parts: list[Any] = []
     pos = 0
@@ -95,8 +97,12 @@ def _render_streaming_segment(
         return None
     if '`' in segment and '```' not in segment:
         return _prep_inline_code_text(segment, base_text_style=base_text_style)
-    if base_text_style == NAVY_TEXT_PRIMARY and len(segment) < 600 and any(
-        marker in segment for marker in ('**', '__', '`', '\n#', '\n- ', '\n* ')
+    if (
+        base_text_style == NAVY_TEXT_PRIMARY
+        and len(segment) < 600
+        and any(
+            marker in segment for marker in ('**', '__', '`', '\n#', '\n- ', '\n* ')
+        )
     ):
         return prep_markdown(segment)
     if '`' in segment:
@@ -149,8 +155,12 @@ def prep_streaming_renderable(
     if '```' not in content:
         if '`' in content:
             return _prep_inline_code_text(content, base_text_style=base_text_style)
-        if base_text_style == NAVY_TEXT_PRIMARY and len(content) < 600 and any(
-            marker in content for marker in ('**', '__', '`', '\n#', '\n- ', '\n* ')
+        if (
+            base_text_style == NAVY_TEXT_PRIMARY
+            and len(content) < 600
+            and any(
+                marker in content for marker in ('**', '__', '`', '\n#', '\n- ', '\n* ')
+            )
         ):
             return prep_markdown(content)
         return Text(content, style=base_text_style)
@@ -161,9 +171,7 @@ def prep_streaming_renderable(
         if isinstance(segment, Syntax):
             parts.append(segment)
             continue
-        rendered = _render_streaming_segment(
-            segment, base_text_style=base_text_style
-        )
+        rendered = _render_streaming_segment(segment, base_text_style=base_text_style)
         if rendered is not None:
             parts.append(rendered)
 

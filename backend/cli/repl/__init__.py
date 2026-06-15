@@ -2,4 +2,4 @@
 
 from backend.cli.repl.session import Repl
 
-__all__ = ["Repl"]
+__all__ = ['Repl']

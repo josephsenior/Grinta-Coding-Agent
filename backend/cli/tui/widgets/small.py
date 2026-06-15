@@ -62,9 +62,7 @@ class ScrollTailBadge(Static):
         elif self._unread_count == 1:
             self.update('[#91abec]↓[/] [#c8d4e8]1 new update[/]')
         else:
-            self.update(
-                f'[#91abec]↓[/] [#c8d4e8]{self._unread_count} new updates[/]'
-            )
+            self.update(f'[#91abec]↓[/] [#c8d4e8]{self._unread_count} new updates[/]')
 
     def on_click(self, event: events.Click) -> None:
         self.post_message(self.FollowRequested())
@@ -167,7 +165,9 @@ class Transcript(VerticalScroll):
                 self._set_user_scrolled_away(False)
             return
 
-        content_grew_in_place = max_y > last_max_y and abs(scroll_y - last_scroll_y) <= 0.5
+        content_grew_in_place = (
+            max_y > last_max_y and abs(scroll_y - last_scroll_y) <= 0.5
+        )
         if content_grew_in_place:
             return
 

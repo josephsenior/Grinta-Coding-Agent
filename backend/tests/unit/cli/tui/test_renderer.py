@@ -2,9 +2,13 @@
 
 from backend.tests.unit.cli.tui import _shared
 from backend.tests.unit.cli.tui._shared import *  # noqa: F403
+
 for _name in dir(_shared):
-    if _name.startswith("_") and not _name.startswith("__"):
+    if _name.startswith('_') and not _name.startswith('__'):
         globals()[_name] = getattr(_shared, _name)
+
+from backend.tests.unit.cli.tui._shared import _fill_scrollable_transcript, _get_screen
+
 
 @pytest.mark.asyncio
 async def test_tui_input_and_transcript(mock_config):
@@ -22,6 +26,7 @@ async def test_tui_input_and_transcript(mock_config):
 
         input_bar = s.query_one('#input-bar', InputBar)
         assert 'processing' not in input_bar.classes
+
 
 @pytest.mark.asyncio
 async def test_tui_activity_card_processing_and_mount(mock_config):
@@ -50,6 +55,7 @@ async def test_tui_activity_card_processing_and_mount(mock_config):
         found = s.query_one(TUIActivityCard)
         assert found is not None
 
+
 @pytest.mark.asyncio
 async def test_tui_activity_card_expanded_output_wraps_in_extra_frame(mock_config):
     console = RichConsole()
@@ -77,6 +83,7 @@ async def test_tui_activity_card_expanded_output_wraps_in_extra_frame(mock_confi
         body = found.query_one('#expanded-body', Container)
         assert body is not None
         assert body.display is True
+
 
 @pytest.mark.asyncio
 async def test_tui_activity_card_body_click_collapses(mock_config):
@@ -119,6 +126,7 @@ async def test_tui_activity_card_body_click_collapses(mock_config):
         assert event.prevented is True
         assert event.stopped is True
 
+
 @pytest.mark.asyncio
 async def test_tui_renderer_writes_expandable_cards_collapsed_by_default(
     mock_config, monkeypatch
@@ -154,6 +162,7 @@ async def test_tui_renderer_writes_expandable_cards_collapsed_by_default(
         assert widget._collapsed is True
         assert body.display is False
 
+
 @pytest.mark.asyncio
 async def test_tui_transcript_autoscrolls_on_rapid_append(mock_config, monkeypatch):
     console = RichConsole()
@@ -180,6 +189,7 @@ async def test_tui_transcript_autoscrolls_on_rapid_append(mock_config, monkeypat
 
         assert display._user_scrolled_away is False
         assert display._was_at_bottom()
+
 
 @pytest.mark.asyncio
 async def test_tui_live_response_follows_tail_when_not_user_scrolled(
@@ -218,6 +228,7 @@ async def test_tui_live_response_follows_tail_when_not_user_scrolled(
 
         assert display._user_scrolled_away is False
         assert display._was_at_bottom()
+
 
 @pytest.mark.asyncio
 async def test_tui_live_response_respects_user_scrolled_away(mock_config, monkeypatch):
@@ -258,6 +269,7 @@ async def test_tui_live_response_respects_user_scrolled_away(mock_config, monkey
         assert display._user_scrolled_away is True
         assert not display._was_at_bottom()
 
+
 @pytest.mark.asyncio
 async def test_tui_content_growth_does_not_mark_user_scrolled_away(
     mock_config, monkeypatch
@@ -281,6 +293,7 @@ async def test_tui_content_growth_does_not_mark_user_scrolled_away(
         await pilot.pause()
         display._sync_scroll_state_from_position()
         assert display._user_scrolled_away is False
+
 
 @pytest.mark.asyncio
 async def test_tui_user_scroll_wins_over_active_follow_tail(mock_config, monkeypatch):
@@ -311,6 +324,7 @@ async def test_tui_user_scroll_wins_over_active_follow_tail(mock_config, monkeyp
         assert display._user_scrolled_away is True
         assert not display._was_at_bottom()
 
+
 @pytest.mark.asyncio
 async def test_tui_page_keys_scroll_transcript_while_turn_running(
     mock_config, monkeypatch
@@ -339,6 +353,7 @@ async def test_tui_page_keys_scroll_transcript_while_turn_running(
         assert display._user_scrolled_away is True
         assert not display._was_at_bottom()
 
+
 @pytest.mark.asyncio
 async def test_tui_backpressure_suppresses_mount_animation(mock_config, monkeypatch):
     """set_backpressure(True) skips append_widget's mount offset animation."""
@@ -364,6 +379,7 @@ async def test_tui_backpressure_suppresses_mount_animation(mock_config, monkeypa
         display.set_backpressure(False)
         assert display._under_backpressure is False
 
+
 @pytest.mark.asyncio
 async def test_tui_mode_switch_supports_chat_plan_agent(mock_config):
     console = RichConsole()
@@ -381,6 +397,7 @@ async def test_tui_mode_switch_supports_chat_plan_agent(mock_config):
             mode_select.value = mode
             await pilot.pause()
             assert agent_config.mode == mode
+
 
 @pytest.mark.asyncio
 async def test_tui_mode_switch_updates_default_agent_config(mock_config):
@@ -403,6 +420,7 @@ async def test_tui_mode_switch_updates_default_agent_config(mock_config):
 
         assert configs['Orchestrator'].mode == 'chat'
         assert configs['agent'].mode == 'agent'
+
 
 @pytest.mark.asyncio
 async def test_tui_mode_switch_updates_running_agent_config(mock_config):
@@ -439,6 +457,7 @@ async def test_tui_mode_switch_updates_running_agent_config(mock_config):
         assert agent.tools == ['read']
         assert 'active_run_mode' not in s._controller.state.extra_data
 
+
 @pytest.mark.asyncio
 async def test_tui_autonomy_visibility_follows_mode(mock_config):
     console = RichConsole()
@@ -468,6 +487,7 @@ async def test_tui_autonomy_visibility_follows_mode(mock_config):
         await pilot.pause()
         assert autonomy.display is True
         assert autonomy_label.display is True
+
 
 @pytest.mark.asyncio
 async def test_tui_sidebar_rows_expose_delete_for_mcp_and_skills(
@@ -504,6 +524,7 @@ async def test_tui_sidebar_rows_expose_delete_for_mcp_and_skills(
         deletable = [row for row in rows if getattr(row, 'deletable', False)]
         assert any(getattr(row, 'item_id', '') == 'mcp:server-a' for row in deletable)
         assert any(getattr(row, 'item_id', '') == 'skill:skill-a' for row in deletable)
+
 
 @pytest.mark.asyncio
 async def test_tui_lsp_sidebar_lists_detected_servers(mock_config):
@@ -555,6 +576,7 @@ async def test_tui_lsp_sidebar_lists_detected_servers(mock_config):
         assert rows[0].interactive is False
         assert lsp_section.is_collapsed is False
 
+
 @pytest.mark.asyncio
 async def test_tui_task_sidebar_does_not_clear_on_empty_view_payload(
     mock_config, monkeypatch
@@ -585,6 +607,7 @@ async def test_tui_task_sidebar_does_not_clear_on_empty_view_payload(
 
         tasks_widget = s.query_one('#sidebar-tasks', CollapsibleSection)
         assert tasks_widget._section_title == 'Tasks (1)'
+
 
 @pytest.mark.asyncio
 async def test_tui_task_sidebar_does_not_clear_on_ambiguous_empty_update_payload(
@@ -624,6 +647,7 @@ async def test_tui_task_sidebar_does_not_clear_on_ambiguous_empty_update_payload
 
         tasks_widget = s.query_one('#sidebar-tasks', CollapsibleSection)
         assert tasks_widget._section_title == 'Tasks (1)'
+
 
 @pytest.mark.asyncio
 async def test_tui_task_sidebar_allows_explicit_empty_update_clear(
@@ -675,6 +699,7 @@ async def test_tui_task_sidebar_allows_explicit_empty_update_clear(
         tasks_widget = s.query_one('#sidebar-tasks', CollapsibleSection)
         assert tasks_widget._section_title == 'Tasks (0)'
 
+
 @pytest.mark.asyncio
 async def test_tui_terminal_session_reuses_single_card(mock_config):
     console = RichConsole()
@@ -713,6 +738,7 @@ async def test_tui_terminal_session_reuses_single_card(mock_config):
         assert '$ status' in str(collapsed.renderable) or 'Sent' in str(
             collapsed.renderable
         )
+
 
 @pytest.mark.asyncio
 async def test_tui_terminal_observation_strips_control_traffic(mock_config):
@@ -757,6 +783,7 @@ async def test_tui_terminal_observation_strips_control_traffic(mock_config):
         assert '\x1b' not in rendered
         assert '[444444;32;15M' not in rendered
 
+
 @pytest.mark.asyncio
 async def test_tui_shell_command_reuses_single_card(mock_config):
     console = RichConsole()
@@ -791,6 +818,7 @@ async def test_tui_shell_command_reuses_single_card(mock_config):
             collapsed.renderable
         )
         assert 'exit 0' in str(collapsed.renderable)
+
 
 @pytest.mark.asyncio
 async def test_tui_lsp_query_renders_orient_line(
@@ -838,6 +866,7 @@ async def test_tui_lsp_query_renders_orient_line(
         assert lines[0].model.target == 'find_definition · MyClass'
         assert lines[0].model.result == '1 result'
 
+
 @pytest.mark.asyncio
 async def test_tui_mcp_call_merges_action_and_observation_into_single_card(
     mock_config,
@@ -884,6 +913,7 @@ async def test_tui_mcp_call_merges_action_and_observation_into_single_card(
         assert 'Called' in rendered
         assert 'search_docs' in rendered
         assert 'ranking' in rendered.lower()
+
 
 @pytest.mark.asyncio
 async def test_tui_web_search_renders_orient_line(mock_config):
@@ -933,6 +963,7 @@ async def test_tui_web_search_renders_orient_line(mock_config):
         assert lines[0].model.target == '"Next.js 15 release notes"'
         assert lines[0].model.result == '2 results'
 
+
 @pytest.mark.asyncio
 async def test_tui_web_fetch_renders_orient_line(mock_config):
     from backend.engine.tools.web_tools import build_web_fetch_action
@@ -975,6 +1006,7 @@ async def test_tui_web_fetch_renders_orient_line(mock_config):
         assert lines[0].model.verb == 'Fetched'
         assert lines[0].model.target == 'example.com/docs'
         assert lines[0].model.result == '1 result'
+
 
 @pytest.mark.asyncio
 async def test_tui_delegate_task_merges_action_and_observation_into_single_card(
@@ -1023,6 +1055,7 @@ async def test_tui_delegate_task_merges_action_and_observation_into_single_card(
         assert 'Delegated' in rendered
         assert 'completed' in rendered
 
+
 @pytest.mark.asyncio
 async def test_tui_browser_screenshot_merges_with_action_card(mock_config):
     console = RichConsole()
@@ -1069,6 +1102,7 @@ async def test_tui_browser_screenshot_merges_with_action_card(mock_config):
         assert 'Navigate' in rendered
         assert 'captured' in rendered
 
+
 @pytest.mark.asyncio
 async def test_tui_final_stream_and_message_action_do_not_duplicate(mock_config):
     console = RichConsole()
@@ -1105,6 +1139,7 @@ async def test_tui_final_stream_and_message_action_do_not_duplicate(mock_config)
         assert sum(isinstance(item, AgentMessage) for item in renderer._history) == 1
         assert isinstance(renderer._history[0], AgentMessage)
         assert isinstance(renderer._history[0].renderable, Markdown)
+
 
 @pytest.mark.asyncio
 async def test_tui_final_stream_commits_response(mock_config):
@@ -1146,6 +1181,7 @@ async def test_tui_final_stream_commits_response(mock_config):
         assert renderer._last_final_response_text == 'Plain preview.'
         assert renderer._live_response == ''
         assert len(renderer._history) == 2
+
 
 @pytest.mark.asyncio
 async def test_tui_final_stream_empty_accumulated_commits_live_response(mock_config):
@@ -1193,6 +1229,7 @@ async def test_tui_final_stream_empty_accumulated_commits_live_response(mock_con
         assert len(renderer._history) == 2
         assert isinstance(renderer._history[0], AgentMessage)
 
+
 @pytest.mark.asyncio
 async def test_tui_final_stream_suppresses_live_response_for_tool_call(mock_config):
     console = RichConsole()
@@ -1236,6 +1273,7 @@ async def test_tui_final_stream_suppresses_live_response_for_tool_call(mock_conf
         assert renderer._live_response == ''
         assert len(renderer._history) == 0
 
+
 @pytest.mark.asyncio
 async def test_tui_streamed_response_clears_before_tool_action(mock_config):
     console = RichConsole()
@@ -1272,6 +1310,7 @@ async def test_tui_streamed_response_clears_before_tool_action(mock_config):
         assert renderer._live_response == ''
         assert len(renderer._history) == 0
 
+
 @pytest.mark.asyncio
 async def test_tui_duplicate_thinking_payload_renders_once(mock_config):
     console = RichConsole()
@@ -1306,6 +1345,7 @@ async def test_tui_duplicate_thinking_payload_renders_once(mock_config):
             thinking_blocks[0].query_one('#thinking-content', Static).renderable
         )
         assert rendered.count(thought) == 1
+
 
 @pytest.mark.asyncio
 async def test_tui_thinking_indicator_shows_content_without_collapse(mock_config):
@@ -1342,6 +1382,7 @@ async def test_tui_thinking_indicator_shows_content_without_collapse(mock_config
         rendered = str(content.renderable)
         assert thought in rendered
         assert 'Thinking:' in rendered
+
 
 @pytest.mark.asyncio
 async def test_tui_find_symbols_observation_renders_orient_line(mock_config):
@@ -1390,6 +1431,7 @@ async def test_tui_find_symbols_observation_renders_orient_line(mock_config):
         assert lines[0].model.target == '"render" in backend'
         assert lines[0].model.result == '1 symbol'
 
+
 @pytest.mark.asyncio
 async def test_tui_grep_observation_renders_orient_line(mock_config):
     """``GrepObservation`` renders a flat grep row with the action pattern."""
@@ -1434,6 +1476,7 @@ async def test_tui_grep_observation_renders_orient_line(mock_config):
         assert lines[0].model.verb == 'Grepped'
         assert lines[0].model.target == '"_start_election" in raftkv/node.py'
         assert lines[0].model.result == '1 file'
+
 
 @pytest.mark.asyncio
 async def test_tui_read_symbols_observation_updates_pending_card(mock_config):
@@ -1484,6 +1527,7 @@ async def test_tui_read_symbols_observation_updates_pending_card(mock_config):
         assert lines[0].model.target == '1 symbol in auth.py'
         assert lines[0].model.result == '1 resolved'
 
+
 @pytest.mark.asyncio
 async def test_tui_glob_observation_renders_orient_line(mock_config):
     """``GlobObservation`` renders a flat glob row with the action pattern."""
@@ -1525,6 +1569,7 @@ async def test_tui_glob_observation_renders_orient_line(mock_config):
         assert lines[0].model.verb == 'Globbed'
         assert lines[0].model.target == '**/*.py in backend'
         assert lines[0].model.result == '2 files'
+
 
 @pytest.mark.asyncio
 async def test_tui_grep_content_mode_uses_match_and_file_metric(mock_config):
@@ -1574,6 +1619,7 @@ async def test_tui_grep_content_mode_uses_match_and_file_metric(mock_config):
         assert lines[0].model.verb == 'Grepped'
         assert lines[0].model.result == '1 match · 1 file'
 
+
 @pytest.mark.asyncio
 async def test_tui_glob_orient_line_uses_file_labels_not_matches(mock_config):
     """Glob rows summarize files, not grep-style match counts."""
@@ -1613,6 +1659,7 @@ async def test_tui_glob_orient_line_uses_file_labels_not_matches(mock_config):
         assert len(lines) == 1
         assert lines[0].model.result == '2 files'
         assert 'matches' not in lines[0].model.result.lower()
+
 
 @pytest.mark.asyncio
 async def test_tui_grep_files_with_matches_shows_file_count(mock_config):
@@ -1662,6 +1709,7 @@ async def test_tui_grep_files_with_matches_shows_file_count(mock_config):
         assert len(lines) == 1
         assert lines[0].model.result == '2 files'
         assert 'matches' not in lines[0].model.result.lower()
+
 
 @pytest.mark.asyncio
 async def test_tui_orient_burst_groups_three_consecutive_lookups(mock_config):
@@ -1728,6 +1776,7 @@ async def test_tui_orient_burst_groups_three_consecutive_lookups(mock_config):
         assert str(burst.query_one('#orient-burst-header').renderable)
         assert '-hidden' in burst.query_one('#orient-burst-body').classes
 
+
 @pytest.mark.asyncio
 async def test_tui_internal_thinking_payloads_render_as_activity_cards(mock_config):
     console = RichConsole()
@@ -1767,6 +1816,7 @@ async def test_tui_internal_thinking_payloads_render_as_activity_cards(mock_conf
         assert len(tool_cards) == 1
         assert 'Memory' in str(memory_cards[0].query_one('#collapsed-row').renderable)
         assert 'Checkpoint' in str(tool_cards[0].query_one('#collapsed-row').renderable)
+
 
 @pytest.mark.asyncio
 async def test_tui_recoverable_error_renders_as_plain_error_message(mock_config):
@@ -1820,6 +1870,7 @@ async def test_tui_recoverable_error_renders_as_plain_error_message(mock_config)
         )
         assert "Invalid task status 'doing'" in history_text
 
+
 @pytest.mark.asyncio
 async def test_tui_compaction_status_renders_persistent_card(mock_config):
     console = RichConsole()
@@ -1858,6 +1909,7 @@ async def test_tui_compaction_status_renders_persistent_card(mock_config):
         assert 'context' in str(collapsed.renderable)
         assert renderer._compaction_transcript_active is True
         assert renderer._condensation_count == 1
+
 
 @pytest.mark.asyncio
 async def test_tui_condensation_request_reuses_status_card(mock_config):
@@ -1906,6 +1958,7 @@ async def test_tui_condensation_request_reuses_status_card(mock_config):
         assert 'Done' in str(completed.renderable)
         assert renderer._compaction_transcript_active is False
 
+
 @pytest.mark.asyncio
 async def test_tui_final_stream_and_normalized_message_do_not_duplicate(mock_config):
     console = RichConsole()
@@ -1949,6 +2002,7 @@ async def test_tui_final_stream_and_normalized_message_do_not_duplicate(mock_con
         assert sum(isinstance(item, AgentMessage) for item in renderer._history) == 2
         assert isinstance(renderer._history[0], AgentMessage)
 
+
 @pytest.mark.asyncio
 async def test_tui_file_write_renders_compact_create_card(mock_config):
     console = RichConsole()
@@ -1969,9 +2023,7 @@ async def test_tui_file_write_renders_compact_create_card(mock_config):
             loop=loop,
         )
 
-        renderer._process_event(
-            FileWriteAction(path='demo.txt', content='alpha\nbeta')
-        )
+        renderer._process_event(FileWriteAction(path='demo.txt', content='alpha\nbeta'))
         renderer._process_event(
             FileWriteObservation(path='demo.txt', content='alpha\nbeta')
         )
@@ -1990,6 +2042,7 @@ async def test_tui_file_write_renders_compact_create_card(mock_config):
         assert card._collapsible is True
         assert card._diff_encoded is True
         assert card.query_one('#expanded-body').display is False
+
 
 @pytest.mark.asyncio
 async def test_tui_file_write_does_not_dump_created_file_body(mock_config):
@@ -2027,6 +2080,7 @@ async def test_tui_file_write_does_not_dump_created_file_body(mock_config):
         assert len(file_cards) == 1
         collapsed = file_cards[0].query_one('#collapsed-row')
         assert 'demo.txt' in str(collapsed.renderable)
+
 
 @pytest.mark.asyncio
 async def test_tui_file_edit_create_action_renders_non_expandable_card(mock_config):
@@ -2096,6 +2150,7 @@ async def test_tui_file_edit_create_action_renders_non_expandable_card(mock_conf
         assert all(row._row.kind == 'add' for row in split_rows)
         assert any('alpha' in row._row.text for row in split_rows)
 
+
 @pytest.mark.asyncio
 async def test_tui_file_read_renders_flat_orient_line(mock_config):
     console = RichConsole()
@@ -2128,6 +2183,7 @@ async def test_tui_file_read_renders_flat_orient_line(mock_config):
         assert lines[0].model.target.endswith('read_card.py')
         assert lines[0].model.result == 'lines 1–EOF'
         assert not list(s.query(TUIActivityCard).results())
+
 
 @pytest.mark.asyncio
 async def test_tui_file_read_observation_keeps_filename_visible(mock_config):
@@ -2164,6 +2220,7 @@ async def test_tui_file_read_observation_keeps_filename_visible(mock_config):
         assert lines[0].model.result == 'lines 1–EOF'
         assert not list(lines[0].query('#caret').results())
 
+
 @pytest.mark.asyncio
 async def test_tui_file_read_ranged_line_shows_range_metric(mock_config):
     console = RichConsole()
@@ -2197,6 +2254,7 @@ async def test_tui_file_read_ranged_line_shows_range_metric(mock_config):
         assert len(lines) == 1
         assert lines[0].model.target.endswith('ranged_read.py')
         assert lines[0].model.result == 'lines 50–100'
+
 
 @pytest.mark.asyncio
 async def test_tui_file_edit_observation_uses_unified_diff_rows(mock_config):
@@ -2236,6 +2294,7 @@ async def test_tui_file_edit_observation_uses_unified_diff_rows(mock_config):
         )
         assert any(row._row.kind == 'ctx' for row in split_rows)
         assert s.query_one(UnifiedDiffView)
+
 
 @pytest.mark.asyncio
 async def test_tui_file_edit_action_and_observation_render_single_delta_card(
@@ -2284,6 +2343,7 @@ async def test_tui_file_edit_action_and_observation_render_single_delta_card(
         assert '[#54efae]+1[/]' in collapsed_markup
         assert '[#fd8383]-1[/]' in collapsed_markup
 
+
 @pytest.mark.asyncio
 async def test_tui_file_edit_observation_uses_explicit_diff_rows(mock_config):
     console = RichConsole()
@@ -2316,9 +2376,15 @@ async def test_tui_file_edit_observation_uses_explicit_diff_rows(mock_config):
 
         diff_rows = list(s.query(UnifiedDiffRow).results())
         assert s.query_one(UnifiedDiffView)
-        assert any(row._row.kind == 'hdr' and 'demo.txt' in row._row.text for row in diff_rows)
-        assert any(row._row.kind == 'add' and row._row.text == 'new' for row in diff_rows)
-        assert any(row._row.kind == 'rem' and row._row.text == 'old' for row in diff_rows)
+        assert any(
+            row._row.kind == 'hdr' and 'demo.txt' in row._row.text for row in diff_rows
+        )
+        assert any(
+            row._row.kind == 'add' and row._row.text == 'new' for row in diff_rows
+        )
+        assert any(
+            row._row.kind == 'rem' and row._row.text == 'old' for row in diff_rows
+        )
 
         file_cards = [
             card
@@ -2328,6 +2394,7 @@ async def test_tui_file_edit_observation_uses_explicit_diff_rows(mock_config):
         collapsed_markup = file_cards[0]._build_collapsed_markup()
         assert '[#54efae]+1[/]' in collapsed_markup
         assert '[#fd8383]-1[/]' in collapsed_markup
+
 
 @pytest.mark.asyncio
 async def test_tui_file_edit_observation_uses_diff_preview_rows(mock_config):
@@ -2364,9 +2431,15 @@ async def test_tui_file_edit_observation_uses_diff_preview_rows(mock_config):
 
         diff_rows = list(s.query(UnifiedDiffRow).results())
         assert s.query_one(UnifiedDiffView)
-        assert any(row._row.kind == 'hdr' and 'demo.txt' in row._row.text for row in diff_rows)
-        assert any(row._row.kind == 'add' and row._row.text == 'new' for row in diff_rows)
-        assert any(row._row.kind == 'rem' and row._row.text == 'old' for row in diff_rows)
+        assert any(
+            row._row.kind == 'hdr' and 'demo.txt' in row._row.text for row in diff_rows
+        )
+        assert any(
+            row._row.kind == 'add' and row._row.text == 'new' for row in diff_rows
+        )
+        assert any(
+            row._row.kind == 'rem' and row._row.text == 'old' for row in diff_rows
+        )
 
         file_cards = [
             card
@@ -2376,6 +2449,7 @@ async def test_tui_file_edit_observation_uses_diff_preview_rows(mock_config):
         collapsed_markup = file_cards[0]._build_collapsed_markup()
         assert '[#54efae]+1[/]' in collapsed_markup
         assert '[#fd8383]-1[/]' in collapsed_markup
+
 
 @pytest.mark.asyncio
 async def test_tui_file_write_observation_uses_diff_preview_rows(mock_config):
@@ -2415,7 +2489,10 @@ async def test_tui_file_write_observation_uses_diff_preview_rows(mock_config):
             row._row.kind == 'hdr' and 'config.toml' in row._row.text
             for row in diff_rows
         )
-        assert any(row._row.kind == 'add' and row._row.text == 'new' for row in diff_rows)
+        assert any(
+            row._row.kind == 'add' and row._row.text == 'new' for row in diff_rows
+        )
+
 
 @pytest.mark.asyncio
 async def test_tui_shell_command_empty_output_still_completes(mock_config):
@@ -2446,6 +2523,7 @@ async def test_tui_shell_command_empty_output_still_completes(mock_config):
         assert len(shell_cards) == 1
         assert 'processing' not in shell_cards[0].classes
 
+
 def test_activity_renderer_keeps_error_heavy_success_output_expanded() -> None:
     card = ActivityRenderer.shell_command(
         'pytest',
@@ -2454,6 +2532,7 @@ def test_activity_renderer_keeps_error_heavy_success_output_expanded() -> None:
     )
     assert card.is_collapsible is True
     assert card.start_collapsed is False
+
 
 @pytest.mark.asyncio
 async def test_tui_recoverable_error_routes_to_add_warning(mock_config):
@@ -2508,6 +2587,7 @@ async def test_tui_recoverable_error_routes_to_add_warning(mock_config):
         s.set_runtime_status.assert_called_once()
         assert '401 Unauthorized' in s.set_runtime_status.call_args.kwargs['meta']
 
+
 @pytest.mark.asyncio
 async def test_tui_add_error_and_warning_omit_hardcoded_wrap(mock_config):
     """add_error/add_warning must not pre-wrap text — let the container wrap."""
@@ -2536,6 +2616,7 @@ async def test_tui_add_error_and_warning_omit_hardcoded_wrap(mock_config):
     # The 200-char run must remain on a single line — no width=80 pre-wrap.
     assert 'x' * 200 in plain
 
+
 @pytest.mark.asyncio
 async def test_tui_protocol_status_is_unlabeled_dim_text(mock_config):
     from backend.cli.tui.screen.messages import (
@@ -2555,6 +2636,7 @@ async def test_tui_protocol_status_is_unlabeled_dim_text(mock_config):
     assert plain == 'Working through the next edit.'
     assert 'Status' not in plain
     assert 'Continue with a tool call' not in plain
+
 
 @pytest.mark.asyncio
 async def test_flush_live_ui_applies_deferred_stream_chunk(mock_config):
@@ -2587,6 +2669,7 @@ async def test_flush_live_ui_applies_deferred_stream_chunk(mock_config):
         assert renderer._deferred_stream_chunk is None
         assert renderer._stream_paint_timer_armed is False
 
+
 @pytest.mark.asyncio
 async def test_transcript_skips_mount_animation_during_streaming(mock_config):
     console = RichConsole()
@@ -2602,6 +2685,7 @@ async def test_transcript_skips_mount_animation_during_streaming(mock_config):
         widget = Static('quiet mount')
         display.append_widget(widget)
         assert float(widget.styles.offset.y.value) == 0.0
+
 
 @pytest.mark.asyncio
 async def test_terminal_append_does_not_remount_all_children(mock_config):
@@ -2627,6 +2711,7 @@ async def test_terminal_append_does_not_remount_all_children(mock_config):
         assert len(children) == 1
         assert children[0].id == 'incremental-tail'
 
+
 @pytest.mark.asyncio
 async def test_tui_live_response_uses_streaming_widget(mock_config, monkeypatch):
     console = RichConsole()
@@ -2651,6 +2736,7 @@ async def test_tui_live_response_uses_streaming_widget(mock_config, monkeypatch)
 
         assert isinstance(renderer._live_response_widget, LiveResponse)
         assert renderer._live_response_widget.has_class('-streaming')
+
 
 @pytest.mark.asyncio
 async def test_tui_tasks_sidebar_refreshes_during_streaming_skip(

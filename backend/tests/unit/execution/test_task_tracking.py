@@ -166,7 +166,9 @@ class TestTaskTrackingMixin(TestCase):
 
         self.assertIsInstance(result, ErrorObservation)
         self.assertIn('active_plan.json', result.content)
-        self.mixin.event_stream.file_store.delete.assert_called_once_with(task_file_path)
+        self.mixin.event_stream.file_store.delete.assert_called_once_with(
+            task_file_path
+        )
 
     def test_handle_task_update_action_empty_task_list(self):
         """Test task update action with empty task list."""

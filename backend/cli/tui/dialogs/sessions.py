@@ -11,10 +11,11 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Input, Label, Select, Static
 
-from backend.core.config import AppConfig
 from backend.cli.theme import NAVY_ERROR, NAVY_READY, NAVY_TEXT_DIM
 from backend.cli.tui.dialogs.confirm import GrintaConfirmDialog
 from backend.cli.tui.widgets.dialogs import ModalDialog
+from backend.core.config import AppConfig
+
 
 class GrintaSessionsDialog(ModalDialog[str | None]):
     """Native sessions manager for full-screen TUI."""
@@ -194,9 +195,9 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
         self._visible_entries = entries[: self._limit]
         for i, (sid, meta, event_count) in enumerate(self._visible_entries, 1):
             title = str(meta.get('title') or meta.get('name') or 'â€”')
-            updated = str(meta.get('last_updated_at') or meta.get('created_at') or 'â€”')[
-                :19
-            ]
+            updated = str(
+                meta.get('last_updated_at') or meta.get('created_at') or 'â€”'
+            )[:19]
             table.add_row(str(i), sid[:12], title, str(event_count), updated, key=sid)
 
         if self._visible_entries:
