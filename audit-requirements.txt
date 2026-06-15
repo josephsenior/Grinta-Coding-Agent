@@ -317,7 +317,7 @@ markdownify==1.2.2
     # via browser-use
 mccabe==0.7.0
     # via pylint
-mcp==1.26.0
+mcp==1.27.2
     # via
     #   browser-use
     #   fastmcp
