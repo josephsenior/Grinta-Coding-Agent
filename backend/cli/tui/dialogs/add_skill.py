@@ -5,7 +5,7 @@ from __future__ import annotations
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
-from textual.widgets import Button, Input, Label, TextArea
+from textual.widgets import Button, Input, Label, Static, TextArea
 
 from backend.cli.tui.widgets.dialogs import ModalDialog
 
@@ -21,7 +21,11 @@ class GrintaAddSkillDialog(ModalDialog[dict[str, str] | None]):
     def compose(self) -> ComposeResult:
         with Vertical(id='dialog-container'):
             yield Label('Add Custom Skill', id='dialog-title')
-            yield Label('Skill Name (e.g. react_best_practices)', classes='field-label')
+            yield Static(
+                'Create a reusable instruction file for future sessions.',
+                id='dialog-subtitle',
+            )
+            yield Label('Skill name', classes='field-label')
             yield Input(id='skill-name')
             yield Label('Instructions (Markdown)', classes='field-label')
             yield TextArea(id='skill-content')

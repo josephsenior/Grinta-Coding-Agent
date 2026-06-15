@@ -326,10 +326,10 @@ class ScreenCommunicateMixin:
             return
         self._suggestion_matches = matches
         lst.clear()
-        from backend.cli.tui.widgets.command_list import CommandListRow
+        from backend.cli.tui.widgets.command_list import CommandListRow, slash_command_detail
 
         for name in matches:
-            hint = self._SLASH_HINTS[name]
+            hint = slash_command_detail(name, self._SLASH_HINTS[name])
             lst.append(ListItem(CommandListRow(name, hint)))
         lst.index = 0
         lst.remove_class('-hidden')

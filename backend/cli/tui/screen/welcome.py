@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from textual.events import ScreenResume
 from textual.widgets import (
     Select,
     TextArea,
@@ -23,6 +24,10 @@ class ScreenWelcomeMixin:
                 return child
         return None
 
+    def on_screen_resume(self, _event: ScreenResume) -> None:
+        """Restore welcome after modal dialogs when the transcript is still empty."""
+        self._show_welcome()
+
     def _show_welcome(self) -> None:
         if self._is_unmounted:
             return
@@ -30,11 +35,10 @@ class ScreenWelcomeMixin:
             if self._transcript_has_real_content():
                 self._hide_welcome()
                 return
-            if self._welcome_visible:
+            if self._get_welcome_widget() is not None:
+                self._welcome_visible = True
                 return
             display = self._get_display()
-            if self._get_welcome_widget() is not None:
-                return
             display.mount(WelcomeWidget())
             self._welcome_visible = True
         except Exception:

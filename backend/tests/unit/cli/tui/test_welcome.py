@@ -1,5 +1,7 @@
 """Headless TUI — welcome."""
 
+import pytest
+
 from backend.tests.unit.cli.tui import _shared
 from backend.tests.unit.cli.tui._shared import *  # noqa: F403
 
@@ -108,6 +110,60 @@ async def test_tui_welcome_persists_until_real_transcript_content(mock_config):
         await s.on_renderer_drain_requested(RendererDrainRequested())
         await pilot.pause()
         assert s._welcome_visible is False
+
+
+@pytest.mark.asyncio
+async def test_tui_welcome_persists_after_slash_command(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        s._show_welcome()
+        await pilot.pause(0.2)
+        assert s._welcome_visible is True
+        assert s._get_welcome_widget() is not None
+
+        s.show_help = MagicMock()  # type: ignore[method-assign]
+        await pilot.press('/', 'h', 'e', 'l', 'p')
+        await pilot.press('enter')
+        await pilot.pause()
+
+        assert s._welcome_visible is True
+        assert s._get_welcome_widget() is not None
+        s.show_help.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_tui_welcome_restored_after_modal_dismiss(mock_config, monkeypatch):
+    from backend.cli.tui.dialogs import GrintaHelpDialog
+
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        s._show_welcome()
+        await pilot.pause(0.2)
+        widget = s._get_welcome_widget()
+        assert widget is not None
+        widget.remove()
+        s._welcome_visible = False
+
+        await app.push_screen(GrintaHelpDialog())
+        await pilot.pause()
+        await pilot.press('escape')
+        await pilot.pause()
+
+        assert s._welcome_visible is True
+        assert s._get_welcome_widget() is not None
 
 
 @pytest.mark.asyncio

@@ -190,10 +190,26 @@ class ScreenInputMixin:
         '/help': ['--all', '--search'],
     }
 
+    def apply_slash_command_from_palette(self, command: str) -> None:
+        """Run or prefill a slash command chosen from help or autocomplete."""
+        from backend.cli.tui.widgets.command_list import slash_command_runs_immediately
+
+        ta = self.query_one('#input', TextArea)
+        lst = self.query_one('#suggestions-list', ListView)
+        lst.add_class('-hidden')
+        self._suggestion_matches = []
+        if slash_command_runs_immediately(command):
+            ta.text = command
+            self.action_submit_input()
+            return
+        ta.text = command + ' '
+        ta.focus()
+
     def _accept_suggestion(self, ta: Any, lst: Any) -> None:
         selected = lst.index if lst.index is not None else 0
         if 0 <= selected < len(self._suggestion_matches):
-            ta.text = self._suggestion_matches[selected] + ' '
+            self.apply_slash_command_from_palette(self._suggestion_matches[selected])
+            return
         lst.add_class('-hidden')
         self._suggestion_matches = []
         ta.focus()
@@ -252,15 +268,18 @@ class ScreenInputMixin:
         else:
             _tui_logger.debug('action_submit_input: empty text, ignoring')
 
-    def _submit_clear_ui_state(self) -> None:
-        if self._welcome_visible:
-            self._hide_welcome()
+    def _submit_clear_communicate_state(self) -> None:
         if self._active_communicate_card is not None:
             try:
                 self._active_communicate_card.set_active(False)
             except Exception:
                 pass
             self._active_communicate_card = None
+
+    def _submit_clear_ui_state(self) -> None:
+        if self._welcome_visible:
+            self._hide_welcome()
+        self._submit_clear_communicate_state()
 
     def _submit_spawn_input_task(self, text: str) -> None:
         try:
@@ -300,6 +319,9 @@ class ScreenInputMixin:
         _tui_logger.debug(f'action_submit_input: text_len={len(text)}')
         if not text:
             self._submit_handle_empty_text()
+            return
+        if text.startswith('/'):
+            self._submit_spawn_input_task(text)
             return
         self._submit_clear_ui_state()
         if not self._command_history or self._command_history[-1] != text:

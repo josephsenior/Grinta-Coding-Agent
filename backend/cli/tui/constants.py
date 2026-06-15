@@ -80,6 +80,14 @@ _WELCOME_SUGGESTIONS = [
     'Inspect the project and propose a testing strategy',
 ]
 
+_WELCOME_SUGGESTION_DETAILS = [
+    'Map the architecture, entry points, and important files.',
+    'Scan the repo, identify risks, and turn findings into ordered next steps.',
+    'Find ownership boundaries, migration steps, and a rollback path.',
+    'Run the relevant suite, summarize failures, and make focused fixes.',
+    'Spot coverage gaps and recommend the smallest useful test set.',
+]
+
 _WELCOME_FIGLET_FALLBACK = (
     '  ____ ____  ___ _   _ _____  _ ',
     ' / ___|  _ \\|_ _| \\ | |_   _|/ \\',

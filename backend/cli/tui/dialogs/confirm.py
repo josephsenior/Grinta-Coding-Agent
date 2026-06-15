@@ -6,7 +6,7 @@ import asyncio
 from typing import Any
 
 from textual.app import ComposeResult
-from textual.containers import Horizontal
+from textual.containers import Horizontal, Vertical
 from textual.widget import Widget
 from textual.widgets import Button, Label, Static
 
@@ -23,9 +23,9 @@ class ConfirmWidget(Widget):
     DEFAULT_CSS = """
     ConfirmWidget {
         height: auto;
-        background: #07101d;
-        border-top: solid #26324f;
-        border-bottom: solid #26324f;
+        background: #08101d;
+        border-top: solid #1b233a;
+        border-bottom: solid #1b233a;
         border-left: heavy #5eead4;
         padding: 1 1 0 1;
         display: none;
@@ -55,34 +55,34 @@ class ConfirmWidget(Widget):
         margin-left: 1;
     }
     ConfirmWidget Button.-primary {
-        background: #2563eb;
+        background: #1e3a70;
         color: #ffffff;
     }
     ConfirmWidget Button.-default {
-        background: #1e293b;
-        color: #94a3b8;
+        background: #101c36;
+        color: #8f9fc1;
     }
     ConfirmWidget .confirm-label {
-        color: #64748b;
+        color: #8f9fc1;
     }
     ConfirmWidget .confirm-type {
-        color: #7dd3fc;
+        color: #91abec;
     }
     ConfirmWidget .confirm-target {
         color: #e2e8f0;
         text-style: italic;
     }
     ConfirmWidget .confirm-risk-low {
-        color: #4ade80;
+        color: #54efae;
     }
     ConfirmWidget .confirm-risk-medium {
-        color: #fbbf24;
+        color: #f6ff8f;
     }
     ConfirmWidget .confirm-risk-high {
-        color: #f87171;
+        color: #fd8383;
     }
     ConfirmWidget .confirm-risk-unknown {
-        color: #94a3b8;
+        color: #969aad;
     }
     """
 

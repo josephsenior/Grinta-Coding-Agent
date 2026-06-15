@@ -93,20 +93,29 @@ class RendererDisplayMixin:
 
         mcp_servers = self._resolve_mcp_server_list(mcp_count)
 
-        current_state = (mcp_servers, skill_count)
+        mcp_items = self._build_mcp_sidebar_items(mcp_servers)
+        skill_items = self._build_skills_sidebar_items()
+        mcp_loading = self._mcp_sidebar_is_loading(mcp_items)
+        skills_loading = self._skills_sidebar_is_loading(skill_items)
+        current_state = (mcp_servers, skill_count, mcp_loading, skills_loading)
         if current_state != self._last_sidebar_state:
-            mcp_items = self._build_mcp_sidebar_items(mcp_servers)
-            skill_items = self._build_skills_sidebar_items()
-
             self._update_sidebar_section(
                 '#sidebar-mcp',
-                f'MCP Servers ({len(mcp_servers) if mcp_servers else 0})',
+                'MCP Servers' if mcp_loading else f'MCP Servers ({len(mcp_servers) if mcp_servers else 0})',
                 mcp_items,
+                empty_message=(
+                    'Loading MCP servers...'
+                    if mcp_loading
+                    else 'No MCP servers configured'
+                ),
             )
             self._update_sidebar_section(
                 '#sidebar-skills',
-                f'Skills ({len(skill_items)})',
+                'Skills' if skills_loading else f'Skills ({len(skill_items)})',
                 skill_items,
+                empty_message=(
+                    'Loading skills...' if skills_loading else 'No skills available'
+                ),
             )
 
             self._last_sidebar_state = current_state
@@ -173,9 +182,9 @@ class RendererDisplayMixin:
             section.set_title('LSP Servers')
             try:
                 empty = section.query_one('#empty-text', Static)
-                empty.update(section._empty_markup('Scanning local PATH…'))
+                empty.update(section._empty_markup('Scanning local PATH...'))
             except Exception:
-                section.set_content('Scanning local PATH…')
+                section.set_content('Scanning local PATH...')
             return
 
         items = self._build_lsp_sidebar_items(cache)
@@ -240,12 +249,39 @@ class RendererDisplayMixin:
         except Exception:
             pass
 
-    def _update_sidebar_section(self, widget_id, title, items):
+    def _is_runtime_bootstrap_pending(self) -> bool:
+        bootstrapping = getattr(self._tui, '_bootstrapping', None)
+        if bootstrapping is None:
+            return False
+        return not bootstrapping.is_set()
+
+    def _mcp_sidebar_is_loading(self, mcp_items: list) -> bool:
+        if mcp_items:
+            return False
+        if self._hud.state.mcp_servers is None:
+            return True
+        return self._is_runtime_bootstrap_pending()
+
+    def _skills_sidebar_is_loading(self, skill_items: list) -> bool:
+        if skill_items:
+            return False
+        return self._is_runtime_bootstrap_pending()
+
+    def _update_sidebar_section(
+        self,
+        widget_id,
+        title,
+        items,
+        *,
+        empty_message: str | None = None,
+    ):
         from backend.cli.tui.widgets.collapsible import CollapsibleSection
 
         try:
             widget = self._tui.query_one(widget_id, CollapsibleSection)
             widget.set_title(title)
+            if empty_message is not None:
+                widget._content = empty_message
             widget.set_items(items)
         except Exception:
             pass

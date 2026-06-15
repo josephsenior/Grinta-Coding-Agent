@@ -15,7 +15,10 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Static
 
-from backend.cli.tui.constants import _WELCOME_SUGGESTIONS
+from backend.cli.tui.constants import (
+    _WELCOME_SUGGESTION_DETAILS,
+    _WELCOME_SUGGESTIONS,
+)
 from backend.cli.tui.helpers import _get_welcome_figlet
 
 
@@ -25,8 +28,8 @@ class WelcomeWidget(Vertical):
     def __init__(
         self,
         *,
-        header: str = 'Describe a task for the current workspace.',
-        subheader: str = 'Use up/down + Enter, or click a starter task.',
+        header: str = 'Start with this workspace.',
+        subheader: str = 'Pick a starter task or type your own request below.',
         suggestions: list[str] | None = None,
         suggestion_details: list[str] | None = None,
         callback_name: str = '_handle_welcome_click',
@@ -39,7 +42,9 @@ class WelcomeWidget(Vertical):
             list(suggestions) if suggestions is not None else list(_WELCOME_SUGGESTIONS)
         )
         self._suggestion_details = list(
-            suggestion_details or [''] * len(self._suggestions)
+            suggestion_details
+            if suggestion_details is not None
+            else _WELCOME_SUGGESTION_DETAILS
         )
         if len(self._suggestion_details) < len(self._suggestions):
             self._suggestion_details.extend(
@@ -52,19 +57,19 @@ class WelcomeWidget(Vertical):
         if self._show_logo:
             yield Static('', id='welcome-logo')
             yield Static(
-                '[#78FFF0]━[/][#6F86B6]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/]',
+                '[#91abec]GRINTA[/] [#54597b]runtime ready[/]',
                 id='welcome-divider',
             )
             yield Static(
-                '[#78FFF0]►[/] [#D7E2F2]Autonomous coding agent runtime[/]',
+                '[#c8d4e8]Start with a concrete task, or choose a guided starter.[/]',
                 id='welcome-slogan',
             )
             yield Static(
-                '[#93A4C8 italic]Pure grit.[/]',
+                '[#6f83aa]Current workspace context, tools, and session state are already wired in.[/]',
                 id='welcome-tagline',
             )
             yield Static(
-                '[#6f83aa]Describe a task to inspect, plan, edit, test, or refactor your project.[/]',
+                '[#8f9fc1]Use up/down + Enter, or click a starter task.[/]',
                 id='welcome-instruction',
             )
         else:
@@ -121,7 +126,7 @@ class WelcomeWidget(Vertical):
         self._selected = idx
 
     def _render_suggestion(self, index: int, *, selected: bool) -> str:
-        icon = '▶' if selected else '▸'
+        icon = '>' if selected else '-'
         label_style = '#5eead4' if selected else '#8ea2c8'
         detail = (self._suggestion_details[index] or '').strip()
         text = f'  {icon} [{label_style}]{self._suggestions[index]}[/]'

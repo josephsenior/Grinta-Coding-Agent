@@ -23,14 +23,14 @@ class ModalDialog(ModalScreen[_T]):
 
     DEFAULT_CSS = """
     ModalDialog {
-        background: #060a14 70%;
+        background: #060a14 80%;
         align: center middle;
     }
     ModalDialog > #dialog-container {
-        background: #080c18;
-        border: round #26324f;
+        background: #08101d;
+        border: round #1b233a;
         border-left: heavy #5eead4;
-        padding: 2 3;
+        padding: 1 3 2 3;
         width: auto;
         min-width: 52;
         max-width: 90%;
@@ -38,11 +38,12 @@ class ModalDialog(ModalScreen[_T]):
         max-height: 92%;
     }
     ModalDialog #dialog-title {
-        color: #c8d4e8;
+        color: #e9e9e9;
+        text-style: bold;
         margin-bottom: 1;
     }
     ModalDialog #dialog-subtitle {
-        color: #6f83aa;
+        color: #8f9fc1;
         margin-bottom: 1;
         height: auto;
     }
@@ -51,12 +52,13 @@ class ModalDialog(ModalScreen[_T]):
         margin-bottom: 2;
     }
     ModalDialog .field-label {
-        color: #969aad;
+        color: #8f9fc1;
         margin-top: 1;
     }
     ModalDialog #dialog-feedback {
         color: #8f9fc1;
         margin-top: 1;
+        height: auto;
     }
     ModalDialog #dialog-buttons {
         height: auto;

@@ -29,16 +29,16 @@ class ScrollTailBadge(Static):
         width: 100%;
         height: 1;
         content-align: center middle;
-        background: #0d162a;
+        background: #08101d;
         color: #91abec;
-        border-top: solid #26324f;
+        border-top: solid #1b233a;
     }
     ScrollTailBadge:hover {
-        background: #12203a;
+        background: #0a1323;
         color: #c8d4e8;
     }
     ScrollTailBadge:focus {
-        background: #152848;
+        background: #0d162a;
         color: #ffffff;
         border-top: solid #5eead4;
     }
@@ -550,18 +550,18 @@ class LoadEarlierButton(Static):
         width: 100%;
         height: 1;
         content-align: center middle;
-        color: #54597b;
-        background: #0a1323;
+        color: #8f9fc1;
+        background: #08101d;
         margin: 0 0 1 0;
     }
     LoadEarlierButton:hover {
         color: #91abec;
-        background: #0d162a;
+        background: #0a1323;
     }
     """
 
     def __init__(self) -> None:
-        super().__init__('Load earlier messages...')
+        super().__init__('Load earlier messages')
         self.can_focus = True
 
     def on_click(self, event: events.Click) -> None:

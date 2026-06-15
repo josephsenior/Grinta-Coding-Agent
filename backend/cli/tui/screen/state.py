@@ -399,12 +399,8 @@ class ScreenStateMixin:
         if lst.has_class('-hidden') or not self._suggestion_matches:
             return
         selected = lst.index if lst.index is not None else 0
-        ta = self.query_one('#input', TextArea)
         if 0 <= selected < len(self._suggestion_matches):
-            ta.text = self._suggestion_matches[selected] + ' '
-        lst.add_class('-hidden')
-        self._suggestion_matches = []
-        ta.focus()
+            self.apply_slash_command_from_palette(self._suggestion_matches[selected])
 
     def _refresh_runtime_feedback(self) -> None:
         if not self._is_unmounted:
