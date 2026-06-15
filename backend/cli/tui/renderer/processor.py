@@ -15,6 +15,11 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from backend.cli.orient_tools import ORIENT_MCP_TOOL_NAMES
+from backend.cli.tui.renderer.handlers.browser import (
+    _handle_browse_interactive_action,
+    _handle_browser_screenshot_observation,
+    _handle_browser_tool_action,
+)
 from backend.cli.tui.renderer.handlers.compaction import (
     _handle_agent_condensation_observation,
     _handle_compaction_trigger,
@@ -23,36 +28,6 @@ from backend.cli.tui.renderer.handlers.compaction import (
 from backend.cli.tui.renderer.handlers.delegate import (
     _handle_delegate_task_action,
     _handle_delegate_task_observation,
-)
-from backend.cli.tui.renderer.handlers.task_tracking import (
-    _handle_task_tracking_action,
-    _handle_task_tracking_observation,
-)
-from backend.cli.tui.renderer.handlers.status import (
-    _handle_error_observation,
-    _handle_status_observation,
-    _handle_success_observation,
-)
-from backend.cli.tui.renderer.handlers.thinking import (
-    _handle_agent_think_action,
-    _handle_agent_think_observation,
-)
-from backend.cli.tui.renderer.handlers.file import (
-    _handle_file_edit_action,
-    _handle_file_edit_observation,
-    _handle_file_read_action,
-    _handle_file_read_observation,
-    _handle_file_write_action,
-    _handle_file_write_observation,
-)
-from backend.cli.tui.renderer.handlers.mcp import (
-    _handle_mcp_action,
-    _handle_mcp_observation,
-)
-from backend.cli.tui.renderer.handlers.browser import (
-    _handle_browse_interactive_action,
-    _handle_browser_screenshot_observation,
-    _handle_browser_tool_action,
 )
 from backend.cli.tui.renderer.handlers.exploration import (
     _handle_analyze_project_structure_action,
@@ -68,15 +43,27 @@ from backend.cli.tui.renderer.handlers.exploration import (
     _handle_read_symbols_action,
     _handle_read_symbols_observation,
 )
-from backend.cli.tui.renderer.handlers.shell import (
-    _handle_cmd_output_observation,
-    _handle_cmd_run_action,
+from backend.cli.tui.renderer.handlers.fallback import (
+    _handle_file_download_dispatch,
+    _handle_legacy_meta_cognition_dispatch,
+    _handle_noop_event,
+    _handle_server_ready_dispatch,
+    _handle_state_change_dispatch,
+    _handle_streaming_chunk_dispatch,
+    _handle_unknown_event,
+    _handle_user_reject_dispatch,
 )
-from backend.cli.tui.renderer.handlers.terminal import (
-    _handle_terminal_input_action,
-    _handle_terminal_observation,
-    _handle_terminal_read_action,
-    _handle_terminal_run_action,
+from backend.cli.tui.renderer.handlers.file import (
+    _handle_file_edit_action,
+    _handle_file_edit_observation,
+    _handle_file_read_action,
+    _handle_file_read_observation,
+    _handle_file_write_action,
+    _handle_file_write_observation,
+)
+from backend.cli.tui.renderer.handlers.mcp import (
+    _handle_mcp_action,
+    _handle_mcp_observation,
 )
 from backend.cli.tui.renderer.handlers.memory import (
     _handle_checkpoint_action,
@@ -92,15 +79,28 @@ from backend.cli.tui.renderer.handlers.memory import (
     _handle_working_memory_action,
     _handle_working_memory_observation,
 )
-from backend.cli.tui.renderer.handlers.fallback import (
-    _handle_file_download_dispatch,
-    _handle_legacy_meta_cognition_dispatch,
-    _handle_noop_event,
-    _handle_server_ready_dispatch,
-    _handle_state_change_dispatch,
-    _handle_streaming_chunk_dispatch,
-    _handle_unknown_event,
-    _handle_user_reject_dispatch,
+from backend.cli.tui.renderer.handlers.shell import (
+    _handle_cmd_output_observation,
+    _handle_cmd_run_action,
+)
+from backend.cli.tui.renderer.handlers.status import (
+    _handle_error_observation,
+    _handle_status_observation,
+    _handle_success_observation,
+)
+from backend.cli.tui.renderer.handlers.task_tracking import (
+    _handle_task_tracking_action,
+    _handle_task_tracking_observation,
+)
+from backend.cli.tui.renderer.handlers.terminal import (
+    _handle_terminal_input_action,
+    _handle_terminal_observation,
+    _handle_terminal_read_action,
+    _handle_terminal_run_action,
+)
+from backend.cli.tui.renderer.handlers.thinking import (
+    _handle_agent_think_action,
+    _handle_agent_think_observation,
 )
 from backend.ledger.action import (
     AgentThinkAction,

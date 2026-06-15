@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from backend.cli.tool_display.renderers.badge import badge_for_tool_name
 from backend.cli.theme import (
     NAVY_BRAND,
     NAVY_ERROR,
@@ -12,6 +11,8 @@ from backend.cli.theme import (
     NAVY_TEXT_MUTED,
     NAVY_WAITING,
 )
+from backend.cli.tool_display.renderers.badge import badge_for_tool_name
+
 
 @dataclass
 class ActivityLine:
@@ -82,4 +83,3 @@ class ActivityCard:
     def to_tui_markup(self) -> str:
         """Convert to Textual markup for TUI rendering."""
         return '\n'.join(self.to_rich_lines())
-

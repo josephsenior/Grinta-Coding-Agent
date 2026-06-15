@@ -557,4 +557,3 @@ class SmartChunker:
             start = end - chunk_overlap
 
         return chunks
-

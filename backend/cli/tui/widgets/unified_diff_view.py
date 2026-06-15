@@ -120,7 +120,9 @@ def _syntax_line_text(line: str, language: str) -> Text:
             padding=(0, 0),
         )
         rendered = Text()
-        for segment, style, _ in console.render(syntax, console.options.update_width(4096)):
+        for segment, style, _ in console.render(
+            syntax, console.options.update_width(4096)
+        ):
             rendered.append(segment, style or _CLR_LINE_CTX)
         return rendered or Text(line or ' ', style=_CLR_LINE_CTX)
     except Exception:
@@ -233,13 +235,9 @@ def _rows_from_old_new(
                             )
                         )
                     elif old_text:
-                        rows.append(
-                            DiffViewRow(old_index + 1, None, 'rem', old_text)
-                        )
+                        rows.append(DiffViewRow(old_index + 1, None, 'rem', old_text))
                     elif new_text:
-                        rows.append(
-                            DiffViewRow(None, new_index + 1, 'add', new_text)
-                        )
+                        rows.append(DiffViewRow(None, new_index + 1, 'add', new_text))
     return rows
 
 

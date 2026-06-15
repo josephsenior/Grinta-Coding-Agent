@@ -9,6 +9,7 @@ from textual.widgets import Button, Input, Label, TextArea
 
 from backend.cli.tui.widgets.dialogs import ModalDialog
 
+
 class GrintaAddSkillDialog(ModalDialog[dict[str, str] | None]):
     """Dialog to create a custom skill dynamically."""
 
@@ -55,5 +56,3 @@ class GrintaAddSkillDialog(ModalDialog[dict[str, str] | None]):
             )
             return
         self.dismiss({'name': name, 'content': content})
-
-

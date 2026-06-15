@@ -1061,9 +1061,7 @@ def _format_test_results_section(results: list) -> list[str]:
         lines.append(f'  {status} (exit={exit_code}): {command}')
         output = str(result.get('output', '')).strip()
         if output:
-            lines.append(
-                '    output: ' + clip_with_marker(output, 200, prefer='tail')
-            )
+            lines.append('    output: ' + clip_with_marker(output, 200, prefer='tail'))
     return lines
 
 

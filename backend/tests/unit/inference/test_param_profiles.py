@@ -38,7 +38,9 @@ def test_openai_gpt5_catalog_entry_keeps_runtime_overrides() -> None:
 def test_opencode_claude_fable_keeps_catalog_variants() -> None:
     raw = lookup('opencode/claude-fable-5')
     assert raw is not None
-    entry = resolve_model_entry_for_capabilities('claude-fable-5', 'opencode', fallback=raw)
+    entry = resolve_model_entry_for_capabilities(
+        'claude-fable-5', 'opencode', fallback=raw
+    )
     assert entry is not None
     assert reasoning_effort_options(entry, include_disabled=True) == (
         'none',

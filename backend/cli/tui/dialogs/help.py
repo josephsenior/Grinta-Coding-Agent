@@ -9,6 +9,7 @@ from textual.widgets import Button, Label, Static
 from backend.cli.theme import NAVY_TEXT_MUTED
 from backend.cli.tui.widgets.dialogs import ModalDialog
 
+
 class GrintaHelpDialog(ModalDialog[None]):
     """Dedicated help and shortcuts modal."""
 
@@ -47,4 +48,3 @@ class GrintaHelpDialog(ModalDialog[None]):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == 'help-close':
             self.dismiss(None)
-

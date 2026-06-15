@@ -19,6 +19,12 @@ from rich.markdown import Markdown
 from rich.padding import Padding
 from rich.text import Text
 
+from backend.cli.display.tool_call_display import (
+    looks_like_streaming_tool_arguments,
+    streaming_args_hint,
+    tool_headline,
+    try_format_message_as_tool_json,
+)
 from backend.cli.event_rendering.constants import (
     THINK_EXTRACT_RE as _THINK_EXTRACT_RE,
 )
@@ -39,12 +45,6 @@ from backend.cli.layout_tokens import (
 )
 from backend.cli.theme import (
     get_grinta_pygments_style,
-)
-from backend.cli.display.tool_call_display import (
-    looks_like_streaming_tool_arguments,
-    streaming_args_hint,
-    tool_headline,
-    try_format_message_as_tool_json,
 )
 from backend.ledger.action import (
     StreamingChunkAction,

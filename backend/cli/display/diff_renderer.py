@@ -10,7 +10,13 @@ from rich.console import Console, ConsoleOptions, Group, RenderResult
 from rich.panel import Panel
 from rich.text import Text
 
-from backend.cli.tool_display.renderers.badge import badge_for_tool_name
+from backend.cli.display.transcript import (
+    format_activity_delta_secondary,
+    format_activity_primary,
+    format_activity_result_secondary,
+    format_activity_secondary,
+    format_activity_validation_callout,
+)
 from backend.cli.theme import (
     CLR_CARD_BORDER,
     CLR_CARD_TITLE,
@@ -21,13 +27,7 @@ from backend.cli.theme import (
     NAVY_BG,
     get_grinta_pygments_style,
 )
-from backend.cli.display.transcript import (
-    format_activity_delta_secondary,
-    format_activity_primary,
-    format_activity_result_secondary,
-    format_activity_secondary,
-    format_activity_validation_callout,
-)
+from backend.cli.tool_display.renderers.badge import badge_for_tool_name
 
 
 def _preview_text_lines(

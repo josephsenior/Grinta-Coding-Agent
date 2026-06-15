@@ -56,6 +56,3 @@ class TestCreateTaskTrackerTool:
         params = tool['function']['parameters']
         assert 'task_list' in params['properties']
         assert params['properties']['task_list']['type'] == 'array'
-
-
-

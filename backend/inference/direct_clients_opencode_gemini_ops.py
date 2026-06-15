@@ -29,12 +29,12 @@ def _message_content_to_text(content: Any) -> str:
     return str(content or '')
 
 
-def _messages_to_gemini_contents(messages: list[dict[str, Any]]) -> tuple[str | None, list[dict[str, Any]]]:
+def _messages_to_gemini_contents(
+    messages: list[dict[str, Any]],
+) -> tuple[str | None, list[dict[str, Any]]]:
     system_parts: list[str] = []
     contents: list[dict[str, Any]] = []
     for message in messages:
-        if not isinstance(message, dict):
-            continue
         role = str(message.get('role') or 'user').strip().lower()
         text = _message_content_to_text(message.get('content'))
         if role == 'system':
@@ -60,7 +60,6 @@ class OpenCodeGeminiClient(DirectLLMClient):
         provider_name: str = 'opencode',
     ) -> None:
         self._model_name = model_name
-        self.model_name = model_name
         self._provider_name = provider_name
         self._request_timeout = _normalize_timeout_seconds(timeout)
         root = (base_url or 'https://opencode.ai/zen/v1').rstrip('/')
@@ -74,7 +73,9 @@ class OpenCodeGeminiClient(DirectLLMClient):
         self._http = get_shared_http_client(provider_name, base_url)
         self._async_http = get_shared_async_http_client(provider_name, base_url)
 
-    def _build_payload(self, messages: list[dict[str, Any]], kwargs: dict[str, Any]) -> dict[str, Any]:
+    def _build_payload(
+        self, messages: list[dict[str, Any]], kwargs: dict[str, Any]
+    ) -> dict[str, Any]:
         system_instruction, contents = _messages_to_gemini_contents(messages)
         payload: dict[str, Any] = {'contents': contents}
         if system_instruction:
@@ -103,7 +104,11 @@ class OpenCodeGeminiClient(DirectLLMClient):
             for part in content.get('parts') or []:
                 if isinstance(part, dict) and isinstance(part.get('text'), str):
                     text_parts.append(part['text'])
-        usage_meta = data.get('usageMetadata') if isinstance(data.get('usageMetadata'), dict) else {}
+        usage_meta = (
+            data.get('usageMetadata')
+            if isinstance(data.get('usageMetadata'), dict)
+            else {}
+        )
         prompt = int(usage_meta.get('promptTokenCount') or 0)
         completion = int(usage_meta.get('candidatesTokenCount') or 0)
         total = int(usage_meta.get('totalTokenCount') or prompt + completion)
@@ -135,7 +140,9 @@ class OpenCodeGeminiClient(DirectLLMClient):
             raise ValueError('OpenCode Gemini endpoint returned non-object JSON')
         return self._parse_response(data, self.model_name)
 
-    async def acompletion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
+    async def acompletion(
+        self, messages: list[dict[str, Any]], **kwargs
+    ) -> LLMResponse:
         payload = self._build_payload(messages, kwargs)
         timeout = bounded_llm_http_timeout(self._request_timeout)
         response = await self._async_http.post(

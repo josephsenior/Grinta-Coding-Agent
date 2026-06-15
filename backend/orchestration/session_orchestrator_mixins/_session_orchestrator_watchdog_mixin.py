@@ -8,7 +8,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Any
 
 from backend.core.schemas import AgentState
 from backend.utils.async_utils import (
@@ -42,7 +41,7 @@ class _SessionOrchestratorWatchdogMixin:
         """
         if self._watchdog_task is not None and not self._watchdog_task.done():
             return
-        
+
         self._watchdog_last_step_ts = time.monotonic()
         loop: asyncio.AbstractEventLoop | None
         try:

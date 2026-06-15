@@ -200,9 +200,7 @@ def main() -> None:
 
     renderer_src = (
         '"""Composed activity card factory."""\n\n'
-        'from __future__ import annotations\n\n'
-        + '\n'.join(mixin_imports)
-        + '\n\n\n'
+        'from __future__ import annotations\n\n' + '\n'.join(mixin_imports) + '\n\n\n'
         'class ActivityRenderer(\n'
         + ',\n'.join(f'    {base}' for base in mixin_bases)
         + ',\n):\n'

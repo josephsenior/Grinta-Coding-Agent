@@ -68,21 +68,21 @@ OBS_MODULE_HELPERS = (134, 191)
 OBS_SHARED_IMPORTS = (23, 119)
 ACT_SHARED_IMPORTS = (21, 113)
 
-TYPE_CHECKING_BLOCK = '''if TYPE_CHECKING:
+TYPE_CHECKING_BLOCK = """if TYPE_CHECKING:
     from backend.cli._typing import ObservationRenderersHost
 
     _ObservationRenderersBase = ObservationRenderersHost
 else:
     _ObservationRenderersBase = object
-'''
+"""
 
-ACT_TYPE_CHECKING_BLOCK = '''if TYPE_CHECKING:
+ACT_TYPE_CHECKING_BLOCK = """if TYPE_CHECKING:
     from backend.cli._typing import ActionRenderersHost
 
     _ActionRenderersBase = ActionRenderersHost
 else:
     _ActionRenderersBase = object
-'''
+"""
 
 
 def _slice(lines: list[str], start: int, end: int) -> list[str]:
@@ -136,7 +136,7 @@ def _write_observations() -> list[str]:
             + '\n'
             + shared
             + '\n\n'
-            + f'logger = logging.getLogger(__name__)\n\n'
+            + 'logger = logging.getLogger(__name__)\n\n'
             + body
             + '\n'
         )
@@ -148,9 +148,7 @@ def _write_observations() -> list[str]:
     )
     compose = (
         '"""Composed observation renderer mixin."""\n\n'
-        'from __future__ import annotations\n\n'
-        + compose_imports
-        + '\n\n\n'
+        'from __future__ import annotations\n\n' + compose_imports + '\n\n\n'
         'class ObservationRenderersMixin(\n'
         + ',\n'.join(f'    {OBS_CLASS[n]}' for n in OBS_RANGES)
         + ',\n):\n'
@@ -198,9 +196,7 @@ def _write_actions() -> list[str]:
     )
     compose = (
         '"""Composed action renderer mixin."""\n\n'
-        'from __future__ import annotations\n\n'
-        + compose_imports
-        + '\n\n\n'
+        'from __future__ import annotations\n\n' + compose_imports + '\n\n\n'
         'class ActionRenderersMixin(\n'
         + ',\n'.join(f'    {ACT_CLASS[n]}' for n in ACT_RANGES)
         + ',\n):\n'

@@ -491,7 +491,8 @@ class SQLiteEventStore:
             clauses.append('source = ?')
             params.append(source)
 
-        sql = f'SELECT id, length(payload) AS sz, payload FROM events WHERE {" AND ".join(clauses)} ORDER BY id'  # nosec B608
+        _sql = f'SELECT id, length(payload) AS sz, payload FROM events WHERE {" AND ".join(clauses)} ORDER BY id'  # nosec
+        sql = _sql
         if limit is not None:
             sql += ' LIMIT ?'
             params.append(limit)

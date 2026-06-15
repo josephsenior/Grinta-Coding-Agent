@@ -29,14 +29,14 @@ from backend.core.type_safety.path_validation import (
 )
 from backend.core.type_safety.sentinels import MISSING, Sentinel, is_missing
 from backend.execution.utils._file_editor_io_helpers import _FileReadMeta
+from backend.execution.utils._file_editor_types import ToolResult
+from backend.execution.utils.file_editor_edit_mixin import FileEditorEditOpsMixin
 from backend.execution.utils.file_editor_ops_mixin import FileEditorOpsMixin
 from backend.execution.utils.file_editor_rollback_mixin import (
-    ToolError,
     FileEditorRollbackMixin,
+    ToolError,
 )
-from backend.execution.utils._file_editor_types import ToolResult
 from backend.execution.utils.file_editor_view_mixin import FileEditorViewMixin
-from backend.execution.utils.file_editor_edit_mixin import FileEditorEditOpsMixin
 
 _GLOBAL_UNDO_HISTORY: dict[str, deque[str | None]] = defaultdict(
     lambda: deque(maxlen=32)
@@ -356,9 +356,9 @@ from backend.execution.utils.file_editor_rollback_mixin import (  # noqa: E402, 
     FileEditorRollbackMixin,
 )
 from backend.execution.utils.file_editor_view_mixin import (  # noqa: E402, F401
+    FileEditorViewMixin,
     _check_block_indent_after_colon,
     _check_first_line_indent,
     _detect_indentation_mismatch,
-    FileEditorViewMixin,
     _get_line_indent,
 )

@@ -8,6 +8,7 @@ from pygments.lexers import guess_lexer_for_filename
 from pygments.util import ClassNotFound
 from rich.text import Text
 
+
 def _strip_ansi(text: str) -> str:
     """Strip ANSI escape sequences using Rich's parser (handles all ECMA-48 sequences)."""
     if not text:

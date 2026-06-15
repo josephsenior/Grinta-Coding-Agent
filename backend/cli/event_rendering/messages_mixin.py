@@ -21,6 +21,10 @@ from rich.padding import Padding
 from rich.panel import Panel
 from rich.text import Text
 
+from backend.cli.display.status_chrome import (
+    rich_fake_prompt_group,
+    status_fields_from_hud,
+)
 from backend.cli.event_rendering.error_panel import (
     build_error_panel as _build_error_panel,
 )
@@ -39,7 +43,6 @@ from backend.cli.layout_tokens import (
     frame_transcript_body,
     gap_below_live_section,
 )
-from backend.cli.display.status_chrome import rich_fake_prompt_group, status_fields_from_hud
 from backend.cli.theme import (
     CLR_USER_BG,
     CLR_USER_BORDER,

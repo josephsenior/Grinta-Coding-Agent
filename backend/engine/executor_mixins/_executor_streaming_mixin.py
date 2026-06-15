@@ -373,10 +373,12 @@ class _ExecutorStreamingMixin:
         if not self._should_emit_stream_snapshot(state, channel='text', force=force):
             return
 
+        from backend.cli.display.tool_call_display import (
+            redact_streamed_tool_call_markers,
+        )
         from backend.cli.event_rendering.text_utils import (
             sanitize_streaming_thinking_text,
         )
-        from backend.cli.display.tool_call_display import redact_streamed_tool_call_markers
         from backend.ledger.action.message import StreamingChunkAction
         from backend.ledger.event import EventSource
 
@@ -414,10 +416,12 @@ class _ExecutorStreamingMixin:
         ):
             return
 
+        from backend.cli.display.tool_call_display import (
+            redact_streamed_tool_call_markers,
+        )
         from backend.cli.event_rendering.text_utils import (
             sanitize_streaming_thinking_text,
         )
-        from backend.cli.display.tool_call_display import redact_streamed_tool_call_markers
         from backend.ledger.action.message import StreamingChunkAction
         from backend.ledger.event import EventSource
 
@@ -440,7 +444,9 @@ class _ExecutorStreamingMixin:
         event_stream: EventStream,
         response: ModelResponse | None = None,
     ) -> None:
-        from backend.cli.display.tool_call_display import redact_streamed_tool_call_markers
+        from backend.cli.display.tool_call_display import (
+            redact_streamed_tool_call_markers,
+        )
         from backend.ledger.action.message import StreamingChunkAction
         from backend.ledger.event import EventSource
 
@@ -1001,6 +1007,8 @@ class _ExecutorStreamingMixin:
 
     @staticmethod
     def _visible_stream_content(content_accumulate: str) -> str:
-        from backend.cli.display.tool_call_display import redact_streamed_tool_call_markers
+        from backend.cli.display.tool_call_display import (
+            redact_streamed_tool_call_markers,
+        )
 
         return redact_streamed_tool_call_markers(content_accumulate).strip()

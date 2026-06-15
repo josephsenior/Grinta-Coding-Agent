@@ -2,9 +2,13 @@
 
 from backend.tests.unit.cli.tui import _shared
 from backend.tests.unit.cli.tui._shared import *  # noqa: F403
+
 for _name in dir(_shared):
-    if _name.startswith("_") and not _name.startswith("__"):
+    if _name.startswith('_') and not _name.startswith('__'):
         globals()[_name] = getattr(_shared, _name)
+
+from backend.tests.unit.cli.tui._shared import _get_screen
+
 
 @pytest.mark.asyncio
 async def test_tui_hud_bar_shows_workspace_path(mock_config):
@@ -24,6 +28,7 @@ async def test_tui_hud_bar_shows_workspace_path(mock_config):
         rendered = str(stats.renderable)
         assert 'Ws:' in rendered
         assert any(sep in rendered for sep in ('/', '\\', '~'))
+
 
 @pytest.mark.asyncio
 async def test_tui_update_hud_state(mock_config):
@@ -45,6 +50,7 @@ async def test_tui_update_hud_state(mock_config):
         assert 'Running' in str(stats.renderable)
         assert 'Help' in str(activity.renderable)
 
+
 @pytest.mark.asyncio
 async def test_tui_hud_bar_shows_accumulated_and_context_tokens(mock_config):
     console = RichConsole()
@@ -65,6 +71,7 @@ async def test_tui_hud_bar_shows_accumulated_and_context_tokens(mock_config):
         rendered = str(stats.renderable)
         assert 'Ctx: 430/8.2K' in rendered
         assert '%' in rendered
+
 
 @pytest.mark.asyncio
 async def test_tui_hud_reasoning_select_syncs_from_config(mock_config, monkeypatch):
@@ -94,10 +101,9 @@ async def test_tui_hud_reasoning_select_syncs_from_config(mock_config, monkeypat
         reasoning = s.query_one('#hud-reasoning', Select)
         assert reasoning.value == 'high'
 
+
 @pytest.mark.asyncio
-async def test_tui_hud_reasoning_sync_does_not_apply_setting(
-    mock_config, monkeypatch
-):
+async def test_tui_hud_reasoning_sync_does_not_apply_setting(mock_config, monkeypatch):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     mock_config.get_llm_config.return_value.reasoning_effort = 'high'
@@ -128,6 +134,7 @@ async def test_tui_hud_reasoning_sync_does_not_apply_setting(
         assert update_calls == []
         s.notify.assert_not_called()
 
+
 @pytest.mark.asyncio
 async def test_tui_hud_reasoning_effort_persists(mock_config, monkeypatch):
     console = RichConsole()
@@ -151,6 +158,7 @@ async def test_tui_hud_reasoning_effort_persists(mock_config, monkeypatch):
 
         assert get_persisted_reasoning_effort() == 'low'
 
+
 @pytest.mark.asyncio
 async def test_tui_hud_autonomy_selector_updates_controller(mock_config):
     console = RichConsole()
@@ -171,6 +179,7 @@ async def test_tui_hud_autonomy_selector_updates_controller(mock_config):
 
         assert controller.autonomy_controller.autonomy_level == 'full'
         assert s._hud.state.autonomy_level == 'full'
+
 
 @pytest.mark.asyncio
 async def test_tui_hud_autonomy_sync_uses_agent_config_without_applying_default(

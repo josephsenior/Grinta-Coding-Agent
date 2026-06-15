@@ -41,7 +41,6 @@ def _external_discovery_hint(*, enable_web: bool, enable_docs: bool) -> str:
     return f' (including {" and ".join(parts)} when external context helps)'
 
 
-
 # Markers that appear only in system-injected user messages (workspace context,
 # playbook knowledge, knowledge-base results) — never in human-typed messages.
 _INJECTED_MSG_MARKERS = (

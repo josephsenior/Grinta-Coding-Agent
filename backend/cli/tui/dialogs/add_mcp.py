@@ -9,6 +9,7 @@ from textual.widgets import Button, Input, Label
 
 from backend.cli.tui.widgets.dialogs import ModalDialog
 
+
 class GrintaAddMCPDialog(ModalDialog[dict[str, str] | None]):
     """Dialog to add an MCP Server."""
 
@@ -53,4 +54,3 @@ class GrintaAddMCPDialog(ModalDialog[dict[str, str] | None]):
             )
             return
         self.dismiss({'name': name, 'command': cmd})
-

@@ -15,19 +15,21 @@ _LOW_SIGNAL_MCP_LINES = frozenset({'search results', 'results', 'content', 'text
 # These are the "looked at the world" tools: flat static line tier, no border,
 # no expansion, single fixed-width result column, left-ellipsis on paths.
 # They share one gutter color (dim accent) distinct from write/exec tools.
-ORIENT_TOOLS: frozenset[str] = frozenset({
-    'grep',
-    'glob',
-    'find_symbols',
-    'read_file',
-    'read_symbol',
-    'lsp',
-    'analyze_project_structure',
-    'web_search',
-    'web_fetch',
-    'docs_resolve',
-    'docs_query',
-})
+ORIENT_TOOLS: frozenset[str] = frozenset(
+    {
+        'grep',
+        'glob',
+        'find_symbols',
+        'read_file',
+        'read_symbol',
+        'lsp',
+        'analyze_project_structure',
+        'web_search',
+        'web_fetch',
+        'docs_resolve',
+        'docs_query',
+    }
+)
 
 # (icon, short verb phrase for the activity line)
 _TOOL_HEADLINE: dict[str, tuple[str, str]] = {

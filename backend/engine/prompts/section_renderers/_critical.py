@@ -51,9 +51,7 @@ def _render_critical(
     _ = checkpoints_on
 
     if can_edit:
-        edit_context_antipattern = (
-            '- **Editing existing content without current context.** Before mutating an existing file/symbol, inspect the relevant file, range, symbol, or anchor in this session. New file creation is exempt. New symbol creation requires reading the target file/anchor first. **Same bar for tests:** if you authored implementation earlier in the turn, **re-read it** before writing tests — memory drifts from the file on disk.\n'
-        )
+        edit_context_antipattern = '- **Editing existing content without current context.** Before mutating an existing file/symbol, inspect the relevant file, range, symbol, or anchor in this session. New file creation is exempt. New symbol creation requires reading the target file/anchor first. **Same bar for tests:** if you authored implementation earlier in the turn, **re-read it** before writing tests — memory drifts from the file on disk.\n'
         planning_tool_list = (
             f'`task_tracker`, `{terminal_command_tool}`, and the public file API tools'
             if tracker_on
@@ -93,9 +91,20 @@ def _render_critical(
     else:
         edit_context_antipattern = ''
         planning_tool_list = ', '.join(
-            filter(None, ['`task_tracker`' if tracker_on and is_plan_mode(mode) else None, '`read`', '`grep`', '`glob`', '`ask_user`'])
+            filter(
+                None,
+                [
+                    '`task_tracker`' if tracker_on and is_plan_mode(mode) else None,
+                    '`read`',
+                    '`grep`',
+                    '`glob`',
+                    '`ask_user`',
+                ],
+            )
         )
-        done_criteria_block = '   **Done criteria:** state what you found or produced in plain text.'
+        done_criteria_block = (
+            '   **Done criteria:** state what you found or produced in plain text.'
+        )
         chat_plan_rules = [
             '**Never fabricate outcomes** — if a tool fails, report it honestly.',
             '**No unchanged retries after failure** — change strategy or escalate with hypothesis, action/outcome, and ruled-out paths.',

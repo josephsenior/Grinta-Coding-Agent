@@ -7,7 +7,11 @@ from typing import TYPE_CHECKING
 from backend.cli.event_rendering.error_panel import notice_panel_title
 from backend.cli.tui.renderer.handlers.compaction import show_compaction_started_card
 from backend.cli.tui.renderer.helpers.status import TRANSIENT_HUD_ONLY_CATEGORIES
-from backend.ledger.observation import ErrorObservation, StatusObservation, SuccessObservation
+from backend.ledger.observation import (
+    ErrorObservation,
+    StatusObservation,
+    SuccessObservation,
+)
 
 if TYPE_CHECKING:
     from backend.cli.tui.renderer.mixins.event_processor import (

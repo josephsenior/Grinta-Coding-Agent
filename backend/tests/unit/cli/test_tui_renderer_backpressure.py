@@ -8,10 +8,10 @@ import pytest
 from rich.text import Text
 
 from backend.cli.theme import CLR_REASONING_SNAP
+from backend.cli.tui import app as tui_app
 from backend.cli.tui.renderer import drain as _drain_mod
 from backend.cli.tui.renderer.mixins import event_processor as _ep_mod
 from backend.cli.tui.renderer.mixins import live as _live_mod
-from backend.cli.tui import app as tui_app
 from backend.ledger.action import StreamingChunkAction
 
 

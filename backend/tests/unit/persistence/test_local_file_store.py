@@ -82,7 +82,9 @@ class TestWriteAndRead:
                 raise PermissionError(5, 'Access is denied')
             return real_replace(src, dst)
 
-        with patch('backend.persistence.atomic_write.os.replace', side_effect=flaky_replace):
+        with patch(
+            'backend.persistence.atomic_write.os.replace', side_effect=flaky_replace
+        ):
             store.write('locked.txt', 'v2')
 
         assert calls['count'] >= 2
@@ -104,7 +106,9 @@ class TestReplaceFileWithRetry:
                 raise PermissionError(5, 'Access is denied')
             return real_replace(src, dst)
 
-        with patch('backend.persistence.atomic_write.os.replace', side_effect=flaky_replace):
+        with patch(
+            'backend.persistence.atomic_write.os.replace', side_effect=flaky_replace
+        ):
             replace_file_with_retry(tmp, dest)
 
         assert calls['count'] >= 2

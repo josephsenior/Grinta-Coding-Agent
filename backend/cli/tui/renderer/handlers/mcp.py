@@ -21,9 +21,7 @@ if TYPE_CHECKING:
     )
 
 
-def _handle_mcp_action(
-    orch: 'RendererEventProcessorMixin', event: MCPAction
-) -> None:
+def _handle_mcp_action(orch: 'RendererEventProcessorMixin', event: MCPAction) -> None:
     orient = mcp_action_model(event)
     if orient is not None:
         orch._pending_mcp_card = orient

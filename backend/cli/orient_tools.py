@@ -7,8 +7,8 @@ from dataclasses import dataclass, replace
 from typing import Any
 from urllib.parse import urlparse
 
-from backend.cli.tool_display.summarize import _orient_path
 from backend.cli.text_truncation import shorten_middle
+from backend.cli.tool_display.summarize import _orient_path
 
 ORIENT_MCP_TOOL_NAMES: frozenset[str] = frozenset(
     {
@@ -206,8 +206,10 @@ def glob_observation_model(obs: Any) -> OrientLineModel:
         files = getattr(obs, 'files', None) or []
         if isinstance(files, list):
             count = len(files)
-    result = 'failed' if getattr(obs, 'error', '') else (
-        _plural(count, 'file') if count else 'no files'
+    result = (
+        'failed'
+        if getattr(obs, 'error', '')
+        else (_plural(count, 'file') if count else 'no files')
     )
     return glob_action_model(obs).with_result(result)
 
@@ -349,7 +351,9 @@ def lsp_action_model(action: Any) -> OrientLineModel:
     )
 
 
-def lsp_observation_model(obs: Any, pending: OrientLineModel | None = None) -> OrientLineModel:
+def lsp_observation_model(
+    obs: Any, pending: OrientLineModel | None = None
+) -> OrientLineModel:
     base = pending or OrientLineModel(
         tool='lsp',
         icon='≡',
@@ -507,11 +511,15 @@ def mcp_action_model(action: Any) -> OrientLineModel | None:
     return None
 
 
-def mcp_observation_model(obs: Any, pending: OrientLineModel | None = None) -> OrientLineModel | None:
+def mcp_observation_model(
+    obs: Any, pending: OrientLineModel | None = None
+) -> OrientLineModel | None:
     action_like = pending or mcp_action_model(obs)
     if action_like is None:
         return None
-    return action_like.with_result(mcp_result(action_like.tool, str(getattr(obs, 'content', '') or '')))
+    return action_like.with_result(
+        mcp_result(action_like.tool, str(getattr(obs, 'content', '') or ''))
+    )
 
 
 def mcp_result(tool: str, content: str) -> str:
@@ -546,4 +554,3 @@ def _fetch_target(args: dict[str, Any]) -> str:
     if len(urls) == 1 and path and path != '/':
         label = f'{host}{path}'
     return shorten_middle(label, max_len=52, head_min=18)
-

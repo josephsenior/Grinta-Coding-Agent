@@ -140,7 +140,9 @@ def test_build_model_entries_includes_all_catalog_models() -> None:
     for provider in get_provider_ids():
         if provider in LOCAL_PROVIDERS:
             continue
-        catalog_names = {entry.name for entry in get_catalog() if entry.provider == provider}
+        catalog_names = {
+            entry.name for entry in get_catalog() if entry.provider == provider
+        }
         if not catalog_names:
             continue
         picker_names = {
@@ -161,7 +163,9 @@ def test_all_opencode_catalog_models_have_grinta_transport() -> None:
         if entry.provider != 'opencode':
             continue
         try:
-            validate_model_transport(f'opencode/{entry.name}', config_provider='opencode')
+            validate_model_transport(
+                f'opencode/{entry.name}', config_provider='opencode'
+            )
         except Exception as exc:
             blocked.append(f'{entry.name}: {exc}')
     assert not blocked, blocked

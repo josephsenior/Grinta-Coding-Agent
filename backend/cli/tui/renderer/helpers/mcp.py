@@ -16,8 +16,6 @@ def mcp_content_is_error(content: str) -> bool:
             data = json.loads(s)
         except json.JSONDecodeError:
             return False
-        if isinstance(data, dict) and (
-            data.get('isError') or data.get('ok') is False
-        ):
+        if isinstance(data, dict) and (data.get('isError') or data.get('ok') is False):
             return True
     return False

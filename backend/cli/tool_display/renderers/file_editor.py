@@ -9,15 +9,15 @@ from typing import TYPE_CHECKING, Any
 
 from rich.markup import escape as markup_escape
 
+from backend.cli.display.transcript import (
+    format_activity_delta_secondary,
+    format_activity_primary,
+)
 from backend.cli.theme import (
     CLR_DETAIL,
     CLR_SECONDARY,
     CLR_STATUS_OK,
     NAVY_TEXT_DIM,
-)
-from backend.cli.display.transcript import (
-    format_activity_delta_secondary,
-    format_activity_primary,
 )
 
 if TYPE_CHECKING:

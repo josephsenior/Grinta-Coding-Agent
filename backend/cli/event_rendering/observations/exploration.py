@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from backend.cli._typing import ObservationRenderersHost
@@ -12,105 +12,28 @@ if TYPE_CHECKING:
 else:
     _ObservationRenderersBase = object
 
-from rich import box
-from rich.padding import Padding
-from rich.panel import Panel
-from rich.syntax import Syntax
-from rich.text import Text
 
-from backend.cli.event_rendering.constants import (
-    BROWSER_TOOL_COMMANDS as _BROWSER_TOOL_COMMANDS,
-)
-from backend.cli.event_rendering.delegate import (
-    summarize_delegate_observation as _summarize_delegate_observation,
-)
-from backend.cli.event_rendering.error_panel import (
-    build_error_panel as _build_error_panel,
-)
-from backend.cli.event_rendering.error_panel import (
-    build_llm_stream_fallback_panel as _build_llm_stream_fallback_panel,
-)
-from backend.cli.event_rendering.error_panel import (
-    use_recoverable_notice_style as _use_recoverable_notice_style,
-)
-from backend.cli.event_rendering.text_utils import (
-    sanitize_visible_transcript_text as _sanitize_visible_transcript_text,
-)
-from backend.cli.event_rendering.text_utils import (
-    strip_pty_echo as _strip_pty_echo,
-)
-from backend.cli.event_rendering.text_utils import (
-    summarize_cmd_failure as _summarize_cmd_failure,
-)
 from backend.cli._typing import ObservationRenderersHost
-from backend.cli.layout_tokens import ACTIVITY_BLOCK_BOTTOM_PAD
 from backend.cli.orient_tools import (
-    ORIENT_MCP_TOOL_NAMES,
     OrientLineModel,
     analyze_observation_model,
-    file_read_observation_model,
     find_symbols_observation_model,
     glob_observation_model,
     grep_observation_model,
     lsp_observation_model,
-    mcp_observation_model,
     read_symbols_observation_model,
 )
-from backend.cli.theme import (
-    CLR_OUTPUT_PANEL_BORDER,
-    CLR_OUTPUT_PANEL_TITLE,
-    CLR_QUESTION_TEXT,
-    CLR_STATUS_WARN,
-    NAVY_BG,
-    get_grinta_pygments_style,
-)
-from backend.cli.display.tool_call_display import (
-    mcp_result_syntax_extras,
-    mcp_result_user_preview,
-)
-from backend.cli.display.transcript import (
-    format_activity_delta_secondary,
-    format_activity_result_secondary,
-    format_activity_shell_block,
-    format_callout_panel,
-    strip_tool_result_validation_annotations,
-)
 from backend.ledger.observation import (
-    AgentCondensationObservation,
-    AgentStateChangedObservation,
-    AgentThinkObservation,
     AnalyzeProjectStructureObservation,
-    BrowserScreenshotObservation,
-    CmdOutputObservation,
-    DelegateTaskObservation,
-    ErrorObservation,
-    FileDownloadObservation,
-    FileEditObservation,
-    FileReadObservation,
-    FileWriteObservation,
     FindSymbolsObservation,
     GlobObservation,
     GrepObservation,
     LspQueryObservation,
-    MCPObservation,
-    Observation,
     ReadSymbolsObservation,
-    RecallFailureObservation,
-    RecallObservation,
-    ServerReadyObservation,
-    StatusObservation,
-    SuccessObservation,
-    TaskTrackingObservation,
-    TerminalObservation,
-    UserRejectObservation,
-)
-from backend.ledger.observation.error import (
-    ERROR_CATEGORY_NETWORK,
-    ERROR_CATEGORY_RATE_LIMIT,
-    ERROR_CATEGORY_TIMEOUT,
 )
 
 logger = logging.getLogger(__name__)
+
 
 class _ObsExplorationMixin(_ObservationRenderersBase):
     def _render_lsp_query_observation(self, obs: LspQueryObservation) -> None:
@@ -238,11 +161,9 @@ class _ObsExplorationMixin(_ObservationRenderersBase):
         if error:
             return f'failed · {error[:60]}'
         symbol_count = len(candidates)
-        file_count = len({
-            str(item.get('path') or '')
-            for item in candidates
-            if item.get('path')
-        })
+        file_count = len(
+            {str(item.get('path') or '') for item in candidates if item.get('path')}
+        )
         if symbol_count == 0:
             return 'no symbols'
         if file_count <= 1:
@@ -288,9 +209,17 @@ class _ObsExplorationMixin(_ObservationRenderersBase):
         if not lines:
             return None
         # Try to count resolved vs ambiguous vs not_found
-        resolved = sum(1 for line in lines if line.startswith('resolved') or '->' in line)
-        ambiguous = sum(1 for line in lines if line.startswith('ambiguous') or '~>' in line)
-        not_found = sum(1 for line in lines if line.startswith('not found') or line.startswith('not_found'))
+        resolved = sum(
+            1 for line in lines if line.startswith('resolved') or '->' in line
+        )
+        ambiguous = sum(
+            1 for line in lines if line.startswith('ambiguous') or '~>' in line
+        )
+        not_found = sum(
+            1
+            for line in lines
+            if line.startswith('not found') or line.startswith('not_found')
+        )
         total = resolved + ambiguous + not_found
         if total == 0:
             return None
@@ -317,17 +246,43 @@ class _ObsExplorationMixin(_ObservationRenderersBase):
         body_lower = body.lower()
         if 'callers' in body_lower or 'caller of' in body_lower:
             # Count callers
-            caller_lines = [line for line in lines if '::' in line or ' -> ' in line or '  ' in line and '(' in line and ')' in line]
+            caller_lines = [
+                line
+                for line in lines
+                if '::' in line
+                or ' -> ' in line
+                or '  ' in line
+                and '(' in line
+                and ')' in line
+            ]
             return f'{len(caller_lines)} callers' if caller_lines else 'completed'
-        if 'dependency' in body_lower or 'depend on' in body_lower or 'import' in body_lower:
-            dep_count = sum(1 for line in lines if line.strip() and ('<-' in line or '->' in line or 'import' in line.lower()))
+        if (
+            'dependency' in body_lower
+            or 'depend on' in body_lower
+            or 'import' in body_lower
+        ):
+            dep_count = sum(
+                1
+                for line in lines
+                if line.strip()
+                and ('<-' in line or '->' in line or 'import' in line.lower())
+            )
             return f'{dep_count} deps' if dep_count else 'completed'
         if 'symbol' in body_lower:
-            symbol_lines = [line for line in lines if line.strip() and not line.startswith('#') and not line.startswith('//')]
+            symbol_lines = [
+                line
+                for line in lines
+                if line.strip()
+                and not line.startswith('#')
+                and not line.startswith('//')
+            ]
             return f'{len(symbol_lines)} symbols' if symbol_lines else 'completed'
-        if 'tree' in body_lower or 'file_outline' in body_lower or 'recent' in body_lower:
+        if (
+            'tree' in body_lower
+            or 'file_outline' in body_lower
+            or 'recent' in body_lower
+        ):
             return 'completed'
         if 'semantic_search' in body_lower:
             return 'completed'
         return 'completed'
-

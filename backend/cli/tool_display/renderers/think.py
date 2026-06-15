@@ -7,10 +7,10 @@ from typing import Any
 from rich.markup import escape as markup_escape
 from rich.text import Text
 
+from backend.cli.display.transcript import format_activity_primary
+from backend.cli.theme import CLR_SECONDARY, CLR_THOUGHT_BODY
 from backend.cli.tool_display.renderers._syntax import highlight_code_blocks
 from backend.cli.tool_display.renderers.badge import badge_for_tool_name
-from backend.cli.theme import CLR_SECONDARY, CLR_THOUGHT_BODY
-from backend.cli.display.transcript import format_activity_primary
 
 
 def _render_think_continuation(paragraphs: list[str]) -> list[Any]:

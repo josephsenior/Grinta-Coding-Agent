@@ -269,7 +269,9 @@ class CollapsibleSection(Container):
 
     def compose(self) -> ComposeResult:
         with Horizontal(classes='collapsible-header-row', id='header-row'):
-            yield Static(self._header_icon_markup(), classes='section-icon', id='header-icon')
+            yield Static(
+                self._header_icon_markup(), classes='section-icon', id='header-icon'
+            )
             yield Static(
                 self._header_title_markup(),
                 id='header',
@@ -398,7 +400,9 @@ class CollapsibleSection(Container):
                     )
                 )
         else:
-            body.mount(Static(self._empty_markup(self._content or 'No items'), id='empty-text'))
+            body.mount(
+                Static(self._empty_markup(self._content or 'No items'), id='empty-text')
+            )
 
     def expand(self) -> None:
         """Expand the section."""

@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import os
-from pathlib import Path
-from typing import Any
 
 from rich.console import Console
 from rich.panel import Panel
@@ -23,11 +20,9 @@ from backend.cli.theme import (
     CLR_STATUS_WARN,
     no_color_enabled,
 )
-from backend.core.app_paths import get_app_settings_root
 from backend.core.config import AppConfig, load_app_config
 from backend.core.config.dotenv_keys import (
     persist_llm_api_key_to_dotenv,
-    persist_provider_api_key_to_dotenv,
 )
 from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
 
@@ -35,15 +30,16 @@ logger = logging.getLogger(__name__)
 _console = Console(no_color=no_color_enabled())
 
 from backend.cli.settings.constants import (
+    _PROVIDERS,
     DEFAULT_MODEL_BY_PROVIDER,
     DEFAULT_ONBOARDING_MODEL,
-    _PROVIDERS,
 )
 from backend.cli.settings.storage import (
     _load_raw_settings,
     _save_raw_settings,
     _settings_path,
 )
+
 
 def needs_onboarding(config: AppConfig) -> bool:
     """Return True when no usable LLM API key is configured."""
@@ -106,7 +102,6 @@ def _default_model_from_environment() -> str | None:
         if env_key:
             return _default_model_for_provider(provider)
     return None
-
 
 
 def auto_detect_api_keys(config: AppConfig) -> str | None:

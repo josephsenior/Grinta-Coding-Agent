@@ -10,8 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from backend.cli.settings import get_current_model
 from backend.cli.display.hud import HUDBar
+from backend.cli.settings import get_current_model
 from backend.cli.settings.settings_tui import open_settings
 from backend.core.config import load_app_config
 

@@ -66,9 +66,7 @@ def _update_or_write_lsp_card(
         orch._write_card(card)
 
 
-def _handle_grep_action(
-    orch: 'RendererEventProcessorMixin', event: GrepAction
-) -> None:
+def _handle_grep_action(orch: 'RendererEventProcessorMixin', event: GrepAction) -> None:
     model = grep_action_model(event)
     orch._pending_search_card = model
     orch._pending_search_tool = 'grep'
@@ -80,9 +78,7 @@ def _handle_grep_action(
     )
 
 
-def _handle_glob_action(
-    orch: 'RendererEventProcessorMixin', event: GlobAction
-) -> None:
+def _handle_glob_action(orch: 'RendererEventProcessorMixin', event: GlobAction) -> None:
     model = glob_action_model(event)
     orch._pending_search_card = model
     orch._pending_search_tool = 'glob'

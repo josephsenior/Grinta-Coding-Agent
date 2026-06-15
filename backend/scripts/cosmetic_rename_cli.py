@@ -65,7 +65,10 @@ ER_IMPORT_SUBS: list[tuple[str, str]] = [
 
 # After repl.py becomes repl/session.py, test patches must target session.
 SESSION_PATCH_SUBS: list[tuple[str, str]] = [
-    ('backend.cli.repl.get_current_model', 'backend.cli.repl.session.get_current_model'),
+    (
+        'backend.cli.repl.get_current_model',
+        'backend.cli.repl.session.get_current_model',
+    ),
     ('backend.cli.repl.load_app_config', 'backend.cli.repl.session.load_app_config'),
     (
         'backend.cli.repl._supports_prompt_session',
@@ -147,7 +150,10 @@ def _rename_er_files() -> None:
         return
     for old, new in ER_FILE_RENAMES:
         _rename_file(er / old, er / new)
-    _rename_file(er / 'error_categories' / '_matchers.py', er / 'error_categories' / 'matchers.py')
+    _rename_file(
+        er / 'error_categories' / '_matchers.py',
+        er / 'error_categories' / 'matchers.py',
+    )
 
 
 def _repl_module_subs() -> list[tuple[str, str]]:

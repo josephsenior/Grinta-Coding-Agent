@@ -117,7 +117,9 @@ async def _read_repl_input(host: RunHelpersHost, session: Any | None) -> str | N
 
 
 def _discard_terminal_noise(host: RunHelpersHost, text: str) -> bool:
-    from backend.cli.repl.slash_command_registry import _looks_like_terminal_selection_noise
+    from backend.cli.repl.slash_command_registry import (
+        _looks_like_terminal_selection_noise,
+    )
 
     if not _looks_like_terminal_selection_noise(text):
         return False

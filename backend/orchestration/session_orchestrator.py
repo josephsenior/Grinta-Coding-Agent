@@ -564,8 +564,6 @@ class SessionOrchestrator(
         finally:
             clear_step_phase()
 
-
-
     async def close(self, set_stop_state: bool = True) -> None:
         """Closes the agent controller, canceling any ongoing tasks and unsubscribing from the event stream.
 

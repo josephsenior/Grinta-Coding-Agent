@@ -5,10 +5,12 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from backend.core.config import AppConfig
 from backend.cli.settings.storage import _load_raw_settings, _save_raw_settings
+from backend.core.config import AppConfig
 
 logger = logging.getLogger(__name__)
+
+
 def get_mcp_servers(config: AppConfig) -> list[dict[str, Any]]:
     from backend.integrations.mcp.native_backends import (
         filter_user_visible_mcp_server_dicts,

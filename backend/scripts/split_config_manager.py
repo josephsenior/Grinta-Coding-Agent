@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 _console = Console(no_color=no_color_enabled())
 '''
 
-CONSTANTS_BODY = '''DEFAULT_ONBOARDING_MODEL = 'openai/gpt-5.1'
+CONSTANTS_BODY = """DEFAULT_ONBOARDING_MODEL = 'openai/gpt-5.1'
 DEFAULT_MODEL_BY_PROVIDER: dict[str, str] = {
     'anthropic': 'anthropic/claude-sonnet-4.6',
     'google': 'google/gemini-3-flash',
@@ -78,7 +78,7 @@ _PROVIDERS: list[tuple[str, str, str]] = [
     ('ollama', 'Ollama', 'local'),
     ('lm_studio', 'LM Studio', 'local'),
 ]
-'''
+"""
 
 # 1-based inclusive line ranges from config_manager.py
 RANGES: dict[str, list[tuple[int, int]]] = {

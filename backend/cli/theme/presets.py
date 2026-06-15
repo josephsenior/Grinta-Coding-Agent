@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from backend.cli.theme.env import get_theme_preset
 import backend.cli.theme.tokens as tokens
+from backend.cli.theme.env import get_theme_preset
 
 
 def apply_theme_overrides() -> None:

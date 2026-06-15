@@ -2,9 +2,13 @@
 
 from backend.tests.unit.cli.frontend import _shared
 from backend.tests.unit.cli.frontend._shared import *  # noqa: F403
+
 for _name in dir(_shared):
-    if _name.startswith("_") and not _name.startswith("__"):
+    if _name.startswith('_') and not _name.startswith('__'):
         globals()[_name] = getattr(_shared, _name)
+
+from backend.tests.unit.cli.frontend._shared import _console_output, _make_console
+
 
 def test_settings_ai_tab_shows_provider_and_model_separately() -> None:
     from backend.cli.settings.settings_tui import _render_ai_tab
@@ -19,7 +23,9 @@ def test_settings_ai_tab_shows_provider_and_model_separately() -> None:
     config.max_budget_per_task = None
     config.cli_tool_icons = False
 
-    with patch('backend.cli.settings.settings_tui.load_app_config', return_value=config):
+    with patch(
+        'backend.cli.settings.settings_tui.load_app_config', return_value=config
+    ):
         _render_ai_tab(console)
 
     output = _console_output(console)

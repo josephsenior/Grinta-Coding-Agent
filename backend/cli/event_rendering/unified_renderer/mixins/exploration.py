@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from backend.cli.event_rendering.unified_renderer.types import ActivityCard, ActivityLine
+from backend.cli.event_rendering.unified_renderer.types import (
+    ActivityCard,
+    ActivityLine,
+)
 from backend.cli.event_rendering.unified_renderer.utils import _SEARCH_CARD_PRESETS
 from backend.cli.theme import NAVY_TEXT_DIM, NAVY_TEXT_MUTED
 

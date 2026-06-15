@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
+from backend.cli.display.transcript import format_activity_primary
 from backend.cli.theme import (
     CLR_BRAND_HUE,
     CLR_SECONDARY,
     CLR_STATUS_OK,
     CLR_STATUS_WARN,
 )
-from backend.cli.display.transcript import format_activity_primary
 
 
 def render_memory_update(

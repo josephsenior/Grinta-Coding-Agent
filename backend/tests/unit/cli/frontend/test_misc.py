@@ -2,9 +2,17 @@
 
 from backend.tests.unit.cli.frontend import _shared
 from backend.tests.unit.cli.frontend._shared import *  # noqa: F403
+
 for _name in dir(_shared):
-    if _name.startswith("_") and not _name.startswith("__"):
+    if _name.startswith('_') and not _name.startswith('__'):
         globals()[_name] = getattr(_shared, _name)
+
+from backend.tests.unit.cli.frontend._shared import (
+    _console_output,
+    _make_config,
+    _make_console,
+)
+
 
 @pytest.mark.asyncio
 async def test_repl_restarts_agent_loop_after_terminal_state() -> None:
@@ -41,6 +49,7 @@ async def test_repl_restarts_agent_loop_after_terminal_state() -> None:
     restarted_task = cast(asyncio.Task[None], restarted_task)
     await restarted_task
 
+
 @pytest.mark.asyncio
 async def test_renderer_handles_error_observation() -> None:
     """ErrorObservation should be rendered with structured error panel."""
@@ -62,6 +71,7 @@ async def test_renderer_handles_error_observation() -> None:
     output = _console_output(console)
     assert 'FileNotFoundError' in output
 
+
 @pytest.mark.asyncio
 async def test_start_stop_live_flushes_items_to_console() -> None:
     """During Live, system messages print immediately; stop_live clears the live region."""
@@ -77,6 +87,7 @@ async def test_start_stop_live_flushes_items_to_console() -> None:
 
     output = _console_output(console)
     assert 'Working' in output
+
 
 @pytest.mark.asyncio
 async def test_renderer_error_observation_shows_recovery_steps() -> None:
@@ -98,6 +109,7 @@ async def test_renderer_error_observation_shows_recovery_steps() -> None:
     assert '/settings' in output
     assert 'update the API key' in output
 
+
 @pytest.mark.asyncio
 async def test_renderer_timeout_error_uses_notice_panel_copy() -> None:
     """Provider wait timeouts should use cyan notice framing, not raw exception titles."""
@@ -118,6 +130,7 @@ async def test_renderer_timeout_error_uses_notice_panel_copy() -> None:
     assert 'Next steps' in output
     assert 'APP_LLM_FALLBACK_TIMEOUT_SECONDS' in output
 
+
 @pytest.mark.asyncio
 async def test_renderer_notice_panel_does_not_repeat_summary_under_next_steps() -> None:
     """Notice headline already states the summary; recovery must list only numbered steps."""
@@ -134,6 +147,7 @@ async def test_renderer_notice_panel_does_not_repeat_summary_under_next_steps() 
     needle = "The model didn't finish within Grinta's wait window"
     assert needle in output
     assert output.count(needle) == 1
+
 
 @pytest.mark.asyncio
 async def test_renderer_timeout_error_with_autonomous_retry_uses_recovery_copy() -> (
@@ -160,6 +174,7 @@ async def test_renderer_timeout_error_with_autonomous_retry_uses_recovery_copy()
     assert 'Automatic retry is running. No action needed.' not in output
     # Should show generic timeout error guidance instead
     assert 'Request timed out' in output
+
 
 @pytest.mark.asyncio
 async def test_renderer_rate_limit_queue_error_uses_notice_not_red_error() -> None:
@@ -188,6 +203,7 @@ async def test_renderer_rate_limit_queue_error_uses_notice_not_red_error() -> No
     # Should show rate limit guidance instead
     assert 'Rate or quota limit' in output
 
+
 @pytest.mark.asyncio
 async def test_renderer_null_action_loop_uses_notice_panel_copy() -> None:
     from backend.ledger.observation import ErrorObservation
@@ -211,6 +227,7 @@ async def test_renderer_null_action_loop_uses_notice_panel_copy() -> None:
         'No action is required unless you want the task to continue immediately.'
         in output
     )
+
 
 @pytest.mark.asyncio
 async def test_renderer_verification_required_uses_notice_panel_copy() -> None:
@@ -243,6 +260,7 @@ async def test_renderer_verification_required_uses_notice_panel_copy() -> None:
         in output
     )
 
+
 @pytest.mark.asyncio
 async def test_renderer_default_shell_session_error_uses_recovery_copy() -> None:
     from backend.ledger.observation import ErrorObservation
@@ -257,6 +275,7 @@ async def test_renderer_default_shell_session_error_uses_recovery_copy() -> None
     output = _console_output(console)
     assert 'The runtime shell session is missing or was interrupted.' in output
     assert 'Retry once to let Grinta recreate the default shell session.' in output
+
 
 @pytest.mark.asyncio
 async def test_renderer_stream_fallback_status_renders_still_working_panel() -> None:
@@ -273,6 +292,7 @@ async def test_renderer_stream_fallback_status_renders_still_working_panel() -> 
     output = _console_output(console)
     assert 'Still Working' in output
     assert 'non-streaming' in output.lower()
+
 
 @pytest.mark.asyncio
 async def test_renderer_syntax_validation_error_panel_is_compact() -> None:
@@ -301,6 +321,7 @@ async def test_renderer_syntax_validation_error_panel_is_compact() -> None:
     assert 'node=' not in output
     assert 'Node text' not in output
 
+
 @pytest.mark.asyncio
 async def test_system_error_message_shows_restart_guidance_for_init_failures() -> None:
     """Startup failures should suggest how to recover outside the REPL."""
@@ -318,6 +339,7 @@ async def test_system_error_message_shows_restart_guidance_for_init_failures() -
     output = _console_output(console)
     assert 'Restart grinta' in output
     assert 'settings.json' in output
+
 
 @pytest.mark.asyncio
 async def test_renderer_shows_recall_observation() -> None:
@@ -343,6 +365,7 @@ async def test_renderer_shows_recall_observation() -> None:
     assert renderer._reasoning.active
     assert 'recalled' in renderer._reasoning._current_action.lower()
 
+
 def test_model_command_rejects_unqualified_model() -> None:
     repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
     mock_renderer = MagicMock()
@@ -356,6 +379,7 @@ def test_model_command_rejects_unqualified_model() -> None:
     message = mock_renderer.add_system_message.call_args[0][0]
     assert 'provider-qualified' in message
 
+
 def test_sessions_command_accepts_optional_limit() -> None:
     repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
     mock_renderer = MagicMock()
@@ -368,6 +392,7 @@ def test_sessions_command_accepts_optional_limit() -> None:
     list_sessions.assert_called_once()
     assert list_sessions.call_args.kwargs['limit'] == 5
 
+
 def test_entry_point_rejects_legacy_serve_subcommand() -> None:
     """Entry point should reject the removed serve subcommand."""
     import sys
@@ -379,6 +404,7 @@ def test_entry_point_rejects_legacy_serve_subcommand() -> None:
             main()
 
     assert exc.value.code == 2
+
 
 def test_entry_point_parses_model_flag() -> None:
     """--model flag should be forwarded to repl main."""
@@ -396,6 +422,7 @@ def test_entry_point_parses_model_flag() -> None:
                 no_splash=False,
             )
 
+
 def test_entry_point_parses_project_flag(tmp_path: Path) -> None:
     """--project flag should be forwarded to repl main."""
     import sys
@@ -412,6 +439,7 @@ def test_entry_point_parses_project_flag(tmp_path: Path) -> None:
                 no_splash=False,
             )
 
+
 def test_entry_point_parses_cleanup_storage_flag() -> None:
     """--cleanup-storage should be forwarded to repl main."""
     import sys
@@ -427,6 +455,7 @@ def test_entry_point_parses_cleanup_storage_flag() -> None:
                 cleanup_storage=True,
                 no_splash=False,
             )
+
 
 def test_entry_point_parses_both_flags(tmp_path: Path) -> None:
     """Both --model and --project should be forwarded."""
@@ -448,6 +477,7 @@ def test_entry_point_parses_both_flags(tmp_path: Path) -> None:
                 no_splash=False,
             )
 
+
 def test_entry_point_parses_cleanup_and_project_flags(tmp_path: Path) -> None:
     """Cleanup flag should preserve the selected project override."""
     import sys
@@ -466,6 +496,7 @@ def test_entry_point_parses_cleanup_and_project_flags(tmp_path: Path) -> None:
                 no_splash=False,
             )
 
+
 def test_entry_point_parses_no_splash_flag() -> None:
     """--no-splash should be forwarded to repl main."""
     import sys
@@ -481,6 +512,7 @@ def test_entry_point_parses_no_splash_flag() -> None:
                 cleanup_storage=False,
                 no_splash=True,
             )
+
 
 def test_grinta_main_parses_project_flag(tmp_path: Path) -> None:
     """Grinta should parse --project even when invoked via backend.cli.main."""
@@ -500,6 +532,7 @@ def test_grinta_main_parses_project_flag(tmp_path: Path) -> None:
     )
     mock_asyncio_run.assert_called_once()
 
+
 def test_grinta_main_parses_no_splash_flag() -> None:
     """Direct backend.cli.main invocation should honor --no-splash."""
     import sys
@@ -516,6 +549,7 @@ def test_grinta_main_parses_no_splash_flag() -> None:
     mock_async_main.assert_called_once_with(model=None, project=None, show_splash=False)
     mock_asyncio_run.assert_called_once()
 
+
 def test_grinta_main_rejects_legacy_serve_subcommand() -> None:
     """Grinta main should reject the removed serve subcommand."""
     import sys
@@ -529,6 +563,7 @@ def test_grinta_main_rejects_legacy_serve_subcommand() -> None:
 
     assert exc.value.code == 2
     mock_asyncio_run.assert_not_called()
+
 
 def test_grinta_main_runs_cleanup_storage_without_asyncio() -> None:
     """Cleanup mode should run the one-off storage command and exit."""
@@ -546,6 +581,7 @@ def test_grinta_main_runs_cleanup_storage_without_asyncio() -> None:
 
     mock_cleanup.assert_called_once_with(None)
     mock_asyncio_run.assert_not_called()
+
 
 @pytest.mark.asyncio
 async def test_async_main_defaults_workspace_to_cwd(
@@ -587,6 +623,7 @@ async def test_async_main_defaults_workspace_to_cwd(
     assert 'workspaces' in config.local_data_root
     assert config.get_agent_config(config.default_agent).cli_mode is True
 
+
 @pytest.mark.asyncio
 async def test_async_main_queues_piped_input(tmp_path: Path) -> None:
     config = AppConfig()
@@ -616,6 +653,7 @@ async def test_async_main_queues_piped_input(tmp_path: Path) -> None:
                                     from backend.cli.main import _async_main
 
                                     await _async_main()
+
 
 @pytest.mark.asyncio
 async def test_async_main_keeps_explicit_project_override(
@@ -655,6 +693,7 @@ async def test_async_main_keeps_explicit_project_override(
     assert 'workspaces' in config.local_data_root
     assert config.get_agent_config(config.default_agent).cli_mode is True
 
+
 @pytest.mark.asyncio
 async def test_repl_non_interactive_uses_queued_input_before_stdin() -> None:
     repl = Repl(_make_config(), _make_console())
@@ -669,6 +708,7 @@ async def test_repl_non_interactive_uses_queued_input_before_stdin() -> None:
     assert result == 'queued task\n'
     stdin.readline.assert_not_called()
 
+
 def test_find_sessions_root_uses_project_storage_sessions(tmp_path: Path) -> None:
     from backend.cli.session.session_manager import _find_sessions_root
 
@@ -677,6 +717,7 @@ def test_find_sessions_root_uses_project_storage_sessions(tmp_path: Path) -> Non
     config = AppConfig(local_data_root=str(tmp_path / '.grinta' / 'storage'))
 
     assert _find_sessions_root(config) == sessions
+
 
 @pytest.mark.asyncio
 async def test_cancel_agent_stops_task() -> None:
@@ -695,6 +736,7 @@ async def test_cancel_agent_stops_task() -> None:
     assert task.cancelled()
     mock_renderer.add_system_message.assert_called_once()
     assert 'Interrupted' in mock_renderer.add_system_message.call_args[0][0]
+
 
 @pytest.mark.asyncio
 async def test_ensure_controller_loop_reconnects_after_hard_kill() -> None:
@@ -743,6 +785,7 @@ async def test_ensure_controller_loop_reconnects_after_hard_kill() -> None:
     )
     connect.assert_not_called()
 
+
 @pytest.mark.asyncio
 async def test_repl_run_saves_controller_state_on_exit() -> None:
     repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
@@ -764,6 +807,7 @@ async def test_repl_run_saves_controller_state_on_exit() -> None:
         await repl.run()
 
     controller.save_state.assert_called_once()
+
 
 @pytest.mark.asyncio
 async def test_wait_for_agent_idle_drains_late_final_message() -> None:
@@ -798,6 +842,7 @@ async def test_wait_for_agent_idle_drains_late_final_message() -> None:
 
     output = _console_output(console)
     assert 'Final answer' in output
+
 
 @pytest.mark.asyncio
 async def test_wait_for_agent_idle_default_timeout_disabled(monkeypatch) -> None:
@@ -840,6 +885,7 @@ async def test_wait_for_agent_idle_default_timeout_disabled(monkeypatch) -> None
     with suppress(asyncio.CancelledError):
         await agent_task
 
+
 @pytest.mark.asyncio
 async def test_wait_for_agent_idle_uses_controller_idle_state_when_renderer_is_stale() -> (
     None
@@ -858,6 +904,7 @@ async def test_wait_for_agent_idle_uses_controller_idle_state_when_renderer_is_s
     controller.get_agent_state.return_value = AgentState.AWAITING_USER_INPUT
 
     await asyncio.wait_for(repl._wait_for_agent_idle(controller, None), timeout=0.2)
+
 
 @pytest.mark.asyncio
 async def test_wait_for_agent_idle_rate_limited_not_treated_as_idle() -> None:
@@ -891,6 +938,7 @@ async def test_wait_for_agent_idle_rate_limited_not_treated_as_idle() -> None:
         await agent_task
 
     assert calls['n'] >= 8
+
 
 @pytest.mark.asyncio
 async def test_repl_run_shows_ready_before_background_bootstrap() -> None:
@@ -932,6 +980,7 @@ async def test_repl_run_shows_ready_before_background_bootstrap() -> None:
     # (the old "grinta ready" message was removed — the splash covers that).
     init_msgs = [e for e in events if e != 'bootstrap']
     assert any('nitializ' in m for m in init_msgs) or events
+
 
 @pytest.mark.asyncio
 async def test_repl_run_accepts_first_message_before_mcp_warmup_finishes() -> None:
@@ -1019,6 +1068,7 @@ async def test_repl_run_accepts_first_message_before_mcp_warmup_finishes() -> No
     mock_setup_mcp.assert_awaited_once()
     mock_release.assert_called_once_with(acquire_result)
 
+
 def test_start_live_passes_vertical_overflow_crop() -> None:
     """Rich Live must use ``crop`` (not ``visible``) for the Thinking panel.
 
@@ -1042,12 +1092,15 @@ def test_start_live_passes_vertical_overflow_crop() -> None:
     assert live_cls.call_args is not None
     assert live_cls.call_args.kwargs.get('vertical_overflow') == 'scroll'
 
+
 def test_atomic_settings_write(tmp_path: Path) -> None:
     """_save_raw_settings should write atomically via tempfile + rename."""
     from backend.cli.settings import _load_raw_settings, _save_raw_settings
 
     settings_file = tmp_path / 'settings.json'
-    with patch('backend.cli.settings.storage._settings_path', return_value=settings_file):
+    with patch(
+        'backend.cli.settings.storage._settings_path', return_value=settings_file
+    ):
         data = {
             'llm_api_key': LLM_API_KEY_SETTINGS_PLACEHOLDER,
             'llm_model': 'test/model',
@@ -1062,6 +1115,7 @@ def test_atomic_settings_write(tmp_path: Path) -> None:
         tmp_files = list(settings_file.parent.glob('*.tmp'))
         assert not tmp_files
 
+
 def test_get_masked_api_key_returns_not_set_when_missing() -> None:
     """Masking should be safe when no key is configured anywhere."""
     from backend.cli.settings import get_masked_api_key
@@ -1074,6 +1128,7 @@ def test_get_masked_api_key_returns_not_set_when_missing() -> None:
 
     with patch.dict(os.environ, {}, clear=True):
         assert get_masked_api_key(config) == '(not set)'
+
 
 def test_get_masked_api_key_reads_env_fallback() -> None:
     """Masking should use env-backed keys when config.api_key is unset."""
@@ -1092,6 +1147,7 @@ def test_get_masked_api_key_reads_env_fallback() -> None:
     assert masked.endswith('5678')
     assert '•' in masked
 
+
 def test_ensure_default_model_sets_model_from_google_key() -> None:
     from backend.cli.settings import ensure_default_model
 
@@ -1106,6 +1162,7 @@ def test_ensure_default_model_sets_model_from_google_key() -> None:
 
     assert selected == 'google/gemini-3-flash'
     assert llm_cfg.model == 'google/gemini-3-flash'
+
 
 def test_ensure_default_model_preserves_existing_model() -> None:
     from backend.cli.settings import ensure_default_model
@@ -1124,6 +1181,7 @@ def test_ensure_default_model_preserves_existing_model() -> None:
     assert selected == 'anthropic/claude-sonnet-4-20250514'
     assert llm_cfg.model == 'anthropic/claude-sonnet-4-20250514'
 
+
 def test_ensure_default_model_uses_provider_specific_env_var() -> None:
     from backend.cli.settings import ensure_default_model
 
@@ -1141,6 +1199,7 @@ def test_ensure_default_model_uses_provider_specific_env_var() -> None:
     assert selected == 'openai/gpt-5.1'
     assert llm_cfg.model == 'openai/gpt-5.1'
 
+
 def test_run_onboarding_uses_provider_default_model(tmp_path: Path) -> None:
     from backend.cli.settings import run_onboarding
 
@@ -1149,7 +1208,9 @@ def test_run_onboarding_uses_provider_default_model(tmp_path: Path) -> None:
     entered = iter(['2', '', 'sk-ant-api03-test-value'])
     loaded_config = MagicMock()
 
-    with patch('backend.cli.settings.storage._settings_path', return_value=settings_file):
+    with patch(
+        'backend.cli.settings.storage._settings_path', return_value=settings_file
+    ):
         with patch(
             'backend.cli.settings.onboarding._settings_path',
             return_value=settings_file,
@@ -1160,7 +1221,8 @@ def test_run_onboarding_uses_provider_default_model(tmp_path: Path) -> None:
                 or str(kwargs.get('default', '')),
             ):
                 with patch(
-                    'backend.cli.settings.onboarding.load_app_config', return_value=loaded_config
+                    'backend.cli.settings.onboarding.load_app_config',
+                    return_value=loaded_config,
                 ):
                     with patch('os.isatty', return_value=True):
                         result = run_onboarding()
@@ -1173,6 +1235,7 @@ def test_run_onboarding_uses_provider_default_model(tmp_path: Path) -> None:
     assert env_file.is_file()
     assert 'sk-ant-api03-test-value' in env_file.read_text(encoding='utf-8')
     assert result is loaded_config
+
 
 @pytest.mark.asyncio
 async def test_budget_warning_at_80_percent() -> None:
@@ -1203,6 +1266,7 @@ async def test_budget_warning_at_80_percent() -> None:
     output = _console_output(console)
     assert 'Budget' in output or 'budget' in output
 
+
 @pytest.mark.asyncio
 async def test_budget_exceeded_at_100_percent() -> None:
     """Renderer should emit a strong warning when cost exceeds budget."""
@@ -1227,6 +1291,7 @@ async def test_budget_exceeded_at_100_percent() -> None:
     await renderer.handle_event(chunk)
 
     assert renderer.budget_warned_100
+
 
 @pytest.mark.asyncio
 async def test_no_budget_warning_when_no_budget_set() -> None:
@@ -1253,6 +1318,7 @@ async def test_no_budget_warning_when_no_budget_set() -> None:
     assert not renderer.budget_warned_80
     assert not renderer.budget_warned_100
 
+
 @pytest.mark.asyncio
 async def test_renderer_shows_command_context_for_output() -> None:
     from backend.ledger.observation import CmdOutputObservation
@@ -1273,6 +1339,7 @@ async def test_renderer_shows_command_context_for_output() -> None:
     output = _console_output(console)
     assert 'exit -1' in output
     assert '2 passed' in output
+
 
 @pytest.mark.asyncio
 async def test_renderer_browser_cmd_output_does_not_print_ghost_terminal_card() -> None:
@@ -1316,6 +1383,7 @@ async def test_renderer_browser_cmd_output_does_not_print_ghost_terminal_card() 
         + output
     )
 
+
 @pytest.mark.asyncio
 async def test_renderer_browser_screenshot_timeout_shows_browser_guidance() -> None:
     """Regression: the generic ``timed out`` branch applied LLM-provider
@@ -1344,6 +1412,7 @@ async def test_renderer_browser_screenshot_timeout_shows_browser_guidance() -> N
     # The misleading provider-centric copy must not appear for this case.
     assert 'provider status page' not in output
     assert 'faster model' not in output
+
 
 @pytest.mark.asyncio
 async def test_renderer_directory_view_uses_entries_not_lines() -> None:
@@ -1378,6 +1447,7 @@ async def test_renderer_directory_view_uses_entries_not_lines() -> None:
     # Current implementation shows file read without lines/entries label
     assert 'Read' in output or '.' in output
 
+
 @pytest.mark.asyncio
 async def test_renderer_file_view_still_uses_lines() -> None:
     """Counterpart to the directory-view test: a real file read still gets
@@ -1408,6 +1478,7 @@ async def test_renderer_file_view_still_uses_lines() -> None:
     output = _console_output(console)
     # Current implementation shows file read path
     assert 'chess.html' in output
+
 
 @pytest.mark.asyncio
 async def test_renderer_non_browser_cmd_with_browser_prefix_word_still_rendered() -> (
@@ -1442,6 +1513,7 @@ async def test_renderer_non_browser_cmd_with_browser_prefix_word_still_rendered(
     # silently dropped by the old ``startswith('browser ')`` filter.
     assert 'Ran' in output or 'command' in output
 
+
 def test_error_guidance_routes_browser_timeouts_to_browser_branch() -> None:
     """Unit-level check that the classifier picks the browser branch before
     the generic timeout branch.
@@ -1464,6 +1536,7 @@ def test_error_guidance_routes_browser_timeouts_to_browser_branch() -> None:
     assert guidance2 is not None
     assert 'browser' in guidance2.summary.lower()
 
+
 def test_error_guidance_routes_debugger_start_timeout_to_debugger_branch() -> None:
     from backend.cli.event_rendering.error_panel import (
         error_guidance as _error_guidance,
@@ -1474,6 +1547,7 @@ def test_error_guidance_routes_debugger_start_timeout_to_debugger_branch() -> No
     )
     assert guidance is not None
     assert 'debugger startup' in guidance.summary.lower()
+
 
 def test_error_guidance_http_503_overload() -> None:
     from backend.cli.event_rendering.error_panel import (
@@ -1486,6 +1560,7 @@ def test_error_guidance_http_503_overload() -> None:
     assert guidance is not None
     assert 'unavailable' in guidance.summary.lower()
 
+
 def test_error_guidance_connection_refused() -> None:
     from backend.cli.event_rendering.error_panel import (
         error_guidance as _error_guidance,
@@ -1494,6 +1569,7 @@ def test_error_guidance_connection_refused() -> None:
     guidance = _error_guidance('[Errno 111] Connection refused')
     assert guidance is not None
     assert 'connection' in guidance.summary.lower()
+
 
 @pytest.mark.asyncio
 async def test_wait_for_state_change_returns_immediately_when_events_are_pending() -> (
@@ -1506,6 +1582,7 @@ async def test_wait_for_state_change_returns_immediately_when_events_are_pending
     state = await renderer.wait_for_state_change(wait_timeout_sec=1.0)
     assert state is None
 
+
 def test_resume_command_sets_pending() -> None:
     """'/resume 1' should set _pending_resume."""
     repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
@@ -1515,6 +1592,7 @@ def test_resume_command_sets_pending() -> None:
     result = repl.handle_command('/resume 1')
     assert result is True
     assert repl.pending_resume == '1'
+
 
 def test_resume_command_no_arg_warns() -> None:
     """'/resume' without arg should show a warning."""
@@ -1528,6 +1606,7 @@ def test_resume_command_no_arg_warns() -> None:
     mock_renderer.add_system_message.assert_called_once()
     assert 'Usage' in mock_renderer.add_system_message.call_args[0][0]
 
+
 def test_resume_command_with_session_id() -> None:
     """'/resume abc-123' should store the raw session ID."""
     repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
@@ -1537,6 +1616,7 @@ def test_resume_command_with_session_id() -> None:
     result = repl.handle_command('/resume abc-def-123')
     assert result is True
     assert repl.pending_resume == 'abc-def-123'
+
 
 @pytest.mark.asyncio
 async def test_resume_session_uses_persisted_session_index(
@@ -1623,6 +1703,7 @@ async def test_resume_session_uses_persisted_session_index(
             agent_task.cancel()
         await agent_task
 
+
 def test_renderer_summarizes_plain_ripgrep_match_lines() -> None:
     summary = CLIEventRenderer._summarize_plain_match_lines(
         'backend/foo.py:12:match one\nbackend/bar.py:34:match two\n'
@@ -1630,10 +1711,12 @@ def test_renderer_summarizes_plain_ripgrep_match_lines() -> None:
 
     assert summary == 'Found 2 matches.'
 
+
 def test_renderer_ignores_non_match_plain_lines() -> None:
     assert (
         CLIEventRenderer._summarize_plain_match_lines('no structured matches') is None
     )
+
 
 @pytest.mark.asyncio
 async def test_renderer_handles_file_read_action() -> None:
@@ -1656,6 +1739,7 @@ async def test_renderer_handles_file_read_action() -> None:
     output = _console_output(console)
     assert 'main.py' in output
 
+
 @pytest.mark.asyncio
 async def test_renderer_handles_file_read_observation() -> None:
     from backend.ledger.observation import FileReadObservation
@@ -1671,6 +1755,7 @@ async def test_renderer_handles_file_read_observation() -> None:
     output = _console_output(console)
     # Just ensure no error is raised
     assert output is not None
+
 
 @pytest.mark.asyncio
 async def test_renderer_handles_mcp_action() -> None:
@@ -1692,6 +1777,7 @@ async def test_renderer_handles_mcp_action() -> None:
     assert 'test' in output
     assert 'found 3 matches' in output
 
+
 @pytest.mark.asyncio
 async def test_renderer_handles_success_observation() -> None:
     from backend.ledger.observation import SuccessObservation
@@ -1705,6 +1791,7 @@ async def test_renderer_handles_success_observation() -> None:
     await renderer.handle_event(obs)
     output = _console_output(console)
     assert 'File written successfully' in output
+
 
 @pytest.mark.asyncio
 async def test_renderer_handles_delegate_task_action() -> None:
@@ -1725,6 +1812,7 @@ async def test_renderer_handles_delegate_task_action() -> None:
     assert 'Delegated' in output
     assert 'Write unit tests' in output
     assert 'done' in output
+
 
 @pytest.mark.asyncio
 async def test_renderer_summarizes_parallel_delegate_task_results() -> None:
@@ -1764,6 +1852,7 @@ async def test_renderer_summarizes_parallel_delegate_task_results() -> None:
     assert 'all 3 workers completed' in output
     assert 'Analyze existing codebase and script logic' in output
 
+
 @pytest.mark.asyncio
 async def test_renderer_shows_background_delegate_completion_without_pending_card() -> (
     None
@@ -1793,6 +1882,7 @@ async def test_renderer_shows_background_delegate_completion_without_pending_car
     assert '1/2 workers completed' in output
     assert 'Update docs' in output
     assert 'One or more parallel workers failed.' in output
+
 
 @pytest.mark.asyncio
 async def test_renderer_updates_worker_panel_from_delegate_progress_status() -> None:
@@ -1853,6 +1943,7 @@ async def test_renderer_updates_worker_panel_from_delegate_progress_status() -> 
     # Worker panel shows worker label and status
     assert 'Worker 1' in output or 'Workers' in output
 
+
 @pytest.mark.asyncio
 async def test_renderer_shows_retry_pending_status_in_hud() -> None:
     from backend.ledger.observation import StatusObservation
@@ -1881,6 +1972,7 @@ async def test_renderer_shows_retry_pending_status_in_hud() -> None:
     assert hud.state.ledger_status == 'Backoff'
     assert hud.state.agent_state_label.startswith('Backoff 1/3')
     assert 'status ·' not in output
+
 
 @pytest.mark.asyncio
 async def test_renderer_preserves_retry_label_on_rate_limited_state_change() -> None:
@@ -1914,6 +2006,7 @@ async def test_renderer_preserves_retry_label_on_rate_limited_state_change() -> 
     assert hud.state.ledger_status == 'Backoff'
     assert hud.state.agent_state_label.startswith('Backoff 1/3')
 
+
 @pytest.mark.asyncio
 async def test_renderer_dedupes_identical_retry_status_lines() -> None:
     from backend.ledger.observation import StatusObservation
@@ -1934,6 +2027,7 @@ async def test_renderer_dedupes_identical_retry_status_lines() -> None:
     output = _console_output(console)
     assert 'status' not in output or output.count('status ·') == 0
 
+
 @pytest.mark.asyncio
 async def test_renderer_renders_final_message_action() -> None:
     console = _make_console()
@@ -1948,6 +2042,7 @@ async def test_renderer_renders_final_message_action() -> None:
 
     output = _console_output(console)
     assert 'Task done.' in output
+
 
 @pytest.mark.asyncio
 async def test_renderer_handles_condensation_action() -> None:
@@ -1965,6 +2060,7 @@ async def test_renderer_handles_condensation_action() -> None:
     assert renderer._reasoning.active
     assert 'compress' in renderer._reasoning._current_action.lower()
 
+
 @pytest.mark.asyncio
 async def test_renderer_handles_task_tracking_action() -> None:
     from backend.ledger.action import TaskTrackingAction
@@ -1980,6 +2076,7 @@ async def test_renderer_handles_task_tracking_action() -> None:
     await renderer.handle_event(action)
     # No error should be raised; event is silently processed
     assert _console_output(console) == ''
+
 
 @pytest.mark.asyncio
 async def test_renderer_task_tracking_observation_replaces_previous_panel() -> None:
@@ -2024,6 +2121,7 @@ async def test_renderer_task_tracking_observation_replaces_previous_panel() -> N
     output = _console_output(console)
     assert 'Analyze manifest structure' in output or output == ''
 
+
 @pytest.mark.asyncio
 async def test_renderer_shows_noop_task_tracker_message_for_update() -> None:
     console = _make_console()
@@ -2055,6 +2153,7 @@ async def test_renderer_shows_noop_task_tracker_message_for_update() -> None:
     # Noop "plan is unchanged" messages are now suppressed in the renderer.
     assert 'plan is unchanged' not in output
 
+
 @pytest.mark.asyncio
 async def test_renderer_hides_task_tracker_update_chatter_when_panel_updates() -> None:
     console = _make_console()
@@ -2081,6 +2180,7 @@ async def test_renderer_hides_task_tracker_update_chatter_when_panel_updates() -
     renderer.stop_live()
     output = _console_output(console)
     assert 'Updated step 1 to done' not in output
+
 
 @pytest.mark.asyncio
 async def test_renderer_displays_done_task_state() -> None:
@@ -2110,6 +2210,7 @@ async def test_renderer_displays_done_task_state() -> None:
     # Task description may or may not appear in output depending on rendering
     assert 'Analyze manifest structure' in output or output == ''
 
+
 @pytest.mark.asyncio
 async def test_renderer_hides_working_memory_thought_payloads() -> None:
     console = _make_console()
@@ -2129,6 +2230,7 @@ async def test_renderer_hides_working_memory_thought_payloads() -> None:
     assert 'working memory' in reasoning._current_action.lower()
     assert reasoning._committed_lines == []
     assert _console_output(console) == ''
+
 
 @pytest.mark.asyncio
 async def test_renderer_sanitizes_internal_working_memory_markup_in_messages() -> None:
@@ -2157,6 +2259,7 @@ async def test_renderer_sanitizes_internal_working_memory_markup_in_messages() -
     assert 'Plan: tighten transcript sanitization' in output
     assert 'Findings: raw task tracker text leaks into chat' in output
 
+
 @pytest.mark.asyncio
 async def test_renderer_sanitizes_internal_working_memory_markup_in_stream_preview() -> (
     None
@@ -2183,6 +2286,7 @@ async def test_renderer_sanitizes_internal_working_memory_markup_in_stream_previ
     assert '<WORKING_MEMORY>' not in renderer._streaming_accumulated
     assert '[PLAN]' not in renderer._streaming_accumulated
     assert 'Plan: tighten transcript sanitization' in renderer._streaming_accumulated
+
 
 @pytest.mark.asyncio
 async def test_renderer_sanitizes_task_tracking_prompt_markup_in_messages() -> None:
@@ -2211,6 +2315,7 @@ async def test_renderer_sanitizes_task_tracking_prompt_markup_in_messages() -> N
     assert 'Allowed statuses' not in output
     assert 'Applied the patch and reran the test.' in output
 
+
 def test_mcp_result_user_preview_compacts_large_raw_text_payload() -> None:
     from backend.cli.display.tool_call_display import mcp_result_user_preview
 
@@ -2231,6 +2336,7 @@ def test_mcp_result_user_preview_compacts_large_raw_text_payload() -> None:
     assert '5 lines' in preview
     assert '2 links' in preview
     assert 'Another detail line' not in preview
+
 
 def test_mcp_result_user_preview_summarizes_result_lists() -> None:
     from backend.cli.display.tool_call_display import mcp_result_user_preview
@@ -2254,6 +2360,7 @@ def test_mcp_result_user_preview_summarizes_result_lists() -> None:
 
     assert preview == '2 results · The Pragmatic Stack'
 
+
 @pytest.mark.asyncio
 async def test_renderer_ignores_agent_think_acknowledgement() -> None:
     console = _make_console()
@@ -2270,6 +2377,7 @@ async def test_renderer_ignores_agent_think_acknowledgement() -> None:
     assert reasoning._committed_lines == []
     assert _console_output(console) == ''
 
+
 @pytest.mark.asyncio
 async def test_renderer_handles_user_reject_with_content() -> None:
     from backend.ledger.observation import UserRejectObservation
@@ -2283,6 +2391,7 @@ async def test_renderer_handles_user_reject_with_content() -> None:
     await renderer.handle_event(obs)
     output = _console_output(console)
     assert 'Too risky' in output
+
 
 @pytest.mark.asyncio
 async def test_renderer_handles_agent_condensation_observation() -> None:
@@ -2298,6 +2407,7 @@ async def test_renderer_handles_agent_condensation_observation() -> None:
     await renderer.handle_event(obs)
     # No error raised; event silently processed
     assert _console_output(console) == ''
+
 
 @pytest.mark.asyncio
 async def test_renderer_prefers_actionable_npm_error_line() -> None:
@@ -2322,6 +2432,7 @@ async def test_renderer_prefers_actionable_npm_error_line() -> None:
 
     output = _console_output(console)
     assert 'Could not read package.json' in output
+
 
 @pytest.mark.asyncio
 async def test_renderer_cmd_output_stdout_is_suppressed_on_success() -> None:
@@ -2355,6 +2466,7 @@ async def test_renderer_cmd_output_stdout_is_suppressed_on_success() -> None:
     # But the card itself must still render (verb + done summary).
     assert 'done' in output.lower() or 'Ran' in output
 
+
 @pytest.mark.asyncio
 async def test_renderer_message_action_shows_attachment_indicators() -> None:
     """MessageAction with file_urls should show attachment indicator."""
@@ -2370,6 +2482,7 @@ async def test_renderer_message_action_shows_attachment_indicators() -> None:
     output = _console_output(console)
     assert 'analysis' in output
     assert '2 file(s)' in output
+
 
 @pytest.mark.asyncio
 async def test_renderer_cmd_run_shows_thought() -> None:
@@ -2387,6 +2500,7 @@ async def test_renderer_cmd_run_shows_thought() -> None:
     assert reasoning.active
     assert reasoning._current_action  # action label set in reasoning
     assert reasoning._committed_lines == []  # tool thoughts are not committed
+
 
 @pytest.mark.asyncio
 async def test_renderer_internal_cmd_run_uses_origin_tool_title() -> None:
@@ -2426,6 +2540,7 @@ async def test_renderer_internal_cmd_run_uses_origin_tool_title() -> None:
     assert '+....' not in output
     assert '-....' not in output
 
+
 @pytest.mark.asyncio
 async def test_fake_prompt_uses_tight_separator_and_combined_model_slug() -> None:
     """Visual-clutter guard for the branded row.
@@ -2451,6 +2566,7 @@ async def test_fake_prompt_uses_tight_separator_and_combined_model_slug() -> Non
     # must not leak back in.
     assert '  •  ' not in output
     assert 'Agent working · ctrl+c to interrupt' in output
+
 
 @pytest.mark.asyncio
 async def test_fake_prompt_single_path_narrow_and_wide_match() -> None:
@@ -2482,6 +2598,7 @@ async def test_fake_prompt_single_path_narrow_and_wide_match() -> None:
     assert 'GRINTA' not in narrow
     assert 'MCP:' not in narrow
 
+
 def test_auto_detect_api_keys_finds_env_var() -> None:
     """auto_detect_api_keys should detect OPENAI_API_KEY from env."""
     from backend.cli.settings import auto_detect_api_keys
@@ -2495,6 +2612,7 @@ def test_auto_detect_api_keys_finds_env_var() -> None:
         result = auto_detect_api_keys(config)
 
     assert result == 'openai'
+
 
 def test_auto_detect_api_keys_returns_none_when_no_env() -> None:
     """auto_detect_api_keys should return None when no env vars set."""

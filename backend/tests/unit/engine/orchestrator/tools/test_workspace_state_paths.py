@@ -125,7 +125,9 @@ def test_task_tracker_persists_active_plan_under_app_dir(tmp_path, monkeypatch) 
     ]
 
 
-def test_task_tracker_save_retries_transient_replace_error(tmp_path, monkeypatch) -> None:
+def test_task_tracker_save_retries_transient_replace_error(
+    tmp_path, monkeypatch
+) -> None:
     monkeypatch.setattr(
         'backend.core.workspace_resolution.workspace_agent_state_dir',
         lambda project_root=None: tmp_path,
@@ -141,7 +143,9 @@ def test_task_tracker_save_retries_transient_replace_error(tmp_path, monkeypatch
             raise PermissionError(5, 'Access is denied')
         return real_replace(src, dst)
 
-    with patch('backend.persistence.atomic_write.os.replace', side_effect=flaky_replace):
+    with patch(
+        'backend.persistence.atomic_write.os.replace', side_effect=flaky_replace
+    ):
         tracker.save_to_file(task_list)
 
     assert calls['count'] >= 2

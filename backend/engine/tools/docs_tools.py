@@ -118,9 +118,7 @@ def build_docs_query_action(arguments: dict[str, Any]) -> MCPAction:
     ).strip()
     query = str(arguments.get('query') or '').strip()
     if not library_id:
-        raise FunctionCallValidationError(
-            'docs_query requires a non-empty library_id.'
-        )
+        raise FunctionCallValidationError('docs_query requires a non-empty library_id.')
     if not query:
         raise FunctionCallValidationError('docs_query requires a non-empty query.')
 

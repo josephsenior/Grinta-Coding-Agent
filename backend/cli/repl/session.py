@@ -16,16 +16,16 @@ from typing import TYPE_CHECKING, Any, Callable, cast
 
 from rich.console import Console
 
-from backend.cli.repl.run_helpers_mixin import RunHelpersMixin
-from backend.cli.repl.session_lifecycle_mixin import SessionLifecycleMixin
-from backend.cli.repl.slash_commands_mixin import SlashCommandsMixin
-from backend.cli.settings import get_current_model
 from backend.cli.display.hud import HUDBar
 from backend.cli.display.reasoning_display import ReasoningDisplay
 from backend.cli.display.status_chrome import (
     autonomy_chrome_suffix,
     status_fields_from_hud,
 )
+from backend.cli.repl.run_helpers_mixin import RunHelpersMixin
+from backend.cli.repl.session_lifecycle_mixin import SessionLifecycleMixin
+from backend.cli.repl.slash_commands_mixin import SlashCommandsMixin
+from backend.cli.settings import get_current_model
 from backend.cli.theme import CLR_STATUS_ERR, mark_prompt, prompt_toolkit_style_dict
 from backend.core.config import (
     AppConfig,

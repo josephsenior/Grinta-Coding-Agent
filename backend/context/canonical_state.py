@@ -1049,9 +1049,11 @@ def _infer_next_action(canonical: CanonicalTaskState) -> str:
     if canonical.verification.command and canonical.verification.status != 'passed':
         return f'Use the latest failing output from {canonical.verification.command} to make the next fix.'
     if canonical.superseding_directive:
-        return f'Switch to the superseding directive: {canonical.superseding_directive}'[
-            :240
-        ]
+        return (
+            f'Switch to the superseding directive: {canonical.superseding_directive}'[
+                :240
+            ]
+        )
     if canonical.latest_directive:
         return 'Continue from the latest user directive.'
     return ''

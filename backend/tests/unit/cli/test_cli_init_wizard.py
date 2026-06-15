@@ -29,7 +29,8 @@ def _quiet_console() -> Console:
 
 def _patch_settings_path(path: Path):
     return patch(
-        'backend.cli.onboarding.init_wizard.get_canonical_settings_path', return_value=str(path)
+        'backend.cli.onboarding.init_wizard.get_canonical_settings_path',
+        return_value=str(path),
     )
 
 
@@ -85,29 +86,49 @@ class TestLmstudioRunning:
 class TestDetectLocal:
     def test_none_detected(self) -> None:
         with (
-            patch('backend.cli.onboarding.init_wizard._ollama_running', return_value=False),
-            patch('backend.cli.onboarding.init_wizard._lmstudio_running', return_value=False),
+            patch(
+                'backend.cli.onboarding.init_wizard._ollama_running', return_value=False
+            ),
+            patch(
+                'backend.cli.onboarding.init_wizard._lmstudio_running',
+                return_value=False,
+            ),
         ):
             assert _detect_local() == []
 
     def test_ollama_detected(self) -> None:
         with (
-            patch('backend.cli.onboarding.init_wizard._ollama_running', return_value=True),
-            patch('backend.cli.onboarding.init_wizard._lmstudio_running', return_value=False),
+            patch(
+                'backend.cli.onboarding.init_wizard._ollama_running', return_value=True
+            ),
+            patch(
+                'backend.cli.onboarding.init_wizard._lmstudio_running',
+                return_value=False,
+            ),
         ):
             assert _detect_local() == ['ollama']
 
     def test_lmstudio_detected(self) -> None:
         with (
-            patch('backend.cli.onboarding.init_wizard._ollama_running', return_value=False),
-            patch('backend.cli.onboarding.init_wizard._lmstudio_running', return_value=True),
+            patch(
+                'backend.cli.onboarding.init_wizard._ollama_running', return_value=False
+            ),
+            patch(
+                'backend.cli.onboarding.init_wizard._lmstudio_running',
+                return_value=True,
+            ),
         ):
             assert _detect_local() == ['lmstudio']
 
     def test_both_detected(self) -> None:
         with (
-            patch('backend.cli.onboarding.init_wizard._ollama_running', return_value=True),
-            patch('backend.cli.onboarding.init_wizard._lmstudio_running', return_value=True),
+            patch(
+                'backend.cli.onboarding.init_wizard._ollama_running', return_value=True
+            ),
+            patch(
+                'backend.cli.onboarding.init_wizard._lmstudio_running',
+                return_value=True,
+            ),
         ):
             result = _detect_local()
             assert 'ollama' in result
@@ -288,7 +309,10 @@ class TestRunInit:
         console = _quiet_console()
         settings_file = tmp_path / 'settings.json'
         with (
-            patch('backend.cli.onboarding.init_wizard._detect_local', return_value=['ollama']),
+            patch(
+                'backend.cli.onboarding.init_wizard._detect_local',
+                return_value=['ollama'],
+            ),
             patch(
                 'rich.prompt.Prompt.ask',
                 side_effect=['ollama', 'ollama/llama3.2', '', 'http://localhost:11434'],

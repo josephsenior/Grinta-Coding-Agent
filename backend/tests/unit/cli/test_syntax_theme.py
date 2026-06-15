@@ -60,7 +60,9 @@ def stream_me():
     console = Console(force_terminal=True, color_system='truecolor', width=80)
     colors = {
         str(style.color)
-        for _text, style, _ in console.render(renderable, console.options.update_width(80))
+        for _text, style, _ in console.render(
+            renderable, console.options.update_width(80)
+        )
         if style and style.color and _text.strip()
     }
     assert any('7dcfff' in color for color in colors)

@@ -138,7 +138,9 @@ def _model_name_supports_reasoning(entry: ModelEntry) -> bool:
         return True
     if logical.startswith('grok-4'):
         return True
-    if 'gemini' in logical and any(token in logical for token in ('2.5', '2-', '3', '3.')):
+    if 'gemini' in logical and any(
+        token in logical for token in ('2.5', '2-', '3', '3.')
+    ):
         return True
     if any(token in logical for token in ('reasoner', 'r1', 'thinking', 'qwq')):
         return True
@@ -200,12 +202,14 @@ def supports_reasoning(entry: ModelEntry) -> bool:
     if entry.provider == 'anthropic':
         return infer_family(entry).startswith('claude')
     if entry.provider == 'google':
-        return infer_family(entry).startswith('gemini') and _model_name_supports_reasoning(
-            entry
-        )
+        return infer_family(entry).startswith(
+            'gemini'
+        ) and _model_name_supports_reasoning(entry)
     if entry.provider == 'openai':
         return entry.supports_reasoning_effort or _model_name_supports_reasoning(entry)
-    if entry.provider == 'xai' and _logical_model_name(entry).lower().startswith('grok-4'):
+    if entry.provider == 'xai' and _logical_model_name(entry).lower().startswith(
+        'grok-4'
+    ):
         return True
 
     vendor, logical = _split_upstream_model_id(entry.name)
@@ -492,10 +496,10 @@ def _build_wire_kwargs(wire: str, effort: str, entry: ModelEntry) -> dict[str, A
         return patch
 
     if wire == WIRE_OPENAI_REASONING_EFFORT:
-        patch: dict[str, Any] = {'reasoning_effort': effort}
+        res_patch: dict[str, Any] = {'reasoning_effort': effort}
         if effort == 'none':
-            patch = {}
-        return patch
+            res_patch = {}
+        return res_patch
 
     if wire == WIRE_OPENAI_THINKING_AND_EFFORT:
         return {

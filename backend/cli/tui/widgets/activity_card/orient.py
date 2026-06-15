@@ -138,8 +138,12 @@ class OrientBurst(Container):
         )
 
     def compose(self) -> ComposeResult:
-        yield Static(self._header_text(), id='orient-burst-header', classes='orient-burst-header')
-        body_classes = 'orient-burst-body -hidden' if self._collapsed else 'orient-burst-body'
+        yield Static(
+            self._header_text(), id='orient-burst-header', classes='orient-burst-header'
+        )
+        body_classes = (
+            'orient-burst-body -hidden' if self._collapsed else 'orient-burst-body'
+        )
         with Vertical(id='orient-burst-body', classes=body_classes):
             for model in self._lines:
                 yield OrientLine(model)

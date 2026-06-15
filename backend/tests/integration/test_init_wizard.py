@@ -48,7 +48,8 @@ class TestInitWizardCrossPlatform:
         settings_file.write_text('corrupted', encoding='utf-8')
 
         with patch(
-            'backend.cli.onboarding.init_wizard.json.dumps', side_effect=ValueError('test')
+            'backend.cli.onboarding.init_wizard.json.dumps',
+            side_effect=ValueError('test'),
         ):
             with pytest.raises(ValueError):
                 _atomic_json_write(settings_file, {'test': 'data'})
@@ -60,7 +61,9 @@ class TestInitWizardCrossPlatform:
         self, tmp_path: Path
     ) -> None:
         """Verify writable check creates missing directories."""
-        from backend.cli.onboarding.init_wizard import _check_settings_directory_writable
+        from backend.cli.onboarding.init_wizard import (
+            _check_settings_directory_writable,
+        )
 
         settings_dir = tmp_path / 'new' / 'nested' / 'dir'
         settings_file = settings_dir / 'settings.json'
@@ -75,7 +78,9 @@ class TestInitWizardCrossPlatform:
         self, tmp_path: Path
     ) -> None:
         """Verify writable check detects permission issues."""
-        from backend.cli.onboarding.init_wizard import _check_settings_directory_writable
+        from backend.cli.onboarding.init_wizard import (
+            _check_settings_directory_writable,
+        )
 
         if os.name == 'nt':
             pytest.skip('Windows permission test requires special setup')
@@ -227,15 +232,20 @@ class TestExitCodes:
                 'backend.cli.onboarding.init_wizard._check_settings_directory_writable',
                 return_value=(True, ''),
             ):
-                with patch('backend.cli.onboarding.init_wizard._load_existing', return_value={}):
+                with patch(
+                    'backend.cli.onboarding.init_wizard._load_existing', return_value={}
+                ):
                     with patch(
-                        'backend.cli.onboarding.init_wizard._detect_local', return_value=[]
+                        'backend.cli.onboarding.init_wizard._detect_local',
+                        return_value=[],
                     ):
                         with patch(
                             'backend.cli.onboarding.init_wizard.Prompt.ask',
                             side_effect=['openai', 'test-model', '', ''],
                         ):
-                            with patch('backend.cli.onboarding.init_wizard._atomic_json_write'):
+                            with patch(
+                                'backend.cli.onboarding.init_wizard._atomic_json_write'
+                            ):
                                 result = run_init(console=mock_console)
 
         assert result == 0

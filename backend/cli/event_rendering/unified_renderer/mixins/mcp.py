@@ -5,14 +5,17 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from backend.cli.event_rendering.unified_renderer.types import ActivityCard, ActivityLine
+from backend.cli.event_rendering.unified_renderer.types import (
+    ActivityCard,
+    ActivityLine,
+)
 from backend.cli.event_rendering.unified_renderer.utils import (
     _WEB_CARD_PRESETS,
     _WEB_MCP_KINDS,
     _exploration_meta_line,
 )
-from backend.cli.tool_display.preview import mcp_result_user_preview
 from backend.cli.theme import NAVY_TEXT_DIM, NAVY_TEXT_MUTED
+from backend.cli.tool_display.preview import mcp_result_user_preview
 
 
 class _McpMixin:
@@ -79,9 +82,7 @@ class _McpMixin:
         formatted = _format_mcp_result(payload)
         extra_lines: list[ActivityLine] = []
         for line in formatted[:12]:
-            extra_lines.append(
-                ActivityLine(str(line), style=NAVY_TEXT_MUTED, indent=1)
-            )
+            extra_lines.append(ActivityLine(str(line), style=NAVY_TEXT_MUTED, indent=1))
         if len(formatted) > 12:
             extra_lines.append(
                 ActivityLine(
@@ -94,9 +95,7 @@ class _McpMixin:
             return extra_lines
         preview = mcp_result_user_preview(content)
         if preview:
-            extra_lines.append(
-                ActivityLine(preview, style=NAVY_TEXT_MUTED, indent=1)
-            )
+            extra_lines.append(ActivityLine(preview, style=NAVY_TEXT_MUTED, indent=1))
         return extra_lines
 
     @staticmethod

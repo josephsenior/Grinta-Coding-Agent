@@ -181,9 +181,7 @@ class RendererDisplayMixin:
         items = self._build_lsp_sidebar_items(cache)
         available_count = len(items)
         title = (
-            f'LSP Servers ({available_count})'
-            if available_count
-            else 'LSP Servers (0)'
+            f'LSP Servers ({available_count})' if available_count else 'LSP Servers (0)'
         )
         section.set_title(title)
         if items:

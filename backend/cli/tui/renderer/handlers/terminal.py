@@ -12,7 +12,11 @@ from backend.cli.tui.renderer.helpers.terminal import (
     sanitize_terminal_observation_content,
     terminal_secondary_kind,
 )
-from backend.ledger.action import TerminalInputAction, TerminalReadAction, TerminalRunAction
+from backend.ledger.action import (
+    TerminalInputAction,
+    TerminalReadAction,
+    TerminalRunAction,
+)
 from backend.ledger.observation import TerminalObservation
 
 if TYPE_CHECKING:

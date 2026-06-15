@@ -21,12 +21,12 @@ def _message_content_to_text(content: Any) -> str:
     return str(content or '')
 
 
-def _messages_to_responses_input(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _messages_to_responses_input(
+    messages: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
     """Convert chat messages to Responses API input items."""
     input_items: list[dict[str, Any]] = []
     for message in messages:
-        if not isinstance(message, dict):
-            continue
         role = str(message.get('role') or 'user').strip().lower()
         if role == 'tool':
             call_id = message.get('tool_call_id') or message.get('id')
@@ -86,7 +86,9 @@ def _extract_responses_text(response: Any) -> str:
     return '\n'.join(chunks)
 
 
-def _build_responses_kwargs(client: Any, messages: list[dict[str, Any]], kwargs: dict[str, Any]) -> dict[str, Any]:
+def _build_responses_kwargs(
+    client: Any, messages: list[dict[str, Any]], kwargs: dict[str, Any]
+) -> dict[str, Any]:
     from backend.inference import direct_clients as dc
 
     payload = dict(kwargs)

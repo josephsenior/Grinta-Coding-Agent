@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import re
 
-from backend.cli.event_rendering.unified_renderer.types import ActivityCard, ActivityLine
+from backend.cli.event_rendering.unified_renderer.types import (
+    ActivityCard,
+    ActivityLine,
+)
 from backend.cli.event_rendering.unified_renderer.utils import (
     _SEARCH_CARD_PRESETS,
     _extract_search_query,
