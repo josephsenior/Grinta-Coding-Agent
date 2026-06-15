@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from backend.cli.display.transcript import strip_tool_result_validation_annotations
-from backend.cli.tui.helpers import _sanitize_terminal_display_text
+from backend.cli.tui.helpers import _strip_terminal_control_literals
 
 
 def sanitize_terminal_observation_content(content: str) -> str:
     if not content:
         return ''
-    return _sanitize_terminal_display_text(
+    return _strip_terminal_control_literals(
         strip_tool_result_validation_annotations(content)
     ).strip()
 

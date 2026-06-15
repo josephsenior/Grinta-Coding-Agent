@@ -50,6 +50,8 @@ from backend.cli.theme import (
 )
 from backend.ledger.observation.error import (
     ERROR_CATEGORY_AUTH,
+    ERROR_CATEGORY_CONTENT_POLICY,
+    ERROR_CATEGORY_CONTEXT_WINDOW,
     ERROR_CATEGORY_MODEL_NOT_FOUND,
     ERROR_CATEGORY_NETWORK,
     ERROR_CATEGORY_RATE_LIMIT,
@@ -70,6 +72,8 @@ _NOTICE_CATEGORIES: frozenset[str] = frozenset(
 _CRITICAL_CATEGORIES: frozenset[str] = frozenset(
     {
         ERROR_CATEGORY_AUTH,
+        ERROR_CATEGORY_CONTENT_POLICY,
+        ERROR_CATEGORY_CONTEXT_WINDOW,
         ERROR_CATEGORY_MODEL_NOT_FOUND,
         ERROR_CATEGORY_RUNTIME_DISCONNECTED,
     }

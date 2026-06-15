@@ -110,5 +110,4 @@ def _handle_terminal_observation(
         secondary_kind=secondary_kind,
         extra_content=content or None,
         processing=exit_code is None,
-        collapse_after_update=exit_code == 0 and bool(content),
     )

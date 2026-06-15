@@ -11,6 +11,7 @@ from rich.console import Console
 
 from backend.cli.session.session_manager import (
     _count_events,
+    _filter_sessions_fuzzy,
     _list_session_entries,
     _load_metadata,
     _resolve_session_by_id_or_prefix,
@@ -131,6 +132,34 @@ class TestListSessionEntries:
         _make_session_dir(tmp_path, 'sess-with-events', {}, event_count=3)
         entries = _list_session_entries(tmp_path)
         assert entries[0][2] == 3
+
+    def test_discovers_user_scoped_sessions(self, tmp_path: Path) -> None:
+        user_session = (
+            tmp_path / 'users' / 'tui' / 'conversations' / 'scoped-session'
+        )
+        user_session.mkdir(parents=True)
+        (user_session / 'metadata.json').write_text(
+            json.dumps({'title': 'TUI session', 'last_updated_at': '2024-02-01'}),
+            encoding='utf-8',
+        )
+        entries = _list_session_entries(tmp_path)
+        assert [entry[0] for entry in entries] == ['scoped-session']
+        assert entries[0][3] == user_session
+
+    def test_filter_falls_back_to_substring_match(self, tmp_path: Path) -> None:
+        _make_session_dir(
+            tmp_path,
+            'alpha-session',
+            {'title': 'Refactor sidebar layout'},
+        )
+        _make_session_dir(
+            tmp_path,
+            'beta-session',
+            {'title': 'Unrelated task'},
+        )
+        entries = _list_session_entries(tmp_path)
+        filtered = _filter_sessions_fuzzy(entries, 'sidebar')
+        assert [entry[0] for entry in filtered] == ['alpha-session']
 
 
 # ---------------------------------------------------------------------------

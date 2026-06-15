@@ -7,7 +7,11 @@ for _name in dir(_shared):
     if _name.startswith('_') and not _name.startswith('__'):
         globals()[_name] = getattr(_shared, _name)
 
-from backend.tests.unit.cli.tui._shared import _fill_scrollable_transcript, _get_screen
+from backend.tests.unit.cli.tui._shared import (
+    _await_at_bottom,
+    _fill_scrollable_transcript,
+    _get_screen,
+)
 
 
 @pytest.mark.asyncio
@@ -109,7 +113,7 @@ async def test_tui_activity_card_body_click_collapses(mock_config):
         await pilot.pause()
 
         found = s.query_one(TUIActivityCard)
-        extra = found.query_one('#extra', Static)
+        extra = found.query_one('#terminal-output', Static)
 
         event = SimpleNamespace(
             widget=extra,
@@ -179,16 +183,14 @@ async def test_tui_transcript_autoscrolls_on_rapid_append(mock_config, monkeypat
             display.append_widget(Static(f'transcript line {idx}'))
         await pilot.pause()
         display.force_scroll_end()
-        await pilot.pause()
+        await _await_at_bottom(display, pilot)
         assert display.max_scroll_y > 0
 
         for idx in range(30):
             display.append_widget(Static(f'burst line {idx}'))
-        await pilot.pause()
-        await pilot.pause()
+        await _await_at_bottom(display, pilot)
 
         assert display._user_scrolled_away is False
-        assert display._was_at_bottom()
 
 
 @pytest.mark.asyncio
@@ -342,8 +344,7 @@ async def test_tui_page_keys_scroll_transcript_while_turn_running(
         display._suppress_mount_animation = True
         await _fill_scrollable_transcript(display, pilot)
         display.force_scroll_end()
-        await pilot.pause()
-        assert display._was_at_bottom()
+        await _await_at_bottom(display, pilot)
 
         s._turn_in_flight = True
         s.query_one('#input', TextArea).focus()
@@ -735,9 +736,7 @@ async def test_tui_terminal_session_reuses_single_card(mock_config):
         assert len(terminal_cards) == 1
 
         collapsed = terminal_cards[0].query_one('#collapsed-row')
-        assert '$ status' in str(collapsed.renderable) or 'Sent' in str(
-            collapsed.renderable
-        )
+        assert 'status' in str(collapsed.renderable)
 
 
 @pytest.mark.asyncio
@@ -774,7 +773,7 @@ async def test_tui_terminal_observation_strips_control_traffic(mock_config):
             for card in s.query(TUIActivityCard).results()
             if 'category-terminal' in card.classes
         )
-        extra = card.query_one('#extra')
+        extra = card.query_one('#terminal-output')
         rendered = (
             str(extra.renderable.plain)
             if hasattr(extra.renderable, 'plain')
@@ -782,6 +781,7 @@ async def test_tui_terminal_observation_strips_control_traffic(mock_config):
         )
         assert '\x1b' not in rendered
         assert '[444444;32;15M' not in rendered
+        assert 'ok' in rendered
 
 
 @pytest.mark.asyncio
@@ -814,9 +814,7 @@ async def test_tui_shell_command_reuses_single_card(mock_config):
         shell_cards = [card for card in cards if 'category-shell' in card.classes]
         assert len(shell_cards) == 1
         collapsed = shell_cards[0].query_one('#collapsed-row')
-        assert '$ pytest -q' in str(collapsed.renderable) or 'Shell' in str(
-            collapsed.renderable
-        )
+        assert 'pytest -q' in str(collapsed.renderable)
         assert 'exit 0' in str(collapsed.renderable)
 
 
@@ -2535,8 +2533,8 @@ def test_activity_renderer_keeps_error_heavy_success_output_expanded() -> None:
 
 
 @pytest.mark.asyncio
-async def test_tui_recoverable_error_routes_to_add_warning(mock_config):
-    """Recoverable ErrorObservations must render via add_warning, not add_error."""
+async def test_tui_error_observations_follow_visibility_policy(mock_config):
+    """ErrorObservations route by transcript/context visibility policy."""
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -2554,15 +2552,21 @@ async def test_tui_recoverable_error_routes_to_add_warning(mock_config):
         )
         s._renderer = renderer
 
-        s.add_warning = MagicMock(wraps=s.add_warning)  # type: ignore[method-assign]
+        s.add_error_panel = MagicMock(wraps=s.add_error_panel)  # type: ignore[method-assign]
         s.add_error = MagicMock(wraps=s.add_error)  # type: ignore[method-assign]
+        s.add_warning = MagicMock(wraps=s.add_warning)  # type: ignore[method-assign]
+        s.notify = MagicMock()  # type: ignore[method-assign]
         s.set_runtime_status = MagicMock()  # type: ignore[method-assign]
 
-        # Recoverable tool-validation outcome → warning path.
+        # Context-bearing tool-validation outcome -> persistent error card.
         renderer._process_event(
             ErrorObservation(content='Tool validation failed: bad args')
         )
-        # HUD-only auth failure → runtime strip, not transcript.
+        # Agent-only repair feedback -> model context only, not user transcript.
+        renderer._process_event(
+            ErrorObservation(content='internal repair hint', agent_only=True)
+        )
+        # UI-only auth failure -> red notification and runtime strip, not transcript.
         renderer._process_event(
             ErrorObservation(
                 content='401 Unauthorized',
@@ -2570,7 +2574,7 @@ async def test_tui_recoverable_error_routes_to_add_warning(mock_config):
                 error_category='auth',
             )
         )
-        # Transient timeout → HUD strip only (retry StatusObservation handles strip).
+        # Transient timeout -> notification only; retry StatusObservation handles strip.
         renderer._process_event(
             ErrorObservation(
                 content='Timeout: provider timed out',
@@ -2580,10 +2584,14 @@ async def test_tui_recoverable_error_routes_to_add_warning(mock_config):
         )
         await asyncio.sleep(0.1)
 
-        assert s.add_warning.call_count == 1
+        assert s.add_error_panel.call_count == 1
+        panel_text = s.add_error_panel.call_args.args[0]
+        assert 'Tool validation failed' in panel_text
         assert s.add_error.call_count == 0
-        warning_text = s.add_warning.call_args[0][0]
-        assert 'Tool validation failed' in warning_text
+        assert s.add_warning.call_count == 0
+        assert s.notify.call_count == 2
+        severities = [call.kwargs['severity'] for call in s.notify.call_args_list]
+        assert severities == ['error', 'warning']
         s.set_runtime_status.assert_called_once()
         assert '401 Unauthorized' in s.set_runtime_status.call_args.kwargs['meta']
 
@@ -2701,15 +2709,21 @@ async def test_terminal_append_does_not_remount_all_children(mock_config):
             detail='session s1',
             badge_category='terminal',
             collapsed=True,
+            shell_kind='terminal',
+            terminal_session_id='s1',
         )
         card.enable_incremental_mode()
         await pilot.app.mount(card)
         card.append_content_incremental('first line')
         card.append_content_incremental('second line')
+        await pilot.pause()
         body = card.query_one('#expanded-body', Container)
         children = list(body.children)
         assert len(children) == 1
-        assert children[0].id == 'incremental-tail'
+        assert children[0].id == 'terminal-pane'
+        output = children[0].query_one('#terminal-output', Static)
+        assert 'first line' in str(output.renderable)
+        assert 'second line' in str(output.renderable)
 
 
 @pytest.mark.asyncio

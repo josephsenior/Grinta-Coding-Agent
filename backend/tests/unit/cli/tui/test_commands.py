@@ -42,7 +42,7 @@ async def test_tui_help_shows(mock_config):
         s = _get_screen(app)
         opened: dict[str, object | None] = {'dialog': None}
 
-        def _fake_push_screen(dialog) -> None:
+        def _fake_push_screen(dialog, callback=None) -> None:
             opened['dialog'] = dialog
 
         app.push_screen = _fake_push_screen  # type: ignore[method-assign]
@@ -184,6 +184,7 @@ async def test_tui_sessions_preview_shows_extended_metadata(
                 'created_at': '2026-05-21T11:30:00',
             },
             42,
+            tmp_path / 'session-abc123456789',
         )
     ]
 
@@ -253,7 +254,7 @@ async def test_tui_command_autocomplete_for_sessions(mock_config):
 
 @pytest.mark.asyncio
 async def test_tui_unknown_command(mock_config):
-    """Verify unknown slash command shows error without crashing."""
+    """Verify unknown slash command shows notification without crashing."""
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -262,6 +263,7 @@ async def test_tui_unknown_command(mock_config):
         await pilot.pause()
 
         s = _get_screen(app)
+        s.notify = MagicMock()  # type: ignore[method-assign]
         ta = s.query_one('#input', TextArea)
         ta.text = '/nonexistent'
         await pilot.press('enter')
@@ -269,6 +271,9 @@ async def test_tui_unknown_command(mock_config):
 
         transcript = s.query_one('#main-display')
         assert transcript is not None
+        s.notify.assert_called_once()
+        assert 'Unknown command' in s.notify.call_args.args[0]
+        assert s.notify.call_args.kwargs['severity'] == 'error'
 
 
 @pytest.mark.asyncio

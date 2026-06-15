@@ -664,10 +664,8 @@ class RecoveryService:
     @staticmethod
     def _format_exception(exc: Exception) -> tuple[str, str, bool]:
         notify_ui_only = (
-            isinstance(
-                exc,
-                (AuthenticationError, ContentPolicyViolationError, Timeout),
-            )
+            isinstance(exc, _HARD_STOP_EXCEPTIONS)
+            or isinstance(exc, Timeout)
             or isinstance(exc, _RATE_LIMITED_EXCEPTIONS)
             or isinstance(exc, _TRANSIENT_LLM_INFRA_EXCEPTIONS)
         )

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import re
 from typing import Any
 
 from rich.rule import Rule
@@ -114,6 +115,49 @@ class ScreenMessagesMixin:
     def add_warning(self, text: str) -> None:
         """Recoverable issue — same soft notice styling as ``add_error``."""
         self._emit_transcript_notice(text)
+
+    def add_error_panel(
+        self,
+        text: str,
+        *,
+        error_category: str | None = None,
+    ) -> None:
+        """Render a persistent structured error card for context-bearing failures."""
+        from backend.cli.event_rendering.error_panel import build_error_panel
+
+        width = getattr(getattr(self, 'size', None), 'width', None)
+        self._write_log(
+            build_error_panel(
+                text,
+                title='Error',
+                error_category=error_category,
+                content_width=width,
+            )
+        )
+
+    def _notify_user(
+        self,
+        text: str,
+        *,
+        severity: str = 'information',
+        timeout: float = 3.5,
+    ) -> None:
+        message = re.sub(r'\s+', ' ', str(text or '').strip())
+        if not message:
+            return
+        if len(message) > 260:
+            message = message[:257] + '...'
+        notify = getattr(self, 'notify', None)
+        if callable(notify):
+            notify(message, severity=severity, timeout=timeout)
+            return
+        self._emit_transcript_notice(message)
+
+    def notify_error(self, text: str, *, timeout: float = 4.5) -> None:
+        self._notify_user(text, severity='error', timeout=timeout)
+
+    def notify_warning(self, text: str, *, timeout: float = 3.5) -> None:
+        self._notify_user(text, severity='warning', timeout=timeout)
 
     def add_success(self, text: str) -> None:
         icon = Text('✓ ', style=NAVY_READY)

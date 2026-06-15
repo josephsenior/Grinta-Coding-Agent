@@ -691,26 +691,20 @@ DataTable > .datatable--row-selected {
 }
 
 /* ── Dialog-specific overrides ──────────────────────── */
-#settings-current-key {
-    color: #8f9fc1;
-    margin-top: 1;
+GrintaSettingsDialog #settings-panel,
+GrintaSessionsDialog #sessions-panel {
+    margin-bottom: 0;
 }
 
-#settings-provider,
-#settings-model,
-#settings-reasoning,
-#settings-custom-model,
-#settings-api-key {
-    margin-bottom: 0;
+#settings-current-key {
+    color: #8f9fc1;
 }
 
 #settings-model-meta {
     color: #8f9fc1;
-    margin-bottom: 1;
 }
 
-GrintaAddSkillDialog TextArea,
-GrintaSettingsDialog TextArea {
+GrintaAddSkillDialog TextArea {
     background: #0f1c30;
     color: #c8d4e8;
     border: none;
@@ -721,44 +715,9 @@ GrintaSettingsDialog TextArea {
     transition: background 150ms, border-left 150ms;
 }
 
-GrintaAddSkillDialog TextArea:focus,
-GrintaSettingsDialog TextArea:focus {
+GrintaAddSkillDialog TextArea:focus {
     background: #12223a;
     border-left: solid #91abec;
-}
-
-#sessions-filters {
-    height: auto;
-    margin-bottom: 1;
-}
-
-#sessions-search {
-    width: 1fr;
-}
-
-#sessions-sort {
-    width: 18;
-    margin-left: 1;
-}
-
-#sessions-limit {
-    width: 10;
-    margin-left: 1;
-}
-
-#sessions-refresh {
-    margin-left: 1;
-}
-
-#sessions-table {
-    height: 14;
-    margin-bottom: 1;
-    border: none;
-}
-
-#dialog-feedback {
-    color: #8f9fc1;
-    margin-top: 1;
 }
 
 #help-body {
@@ -784,16 +743,6 @@ GrintaSettingsDialog TextArea:focus {
 
 CommandListPanel {
     margin-bottom: 1;
-}
-
-#sessions-preview {
-    height: auto;
-    max-height: 10;
-    border: round #1b233a;
-    border-left: heavy #5eead4;
-    padding: 1 2;
-    background: #08101d;
-    color: #cbd5e1;
 }
 
 /* ── Toast notifications ──────────────────────────── */

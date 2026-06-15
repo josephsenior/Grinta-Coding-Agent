@@ -12,11 +12,78 @@ from backend.ledger.observation import (
     StatusObservation,
     SuccessObservation,
 )
+from backend.ledger.observation.error import (
+    ERROR_CATEGORY_AUTH,
+    ERROR_CATEGORY_CONTENT_POLICY,
+    ERROR_CATEGORY_CONTEXT_WINDOW,
+    ERROR_CATEGORY_MODEL_NOT_FOUND,
+    ERROR_CATEGORY_RUNTIME_DISCONNECTED,
+)
 
 if TYPE_CHECKING:
     from backend.cli.tui.renderer.mixins.event_processor import (
         RendererEventProcessorMixin,
     )
+
+_ACTION_REQUIRED_CATEGORIES = frozenset(
+    {
+        ERROR_CATEGORY_AUTH,
+        ERROR_CATEGORY_CONTENT_POLICY,
+        ERROR_CATEGORY_CONTEXT_WINDOW,
+        ERROR_CATEGORY_MODEL_NOT_FOUND,
+        ERROR_CATEGORY_RUNTIME_DISCONNECTED,
+    }
+)
+
+_ACTION_REQUIRED_TITLES = {
+    ERROR_CATEGORY_AUTH: 'Authentication failed',
+    ERROR_CATEGORY_CONTENT_POLICY: 'Content blocked',
+    ERROR_CATEGORY_CONTEXT_WINDOW: 'Context window full',
+    ERROR_CATEGORY_MODEL_NOT_FOUND: 'Model unavailable',
+    ERROR_CATEGORY_RUNTIME_DISCONNECTED: 'Runtime disconnected',
+}
+
+
+def _first_error_line(content: str) -> str:
+    return content.split('\n', 1)[0].strip() or 'An unknown error occurred'
+
+
+def _notification_title(content: str, error_category: str | None) -> str:
+    if error_category in _ACTION_REQUIRED_TITLES:
+        return _ACTION_REQUIRED_TITLES[error_category]
+    return notice_panel_title(content, error_category=error_category)
+
+
+def _notification_message(content: str, error_category: str | None) -> str:
+    title = _notification_title(content, error_category)
+    first_line = _first_error_line(content)
+    if first_line.lower().startswith(title.lower()):
+        return first_line
+    return f'{title}: {first_line}'
+
+
+def _notify_ui_only_error(
+    orch: 'RendererEventProcessorMixin',
+    content: str,
+    error_category: str | None,
+) -> None:
+    message = _notification_message(content, error_category)
+    severity = (
+        'error' if error_category in _ACTION_REQUIRED_CATEGORIES else 'warning'
+    )
+    if severity == 'error' and hasattr(orch._tui, 'notify_error'):
+        orch._tui.notify_error(message)
+    elif hasattr(orch._tui, 'notify_warning'):
+        orch._tui.notify_warning(message)
+    else:
+        orch._tui.notify(message, severity=severity, timeout=4.0)
+
+    if error_category and error_category not in TRANSIENT_HUD_ONLY_CATEGORIES:
+        orch._update_runtime_strip(
+            _notification_title(content, error_category),
+            _first_error_line(content),
+            active=True,
+        )
 
 
 def _handle_error_observation(
@@ -24,12 +91,15 @@ def _handle_error_observation(
 ) -> None:
     orch._compaction_transcript_active = False
     content = event.content or 'An unknown error occurred'
+    if getattr(event, 'agent_only', False):
+        return
     if getattr(event, 'notify_ui_only', False):
         error_category = getattr(event, 'error_category', None)
-        if error_category and error_category not in TRANSIENT_HUD_ONLY_CATEGORIES:
-            summary = notice_panel_title(content, error_category=error_category)
-            first_line = content.split('\n', 1)[0].strip()
-            orch._update_runtime_strip(summary, first_line, active=True)
+        _notify_ui_only_error(orch, content, error_category)
+        return
+    add_panel = getattr(orch._tui, 'add_error_panel', None)
+    if callable(add_panel):
+        add_panel(content, error_category=getattr(event, 'error_category', None))
         return
     orch._tui.add_warning(content)
 

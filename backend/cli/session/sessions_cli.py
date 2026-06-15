@@ -49,10 +49,7 @@ def _entries() -> list[tuple[str, dict[str, Any], int, Path]]:
     from backend.cli.session.session_manager import _list_session_entries
 
     base = _list_session_entries(root)
-    out: list[tuple[str, dict[str, Any], int, Path]] = []
-    for sid, meta, count in base:
-        out.append((sid, meta, count, root / sid))
-    return out
+    return list(base)
 
 
 def cmd_list(console: Console, limit: int = 50, search: str | None = None) -> int:

@@ -244,7 +244,7 @@ class ScreenInputMixin:
         try:
             parts = shlex.split(raw.strip())
         except ValueError:
-            self.add_error('Cannot autocomplete: malformed command.')
+            self.notify_warning('Cannot autocomplete: malformed command.')
             return
         if not parts:
             return
@@ -364,7 +364,7 @@ class ScreenInputMixin:
         """Handle errors during input processing."""
         _tui_logger.debug(f'_handle_input: EXCEPTION in setup: {exc}')
         logger.exception('[TUI] _handle_input setup FAILED')
-        self.add_error(f'Agent error: {type(exc).__name__}: {exc}')
+        self.notify_error(f'Agent error: {type(exc).__name__}: {exc}')
         self._render_hud_bar()
         if self._controller:
             try:
@@ -401,7 +401,7 @@ class ScreenInputMixin:
         except Exception as exc:
             _tui_logger.debug(f'_handle_input: EXCEPTION in dispatch: {exc}')
             logger.exception('[TUI] _handle_input FAILED')
-            self.add_error(f'Agent error: {type(exc).__name__}: {exc}')
+            self.notify_error(f'Agent error: {type(exc).__name__}: {exc}')
             self._render_hud_bar()
             if self._controller:
                 try:
@@ -477,7 +477,7 @@ class ScreenInputMixin:
         try:
             parts = shlex.split(raw)
         except ValueError as exc:
-            self.add_error(f'Invalid command syntax: {exc}')
+            self.notify_error(f'Invalid command syntax: {exc}')
             return
         if not parts:
             return
@@ -497,7 +497,7 @@ class ScreenInputMixin:
         elif cmd == '/resume':
             self.run_worker(self._run_resume_tui(args), exclusive=True)
         else:
-            self.add_error(f'Unknown command: {text}')
+            self.notify_error(f'Unknown command: {text}')
 
     async def _open_settings_tui(self) -> None:
         from backend.cli.settings import (
@@ -512,7 +512,7 @@ class ScreenInputMixin:
             result = await self.app.push_screen_wait(GrintaSettingsDialog(self._config))
         except Exception as exc:
             logger.exception('[TUI] /settings dialog failed')
-            self.add_error(f'/settings failed: {type(exc).__name__}: {exc}')
+            self.notify_error(f'/settings failed: {type(exc).__name__}: {exc}')
             return
         if not result:
             return
@@ -530,7 +530,7 @@ class ScreenInputMixin:
                 update_api_key(api_key, provider=provider or None)
         except Exception as exc:
             logger.exception('[TUI] /settings failed to persist')
-            self.add_error(f'/settings failed: {type(exc).__name__}: {exc}')
+            self.notify_error(f'/settings failed: {type(exc).__name__}: {exc}')
             return
 
         self._config = load_app_config()
@@ -551,7 +551,7 @@ class ScreenInputMixin:
     async def _run_sessions_tui(self, args: list[str]) -> None:
         parsed = _parse_sessions_tui_args(args)
         if parsed['error'] is not None:
-            self.add_error(parsed['error'])
+            self.notify_error(parsed['error'])
             return
 
         sid_to_resume = await self.app.push_screen_wait(
@@ -569,7 +569,7 @@ class ScreenInputMixin:
 
     async def _run_resume_tui(self, args: list[str]) -> None:
         if len(args) != 1:
-            self.add_error('Usage: /resume <N|session_id>')
+            self.notify_warning('Usage: /resume <N|session_id>')
             return
         await self._resume_session_target(args[0])
 
@@ -586,12 +586,12 @@ class ScreenInputMixin:
 
         cleaned_target = (target or '').strip()
         if not cleaned_target:
-            self.add_error('Usage: /resume <N|session_id>')
+            self.notify_warning('Usage: /resume <N|session_id>')
             return
 
         resolved_id, resolve_error = resolve_session_id(cleaned_target, self._config)
         if resolve_error or resolved_id is None:
-            self.add_error(resolve_error or f'No session matches: {cleaned_target}')
+            self.notify_error(resolve_error or f'No session matches: {cleaned_target}')
             return
 
         self.add_system_message(f'Resuming session: {resolved_id}')
@@ -604,7 +604,7 @@ class ScreenInputMixin:
             await self._resume_wait_and_bootstrap(resolved_id)
         except Exception as exc:
             logger.exception('[TUI] /resume failed')
-            self.add_error(f'Resume failed: {type(exc).__name__}: {exc}')
+            self.notify_error(f'Resume failed: {type(exc).__name__}: {exc}')
         else:
             self.add_success(
                 f'Session {resolved_id[:12]} resumed. Send a message to continue.'

@@ -4,15 +4,59 @@ from __future__ import annotations
 
 import asyncio
 import io
+import json
+import os
+import subprocess
+import sys
+from contextlib import suppress
+from pathlib import Path
 from typing import cast
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from rich.console import Console
+from rich.text import Text
 
+from backend.cli.display.diff_renderer import DiffPanel
 from backend.cli.display.hud import HUDBar
 from backend.cli.display.reasoning_display import ReasoningDisplay
 from backend.cli.event_renderer import CLIEventRenderer
+from backend.cli.event_rendering.panels import task_panel_signature
+from backend.cli.event_rendering.sidebar import build_task_list_panel
+from backend.cli.main import (
+    _configure_redirected_streams,
+    _read_piped_stdin,
+    show_grinta_splash,
+)
+from backend.cli.repl import Repl
+from backend.cli.repl.slash_command_registry import (
+    _build_command_completer,
+    _build_help_markdown,
+    _parse_slash_command,
+    _prompt_toolkit_available,
+    _supports_prompt_session,
+)
+from backend.cli.settings.confirmation import _risk_label
+from backend.cli.tui.helpers import _render_thinking_with_diff
 from backend.core.config import AppConfig
+from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
+from backend.core.enums import ActionSecurityRisk, AgentState, EventSource
+from backend.inference.metrics import Metrics, ResponseLatency, TokenUsage
+from backend.ledger.action import (
+    CmdRunAction,
+    FileEditAction,
+    FileReadAction,
+    MessageAction,
+    StreamingChunkAction,
+)
+from backend.ledger.observation import (
+    AgentThinkObservation,
+    CmdOutputObservation,
+    ErrorObservation,
+    TaskTrackingObservation,
+)
+from backend.orchestration.state.state import PlanStep
+from backend.persistence.locations import get_project_local_data_root
 
 
 def _make_console(*, width: int = 120) -> Console:

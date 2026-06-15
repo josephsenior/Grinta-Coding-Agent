@@ -368,11 +368,39 @@ class RendererDisplayMixin:
                 items.append(line)
         self.add_to_history(Group(*items))
 
+    def _deactivate_last_streaming_card(self, *, except_widget: Any = None) -> None:
+        """Collapse the previous streaming card when a new action starts."""
+        prev = getattr(self, '_last_streaming_card', None)
+        if prev is None or prev is except_widget:
+            return
+        try:
+            prev.set_processing(False)
+            if not getattr(prev, 'is_pinned', False):
+                prev.collapse()
+        except Exception:
+            pass
+        self._last_streaming_card = None
+
+    def _activate_activity_card(self, widget: Any) -> None:
+        """Mark a card as the current streaming target and expand it."""
+        if widget is None:
+            return
+        self._deactivate_last_streaming_card(except_widget=widget)
+        self._last_streaming_card = widget
+        self._last_active_card = widget
+        try:
+            widget.set_processing(True)
+            if getattr(widget, 'should_auto_expand', lambda: False)():
+                widget.expand()
+        except Exception:
+            pass
+
     def _clear_last_active_card_processing(self) -> None:
         """Clear the pulsing processing indicator on the last active card."""
-        if hasattr(self, '_last_active_card') and self._last_active_card:
+        prev = getattr(self, '_last_active_card', None)
+        if prev:
             try:
-                self._last_active_card.set_processing(False)
+                prev.set_processing(False)
             except Exception:
                 pass
             self._last_active_card = None
@@ -468,6 +496,17 @@ class RendererDisplayMixin:
             'neutral': 'neutral',
         }
         status = status_map.get(card.secondary_kind, 'neutral')
+        terminal_command = None
+        shell_kind = None
+        if card.badge_category in ('shell', 'terminal'):
+            from backend.cli.tui.helpers import infer_display_shell_kind
+
+            terminal_command = TUIActivityCard._command_from_detail(card.detail)
+            shell_kind = (
+                'terminal'
+                if card.badge_category == 'terminal'
+                else infer_display_shell_kind(terminal_command)
+            )
         widget = TUIActivityCard(
             verb=card.verb,
             detail=card.detail,
@@ -479,6 +518,8 @@ class RendererDisplayMixin:
             collapsible=card.is_collapsible,
             syntax_language=card.syntax_language,
             show_meta=bool(card.meta_lines),
+            shell_kind=shell_kind,
+            terminal_command=terminal_command,
         )
         if card.meta_lines:
             widget.set_meta(*card.meta_lines)
@@ -495,10 +536,7 @@ class RendererDisplayMixin:
         )
         is_active = is_tool and card.secondary_kind == 'neutral'
         if is_active:
-            widget.set_processing(True)
-            self._clear_last_active_card_processing()
-            widget.set_processing(True)
-            self._last_active_card = widget
+            self._activate_activity_card(widget)
             self._tui.set_current_operation(
                 f'{card.verb} {card.detail}'.strip(),
                 meta=card.secondary or 'Running',
@@ -609,9 +647,15 @@ class RendererDisplayMixin:
                 widget.set_meta(*meta_lines)
             except Exception:
                 pass
-        if collapse:
+        if status in {'err', 'warn'}:
             try:
-                widget.collapse()
+                widget.expand()
+            except Exception:
+                pass
+        if collapse and status not in {'err', 'warn'}:
+            try:
+                if not getattr(widget, 'is_pinned', False):
+                    widget.collapse()
             except Exception:
                 pass
 
@@ -622,7 +666,7 @@ class RendererDisplayMixin:
         status: str,
         outcome: str | None = None,
         extra_content: str | None = None,
-        collapse: bool = True,
+        collapse: bool = False,
         operation_label: str | None = None,
         syntax_language: str | None = None,
         meta_lines: list[str] | None = None,

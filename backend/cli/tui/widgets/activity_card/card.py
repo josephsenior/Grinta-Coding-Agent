@@ -27,6 +27,8 @@ from backend.cli.tui.widgets.activity_card.diff_lines import (
     _decode_split_diff_line,
     _format_file_delta_outcome,
 )
+from backend.cli.tui.widgets.terminal_pane import TerminalPane
+from backend.cli.tui.helpers import infer_display_shell_kind
 
 
 class ActivityCard(Container):
@@ -63,6 +65,19 @@ class ActivityCard(Container):
     ActivityCard.-category-terminal {
         border: round #24385c;
         background: #050913;
+    }
+    ActivityCard.-category-shell.-running,
+    ActivityCard.-category-terminal.-running {
+        border-left: heavy #5eead4;
+    }
+    ActivityCard.-expanded.-category-shell,
+    ActivityCard.-expanded.-category-terminal {
+        border: round #24385c;
+        padding: 0;
+    }
+    ActivityCard.-collapsed.-category-shell .card-collapsed-text,
+    ActivityCard.-collapsed.-category-terminal .card-collapsed-text {
+        color: #cbd5e1;
     }
     ActivityCard.-category-grep,
     ActivityCard.-category-glob,
@@ -128,6 +143,21 @@ class ActivityCard(Container):
         width: 1fr;
         height: 1;
     }
+    ActivityCard.-pinned {
+        border-left: heavy #f6ff8f;
+    }
+    ActivityCard.-collapsed.-pinned {
+        border-left: heavy #f6ff8f;
+    }
+    ActivityCard .card-pin {
+        width: 2;
+        height: 1;
+        content-align: center middle;
+        color: #f6ff8f;
+    }
+    ActivityCard .card-pin.-hidden {
+        display: none;
+    }
     ActivityCard .card-caret {
         width: 3;
         height: 1;
@@ -180,6 +210,7 @@ class ActivityCard(Container):
     BINDINGS = [
         ('enter', 'toggle', 'Toggle Expansion'),
         ('space', 'toggle', 'Toggle Expansion'),
+        ('p', 'toggle_pin', 'Pin card'),
     ]
 
     def __init__(
@@ -196,6 +227,10 @@ class ActivityCard(Container):
         diff_encoded: bool = False,
         show_meta: bool = False,
         syntax_language: str | None = None,
+        shell_kind: str | None = None,
+        terminal_command: str | None = None,
+        terminal_cwd: str | None = None,
+        terminal_session_id: str | None = None,
         id: str | None = None,
     ) -> None:
         super().__init__(id=id)
@@ -210,6 +245,14 @@ class ActivityCard(Container):
         self._diff_encoded = diff_encoded
         self._show_meta = show_meta
         self._syntax_language = syntax_language
+        self._terminal_command = terminal_command or self._command_from_detail(detail)
+        self._shell_kind = shell_kind or self._default_shell_kind()
+        self._terminal_cwd = terminal_cwd
+        self._terminal_session_id = terminal_session_id or ''
+        self._terminal_exit_code: int | None = None
+        self._terminal_pane: TerminalPane | None = None
+        self._pinned = False
+        self._output_tail = ''
         self.processing = False
         self.can_focus = bool(extra_content) or collapsible
         self._meta_lines: list[str] = []
@@ -222,6 +265,154 @@ class ActivityCard(Container):
         else:
             self.add_class('-expanded')
 
+    @staticmethod
+    def _command_from_detail(detail: str) -> str:
+        text = (detail or '').strip()
+        if text.startswith('$ '):
+            return text[2:].strip()
+        return text
+
+    def _default_shell_kind(self) -> str:
+        if self._badge_category == 'terminal':
+            return 'terminal'
+        if self._badge_category == 'shell':
+            return infer_display_shell_kind(self._terminal_command)
+        return 'bash'
+
+    def _is_terminal_card(self) -> bool:
+        return self._badge_category in {'shell', 'terminal'}
+
+    def _sync_running_class(self) -> None:
+        if not self._is_terminal_card():
+            return
+        if self.processing:
+            self.add_class('-running')
+        else:
+            self.remove_class('-running')
+
+    @property
+    def is_pinned(self) -> bool:
+        return self._pinned
+
+    def should_auto_expand(self) -> bool:
+        if not self._collapsible:
+            return False
+        if self._is_terminal_card():
+            return True
+        return bool(self._extra_content) or self.processing
+
+    def _refresh_output_tail(self) -> None:
+        if not self._is_terminal_card():
+            return
+        lines = [
+            line
+            for line in (self._extra_content or '').splitlines()
+            if line.strip()
+        ]
+        self._output_tail = lines[-1][:100] if lines else ''
+
+    def set_pinned(self, pinned: bool) -> None:
+        self._pinned = pinned
+        if pinned:
+            self.add_class('-pinned')
+            self.expand()
+        else:
+            self.remove_class('-pinned')
+        self._sync_pin_indicator()
+        try:
+            collapsed = self.query_one('#collapsed-row', Static)
+            collapsed.update(self._build_collapsed_markup())
+        except Exception:
+            pass
+
+    def toggle_pin(self) -> None:
+        self.set_pinned(not self._pinned)
+
+    def action_toggle_pin(self) -> None:
+        self.toggle_pin()
+
+    def _sync_pin_indicator(self) -> None:
+        try:
+            pin = self.query_one('#pin-indicator', Static)
+            pin.set_class('-hidden', not self._pinned)
+        except Exception:
+            pass
+
+    def configure_terminal(
+        self,
+        *,
+        command: str | None = None,
+        cwd: str | None = None,
+        session_id: str | None = None,
+        shell_kind: str | None = None,
+        exit_code: int | None = None,
+    ) -> None:
+        """Update embedded terminal chrome metadata."""
+        if command is not None:
+            self._terminal_command = command.strip()
+        if cwd is not None:
+            self._terminal_cwd = cwd.strip() or None
+        if session_id is not None:
+            self._terminal_session_id = session_id.strip()
+        if shell_kind is not None:
+            self._shell_kind = shell_kind
+        if exit_code is not None:
+            self._terminal_exit_code = exit_code
+        if self._terminal_pane is not None and self.is_mounted:
+            self._apply_terminal_pane_state(self._terminal_pane)
+
+    def _terminal_footer_text(self) -> str:
+        parts: list[str] = []
+        if self._terminal_cwd:
+            parts.append(f'cwd: {self._terminal_cwd}')
+        if self._terminal_exit_code is not None:
+            parts.append(f'exit {self._terminal_exit_code}')
+        elif self.processing:
+            parts.append('running')
+        if self._outcome and self._terminal_exit_code is None:
+            parts.append(self._outcome)
+        return ' · '.join(parts)
+
+    def _ensure_terminal_pane(self, body: Container) -> TerminalPane:
+        if self._terminal_pane is not None:
+            return self._terminal_pane
+        try:
+            pane = body.query_one('#terminal-pane', TerminalPane)
+            self._terminal_pane = pane
+            self._apply_terminal_pane_state(pane)
+            return pane
+        except Exception:
+            pass
+        pane = TerminalPane(
+            shell_kind=self._shell_kind,
+            command=self._terminal_command,
+            cwd=self._terminal_cwd,
+            session_id=self._terminal_session_id,
+            footer=self._terminal_footer_text(),
+            running=self.processing,
+            id='terminal-pane',
+        )
+        body.remove_children()
+        body.mount(pane)
+        self._terminal_pane = pane
+        self._apply_terminal_pane_state(pane)
+        return pane
+
+    def _apply_terminal_pane_state(self, pane: TerminalPane) -> None:
+        pane.set_shell_kind(self._shell_kind)
+        pane.set_command(self._terminal_command)
+        pane.set_cwd(self._terminal_cwd)
+        pane.set_session_id(self._terminal_session_id)
+        pane.set_footer(self._terminal_footer_text())
+        pane.set_running(self.processing)
+        if self._extra_content:
+            pane.set_output(self._extra_content)
+
+    def _mount_terminal_body(self, body: Container) -> None:
+        pane = self._ensure_terminal_pane(body)
+        pane.set_output(self._extra_content or '')
+        body.display = not self._collapsed
+
     def set_processing(self, processing: bool) -> None:
         """Set the card processing status."""
         self.processing = processing
@@ -229,6 +420,12 @@ class ActivityCard(Container):
             self._status = 'running'
         elif not processing and self._status == 'running':
             self._status = 'neutral'
+        self._sync_running_class()
+        if self._terminal_pane is not None:
+            self._terminal_pane.set_running(processing)
+            self._terminal_pane.set_footer(self._terminal_footer_text())
+        if processing and self.should_auto_expand():
+            self.expand()
         try:
             collapsed = self.query_one('#collapsed-row', Static)
             collapsed.update(self._build_collapsed_markup())
@@ -240,6 +437,8 @@ class ActivityCard(Container):
         self._status = status
         if outcome is not None:
             self._outcome = outcome
+        if status in {'err', 'warn'} and self._collapsible:
+            self.expand()
         try:
             collapsed = self.query_one('#collapsed-row', Static)
             collapsed.update(self._build_collapsed_markup())
@@ -278,8 +477,18 @@ class ActivityCard(Container):
             color = '#5eead4'
 
         icon_part = f'[{color}]{icon}[/]'
-        verb_part = f'[{NAVY_BRAND}]{self._verb}[/]'
-        detail_part = self._detail
+
+        if self._is_terminal_card():
+            command = self._terminal_command or self._command_from_detail(self._detail)
+            if self._shell_kind == 'pwsh':
+                prompt = f'[#7dd3fc]PS>[/] [#e2e8f0]{command}[/]'
+            else:
+                prompt = f'[#54efae]$[/] [#e2e8f0]{command}[/]'
+            detail_part = prompt
+        else:
+            verb_part = f'[{NAVY_BRAND}]{self._verb}[/]'
+            detail_part = f'{verb_part}  {self._detail}'
+
         outcome_part = ''
         if self._outcome:
             file_delta = (
@@ -299,7 +508,20 @@ class ActivityCard(Container):
                 )
                 outcome_part = f'  [{outcome_color}]{self._outcome}[/]'
 
-        return f'{pulse}{icon_part} {verb_part}  {detail_part}{outcome_part}'
+        tail_part = ''
+        if (
+            self._is_terminal_card()
+            and not self.processing
+            and self._output_tail
+            and self._collapsed
+        ):
+            tail = self._output_tail
+            if len(tail) > 72:
+                tail = tail[:69] + '...'
+            tail_part = f'  [#54597b]{tail}[/]'
+
+        pin_part = ' [#f6ff8f]📌[/]' if self._pinned else ''
+        return f'{pulse}{icon_part} {detail_part}{outcome_part}{tail_part}{pin_part}'
 
     def _caret_char(self) -> str:
         return chr(9660) if not self._collapsed else chr(9654)
@@ -406,12 +628,24 @@ class ActivityCard(Container):
                 id='collapsed-row',
                 classes='card-collapsed-text',
             )
+            yield Static('📌', id='pin-indicator', classes='card-pin -hidden')
             if self._collapsible:
                 yield Static(self._caret_char(), id='caret', classes='card-caret')
 
         if self._extra_content:
             with Container(classes='card-expanded-body', id='expanded-body'):
-                yield from self._extra_renderables()
+                if self._is_terminal_card():
+                    yield TerminalPane(
+                        shell_kind=self._shell_kind,
+                        command=self._terminal_command,
+                        cwd=self._terminal_cwd,
+                        session_id=self._terminal_session_id,
+                        footer=self._terminal_footer_text(),
+                        running=self.processing,
+                        id='terminal-pane',
+                    )
+                else:
+                    yield from self._extra_renderables()
 
             if self._show_meta or self._meta_lines:
                 meta_text = '  '.join(self._meta_lines) if self._meta_lines else ''
@@ -427,6 +661,15 @@ class ActivityCard(Container):
             yield Static('', id='meta-row', classes='card-meta-row -hidden')
 
     def on_mount(self) -> None:
+        try:
+            self._terminal_pane = self.query_one('#terminal-pane', TerminalPane)
+        except Exception:
+            self._terminal_pane = None
+        if self._terminal_pane is not None and self._extra_content:
+            self._terminal_pane.set_output(self._extra_content)
+        self._refresh_output_tail()
+        self._sync_running_class()
+        self._sync_pin_indicator()
         self._sync_visibility()
 
     def _sync_visibility(self) -> None:
@@ -479,6 +722,8 @@ class ActivityCard(Container):
 
     def collapse(self) -> None:
         """Collapse the card back to compact view."""
+        if self._pinned:
+            return
         if not self._collapsed:
             self.set_collapsed(True)
 
@@ -588,9 +833,24 @@ class ActivityCard(Container):
             self._extra_content += '\n' + chunk
         else:
             self._extra_content = chunk
+        self._refresh_output_tail()
         self.can_focus = True
         self._ensure_collapsible_for_extra()
         if not self.is_mounted:
+            return
+        try:
+            collapsed = self.query_one('#collapsed-row', Static)
+            collapsed.update(self._build_collapsed_markup())
+        except Exception:
+            pass
+        if self._is_terminal_card():
+            try:
+                body = self.query_one('#expanded-body', Container)
+                pane = self._ensure_terminal_pane(body)
+                pane.append_output(chunk)
+                body.display = not self._collapsed
+            except Exception:
+                pass
             return
         try:
             body = self.query_one('#expanded-body', Container)
@@ -601,6 +861,7 @@ class ActivityCard(Container):
     def update_content(self, extra_content: str) -> None:
         """Update or set the extra content."""
         self._extra_content = extra_content
+        self._refresh_output_tail()
         self.can_focus = True
         if extra_content:
             self._ensure_collapsible_for_extra()
@@ -609,6 +870,12 @@ class ActivityCard(Container):
 
         try:
             body = self.query_one('#expanded-body', Container)
+            if self._is_terminal_card():
+                pane = self._ensure_terminal_pane(body)
+                pane.set_output(extra_content or '')
+                pane.set_footer(self._terminal_footer_text())
+                body.display = not self._collapsed
+                return
             if self._incremental_mode and not self._diff_encoded:
                 self._mount_incremental_tail(body)
                 return
