@@ -44,8 +44,9 @@ uv run python -m backend.inference.discover_models
 uv run python -m backend.inference.discover_models status
 ```
 
-Then use a provider-qualified model id such as `ollama/llama3.2` in
-`settings.json` or `/model`.
+Then use a provider-qualified model id such as `ollama/llama3.2`,
+`lm_studio/qwen2.5-coder`, or `vllm/mistral-small` in `settings.json` or
+`/model`.
 
 ## Useful source commands
 
