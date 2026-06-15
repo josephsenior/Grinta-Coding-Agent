@@ -17,12 +17,12 @@ from backend.ledger.observation import TerminalObservation
 
 if TYPE_CHECKING:
     from backend.cli.tui.renderer.mixins.event_processor import (
-        _AppRendererEventProcessorMixin,
+        RendererEventProcessorMixin,
     )
 
 
 def _terminal_secondary_text(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     session_id: str,
     exit_code: int | None,
     state: str | None,
@@ -33,7 +33,7 @@ def _terminal_secondary_text(
 
 
 def _handle_terminal_run_action(
-    orch: '_AppRendererEventProcessorMixin', event: TerminalRunAction
+    orch: 'RendererEventProcessorMixin', event: TerminalRunAction
 ) -> None:
     cmd = getattr(event, 'command', '') or ''
     session_id = getattr(event, 'session_id', '') or ''
@@ -52,7 +52,7 @@ def _handle_terminal_run_action(
 
 
 def _handle_terminal_input_action(
-    orch: '_AppRendererEventProcessorMixin', event: TerminalInputAction
+    orch: 'RendererEventProcessorMixin', event: TerminalInputAction
 ) -> None:
     session_id = getattr(event, 'session_id', '') or ''
     submitted = _sanitize_terminal_display_text(getattr(event, 'input', '') or '')
@@ -72,7 +72,7 @@ def _handle_terminal_input_action(
 
 
 def _handle_terminal_read_action(
-    orch: '_AppRendererEventProcessorMixin', event: TerminalReadAction
+    orch: 'RendererEventProcessorMixin', event: TerminalReadAction
 ) -> None:
     session_id = getattr(event, 'session_id', '') or ''
     orch._upsert_terminal_session_card(
@@ -89,7 +89,7 @@ def _handle_terminal_read_action(
 
 
 def _handle_terminal_observation(
-    orch: '_AppRendererEventProcessorMixin', event: TerminalObservation
+    orch: 'RendererEventProcessorMixin', event: TerminalObservation
 ) -> None:
     content = event.content or ''
     session_id = getattr(event, 'session_id', '') or ''

@@ -1,4 +1,4 @@
-"""_AppRendererTerminalMixin: terminal command cards (per-session)."""
+"""RendererTerminalMixin: terminal command cards (per-session)."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from backend.cli.tui.helpers import (
 )
 
 
-class _AppRendererTerminalMixin:
+class RendererTerminalMixin:
     """terminal command cards (per-session)."""
 
     def _remember_terminal_command(self, session_id: str, command: str) -> None:

@@ -1,4 +1,4 @@
-"""_AppRendererDisplayMixin: history refresh, display writes, retry/runtime strips, cards."""
+"""RendererDisplayMixin: history refresh, display writes, retry/runtime strips, cards."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ from backend.cli.event_rendering.unified_renderer import (
 from backend.cli.orient_tools import OrientLineModel
 
 
-class _AppRendererDisplayMixin:
+class RendererDisplayMixin:
     """history refresh, display writes, retry/runtime strips, cards."""
 
     _playbook_skills_cache: list[str] | None = None

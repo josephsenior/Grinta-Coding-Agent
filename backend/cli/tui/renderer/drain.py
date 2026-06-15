@@ -1,4 +1,4 @@
-"""Event drain / activity machinery for :class:`_AppRendererEventProcessorMixin`.
+"""Event drain / activity machinery for :class:`RendererEventProcessorMixin`.
 
 Owns:
 - ``drain_events`` — atomic flush of the pending event queue into the
@@ -32,14 +32,14 @@ from backend.cli.tui.widgets.small import RendererDrainRequested
 
 if TYPE_CHECKING:
     from backend.cli.tui.renderer.mixins.event_processor import (
-        _AppRendererEventProcessorMixin,
+        RendererEventProcessorMixin,
     )
 
 _TUI_DRAIN_DEBOUNCE_SECONDS = 0.016
 
 
 def _set_display_backpressure(
-    orch: '_AppRendererEventProcessorMixin', active: bool
+    orch: 'RendererEventProcessorMixin', active: bool
 ) -> None:
     """Propagate drain backpressure to the transcript display widget.
 
@@ -186,7 +186,7 @@ def _drop_one_pending_event_for_backpressure(pending: Any) -> bool:
 
 
 def _make_backpressure_room(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     pending: Any,
     limit: int,
 ) -> bool:
@@ -214,7 +214,7 @@ def _make_backpressure_room(
     return bool(reclaimed or dropped)
 
 
-def _force_immediate_drain(orch: '_AppRendererEventProcessorMixin') -> None:
+def _force_immediate_drain(orch: 'RendererEventProcessorMixin') -> None:
     handle = getattr(orch, '_drain_debounce_handle', None)
     if handle is not None:
         try:
@@ -225,7 +225,7 @@ def _force_immediate_drain(orch: '_AppRendererEventProcessorMixin') -> None:
     _post_drain_message(orch)
 
 
-def drain_events(orch: '_AppRendererEventProcessorMixin') -> None:
+def drain_events(orch: 'RendererEventProcessorMixin') -> None:
     """Synchronous drain for non-async contexts (backward compatibility)."""
     with orch._pending_lock:
         events = list(orch._pending_events)
@@ -256,7 +256,7 @@ def drain_events(orch: '_AppRendererEventProcessorMixin') -> None:
         orch._refresh_display(skip_sidebar=streaming_only)
 
 
-def _cancel_drain_debounce(orch: '_AppRendererEventProcessorMixin') -> None:
+def _cancel_drain_debounce(orch: 'RendererEventProcessorMixin') -> None:
     debounce_handle = getattr(orch, '_drain_debounce_handle', None)
     if debounce_handle is not None:
         try:
@@ -267,7 +267,7 @@ def _cancel_drain_debounce(orch: '_AppRendererEventProcessorMixin') -> None:
 
 
 def _collect_pending_events(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
 ) -> tuple[list[Any], int]:
     with orch._pending_lock:
         events = list(orch._pending_events)
@@ -280,7 +280,7 @@ def _collect_pending_events(
 
 
 def _record_dropped_events(
-    orch: '_AppRendererEventProcessorMixin', dropped: int
+    orch: 'RendererEventProcessorMixin', dropped: int
 ) -> None:
     notice = Text(
         f'... {dropped} stale TUI event(s) skipped while the renderer caught up ...',
@@ -306,7 +306,7 @@ def _record_dropped_events(
 
 
 def _flush_and_refresh(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     events: list[Any],
     streaming_only: bool,
     *,
@@ -322,7 +322,7 @@ def _flush_and_refresh(
 
 
 async def _preprocess_event_async(
-    orch: '_AppRendererEventProcessorMixin', event: Any
+    orch: 'RendererEventProcessorMixin', event: Any
 ) -> None:
     """Run heavy prep off the UI thread before synchronous dispatch."""
     event_id = getattr(event, 'id', -1)
@@ -345,7 +345,7 @@ async def _preprocess_event_async(
 
 
 async def _process_events_with_frame_budget(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     events: list[Any],
 ) -> int:
     """Process events until the frame budget elapses. Returns count processed."""
@@ -360,7 +360,7 @@ async def _process_events_with_frame_budget(
     return processed
 
 
-async def _finalize_drain_pass(orch: '_AppRendererEventProcessorMixin') -> None:
+async def _finalize_drain_pass(orch: 'RendererEventProcessorMixin') -> None:
     flush = getattr(orch, 'flush_live_ui', None)
     if callable(flush):
         flush()
@@ -370,7 +370,7 @@ async def _finalize_drain_pass(orch: '_AppRendererEventProcessorMixin') -> None:
     orch._refresh_display()
 
 
-async def drain_events_async(orch: '_AppRendererEventProcessorMixin') -> None:
+async def drain_events_async(orch: 'RendererEventProcessorMixin') -> None:
     """Async drain that yields control to the event loop periodically.
 
     Processes multiple micro-batches per invocation up to a wall-clock cap so
@@ -461,7 +461,7 @@ async def drain_events_async(orch: '_AppRendererEventProcessorMixin') -> None:
 
 
 async def wait_for_activity(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     wait_timeout_sec: float = 0.5,
 ) -> Any:
     with orch._pending_lock:
@@ -484,7 +484,7 @@ _LOAD_EARLIER_BATCH_SIZE = 100
 
 
 async def hydrate_recent_transcript(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     *,
     limit: int | None = None,
 ) -> int:
@@ -531,7 +531,7 @@ async def hydrate_recent_transcript(
 
 
 async def load_earlier_messages(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     batch_size: int = _LOAD_EARLIER_BATCH_SIZE,
 ) -> int:
     """Fetch and render earlier events from the ledger.
@@ -585,7 +585,7 @@ async def load_earlier_messages(
     return len(events)
 
 
-def _on_event(orch: '_AppRendererEventProcessorMixin', event: Any) -> None:
+def _on_event(orch: 'RendererEventProcessorMixin', event: Any) -> None:
     # Deferred import: the test suite monkey-patches this constant on the
     # mixin module (``monkeypatch.setattr(_ep_mod, '_TUI_PENDING_EVENT_LIMIT', N)``).
     from backend.cli.tui.renderer.mixins.event_processor import (
@@ -628,7 +628,7 @@ def _on_event(orch: '_AppRendererEventProcessorMixin', event: Any) -> None:
         pass
 
 
-def _post_drain_message(orch: '_AppRendererEventProcessorMixin') -> None:
+def _post_drain_message(orch: 'RendererEventProcessorMixin') -> None:
     orch._drain_debounce_handle = None
     try:
         orch._tui.post_message(RendererDrainRequested())
@@ -638,7 +638,7 @@ def _post_drain_message(orch: '_AppRendererEventProcessorMixin') -> None:
 
 
 def _signal_activity(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     should_schedule_drain: bool,
 ) -> None:
     orch._state_event.set()

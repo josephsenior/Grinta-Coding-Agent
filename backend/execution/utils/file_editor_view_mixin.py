@@ -109,7 +109,7 @@ def _check_block_indent_after_colon(
         )
 
 
-class _FileEditorViewMixin:
+class FileEditorViewMixin:
     def _handle_view(self, file_path: Path, view_range: list[int] | None) -> ToolResult:
         """Handle view command - read file or specific line range."""
         try:

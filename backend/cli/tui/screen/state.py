@@ -40,7 +40,7 @@ from backend.core.interaction_modes import (
 )
 
 
-class _AppScreenStateMixin:
+class ScreenStateMixin:
     """State-related methods of GrintaScreen."""
 
     @classmethod

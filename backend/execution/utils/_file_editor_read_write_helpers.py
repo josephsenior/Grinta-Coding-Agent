@@ -2,12 +2,12 @@
 
 These module functions are the extracted method bodies for the
 low-level read, write, and line-manipulation methods on
-``_FileEditorOpsMixin``. They are called as one-line forwarders
+``FileEditorOpsMixin``. They are called as one-line forwarders
 from the mixin class. Module functions invoke other methods via
 ``self._method(...)`` so that monkey-patching of the class
 methods in tests still works.
 
-Extracted from ``backend.execution.utils._file_editor_ops_mixin`` to
+Extracted from ``backend.execution.utils.file_editor_ops_mixin`` to
 keep that module focused on the ops mixin class.
 """
 
@@ -24,7 +24,7 @@ from backend.execution.utils._file_editor_io_helpers import (
     _normalize_newlines_for_metadata,
 )
 from backend.execution.utils._file_editor_types import ToolResult
-from backend.execution.utils._file_editor_view_mixin import _detect_indentation_mismatch
+from backend.execution.utils.file_editor_view_mixin import _detect_indentation_mismatch
 
 
 def read_file_with_meta_impl(self, file_path: Path) -> tuple[str, _FileReadMeta]:

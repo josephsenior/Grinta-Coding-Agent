@@ -143,7 +143,7 @@ Runtime/session state is stored under `~/.grinta/workspaces/<id>/storage`, not u
 
 - TTY startup path: `launch/entry.py` -> `backend/cli/entry.py` -> `backend/cli/main.py` -> `backend/cli/tui/main.py`.
 - Non-interactive path: `backend/cli/main.py` -> `backend/cli/repl_noninteractive.py`.
-- Prompt-toolkit REPL support remains in `backend/cli/repl.py` and `backend/cli/_repl/`; keep it working when changing shared slash-command behavior.
+- Prompt-toolkit REPL support lives in `backend/cli/repl/` (`session.py` plus slash-command modules); keep it working when changing shared slash-command behavior.
 
 ### Security boundary
 

@@ -15,12 +15,12 @@ from backend.ledger.observation import DelegateTaskObservation
 
 if TYPE_CHECKING:
     from backend.cli.tui.renderer.mixins.event_processor import (
-        _AppRendererEventProcessorMixin,
+        RendererEventProcessorMixin,
     )
 
 
 def _register_parallel_worker_tasks(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     event: DelegateTaskAction,
 ) -> None:
     for item in list(getattr(event, 'parallel_tasks', []) or []):
@@ -31,7 +31,7 @@ def _register_parallel_worker_tasks(
 
 
 def _record_delegate_result(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     resolved_task: str,
     success: bool,
 ) -> None:
@@ -46,7 +46,7 @@ def _record_delegate_result(
 
 
 def _update_or_write_delegate_card(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     card: Any,
     resolved_task: str,
     success: bool,
@@ -69,7 +69,7 @@ def _update_or_write_delegate_card(
 
 
 def _handle_delegate_task_action(
-    orch: '_AppRendererEventProcessorMixin', event: DelegateTaskAction
+    orch: 'RendererEventProcessorMixin', event: DelegateTaskAction
 ) -> None:
     task, worker = resolve_delegate_task_and_worker(event)
     if getattr(event, 'parallel_tasks', None):
@@ -83,7 +83,7 @@ def _handle_delegate_task_action(
 
 
 def _handle_delegate_task_observation(
-    orch: '_AppRendererEventProcessorMixin', event: DelegateTaskObservation
+    orch: 'RendererEventProcessorMixin', event: DelegateTaskObservation
 ) -> None:
     content, error_message = resolve_delegate_card_detail(event)
     success = bool(getattr(event, 'success', True))

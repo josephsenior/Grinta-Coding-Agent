@@ -24,12 +24,12 @@ from backend.ledger.observation.memory_tools import (
 
 if TYPE_CHECKING:
     from backend.cli.tui.renderer.mixins.event_processor import (
-        _AppRendererEventProcessorMixin,
+        RendererEventProcessorMixin,
     )
 
 
 def _render_memory_tool_card(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     content: str,
     *,
     kind: str,
@@ -50,7 +50,7 @@ def _render_memory_tool_card(
 
 
 def _handle_checkpoint_observation(
-    orch: '_AppRendererEventProcessorMixin', event: CheckpointObservation
+    orch: 'RendererEventProcessorMixin', event: CheckpointObservation
 ) -> None:
     _render_memory_tool_card(
         orch, event.content, kind='checkpoint', source_tool='checkpoint'
@@ -58,68 +58,68 @@ def _handle_checkpoint_observation(
 
 
 def _handle_working_memory_observation(
-    orch: '_AppRendererEventProcessorMixin', event: WorkingMemoryObservation
+    orch: 'RendererEventProcessorMixin', event: WorkingMemoryObservation
 ) -> None:
     _render_memory_tool_card(orch, event.content, kind='memory')
 
 
 def _handle_memory_persist_observation(
-    orch: '_AppRendererEventProcessorMixin', event: MemoryPersistObservation
+    orch: 'RendererEventProcessorMixin', event: MemoryPersistObservation
 ) -> None:
     _render_memory_tool_card(orch, event.content, kind='memory')
 
 
 def _handle_memory_recall_observation(
-    orch: '_AppRendererEventProcessorMixin', event: MemoryRecallObservation
+    orch: 'RendererEventProcessorMixin', event: MemoryRecallObservation
 ) -> None:
     _render_memory_tool_card(orch, event.content, kind='memory')
 
 
 def _handle_scratchpad_note_observation(
-    orch: '_AppRendererEventProcessorMixin', event: ScratchpadNoteObservation
+    orch: 'RendererEventProcessorMixin', event: ScratchpadNoteObservation
 ) -> None:
     _render_memory_tool_card(orch, event.content, kind='memory')
 
 
 def _handle_scratchpad_recall_observation(
-    orch: '_AppRendererEventProcessorMixin', event: ScratchpadRecallObservation
+    orch: 'RendererEventProcessorMixin', event: ScratchpadRecallObservation
 ) -> None:
     _render_memory_tool_card(orch, event.content, kind='memory')
 
 
 def _handle_checkpoint_action(
-    orch: '_AppRendererEventProcessorMixin', event: CheckpointAction
+    orch: 'RendererEventProcessorMixin', event: CheckpointAction
 ) -> None:
     detail = event.label or event.command or 'checkpoint'
     _render_memory_tool_card(orch, detail, kind='checkpoint', source_tool='checkpoint')
 
 
 def _handle_working_memory_action(
-    orch: '_AppRendererEventProcessorMixin', event: WorkingMemoryAction
+    orch: 'RendererEventProcessorMixin', event: WorkingMemoryAction
 ) -> None:
     detail = f'{event.command} {event.section}'.strip()
     _render_memory_tool_card(orch, detail, kind='memory')
 
 
 def _handle_memory_persist_action(
-    orch: '_AppRendererEventProcessorMixin', event: MemoryPersistAction
+    orch: 'RendererEventProcessorMixin', event: MemoryPersistAction
 ) -> None:
     _render_memory_tool_card(orch, event.key or 'persist', kind='memory')
 
 
 def _handle_memory_recall_action(
-    orch: '_AppRendererEventProcessorMixin', event: MemoryRecallAction
+    orch: 'RendererEventProcessorMixin', event: MemoryRecallAction
 ) -> None:
     _render_memory_tool_card(orch, event.query or 'recall', kind='memory')
 
 
 def _handle_scratchpad_note_action(
-    orch: '_AppRendererEventProcessorMixin', event: ScratchpadNoteAction
+    orch: 'RendererEventProcessorMixin', event: ScratchpadNoteAction
 ) -> None:
     _render_memory_tool_card(orch, event.key or 'note', kind='memory')
 
 
 def _handle_scratchpad_recall_action(
-    orch: '_AppRendererEventProcessorMixin', event: ScratchpadRecallAction
+    orch: 'RendererEventProcessorMixin', event: ScratchpadRecallAction
 ) -> None:
     _render_memory_tool_card(orch, event.key or 'recall', kind='memory')

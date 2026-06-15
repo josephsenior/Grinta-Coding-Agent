@@ -26,12 +26,12 @@ from backend.ledger.observation import FileEditObservation, FileReadObservation,
 
 if TYPE_CHECKING:
     from backend.cli.tui.renderer.mixins.event_processor import (
-        _AppRendererEventProcessorMixin,
+        RendererEventProcessorMixin,
     )
 
 
 def _write_create_file_diff_card(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     path: str,
     new_content: str,
     *,
@@ -50,7 +50,7 @@ def _write_create_file_diff_card(
 
 
 def _finalize_pending_create_file_card(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     widget: Any,
     path: str,
     new_content: str,
@@ -71,7 +71,7 @@ def _finalize_pending_create_file_card(
 
 
 def _handle_file_read_action(
-    orch: '_AppRendererEventProcessorMixin', event: FileReadAction
+    orch: 'RendererEventProcessorMixin', event: FileReadAction
 ) -> None:
     path = getattr(event, 'path', '')
     model = file_read_action_model(event)
@@ -88,7 +88,7 @@ def _handle_file_read_action(
 
 
 def _resolve_verb_from_registry(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     cmd: str,
     insert_line: int | None,
 ) -> tuple[str, str] | None:
@@ -102,7 +102,7 @@ def _resolve_verb_from_registry(
 
 
 def _resolve_file_edit_verb_and_range(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     event: FileEditAction,
     cmd: str,
     insert_line: int | None,
@@ -124,7 +124,7 @@ def _resolve_file_edit_verb_and_range(
 
 
 def _handle_file_edit_create(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     event: FileEditAction,
     path: str,
 ) -> None:
@@ -147,7 +147,7 @@ def _handle_file_edit_create(
 
 
 def _handle_file_edit_action(
-    orch: '_AppRendererEventProcessorMixin', event: FileEditAction
+    orch: 'RendererEventProcessorMixin', event: FileEditAction
 ) -> None:
     cmd = getattr(event, 'command', '')
     path = event.path
@@ -180,7 +180,7 @@ def _handle_file_edit_action(
 
 
 def _handle_file_write_action(
-    orch: '_AppRendererEventProcessorMixin', event: FileWriteAction
+    orch: 'RendererEventProcessorMixin', event: FileWriteAction
 ) -> None:
     path = event.path
     if orch._has_pending_file_card('_pending_file_create_cards_by_path', path):
@@ -199,7 +199,7 @@ def _handle_file_write_action(
 
 
 def _handle_file_read_observation(
-    orch: '_AppRendererEventProcessorMixin', event: FileReadObservation
+    orch: 'RendererEventProcessorMixin', event: FileReadObservation
 ) -> None:
     path = getattr(event, 'path', '') or ''
     pending = orch._take_pending_file_card(
@@ -213,7 +213,7 @@ def _handle_file_read_observation(
 
 
 def _resolve_file_edit_pending_create(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     event: FileEditObservation,
     path: str,
     added: int,
@@ -236,7 +236,7 @@ def _resolve_file_edit_pending_create(
 
 
 def _handle_file_edit_new_file(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     event: FileEditObservation,
     path: str,
     added: int,
@@ -251,7 +251,7 @@ def _handle_file_edit_new_file(
 
 
 def _write_multi_file_edit_card(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     fp: str,
     file_diff: str,
 ) -> None:
@@ -268,7 +268,7 @@ def _write_multi_file_edit_card(
 
 
 def _write_multi_file_edit_cards(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     per_file: list,
 ) -> None:
     for fp, file_diff in per_file:
@@ -276,7 +276,7 @@ def _write_multi_file_edit_cards(
 
 
 def _handle_file_edit_multi_file(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     event: FileEditObservation,
     path: str,
 ) -> None:
@@ -292,7 +292,7 @@ def _handle_file_edit_multi_file(
 
 
 def _resolve_existing_file_edit_diff(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     event: FileEditObservation,
     added: int,
     removed: int,
@@ -320,7 +320,7 @@ def _resolve_existing_file_edit_diff(
 
 
 def _write_file_edit_existing_card(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     path: str,
     encoded_diff: str | None,
     added: int,
@@ -345,7 +345,7 @@ def _write_file_edit_existing_card(
 
 
 def _handle_file_edit_existing(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     event: FileEditObservation,
     path: str,
     added: int,
@@ -361,7 +361,7 @@ def _handle_file_edit_existing(
 
 
 def _route_file_edit_observation(
-    orch: '_AppRendererEventProcessorMixin',
+    orch: 'RendererEventProcessorMixin',
     event: FileEditObservation,
     path: str,
     added: int,
@@ -376,7 +376,7 @@ def _route_file_edit_observation(
 
 
 def _handle_file_edit_observation(
-    orch: '_AppRendererEventProcessorMixin', event: FileEditObservation
+    orch: 'RendererEventProcessorMixin', event: FileEditObservation
 ) -> None:
     clean_file_edit_content(event)
     path = (getattr(event, 'path', '') or '').strip()
@@ -388,7 +388,7 @@ def _handle_file_edit_observation(
 
 
 def _handle_file_write_observation(
-    orch: '_AppRendererEventProcessorMixin', event: FileWriteObservation
+    orch: 'RendererEventProcessorMixin', event: FileWriteObservation
 ) -> None:
     path = event.path
     pending = orch._take_pending_file_card(

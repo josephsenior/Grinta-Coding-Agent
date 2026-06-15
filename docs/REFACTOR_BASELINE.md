@@ -68,8 +68,8 @@ uv run python backend/scripts/verify/check_file_size.py
 - [x] `backend/cli/tui/widgets/activity_card/` package
 - [x] `backend/cli/tui/renderer/` handlers + screen/ layout
 - [x] `backend/cli/tui/dialogs/` package
-- [x] `_event_renderer/unified_renderer/` package
-- [x] `_event_renderer/observations/` + `actions/` packages
+- [x] `event_rendering/unified_renderer/` package
+- [x] `event_rendering/observations/` + `actions/` packages
 - [x] Cosmetic rename: `event_rendering/`, `tool_display/`, `repl/` (no leading `_`)
 - [x] `config_manager.py` → `settings/` submodules
 

@@ -72,8 +72,8 @@ Backend code imports from `backend.*`. The supported entrypoints are the CLI und
 
 ### CLI Mixin Typing Convention
 
-When extracting logic into CLI mixins (for example in `backend/cli/_repl/` or
-`backend/cli/_event_renderer/`), define host interfaces in
+When extracting logic into CLI mixins (for example in `backend/cli/repl/` or
+`backend/cli/event_rendering/`), define host interfaces in
 `backend/cli/_typing.py` and import them into mixins instead of re-declaring
 `TYPE_CHECKING`-only host stubs per file.
 

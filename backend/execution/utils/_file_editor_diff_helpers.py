@@ -2,7 +2,7 @@
 
 No instance state — these helpers take raw content strings and return
 formatted diff context. Extracted from
-``backend.execution.utils._file_editor_ops_mixin`` to keep that module
+``backend.execution.utils.file_editor_ops_mixin`` to keep that module
 focused on the ops mixin class.
 """
 

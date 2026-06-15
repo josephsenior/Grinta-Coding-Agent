@@ -13,12 +13,12 @@ from backend.ledger.observation import CmdOutputObservation
 
 if TYPE_CHECKING:
     from backend.cli.tui.renderer.mixins.event_processor import (
-        _AppRendererEventProcessorMixin,
+        RendererEventProcessorMixin,
     )
 
 
 def _handle_cmd_run_action(
-    orch: '_AppRendererEventProcessorMixin', event: CmdRunAction
+    orch: 'RendererEventProcessorMixin', event: CmdRunAction
 ) -> None:
     cmd = getattr(event, 'command', '') or ''
     if not getattr(event, 'hidden', False):
@@ -26,7 +26,7 @@ def _handle_cmd_run_action(
 
 
 def _handle_cmd_output_observation(
-    orch: '_AppRendererEventProcessorMixin', event: CmdOutputObservation
+    orch: 'RendererEventProcessorMixin', event: CmdOutputObservation
 ) -> None:
     output = (event.content or '').strip()
     exit_code = getattr(event, 'exit_code', None)

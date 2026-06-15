@@ -17,12 +17,12 @@ from backend.ledger.observation import MCPObservation
 
 if TYPE_CHECKING:
     from backend.cli.tui.renderer.mixins.event_processor import (
-        _AppRendererEventProcessorMixin,
+        RendererEventProcessorMixin,
     )
 
 
 def _handle_mcp_action(
-    orch: '_AppRendererEventProcessorMixin', event: MCPAction
+    orch: 'RendererEventProcessorMixin', event: MCPAction
 ) -> None:
     orient = mcp_action_model(event)
     if orient is not None:
@@ -41,7 +41,7 @@ def _handle_mcp_action(
 
 
 def _handle_mcp_observation(
-    orch: '_AppRendererEventProcessorMixin', event: MCPObservation
+    orch: 'RendererEventProcessorMixin', event: MCPObservation
 ) -> None:
     content = event.content or ''
     if event.name in ORIENT_MCP_TOOL_NAMES:

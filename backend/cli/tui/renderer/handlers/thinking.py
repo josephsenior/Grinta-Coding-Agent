@@ -9,12 +9,12 @@ from backend.ledger.observation import AgentThinkObservation
 
 if TYPE_CHECKING:
     from backend.cli.tui.renderer.mixins.event_processor import (
-        _AppRendererEventProcessorMixin,
+        RendererEventProcessorMixin,
     )
 
 
 def _handle_agent_think_action(
-    orch: '_AppRendererEventProcessorMixin', event: AgentThinkAction
+    orch: 'RendererEventProcessorMixin', event: AgentThinkAction
 ) -> None:
     from backend.engine.common import arguments_from_tool_call_metadata
 
@@ -35,7 +35,7 @@ def _handle_agent_think_action(
 
 
 def _handle_agent_think_observation(
-    orch: '_AppRendererEventProcessorMixin', event: AgentThinkObservation
+    orch: 'RendererEventProcessorMixin', event: AgentThinkObservation
 ) -> None:
     thought = getattr(event, 'thought', '') or getattr(event, 'content', '')
     kind = getattr(event, 'kind', '') or ''

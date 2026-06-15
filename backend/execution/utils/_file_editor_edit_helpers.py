@@ -2,12 +2,12 @@
 
 These module functions are the extracted method bodies for the
 high-level edit, write, and verification methods on
-``_FileEditorOpsMixin``. They are called as one-line forwarders
+``FileEditorOpsMixin``. They are called as one-line forwarders
 from the mixin class. Module functions invoke other methods via
 ``self._method(...)`` so that monkey-patching of the class
 methods in tests still works.
 
-Extracted from ``backend.execution.utils._file_editor_ops_mixin`` to
+Extracted from ``backend.execution.utils.file_editor_ops_mixin`` to
 keep that module focused on the ops mixin class.
 """
 

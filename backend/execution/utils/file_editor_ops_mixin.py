@@ -83,7 +83,7 @@ from backend.execution.utils._file_editor_read_write_helpers import (
 from backend.execution.utils._file_editor_types import ToolResult
 
 
-class _FileEditorOpsMixin:
+class FileEditorOpsMixin:
     def _handle_edit(
         self,
         file_path: Path,
