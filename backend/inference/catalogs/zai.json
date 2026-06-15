@@ -1,0 +1,39 @@
+{
+  "provider": "zai",
+  "client": "openai_compatible",
+  "models": {
+    "glm-5.2": {
+      "runtime": {
+        "aliases": [
+          "zai/glm-5.2",
+          "glm-5.2[1m]"
+        ],
+        "context_window_tokens": 1000000,
+        "max_input_tokens": 868928,
+        "max_output_tokens": 131072,
+        "input_price_per_m": 1.4,
+        "cached_input_price_per_m": 0.26,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 4.4,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_reasoning_effort": true,
+        "supports_stop_words": true,
+        "inference_endpoint": "/chat/completions",
+        "reasoning_efforts": [
+          "high",
+          "max"
+        ],
+        "reasoning_wire": "glm_thinking"
+      },
+      "metadata": {
+        "display_name": "GLM-5.2",
+        "family": "glm",
+        "release_date": "2026-06-13",
+        "notes": "Use glm-5.2[1m] alias for the full 1M-token context window."
+      }
+    }
+  }
+}

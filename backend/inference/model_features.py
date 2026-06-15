@@ -78,6 +78,8 @@ FUNCTION_CALLING_PATTERNS: list[str] = [
     'kimi-k2*',
     'qwen3*',
     'zai-glm-4.7*',
+    'zai-glm-5*',
+    'glm-5*',
     'deepseek*',
 ]
 REASONING_EFFORT_PATTERNS: list[str] = [

@@ -47,6 +47,7 @@ PROVIDER_DEFAULT_URLS: dict[str, str] = {
     'mistral': 'https://api.mistral.ai/v1',
     'opencode': 'https://opencode.ai/zen/v1',
     'opencode-go': 'https://opencode.ai/zen/go/v1',
+    'zai': 'https://api.z.ai/api/paas/v4',
 }
 
 KNOWN_PROVIDER_PREFIXES: frozenset[str] = frozenset(
@@ -67,6 +68,7 @@ KNOWN_PROVIDER_PREFIXES: frozenset[str] = frozenset(
         'openai',
         'opencode',
         'opencode-go',
+        'zai',
         'openrouter',
         'perplexity',
         'replicate',
@@ -98,6 +100,7 @@ OPENAI_COMPATIBLE_REMOTE_PROVIDERS: frozenset[str] = frozenset(
         'perplexity',
         'opencode',
         'opencode-go',
+        'zai',
     }
 )
 
