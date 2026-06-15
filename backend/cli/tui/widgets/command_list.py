@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from textual import events
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
+from textual.message import Message
 from textual.widgets import Static
 
 # Human-readable descriptions for the help modal (syntax lives in GrintaScreen._SLASH_HINTS).
@@ -28,6 +30,15 @@ KEYBOARD_SHORTCUTS: list[tuple[str, str]] = [
 ]
 
 
+# Slash commands that need arguments before they can run.
+_SLASH_COMMANDS_REQUIRING_ARGS = frozenset({'/resume'})
+
+
+def slash_command_runs_immediately(name: str) -> bool:
+    """Return True when a palette pick can execute without extra input."""
+    return name not in _SLASH_COMMANDS_REQUIRING_ARGS
+
+
 class CommandListSection(Static):
     """Section title inside a command list panel."""
 
@@ -37,7 +48,7 @@ class CommandListSection(Static):
         height: 1;
         margin: 1 0 0 0;
         padding: 0 1;
-        color: #91abec;
+        color: #5eead4;
     }
     CommandListSection:first-of-type {
         margin-top: 0;
@@ -48,6 +59,13 @@ class CommandListSection(Static):
 class CommandListRow(Horizontal):
     """Two-column row: command name + usage or description."""
 
+    class Activated(Message):
+        """A clickable slash-command row was chosen."""
+
+        def __init__(self, command: str) -> None:
+            super().__init__()
+            self.command = command
+
     DEFAULT_CSS = """
     CommandListRow {
         width: 100%;
@@ -56,17 +74,23 @@ class CommandListRow(Horizontal):
         padding: 0 1;
         margin: 0;
     }
+    CommandListRow.-activatable {
+        height: 1;
+    }
+    CommandListRow.-activatable:hover {
+        background: #0d162a;
+    }
     CommandListRow .cmd-name {
         width: 18;
         min-width: 18;
-        color: #eacb8a;
+        color: #c8d4e8;
     }
     CommandListRow .cmd-detail {
         width: 1fr;
-        color: #8ea2c8;
+        color: #8f9fc1;
     }
     CommandListRow.-highlighted .cmd-name {
-        color: #5eead4;
+        color: #e9e9e9;
     }
     CommandListRow.-highlighted .cmd-detail {
         color: #c8d4e8;
@@ -79,17 +103,37 @@ class CommandListRow(Horizontal):
         detail: str,
         *,
         highlighted: bool = False,
+        activatable: bool = False,
         id: str | None = None,
     ) -> None:
         super().__init__(id=id)
         self._name = name
         self._detail = detail
+        self._activatable = activatable
         if highlighted:
             self.add_class('-highlighted')
+        if activatable:
+            self.add_class('-activatable')
+            self.can_focus = True
 
     def compose(self) -> ComposeResult:
         yield Static(self._name, classes='cmd-name')
         yield Static(self._detail, classes='cmd-detail')
+
+    def on_click(self, event: events.Click) -> None:
+        if not self._activatable:
+            return
+        self.post_message(self.Activated(self._name))
+        event.prevent_default()
+        event.stop()
+
+    def on_key(self, event: events.Key) -> None:
+        if not self._activatable:
+            return
+        if event.key in ('enter', 'space'):
+            self.post_message(self.Activated(self._name))
+            event.prevent_default()
+            event.stop()
 
 
 class CommandListPanel(Vertical):
@@ -99,8 +143,8 @@ class CommandListPanel(Vertical):
     CommandListPanel {
         width: 100%;
         height: auto;
-        background: #07101d;
-        border: round #26324f;
+        background: #08101d;
+        border: round #1b233a;
         border-left: heavy #5eead4;
         padding: 1 0;
     }
@@ -121,17 +165,24 @@ class CommandListPanel(Vertical):
         if self._section_title:
             yield CommandListSection(self._section_title)
         for name, detail in self._rows:
-            yield CommandListRow(name, detail)
+            yield CommandListRow(name, detail, activatable=True)
+
+
+def slash_command_detail(name: str, syntax: str) -> str:
+    """Human detail for a slash command without repeating the command label."""
+    desc = SLASH_COMMAND_DESCRIPTIONS.get(name, '')
+    if syntax == name:
+        return desc or name
+    if syntax.startswith(name):
+        stripped = syntax[len(name) :].lstrip()
+        if stripped:
+            return stripped
+    return desc or syntax
 
 
 def build_slash_command_rows(hints: dict[str, str]) -> list[tuple[str, str]]:
     """Merge registry syntax hints with human descriptions."""
     rows: list[tuple[str, str]] = []
     for name in sorted(hints):
-        syntax = hints[name]
-        desc = SLASH_COMMAND_DESCRIPTIONS.get(name, '')
-        detail = syntax if syntax != name else desc
-        if desc and syntax != name and desc not in detail:
-            detail = f'{desc}  ·  {syntax}'
-        rows.append((name, detail))
+        rows.append((name, slash_command_detail(name, hints[name])))
     return rows

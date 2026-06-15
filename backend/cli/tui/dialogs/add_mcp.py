@@ -5,7 +5,7 @@ from __future__ import annotations
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
-from textual.widgets import Button, Input, Label
+from textual.widgets import Button, Input, Label, Static
 
 from backend.cli.tui.widgets.dialogs import ModalDialog
 
@@ -21,10 +21,14 @@ class GrintaAddMCPDialog(ModalDialog[dict[str, str] | None]):
     def compose(self) -> ComposeResult:
         with Vertical(id='dialog-container'):
             yield Label('Add MCP Server', id='dialog-title')
-            yield Label('Server Name', classes='field-label')
+            yield Static(
+                'Register a local command or remote endpoint for tool access.',
+                id='dialog-subtitle',
+            )
+            yield Label('Server name', classes='field-label')
             yield Input(id='mcp-name')
             yield Label(
-                'Command or URL (e.g. npx -y @modelcontextprotocol/server-postgres)',
+                'Command or HTTPS URL',
                 classes='field-label',
             )
             yield Input(id='mcp-command')

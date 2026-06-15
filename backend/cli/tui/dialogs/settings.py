@@ -9,7 +9,7 @@ from textual import work
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
-from textual.widgets import Button, Input, Label, Select
+from textual.widgets import Button, Input, Label, Select, Static
 
 from backend.cli.theme import NAVY_ERROR, NAVY_READY, NAVY_TEXT_MUTED
 from backend.cli.tui.widgets.dialogs import ModalDialog
@@ -140,6 +140,10 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
 
         with Vertical(id='dialog-container'):
             yield Label('Settings', id='dialog-title')
+            yield Static(
+                'Choose the provider, model, reasoning level, and optional API key.',
+                id='dialog-subtitle',
+            )
             yield Label(
                 f'Current {self._provider_label(current_provider)} API key: {masked_key}',
                 id='settings-current-key',

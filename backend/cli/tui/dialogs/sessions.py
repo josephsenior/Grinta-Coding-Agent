@@ -63,9 +63,15 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
         ]
         with Vertical(id='dialog-container'):
             yield Label('Sessions', id='dialog-title')
+            yield Static(
+                'Resume previous work, preview context, or clear old sessions.',
+                id='dialog-subtitle',
+            )
             with Horizontal(id='sessions-filters'):
                 yield Input(
-                    value=self._search, placeholder='Searchâ€¦', id='sessions-search'
+                    value=self._search,
+                    placeholder='Search sessions',
+                    id='sessions-search',
                 )
                 yield Select(
                     options=options,
@@ -194,10 +200,10 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
             entries = _filter_sessions_fuzzy(entries, self._search)
         self._visible_entries = entries[: self._limit]
         for i, (sid, meta, event_count) in enumerate(self._visible_entries, 1):
-            title = str(meta.get('title') or meta.get('name') or 'â€”')
-            updated = str(
-                meta.get('last_updated_at') or meta.get('created_at') or 'â€”'
-            )[:19]
+            title = str(meta.get('title') or meta.get('name') or '-')
+            updated = str(meta.get('last_updated_at') or meta.get('created_at') or '-')[
+                :19
+            ]
             table.add_row(str(i), sid[:12], title, str(event_count), updated, key=sid)
 
         if self._visible_entries:

@@ -79,8 +79,8 @@ class ScreenLifecycleMixin:
                         id='sidebar-tasks',
                     )
                     yield CollapsibleSection(
-                        title='MCP Servers (0)',
-                        content='No MCP servers configured',
+                        title='MCP Servers',
+                        content='Loading MCP servers...',
                         collapsed=False,
                         accent_color='#eacb8a',
                         section_icon='⬡',
@@ -89,7 +89,7 @@ class ScreenLifecycleMixin:
                     )
                     yield CollapsibleSection(
                         title='LSP Servers',
-                        content='Scanning local PATH…',
+                        content='Scanning local PATH...',
                         collapsed=False,
                         accent_color='#5eead4',
                         section_icon='◈',
@@ -97,7 +97,7 @@ class ScreenLifecycleMixin:
                     )
                     yield CollapsibleSection(
                         title='Skills',
-                        content='No skills available',
+                        content='Loading skills...',
                         collapsed=False,
                         accent_color='#c792ea',
                         section_icon='✦',
@@ -152,7 +152,7 @@ class ScreenLifecycleMixin:
                     display._load_earlier_button.remove()
                     display.set_load_earlier_button(None)
             else:
-                display._load_earlier_button.update('Load earlier messages...')
+                display._load_earlier_button.update('Load earlier messages')
         except Exception:
             pass
 
@@ -209,7 +209,11 @@ class ScreenLifecycleMixin:
         _tui_logger.debug('on_unmount: done')
 
     def show_help(self) -> None:
-        self.app.push_screen(GrintaHelpDialog())
+        def _on_help_dismiss(command: str | None) -> None:
+            if command:
+                self.apply_slash_command_from_palette(command)
+
+        self.app.push_screen(GrintaHelpDialog(), _on_help_dismiss)
 
     async def _bootstrap(self, session_id: str | None = None) -> None:
         _tui_logger.debug('_bootstrap: start')

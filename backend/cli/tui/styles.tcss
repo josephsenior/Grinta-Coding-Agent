@@ -92,7 +92,7 @@ CollapsibleSection:focus {
 
 /* ── Info Sidebar ──────────────────────────────────── */
 InfoSidebar {
-    background: #080c18;
+    background: #07101d;
     padding: 1 1;
     scrollbar-color: #64748b #0f172a;
     scrollbar-color-hover: #94a3b8 #0f172a;
@@ -193,7 +193,7 @@ SidebarRow.-read-only:hover {
 }
 
 #suggestions-list > ListItem.-highlighted CommandListRow .cmd-name {
-    color: #5eead4;
+    color: #e9e9e9;
 }
 
 #suggestions-list > ListItem.-highlighted CommandListRow .cmd-detail {
@@ -204,28 +204,29 @@ SidebarRow.-read-only:hover {
 WelcomeWidget {
     width: 100%;
     height: auto;
-    padding: 3 4 2 4;
+    padding: 2 3 2 3;
     margin: 2 1 0 0;
-    background: #07101d;
-    border: round #26324f;
+    background: #08101d;
+    border: round #1b233a;
     border-left: heavy #5eead4;
 }
 
 #welcome-header {
-    height: 1;
+    height: auto;
     color: #c8d4e8;
     text-style: none;
 }
 
 #welcome-subheader {
-    height: 1;
+    height: auto;
     color: #6f83aa;
     margin: 0 0 2 0;
 }
 
 .welcome-item {
-    height: 1;
-    padding: 0 0 0 2;
+    height: auto;
+    min-height: 2;
+    padding: 0 1 0 2;
     margin: 0 0 1 0;
 }
 
@@ -239,21 +240,27 @@ WelcomeWidget {
     margin: 0 0 1 0;
 }
 
-#welcome-slogan {
+#welcome-divider {
     height: 1;
+    color: #8f9fc1;
+    margin: 0 0 1 0;
+}
+
+#welcome-slogan {
+    height: auto;
     color: #c8d4e8;
     text-style: none;
 }
 
 #welcome-tagline {
-    height: 1;
+    height: auto;
     color: #6f83aa;
     text-style: italic;
     margin: 0 0 1 0;
 }
 
 #welcome-instruction {
-    height: 1;
+    height: auto;
     color: #6f83aa;
     margin: 0 0 2 0;
 }
@@ -744,7 +751,7 @@ GrintaSettingsDialog TextArea:focus {
 }
 
 #sessions-table {
-    height: 12;
+    height: 14;
     margin-bottom: 1;
     border: none;
 }
@@ -782,10 +789,10 @@ CommandListPanel {
 #sessions-preview {
     height: auto;
     max-height: 10;
-    border: round #26324f;
+    border: round #1b233a;
     border-left: heavy #5eead4;
     padding: 1 2;
-    background: #07101d;
+    background: #08101d;
     color: #cbd5e1;
 }
 

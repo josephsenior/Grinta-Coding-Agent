@@ -7,10 +7,11 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, Label, Static
 
 from backend.cli.theme import NAVY_TEXT_MUTED
+from backend.cli.tui.widgets.command_list import CommandListRow
 from backend.cli.tui.widgets.dialogs import ModalDialog
 
 
-class GrintaHelpDialog(ModalDialog[None]):
+class GrintaHelpDialog(ModalDialog[str | None]):
     """Dedicated help and shortcuts modal."""
 
     def compose(self) -> ComposeResult:
@@ -27,7 +28,7 @@ class GrintaHelpDialog(ModalDialog[None]):
         with Vertical(id='dialog-container'):
             yield Label('Help', id='dialog-title')
             yield Static(
-                f'[{NAVY_TEXT_MUTED}]Use the transcript for evidence and the HUD for runtime state.[/]',
+                f'[{NAVY_TEXT_MUTED}]Slash commands, navigation, and workspace controls.[/]',
                 id='dialog-subtitle',
             )
             with Vertical(id='help-body'):
@@ -44,6 +45,11 @@ class GrintaHelpDialog(ModalDialog[None]):
 
     def on_mount(self) -> None:
         self.query_one('#help-close', Button).focus()
+
+    def on_command_list_row_activated(
+        self, event: CommandListRow.Activated
+    ) -> None:
+        self.dismiss(event.command)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == 'help-close':
