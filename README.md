@@ -12,7 +12,7 @@
 [![CLI Regression](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/e2e-tests.yml/badge.svg)](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/e2e-tests.yml)
 [![Release Stage: RC](https://img.shields.io/badge/release_stage-RC-orange)](https://github.com/josephsenior/Grinta-Coding-Agent/releases/tag/v1.0.0-rc1)
 
-> **Local-first. Provider-agnostic. Ships with real LSP + DAP. Small base wheel.**
+> **Local-first. Provider-agnostic. Ships with real LSP + DAP. Optional extras stay opt-in.**
 >
 > A terminal coding agent that plans, executes, validates, and finishes — without a cloud control plane, without lock-in to one model vendor, and without the old heavyweight install footprint.
 >
@@ -35,7 +35,6 @@ Direct link if the animation does not load: [`docs/grinta-demo.gif`](docs/grinta
 
 |                                                                                   | **Grinta**          | Aider   | Claude Code       | Codex CLI      |
 | --------------------------------------------------------------------------------- | ------------------- | ------- | ----------------- | -------------- |
-| Install footprint                                                                 | **small wheel; ~150 MB base env** | ~80 MB  | ~15 MB            | ~12 MB         |
 | Provider-agnostic (OpenAI / Anthropic / Google / Ollama / LM Studio / OpenRouter) | ✅                  | ✅      | ❌ Anthropic only | ❌ OpenAI only |
 | Local-first (works fully offline w/ Ollama)                                       | ✅ auto-detected    | partial | ❌                | ❌             |
 | LSP integration (auto-discovers 17 servers)                                       | ✅                  | ❌      | partial           | ❌             |
@@ -50,6 +49,8 @@ Direct link if the animation does not load: [`docs/grinta-demo.gif`](docs/grinta
 The pitch in one sentence: **everything Aider's local-first ethos gives you, plus the depth of tooling Claude Code has, without locking you to a single model vendor.**
 
 ## Install in 30 seconds
+
+Prerequisites: Python 3.12+ and `pipx`.
 
 ```bash
 pipx install grinta-ai          # base install; optional extras stay opt-in
@@ -66,7 +67,7 @@ pipx install "grinta-ai[browser]"    # adds browser-use for web automation
 pipx install "grinta-ai[all]"        # everything
 ```
 
-That is the whole setup. The `grinta init` wizard configures provider, model, and key; local Ollama, LM Studio, and vLLM models can also be discovered with `python -m backend.inference.discover_models` from a source checkout. Installed runs use `~/.grinta/settings.json`; source checkouts use the repository `settings.json`; `APP_ROOT` can intentionally override that root. Other install paths (uv, Homebrew, Scoop, and experimental Docker image usage) are in [docs/INSTALL.md](docs/INSTALL.md).
+The base install keeps RAG, document parsing, and browser automation out of the default wheel, but the isolated Python environment is still about 150 MB before opt-in extras. The `grinta init` wizard configures provider, model, and key; local Ollama, LM Studio, and vLLM models can also be discovered with `uv run python -m backend.inference.discover_models` from a source checkout. Installed runs use `~/.grinta/settings.json`; source checkouts use the repository `settings.json`; `APP_ROOT` can intentionally override that root. Other install paths (uv, Homebrew, Scoop, and experimental Docker image usage) are in [docs/INSTALL.md](docs/INSTALL.md).
 
 ## What you get
 
