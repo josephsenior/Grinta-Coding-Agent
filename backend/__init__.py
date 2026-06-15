@@ -2,15 +2,48 @@
 
 import warnings
 
-# Kill ALL third-party DeprecationWarnings before anything else runs.
-# The asttokens/astroid warning fires from frozen importlib frames and
-# can't be caught by module-based filters.
-warnings.filterwarnings('ignore', category=DeprecationWarning)
+# Suppress only known, specific third-party DeprecationWarnings.
+# Do NOT use a blanket `category=DeprecationWarning` filter — that silences
+# warnings from Grinta's own code and newly added dependencies too.
+#
+# Pattern: warnings.filterwarnings('ignore', message=<regex>, category=DeprecationWarning, module=<regex>)
+# Add a new entry for each third-party library that produces noise, scoped as
+# narrowly as possible (prefer `module=` + `message=` over category-only).
+
+# asttokens / astroid: fires from frozen importlib frames; cannot be caught by
+# module-based filters alone because the source frame is internal to importlib.
+warnings.filterwarnings(
+    'ignore',
+    message=r'.*asttokens.*',
+    category=DeprecationWarning,
+)
+warnings.filterwarnings(
+    'ignore',
+    message=r'.*astroid.*',
+    category=DeprecationWarning,
+)
+
 # google-genai (Gemini SDK) subclasses aiohttp.ClientSession — noisy on import.
 warnings.filterwarnings(
     'ignore',
     message=r'Inheritance class AiohttpClientSession from ClientSession is discouraged',
     category=DeprecationWarning,
+)
+
+# anthropic SDK: uses deprecated pkg_resources internals in some versions.
+warnings.filterwarnings(
+    'ignore',
+    message=r'.*pkg_resources.*',
+    category=DeprecationWarning,
+    module=r'anthropic.*',
+)
+
+# tree-sitter <0.25 exposes a deprecated Language constructor form.
+warnings.filterwarnings(
+    'ignore',
+    message=r'.*Language\(\) with a shared library.*',
+    category=DeprecationWarning,
+    module=r'tree_sitter.*',
 )
 
 from importlib.metadata import PackageNotFoundError, version  # noqa: E402
