@@ -18,6 +18,12 @@ monolith is split, the manifest tells us which files import the
 target module and which names they reach for, so the re-export shim
 for the old path can be planned with zero guesswork.
 
+## `confirmation-autonomy.md`
+
+The architecture note for the confirmation-state ownership fix. It records why
+orchestration is the only layer allowed to set `AWAITING_CONFIRMATION`, and why
+runtime execution only reads that state or blocks unsafe actions.
+
 ### How to regenerate
 
 ```bash
