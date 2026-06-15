@@ -212,6 +212,8 @@ class ActionRenderersMixin(_ActionRenderersBase):
         'create_file': ('Created', False),
         'replace_string': ('Edited', False),
         'multi_edit': ('Edited', False),
+        'edit': ('Edited', False),
+        'insert_text': ('Edited', False),
     }
 
     def _handle_agent_action(self, action: Action) -> None:

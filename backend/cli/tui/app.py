@@ -88,8 +88,8 @@ class GrintaScreen(
         Binding('ctrl+space', 'complete_command', 'Complete', show=False),
         Binding('ctrl+z', 'suspend', 'Suspend', show=False),
         Binding('enter', 'submit_input', 'Send', show=False, priority=True),
-        Binding('pageup', 'scroll_up', 'Scroll Up', show=False),
-        Binding('pagedown', 'scroll_down', 'Scroll Down', show=False),
+        Binding('pageup', 'scroll_up', 'Scroll Up', show=False, priority=True),
+        Binding('pagedown', 'scroll_down', 'Scroll Down', show=False, priority=True),
         Binding('home', 'scroll_home', 'Top', show=False),
         Binding('end', 'scroll_end', 'Bottom', show=False),
         Binding('ctrl+b', 'toggle_sidebar', 'Toggle Sidebar', show=True),
@@ -236,6 +236,8 @@ class TUIRenderer(
         'create_file': ('Created', False),
         'replace_string': ('Edited', False),
         'multi_edit': ('Edited', False),
+        'edit': ('Edited', False),
+        'insert_text': ('Edited', False),
     }
 
     def __init__(

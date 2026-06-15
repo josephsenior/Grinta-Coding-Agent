@@ -144,16 +144,19 @@ class _AppRendererLiveMixin:
             return
 
         def _follow_after_reflow() -> None:
+            if getattr(display, '_user_scrolled_away', False):
+                return
             # call_after_refresh already runs after the layout reflow that
             # updates max_scroll_y, so a single scroll is sufficient. Avoid
             # piling extra call_soon callbacks onto the event loop.
-            force_scroll_end = getattr(display, 'force_scroll_end', None)
-            if callable(force_scroll_end):
-                force_scroll_end(animate=False)
-                return
-            follow_tail = getattr(display, 'follow_tail', None)
-            if callable(follow_tail):
-                follow_tail()
+            try:
+                display._suppress_scroll_sync = True
+                display.scroll_end(animate=False, force=True, immediate=True)
+                display.call_after_refresh(display._release_programmatic_scroll)
+            except Exception:
+                follow_tail = getattr(display, 'follow_tail', None)
+                if callable(follow_tail):
+                    follow_tail()
 
         display.call_after_refresh(_follow_after_reflow)
 

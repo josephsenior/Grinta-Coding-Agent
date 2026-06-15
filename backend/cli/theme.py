@@ -264,7 +264,7 @@ def _apply_theme_overrides() -> None:
         CLR_CARD_TITLE = 'bold #91abec'
         CLR_THINKING_BORDER = '#1b233a'
         CLR_LIVE_PANEL_BORDER = '#1b233a'
-        CLR_THOUGHT_BODY = 'dim white'
+        CLR_THOUGHT_BODY = '#65737e'
         CLR_SECTION_RULE = '#32416a'
         CLR_RISK_HIGH = 'bold #fd8383'
         CLR_RISK_MEDIUM = '#f6ff8f'
@@ -491,7 +491,7 @@ CLR_SPINNER = '#91abec'  # spinner icon (matches brand blue)
 CLR_ACTION = 'bold #e9e9e9'  # current action label text
 CLR_THINKING_BORDER = '#1b233a'  # reasoning / live panel border accent (navy)
 CLR_LIVE_PANEL_BORDER = '#1b233a'  # Live Rich block border
-CLR_THOUGHT_BODY = '#8f9fc1'  # Live Thinking + flushed reasoning snapshot (dim blue)
+CLR_THOUGHT_BODY = '#65737e'  # Live Thinking + flushed reasoning snapshot (dim slate)
 CLR_REASONING_SNAP = CLR_THOUGHT_BODY  # legacy alias; keep in sync
 CLR_DRAFT_BORDER = '#91abec'  # draft reply preview border accent (brand blue)
 CLR_DECISION_BORDER = '#f6ff8f'  # approval / question / options accent (lime yellow)
@@ -632,8 +632,16 @@ NAVY_READY_OLD = '#99c794'  # old green — used in theme.py presets
 NAVY_RUNNING_OLD = '#5fb3b3'  # old teal
 
 
+def _sync_theme_aliases() -> None:
+    """Keep legacy theme aliases aligned after preset overrides."""
+    global CLR_REASONING_SNAP, CLR_REASONING_COMMITTED
+    CLR_REASONING_SNAP = CLR_THOUGHT_BODY
+    CLR_REASONING_COMMITTED = CLR_THOUGHT_BODY
+
+
 # Apply theme preset overrides after all constants are defined.
 _apply_theme_overrides()
+_sync_theme_aliases()
 
 
 def grinta_rich_theme_styles() -> dict[str, str]:

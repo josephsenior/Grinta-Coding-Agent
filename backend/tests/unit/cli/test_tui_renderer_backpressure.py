@@ -161,6 +161,44 @@ def test_tui_renderer_committed_thinking_uses_muted_reasoning_style():
     assert any(span.style == CLR_REASONING_SNAP for span in snapshot.spans)
 
 
+def test_live_follow_tail_rechecks_manual_scroll_before_repaint():
+    callbacks = []
+
+    class Display:
+        _user_scrolled_away = False
+        _suppress_scroll_sync = False
+        scroll_calls = 0
+
+        def call_after_refresh(self, callback):
+            callbacks.append(callback)
+
+        def scroll_end(self, **_kwargs):
+            self.scroll_calls += 1
+
+        def _release_programmatic_scroll(self):
+            self._suppress_scroll_sync = False
+
+    display = Display()
+    renderer = tui_app.TUIRenderer(
+        console=SimpleNamespace(width=100),
+        hud=SimpleNamespace(
+            state=SimpleNamespace(mcp_servers=0), bundled_skill_count=0
+        ),
+        reasoning=SimpleNamespace(),
+        tui=SimpleNamespace(),
+        loop=MagicMock(),
+    )
+
+    renderer._follow_transcript_tail_after_reflow(display)
+    display._user_scrolled_away = True
+
+    for callback in list(callbacks):
+        callback()
+
+    assert display.scroll_calls == 0
+    assert display._suppress_scroll_sync is False
+
+
 @pytest.mark.asyncio
 async def test_tui_renderer_live_response_renders_in_main_panel_until_clear():
     display = MagicMock()

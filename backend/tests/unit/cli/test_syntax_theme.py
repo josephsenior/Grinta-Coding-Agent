@@ -17,7 +17,7 @@ from backend.cli.syntax_theme import (
     invalidate_grinta_syntax_theme_cache,
     resolve_syntax_colors,
 )
-from backend.cli.theme import grinta_rich_theme_styles
+from backend.cli.theme import CLR_REASONING_SNAP, grinta_rich_theme_styles
 from backend.cli.tui._render_prep import (
     prep_markdown,
     prep_streaming_renderable,
@@ -108,6 +108,28 @@ def test_prep_streaming_inline_code():
     ]
     assert any('101829' in str(style) for style in styles)
     assert all(style.bold is not True for style in styles)
+
+
+def test_prep_streaming_inline_code_can_use_reasoning_base_style():
+    renderable = prep_streaming_renderable(
+        'Use `my_func` here', base_text_style=CLR_REASONING_SNAP
+    )
+    console = Console(force_terminal=True, color_system='truecolor', width=80)
+    rendered = list(console.render(renderable, console.options.update_width(80)))
+
+    prose_styles = [
+        style
+        for text, style, _ in rendered
+        if style and text.strip() in {'Use', 'here'}
+    ]
+    code_styles = [
+        style for text, style, _ in rendered if style and text.strip() == 'my_func'
+    ]
+
+    expected_color = CLR_REASONING_SNAP.split()[-1].lstrip('#')
+    assert prose_styles
+    assert all(expected_color in str(style.color) for style in prose_styles)
+    assert any('101829' in str(style) for style in code_styles)
 
 
 def test_grinta_syntax_theme_has_no_bold_tokens():

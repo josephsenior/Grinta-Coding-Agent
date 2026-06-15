@@ -268,6 +268,39 @@ class ActivityCard(Container):
         border: round #3a3d5a;
         background: #080a14;
     }
+    ActivityCard.-collapsed {
+        border: none;
+        border-left: solid #1b233a;
+        padding: 0 1 0 1;
+    }
+    ActivityCard.-collapsed:focus {
+        border-left: solid #4a5f99;
+    }
+    ActivityCard.-collapsed:hover {
+        border-left: solid #26365b;
+    }
+    ActivityCard.-collapsed.-category-shell,
+    ActivityCard.-collapsed.-category-terminal {
+        border-left: solid #24385c;
+    }
+    ActivityCard.-collapsed.-category-grep,
+    ActivityCard.-collapsed.-category-glob,
+    ActivityCard.-collapsed.-category-search,
+    ActivityCard.-collapsed.-category-find_symbols,
+    ActivityCard.-collapsed.-category-read_symbols,
+    ActivityCard.-collapsed.-category-analyze {
+        border-left: solid #2d4a6a;
+    }
+    ActivityCard.-collapsed.-category-web_search,
+    ActivityCard.-collapsed.-category-web_fetch {
+        border-left: solid #3a4a6a;
+    }
+    ActivityCard.-collapsed.-category-browser {
+        border-left: solid #3d5a4a;
+    }
+    ActivityCard.-collapsed.-category-mcp {
+        border-left: solid #3a3d5a;
+    }
     ActivityCard #collapsed-row-container {
         width: 100%;
         height: 1;
@@ -1272,7 +1305,9 @@ class ThinkingIndicator(Container):
         prefix = Text.assemble((f'{self._current_action}: ', prefix_color))
 
         if '```' in full_text or '`' in full_text:
-            body = prep_streaming_renderable(full_text)
+            body = prep_streaming_renderable(
+                full_text, base_text_style=CLR_REASONING_SNAP
+            )
             content.update(Group(prefix, body))
             return
 

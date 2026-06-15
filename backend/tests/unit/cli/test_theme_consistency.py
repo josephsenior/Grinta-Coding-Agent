@@ -37,6 +37,13 @@ def test_prompt_marker_uses_theme_constant() -> None:
     assert mark_prompt() in repl._prompt_message()
 
 
+def test_reasoning_aliases_track_thought_body_after_theme_overrides() -> None:
+    from backend.cli import theme as theme_mod
+
+    assert theme_mod.CLR_REASONING_SNAP == theme_mod.CLR_THOUGHT_BODY
+    assert theme_mod.CLR_REASONING_COMMITTED == theme_mod.CLR_THOUGHT_BODY
+
+
 def test_prompt_stats_row2_omits_mcp_and_skills_by_default() -> None:
     fields = StatusFields(
         provider='openai',

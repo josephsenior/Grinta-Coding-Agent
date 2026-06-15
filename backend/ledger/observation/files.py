@@ -59,7 +59,7 @@ class FileEditObservation(Observation):
     """
 
     path: str = ''
-    prev_exist: bool = False
+    prev_exist: bool = True
     old_content: str | None = None
     new_content: str | None = None
     impl_source: FileEditSource = FileEditSource.FILE_EDITOR
