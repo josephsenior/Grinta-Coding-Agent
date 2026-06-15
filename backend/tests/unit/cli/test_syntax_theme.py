@@ -18,7 +18,7 @@ from backend.cli.syntax_theme import (
     resolve_syntax_colors,
 )
 from backend.cli.theme import CLR_REASONING_SNAP, grinta_rich_theme_styles
-from backend.cli.tui._render_prep import (
+from backend.cli.tui.renderer.prep import (
     prep_markdown,
     prep_streaming_renderable,
     streaming_render_interval,

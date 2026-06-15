@@ -2,7 +2,7 @@
 
 from textual.app import App, ComposeResult
 
-from backend.cli._event_renderer.unified_renderer import ActivityRenderer
+from backend.cli.event_rendering.unified_renderer import ActivityRenderer
 
 
 class TestApp(App):

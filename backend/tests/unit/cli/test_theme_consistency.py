@@ -5,9 +5,9 @@ from typing import cast
 from unittest.mock import MagicMock
 
 from backend.cli.repl import Repl
-from backend.cli.status_chrome import StatusFields, pt_stats_row2_fragments
+from backend.cli.display.status_chrome import StatusFields, pt_stats_row2_fragments
 from backend.cli.theme import mark_err, mark_info, mark_ok, mark_prompt
-from backend.cli.transcript import format_activity_result_secondary
+from backend.cli.display.transcript import format_activity_result_secondary
 from backend.core.config import AppConfig
 
 
@@ -79,17 +79,18 @@ def test_prompt_stats_row2_omits_mcp_and_skills_by_default() -> None:
 
 def test_core_cli_renderers_avoid_raw_style_literals() -> None:
     repo = Path(__file__).resolve().parents[4]
-    targets = (
-        repo / 'backend/cli/transcript.py',
+    targets = [
+        repo / 'backend/cli/display/transcript.py',
         repo / 'backend/cli/event_renderer.py',
-        repo / 'backend/cli/confirmation.py',
-        repo / 'backend/cli/_event_renderer/panels.py',
-        repo / 'backend/cli/_event_renderer/action_renderers_mixin.py',
-        repo / 'backend/cli/session_manager.py',
-        repo / 'backend/cli/diff_renderer.py',
+        repo / 'backend/cli/settings/confirmation.py',
+        repo / 'backend/cli/event_rendering/panels.py',
+        repo / 'backend/cli/session/session_manager.py',
+        repo / 'backend/cli/display/diff_renderer.py',
         repo / 'backend/cli/storage_cleanup.py',
-        repo / 'backend/cli/_repl/run_helpers_mixin.py',
-    )
+        repo / 'backend/cli/repl/run_helpers_mixin.py',
+    ]
+    targets.extend((repo / 'backend/cli/event_rendering/actions').glob('*.py'))
+    targets.extend((repo / 'backend/cli/event_rendering/observations').glob('*.py'))
     banned = ("style='dim'", "style='default'", "style='bold'", "style='bold dim'")
     for path in targets:
         content = path.read_text(encoding='utf-8')

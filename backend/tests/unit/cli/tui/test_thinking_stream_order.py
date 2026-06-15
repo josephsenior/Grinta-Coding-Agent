@@ -7,8 +7,8 @@ import pytest
 from rich.console import Console as RichConsole
 from textual.widgets import Static
 
-from backend.cli.hud import HUDBar
-from backend.cli.reasoning_display import ReasoningDisplay
+from backend.cli.display.hud import HUDBar
+from backend.cli.display.reasoning_display import ReasoningDisplay
 from backend.cli.tui.app import GrintaScreen, TUIRenderer
 from backend.cli.tui.main import GrintaTUIApp
 from backend.cli.tui.widgets.activity_card import (

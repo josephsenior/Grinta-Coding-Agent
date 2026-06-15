@@ -216,7 +216,7 @@ def _pin_project(project: str | None) -> None:
 def _run_init(_args: argparse.Namespace) -> int:
     from rich.console import Console
 
-    from backend.cli.init_wizard import run_init
+    from backend.cli.onboarding.init_wizard import run_init
     from backend.cli.theme import no_color_enabled
 
     project = getattr(_args, 'project', None)
@@ -230,7 +230,7 @@ def _run_init(_args: argparse.Namespace) -> int:
 def _run_sessions(args: argparse.Namespace) -> int:
     from rich.console import Console
 
-    from backend.cli import sessions_cli
+    from backend.cli.session import sessions_cli
     from backend.cli.theme import no_color_enabled
 
     _pin_project(getattr(args, 'project', None))

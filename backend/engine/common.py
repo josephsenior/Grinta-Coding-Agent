@@ -290,7 +290,7 @@ def _coerce_visible_message_content_text(content: Any) -> str:
     text = _coerce_message_content_text(content)
     if not text:
         return ''
-    from backend.cli.tool_call_display import redact_streamed_tool_call_markers
+    from backend.cli.display.tool_call_display import redact_streamed_tool_call_markers
 
     return redact_streamed_tool_call_markers(text).strip()
 
@@ -559,7 +559,7 @@ def _extract_text_marker_tool_calls_from_content(content_text: str) -> list[Any]
         and '<invoke' not in lowered
     ):
         return []
-    from backend.cli.tool_call_display import extract_tool_calls_from_text_markers
+    from backend.cli.display.tool_call_display import extract_tool_calls_from_text_markers
 
     tool_calls = extract_tool_calls_from_text_markers(content_text)
     return [

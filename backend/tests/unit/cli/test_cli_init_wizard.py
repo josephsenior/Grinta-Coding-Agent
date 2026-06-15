@@ -1,4 +1,4 @@
-"""Tests for backend.cli.init_wizard."""
+"""Tests for backend.cli.onboarding.init_wizard."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from rich.console import Console
 
-from backend.cli.init_wizard import (
+from backend.cli.onboarding.init_wizard import (
     _collect_api_key,
     _confirm_overwrite_existing,
     _detect_local,
@@ -29,7 +29,7 @@ def _quiet_console() -> Console:
 
 def _patch_settings_path(path: Path):
     return patch(
-        'backend.cli.init_wizard.get_canonical_settings_path', return_value=str(path)
+        'backend.cli.onboarding.init_wizard.get_canonical_settings_path', return_value=str(path)
     )
 
 
@@ -64,50 +64,50 @@ class TestHttpOk:
 
 class TestOllamaRunning:
     def test_running(self) -> None:
-        with patch('backend.cli.init_wizard._http_ok', return_value=True):
+        with patch('backend.cli.onboarding.init_wizard._http_ok', return_value=True):
             assert _ollama_running('http://localhost:11434') is True
 
     def test_not_running(self) -> None:
-        with patch('backend.cli.init_wizard._http_ok', return_value=False):
+        with patch('backend.cli.onboarding.init_wizard._http_ok', return_value=False):
             assert _ollama_running('http://localhost:11434') is False
 
 
 class TestLmstudioRunning:
     def test_running(self) -> None:
-        with patch('backend.cli.init_wizard._http_ok', return_value=True):
+        with patch('backend.cli.onboarding.init_wizard._http_ok', return_value=True):
             assert _lmstudio_running('http://localhost:1234/v1') is True
 
     def test_not_running(self) -> None:
-        with patch('backend.cli.init_wizard._http_ok', return_value=False):
+        with patch('backend.cli.onboarding.init_wizard._http_ok', return_value=False):
             assert _lmstudio_running('http://localhost:1234/v1') is False
 
 
 class TestDetectLocal:
     def test_none_detected(self) -> None:
         with (
-            patch('backend.cli.init_wizard._ollama_running', return_value=False),
-            patch('backend.cli.init_wizard._lmstudio_running', return_value=False),
+            patch('backend.cli.onboarding.init_wizard._ollama_running', return_value=False),
+            patch('backend.cli.onboarding.init_wizard._lmstudio_running', return_value=False),
         ):
             assert _detect_local() == []
 
     def test_ollama_detected(self) -> None:
         with (
-            patch('backend.cli.init_wizard._ollama_running', return_value=True),
-            patch('backend.cli.init_wizard._lmstudio_running', return_value=False),
+            patch('backend.cli.onboarding.init_wizard._ollama_running', return_value=True),
+            patch('backend.cli.onboarding.init_wizard._lmstudio_running', return_value=False),
         ):
             assert _detect_local() == ['ollama']
 
     def test_lmstudio_detected(self) -> None:
         with (
-            patch('backend.cli.init_wizard._ollama_running', return_value=False),
-            patch('backend.cli.init_wizard._lmstudio_running', return_value=True),
+            patch('backend.cli.onboarding.init_wizard._ollama_running', return_value=False),
+            patch('backend.cli.onboarding.init_wizard._lmstudio_running', return_value=True),
         ):
             assert _detect_local() == ['lmstudio']
 
     def test_both_detected(self) -> None:
         with (
-            patch('backend.cli.init_wizard._ollama_running', return_value=True),
-            patch('backend.cli.init_wizard._lmstudio_running', return_value=True),
+            patch('backend.cli.onboarding.init_wizard._ollama_running', return_value=True),
+            patch('backend.cli.onboarding.init_wizard._lmstudio_running', return_value=True),
         ):
             result = _detect_local()
             assert 'ollama' in result
@@ -208,7 +208,7 @@ class TestRunInit:
     ):
         """Return a context-manager-like patch stack for Prompt/Confirm."""
         return [
-            patch('backend.cli.init_wizard._detect_local', return_value=[]),
+            patch('backend.cli.onboarding.init_wizard._detect_local', return_value=[]),
             patch(
                 'rich.prompt.Prompt.ask',
                 side_effect=[provider, model, api_key, base_url],
@@ -222,7 +222,7 @@ class TestRunInit:
         settings_file = tmp_path / 'settings.json'
         monkeypatch.delenv('OPENAI_API_KEY', raising=False)
         with (
-            patch('backend.cli.init_wizard._detect_local', return_value=[]),
+            patch('backend.cli.onboarding.init_wizard._detect_local', return_value=[]),
             patch(
                 'rich.prompt.Prompt.ask',
                 side_effect=['openai', 'openai/gpt-4o-mini', 'sk-test', ''],
@@ -267,7 +267,7 @@ class TestRunInit:
         )
         with (
             patch('rich.prompt.Confirm.ask', return_value=True),
-            patch('backend.cli.init_wizard._detect_local', return_value=[]),
+            patch('backend.cli.onboarding.init_wizard._detect_local', return_value=[]),
             patch(
                 'rich.prompt.Prompt.ask',
                 side_effect=[
@@ -288,7 +288,7 @@ class TestRunInit:
         console = _quiet_console()
         settings_file = tmp_path / 'settings.json'
         with (
-            patch('backend.cli.init_wizard._detect_local', return_value=['ollama']),
+            patch('backend.cli.onboarding.init_wizard._detect_local', return_value=['ollama']),
             patch(
                 'rich.prompt.Prompt.ask',
                 side_effect=['ollama', 'ollama/llama3.2', '', 'http://localhost:11434'],
@@ -308,7 +308,7 @@ class TestRunInit:
         docs.mkdir()
         (docs / 'SECURITY_CHECKLIST.md').write_text('checklist', encoding='utf-8')
         with (
-            patch('backend.cli.init_wizard._detect_local', return_value=[]),
+            patch('backend.cli.onboarding.init_wizard._detect_local', return_value=[]),
             patch(
                 'rich.prompt.Prompt.ask',
                 side_effect=['openai', 'openai/gpt-4o-mini', 'sk', ''],
@@ -325,7 +325,7 @@ class TestRunInit:
         console = _quiet_console()
         settings_file = tmp_path / 'settings.json'
         with (
-            patch('backend.cli.init_wizard._detect_local', return_value=[]),
+            patch('backend.cli.onboarding.init_wizard._detect_local', return_value=[]),
             patch(
                 'rich.prompt.Prompt.ask',
                 side_effect=['openai', 'openai/gpt-4o-mini', 'sk', ''],

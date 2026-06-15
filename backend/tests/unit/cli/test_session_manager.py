@@ -1,4 +1,4 @@
-"""Tests for backend.cli.session_manager."""
+"""Tests for backend.cli.session.session_manager."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 from rich.console import Console
 
-from backend.cli.session_manager import (
+from backend.cli.session.session_manager import (
     _count_events,
     _list_session_entries,
     _load_metadata,
@@ -142,14 +142,14 @@ class TestListSessions:
     def test_no_storage_found(self) -> None:
         console = _quiet_console()
         with patch(
-            'backend.cli.session_manager._find_sessions_root', return_value=None
+            'backend.cli.session.session_manager._find_sessions_root', return_value=None
         ):
             list_sessions(console)  # Should not raise
 
     def test_no_sessions(self, tmp_path: Path) -> None:
         console = _quiet_console()
         with patch(
-            'backend.cli.session_manager._find_sessions_root', return_value=tmp_path
+            'backend.cli.session.session_manager._find_sessions_root', return_value=tmp_path
         ):
             list_sessions(console)  # Empty dir â€” should not raise
 
@@ -167,7 +167,7 @@ class TestListSessions:
         )
         console = _quiet_console()
         with patch(
-            'backend.cli.session_manager._find_sessions_root', return_value=tmp_path
+            'backend.cli.session.session_manager._find_sessions_root', return_value=tmp_path
         ):
             list_sessions(console, limit=5)  # Should not raise
 
@@ -180,7 +180,7 @@ class TestListSessions:
             )
         console = _quiet_console()
         with patch(
-            'backend.cli.session_manager._find_sessions_root', return_value=tmp_path
+            'backend.cli.session.session_manager._find_sessions_root', return_value=tmp_path
         ):
             list_sessions(console, limit=2)  # Should not raise
 
@@ -199,7 +199,7 @@ class TestGetSessionIdByIndex:
             tmp_path, 'sess-bbb', {'last_updated_at': '2024-01-01T00:00:00'}
         )
         with patch(
-            'backend.cli.session_manager._find_sessions_root', return_value=tmp_path
+            'backend.cli.session.session_manager._find_sessions_root', return_value=tmp_path
         ):
             result = get_session_id_by_index(1)
         assert result == 'sess-aaa'
@@ -212,7 +212,7 @@ class TestGetSessionIdByIndex:
             tmp_path, 'sess-bbb', {'last_updated_at': '2024-01-01T00:00:00'}
         )
         with patch(
-            'backend.cli.session_manager._find_sessions_root', return_value=tmp_path
+            'backend.cli.session.session_manager._find_sessions_root', return_value=tmp_path
         ):
             result = get_session_id_by_index(2)
         assert result == 'sess-bbb'
@@ -220,14 +220,14 @@ class TestGetSessionIdByIndex:
     def test_out_of_range(self, tmp_path: Path) -> None:
         _make_session_dir(tmp_path, 'sess-aaa', {})
         with patch(
-            'backend.cli.session_manager._find_sessions_root', return_value=tmp_path
+            'backend.cli.session.session_manager._find_sessions_root', return_value=tmp_path
         ):
             result = get_session_id_by_index(99)
         assert result is None
 
     def test_no_storage(self) -> None:
         with patch(
-            'backend.cli.session_manager._find_sessions_root', return_value=None
+            'backend.cli.session.session_manager._find_sessions_root', return_value=None
         ):
             assert get_session_id_by_index(1) is None
 
@@ -240,7 +240,7 @@ class TestGetSessionIdByIndex:
 class TestResolveSessionId:
     def test_empty_target(self) -> None:
         with patch(
-            'backend.cli.session_manager._find_sessions_root', return_value=None
+            'backend.cli.session.session_manager._find_sessions_root', return_value=None
         ):
             sid, err = resolve_session_id('')
         assert sid is None
@@ -248,7 +248,7 @@ class TestResolveSessionId:
 
     def test_no_storage(self) -> None:
         with patch(
-            'backend.cli.session_manager._find_sessions_root', return_value=None
+            'backend.cli.session.session_manager._find_sessions_root', return_value=None
         ):
             sid, err = resolve_session_id('abc')
         assert sid is None
@@ -256,7 +256,7 @@ class TestResolveSessionId:
 
     def test_no_sessions(self, tmp_path: Path) -> None:
         with patch(
-            'backend.cli.session_manager._find_sessions_root', return_value=tmp_path
+            'backend.cli.session.session_manager._find_sessions_root', return_value=tmp_path
         ):
             sid, err = resolve_session_id('1')
         assert sid is None
@@ -265,7 +265,7 @@ class TestResolveSessionId:
     def test_by_index(self, tmp_path: Path) -> None:
         _make_session_dir(tmp_path, 'sess-abc', {})
         with patch(
-            'backend.cli.session_manager._find_sessions_root', return_value=tmp_path
+            'backend.cli.session.session_manager._find_sessions_root', return_value=tmp_path
         ):
             sid, err = resolve_session_id('1')
         assert sid == 'sess-abc'
@@ -274,7 +274,7 @@ class TestResolveSessionId:
     def test_by_exact_id(self, tmp_path: Path) -> None:
         _make_session_dir(tmp_path, 'sess-abc123', {})
         with patch(
-            'backend.cli.session_manager._find_sessions_root', return_value=tmp_path
+            'backend.cli.session.session_manager._find_sessions_root', return_value=tmp_path
         ):
             sid, err = resolve_session_id('sess-abc123')
         assert sid == 'sess-abc123'
@@ -283,7 +283,7 @@ class TestResolveSessionId:
     def test_by_prefix(self, tmp_path: Path) -> None:
         _make_session_dir(tmp_path, 'sess-abcdef', {})
         with patch(
-            'backend.cli.session_manager._find_sessions_root', return_value=tmp_path
+            'backend.cli.session.session_manager._find_sessions_root', return_value=tmp_path
         ):
             sid, err = resolve_session_id('sess-abc')
         assert sid == 'sess-abcdef'
@@ -292,7 +292,7 @@ class TestResolveSessionId:
     def test_index_out_of_range(self, tmp_path: Path) -> None:
         _make_session_dir(tmp_path, 'sess-abc', {})
         with patch(
-            'backend.cli.session_manager._find_sessions_root', return_value=tmp_path
+            'backend.cli.session.session_manager._find_sessions_root', return_value=tmp_path
         ):
             sid, err = resolve_session_id('99')
         assert sid is None
@@ -302,7 +302,7 @@ class TestResolveSessionId:
         _make_session_dir(tmp_path, 'sess-abc1', {})
         _make_session_dir(tmp_path, 'sess-abc2', {})
         with patch(
-            'backend.cli.session_manager._find_sessions_root', return_value=tmp_path
+            'backend.cli.session.session_manager._find_sessions_root', return_value=tmp_path
         ):
             sid, err = resolve_session_id('sess-abc')
         assert sid is None
@@ -311,7 +311,7 @@ class TestResolveSessionId:
     def test_no_match(self, tmp_path: Path) -> None:
         _make_session_dir(tmp_path, 'sess-xyz', {})
         with patch(
-            'backend.cli.session_manager._find_sessions_root', return_value=tmp_path
+            'backend.cli.session.session_manager._find_sessions_root', return_value=tmp_path
         ):
             sid, err = resolve_session_id('zzz-not-here')
         assert sid is None
@@ -375,7 +375,7 @@ class TestResolveSessionByIdOrPrefix:
 class TestGetSessionSuggestions:
     def test_no_storage(self) -> None:
         with patch(
-            'backend.cli.session_manager._find_sessions_root', return_value=None
+            'backend.cli.session.session_manager._find_sessions_root', return_value=None
         ):
             suggestions = get_session_suggestions()
         assert suggestions == []
@@ -391,7 +391,7 @@ class TestGetSessionSuggestions:
             },
         )
         with patch(
-            'backend.cli.session_manager._find_sessions_root', return_value=tmp_path
+            'backend.cli.session.session_manager._find_sessions_root', return_value=tmp_path
         ):
             suggestions = get_session_suggestions()
         # Should have at least 2 entries per session (index + full id)
@@ -408,7 +408,7 @@ class TestGetSessionSuggestions:
                 {'last_updated_at': f'2024-01-{i + 1:02d}T00:00:00'},
             )
         with patch(
-            'backend.cli.session_manager._find_sessions_root', return_value=tmp_path
+            'backend.cli.session.session_manager._find_sessions_root', return_value=tmp_path
         ):
             suggestions = get_session_suggestions(limit=2)
         # 2 sessions Ã— 2 entries each = 4
@@ -417,7 +417,7 @@ class TestGetSessionSuggestions:
     def test_fallback_title(self, tmp_path: Path) -> None:
         _make_session_dir(tmp_path, 'sess-notitle', {})
         with patch(
-            'backend.cli.session_manager._find_sessions_root', return_value=tmp_path
+            'backend.cli.session.session_manager._find_sessions_root', return_value=tmp_path
         ):
             suggestions = get_session_suggestions()
         descriptors = [s[1] for s in suggestions]

@@ -1,9 +1,9 @@
-"""Tests for backend.cli.tool_call_display."""
+"""Tests for backend.cli.display.tool_call_display."""
 
 import json
 import unittest
 
-from backend.cli.tool_call_display import (
+from backend.cli.display.tool_call_display import (
     contains_tool_transport_markup,
     extract_tool_calls_from_text_markers,
     flatten_tool_call_for_history,

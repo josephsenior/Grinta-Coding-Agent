@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from backend.cli.config_manager import _test_llm_call
+from backend.cli.settings import _test_llm_call
 from backend.inference.exceptions import AuthenticationError, NotFoundError, Timeout
 
 

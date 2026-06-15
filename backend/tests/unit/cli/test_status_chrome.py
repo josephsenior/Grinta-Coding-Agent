@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from backend.cli.hud import HUDBar
-from backend.cli.status_chrome import (
+from backend.cli.display.hud import HUDBar
+from backend.cli.display.status_chrome import (
     STATUS_CHROME_COMPACT_WIDTH,
     pt_compact_line_plain,
     pt_stats_row2_fragments,

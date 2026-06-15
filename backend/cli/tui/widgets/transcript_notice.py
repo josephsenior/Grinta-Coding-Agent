@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from textual.widgets import Static
 
-from backend.cli._event_renderer.text_utils import sanitize_visible_transcript_text
+from backend.cli.event_rendering.text_utils import sanitize_visible_transcript_text
 
 
 class TranscriptNotice(Static):

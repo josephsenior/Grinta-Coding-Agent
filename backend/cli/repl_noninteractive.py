@@ -12,12 +12,12 @@ from typing import TYPE_CHECKING
 
 from rich.console import Console
 
-from backend.cli.hud import HUDBar
-from backend.cli.reasoning_display import ReasoningDisplay
+from backend.cli.display.hud import HUDBar
+from backend.cli.display.reasoning_display import ReasoningDisplay
 from backend.core.enums import AgentState
 
 if TYPE_CHECKING:
-    from backend.cli.config_manager import AppConfig
+    from backend.core.config import AppConfig
 
 logger = logging.getLogger(__name__)
 

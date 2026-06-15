@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 
 def _visible_fallback_message_text(message_text: str) -> str:
-    from backend.cli.tool_call_display import redact_streamed_tool_call_markers
+    from backend.cli.display.tool_call_display import redact_streamed_tool_call_markers
 
     return redact_streamed_tool_call_markers(message_text or '').strip()
 

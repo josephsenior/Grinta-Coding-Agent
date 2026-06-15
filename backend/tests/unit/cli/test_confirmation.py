@@ -1,4 +1,4 @@
-"""Tests for backend.cli.confirmation."""
+"""Tests for backend.cli.settings.confirmation."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 from rich.console import Console
 
-from backend.cli.confirmation import (
+from backend.cli.settings.confirmation import (
     ConfirmationDecision,
     _action_label,
     _confirmation_frame_style,
