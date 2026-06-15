@@ -5,7 +5,7 @@ import sys
 
 from textual.app import App
 
-from backend.cli._event_renderer.unified_renderer import ActivityRenderer
+from backend.cli.event_rendering.unified_renderer import ActivityRenderer
 from backend.cli.tui.widgets.activity_card import ActivityCard
 
 # Force UTF-8 stdout

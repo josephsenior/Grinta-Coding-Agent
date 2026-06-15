@@ -249,7 +249,7 @@ def _build_splash_lines() -> list[Any]:
 
 def _is_returning_user() -> bool:
     """Check if the user has run grinta before (history file exists)."""
-    from backend.cli.repl import _HISTORY_FILE
+    from backend.cli.repl.slash_command_registry import _HISTORY_FILE
 
     return _HISTORY_FILE.exists()
 
@@ -494,7 +494,7 @@ async def _ensure_onboarded(
     resolved_project: str,
     get_project_local_data_root: Any,
 ) -> Any | None:
-    from backend.cli.config_manager import (
+    from backend.cli.settings import (
         auto_detect_api_keys,
         ensure_default_model,
         needs_onboarding,

@@ -145,7 +145,7 @@ NEW_BLOCK = '''    # Dispatch table for :meth:`_handle_observation` — maps obs
 
     def _render_file_edit_observation(self, obs: FileEditObservation) -> None:
         self._stop_reasoning()
-        from backend.cli.diff_renderer import DiffPanel
+        from backend.cli.display.diff_renderer import DiffPanel
 
         path = getattr(obs, 'path', '')
         pending = self._take_pending_activity_card('file_edit')

@@ -341,7 +341,7 @@ class _ExecutorStreamingMixin:
         from backend.ledger.event import EventSource
 
         draft_reply_accum = '' if has_tools else visible_accum
-        from backend.cli._event_renderer.text_utils import (
+        from backend.cli.event_rendering.text_utils import (
             sanitize_streaming_thinking_text,
         )
 
@@ -373,10 +373,10 @@ class _ExecutorStreamingMixin:
         if not self._should_emit_stream_snapshot(state, channel='text', force=force):
             return
 
-        from backend.cli._event_renderer.text_utils import (
+        from backend.cli.event_rendering.text_utils import (
             sanitize_streaming_thinking_text,
         )
-        from backend.cli.tool_call_display import redact_streamed_tool_call_markers
+        from backend.cli.display.tool_call_display import redact_streamed_tool_call_markers
         from backend.ledger.action.message import StreamingChunkAction
         from backend.ledger.event import EventSource
 
@@ -414,10 +414,10 @@ class _ExecutorStreamingMixin:
         ):
             return
 
-        from backend.cli._event_renderer.text_utils import (
+        from backend.cli.event_rendering.text_utils import (
             sanitize_streaming_thinking_text,
         )
-        from backend.cli.tool_call_display import redact_streamed_tool_call_markers
+        from backend.cli.display.tool_call_display import redact_streamed_tool_call_markers
         from backend.ledger.action.message import StreamingChunkAction
         from backend.ledger.event import EventSource
 
@@ -440,7 +440,7 @@ class _ExecutorStreamingMixin:
         event_stream: EventStream,
         response: ModelResponse | None = None,
     ) -> None:
-        from backend.cli.tool_call_display import redact_streamed_tool_call_markers
+        from backend.cli.display.tool_call_display import redact_streamed_tool_call_markers
         from backend.ledger.action.message import StreamingChunkAction
         from backend.ledger.event import EventSource
 
@@ -702,7 +702,7 @@ class _ExecutorStreamingMixin:
     ) -> list[dict[str, Any]] | None:
         tool_calls_list = self._valid_stream_tool_calls(state.tool_calls_dict)
         if not tool_calls_list and state.content_accumulate:
-            from backend.cli.tool_call_display import (
+            from backend.cli.display.tool_call_display import (
                 extract_tool_calls_from_text_markers,
             )
 
@@ -1001,6 +1001,6 @@ class _ExecutorStreamingMixin:
 
     @staticmethod
     def _visible_stream_content(content_accumulate: str) -> str:
-        from backend.cli.tool_call_display import redact_streamed_tool_call_markers
+        from backend.cli.display.tool_call_display import redact_streamed_tool_call_markers
 
         return redact_streamed_tool_call_markers(content_accumulate).strip()

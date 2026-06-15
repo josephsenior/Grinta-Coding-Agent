@@ -1,4 +1,4 @@
-"""Unit tests for :mod:`backend.cli.transcript`."""
+"""Unit tests for :mod:`backend.cli.display.transcript`."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.text import Text
 
 from backend.cli.layout_tokens import CALLOUT_PANEL_PADDING
-from backend.cli.transcript import (
+from backend.cli.display.transcript import (
     format_activity_block,
     format_activity_delta_secondary,
     format_activity_primary,

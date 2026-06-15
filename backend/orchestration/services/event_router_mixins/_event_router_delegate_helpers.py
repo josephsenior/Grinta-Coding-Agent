@@ -8,7 +8,7 @@ progress observations from worker events.
 
 from __future__ import annotations
 
-from backend.cli.tool_call_display import contains_tool_transport_markup
+from backend.cli.display.tool_call_display import contains_tool_transport_markup
 from backend.core.schemas import AgentState
 from backend.ledger.action import (
     Action,

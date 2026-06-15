@@ -51,6 +51,16 @@ repos:
 
   - repo: local
     hooks:
+      - id: check-cli-file-size
+        name: Check CLI file size budget (advisory)
+        entry: python backend/scripts/verify/check_file_size.py --changed-only
+        language: system
+        pass_filenames: false
+        files: ^backend/cli/.*\.py$
+        verbose: true
+
+  - repo: local
+    hooks:
       - id: bandit
         name: bandit
         entry: uv run python -c "import os, subprocess, sys; os.environ['PYTHONIOENCODING'] = 'utf-8'; sys.exit(subprocess.run([sys.executable, '-m', 'bandit', '-c', 'pyproject.toml', '-r', '-q', 'backend'], check=False).returncode)"

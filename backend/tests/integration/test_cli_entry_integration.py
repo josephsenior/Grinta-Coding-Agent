@@ -58,11 +58,11 @@ def test_entry_main_launches_cli_repl_with_project_and_piped_input(
                                     return_value=None,
                                 ):
                                     with patch(
-                                        'backend.cli.config_manager.needs_onboarding',
+                                        'backend.cli.settings.needs_onboarding',
                                         return_value=False,
                                     ):
                                         with patch(
-                                            'backend.cli.config_manager.ensure_default_model',
+                                            'backend.cli.settings.ensure_default_model',
                                             return_value='openai/gpt-4.1',
                                         ):
                                             from backend.cli.entry import main

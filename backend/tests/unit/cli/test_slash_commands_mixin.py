@@ -1,4 +1,4 @@
-"""Tests for backend.cli._repl.slash_commands_mixin.SlashCommandsMixin."""
+"""Tests for backend.cli.repl.slash_commands_mixin.SlashCommandsMixin."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ from unittest.mock import MagicMock, patch
 
 from rich.console import Console
 
-from backend.cli._repl.slash_commands_mixin import SlashCommandsMixin
-from backend.cli.repl import _parse_slash_command
+from backend.cli.repl.slash_commands_mixin import SlashCommandsMixin
+from backend.cli.repl.slash_command_registry import _parse_slash_command
 
 # ---------------------------------------------------------------------------
 # Minimal fake host class that provides SlashCommandsMixin requirements
@@ -365,7 +365,7 @@ class TestCmdCopy:
     def test_copy_ok(self) -> None:
         r = _repl()
         with patch(
-            'backend.cli.repl._copy_to_system_clipboard', return_value=(True, 'Copied!')
+            'backend.cli.repl.slash_command_registry._copy_to_system_clipboard', return_value=(True, 'Copied!')
         ):
             result = r._cmd_copy(_parse('/copy'))
         assert result is True
@@ -376,7 +376,7 @@ class TestCmdCopy:
     def test_copy_fail(self) -> None:
         r = _repl()
         with patch(
-            'backend.cli.repl._copy_to_system_clipboard',
+            'backend.cli.repl.slash_command_registry._copy_to_system_clipboard',
             return_value=(False, 'Failed!'),
         ):
             result = r._cmd_copy(_parse('/copy'))
@@ -394,21 +394,21 @@ class TestCmdCopy:
 class TestCmdSessions:
     def test_calls_list_sessions(self) -> None:
         r = _repl()
-        with patch('backend.cli.session_manager.list_sessions') as mock_list:
+        with patch('backend.cli.session.session_manager.list_sessions') as mock_list:
             result = r._cmd_sessions(_parse('/sessions'))
         assert result is True
         mock_list.assert_called_once()
 
     def test_list_subcommand(self) -> None:
         r = _repl()
-        with patch('backend.cli.session_manager.list_sessions') as mock_list:
+        with patch('backend.cli.session.session_manager.list_sessions') as mock_list:
             result = r._cmd_sessions(_parse('/sessions list'))
         assert result is True
         mock_list.assert_called_once()
 
     def test_custom_limit(self) -> None:
         r = _repl()
-        with patch('backend.cli.session_manager.list_sessions') as mock_list:
+        with patch('backend.cli.session.session_manager.list_sessions') as mock_list:
             result = r._cmd_sessions(_parse('/sessions 10'))
         assert result is True
         args, kwargs = mock_list.call_args
@@ -506,7 +506,7 @@ class TestCmdModel:
     def test_no_args_shows_current(self) -> None:
         r = _repl()
         with patch(
-            'backend.cli.config_manager.get_current_model', return_value='openai/gpt-4o'
+            'backend.cli.settings.get_current_model', return_value='openai/gpt-4o'
         ):
             result = r._cmd_model(_parse('/model'))
         assert result is True
@@ -517,9 +517,9 @@ class TestCmdModel:
     def test_valid_model_switch(self) -> None:
         r = _repl()
         with (
-            patch('backend.cli.config_manager.update_model') as mock_update,
+            patch('backend.cli.settings.update_model') as mock_update,
             patch(
-                'backend.cli.config_manager.get_current_model',
+                'backend.cli.settings.get_current_model',
                 return_value='anthropic/claude-haiku-4',
             ),
         ):

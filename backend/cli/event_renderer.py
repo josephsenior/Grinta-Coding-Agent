@@ -18,7 +18,7 @@ from rich.console import Console, ConsoleOptions, Group, RenderResult
 from rich.live import Live
 from rich.text import Text
 
-from backend.cli.hud import HUDBar
+from backend.cli.display.hud import HUDBar
 from backend.cli.layout_tokens import (
     spacer_live_section,
 )
@@ -38,22 +38,20 @@ from backend.ledger.observation import (
 logger = logging.getLogger(__name__)
 
 
-from backend.cli._event_renderer.action_renderers_mixin import ActionRenderersMixin
-from backend.cli._event_renderer.observation_renderers_mixin import (
-    ObservationRenderersMixin,
-)
-from backend.cli._event_renderer.panels import (
+from backend.cli.event_rendering.actions import ActionRenderersMixin
+from backend.cli.event_rendering.observations import ObservationRenderersMixin
+from backend.cli.event_rendering.panels import (
     PendingActivityCard,
 )
-from backend.cli._event_renderer.sidebar import (
+from backend.cli.event_rendering.sidebar import (
     build_sidebar as _build_sidebar,
 )
-from backend.cli._event_renderer.sidebar import (
+from backend.cli.event_rendering.sidebar import (
     compute_main_width as _compute_main_width,
 )
 
 if TYPE_CHECKING:
-    from backend.cli.reasoning_display import ReasoningDisplay
+    from backend.cli.display.reasoning_display import ReasoningDisplay
 
 # Events to silently skip (mirrors gateway filtering).
 _SKIP_ACTIONS = (NullAction,)
@@ -69,25 +67,25 @@ _IDLE_STATES = {
 _SUBSCRIBER = EventStreamSubscriber.CLI
 
 
-from backend.cli._event_renderer._activity_mixin import (
+from backend.cli.event_rendering.activity_mixin import (
     _EventRendererActivityMixin,  # noqa: F401, E402
 )
-from backend.cli._event_renderer._live_mixin import (
+from backend.cli.event_rendering.live_mixin import (
     _EventRendererLiveMixin,  # noqa: F401, E402
 )
-from backend.cli._event_renderer._messages_mixin import (
+from backend.cli.event_rendering.messages_mixin import (
     _EventRendererMessagesMixin,  # noqa: F401, E402
 )
-from backend.cli._event_renderer._panels_mixin import (
+from backend.cli.event_rendering.panels_mixin import (
     _EventRendererPanelsMixin,  # noqa: F401, E402
 )
-from backend.cli._event_renderer._state_mixin import (
+from backend.cli.event_rendering.state_mixin import (
     _EventRendererStateMixin,  # noqa: F401, E402
 )
-from backend.cli._event_renderer._streaming_mixin import (
+from backend.cli.event_rendering.streaming_mixin import (
     _EventRendererStreamingMixin,  # noqa: F401, E402
 )
-from backend.cli._event_renderer._subscription_mixin import (
+from backend.cli.event_rendering.subscription_mixin import (
     _EventRendererSubscriptionMixin,
 )  # noqa: F401, E402
 

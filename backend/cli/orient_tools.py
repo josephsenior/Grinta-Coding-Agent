@@ -7,7 +7,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 from urllib.parse import urlparse
 
-from backend.cli._tool_display.summarize import _orient_path
+from backend.cli.tool_display.summarize import _orient_path
 from backend.cli.text_truncation import shorten_middle
 
 ORIENT_MCP_TOOL_NAMES: frozenset[str] = frozenset(

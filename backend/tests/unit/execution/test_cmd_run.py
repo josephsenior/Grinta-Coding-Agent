@@ -993,7 +993,7 @@ async def test_terminal_input_polls_pty_delta_after_existing_cursor(
 
 
 def test_pty_output_transcript_caption_notes_no_new_bytes_when_flag_false() -> None:
-    from backend.cli._event_renderer.text_utils import pty_output_transcript_caption
+    from backend.cli.event_rendering.text_utils import pty_output_transcript_caption
 
     cap = pty_output_transcript_caption(
         session_id='t1',

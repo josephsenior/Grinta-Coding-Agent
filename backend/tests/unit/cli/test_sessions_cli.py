@@ -1,4 +1,4 @@
-"""Tests for backend.cli.sessions_cli."""
+"""Tests for backend.cli.session.sessions_cli."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 from rich.console import Console
 
-from backend.cli.sessions_cli import (
+from backend.cli.session.sessions_cli import (
     _build_session_table,
     _format_session_row,
     _resolve_by_index,
@@ -173,13 +173,13 @@ class TestSessionOlderThanCutoff:
 class TestCmdList:
     def test_no_sessions(self) -> None:
         console = _make_console()
-        with patch('backend.cli.sessions_cli._entries', return_value=[]):
+        with patch('backend.cli.session.sessions_cli._entries', return_value=[]):
             rc = cmd_list(console)
         assert rc == 0
 
     def test_with_sessions(self) -> None:
         console = _make_console()
-        with patch('backend.cli.sessions_cli._entries', return_value=_SAMPLE_ROWS):
+        with patch('backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS):
             rc = cmd_list(console, limit=10)
         assert rc == 0
 
@@ -195,7 +195,7 @@ class TestCmdList:
 
     def test_limit_respected(self) -> None:
         console = _make_console()
-        with patch('backend.cli.sessions_cli._entries', return_value=_SAMPLE_ROWS):
+        with patch('backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS):
             rc = cmd_list(console, limit=1)
         assert rc == 0
 
@@ -203,37 +203,37 @@ class TestCmdList:
 class TestCmdShow:
     def test_no_sessions(self) -> None:
         console = _make_console()
-        with patch('backend.cli.sessions_cli._entries', return_value=[]):
+        with patch('backend.cli.session.sessions_cli._entries', return_value=[]):
             rc = cmd_show(console, 'abc')
         assert rc == 2
 
     def test_found_by_prefix(self) -> None:
         console = _make_console()
-        with patch('backend.cli.sessions_cli._entries', return_value=_SAMPLE_ROWS):
+        with patch('backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS):
             rc = cmd_show(console, 'session-aa')
         assert rc == 0
 
     def test_found_by_index(self) -> None:
         console = _make_console()
-        with patch('backend.cli.sessions_cli._entries', return_value=_SAMPLE_ROWS):
+        with patch('backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS):
             rc = cmd_show(console, '1')
         assert rc == 0
 
     def test_ambiguous_target(self) -> None:
         console = _make_console()
-        with patch('backend.cli.sessions_cli._entries', return_value=_SAMPLE_ROWS):
+        with patch('backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS):
             rc = cmd_show(console, 'session-')
         assert rc == 2
 
     def test_not_found(self) -> None:
         console = _make_console()
-        with patch('backend.cli.sessions_cli._entries', return_value=_SAMPLE_ROWS):
+        with patch('backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS):
             rc = cmd_show(console, 'zzz-not-there')
         assert rc == 2
 
     def test_shows_metadata(self, capsys) -> None:
         console = Console()
-        with patch('backend.cli.sessions_cli._entries', return_value=_SAMPLE_ROWS):
+        with patch('backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS):
             cmd_show(console, 'session-aabbcc')
         # No error = success
 
@@ -249,7 +249,7 @@ class TestCmdExport:
         ]
         out = tmp_path / 'export' / 'out'
         console = _make_console()
-        with patch('backend.cli.sessions_cli._entries', return_value=rows):
+        with patch('backend.cli.session.sessions_cli._entries', return_value=rows):
             rc = cmd_export(console, 'session-aabbcc', str(out))
         assert rc == 0
         assert (out / 'events' / 'ev1.json').exists()
@@ -263,19 +263,19 @@ class TestCmdExport:
         ]
         out = tmp_path / 'archive.zip'
         console = _make_console()
-        with patch('backend.cli.sessions_cli._entries', return_value=rows):
+        with patch('backend.cli.session.sessions_cli._entries', return_value=rows):
             rc = cmd_export(console, 'session-aabbcc', str(out))
         assert rc == 0
 
     def test_not_found(self, tmp_path: Path) -> None:
         console = _make_console()
-        with patch('backend.cli.sessions_cli._entries', return_value=_SAMPLE_ROWS):
+        with patch('backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS):
             rc = cmd_export(console, 'zzz', str(tmp_path / 'out'))
         assert rc == 2
 
     def test_ambiguous(self, tmp_path: Path) -> None:
         console = _make_console()
-        with patch('backend.cli.sessions_cli._entries', return_value=_SAMPLE_ROWS):
+        with patch('backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS):
             rc = cmd_export(console, 'session-', str(tmp_path / 'out'))
         assert rc == 2
 
@@ -288,7 +288,7 @@ class TestCmdDelete:
             ('session-aabbcc', _SAMPLE_META, 1, src),
         ]
         console = _make_console()
-        with patch('backend.cli.sessions_cli._entries', return_value=rows):
+        with patch('backend.cli.session.sessions_cli._entries', return_value=rows):
             rc = cmd_delete(console, 'session-aabbcc', yes=True)
         assert rc == 0
         assert not src.exists()
@@ -300,7 +300,7 @@ class TestCmdDelete:
             ('session-aabbcc', _SAMPLE_META, 1, src),
         ]
         console = _make_console()
-        with patch('backend.cli.sessions_cli._entries', return_value=rows):
+        with patch('backend.cli.session.sessions_cli._entries', return_value=rows):
             with patch('rich.prompt.Confirm.ask', return_value=False):
                 rc = cmd_delete(console, 'session-aabbcc', yes=False)
         assert rc == 0
@@ -313,7 +313,7 @@ class TestCmdDelete:
             ('session-aabbcc', _SAMPLE_META, 1, src),
         ]
         console = _make_console()
-        with patch('backend.cli.sessions_cli._entries', return_value=rows):
+        with patch('backend.cli.session.sessions_cli._entries', return_value=rows):
             with patch('rich.prompt.Confirm.ask', return_value=True):
                 rc = cmd_delete(console, 'session-aabbcc', yes=False)
         assert rc == 0
@@ -321,13 +321,13 @@ class TestCmdDelete:
 
     def test_delete_not_found(self) -> None:
         console = _make_console()
-        with patch('backend.cli.sessions_cli._entries', return_value=_SAMPLE_ROWS):
+        with patch('backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS):
             rc = cmd_delete(console, 'zzz', yes=True)
         assert rc == 2
 
     def test_delete_ambiguous(self) -> None:
         console = _make_console()
-        with patch('backend.cli.sessions_cli._entries', return_value=_SAMPLE_ROWS):
+        with patch('backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS):
             rc = cmd_delete(console, 'session-', yes=True)
         assert rc == 2
 
@@ -335,7 +335,7 @@ class TestCmdDelete:
 class TestCmdPrune:
     def test_negative_days(self) -> None:
         console = _make_console()
-        with patch('backend.cli.sessions_cli._entries', return_value=_SAMPLE_ROWS):
+        with patch('backend.cli.session.sessions_cli._entries', return_value=_SAMPLE_ROWS):
             rc = cmd_prune(console, days=-1)
         assert rc == 2
 
@@ -345,7 +345,7 @@ class TestCmdPrune:
         rows: list[tuple[str, dict[str, Any], int, Path]] = [
             ('session-future', future_meta, 1, Path('/fake/session-future')),
         ]
-        with patch('backend.cli.sessions_cli._entries', return_value=rows):
+        with patch('backend.cli.session.sessions_cli._entries', return_value=rows):
             rc = cmd_prune(console, days=30)
         assert rc == 0
 
@@ -357,7 +357,7 @@ class TestCmdPrune:
             ('session-old', old_meta, 0, src),
         ]
         console = _make_console()
-        with patch('backend.cli.sessions_cli._entries', return_value=rows):
+        with patch('backend.cli.session.sessions_cli._entries', return_value=rows):
             with patch('rich.prompt.Confirm.ask', return_value=False):
                 rc = cmd_prune(console, days=30, yes=False)
         assert rc == 0
@@ -371,7 +371,7 @@ class TestCmdPrune:
             ('session-old', old_meta, 0, src),
         ]
         console = _make_console()
-        with patch('backend.cli.sessions_cli._entries', return_value=rows):
+        with patch('backend.cli.session.sessions_cli._entries', return_value=rows):
             rc = cmd_prune(console, days=30, yes=True)
         assert rc == 0
         assert not src.exists()
@@ -384,7 +384,7 @@ class TestCmdPrune:
             ('session-old', old_meta, 0, src),
         ]
         console = _make_console()
-        with patch('backend.cli.sessions_cli._entries', return_value=rows):
+        with patch('backend.cli.session.sessions_cli._entries', return_value=rows):
             with patch('rich.prompt.Confirm.ask', return_value=True):
                 rc = cmd_prune(console, days=30, yes=False)
         assert rc == 0
@@ -392,6 +392,6 @@ class TestCmdPrune:
 
     def test_empty_entries(self) -> None:
         console = _make_console()
-        with patch('backend.cli.sessions_cli._entries', return_value=[]):
+        with patch('backend.cli.session.sessions_cli._entries', return_value=[]):
             rc = cmd_prune(console, days=30)
         assert rc == 0

@@ -14,9 +14,9 @@ from textual.app import App
 from textual.binding import Binding
 from textual.screen import Screen
 
-from backend.cli.config_manager import AppConfig
-from backend.cli.hud import HUDBar
-from backend.cli.reasoning_display import ReasoningDisplay
+from backend.core.config import AppConfig
+from backend.cli.display.hud import HUDBar
+from backend.cli.display.reasoning_display import ReasoningDisplay
 from backend.cli.theme import (
     NAVY_BRAND,
     NAVY_ERROR,
@@ -24,44 +24,44 @@ from backend.cli.theme import (
     NAVY_TEXT_MUTED,
     NAVY_WAITING,
 )
-from backend.cli.tui._app_renderer_action_handlers_mixin import (
+from backend.cli.tui.renderer.mixins.action_handlers import (
     _AppRendererActionHandlersMixin,  # noqa: F401
 )
-from backend.cli.tui._app_renderer_display_mixin import (
+from backend.cli.tui.renderer.mixins.display import (
     _AppRendererDisplayMixin,  # noqa: F401
 )
-from backend.cli.tui._app_renderer_event_processor_mixin import (
+from backend.cli.tui.renderer.mixins.event_processor import (
     _AppRendererEventProcessorMixin,  # noqa: F401
 )
 
 # ── TUIRenderer mixin imports ──
-from backend.cli.tui._app_renderer_live_mixin import _AppRendererLiveMixin  # noqa: F401
-from backend.cli.tui._app_renderer_terminal_mixin import (
+from backend.cli.tui.renderer.mixins.live import _AppRendererLiveMixin  # noqa: F401
+from backend.cli.tui.renderer.mixins.terminal import (
     _AppRendererTerminalMixin,  # noqa: F401
 )
-from backend.cli.tui._app_renderer_thinking_mixin import (
+from backend.cli.tui.renderer.mixins.thinking import (
     _AppRendererThinkingMixin,  # noqa: F401
 )
-from backend.cli.tui._app_screen_actions_mixin import (
+from backend.cli.tui.screen.actions import (
     _AppScreenActionsMixin,  # noqa: F401
 )
-from backend.cli.tui._app_screen_communicate_mixin import (
+from backend.cli.tui.screen.communicate import (
     _AppScreenCommunicateMixin,  # noqa: F401
 )
-from backend.cli.tui._app_screen_input_mixin import _AppScreenInputMixin  # noqa: F401
+from backend.cli.tui.screen.input import _AppScreenInputMixin  # noqa: F401
 
 # ── GrintaScreen mixin imports ──
-from backend.cli.tui._app_screen_lifecycle_mixin import (
+from backend.cli.tui.screen.lifecycle import (
     _AppScreenLifecycleMixin,  # noqa: F401
 )
-from backend.cli.tui._app_screen_messages_mixin import (
+from backend.cli.tui.screen.messages import (
     _AppScreenMessagesMixin,  # noqa: F401
 )
-from backend.cli.tui._app_screen_settings_mixin import (
+from backend.cli.tui.screen.settings import (
     _AppScreenSettingsMixin,  # noqa: F401
 )
-from backend.cli.tui._app_screen_state_mixin import _AppScreenStateMixin  # noqa: F401
-from backend.cli.tui._app_screen_welcome_mixin import (
+from backend.cli.tui.screen.state import _AppScreenStateMixin  # noqa: F401
+from backend.cli.tui.screen.welcome import (
     _AppScreenWelcomeMixin,  # noqa: F401
 )
 
@@ -339,7 +339,7 @@ class TUIRenderer(
 
 
 # ── Re-exports for backward compatibility ──
-from backend.cli.tui._app_constants import (  # noqa: F401
+from backend.cli.tui.constants import (  # noqa: F401
     _FILE_DIFF_AUTO_COLLAPSE_LINES,
     _TERMINAL_MOUSE_REPORT_RE,
     _TERMINAL_ORPHAN_PARAM_TOKEN_RE,
@@ -355,7 +355,7 @@ from backend.cli.tui._app_constants import (  # noqa: F401
     _bounded_int_env,
     _tui_logger,
 )
-from backend.cli.tui._app_dialogs import (  # noqa: F401
+from backend.cli.tui.dialogs import (  # noqa: F401
     ConfirmWidget,
     GrintaAddMCPDialog,
     GrintaAddSkillDialog,
@@ -364,7 +364,7 @@ from backend.cli.tui._app_dialogs import (  # noqa: F401
     GrintaSessionsDialog,
     GrintaSettingsDialog,
 )
-from backend.cli.tui._app_helpers import (  # noqa: F401
+from backend.cli.tui.helpers import (  # noqa: F401
     _count_text_lines,
     _count_unified_diff_changes,
     _encode_split_diff_contents,
@@ -383,7 +383,7 @@ from backend.cli.tui._app_helpers import (  # noqa: F401
     _strip_ansi,
     _strip_terminal_control_literals,
 )
-from backend.cli.tui._app_small_widgets import (  # noqa: F401
+from backend.cli.tui.widgets.small import (  # noqa: F401
     HUD,
     InfoSidebar,
     InputBar,
@@ -393,7 +393,7 @@ from backend.cli.tui._app_small_widgets import (  # noqa: F401
     RendererDrainRequested,
     Transcript,
 )
-from backend.cli.tui._app_welcome_widgets import (  # noqa: F401
+from backend.cli.tui.widgets.welcome import (  # noqa: F401
     CommunicatePromptWidget,
     WelcomeWidget,
 )

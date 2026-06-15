@@ -5,8 +5,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.cli.hud import HUDBar
-from backend.cli.reasoning_display import ReasoningDisplay
+from backend.cli.display.hud import HUDBar
+from backend.cli.display.reasoning_display import ReasoningDisplay
 from backend.cli.tui.app import GrintaScreen, TUIRenderer
 from backend.core.schemas import AgentState
 from backend.ledger.observation import AgentStateChangedObservation, StatusObservation

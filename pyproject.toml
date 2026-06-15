@@ -189,9 +189,9 @@ lint.ignore = [
   "D1",   # Ignore warnings for missing docstrings
   "E501",
 ]
-lint.per-file-ignores."backend/cli/config_manager.py" = [ "E402" ]
+lint.per-file-ignores."backend/cli/settings/storage.py" = [ "E402" ]
 lint.per-file-ignores."backend/cli/event_renderer.py" = [ "E402" ]
-lint.per-file-ignores."backend/cli/repl.py" = [ "E402" ]
+lint.per-file-ignores."backend/cli/repl/session.py" = [ "E402" ]
 lint.per-file-ignores."backend/integrations/mcp/mcp_utils.py" = [ "E402" ]
 lint.per-file-ignores."backend/persistence/data_models/settings.py" = [ "E402" ]
 lint.per-file-ignores."backend/scripts/**" = [ "ASYNC" ]

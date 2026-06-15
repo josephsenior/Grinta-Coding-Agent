@@ -7,8 +7,8 @@ import json
 import pytest
 from rich.syntax import Syntax
 
-from backend.cli._tool_display import preview as mcp_preview
-from backend.cli._tool_display.preview import mcp_result_syntax_extras
+from backend.cli.tool_display import preview as mcp_preview
+from backend.cli.tool_display.preview import mcp_result_syntax_extras
 
 
 def test_mcp_result_syntax_extras_returns_none_when_not_verbose(

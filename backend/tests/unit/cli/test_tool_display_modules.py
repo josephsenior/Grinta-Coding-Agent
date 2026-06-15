@@ -1,4 +1,4 @@
-"""Tests for backend.cli._tool_display submodules (headline, summarize, redact, preview)."""
+"""Tests for backend.cli.tool_display submodules (headline, summarize, redact, preview)."""
 
 from __future__ import annotations
 
@@ -7,12 +7,12 @@ import unittest
 # ============================================================================
 # headline.py
 # ============================================================================
-from backend.cli._tool_display.headline import (
+from backend.cli.tool_display.headline import (
     friendly_verb_for_tool,
     tool_activity_stats_hint,
     tool_headline,
 )
-from backend.cli._tool_display.renderers.file_editor import (
+from backend.cli.tool_display.renderers.file_editor import (
     render_file_create,
     render_file_edit,
 )
@@ -185,7 +185,7 @@ class TestToolActivityStatsHint(unittest.TestCase):
 # summarize.py
 # ============================================================================
 
-from backend.cli._tool_display.summarize import (
+from backend.cli.tool_display.summarize import (
     _arg_str,
     _pluralize_result_label,
     _preview_result_item,
@@ -485,7 +485,7 @@ class TestStreamingArgsHint(unittest.TestCase):
 # redact.py
 # ============================================================================
 
-from backend.cli._tool_display.redact import (
+from backend.cli.tool_display.redact import (
     _balanced_json_object_end,
     extract_tool_calls_from_text_markers,
     redact_streamed_tool_call_markers,
@@ -671,7 +671,7 @@ class TestExtractToolCallsFromTextMarkers(unittest.TestCase):
 # preview.py
 # ============================================================================
 
-from backend.cli._tool_display.preview import (
+from backend.cli.tool_display.preview import (
     _mcp_collection_summary,
     _mcp_count_summary,
     _mcp_error_summary,

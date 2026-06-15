@@ -17,8 +17,8 @@ from rich.theme import Theme as RichTheme
 from textual.app import App
 from textual.reactive import Reactive
 
-from backend.cli.hud import HUDBar
-from backend.cli.reasoning_display import ReasoningDisplay
+from backend.cli.display.hud import HUDBar
+from backend.cli.display.reasoning_display import ReasoningDisplay
 from backend.cli.syntax_theme import GRINTA_TERMINAL_THEME
 from backend.cli.theme import grinta_rich_theme_styles
 
@@ -26,7 +26,7 @@ from backend.cli.theme import grinta_rich_theme_styles
 _RICH_THEME = RichTheme(grinta_rich_theme_styles())
 
 if TYPE_CHECKING:
-    from backend.cli.config_manager import AppConfig
+    from backend.core.config import AppConfig
 
 
 class GrintaTUIApp(App):
@@ -168,7 +168,7 @@ async def _async_main_tui(
     verbose: bool = False,
 ) -> None:
     if model:
-        from backend.cli.config_manager import update_model
+        from backend.cli.settings import update_model
 
         update_model(model)
 

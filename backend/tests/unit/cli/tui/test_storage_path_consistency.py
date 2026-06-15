@@ -9,7 +9,7 @@ These tests verify that:
 
 Background
 ----------
-Originally, ``_app_screen_lifecycle_mixin._bootstrap`` called
+Originally, ``screen.lifecycle._bootstrap`` called
 ``get_file_store(config)`` (passing the config object as ``file_store_type``).
 The function signature is ``get_file_store(file_store_type, local_data_root)``,
 so the config object never equaled ``'local'`` and the function silently
@@ -32,7 +32,7 @@ def test_get_file_store_call_uses_config_file_store_attribute():
     to ``InMemoryFileStore`` (losing all events on restart). This test
     guards against that regression by inspecting the call site.
     """
-    from backend.cli.tui import _app_screen_lifecycle_mixin as mixin
+    from backend.cli.tui.screen import lifecycle as mixin
 
     source = mixin.__file__
     assert source is not None
