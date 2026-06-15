@@ -46,9 +46,7 @@ class GrintaHelpDialog(ModalDialog[str | None]):
     def on_mount(self) -> None:
         self.query_one('#help-close', Button).focus()
 
-    def on_command_list_row_activated(
-        self, event: CommandListRow.Activated
-    ) -> None:
+    def on_command_list_row_activated(self, event: CommandListRow.Activated) -> None:
         self.dismiss(event.command)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:

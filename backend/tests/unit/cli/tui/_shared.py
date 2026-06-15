@@ -30,6 +30,8 @@ from backend.cli.tui.dialogs import GrintaHelpDialog, GrintaSessionsDialog
 from backend.cli.tui.main import GrintaTUIApp
 from backend.cli.tui.widgets.activity_card import (
     ActivityCard as TUIActivityCard,
+)
+from backend.cli.tui.widgets.activity_card import (
     AgentMessage,
     LiveResponse,
     OrientBurst,

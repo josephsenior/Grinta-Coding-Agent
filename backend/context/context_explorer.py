@@ -281,7 +281,9 @@ def _content_hits(root: Path, terms: list[str]) -> dict[str, set[str]]:
     return hits
 
 
-def _collect_python_symbols(path: Path, terms: set[str], *, limit: int = 4) -> list[str]:
+def _collect_python_symbols(
+    path: Path, terms: set[str], *, limit: int = 4
+) -> list[str]:
     if path.suffix.lower() != '.py':
         return []
     try:

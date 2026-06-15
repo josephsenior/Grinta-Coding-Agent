@@ -39,7 +39,9 @@ async def test_active_card_collapses_when_next_shell_starts(mock_config) -> None
         await pilot.pause()
 
         first = next(
-            card for card in screen.query(TUIActivityCard).results() if 'category-shell' in card.classes
+            card
+            for card in screen.query(TUIActivityCard).results()
+            if 'category-shell' in card.classes
         )
         first.expand()
         assert '-expanded' in first.classes
@@ -49,7 +51,9 @@ async def test_active_card_collapses_when_next_shell_starts(mock_config) -> None
 
         assert '-collapsed' in first.classes
         shell_cards = [
-            card for card in screen.query(TUIActivityCard).results() if 'category-shell' in card.classes
+            card
+            for card in screen.query(TUIActivityCard).results()
+            if 'category-shell' in card.classes
         ]
         assert len(shell_cards) == 2
         assert '-expanded' in shell_cards[1].classes
@@ -79,7 +83,9 @@ async def test_pinned_card_stays_expanded_when_next_shell_starts(mock_config) ->
         await pilot.pause()
 
         first = next(
-            card for card in screen.query(TUIActivityCard).results() if 'category-shell' in card.classes
+            card
+            for card in screen.query(TUIActivityCard).results()
+            if 'category-shell' in card.classes
         )
         first.set_pinned(True)
         renderer._process_event(CmdRunAction(command='npm test'))

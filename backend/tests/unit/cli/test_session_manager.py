@@ -134,9 +134,7 @@ class TestListSessionEntries:
         assert entries[0][2] == 3
 
     def test_discovers_user_scoped_sessions(self, tmp_path: Path) -> None:
-        user_session = (
-            tmp_path / 'users' / 'tui' / 'conversations' / 'scoped-session'
-        )
+        user_session = tmp_path / 'users' / 'tui' / 'conversations' / 'scoped-session'
         user_session.mkdir(parents=True)
         (user_session / 'metadata.json').write_text(
             json.dumps({'title': 'TUI session', 'last_updated_at': '2024-02-01'}),

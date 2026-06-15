@@ -610,9 +610,7 @@ class OrchestratorPlanner:
         status = f'<APP_DIRECTIVE>\n{planning_directive}\n</APP_DIRECTIVE>'
         return self._apply_control_message(messages, status)
 
-    def _inject_coding_preflight(
-        self, messages: list, state: State, mode: str
-    ) -> list:
+    def _inject_coding_preflight(self, messages: list, state: State, mode: str) -> list:
         """Inject a lightweight first-turn coding-task preflight when enabled."""
         enabled = getattr(self._config, 'enable_coding_preflight', True)
         if enabled is False:

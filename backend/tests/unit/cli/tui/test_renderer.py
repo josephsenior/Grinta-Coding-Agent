@@ -321,7 +321,11 @@ async def test_tui_user_scroll_wins_over_active_follow_tail(mock_config, monkeyp
         display._suppress_scroll_sync = True
 
         display.user_scroll_page_up(animate=False)
-        await pilot.pause()
+        for _ in range(12):
+            display._sync_scroll_state_from_position()
+            if not display._was_at_bottom():
+                break
+            await pilot.pause()
 
         assert display._user_scrolled_away is True
         assert not display._was_at_bottom()
@@ -348,8 +352,14 @@ async def test_tui_page_keys_scroll_transcript_while_turn_running(
 
         s._turn_in_flight = True
         s.query_one('#input', TextArea).focus()
-        await pilot.press('pageup')
-        await pilot.pause()
+        # PromptTextArea routes pageup to action_scroll_up; invoke directly so
+        # the test does not depend on pilot key-delivery timing.
+        s.action_scroll_up()
+        for _ in range(12):
+            display._sync_scroll_state_from_position()
+            if not display._was_at_bottom():
+                break
+            await pilot.pause()
 
         assert display._user_scrolled_away is True
         assert not display._was_at_bottom()

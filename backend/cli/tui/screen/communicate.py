@@ -326,7 +326,10 @@ class ScreenCommunicateMixin:
             return
         self._suggestion_matches = matches
         lst.clear()
-        from backend.cli.tui.widgets.command_list import CommandListRow, slash_command_detail
+        from backend.cli.tui.widgets.command_list import (
+            CommandListRow,
+            slash_command_detail,
+        )
 
         for name in matches:
             hint = slash_command_detail(name, self._SLASH_HINTS[name])

@@ -151,7 +151,9 @@ def _already_started_current_turn(state: Any) -> bool:
         return False
 
     ignored = {'SystemMessageAction', 'StatusObservation'}
-    return any(type(event).__name__ not in ignored for event in history[last_user_index + 1 :])
+    return any(
+        type(event).__name__ not in ignored for event in history[last_user_index + 1 :]
+    )
 
 
 def _format_list(label: str, values: list[str]) -> str:
@@ -168,7 +170,7 @@ def _format_candidate_lines(candidates: Sequence[ContextCandidate]) -> list[str]
         reasons = '; '.join(candidate.reasons[:3])
         symbols = ''
         if candidate.symbols:
-            symbols = f" | symbols: {', '.join(candidate.symbols)}"
+            symbols = f' | symbols: {", ".join(candidate.symbols)}'
         lines.append(
             f'  {index}. {candidate.path} (score {candidate.score}; {reasons}{symbols})'
         )

@@ -96,7 +96,9 @@ class GrintaScreen(
         Binding('f1', 'show_help', 'Help', show=True),
         Binding('ctrl+j', 'focus_next_card', 'Next Card', show=False, priority=True),
         Binding('ctrl+k', 'focus_prev_card', 'Prev Card', show=False, priority=True),
-        Binding('ctrl+shift+]', 'collapse_activity_cards', 'Collapse Cards', show=False),
+        Binding(
+            'ctrl+shift+]', 'collapse_activity_cards', 'Collapse Cards', show=False
+        ),
         Binding('ctrl+shift+[', 'expand_activity_cards', 'Expand Cards', show=False),
         Binding('ctrl+p', 'history_prev', 'History Prev', show=False),
         Binding('ctrl+n', 'history_next', 'History Next', show=False),
