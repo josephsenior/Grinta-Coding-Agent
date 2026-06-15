@@ -27,6 +27,9 @@ from backend.orchestration.session_orchestrator_mixins._session_orchestrator_sta
 from backend.orchestration.session_orchestrator_mixins._session_orchestrator_step_mixin import (  # noqa: F401, E402
     _SessionOrchestratorStepMixin,
 )
+from backend.orchestration.session_orchestrator_mixins._session_orchestrator_watchdog_mixin import (  # noqa: F401, E402
+    _SessionOrchestratorWatchdogMixin,
+)
 
 __all__ = [
     '_SessionOrchestratorActionMixin',
@@ -34,4 +37,5 @@ __all__ = [
     '_SessionOrchestratorParallelMixin',
     '_SessionOrchestratorStateMixin',
     '_SessionOrchestratorStepMixin',
+    '_SessionOrchestratorWatchdogMixin',
 ]

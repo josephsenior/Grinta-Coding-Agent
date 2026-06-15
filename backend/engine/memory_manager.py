@@ -770,6 +770,25 @@ class ContextMemoryManager:
                 item.cache_prompt = True
                 break
 
+        # Stable intermediate anchors: mark the 4th and 8th user messages
+        # (0-indexed positions 3 and 7).  Because these are absolute positions
+        # from the start of the list they do *not* shift as new messages are
+        # appended, so the Anthropic prompt cache can reuse the prefix across
+        # successive turns.
+        _STABLE_USER_CACHE_POSITIONS = (3, 7)
+        user_msg_idx = 0
+        for msg in messages:
+            if msg.role != 'user':
+                continue
+            if user_msg_idx in _STABLE_USER_CACHE_POSITIONS:
+                for item in msg.content:
+                    if isinstance(item, TextContent):
+                        item.cache_prompt = True
+                        break
+            user_msg_idx += 1
+            if user_msg_idx > max(_STABLE_USER_CACHE_POSITIONS):
+                break
+
         for message in reversed(messages):
             if message.role != 'user':
                 continue
