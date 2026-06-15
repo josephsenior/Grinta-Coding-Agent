@@ -8,6 +8,10 @@ from unittest import TestCase
 from unittest.mock import patch
 
 from backend.inference.discover_models import (
+    _display_provider_name,
+    _icon,
+    _model_reference,
+    _stream_supports,
     discover_command,
     main,
     print_section,
@@ -19,6 +23,26 @@ class Cp1252StringIO(StringIO):
     """StringIO with a Windows console encoding for icon fallback tests."""
 
     encoding = 'cp1252'
+
+
+class TestHelperFunctions(TestCase):
+    def test_stream_supports_utf8_stringio(self):
+        self.assertTrue(_stream_supports('✓', StringIO()))
+
+    def test_stream_supports_rejects_unencodable_text(self):
+        stream = Cp1252StringIO()
+        self.assertFalse(_stream_supports('✓', stream))
+
+    def test_icon_fallback_when_stream_cannot_encode(self):
+        with patch('backend.inference.discover_models._stream_supports', return_value=False):
+            self.assertEqual(_icon('✓', '[OK]'), '[OK]')
+
+    def test_display_provider_name(self):
+        self.assertEqual(_display_provider_name('lm_studio'), 'LM STUDIO')
+
+    def test_model_reference_preserves_prefixed_id(self):
+        self.assertEqual(_model_reference('ollama', 'ollama/llama3'), 'ollama/llama3')
+        self.assertEqual(_model_reference('ollama', 'llama3'), 'ollama/llama3')
 
 
 class TestPrintSection(TestCase):

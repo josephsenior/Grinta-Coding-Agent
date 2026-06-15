@@ -12,6 +12,7 @@ from backend.cli.display.transcript import (
     format_activity_block,
     format_activity_delta_secondary,
     format_activity_primary,
+    format_activity_result_secondary,
     format_activity_secondary,
     format_activity_shell_block,
     format_activity_turn_header,
@@ -19,8 +20,12 @@ from backend.cli.display.transcript import (
     format_callout_panel,
     format_ground_truth_tool_line,
     format_live_panel,
+    format_orient_burst_header,
+    format_orient_line,
     format_reasoning_snapshot,
     format_shell_result_secondary,
+    strip_indentation_warnings,
+    strip_pseudo_xml_function_calls,
     strip_tool_result_validation_annotations,
 )
 from backend.cli.layout_tokens import CALLOUT_PANEL_PADDING
@@ -177,3 +182,29 @@ def test_format_reasoning_snapshot_lines() -> None:
     out = buf.getvalue()
     assert 'first line' in out
     assert 'second' in out
+
+
+def test_strip_pseudo_xml_and_indentation_warnings() -> None:
+    raw = 'visible<function=name>hidden</function> tail'
+    assert 'hidden' not in strip_pseudo_xml_function_calls(raw)
+    indented = 'ok\n\n[INDENTATION WARNINGS]\nfix tabs\n\nmore'
+    assert '[INDENTATION WARNINGS]' not in strip_indentation_warnings(indented)
+    assert 'more' in strip_indentation_warnings(indented)
+
+
+def test_format_orient_line_and_burst_header() -> None:
+    line = format_orient_line(
+        icon='⌕',
+        verb='Grepped',
+        target='"foo"',
+        result='2 matchs',
+    )
+    assert 'Grepped' in line.plain
+    assert '2 matchs' in line.plain
+    header = format_orient_burst_header('codebase', 3)
+    assert '3' in header.plain
+
+
+def test_format_activity_result_secondary_kinds() -> None:
+    warn = format_activity_result_secondary('retrying', kind='warn')
+    assert 'retrying' in warn.plain
