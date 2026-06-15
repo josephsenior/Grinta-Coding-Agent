@@ -31,10 +31,11 @@ async def test_tui_hud_bar_shows_workspace_path(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_tui_update_hud_state(mock_config):
+async def test_tui_update_hud_state(mock_config, monkeypatch):
     """Verify update_hud folds runtime info into the two-line HUD."""
     console = RichConsole()
     loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
 
     async with app.run_test(size=(120, 36)) as pilot:
