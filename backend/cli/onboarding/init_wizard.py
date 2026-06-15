@@ -67,9 +67,9 @@ _PROVIDER_PRESETS: dict[str, dict[str, str]] = {
         'base_url': 'http://localhost:11434',
         'help': 'Local Ollama server (any pulled model)',
     },
-    'lmstudio': {
+    'lm_studio': {
         'env': '',
-        'default_model': 'openai/local-model',
+        'default_model': 'lm_studio/local-model',
         'base_url': 'http://localhost:1234/v1',
         'help': 'Local LM Studio (OpenAI-compatible at /v1)',
     },
@@ -148,12 +148,30 @@ def _detect_local() -> list[str]:
         pass
 
     try:
-        if _lmstudio_running(_PROVIDER_PRESETS['lmstudio']['base_url']):
-            found.append('lmstudio')
+        if _lmstudio_running(_PROVIDER_PRESETS['lm_studio']['base_url']):
+            found.append('lm_studio')
     except Exception:
         pass
 
     return found
+
+
+def _provider_requires_api_key(provider: str) -> bool:
+    """Return True when the preset is backed by a cloud API key env var."""
+    return bool(_PROVIDER_PRESETS[provider]['env'])
+
+
+def _settings_api_key_value(provider: str, api_key: str) -> str:
+    """Return the settings.json api-key value for the selected provider."""
+    if api_key or _provider_requires_api_key(provider):
+        return LLM_API_KEY_SETTINGS_PLACEHOLDER
+    return ''
+
+
+def _is_env_placeholder(value: str) -> bool:
+    """Return True for values like ``${OPENAI_API_KEY}``."""
+    stripped = value.strip()
+    return stripped.startswith('${') and stripped.endswith('}')
 
 
 def _check_settings_directory_writable(settings_path: Path) -> tuple[bool, str]:
@@ -256,19 +274,25 @@ def _collect_api_key(console: Console, preset: dict[str, Any]) -> str:
     env_var = preset['env']
     if not env_var:
         # Local providers: usually no key required.
-        return Prompt.ask('API key (optional)', password=True, default='')
+        return Prompt.ask(
+            'API key (optional; leave blank if the local server does not require one)',
+            password=True,
+            default='',
+        ).strip()
     env_value = os.environ.get(env_var, '')
-    if env_value:
+    if env_value.strip():
         console.print(
-            f'[dim]Found [bold]{env_var}[/bold] in environment — will reference it via [bold]${{{env_var}}}[/bold].[/dim]'
+            f'[dim]Found [bold]{env_var}[/bold] in the environment; '
+            'Grinta will save it to the local [bold].env[/bold] as '
+            f'[bold]LLM_API_KEY[/bold].[/dim]'
         )
-        return f'${{{env_var}}}'
+        return env_value.strip()
     api_key = Prompt.ask(
-        f'API key (paste; or leave blank to set {env_var} later)',
+        'API key (paste; or leave blank to set LLM_API_KEY later)',
         password=True,
         default='',
     )
-    return api_key or f'${{{env_var}}}'
+    return api_key.strip()
 
 
 def _print_welcome(console: Console, platform_info: str) -> None:
@@ -353,7 +377,7 @@ def _write_settings_file(
     settings = {
         'llm_provider': provider,
         'llm_model': model,
-        'llm_api_key': LLM_API_KEY_SETTINGS_PLACEHOLDER if api_key else '',
+        'llm_api_key': _settings_api_key_value(provider, api_key),
         'llm_base_url': base_url,
     }
     try:
@@ -375,6 +399,13 @@ def _write_settings_file(
 
 def _persist_api_key_safe(console: Console, api_key: str, settings_file: Path) -> None:
     if not api_key:
+        return
+    if _is_env_placeholder(api_key):
+        console.print(
+            f'[{CLR_STATUS_WARN}]Warning:[/] Ignoring placeholder API key value; '
+            'set a real LLM_API_KEY value before starting Grinta.',
+            style=CLR_STATUS_WARN,
+        )
         return
     try:
         persist_llm_api_key_to_dotenv(api_key, settings_json_path=settings_file)
@@ -435,19 +466,31 @@ def _print_success(
     provider: str,
     model: str,
     project_root: Path,
+    api_key: str,
 ) -> None:
     scope_note = ''
     if not _is_global_settings(settings_file):
-        scope_note = f'[{CLR_STATUS_WARN}]Note: Running from source. Settings localized to this directory.[/]\n'
+        scope_note = (
+            f'[{CLR_STATUS_WARN}]Note: Running from source. Settings localized to '
+            f'{settings_file.parent}.[/]\n'
+        )
+    key_note = ''
+    if _provider_requires_api_key(provider) and not api_key:
+        env_path = settings_file.parent / '.env'
+        key_note = (
+            f'[{CLR_STATUS_WARN}]API key not saved yet. Set LLM_API_KEY in '
+            f'{env_path} or rerun grinta init before starting.[/]\n'
+        )
     console.print(
         Panel.fit(
             f'Wrote [bold]{settings_file}[/bold]\n'
             f'{scope_note}'
             f'Provider: [bold]{provider}[/bold]\n'
             f'Model: [bold]{model}[/bold]\n\n'
+            f'{key_note}'
             f'Start the agent with: [{CLR_BRAND}]grinta[/]\n'
             f'REPL commands: [{CLR_BRAND}]/help[/] · shell commands: [{CLR_BRAND}]grinta sessions ...[/]',
-            title='Setup complete',
+            title='Setup saved' if key_note else 'Setup complete',
             border_style=CLR_STATUS_OK,
         )
     )
@@ -484,7 +527,7 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
     if choices is None:
         return 3
     provider, model, api_key, base_url = choices
-    _print_success(console, settings_file, provider, model, project_root)
+    _print_success(console, settings_file, provider, model, project_root, api_key)
     return 0
 
 
