@@ -73,7 +73,7 @@ def _finalize_pending_create_file_card(
         outcome=f'+{line_count}' if line_count else None,
         extra_content=encoded,
         diff_encoded=bool(encoded),
-        collapse=True,
+        collapse=False,
         operation_label=f'Created {orch._compact_file_card_path(path)}'.strip(),
     )
 
@@ -414,7 +414,7 @@ def _handle_file_write_observation(
                 outcome=_format_diff_summary(added, removed),
                 extra_content=encoded,
                 diff_encoded=True,
-                collapse=True,
+                collapse=False,
                 operation_label=f'Wrote {path}'.strip(),
             )
             return

@@ -6,13 +6,19 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from backend.core.errors import LLMNoResponseError
+from backend.core.errors import (
+    AgentRuntimeDisconnectedError,
+    LLMContextWindowExceedError,
+    LLMNoResponseError,
+)
 from backend.core.schemas import AgentState
 from backend.inference.exceptions import (
     APIConnectionError,
     AuthenticationError,
+    ContentPolicyViolationError,
     ContextWindowExceededError,
     InternalServerError,
+    NotFoundError,
     RateLimitError,
     ServiceUnavailableError,
     Timeout,
@@ -207,6 +213,21 @@ class TestRecoveryService:
 
         err_obs = mock_context.emit_event.call_args[0][0]
         assert err_obs.notify_ui_only is True
+
+    @pytest.mark.parametrize(
+        'exc',
+        [
+            ContentPolicyViolationError('blocked'),
+            ContextWindowExceededError('too long'),
+            LLMContextWindowExceedError('too long'),
+            NotFoundError('model missing'),
+            AgentRuntimeDisconnectedError('runtime gone'),
+        ],
+    )
+    def test_hard_stop_exceptions_are_notify_ui_only(self, exc):
+        _, _, notify_ui_only = RecoveryService._format_exception(exc)
+
+        assert notify_ui_only is True
 
     @pytest.mark.asyncio
     async def test_timeout_with_recent_mcp_validation_error_sets_directive(

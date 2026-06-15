@@ -117,6 +117,8 @@ class Transcript(VerticalScroll):
         if self.max_scroll_y <= 0:
             return True
         current_distance = self.max_scroll_y - self.scroll_y
+        if self._user_scrolled_away:
+            return current_distance <= threshold
         target_distance = self.max_scroll_y - self.scroll_target_y
         return current_distance <= threshold or target_distance <= threshold
 
@@ -161,14 +163,11 @@ class Transcript(VerticalScroll):
         self._last_scroll_y = scroll_y
 
         if self._user_scrolled_away:
-            if self._was_at_bottom():
+            if self._was_at_bottom() and scroll_y > last_scroll_y + 0.5:
                 self._set_user_scrolled_away(False)
             return
 
-        content_grew_in_place = (
-            max_y > last_max_y and abs(scroll_y - last_scroll_y) <= 0.5
-        )
-        if content_grew_in_place:
+        if max_y > last_max_y:
             return
 
         if not self._was_at_bottom():
@@ -458,6 +457,14 @@ class PromptTextArea(TextArea):
 
     def on_key(self, event: events.Key) -> None:
         screen = getattr(self, 'screen', None)
+        if event.key in {'pageup', 'pagedown'} and screen is not None:
+            if event.key == 'pageup' and hasattr(screen, 'action_scroll_up'):
+                screen.action_scroll_up()
+            elif event.key == 'pagedown' and hasattr(screen, 'action_scroll_down'):
+                screen.action_scroll_down()
+            event.prevent_default()
+            event.stop()
+            return
         if event.key in {'up', 'down'} and bool(screen) and not self.text.strip():
             if getattr(screen, '_welcome_visible', False):
                 if event.key == 'up' and hasattr(screen, 'action_focus_prev_card'):

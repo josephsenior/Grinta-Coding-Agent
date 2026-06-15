@@ -22,6 +22,38 @@ def _rich_text(text: str) -> Text:
     return Text.from_ansi(text)
 
 
+def _format_terminal_output_for_display(text: str) -> Text:
+    """Prepare shell/PTY output for display: strip control noise, keep ANSI colors."""
+    if not text:
+        return Text('')
+    return Text.from_ansi(_strip_terminal_control_literals(text))
+
+
+def infer_display_shell_kind(command: str = '') -> str:
+    """Return ``pwsh`` or ``bash`` for embedded terminal chrome."""
+    from backend.core.os_capabilities import OS_CAPS
+
+    cmd = (command or '').strip().lower()
+    pwsh_markers = (
+        'get-childitem',
+        'gci ',
+        'gci\t',
+        'set-location ',
+        'select-object ',
+        'powershell',
+        'pwsh ',
+        'pwsh\t',
+        '$env:',
+        'test-path ',
+        'out-file ',
+    )
+    if any(cmd.startswith(marker) or f' {marker}' in cmd for marker in pwsh_markers):
+        return 'pwsh'
+    if OS_CAPS.shell_kind == 'powershell':
+        return 'pwsh'
+    return 'bash'
+
+
 def _strip_ansi(text: str) -> str:
     """Strip all ANSI escape sequences from text using Rich's parser."""
     return _rich_text(text).plain

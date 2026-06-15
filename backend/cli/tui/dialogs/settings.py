@@ -21,32 +21,54 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
 
     DEFAULT_CSS = """
     GrintaSettingsDialog > #dialog-container {
-        padding: 1 3;
+        width: 72;
+        max-width: 92%;
+        padding: 1 2;
         height: auto;
         max-height: 92%;
     }
     GrintaSettingsDialog #dialog-title {
         margin-bottom: 0;
     }
+    GrintaSettingsDialog #dialog-subtitle {
+        margin-bottom: 1;
+    }
+    GrintaSettingsDialog #settings-panel {
+        background: #08101d;
+        border: round #1b233a;
+        border-left: heavy #5eead4;
+        padding: 1 1 0 1;
+        height: auto;
+    }
     GrintaSettingsDialog .field-label {
         margin-top: 0;
+        margin-bottom: 0;
+        height: 1;
+        color: #8f9fc1;
     }
     GrintaSettingsDialog #settings-current-key {
         margin-top: 0;
         margin-bottom: 1;
+        height: 1;
+        color: #8f9fc1;
     }
     GrintaSettingsDialog #settings-provider,
     GrintaSettingsDialog #settings-model,
     GrintaSettingsDialog #settings-reasoning,
     GrintaSettingsDialog #settings-custom-model,
     GrintaSettingsDialog #settings-api-key {
-        height: 3;
-        margin-bottom: 0;
+        height: 1;
+        margin-bottom: 1;
+        border: none;
+        background: #0a1323;
+        color: #c8d4e8;
+        padding: 0 1;
     }
     GrintaSettingsDialog #settings-model-meta {
         height: auto;
         max-height: 2;
-        margin-bottom: 0;
+        margin-bottom: 1;
+        color: #8f9fc1;
     }
     GrintaSettingsDialog #dialog-feedback {
         margin-top: 0;
@@ -141,45 +163,48 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         with Vertical(id='dialog-container'):
             yield Label('Settings', id='dialog-title')
             yield Static(
-                'Choose the provider, model, reasoning level, and optional API key.',
+                f'[{NAVY_TEXT_MUTED}]Provider, model, reasoning, and API key.[/]',
                 id='dialog-subtitle',
             )
-            yield Label(
-                f'Current {self._provider_label(current_provider)} API key: {masked_key}',
-                id='settings-current-key',
-            )
-            yield Label('Provider', classes='field-label')
-            yield Select(
-                options=self._provider_options(),
-                value=current_provider,
-                allow_blank=False,
-                id='settings-provider',
-            )
-            yield Label('Model', classes='field-label')
-            yield Select(
-                options=self._model_options(current_provider),
-                value=current_model,
-                allow_blank=False,
-                id='settings-model',
-            )
-            yield Label(
-                'Custom model id',
-                classes='field-label',
-                id='settings-custom-model-label',
-            )
-            yield Input(value=current_custom_model, id='settings-custom-model')
-            yield Label('', id='settings-model-meta')
-            yield Label(
-                'Reasoning effort', classes='field-label', id='settings-reasoning-label'
-            )
-            yield Select(
-                options=self._reasoning_options(current_provider, current_model),
-                value=current_reasoning,
-                allow_blank=False,
-                id='settings-reasoning',
-            )
-            yield Label('API key (blank = keep current)', classes='field-label')
-            yield Input(password=True, id='settings-api-key')
+            with Vertical(id='settings-panel'):
+                yield Label(
+                    f'Current {self._provider_label(current_provider)} API key: {masked_key}',
+                    id='settings-current-key',
+                )
+                yield Label('Provider', classes='field-label')
+                yield Select(
+                    options=self._provider_options(),
+                    value=current_provider,
+                    allow_blank=False,
+                    id='settings-provider',
+                )
+                yield Label('Model', classes='field-label')
+                yield Select(
+                    options=self._model_options(current_provider),
+                    value=current_model,
+                    allow_blank=False,
+                    id='settings-model',
+                )
+                yield Label(
+                    'Custom model id',
+                    classes='field-label',
+                    id='settings-custom-model-label',
+                )
+                yield Input(value=current_custom_model, id='settings-custom-model')
+                yield Label('', id='settings-model-meta')
+                yield Label(
+                    'Reasoning effort',
+                    classes='field-label',
+                    id='settings-reasoning-label',
+                )
+                yield Select(
+                    options=self._reasoning_options(current_provider, current_model),
+                    value=current_reasoning,
+                    allow_blank=False,
+                    id='settings-reasoning',
+                )
+                yield Label('API key (blank = keep current)', classes='field-label')
+                yield Input(password=True, id='settings-api-key')
             yield Label('', id='dialog-feedback')
             with Horizontal(id='dialog-buttons'):
                 yield Button('Save', id='settings-save', variant='primary')

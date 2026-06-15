@@ -10,6 +10,7 @@ from backend.cli.event_rendering.unified_renderer import (
 from backend.cli.tui.helpers import (
     _sanitize_terminal_display_text,
 )
+from backend.cli.tui.widgets.activity_card import ActivityCard as TUIActivityCard
 
 
 class RendererTerminalMixin:
@@ -85,6 +86,12 @@ class RendererTerminalMixin:
         )
         widget = self._write_card(card, collapsed=True)
         widget.enable_incremental_mode()
+        command = TUIActivityCard._command_from_detail(detail)
+        widget.configure_terminal(
+            command=command if not command.startswith('session ') else '',
+            session_id=session_id,
+            shell_kind='terminal',
+        )
         if session_id:
             self._terminal_cards_by_session[session_key] = widget
         else:
@@ -107,24 +114,23 @@ class RendererTerminalMixin:
         secondary: str | None,
         session_key: str,
     ) -> None:
-        widget.set_processing(processing)
         if processing:
-            self._clear_last_active_card_processing()
-            widget.set_processing(True)
-            self._last_active_card = widget
+            self._activate_activity_card(widget)
             self._tui.set_current_operation(
                 f'{verb} {detail}'.strip(),
                 meta=secondary or f'session {session_key}',
                 active=True,
             )
-        else:
-            if self._last_active_card is widget:
-                self._last_active_card = None
-            self._tui.set_current_operation(
-                f'{verb} {detail}'.strip(),
-                meta=secondary or f'session {session_key}',
-                active=False,
-            )
+            return
+
+        widget.set_processing(False)
+        if self._last_active_card is widget:
+            self._last_active_card = None
+        self._tui.set_current_operation(
+            f'{verb} {detail}'.strip(),
+            meta=secondary or f'session {session_key}',
+            active=False,
+        )
 
     def _upsert_terminal_session_card(
         self,
@@ -136,7 +142,6 @@ class RendererTerminalMixin:
         secondary_kind: str = 'neutral',
         extra_content: str | None = None,
         processing: bool = True,
-        collapse_after_update: bool = False,
     ) -> None:
         session_key = session_id or 'terminal'
         widget = self._resolve_terminal_widget(session_key, session_id)
@@ -157,10 +162,18 @@ class RendererTerminalMixin:
             self._terminal_status_from_kind(secondary_kind),
             outcome=secondary,
         )
+        command = TUIActivityCard._command_from_detail(detail)
+        if command and not command.startswith('session '):
+            widget.configure_terminal(
+                command=command,
+                session_id=session_id,
+                shell_kind='terminal',
+            )
+        elif session_id:
+            widget.configure_terminal(session_id=session_id, shell_kind='terminal')
         if extra_content:
             widget.append_content_incremental(extra_content)
 
-        del collapse_after_update
         self._apply_terminal_processing(
             widget,
             processing,
@@ -213,12 +226,17 @@ class RendererTerminalMixin:
 
         status = 'ok' if exit_code == 0 else 'err'
         widget.set_status(status, outcome=card.secondary)
+        widget.configure_terminal(command=command, cwd=cwd, exit_code=exit_code)
 
-        extra_parts = self._build_shell_meta_header(command, cwd, exit_code)
-        self._append_card_extra_lines(extra_parts, card)
-        extra_content = '\n'.join(extra_parts)
+        output_text = output or ''
+        if not output_text and card.extra_lines:
+            output_lines: list[str] = []
+            for extra in card.extra_lines:
+                indent = '  ' * extra.indent
+                output_lines.append(f'{indent}{extra.text}')
+            output_text = '\n'.join(output_lines)
 
-        widget.update_content(extra_content)
+        widget.update_content(output_text)
         widget.set_processing(False)
         self._tui.set_current_operation(
             f'{card.verb} {card.detail}'.strip(),
@@ -233,6 +251,8 @@ class RendererTerminalMixin:
 
         self.commit_live_thinking()
         card = ActivityRenderer.shell_command(command)
+        from backend.cli.tui.helpers import infer_display_shell_kind
+
         widget = TUIActivityCard(
             verb=card.verb,
             detail=card.detail,
@@ -243,10 +263,11 @@ class RendererTerminalMixin:
             collapsed=True,
             collapsible=True,
             syntax_language=card.syntax_language,
+            shell_kind=infer_display_shell_kind(command),
+            terminal_command=command,
         )
         widget.set_processing(True)
-        self._clear_last_active_card_processing()
-        self._last_active_card = widget
+        self._activate_activity_card(widget)
         self._pending_shell_cards_by_command[command].append(widget)
         self._tui.set_current_operation(
             f'{card.verb} {card.detail}'.strip(),

@@ -709,14 +709,14 @@ async def test_repl_non_interactive_uses_queued_input_before_stdin() -> None:
     stdin.readline.assert_not_called()
 
 
-def test_find_sessions_root_uses_project_storage_sessions(tmp_path: Path) -> None:
+def test_find_sessions_root_uses_project_storage_root(tmp_path: Path) -> None:
     from backend.cli.session.session_manager import _find_sessions_root
 
-    sessions = tmp_path / '.grinta' / 'storage' / 'sessions'
-    sessions.mkdir(parents=True)
-    config = AppConfig(local_data_root=str(tmp_path / '.grinta' / 'storage'))
+    storage = tmp_path / '.grinta' / 'storage'
+    storage.mkdir(parents=True)
+    config = AppConfig(local_data_root=str(storage))
 
-    assert _find_sessions_root(config) == sessions
+    assert _find_sessions_root(config) == storage
 
 
 @pytest.mark.asyncio

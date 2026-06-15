@@ -14,11 +14,14 @@ from rich.table import Table
 from rich.text import Text
 
 from backend.cli.theme import CLR_CARD_BORDER, CLR_CARD_TITLE, STYLE_DIM
+from backend.core.constants import CONVERSATION_BASE_DIR
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from backend.core.config.app_config import AppConfig
+
+SessionEntry = tuple[str, dict[str, Any], int, Path]
 
 
 def _resolve_config(config: AppConfig | None) -> AppConfig:
@@ -31,15 +34,63 @@ def _resolve_config(config: AppConfig | None) -> AppConfig:
 
 
 def _find_sessions_root(config: AppConfig | None = None) -> Path | None:
-    """Locate the canonical conversation storage directory."""
-    from backend.core.constants import CONVERSATION_BASE_DIR
+    """Locate the LocalFileStore root used for session discovery."""
     from backend.persistence.locations import get_local_data_root
 
     resolved_config = _resolve_config(config)
-    path = Path(get_local_data_root(resolved_config)) / CONVERSATION_BASE_DIR
+    path = Path(get_local_data_root(resolved_config))
     if path.is_dir():
         return path
     return None
+
+
+def _looks_like_session_dir(path: Path) -> bool:
+    return (path / 'metadata.json').is_file() or (path / 'events').is_dir()
+
+
+def _iter_session_dirs(storage_root: Path) -> list[Path]:
+    """Collect session directories from all supported storage layouts."""
+    seen: set[str] = set()
+    discovered: list[Path] = []
+
+    def _add(path: Path) -> None:
+        if not path.is_dir():
+            return
+        key = str(path.resolve())
+        if key in seen:
+            return
+        seen.add(key)
+        discovered.append(path)
+
+    users_root = storage_root / 'users'
+    if users_root.is_dir():
+        for user_dir in users_root.iterdir():
+            if not user_dir.is_dir():
+                continue
+            conversations_root = user_dir / 'conversations'
+            if conversations_root.is_dir():
+                for entry in conversations_root.iterdir():
+                    _add(entry)
+
+    sessions_root = storage_root / CONVERSATION_BASE_DIR
+    if sessions_root.is_dir():
+        for entry in sessions_root.iterdir():
+            _add(entry)
+
+    for entry in storage_root.iterdir():
+        if not entry.is_dir():
+            continue
+        if entry.name in {'users', CONVERSATION_BASE_DIR}:
+            continue
+        _add(entry)
+
+    return sorted(discovered, key=lambda path: path.name)
+
+
+def _session_dir_for(entry: SessionEntry | tuple[str, dict[str, Any], int]) -> Path:
+    if len(entry) >= 4:
+        return entry[3]  # type: ignore[return-value]
+    raise ValueError('session directory path is required for this operation')
 
 
 def _load_metadata(session_dir: Path) -> dict[str, Any] | None:
@@ -60,9 +111,19 @@ def _load_metadata(session_dir: Path) -> dict[str, Any] | None:
 def _count_events(session_dir: Path) -> int:
     """Count persisted events in a session directory."""
     events_dir = session_dir / 'events'
-    if events_dir.is_dir():
-        return sum(1 for f in events_dir.iterdir() if f.suffix == '.json')
-    return 0
+    if not events_dir.is_dir():
+        return 0
+    db_path = events_dir / 'events.db'
+    if db_path.is_file():
+        try:
+            import sqlite3
+
+            with sqlite3.connect(db_path) as conn:
+                row = conn.execute('SELECT COUNT(*) FROM events').fetchone()
+            return int(row[0]) if row else 0
+        except Exception:
+            logger.debug('Could not count sqlite events in %s', db_path, exc_info=True)
+    return sum(1 for f in events_dir.iterdir() if f.suffix == '.json')
 
 
 def _safe_str(value: Any) -> str:
@@ -72,24 +133,18 @@ def _safe_str(value: Any) -> str:
 
 
 def _list_session_entries(
-    root: Path,
+    storage_root: Path,
     sort_by: str = 'updated',
-) -> list[tuple[str, dict[str, Any], int]]:
-    """Load and sort persisted sessions.
-
-    Supports sorting by: ``updated`` (default), ``created``, ``events``,
-    ``cost``, ``model``.
-    """
-    sessions: list[tuple[str, dict[str, Any], int]] = []
-    for entry in root.iterdir():
-        if not entry.is_dir():
-            continue
+) -> list[SessionEntry]:
+    """Load and sort persisted sessions from every supported storage layout."""
+    sessions: list[SessionEntry] = []
+    for entry in _iter_session_dirs(storage_root):
         meta = _load_metadata(entry)
         event_count = _count_events(entry)
-        sessions.append((entry.name, meta or {}, event_count))
+        sessions.append((entry.name, meta or {}, event_count, entry))
 
-    def _sort_key(item: tuple[str, dict[str, Any], int]) -> Any:
-        sid, meta, count = item
+    def _sort_key(item: SessionEntry) -> Any:
+        _sid, meta, count, _path = item
         if sort_by == 'created':
             return meta.get('created_at', '0')
         if sort_by == 'events':
@@ -105,11 +160,8 @@ def _list_session_entries(
     return sessions
 
 
-def _session_matches_fallback(
-    search_lower: str,
-    session: tuple[str, dict[str, Any], int],
-) -> bool:
-    sid, meta, _ = session
+def _session_matches_fallback(search_lower: str, session: SessionEntry) -> bool:
+    sid, meta, _, _path = session
     if search_lower in sid.lower():
         return True
     if search_lower in _safe_str(meta.get('title')).lower():
@@ -122,20 +174,17 @@ def _session_matches_fallback(
 
 
 def _filter_sessions_fallback(
-    sessions: list[tuple[str, dict[str, Any], int]],
+    sessions: list[SessionEntry],
     search_term: str,
-) -> list[tuple[str, dict[str, Any], int]]:
+) -> list[SessionEntry]:
     search_lower = search_term.lower()
     return [s for s in sessions if _session_matches_fallback(search_lower, s)]
 
 
-def _fuzzy_score_session(
-    search_lower: str,
-    session: tuple[str, dict[str, Any], int],
-) -> int:
+def _fuzzy_score_session(search_lower: str, session: SessionEntry) -> int:
     from rapidfuzz import fuzz
 
-    sid, meta, _ = session
+    sid, meta, _, _path = session
     title = _safe_str(meta.get('title') or meta.get('name')).lower()
     model = _safe_str(meta.get('llm_model')).lower()
     sid_score = fuzz.partial_ratio(search_lower, sid.lower())
@@ -145,10 +194,10 @@ def _fuzzy_score_session(
 
 
 def _filter_sessions_scored(
-    sessions: list[tuple[str, dict[str, Any], int]],
+    sessions: list[SessionEntry],
     search_lower: str,
-) -> list[tuple[str, dict[str, Any], int]]:
-    scored: list[tuple[int, tuple[str, dict[str, Any], int]]] = []
+) -> list[SessionEntry]:
+    scored: list[tuple[int, SessionEntry]] = []
     for session in sessions:
         max_score = _fuzzy_score_session(search_lower, session)
         if max_score > 50:
@@ -158,15 +207,33 @@ def _filter_sessions_scored(
 
 
 def _filter_sessions_fuzzy(
-    sessions: list[tuple[str, dict[str, Any], int]],
+    sessions: list[SessionEntry],
     search_term: str,
-) -> list[tuple[str, dict[str, Any], int]]:
-    """Filter sessions using fuzzy matching on id, title, and model."""
+) -> list[SessionEntry]:
+    """Filter sessions using substring and fuzzy matching."""
+    stripped = (search_term or '').strip()
+    if not stripped:
+        return sessions
+
+    substring_matches = _filter_sessions_fallback(sessions, stripped)
     try:
         from rapidfuzz import fuzz  # noqa: F401
     except ImportError:
-        return _filter_sessions_fallback(sessions, search_term)
-    return _filter_sessions_scored(sessions, search_term.lower())
+        return substring_matches
+
+    fuzzy_matches = _filter_sessions_scored(sessions, stripped.lower())
+    if not fuzzy_matches:
+        return substring_matches
+
+    merged: list[SessionEntry] = []
+    seen: set[str] = set()
+    for session in fuzzy_matches + substring_matches:
+        sid = session[0]
+        if sid in seen:
+            continue
+        seen.add(sid)
+        merged.append(session)
+    return merged
 
 
 def _add_session_detail_rows(
@@ -220,7 +287,7 @@ def show_session(
     if resolved is None:
         return False
 
-    sid, meta, event_count = resolved
+    sid, meta, event_count, _path = resolved
 
     detail = Table(
         show_header=False,
@@ -250,9 +317,9 @@ def show_session(
 
 
 def _resolve_target_by_index(
-    sessions: list[tuple[str, dict[str, Any], int]],
+    sessions: list[SessionEntry],
     target: str | int,
-) -> tuple[str, dict[str, Any], int] | None:
+) -> SessionEntry | None:
     index = int(target)
     if 1 <= index <= len(sessions):
         return sessions[index - 1]
@@ -260,9 +327,9 @@ def _resolve_target_by_index(
 
 
 def _resolve_target_by_id(
-    sessions: list[tuple[str, dict[str, Any], int]],
+    sessions: list[SessionEntry],
     cleaned: str,
-) -> tuple[str, dict[str, Any], int] | None:
+) -> SessionEntry | None:
     exact = [s for s in sessions if s[0] == cleaned]
     if exact:
         return exact[0]
@@ -273,9 +340,9 @@ def _resolve_target_by_id(
 
 
 def _resolve_target(
-    sessions: list[tuple[str, dict[str, Any], int]],
+    sessions: list[SessionEntry],
     target: str | int,
-) -> tuple[str, dict[str, Any], int] | None:
+) -> SessionEntry | None:
     """Resolve an index (int) or id prefix (str) to a session."""
     if isinstance(target, int) or (isinstance(target, str) and target.isdigit()):
         return _resolve_target_by_index(sessions, target)
@@ -283,9 +350,9 @@ def _resolve_target(
 
 
 def _resolve_by_id(
-    sessions: list[tuple[str, dict[str, Any], int]],
+    sessions: list[SessionEntry],
     sid: str,
-) -> tuple[str, dict[str, Any], int] | None:
+) -> SessionEntry | None:
     """Resolve by exact session id."""
     for s in sessions:
         if s[0] == sid:
@@ -396,7 +463,8 @@ def list_sessions(
     table.add_column('Cost', justify='right', style=STYLE_DIM)
     table.add_column('Updated', style=STYLE_DIM)
 
-    for i, (sid, meta, event_count) in enumerate(sessions, 1):
+    for i, entry in enumerate(sessions, 1):
+        sid, meta, event_count, _path = entry
         _add_session_table_row(table, i, sid, meta, event_count)
 
     console.print(table)
@@ -410,9 +478,9 @@ def list_sessions(
 
 
 def _resolve_delete_target(
-    sessions: list[tuple[str, dict[str, Any], int]],
+    sessions: list[SessionEntry],
     target: str,
-) -> tuple[tuple[str, dict[str, Any], int] | None, str | None]:
+) -> tuple[SessionEntry | None, str | None]:
     """Resolve a delete target to a session or error message."""
     if target.isdigit():
         idx = int(target)
@@ -433,10 +501,10 @@ def _resolve_delete_target(
 
 
 def _resolve_delete_targets(
-    sessions: list[tuple[str, dict[str, Any], int]],
+    sessions: list[SessionEntry],
     targets: list[str],
-) -> tuple[list[tuple[str, dict[str, Any], int]], list[str]]:
-    to_delete: list[tuple[str, dict[str, Any], int]] = []
+) -> tuple[list[SessionEntry], list[str]]:
+    to_delete: list[SessionEntry] = []
     errors: list[str] = []
     for target in targets:
         resolved, error = _resolve_delete_target(sessions, target)
@@ -458,12 +526,12 @@ def _print_messages(
 
 def _print_delete_confirmation(
     console: Console,
-    to_delete: list[tuple[str, dict[str, Any], int]],
+    to_delete: list[SessionEntry],
 ) -> bool:
     from rich.prompt import Confirm
 
     console.print(f'Will delete {len(to_delete)} session(s):')
-    for sid, meta, _count in to_delete:
+    for sid, meta, _count, _path in to_delete:
         title = str(meta.get('title') or meta.get('name') or sid)
         console.print(f'  {sid[:12]}  {title[:40]}')
     return Confirm.ask('Proceed?', default=False)
@@ -472,11 +540,12 @@ def _print_delete_confirmation(
 def _perform_session_deletions(
     console: Console,
     root: Path,
-    to_delete: list[tuple[str, dict[str, Any], int]],
+    to_delete: list[SessionEntry],
 ) -> int:
     deleted = 0
-    for sid, _meta, _count in to_delete:
-        path = root / sid
+    for session in to_delete:
+        sid = session[0]
+        path = _session_dir_for(session)
         try:
             shutil.rmtree(path, ignore_errors=True)
             console.print(f'  [green]Deleted[/] {sid[:12]}')
@@ -564,7 +633,7 @@ def resolve_session_id(
 
 
 def _resolve_session_index(
-    sessions: list[tuple[str, dict[str, Any], int]],
+    sessions: list[SessionEntry],
     cleaned: str,
 ) -> tuple[str | None, str | None]:
     index = int(cleaned)
@@ -574,14 +643,14 @@ def _resolve_session_index(
 
 
 def _resolve_session_by_id_or_prefix(
-    sessions: list[tuple[str, dict[str, Any], int]],
+    sessions: list[SessionEntry],
     cleaned: str,
 ) -> tuple[str | None, str | None]:
-    exact = [sid for sid, _meta, _event_count in sessions if sid == cleaned]
+    exact = [s[0] for s in sessions if s[0] == cleaned]
     if exact:
         return exact[0], None
 
-    matches = [sid for sid, _meta, _event_count in sessions if sid.startswith(cleaned)]
+    matches = [s[0] for s in sessions if s[0].startswith(cleaned)]
     if len(matches) == 1:
         return matches[0], None
     if len(matches) > 1:
@@ -604,9 +673,8 @@ def get_session_suggestions(
         return []
 
     suggestions: list[tuple[str, str]] = []
-    for index, (sid, meta, _event_count) in enumerate(
-        _list_session_entries(root)[:limit], 1
-    ):
+    for index, entry in enumerate(_list_session_entries(root)[:limit], 1):
+        sid, meta, _event_count, _path = entry
         title = str(
             meta.get('title', meta.get('name', 'Untitled session'))
             or 'Untitled session'

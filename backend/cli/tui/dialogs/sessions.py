@@ -11,7 +11,7 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Input, Label, Select, Static
 
-from backend.cli.theme import NAVY_ERROR, NAVY_READY, NAVY_TEXT_DIM
+from backend.cli.theme import NAVY_ERROR, NAVY_READY, NAVY_TEXT_DIM, NAVY_TEXT_MUTED
 from backend.cli.tui.dialogs.confirm import GrintaConfirmDialog
 from backend.cli.tui.widgets.dialogs import ModalDialog
 from backend.core.config import AppConfig
@@ -22,7 +22,80 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
 
     DEFAULT_CSS = """
     GrintaSessionsDialog > #dialog-container {
-        max-height: 40;
+        width: 88;
+        max-width: 96%;
+        padding: 1 2;
+    }
+    GrintaSessionsDialog #dialog-subtitle {
+        margin-bottom: 0;
+    }
+    GrintaSessionsDialog #sessions-filters {
+        height: 3;
+        margin: 1 0 0 0;
+    }
+    GrintaSessionsDialog #sessions-filters .filter-label {
+        width: auto;
+        min-width: 6;
+        color: #8f9fc1;
+        content-align: left middle;
+        margin-right: 1;
+    }
+    GrintaSessionsDialog #sessions-search,
+    GrintaSessionsDialog #sessions-limit {
+        height: 1;
+        border: none;
+        background: #0a1323;
+        color: #c8d4e8;
+        padding: 0 1;
+    }
+    GrintaSessionsDialog #sessions-search {
+        width: 1fr;
+    }
+    GrintaSessionsDialog #sessions-sort {
+        width: 14;
+        height: 1;
+        margin-left: 1;
+        border: none;
+        background: #0a1323;
+    }
+    GrintaSessionsDialog #sessions-limit {
+        width: 5;
+        margin-left: 1;
+    }
+    GrintaSessionsDialog #sessions-refresh {
+        margin-left: 1;
+        min-width: 9;
+        height: 1;
+    }
+    GrintaSessionsDialog #sessions-panel {
+        height: auto;
+        margin-top: 1;
+        background: #08101d;
+        border: round #1b233a;
+        border-left: heavy #5eead4;
+        padding: 0;
+    }
+    GrintaSessionsDialog #sessions-table {
+        height: 12;
+        margin: 0;
+        border: none;
+        background: transparent;
+    }
+    GrintaSessionsDialog #sessions-preview {
+        height: auto;
+        max-height: 7;
+        margin-top: 1;
+        padding: 0 1;
+        border: none;
+        background: #0a1323;
+        color: #cbd5e1;
+    }
+    GrintaSessionsDialog #dialog-feedback {
+        margin-top: 0;
+        height: 1;
+    }
+    GrintaSessionsDialog #dialog-buttons {
+        margin-top: 1;
     }
     """
 
@@ -49,9 +122,8 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
         self._limit = max(1, int(limit))
         self._preview_target = preview_target
         self._delete_targets = delete_targets or []
-        self._all_entries: list[tuple[str, dict[str, Any], int]] = []
-        self._visible_entries: list[tuple[str, dict[str, Any], int]] = []
-        self._sessions_root: Path | None = None
+        self._all_entries: list[tuple[str, dict[str, Any], int, Path]] = []
+        self._visible_entries: list[tuple[str, dict[str, Any], int, Path]] = []
 
     def compose(self) -> ComposeResult:
         options = [
@@ -64,26 +136,30 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
         with Vertical(id='dialog-container'):
             yield Label('Sessions', id='dialog-title')
             yield Static(
-                'Resume previous work, preview context, or clear old sessions.',
+                f'[{NAVY_TEXT_MUTED}]Resume, preview, or clear saved conversations.[/]',
                 id='dialog-subtitle',
             )
             with Horizontal(id='sessions-filters'):
+                yield Static('Search', classes='filter-label')
                 yield Input(
                     value=self._search,
-                    placeholder='Search sessions',
+                    placeholder='title, model, id',
                     id='sessions-search',
                 )
+                yield Static('Sort', classes='filter-label')
                 yield Select(
                     options=options,
                     value=self._sort_by,
                     allow_blank=False,
                     id='sessions-sort',
                 )
+                yield Static('Limit', classes='filter-label')
                 yield Input(
                     value=str(self._limit), restrict=r'\d*', id='sessions-limit'
                 )
-                yield Button('Refresh', id='sessions-refresh')
-            yield DataTable(id='sessions-table')
+                yield Button('Refresh', id='sessions-refresh', variant='default')
+            with Vertical(id='sessions-panel'):
+                yield DataTable(id='sessions-table', zebra_stripes=True)
             yield Static('', id='sessions-preview')
             yield Label('', id='dialog-feedback')
             with Horizontal(id='dialog-buttons'):
@@ -107,6 +183,7 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
         self.query_one('#sessions-search', Input).focus()
 
     def action_refresh(self) -> None:
+        self._sync_filters_from_ui()
         self._refresh_table()
 
     async def action_delete_selected(self) -> None:
@@ -133,6 +210,7 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         bid = event.button.id
         if bid == 'sessions-refresh':
+            self._sync_filters_from_ui()
             self._refresh_table()
             return
         if bid == 'sessions-delete':
@@ -173,6 +251,15 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
             self._sort_by = event.value
             self._refresh_table()
 
+    def _sync_filters_from_ui(self) -> None:
+        self._search = self.query_one('#sessions-search', Input).value.strip()
+        limit_text = self.query_one('#sessions-limit', Input).value.strip()
+        if limit_text.isdigit() and int(limit_text) > 0:
+            self._limit = int(limit_text)
+        sort_value = self.query_one('#sessions-sort', Select).value
+        if isinstance(sort_value, str) and sort_value:
+            self._sort_by = sort_value
+
     def _set_feedback(self, message: str, *, error: bool = False) -> None:
         style = NAVY_ERROR if error else NAVY_READY
         self.query_one('#dialog-feedback', Label).update(f'[{style}]{message}[/]')
@@ -184,22 +271,22 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
             _list_session_entries,
         )
 
-        self._sessions_root = _find_sessions_root(self._config)
+        storage_root = _find_sessions_root(self._config)
         table = self.query_one('#sessions-table', DataTable)
-        table.clear()
-        if self._sessions_root is None:
+        table.clear(columns=False)
+        if storage_root is None:
             self._all_entries = []
             self._visible_entries = []
             self._set_feedback('No session storage found.', error=True)
             self.query_one('#sessions-preview', Static).update('')
             return
 
-        entries = _list_session_entries(self._sessions_root, sort_by=self._sort_by)
+        entries = _list_session_entries(storage_root, sort_by=self._sort_by)
         self._all_entries = entries
         if self._search:
             entries = _filter_sessions_fuzzy(entries, self._search)
         self._visible_entries = entries[: self._limit]
-        for i, (sid, meta, event_count) in enumerate(self._visible_entries, 1):
+        for i, (sid, meta, event_count, _path) in enumerate(self._visible_entries, 1):
             title = str(meta.get('title') or meta.get('name') or '-')
             updated = str(meta.get('last_updated_at') or meta.get('created_at') or '-')[
                 :19
@@ -209,7 +296,10 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
         if self._visible_entries:
             table.move_cursor(row=0, column=0, animate=False, scroll=False)
             self._update_preview(0)
-            self._set_feedback(f'{len(self._visible_entries)} session(s) loaded.')
+            total = len(self._all_entries)
+            shown = len(self._visible_entries)
+            suffix = f' (showing {shown} of {total})' if shown < total else ''
+            self._set_feedback(f'{shown} session(s) loaded{suffix}.')
         else:
             self.query_one('#sessions-preview', Static).update('')
             if self._search:
@@ -301,14 +391,17 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
         if row_index < 0 or row_index >= len(self._visible_entries):
             self.query_one('#sessions-preview', Static).update('')
             return
-        sid, meta, event_count = self._visible_entries[row_index]
+        sid, meta, event_count, _path = self._visible_entries[row_index]
         lines = self._build_preview_lines(sid, meta, event_count)
         self.query_one('#sessions-preview', Static).update('\n'.join(lines))
 
     def _delete_sessions(self, targets: list[str]) -> tuple[int, list[str]]:
-        from backend.cli.session.session_manager import _resolve_target
+        from backend.cli.session.session_manager import (
+            _resolve_target,
+            _session_dir_for,
+        )
 
-        if self._sessions_root is None:
+        if not self._all_entries:
             return 0, ['No session storage found.']
 
         deleted = 0
@@ -320,7 +413,7 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
                 continue
             sid = resolved[0]
             try:
-                shutil.rmtree(self._sessions_root / sid, ignore_errors=False)
+                shutil.rmtree(_session_dir_for(resolved), ignore_errors=False)
                 deleted += 1
             except Exception as exc:
                 errors.append(f'{sid[:12]}: {exc}')
