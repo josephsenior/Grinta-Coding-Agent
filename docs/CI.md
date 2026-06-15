@@ -1,12 +1,12 @@
 # Continuous integration
 
-This document describes what runs in GitHub Actions and how it relates to local `pytest` ([`pytest.ini`](../pytest.ini)). Required PR gates run the **unit** tree only; a bare `pytest` from the repo root follows `pytest.ini` and discovers the full **`backend/tests`** tree (slower, may need services).
+This document describes what runs in GitHub Actions and how it relates to local `pytest` ([`pytest.ini`](../pytest.ini)). **Linux PR gates** run the full **`backend/tests`** tree with coverage (unit + integration + e2e + stress). **Windows** gates still run **`backend/tests/unit`** only for cross-platform smoke.
 
 ## Required checks on pull requests
 
 | Workflow | Job | What runs |
 |----------|-----|-----------|
-| **Run Python Tests** | `gates-on-linux` | Full unit corpus: `pytest backend/tests/unit` (required PR gates; narrower than a bare local `pytest`, which uses `testpaths = backend/tests` in [`pytest.ini`](../pytest.ini)). |
+| **Run Python Tests** | `gates-on-linux` | Full test corpus with coverage: `pytest --cov=backend backend/tests` (unit + integration + e2e + stress; matches [`pytest.ini`](../pytest.ini) `testpaths`). Codecov upload uses the same run. |
 | **Run Python Tests** | `gates-on-windows` | Same unit corpus as `gates-on-linux` on `windows-latest`. |
 | **Run Python Tests** | `gates-on-macos` | Same unit corpus as `gates-on-linux` on `macos-latest` — **advisory only** (`continue-on-error: true`) until the matrix is promoted to required. |
 | **Lint** | pre-commit, mypy, version check | See [`.github/workflows/lint.yml`](../.github/workflows/lint.yml). |
@@ -14,7 +14,7 @@ This document describes what runs in GitHub Actions and how it relates to local 
 | **CodeQL** | `analyze` | Static security analysis for Python on PRs and main. |
 | **CLI Regression Tests** | (when paths match) | CLI integration smoke and selected orchestration tests; see [`.github/workflows/e2e-tests.yml`](../.github/workflows/e2e-tests.yml). |
 
-Codecov upload is enforced (`fail_ci_if_error: true`) and coverage uses the same `fail_under` policy as the project configuration.
+Codecov upload is enforced (`fail_ci_if_error: true`) and coverage uses the same `fail_under` policy as the project configuration. The coverage gate runs against the full `backend/tests` tree (not unit-only), so integration, e2e, and stress tests contribute to the reported percentage.
 
 ## Heavy / integration / benchmark tier
 

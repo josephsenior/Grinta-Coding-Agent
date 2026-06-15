@@ -110,6 +110,36 @@ def test_git_files_returns_empty_on_failure(tmp_path: Path, monkeypatch) -> None
     assert ce._git_files(tmp_path) == []
 
 
+def test_run_returns_none_on_subprocess_error(tmp_path: Path, monkeypatch) -> None:
+    def _boom(*_a, **_k):
+        raise OSError('boom')
+
+    monkeypatch.setattr(ce.subprocess, 'run', _boom)
+    assert ce._run(['git', 'status'], tmp_path) is None
+
+
+def test_git_status_lines_returns_empty_when_git_fails(tmp_path: Path, monkeypatch) -> None:
+    class Result:
+        returncode = 1
+        stdout = ''
+
+    monkeypatch.setattr(ce, '_run', lambda *_a, **_k: Result())
+    assert ce.git_status_lines(tmp_path) == []
+
+
+def test_content_hits_skips_short_terms_and_too_many_paths(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(ce, '_run', lambda *_a, **_k: None)
+    assert ce._content_hits(tmp_path, ['ab', 'token']) == {}
+    many_paths = '\n'.join(f'file{i}.py' for i in range(100))
+
+    class Result:
+        returncode = 0
+        stdout = many_paths
+
+    monkeypatch.setattr(ce, '_run', lambda *_a, **_k: Result())
+    assert ce._content_hits(tmp_path, ['token']) == {}
+
+
 def test_explore_context_ranks_mentioned_and_dirty(tmp_path: Path, monkeypatch) -> None:
     source = tmp_path / 'backend' / 'auth.py'
     source.parent.mkdir(parents=True)

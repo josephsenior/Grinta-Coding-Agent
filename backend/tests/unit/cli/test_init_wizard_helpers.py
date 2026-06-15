@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import json
+import platform
 from pathlib import Path
 
 import pytest
 
 from backend.cli.onboarding.init_wizard import (
     _atomic_json_write,
+    _check_settings_directory_writable,
     _is_env_placeholder,
     _is_global_settings,
+    _load_existing,
     _provider_requires_api_key,
     _settings_api_key_value,
 )
@@ -48,3 +51,34 @@ def test_is_global_settings_detects_home_grinta_path(tmp_path: Path, monkeypatch
     global_settings.write_text('{}', encoding='utf-8')
     assert _is_global_settings(global_settings) is True
     assert _is_global_settings(tmp_path / 'project' / 'settings.json') is False
+
+
+def test_check_settings_directory_writable_existing_dir(tmp_path: Path) -> None:
+    settings_path = tmp_path / 'settings.json'
+    ok, message = _check_settings_directory_writable(settings_path)
+    assert ok is True
+    assert message == ''
+
+
+def test_load_existing_handles_missing_and_invalid_json(tmp_path: Path) -> None:
+    missing = tmp_path / 'missing.json'
+    assert _load_existing(missing) == {}
+    bad = tmp_path / 'bad.json'
+    bad.write_text('{not json', encoding='utf-8')
+    assert _load_existing(bad) == {}
+
+
+def test_get_platform_info_includes_os_name() -> None:
+    from backend.cli.onboarding.init_wizard import _get_platform_info
+
+    assert platform.system() in _get_platform_info()
+
+
+def test_settings_path_uses_canonical_location(monkeypatch: pytest.MonkeyPatch) -> None:
+    from backend.cli.onboarding.init_wizard import _settings_path
+
+    monkeypatch.setattr(
+        'backend.cli.onboarding.init_wizard.get_canonical_settings_path',
+        lambda: str(Path('/tmp/grinta/settings.json')),
+    )
+    assert _settings_path() == Path('/tmp/grinta/settings.json')

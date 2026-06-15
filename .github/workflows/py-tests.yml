@@ -20,8 +20,9 @@ concurrency:
   cancel-in-progress: true
 
 # CI tiers (see docs/CI.md):
-# - gates-on-linux / gates-on-windows: full backend/tests/unit (fast PR gates; narrower than pytest.ini testpaths).
-# - heavy-tests: pytest markers heavy | integration | benchmark (schedule, main, manual).
+# - gates-on-linux: full backend/tests corpus + Codecov coverage (matches pytest.ini testpaths).
+# - gates-on-windows / gates-on-macos: unit-only PR gates for cross-platform smoke.
+# - heavy-tests: marker-filtered heavy | integration | benchmark (schedule, main, manual).
 jobs:
   gates-on-linux:
     name: Python Gates on Linux
@@ -49,12 +50,8 @@ jobs:
         run: python backend/scripts/verify/verify_optional_imports.py
       - name: Compile backend (syntax gate)
         run: uv run python -m compileall backend
-      - name: Run unit tests (full corpus)
-        run: PYTHONPATH=".:$PYTHONPATH" uv run pytest -q backend/tests/unit
-
-      - name: Run coverage for Codecov
-        if: always()
-        run: PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q --cov=backend --cov-fail-under=75 --cov-report=xml:coverage.xml backend/tests/unit
+      - name: Run tests with coverage (full corpus)
+        run: PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q --cov=backend --cov-fail-under=75 --cov-report=xml:coverage.xml backend/tests
 
       - name: Upload coverage to Codecov
         if: always() && matrix.python-version == '3.12'

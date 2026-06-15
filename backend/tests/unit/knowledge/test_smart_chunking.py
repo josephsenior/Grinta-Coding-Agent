@@ -64,3 +64,11 @@ def test_sliding_window_chunk_produces_multiple_chunks() -> None:
     )
     assert len(chunks) > 1
     assert chunks[0].chunk_index == 0
+
+
+def test_chunk_code_falls_back_to_sliding_window() -> None:
+    chunker = SmartChunker()
+    source = '\n'.join(f'def func_{idx}():\n    return {idx}\n' for idx in range(20))
+    chunks = chunker.chunk_code(source, 'doc6', 'module.py', metadata={'lang': 'python'})
+    assert chunks
+    assert all(chunk.document_id == 'doc6' for chunk in chunks)
