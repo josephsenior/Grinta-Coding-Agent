@@ -538,13 +538,11 @@ class TestSearch:
         mock_vector_store = MagicMock()
         mock_vector_store.search.return_value = [
             {
-                'content': 'Test content',
+                'excerpt': 'Test content',
                 'score': 0.9,
-                'metadata': {
-                    'document_id': 'doc123',
-                    'collection_id': 'col123',
-                    'filename': 'test.txt',
-                },
+                'document_id': 'doc123',
+                'collection_id': 'col123',
+                'filename': 'test.txt',
             }
         ]
         mock_vector_store_cls.return_value = mock_vector_store
@@ -555,6 +553,8 @@ class TestSearch:
         assert len(results) == 1
         assert isinstance(results[0], KnowledgeBaseSearchResult)
         assert results[0].relevance_score == 0.9
+        assert results[0].chunk_content == 'Test content'
+        assert results[0].metadata['document_id'] == 'doc123'
 
     @patch('backend.knowledge.knowledge_base_manager.get_knowledge_base_store')
     def test_search_filters_by_relevance(self, mock_get_store):
@@ -571,22 +571,18 @@ class TestSearch:
         mock_vector_store = MagicMock()
         mock_vector_store.search.return_value = [
             {
-                'content': 'Low score',
+                'excerpt': 'Low score',
                 'score': 0.3,
-                'metadata': {
-                    'document_id': 'doc1',
-                    'collection_id': 'col123',
-                    'filename': 'low.txt',
-                },
+                'document_id': 'doc1',
+                'collection_id': 'col123',
+                'filename': 'low.txt',
             },
             {
-                'content': 'High score',
+                'excerpt': 'High score',
                 'score': 0.9,
-                'metadata': {
-                    'document_id': 'doc2',
-                    'collection_id': 'col123',
-                    'filename': 'high.txt',
-                },
+                'document_id': 'doc2',
+                'collection_id': 'col123',
+                'filename': 'high.txt',
             },
         ]
         manager._vector_stores['col123'] = mock_vector_store
@@ -598,6 +594,7 @@ class TestSearch:
         # Only high score result should pass threshold
         assert len(results) == 1
         assert results[0].relevance_score == 0.9
+        assert results[0].chunk_content == 'High score'
 
     @patch('backend.knowledge.knowledge_base_manager.get_knowledge_base_store')
     def test_search_all_collections(self, mock_get_store):
@@ -875,7 +872,7 @@ class TestAdditionalCoveragePaths:
 
         mock_vector_store = MagicMock()
         mock_vector_store.search.return_value = [
-            {'content': 'Content', 'score': 0.8, 'metadata': {}}
+            {'excerpt': 'Content', 'score': 0.8}
         ]
         mock_vector_store_cls.return_value = mock_vector_store
 

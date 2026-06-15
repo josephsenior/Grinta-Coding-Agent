@@ -208,6 +208,12 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     )
     enable_editor: bool = Field(default=True)
     enable_working_memory: bool = Field(default=True)
+    enable_coding_preflight: bool = Field(
+        default=True,
+        description=(
+            'Inject a bounded first-turn repository snapshot for likely coding tasks.'
+        ),
+    )
     enable_lsp_query: bool = Field(
         default=True,
         description=(

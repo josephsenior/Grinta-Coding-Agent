@@ -413,8 +413,9 @@ class OrchestratorPlanner:
         tools: list[ChatCompletionToolParam],
     ) -> dict:
         tool_choice = self._determine_tool_choice(messages, state)
-        messages = self._inject_turn_status(messages, state)
         mode = self._active_mode_for_state(state)
+        messages = self._inject_turn_status(messages, state)
+        messages = self._inject_coding_preflight(messages, state, mode)
         tools = self._filter_tools_for_mode(tools, mode)
         messages = self._inject_mode_instructions(messages, state, mode)
         _maybe_log_prompt_metrics(messages)
@@ -608,6 +609,29 @@ class OrchestratorPlanner:
             return messages
         status = f'<APP_DIRECTIVE>\n{planning_directive}\n</APP_DIRECTIVE>'
         return self._apply_control_message(messages, status)
+
+    def _inject_coding_preflight(
+        self, messages: list, state: State, mode: str
+    ) -> list:
+        """Inject a lightweight first-turn coding-task preflight when enabled."""
+        enabled = getattr(self._config, 'enable_coding_preflight', True)
+        if enabled is False:
+            return messages
+        try:
+            from backend.context.coding_preflight import build_coding_preflight_block
+
+            block = build_coding_preflight_block(
+                messages,
+                state,
+                self._config,
+                mode=mode,
+            )
+        except Exception:
+            logger.debug('Coding preflight generation failed', exc_info=True)
+            return messages
+        if not block:
+            return messages
+        return self._apply_control_message(messages, block)
 
     def _apply_control_message(self, messages: list, status: str) -> list:
         """Attach turn control either as a second system message or merged into primary."""

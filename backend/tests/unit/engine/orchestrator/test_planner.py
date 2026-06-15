@@ -398,6 +398,57 @@ class TestBuildLlmParams:
         assert 'raw editor' not in joined
         assert 'XML file-edit' not in joined
 
+    def test_coding_preflight_injected_for_first_coding_turn(self, tmp_path):
+        p = _make_planner()
+        state = _make_state()
+        source = tmp_path / 'backend' / 'auth.py'
+        source.parent.mkdir()
+        source.write_text('def refresh_token():\n    return "ok"\n', encoding='utf-8')
+        messages = [
+            {'role': 'system', 'content': 'sys'},
+            {'role': 'user', 'content': 'implement retry function in auth.py'},
+        ]
+
+        with (
+            patch('backend.engine.planner.check_tools', return_value=[]),
+            patch(
+                'backend.context.coding_preflight.resolve_cli_workspace_directory',
+                return_value=tmp_path,
+            ),
+        ):
+            params = p.build_llm_params(messages, state, [])
+
+        joined = '\n'.join(
+            m['content'] for m in params['messages'] if isinstance(m.get('content'), str)
+        )
+        assert '<CODING_PREFLIGHT>' in joined
+        assert 'backend/auth.py' in joined
+        assert 'Ranked candidates' in joined
+        assert 'Treat candidates as hints' in joined
+        assert 'Prefer grep/glob/find_symbols' not in joined
+
+    def test_coding_preflight_can_be_disabled(self, tmp_path):
+        p = _make_planner(config=_make_config(enable_coding_preflight=False))
+        state = _make_state()
+        messages = [
+            {'role': 'system', 'content': 'sys'},
+            {'role': 'user', 'content': 'implement retry function in auth.py'},
+        ]
+
+        with (
+            patch('backend.engine.planner.check_tools', return_value=[]),
+            patch(
+                'backend.context.coding_preflight.resolve_cli_workspace_directory',
+                return_value=tmp_path,
+            ),
+        ):
+            params = p.build_llm_params(messages, state, [])
+
+        joined = '\n'.join(
+            m['content'] for m in params['messages'] if isinstance(m.get('content'), str)
+        )
+        assert '<CODING_PREFLIGHT>' not in joined
+
     def test_prompt_accounting_splits_static_tools_context_and_dynamic_history(self):
         p = _make_planner()
         p._llm.config.custom_tokenizer = None
