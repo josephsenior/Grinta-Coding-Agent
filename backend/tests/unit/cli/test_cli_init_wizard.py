@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -118,7 +119,7 @@ class TestDetectLocal:
                 return_value=True,
             ),
         ):
-            assert _detect_local() == ['lmstudio']
+            assert _detect_local() == ['lm_studio']
 
     def test_both_detected(self) -> None:
         with (
@@ -132,7 +133,7 @@ class TestDetectLocal:
         ):
             result = _detect_local()
             assert 'ollama' in result
-            assert 'lmstudio' in result
+            assert 'lm_studio' in result
 
 
 class TestSettingsPath:
@@ -197,7 +198,7 @@ class TestCollectApiKey:
         monkeypatch.setenv('OPENAI_API_KEY', 'sk-secret')
         preset = {'env': 'OPENAI_API_KEY'}
         result = _collect_api_key(_quiet_console(), preset)
-        assert result == '${OPENAI_API_KEY}'
+        assert result == 'sk-secret'
 
     def test_env_var_not_set_user_provides_key(
         self, monkeypatch: pytest.MonkeyPatch
@@ -215,8 +216,7 @@ class TestCollectApiKey:
         preset = {'env': 'MY_UNIQUE_KEY_XYZ'}
         with patch('rich.prompt.Prompt.ask', return_value=''):
             result = _collect_api_key(_quiet_console(), preset)
-        # Falls back to env var placeholder
-        assert result == '${MY_UNIQUE_KEY_XYZ}'
+        assert result == ''
 
 
 class TestRunInit:
@@ -260,6 +260,51 @@ class TestRunInit:
         assert (tmp_path / '.env').read_text(
             encoding='utf-8'
         ) == 'LLM_API_KEY=sk-test\n'
+
+    def test_blank_cloud_key_writes_placeholder_without_fake_env(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        console = _quiet_console()
+        settings_file = tmp_path / 'settings.json'
+        monkeypatch.delenv('OPENAI_API_KEY', raising=False)
+        with (
+            patch('backend.cli.onboarding.init_wizard._detect_local', return_value=[]),
+            patch(
+                'rich.prompt.Prompt.ask',
+                side_effect=['openai', 'openai/gpt-4o-mini', '', ''],
+            ),
+            _patch_settings_path(settings_file),
+        ):
+            rc = run_init(project_root=tmp_path, console=console)
+
+        assert rc == 0
+        data = json.loads(settings_file.read_text(encoding='utf-8'))
+        assert data['llm_api_key'] == '${LLM_API_KEY}'
+        assert not (tmp_path / '.env').exists()
+        assert 'LLM_API_KEY' not in os.environ
+
+    def test_provider_env_key_is_copied_to_generic_dotenv(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        console = _quiet_console()
+        settings_file = tmp_path / 'settings.json'
+        monkeypatch.setenv('OPENAI_API_KEY', 'sk-from-env')
+        with (
+            patch('backend.cli.onboarding.init_wizard._detect_local', return_value=[]),
+            patch(
+                'rich.prompt.Prompt.ask',
+                side_effect=['openai', 'openai/gpt-4o-mini', ''],
+            ),
+            _patch_settings_path(settings_file),
+        ):
+            rc = run_init(project_root=tmp_path, console=console)
+
+        assert rc == 0
+        data = json.loads(settings_file.read_text(encoding='utf-8'))
+        assert data['llm_api_key'] == '${LLM_API_KEY}'
+        assert (tmp_path / '.env').read_text(
+            encoding='utf-8'
+        ) == 'LLM_API_KEY=sk-from-env\n'
 
     def test_existing_settings_declined(self, tmp_path: Path) -> None:
         console = _quiet_console()
@@ -321,6 +366,35 @@ class TestRunInit:
         ):
             rc = run_init(project_root=tmp_path, console=console)
         assert rc == 0
+        data = json.loads(settings_file.read_text(encoding='utf-8'))
+        assert data['llm_api_key'] == ''
+        assert not (tmp_path / '.env').exists()
+
+    def test_lm_studio_detected_as_default(self, tmp_path: Path) -> None:
+        console = _quiet_console()
+        settings_file = tmp_path / 'settings.json'
+        with (
+            patch(
+                'backend.cli.onboarding.init_wizard._detect_local',
+                return_value=['lm_studio'],
+            ),
+            patch(
+                'rich.prompt.Prompt.ask',
+                side_effect=[
+                    'lm_studio',
+                    'lm_studio/local-model',
+                    '',
+                    'http://localhost:1234/v1',
+                ],
+            ),
+            _patch_settings_path(settings_file),
+        ):
+            rc = run_init(project_root=tmp_path, console=console)
+
+        assert rc == 0
+        data = json.loads(settings_file.read_text(encoding='utf-8'))
+        assert data['llm_provider'] == 'lm_studio'
+        assert data['llm_model'] == 'lm_studio/local-model'
 
     def test_security_checklist_shown_if_exists(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

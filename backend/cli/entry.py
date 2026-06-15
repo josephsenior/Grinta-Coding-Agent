@@ -214,6 +214,14 @@ def _pin_project(project: str | None) -> None:
 
 
 def _run_init(_args: argparse.Namespace) -> int:
+    if not sys.stdin.isatty():
+        print(
+            'grinta init is interactive. Run it in a terminal, or create '
+            'settings.json and .env manually under your Grinta settings root.',
+            file=sys.stderr,
+        )
+        return 3
+
     from rich.console import Console
 
     from backend.cli.onboarding.init_wizard import run_init

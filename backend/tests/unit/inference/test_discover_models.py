@@ -15,6 +15,14 @@ from backend.inference.discover_models import (
 )
 
 
+class Cp1252StringIO(StringIO):
+    """StringIO with a Windows console encoding for icon fallback tests."""
+
+    @property
+    def encoding(self) -> str:
+        return 'cp1252'
+
+
 class TestPrintSection(TestCase):
     """Test print_section utility function."""
 
@@ -58,7 +66,20 @@ class TestDiscoverCommand(TestCase):
             output = fake_out.getvalue()
 
         self.assertIn('No local providers found', output)
-        self.assertIn('Install Ollama', output)
+        self.assertIn('Start Ollama, LM Studio, or vLLM', output)
+        self.assertIn('http://localhost:1234', output)
+
+    @patch('backend.inference.discover_models.discover_all_local_models')
+    def test_discover_no_models_uses_ascii_on_cp1252(self, mock_discover):
+        """Test discover output avoids Unicode icons on CP1252 streams."""
+        mock_discover.return_value = {}
+
+        with patch('sys.stdout', new=Cp1252StringIO()) as fake_out:
+            discover_command()
+            output = fake_out.getvalue()
+
+        self.assertIn('[!] No local providers found', output)
+        self.assertNotIn('❌', output)
 
     @patch('backend.inference.discover_models.discover_all_local_models')
     def test_discover_with_ollama_models(self, mock_discover):
@@ -73,7 +94,7 @@ class TestDiscoverCommand(TestCase):
         self.assertIn('OLLAMA', output)
         self.assertIn('llama3.2', output)
         self.assertIn('codellama', output)
-        self.assertIn('Usage examples', output)
+        self.assertIn('Settings examples', output)
 
     @patch('backend.inference.discover_models.discover_all_local_models')
     def test_discover_multiple_providers(self, mock_discover):
@@ -101,8 +122,23 @@ class TestDiscoverCommand(TestCase):
             discover_command()
             output = fake_out.getvalue()
 
-        self.assertIn('ollama/llama3.2', output)
+        self.assertIn('ollama: set llm_model to "ollama/llama3.2"', output)
         self.assertIn('llm_model', output)
+
+    @patch('backend.inference.discover_models.discover_all_local_models')
+    def test_discover_shows_usage_examples_for_each_provider(self, mock_discover):
+        """Test that discover shows provider-prefixed model ids."""
+        mock_discover.return_value = {
+            'lm_studio': ['qwen2.5-coder'],
+            'vllm': ['mistral-small'],
+        }
+
+        with patch('sys.stdout', new=StringIO()) as fake_out:
+            discover_command()
+            output = fake_out.getvalue()
+
+        self.assertIn('lm_studio: set llm_model to "lm_studio/qwen2.5-coder"', output)
+        self.assertIn('vllm: set llm_model to "vllm/mistral-small"', output)
 
 
 class TestStatusCommand(TestCase):
@@ -132,7 +168,7 @@ class TestStatusCommand(TestCase):
 
         self.assertIn('NOT FOUND', output)
         self.assertIn('No local providers are running', output)
-        self.assertIn('ollama serve', output)
+        self.assertIn('Start Ollama, LM Studio, or vLLM', output)
 
     @patch('backend.inference.discover_models.check_local_providers')
     def test_status_mixed(self, mock_check):
@@ -213,6 +249,24 @@ class TestMain(TestCase):
                 fake_out.getvalue()
 
         self.assertEqual(result, 1)
+        mock_logger.error.assert_called_once()
+
+    @patch('backend.inference.discover_models.discover_command')
+    @patch('backend.inference.discover_models.logger')
+    def test_main_exception_handling_uses_ascii_on_cp1252(
+        self, mock_logger, mock_discover
+    ):
+        """Test error output avoids Unicode icons on CP1252 streams."""
+        mock_discover.side_effect = RuntimeError('Test error')
+
+        with patch.object(sys, 'argv', ['discover_models.py', 'discover']):
+            with patch('sys.stdout', new=Cp1252StringIO()) as fake_out:
+                result = main()
+                output = fake_out.getvalue()
+
+        self.assertEqual(result, 1)
+        self.assertIn('[ERROR] Error: Test error', output)
+        self.assertNotIn('❌', output)
         mock_logger.error.assert_called_once()
 
     def test_main_case_insensitive_commands(self):

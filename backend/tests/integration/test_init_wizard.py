@@ -102,8 +102,8 @@ class TestInitWizardCrossPlatform:
         assert any(p in platform_info for p in ('Windows', 'Darwin', 'Linux'))
 
     @pytest.mark.integration
-    def test_init_command_runs_without_crash(self, tmp_path: Path) -> None:
-        """Verify 'grinta init' can be invoked without crash (any valid exit code)."""
+    def test_init_command_fails_fast_without_tty(self, tmp_path: Path) -> None:
+        """Verify 'grinta init' does not hang when stdin is not interactive."""
         env = os.environ.copy()
         env.update(
             {
@@ -118,15 +118,17 @@ class TestInitWizardCrossPlatform:
 
         app_root = tmp_path / 'app'
         app_root.mkdir()
+        project_root = tmp_path / 'project'
+        project_root.mkdir()
 
         result = subprocess.run(
             [
                 sys.executable,
                 '-m',
                 'backend.cli.entry',
-                'init',
                 '--project',
-                str(tmp_path / 'project'),
+                str(project_root),
+                'init',
             ],
             cwd=_REPO_ROOT,
             capture_output=True,
@@ -136,7 +138,8 @@ class TestInitWizardCrossPlatform:
             input='openai\n\n\n\n',
         )
 
-        assert result.returncode in (0, 1, 2, 3)
+        assert result.returncode == 3
+        assert 'grinta init is interactive' in result.stderr
 
 
 class TestSettingsValidation:
@@ -191,7 +194,7 @@ class TestProviderPresets:
         """Verify local providers have localhost URLs."""
         from backend.cli.onboarding.init_wizard import _PROVIDER_PRESETS
 
-        local_providers = ['ollama', 'lmstudio']
+        local_providers = ['ollama', 'lm_studio']
         for provider in local_providers:
             preset = _PROVIDER_PRESETS[provider]
             assert 'localhost' in preset['base_url'], (
