@@ -186,7 +186,7 @@ def execute_memory_recall(action: MemoryRecallAction) -> MemoryRecallObservation
         )
     parts = [f'{len(results)} results for query: {query!r}\n']
     for i, item in enumerate(results, 1):
-        content = item.get('content_text', item.get('content', ''))
+        content = str(item.get('excerpt', ''))
         role = item.get('role', 'unknown')
         score = item.get('score', '')
         score_str = f' (score={score:.3f})' if isinstance(score, float) else ''

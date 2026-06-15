@@ -24,6 +24,29 @@ from backend.persistence.knowledge_base.knowledge_base_store import (
 logger = logging.getLogger(__name__)
 
 
+_VECTOR_RESULT_RESERVED_KEYS = frozenset({'step_id', 'score', 'excerpt'})
+_METADATA_SCALAR_TYPES = (str, int, float)
+
+
+def _vector_hit_metadata(result: dict[str, Any]) -> dict[str, str | int | float]:
+    """Return flattened vector metadata, excluding transport fields."""
+    return {
+        key: value
+        for key, value in result.items()
+        if key not in _VECTOR_RESULT_RESERVED_KEYS
+        and isinstance(value, _METADATA_SCALAR_TYPES)
+        and not isinstance(value, bool)
+    }
+
+
+def _required_vector_text(result: dict[str, Any], key: str) -> str | None:
+    value = result.get(key)
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    return value or None
+
+
 class KnowledgeBaseManager:
     """Manages knowledge base collections, documents, and vector search."""
 
@@ -402,17 +425,36 @@ class KnowledgeBaseManager:
                 )
                 for result in raw_results:
                     score = result.get('score', 0.0)
+                    if not isinstance(score, (int, float)) or isinstance(score, bool):
+                        logger.warning(
+                            'Skipping knowledge-base vector hit with invalid score from %s',
+                            cid,
+                        )
+                        continue
                     if score < relevance_threshold:
                         continue
-                    meta = result.get('metadata', {})
+                    document_id = _required_vector_text(result, 'document_id')
+                    result_collection_id = _required_vector_text(
+                        result, 'collection_id'
+                    )
+                    filename = _required_vector_text(result, 'filename')
+                    excerpt = _required_vector_text(result, 'excerpt')
+                    if not (
+                        document_id and result_collection_id and filename and excerpt
+                    ):
+                        logger.warning(
+                            'Skipping malformed knowledge-base vector hit from %s',
+                            cid,
+                        )
+                        continue
                     results.append(
                         KnowledgeBaseSearchResult(
-                            document_id=meta.get('document_id', ''),
-                            collection_id=cid,
-                            filename=meta.get('filename', ''),
-                            chunk_content=result.get('content', ''),
-                            relevance_score=score,
-                            metadata=meta,
+                            document_id=document_id,
+                            collection_id=result_collection_id,
+                            filename=filename,
+                            chunk_content=excerpt,
+                            relevance_score=float(score),
+                            metadata=_vector_hit_metadata(result),
                         )
                     )
             except Exception as e:

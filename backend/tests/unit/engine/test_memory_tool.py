@@ -9,6 +9,7 @@ import pytest
 from backend.core.errors import FunctionCallValidationError
 from backend.engine.tools._tool_handlers import (
     _handle_memory_tool,
+    _semantic_recall_registry,
     execute_memory_persist,
     execute_memory_recall,
 )
@@ -26,8 +27,8 @@ def test_memory_working_get_empty() -> None:
         return_value={},
     ):
         action = _handle_memory_tool({'action': 'working', 'update_type': 'get'})
-    assert isinstance(action, WorkingMemoryAction)
-    obs = execute_working_memory(action)
+        assert isinstance(action, WorkingMemoryAction)
+        obs = execute_working_memory(action)
     assert 'empty' in obs.content.lower()
 
 
@@ -43,6 +44,26 @@ def test_memory_recall_without_vector_store() -> None:
     assert isinstance(action, MemoryRecallAction)
     obs = execute_memory_recall(action)
     assert 'not available' in obs.content.lower()
+
+
+def test_memory_recall_formats_vector_excerpts() -> None:
+    action = MemoryRecallAction(query='auth decision')
+
+    def recall(_query: str, _k: int):
+        return [
+            {
+                'excerpt': 'Use the token refresh path before retrying auth.',
+                'role': 'assistant',
+                'score': 0.91,
+            }
+        ]
+
+    with patch.dict(_semantic_recall_registry, {'fn': recall}, clear=True):
+        obs = execute_memory_recall(action)
+
+    assert 'Use the token refresh path' in obs.content
+    assert '(assistant (score=0.910))' in obs.content
+    assert obs.hits[0]['excerpt'].startswith('Use the token refresh path')
 
 
 def test_memory_persist_execute() -> None:
