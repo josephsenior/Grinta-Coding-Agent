@@ -54,7 +54,7 @@ jobs:
 
       - name: Run coverage for Codecov
         if: always()
-        run: PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q --cov=backend --cov-fail-under=0 --cov-report=xml:coverage.xml backend/tests/unit
+        run: PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q --cov=backend --cov-fail-under=75 --cov-report=xml:coverage.xml backend/tests/unit
 
       - name: Upload coverage to Codecov
         if: always() && matrix.python-version == '3.12'
