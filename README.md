@@ -20,11 +20,9 @@
 
 ### Grinta in action
 
-Full session recording (~2.5 min, with audio):
+![Grinta terminal demo](docs/grinta-demo.gif)
 
-<video src="https://github.com/josephsenior/Grinta-Coding-Agent/raw/refs/heads/main/grinta-demo.mp4" controls playsinline width="100%"></video>
-
-Direct link if the player does not load: [`grinta-demo.mp4`](https://github.com/josephsenior/Grinta-Coding-Agent/raw/refs/heads/main/grinta-demo.mp4).
+Direct link if the animation does not load: [`docs/grinta-demo.gif`](docs/grinta-demo.gif).
 
 ## Release status
 

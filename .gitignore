@@ -54,8 +54,13 @@ diag_*.txt
 # Test coverage reports
 coverage/
 .coverage
+.coverage.*
+coverage.json
 *.cover
 htmlcov/
+
+# Generated dependency audit exports
+audit-requirements.txt
 
 # Test framework caches
 .hypothesis/
