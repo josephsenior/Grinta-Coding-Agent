@@ -185,15 +185,21 @@ class TerminalPane(Vertical):
         return renderable
 
     def compose(self) -> ComposeResult:
-        yield Static(self._title_markup(), id='terminal-titlebar', classes='terminal-titlebar')
-        yield Static(self._prompt_markup(), id='terminal-prompt', classes='terminal-prompt')
+        yield Static(
+            self._title_markup(), id='terminal-titlebar', classes='terminal-titlebar'
+        )
+        yield Static(
+            self._prompt_markup(), id='terminal-prompt', classes='terminal-prompt'
+        )
         with Container(classes='terminal-output-wrap', id='terminal-output-wrap'):
             yield Static(
                 self._output_renderable(),
                 id='terminal-output',
                 classes='terminal-output',
             )
-        yield Static(self._footer_markup(), id='terminal-footer', classes='terminal-footer')
+        yield Static(
+            self._footer_markup(), id='terminal-footer', classes='terminal-footer'
+        )
 
     def on_mount(self) -> None:
         self._refresh_chrome()

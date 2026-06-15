@@ -871,9 +871,7 @@ class TestAdditionalCoveragePaths:
         mock_get_store.return_value = mock_store
 
         mock_vector_store = MagicMock()
-        mock_vector_store.search.return_value = [
-            {'excerpt': 'Content', 'score': 0.8}
-        ]
+        mock_vector_store.search.return_value = [{'excerpt': 'Content', 'score': 0.8}]
         mock_vector_store_cls.return_value = mock_vector_store
 
         manager = KnowledgeBaseManager(user_id='user123')

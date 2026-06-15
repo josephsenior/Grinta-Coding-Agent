@@ -20,6 +20,7 @@ from backend.cli.theme import (
     NAVY_TEXT_DIM,
     NAVY_TEXT_MUTED,
 )
+from backend.cli.tui.helpers import infer_display_shell_kind
 from backend.cli.tui.widgets.activity_card.diff_lines import (
     DiffLine,
     SplitDiffLine,
@@ -28,7 +29,6 @@ from backend.cli.tui.widgets.activity_card.diff_lines import (
     _format_file_delta_outcome,
 )
 from backend.cli.tui.widgets.terminal_pane import TerminalPane
-from backend.cli.tui.helpers import infer_display_shell_kind
 
 
 class ActivityCard(Container):
@@ -305,9 +305,7 @@ class ActivityCard(Container):
         if not self._is_terminal_card():
             return
         lines = [
-            line
-            for line in (self._extra_content or '').splitlines()
-            if line.strip()
+            line for line in (self._extra_content or '').splitlines() if line.strip()
         ]
         self._output_tail = lines[-1][:100] if lines else ''
 

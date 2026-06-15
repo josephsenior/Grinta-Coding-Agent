@@ -68,9 +68,7 @@ def _notify_ui_only_error(
     error_category: str | None,
 ) -> None:
     message = _notification_message(content, error_category)
-    severity = (
-        'error' if error_category in _ACTION_REQUIRED_CATEGORIES else 'warning'
-    )
+    severity = 'error' if error_category in _ACTION_REQUIRED_CATEGORIES else 'warning'
     if severity == 'error' and hasattr(orch._tui, 'notify_error'):
         orch._tui.notify_error(message)
     elif hasattr(orch._tui, 'notify_warning'):

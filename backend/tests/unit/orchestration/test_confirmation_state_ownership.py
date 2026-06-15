@@ -14,15 +14,9 @@ _ALLOWED_AWAITING_ASSIGNERS = {
 
 def _contains_awaiting_confirmation(node: ast.AST) -> bool:
     for child in ast.walk(node):
-        if (
-            isinstance(child, ast.Attribute)
-            and child.attr == 'AWAITING_CONFIRMATION'
-        ):
+        if isinstance(child, ast.Attribute) and child.attr == 'AWAITING_CONFIRMATION':
             return True
-        if (
-            isinstance(child, ast.Constant)
-            and child.value == 'awaiting_confirmation'
-        ):
+        if isinstance(child, ast.Constant) and child.value == 'awaiting_confirmation':
             return True
     return False
 

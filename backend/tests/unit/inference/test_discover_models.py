@@ -18,9 +18,7 @@ from backend.inference.discover_models import (
 class Cp1252StringIO(StringIO):
     """StringIO with a Windows console encoding for icon fallback tests."""
 
-    @property
-    def encoding(self) -> str:
-        return 'cp1252'
+    encoding = 'cp1252'
 
 
 class TestPrintSection(TestCase):

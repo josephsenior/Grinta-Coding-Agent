@@ -101,7 +101,9 @@ class RendererDisplayMixin:
         if current_state != self._last_sidebar_state:
             self._update_sidebar_section(
                 '#sidebar-mcp',
-                'MCP Servers' if mcp_loading else f'MCP Servers ({len(mcp_servers) if mcp_servers else 0})',
+                'MCP Servers'
+                if mcp_loading
+                else f'MCP Servers ({len(mcp_servers) if mcp_servers else 0})',
                 mcp_items,
                 empty_message=(
                     'Loading MCP servers...'

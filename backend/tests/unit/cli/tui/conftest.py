@@ -1,7 +1,8 @@
 """Pytest fixtures for Headless TUI."""
 
-import pytest
 from unittest.mock import MagicMock, PropertyMock
+
+import pytest
 
 from backend.tests.unit.cli.tui._shared import *  # noqa: F403
 
