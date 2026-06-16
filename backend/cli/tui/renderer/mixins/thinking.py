@@ -303,6 +303,9 @@ class RendererThinkingMixin:
             self._render_thinking_text_intent(intent, finalize)
             return True
 
+        if intent.kind == 'memory':
+            return True
+
         if not self._should_render_thinking_artifact(intent):
             return True
 

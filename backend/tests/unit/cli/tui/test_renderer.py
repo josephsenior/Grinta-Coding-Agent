@@ -1785,7 +1785,7 @@ async def test_tui_grep_files_with_matches_shows_file_count(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_tui_orient_burst_groups_three_consecutive_lookups(mock_config):
+async def test_tui_orient_lines_stay_individual_for_consecutive_lookups(mock_config):
     from backend.ledger.action.search import FindSymbolsAction, GlobAction, GrepAction
     from backend.ledger.observation.search import (
         FindSymbolsObservation,
@@ -1841,13 +1841,12 @@ async def test_tui_orient_burst_groups_three_consecutive_lookups(mock_config):
         renderer._flush_orient_burst()
         await pilot.pause()
 
-        bursts = list(s.query(OrientBurst).results())
-        assert len(bursts) == 1
-        burst = bursts[0]
-        assert burst._collapsed is True
-        assert len(burst._lines) == 3
-        assert str(burst.query_one('#orient-burst-header').renderable)
-        assert '-hidden' in burst.query_one('#orient-burst-body').classes
+        lines = list(s.query(OrientLine).results())
+        assert len(lines) == 3
+        assert list(s.query(OrientBurst).results()) == []
+        assert lines[0].model.verb == 'Grepped'
+        assert lines[1].model.verb == 'Globbed'
+        assert lines[2].model.verb == 'Found'
 
 
 @pytest.mark.asyncio
@@ -1885,9 +1884,8 @@ async def test_tui_internal_thinking_payloads_render_as_activity_cards(mock_conf
         memory_cards = [card for card in cards if 'category-memory' in card.classes]
         tool_cards = [card for card in cards if 'category-tool' in card.classes]
 
-        assert len(memory_cards) == 1
+        assert len(memory_cards) == 0
         assert len(tool_cards) == 1
-        assert 'Memory' in str(memory_cards[0].query_one('#collapsed-row').renderable)
         assert 'Checkpoint' in str(tool_cards[0].query_one('#collapsed-row').renderable)
 
 
