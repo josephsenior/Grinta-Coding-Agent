@@ -113,6 +113,16 @@ For a one-command onboarding sanity check on Unix-like systems:
 bash scripts/check_contributor_bootstrap.sh
 ```
 
+For packaging / onboarding smoke (wheel + source non-interactive checks):
+
+```bash
+uv build --wheel
+WHEEL_DIR=./dist ./scripts/smoke_install.sh
+./scripts/smoke_source_onboarding.sh
+```
+
+Maintainers: see [docs/FRESH_MACHINE_ONBOARDING.md](docs/FRESH_MACHINE_ONBOARDING.md) for the GA fresh-machine checklist.
+
 ### Code Standards
 
 **Backend (Python):**

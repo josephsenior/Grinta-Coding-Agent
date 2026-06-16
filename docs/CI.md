@@ -13,6 +13,7 @@ This document describes what runs in GitHub Actions and how it relates to local 
 | **Dependency Review** | `dependency-review` | Blocks high-severity dependency risk on pull requests. |
 | **CodeQL** | `analyze` | Static security analysis for Python on PRs and main. |
 | **CLI Regression Tests** | (when paths match) | CLI integration smoke and selected orchestration tests; see [`.github/workflows/e2e-tests.yml`](../.github/workflows/e2e-tests.yml). |
+| **Smoke Install** | `smoke-install` | Clean venv wheel install + source onboarding smoke (`scripts/smoke_install.*`, `scripts/smoke_source_onboarding.*`) on Linux and Windows; see [`.github/workflows/smoke-install.yml`](../.github/workflows/smoke-install.yml). |
 
 Codecov upload is enforced (`fail_ci_if_error: true`) and coverage uses the same `fail_under` policy as the project configuration. The coverage gate runs against the full `backend/tests` tree (not unit-only), so integration, e2e, and stress tests contribute to the reported percentage.
 

@@ -13,11 +13,11 @@ modules and does NOT execute project code. It walks ``backend/`` and
   but treated as non-binding because they do not run at import time)
 
 The output is a single JSON file describing the repository's module
-graph. The primary use case is the file-size decomposition work tracked
-in ``docs/ARCHITECTURE.md`` and ``docs/investigations/`` — before any
-module is split, this manifest tells us exactly which files import the
-target module and which names they reach for, so we can plan a
-re-export shim that satisfies every consumer.
+graph. The primary use case is refactor planning tracked in
+``docs/ARCHITECTURE.md`` and ``docs/internals/`` — before any module is
+split, this manifest tells us exactly which files import the target
+module and which names they reach for, so we can plan a re-export shim
+that satisfies every consumer.
 
 Run from the repository root::
 

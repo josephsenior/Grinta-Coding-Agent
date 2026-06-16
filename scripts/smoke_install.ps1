@@ -89,3 +89,4 @@ try {
 
 Write-Host ''
 Write-Host "==> Done. Extras installed: $($Extras -join ', ')"
+exit 0

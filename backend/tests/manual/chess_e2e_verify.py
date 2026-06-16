@@ -18,9 +18,9 @@ After the fixes:
       residue for strict-markup files -> content hits disk as valid
       HTML/CSS/JS -> chess game is playable.
 
-Run::
+Run from the repository root::
 
-    python scripts/chess_e2e_verify.py
+    uv run python backend/tests/manual/chess_e2e_verify.py
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ import sys
 from pathlib import Path
 
 # Make sure we can import the in-tree backend regardless of how the script is run.
-_REPO_ROOT = Path(__file__).resolve().parent.parent
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
