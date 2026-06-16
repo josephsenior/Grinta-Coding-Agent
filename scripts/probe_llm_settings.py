@@ -86,11 +86,7 @@ def _extract_config(cfg: dict) -> tuple[str, str | None, str | None]:
 
 def _resolve_api_key(raw_key: Any) -> str | None:
     placeholder = '${LLM_API_KEY}'
-    if (
-        not raw_key
-        or str(raw_key).strip() == ''
-        or str(raw_key).strip() == placeholder
-    ):
+    if not raw_key or str(raw_key).strip() == '' or str(raw_key).strip() == placeholder:
         return os.environ.get('LLM_API_KEY')
     return raw_key
 
@@ -155,7 +151,8 @@ def _create_and_test_client(model: str, api_key: str) -> int:
         messages = [{'role': 'user', 'content': 'Hello, say hi in one word.'}]
         print('Sending a short test completion request...')
         resp = client.completion(messages, max_tokens=1)
-        print('Response:', resp)
+        text = (resp.choices[0].message.content or '').strip() if resp.choices else ''
+        print(f'Response ({len(text)} chars): {text!r}')
         return 0
 
     except Exception as e:
@@ -168,7 +165,7 @@ def _print_exception_info(e: Exception) -> None:
     print('\nTraceback:')
     traceback.print_exc()
     try:
-        for a in ('status_code', 'code', 'body', 'llm_provider', 'model'):
+        for a in ('status_code', 'code', 'llm_provider', 'model'):
             if hasattr(e, a):
                 val = getattr(e, a)
                 if isinstance(val, str) and len(val) > 0:
