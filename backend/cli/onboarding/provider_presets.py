@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from backend.cli.settings.constants import (
-    DEFAULT_MODEL_BY_PROVIDER,
     _PROVIDERS,
+    DEFAULT_MODEL_BY_PROVIDER,
 )
 from backend.core.providers import PROVIDER_CONFIGURATIONS
 from backend.inference.registry import PROVIDER_DEFAULT_URLS

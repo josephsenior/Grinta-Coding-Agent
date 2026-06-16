@@ -20,7 +20,6 @@ Note:
 """
 
 import base64
-import warnings
 from typing import Any, cast
 
 from backend.execution.plugins.agent_skills.utils.config import (
@@ -38,17 +37,9 @@ _DOCUMENTS_EXTRA_HINT = (
 def _read_pdf_reader():
     try:
         from pypdf import PdfReader
-
-        return PdfReader
-    except Exception:
-        with warnings.catch_warnings():
-            warnings.simplefilter('ignore', DeprecationWarning)
-            try:
-                import PyPDF2  # type: ignore[import-untyped]
-            except ImportError as exc:
-                raise RuntimeError(_DOCUMENTS_EXTRA_HINT) from exc
-
-            return PyPDF2.PdfReader
+    except ImportError as exc:
+        raise RuntimeError(_DOCUMENTS_EXTRA_HINT) from exc
+    return PdfReader
 
 
 def parse_pdf(file_path: str) -> None:

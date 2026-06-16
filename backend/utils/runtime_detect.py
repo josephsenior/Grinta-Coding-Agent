@@ -504,8 +504,7 @@ def detection_summary() -> dict[str, list[str]]:
         'debug_unsupported': sorted(
             f'{e["language"]}:{e["adapter"]}({e.get("transport", "unknown")})'
             for e in debug
-            if e.get('available')
-            and not e.get('auto_resolvable', e.get('available'))
+            if e.get('available') and not e.get('auto_resolvable', e.get('available'))
         ),
         'debug_missing': sorted(
             f'{e["language"]}:{e["adapter"]}' for e in debug if not e.get('available')

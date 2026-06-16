@@ -276,9 +276,7 @@ class DAPClient:
                 timeout_seconds=timeout,
                 pending_count=len(self._pending),
                 stderr_tail=self.stderr_tail(10),
-                process_alive=(
-                    self.is_running()
-                ),
+                process_alive=(self.is_running()),
             )
             raise DAPError(f'DAP request {request_seq} timed out') from exc
         finally:

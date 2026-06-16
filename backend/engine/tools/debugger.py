@@ -204,11 +204,7 @@ def create_debugger_tool() -> dict[str, Any]:
                         'then': {'required': ['session_id']},
                     },
                     {
-                        'if': {
-                            'properties': {
-                                'action': {'const': 'set_breakpoints'}
-                            }
-                        },
+                        'if': {'properties': {'action': {'const': 'set_breakpoints'}}},
                         'then': {'required': ['session_id', 'file']},
                     },
                     {

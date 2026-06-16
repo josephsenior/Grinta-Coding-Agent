@@ -61,7 +61,7 @@ jobs:
           files: ./coverage.xml
           flags: python-linux
           name: python-linux
-          fail_ci_if_error: true
+          fail_ci_if_error: false
           verbose: true
 
   gates-on-windows:

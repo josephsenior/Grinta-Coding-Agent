@@ -29,12 +29,13 @@ jobs:
         id: detect
         shell: bash
         run: |
-          required=(
+          integration_paths=(
             "backend/evaluation/agent_eval_pack.py"
+            "evaluation/integration_tests/scripts/run_infer.sh"
           )
 
           missing=()
-          for path in "${required[@]}"; do
+          for path in "${integration_paths[@]}"; do
             if [ ! -e "$path" ]; then
               missing+=("$path")
             fi

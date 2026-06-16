@@ -237,7 +237,7 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
                     classes='field-label',
                     id='settings-custom-model-label',
                 )
-                yield Input(value=current_custom_model, id='settings-custom-model', compact=True)
+                yield Input(value=current_custom_model, id='settings-custom-model')
                 yield Label('', id='settings-model-meta')
                 yield Label(
                     'Reasoning effort',
@@ -251,7 +251,7 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
                     id='settings-reasoning',
                 )
                 yield Label('API key (blank = keep current)', classes='field-label')
-                yield Input(password=True, id='settings-api-key', compact=True)
+                yield Input(password=True, id='settings-api-key')
             yield Label('', id='dialog-feedback')
             with Horizontal(id='dialog-buttons'):
                 yield Button('Save', id='settings-save', variant='primary')
