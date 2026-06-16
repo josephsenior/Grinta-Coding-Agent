@@ -21,6 +21,7 @@ from backend.ledger.observation import (
     AnalyzeProjectStructureObservation,
     BrowserScreenshotObservation,
     CmdOutputObservation,
+    DebuggerObservation,
     DelegateTaskObservation,
     ErrorObservation,
     FileDownloadObservation,
@@ -72,6 +73,7 @@ class _ObsDispatchMixin(_ObservationRenderersBase):
         (MCPObservation, '_render_mcp_observation'),
         (TerminalObservation, '_render_terminal_observation'),
         (LspQueryObservation, '_render_lsp_query_observation'),
+        (DebuggerObservation, '_render_debugger_observation'),
         (GrepObservation, '_render_grep_observation'),
         (GlobObservation, '_render_glob_observation'),
         (FindSymbolsObservation, '_render_find_symbols_observation'),
@@ -98,3 +100,17 @@ class _ObsDispatchMixin(_ObservationRenderersBase):
         self.refresh()
 
     # -- Per-observation renderers (small, single-CC dispatch targets) ------
+
+    def _render_debugger_observation(self, obs: DebuggerObservation) -> None:
+        """Render a debugger result in the legacy terminal frontend."""
+        self._stop_reasoning()
+        self._flush_pending_tool_cards()
+        content = (getattr(obs, 'content', '') or '').strip()
+        payload = getattr(obs, 'payload', None)
+        if not content and isinstance(payload, dict):
+            state = payload.get('state') or getattr(obs, 'state', None) or 'updated'
+            target = payload.get('target') or getattr(obs, 'session_id', None) or ''
+            content = f'{state}: {target}'.strip(': ')
+        if content:
+            self._render_terminal_panel(body=content)
+        self.refresh()

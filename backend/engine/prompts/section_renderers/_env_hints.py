@@ -22,6 +22,18 @@ def _lsp_available(config: Any = None) -> bool:
         return False
 
 
+def _debugger_available(config: Any = None) -> bool:
+    """Return whether the debugger tool should be considered available."""
+    if not getattr(config, 'enable_debugger', False):
+        return False
+    try:
+        from backend.utils.runtime_detect import has_any_debug_adapter
+
+        return bool(has_any_debug_adapter())
+    except Exception:
+        return False
+
+
 def _discovery_decision_table(
     *, lsp_available: bool, web_on: bool = True, docs_on: bool = True
 ) -> str:

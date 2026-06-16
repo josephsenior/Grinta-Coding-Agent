@@ -203,7 +203,7 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         default=DEFAULT_AGENT_DEBUGGER_ENABLED,
         description=(
             'Expose the interactive DAP `debugger` tool. When false, the tool is omitted '
-            'and the system prompt states that debugging is disabled for this run.'
+            'from the toolset; when true, runtime adapter detection still gates availability.'
         ),
     )
     enable_editor: bool = Field(default=True)

@@ -6,6 +6,7 @@ from collections.abc import Callable
 from typing import Any
 
 from backend.engine.prompts.section_renderers._env_hints import (
+    _debugger_available,
     _discovery_decision_table,
     _lsp_available,
     _repo_discovery_contract,
@@ -33,6 +34,7 @@ def _render_routing(
     can_edit = not (is_chat_mode(mode) or is_plan_mode(mode))
 
     lsp_available = _lsp_available(config)
+    debugger_available = can_edit and _debugger_available(config)
     working_memory_on = getattr(config, 'enable_working_memory', True)
     tracker_on = getattr(config, 'enable_task_tracker_tool', False)
     if not is_windows:
@@ -53,6 +55,11 @@ def _render_routing(
     lsp_routing = (
         '- **Known file + symbol position, precise definition/references/hover** → `lsp`'
         if lsp_available
+        else ''
+    )
+    debugger_routing = (
+        '- **Runtime bugs, stateful failures, control-flow uncertainty, or "why did this branch/value happen?"** -> `debugger` (set breakpoints, run/attach, inspect stack/scopes/variables, evaluate, step, then stop the session).'
+        if debugger_available
         else ''
     )
     tool_call_batching_mode = _routing_tool_batching_paragraph(function_calling_mode)
@@ -84,6 +91,7 @@ def _render_routing(
         ambiguous_intent_instruction=memory_kw['ambiguous_intent_instruction'],
         batch_commands=batch_cmds,
         lsp_routing=lsp_routing,
+        debugger_routing=debugger_routing,
         discovery_decision_table=discovery_decision_table,
         memory_and_context_section=memory_kw['memory_and_context_section'],
         post_condensation_retrieval=memory_kw['post_condensation_retrieval'],

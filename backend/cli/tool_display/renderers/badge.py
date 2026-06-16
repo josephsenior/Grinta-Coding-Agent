@@ -48,6 +48,7 @@ _BADGES: dict[str, ToolBadge] = {
     # Execution: shell commands, terminal operations
     'shell': ToolBadge('Shell', CLR_STATUS_WARN, CLR_STATUS_WARN, '├'),
     'terminal': ToolBadge('Terminal', CLR_STATUS_WARN, CLR_STATUS_WARN, '├'),
+    'debugger': ToolBadge('Debugger', '#8f9fc1', '#8f9fc1', '├'),
     # Files: read, edit, create operations
     'files': ToolBadge('Files', CLR_BRAND_HUE, CLR_BRAND_HUE, '├'),
     # Search: code search, grep
@@ -83,6 +84,7 @@ def get_tool_badge(tool_category: str) -> ToolBadge:
 _NAME_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
     (('error',), 'error'),
     (('bash', 'powershell', 'shell'), 'shell'),
+    (('debugger', 'debug'), 'debugger'),
     (('file', 'symbol'), 'files'),
     (('search',), 'search'),
     (('lsp', 'symbol'), 'code'),

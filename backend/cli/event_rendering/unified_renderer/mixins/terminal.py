@@ -104,3 +104,28 @@ class _TerminalMixin:
             start_collapsed=True,
             syntax_language='console',
         )
+
+    @staticmethod
+    def debugger_action(
+        verb: str,
+        detail: str,
+        secondary: str | None = None,
+        secondary_kind: str = 'neutral',
+        extra_content: str | None = None,
+    ) -> ActivityCard:
+        """Create an activity card for a DAP debugger action/result."""
+        extra_lines: list[ActivityLine] = []
+        extra_lines.extend(_TerminalMixin._build_terminal_content_lines(extra_content))
+
+        return ActivityCard(
+            verb=verb,
+            detail=detail,
+            badge_category='debugger',
+            title='Debugger',
+            secondary=secondary,
+            secondary_kind=secondary_kind,
+            extra_lines=extra_lines,
+            is_collapsible=True,
+            start_collapsed=True,
+            syntax_language='console',
+        )

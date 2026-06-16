@@ -500,13 +500,15 @@ class RendererDisplayMixin:
         status = status_map.get(card.secondary_kind, 'neutral')
         terminal_command = None
         shell_kind = None
-        if card.badge_category in ('shell', 'terminal'):
+        if card.badge_category in ('shell', 'terminal', 'debugger'):
             from backend.cli.tui.helpers import infer_display_shell_kind
 
             terminal_command = TUIActivityCard._command_from_detail(card.detail)
             shell_kind = (
                 'terminal'
                 if card.badge_category == 'terminal'
+                else 'debugger'
+                if card.badge_category == 'debugger'
                 else infer_display_shell_kind(terminal_command)
             )
         widget = TUIActivityCard(
@@ -535,6 +537,7 @@ class RendererDisplayMixin:
             'mcp',
             'workers',
             'code',
+            'debugger',
         )
         is_active = is_tool and card.secondary_kind == 'neutral'
         if is_active:

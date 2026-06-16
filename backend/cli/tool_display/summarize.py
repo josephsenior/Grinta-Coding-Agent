@@ -158,6 +158,41 @@ def _summarize_terminal_manager_args(args: dict[str, Any]) -> str:
     return handler(args) if handler else 'terminal…'
 
 
+def _summary_debugger(args: dict[str, Any]) -> str:
+    """Human-readable line for the DAP ``debugger`` tool."""
+    op = str(args.get('action') or args.get('debug_action') or '').strip().lower()
+    sid = str(args.get('session_id') or '').strip()
+    if op == 'start':
+        target = _arg_str(args, 'program', 'adapter', 'language', 'adapter_id')
+        cwd = _arg_str(args, 'cwd')
+        bits = ['start']
+        if target:
+            bits.append(_trunc(target, 72))
+        if cwd:
+            bits.append(f'cwd {_trunc(cwd, 40)}')
+        return ' · '.join(bits)
+    if op == 'set_breakpoints':
+        file = _arg_str(args, 'file') or 'breakpoints'
+        lines = args.get('lines')
+        if isinstance(lines, list) and lines:
+            preview = ','.join(str(line) for line in lines[:6])
+            if len(lines) > 6:
+                preview += ',...'
+            return _trunc(f'breakpoints · {file}:{preview}', 120)
+        breakpoints = args.get('breakpoints')
+        if isinstance(breakpoints, list) and breakpoints:
+            return _trunc(f'breakpoints · {file} · {len(breakpoints)}', 120)
+        return _trunc(f'breakpoints · {file}', 120)
+    if op == 'evaluate':
+        expr = _arg_str(args, 'expression')
+        return f'evaluate · {_trunc(expr, 90)}' if expr else 'evaluate'
+    if op in {'stack', 'scopes', 'variables', 'status', 'stop'}:
+        return f'{op} · {_trunc(sid, 36)}' if sid else op
+    if op in {'continue', 'next', 'step_in', 'step_out', 'pause'}:
+        return f'{op} · {_trunc(sid, 36)}' if sid else op
+    return _trunc(op or sid or 'debugger…', 120)
+
+
 def _streaming_hint_terminal_manager(partial_json: str) -> str:
     """Best-effort label while ``terminal_manager`` JSON is still streaming."""
     m_act = re.search(r'"action"\s*:\s*"(open|input|read)"', partial_json)
@@ -408,6 +443,7 @@ _TOOL_SUMMARIZERS: dict[str, Callable[[dict[str, Any]], str]] = {
     'call_mcp_tool': _summary_call_mcp,
     'checkpoint': _summary_checkpoint,
     'terminal_manager': _summarize_terminal_manager_args,
+    'debugger': _summary_debugger,
     'shared_task_board': _summary_shared_board,
 }
 

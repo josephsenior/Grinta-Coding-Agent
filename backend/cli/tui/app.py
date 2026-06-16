@@ -26,6 +26,9 @@ from backend.cli.theme import (
 from backend.cli.tui.renderer.mixins.action_handlers import (
     RendererActionHandlersMixin,  # noqa: F401
 )
+from backend.cli.tui.renderer.mixins.debugger import (
+    RendererDebuggerMixin,  # noqa: F401
+)
 from backend.cli.tui.renderer.mixins.display import (
     RendererDisplayMixin,  # noqa: F401
 )
@@ -229,6 +232,7 @@ class GrintaScreen(
 class TUIRenderer(
     RendererLiveMixin,
     RendererDisplayMixin,
+    RendererDebuggerMixin,
     RendererTerminalMixin,
     RendererThinkingMixin,
     RendererEventProcessorMixin,
@@ -294,6 +298,8 @@ class TUIRenderer(
         self._terminal_commands_by_session: dict[str, str] = {}
         self._pending_terminal_command: str | None = None
         self._pending_terminal_card: Any | None = None
+        self._debugger_cards_by_session: dict[str, Any] = {}
+        self._pending_debugger_card: Any | None = None
         self._pending_shell_cards_by_command: dict[str, deque[Any]] = defaultdict(deque)
         self._pending_file_read_cards_by_path: dict[str, deque[Any]] = defaultdict(
             deque

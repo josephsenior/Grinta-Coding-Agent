@@ -33,6 +33,7 @@ from backend.ledger.action import (  # noqa: E402
     ClarificationRequestAction,
     CmdRunAction,
     CondensationAction,
+    DebuggerAction,
     DelegateTaskAction,
     EscalateToHumanAction,
     FileEditAction,
@@ -94,6 +95,7 @@ class _ActionDispatchMixin(_ActionRenderersBase):
         (ReadSymbolsAction, '_render_read_symbols_action'),
         (AnalyzeProjectStructureAction, '_render_analyze_project_structure_action'),
         (LspQueryAction, '_render_lsp_query_action'),
+        (DebuggerAction, '_render_debugger_action'),
         (TaskTrackingAction, '_render_task_tracking_action'),
         (CondensationAction, '_render_condensation_action'),
         (TerminalRunAction, '_render_terminal_run_action'),
@@ -193,3 +195,32 @@ class _ActionDispatchMixin(_ActionRenderersBase):
         self.refresh()
 
     # -- Per-action renderers (small, single-CC dispatch targets) -----------
+
+    def _render_debugger_action(self, action: DebuggerAction) -> None:
+        """Render a debugger action in the legacy terminal frontend."""
+        from backend.cli.tool_display.headline import friendly_verb_for_tool
+        from backend.cli.tool_display.summarize import summarize_tool_arguments
+
+        self._flush_pending_tool_cards()
+        args = {
+            'action': getattr(action, 'debug_action', '') or '',
+            'session_id': getattr(action, 'session_id', None),
+            'adapter': getattr(action, 'adapter', None),
+            'language': getattr(action, 'language', None),
+            'program': getattr(action, 'program', None),
+            'cwd': getattr(action, 'cwd', None),
+            'file': getattr(action, 'file', None),
+            'lines': getattr(action, 'lines', None),
+            'breakpoints': getattr(action, 'breakpoints', None),
+            'expression': getattr(action, 'expression', None),
+        }
+        self._print_activity(
+            friendly_verb_for_tool('debugger', args),
+            summarize_tool_arguments('debugger', args),
+            None,
+            title='Debugger',
+            shell_rail=True,
+            badge_label='debugger',
+        )
+        self._ensure_reasoning()
+        self.refresh()

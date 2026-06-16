@@ -36,6 +36,22 @@ _TERMINAL_MANAGER_VERBS = {
     'read': 'Read',
 }
 
+_DEBUGGER_VERBS = {
+    'start': 'Started',
+    'set_breakpoints': 'Set',
+    'continue': 'Continued',
+    'next': 'Stepped',
+    'step_in': 'Stepped',
+    'step_out': 'Stepped',
+    'pause': 'Paused',
+    'stack': 'Inspected',
+    'scopes': 'Inspected',
+    'variables': 'Inspected',
+    'evaluate': 'Evaluated',
+    'status': 'Checked',
+    'stop': 'Stopped',
+}
+
 _SIMPLE_VERB_MAP = {
     'read_file': 'Read',
     'create': 'Created',
@@ -66,6 +82,11 @@ def _verb_terminal_manager(args: dict[str, Any]) -> str:
     return _TERMINAL_MANAGER_VERBS.get(op, 'Tool')
 
 
+def _verb_debugger(args: dict[str, Any]) -> str:
+    op = str(args.get('action') or args.get('debug_action') or '').strip().lower()
+    return _DEBUGGER_VERBS.get(op, 'Debugging')
+
+
 def friendly_verb_for_tool(tool_name: str, args: dict[str, Any] | None = None) -> str:
     """Short English verb for the activity row (no emoji)."""
     tn = (tool_name or '').strip()
@@ -76,6 +97,8 @@ def friendly_verb_for_tool(tool_name: str, args: dict[str, Any] | None = None) -
         verb = _verb_terminal_manager(a)
         if verb != 'Tool':
             return verb
+    if tn == 'debugger':
+        return _verb_debugger(a)
     if tn in _SIMPLE_VERB_MAP:
         return _SIMPLE_VERB_MAP[tn]
     return tn.replace('_', ' ').title() if tn else 'Tool'
@@ -141,6 +164,18 @@ def _stats_lsp(args: dict[str, Any]) -> str | None:
     return None
 
 
+def _stats_debugger(args: dict[str, Any]) -> str | None:
+    sid = args.get('session_id')
+    if isinstance(sid, str) and sid.strip():
+        from backend.cli.tool_display.summarize import _trunc
+
+        return f'session: {_trunc(sid, 36)}'
+    adapter = args.get('adapter') or args.get('language') or args.get('adapter_type')
+    if isinstance(adapter, str) and adapter.strip():
+        return f'adapter: {adapter}'
+    return None
+
+
 def _stats_read_symbol(args: dict[str, Any]) -> str | None:
     entities = args.get('entity_names')
     if isinstance(entities, list) and entities:
@@ -158,6 +193,7 @@ _STATS_HANDLERS: dict[str, Callable[[dict[str, Any]], str | None]] = {
     'read_symbol': _stats_read_symbol,
     'task_tracker': _stats_task_tracker,
     'terminal_manager': _stats_terminal_manager,
+    'debugger': _stats_debugger,
     'lsp': _stats_lsp,
     'lsp_query': _stats_lsp,
 }
