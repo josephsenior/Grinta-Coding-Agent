@@ -630,6 +630,13 @@
         "featured": true,
         "supports_function_calling": true,
         "supports_parallel_tool_calls": true,
+        "supports_reasoning_effort": true,
+        "reasoning_efforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "reasoning_wire": "openai_thinking_enabled",
         "supports_stop_words": true
       },
       "metadata": {
@@ -650,6 +657,13 @@
         "featured": true,
         "supports_function_calling": true,
         "supports_parallel_tool_calls": true,
+        "supports_reasoning_effort": true,
+        "reasoning_efforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "reasoning_wire": "openai_thinking_enabled",
         "supports_stop_words": true
       },
       "metadata": {

@@ -225,6 +225,35 @@ class TestGatewayReasoningOptions:
             'enabled': True,
         }
 
+    def test_vercel_qwen37_plus_has_configurable_thinking(self):
+        kwargs = {
+            'model': 'vercel/alibaba/qwen3.7-plus',
+            'temperature': 0.5,
+            'reasoning_effort': 'high',
+        }
+
+        out = apply_model_param_overrides(
+            'vercel/alibaba/qwen3.7-plus',
+            kwargs,
+            reasoning_effort='high',
+            provider='vercel',
+        )
+
+        assert out['thinking'] == {'type': 'enabled'}
+        assert out['enable_thinking'] is True
+        assert 'reasoning_effort' not in out
+
+        disabled = apply_model_param_overrides(
+            'vercel/alibaba/qwen3.7-plus',
+            {'model': 'vercel/alibaba/qwen3.7-plus', 'reasoning_effort': 'none'},
+            reasoning_effort='none',
+            provider='vercel',
+        )
+
+        assert disabled['enable_thinking'] is False
+        assert 'thinking' not in disabled
+        assert 'reasoning_effort' not in disabled
+
 
 class TestReasoningDisplayOptions:
     def test_opencode_claude_fable_display_labels_match_variants(self):

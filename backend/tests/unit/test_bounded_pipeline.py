@@ -1,11 +1,11 @@
 """Tests for the bounded-pipeline plan (Layers 1, 2, 5).
 
-These tests verify the orchestrator's hot path is bounded against any
-single hang point:
+These tests verify the orchestrator's hot path has bounded stall points
+without interrupting active LLM streams:
 
-- Layer 1: LLM step (``astep``) has a default wall-clock cap so a hung
-  LLM provider cannot wedge the agent.  The cap is configurable via
-  ``APP_LLM_STEP_TIMEOUT_SECONDS``.
+- Layer 1: LLM step (``astep``) supports an explicit opt-in wall-clock cap
+  via ``APP_LLM_STEP_TIMEOUT_SECONDS``. Streaming liveness is handled by
+  first-chunk and per-chunk stall timeouts instead of a blind outer cap.
 - Layer 2: Observation handler is bounded with a 10s ceiling.
 - Layer 5: Step drain loop has a 600s ceiling per iteration; force-clears
   pending state and emits a visible error on timeout.
@@ -28,24 +28,23 @@ from backend.core.llm_step_timeout import (
 
 
 class TestLlmStepTimeoutDefault:
-    """The default LLM step timeout must be a positive value."""
+    """The outer LLM step timeout is opt-in."""
 
-    def test_default_is_300s(self):
-        """Production default is 300s (5 minutes) per LLM step."""
-        assert DEFAULT_LLM_STEP_TIMEOUT_SECONDS == 300.0
+    def test_default_is_disabled(self):
+        """Production default leaves active streams governed by chunk liveness."""
+        assert DEFAULT_LLM_STEP_TIMEOUT_SECONDS is None
 
-    def test_unset_env_returns_default(self, monkeypatch):
-        """With APP_LLM_STEP_TIMEOUT_SECONDS unset, default 300s applies."""
+    def test_unset_env_returns_none(self, monkeypatch):
+        """With APP_LLM_STEP_TIMEOUT_SECONDS unset, no outer cap applies."""
         monkeypatch.delenv('APP_LLM_STEP_TIMEOUT_SECONDS', raising=False)
         result = llm_step_timeout_seconds_from_env()
-        assert result == DEFAULT_LLM_STEP_TIMEOUT_SECONDS
-        assert result == 300.0
+        assert result is None
 
-    def test_empty_env_returns_default(self, monkeypatch):
-        """Empty env var is treated as unset and uses the default."""
+    def test_empty_env_returns_none(self, monkeypatch):
+        """Empty env var is treated as unset."""
         monkeypatch.setenv('APP_LLM_STEP_TIMEOUT_SECONDS', '')
         result = llm_step_timeout_seconds_from_env()
-        assert result == DEFAULT_LLM_STEP_TIMEOUT_SECONDS
+        assert result is None
 
     def test_explicit_positive_value(self, monkeypatch):
         """Positive env value overrides the default."""
@@ -59,11 +58,11 @@ class TestLlmStepTimeoutDefault:
         result = llm_step_timeout_seconds_from_env()
         assert result is None
 
-    def test_invalid_value_returns_default(self, monkeypatch):
-        """Invalid env value falls back to safe default."""
+    def test_invalid_value_returns_none(self, monkeypatch):
+        """Invalid env value leaves the outer cap disabled."""
         monkeypatch.setenv('APP_LLM_STEP_TIMEOUT_SECONDS', 'not-a-number')
         result = llm_step_timeout_seconds_from_env()
-        assert result == DEFAULT_LLM_STEP_TIMEOUT_SECONDS
+        assert result is None
 
 
 # ── Layer 1: LLM step timeout propagates for retry-queue recovery ────
