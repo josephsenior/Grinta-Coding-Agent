@@ -228,6 +228,10 @@ class TestPreCondensationSnapshot(unittest.TestCase):
 
         assert snapshot['objective'] == 'Fix long-running compaction'
         assert snapshot['latest_directive'] == 'Also preserve background processes'
+        assert snapshot['recent_user_messages'] == [
+            {'text': 'Fix long-running compaction'},
+            {'text': 'Also preserve background processes'},
+        ]
         assert snapshot['background_tasks'] == [
             {
                 'session_id': 'terminal_9',

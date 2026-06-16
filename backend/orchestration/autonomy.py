@@ -14,11 +14,16 @@ from typing import TYPE_CHECKING
 
 from backend.ledger.action import (
     Action,
+    ActionSecurityRisk,
+    BlackboardAction,
     BrowseInteractiveAction,
     BrowserToolAction,
     CmdRunAction,
+    DelegateTaskAction,
     FileEditAction,
     FileWriteAction,
+    TerminalInputAction,
+    TerminalRunAction,
 )
 from backend.security.command_analyzer import CommandAnalyzer, RiskCategory
 
@@ -95,9 +100,23 @@ class AutonomyController:
         """
         if isinstance(action, CmdRunAction):
             return f'cmd:{action.command}'
+        if isinstance(action, TerminalRunAction):
+            return f'terminal-run:{action.cwd or ""}:{action.command}'
+        if isinstance(action, TerminalInputAction):
+            return f'terminal-input:{action.session_id}:{action.input}'
         if isinstance(action, FileWriteAction | FileEditAction):
             path = getattr(action, 'path', '') or ''
-            return f'{type(action).__name__}:{path}'
+            command = getattr(action, 'command', '') or ''
+            return f'{type(action).__name__}:{path}:{command}'
+        if isinstance(action, BrowserToolAction):
+            return f'browser:{action.command}:{action.params}'
+        if isinstance(action, BlackboardAction):
+            return f'blackboard:{action.command}:{action.key}'
+        if isinstance(action, DelegateTaskAction):
+            return (
+                f'delegate:{action.run_in_background}:'
+                f'{len(action.parallel_tasks)}:{action.task_description}'
+            )
         return type(action).__name__
 
     def remember_always_allow(self, action: Action) -> None:
@@ -156,12 +175,24 @@ class AutonomyController:
         Returns:
             True if the action is high-risk
         """
+        risk = getattr(action, 'security_risk', ActionSecurityRisk.UNKNOWN)
+        if risk == ActionSecurityRisk.HIGH:
+            return True
+
+        command = ''
         if isinstance(action, CmdRunAction):
+            command = action.command
+        elif isinstance(action, TerminalRunAction):
+            command = action.command
+        elif isinstance(action, TerminalInputAction) and not action.is_control:
+            command = action.input.rstrip('\r\n')
+
+        if command:
             analyzer = getattr(self, '_command_analyzer', None)
             if analyzer is None:
                 analyzer = CommandAnalyzer({})
                 self._command_analyzer = analyzer
-            assessment = analyzer.analyze_command(action.command)
+            assessment = analyzer.analyze_command(command)
             if assessment.risk_category in (
                 RiskCategory.HIGH,
                 RiskCategory.CRITICAL,
@@ -169,7 +200,7 @@ class AutonomyController:
                 logger.warning(
                     'High-risk command detected (%s): %s',
                     assessment.risk_category.value,
-                    action.command,
+                    command,
                 )
                 return True
 
@@ -177,6 +208,12 @@ class AutonomyController:
             return True
 
         if isinstance(action, BrowseInteractiveAction | BrowserToolAction):
+            return True
+
+        if isinstance(action, DelegateTaskAction):
+            return True
+
+        if isinstance(action, BlackboardAction) and action.command.lower() == 'set':
             return True
 
         return False

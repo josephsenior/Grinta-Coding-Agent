@@ -375,10 +375,43 @@ def process_tool_calls(
             response_obj=response,
             total_calls_in_response=len(assistant_msg.tool_calls),
         )
+        _log_emitted_tool_action(action, tool_call, arguments, len(assistant_msg.tool_calls))
 
         actions.append(action)
 
     return actions
+
+
+def _log_emitted_tool_action(
+    action: Action,
+    tool_call: Any,
+    arguments: dict[str, Any],
+    total_calls: int,
+) -> None:
+    try:
+        logger.info(
+            'LLM emitted tool action: action=%s tool=%s call_id=%s total_calls=%s args=%s',
+            type(action).__name__,
+            _tool_call_function_name(tool_call),
+            getattr(tool_call, 'id', ''),
+            total_calls,
+            _compact_tool_args_for_log(arguments),
+        )
+    except Exception:
+        logger.debug('Failed to log emitted tool action', exc_info=True)
+
+
+def _compact_tool_args_for_log(arguments: dict[str, Any], *, limit: int = 500) -> str:
+    import json as _json
+
+    try:
+        text = _json.dumps(arguments, ensure_ascii=False, sort_keys=True)
+    except (TypeError, ValueError):
+        text = str(arguments)
+    text = ' '.join(text.replace('\r', ' ').replace('\n', ' ').split())
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3].rstrip() + '...'
 
 
 def common_response_to_actions(

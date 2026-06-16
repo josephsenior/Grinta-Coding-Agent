@@ -38,6 +38,7 @@ _MAX_TEST_RESULTS = 8
 _MAX_INVALIDATED_ASSUMPTIONS = 12
 _MAX_CONTENT_LENGTH = 500
 _MAX_TASKS = 20
+_MAX_RECENT_USER_MESSAGES = 8
 
 
 def _agent_debug_log(
@@ -135,6 +136,7 @@ def extract_snapshot(events: list[Event]) -> dict[str, Any]:
         'events_condensed': len(events),
         'objective': '',
         'latest_directive': '',
+        'recent_user_messages': [],
         'files_touched': {},
         'recent_errors': [],
         'decisions': [],
@@ -311,6 +313,22 @@ def _extract_user_directive(event: Event, snapshot: dict) -> None:
     if not snapshot.get('objective'):
         snapshot['objective'] = content[:_MAX_CONTENT_LENGTH]
     snapshot['latest_directive'] = content[:_MAX_CONTENT_LENGTH]
+    _append_recent_user_message(event, content, snapshot)
+
+
+def _append_recent_user_message(event: Event, content: str, snapshot: dict) -> None:
+    recent = snapshot.setdefault('recent_user_messages', [])
+    if not isinstance(recent, list):
+        recent = []
+        snapshot['recent_user_messages'] = recent
+    event_id = getattr(event, 'id', None)
+    item: dict[str, Any] = {'text': content[:_MAX_CONTENT_LENGTH]}
+    if isinstance(event_id, int) and event_id >= 0:
+        item['event_id'] = event_id
+    elif isinstance(event_id, str) and event_id:
+        item['event_id'] = event_id
+    recent.append(item)
+    del recent[:-_MAX_RECENT_USER_MESSAGES]
 
 
 def _extract_task_plan(event: Event, snapshot: dict) -> None:

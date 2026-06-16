@@ -61,7 +61,7 @@ The event stream serializes/deserializes actions (`event_to_dict` → `event_fro
 - **Removed**: `_is_full_autonomy()` helper method (no longer needed)
 - **Simplified**: `_enforce_security()` to only handle blocking, not confirmation
 - **Removed**: Logic that set `action.confirmation_state = AWAITING_CONFIRMATION`
-- **Kept**: All hardcoded safety blocks (editor-only writes, sensitive paths)
+- **Kept**: Hardcoded safety blocks that are active in runtime security policy (critical commands, hardened-local sensitive paths)
 - **Kept**: Configurable blocking (`block_high_risk`)
 - **Kept**: `_check_action_confirmation()` that reads state and blocks execution
 
@@ -75,7 +75,7 @@ The event stream serializes/deserializes actions (`event_to_dict` → `event_fro
 ### What's Preserved
 
 ✅ **All safety guarantees remain intact:**
-- Hardcoded blocks (editor-only writes, sensitive paths like `.env`, `.ssh`)
+- Hardcoded blocks (critical commands, hardened-local sensitive paths like `.env`, `.ssh`)
 - Configurable blocking (`block_high_risk` config)
 - Execution gating (reads confirmation state, blocks if `AWAITING_CONFIRMATION`)
 - Security risk analysis (shared analyzer used by both layers)
@@ -120,4 +120,4 @@ To verify safety is preserved:
 1. Enable `block_high_risk` in config
 2. Execute high-risk actions
 3. Confirm actions are blocked with `ErrorObservation`
-4. Verify hardcoded blocks still work (e.g., editor-only shell writes)
+4. Verify hardcoded blocks still work (e.g., critical command refusal and hardened-local sensitive paths)

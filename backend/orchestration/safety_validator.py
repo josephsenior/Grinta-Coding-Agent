@@ -200,7 +200,7 @@ class SafetyValidator:
             assessment.risk_level == ActionSecurityRisk.HIGH
             and self.config.enable_mandatory_validation
             and context.is_autonomous
-            and self.config.risk_threshold in ['critical', 'high']
+            and self.config.risk_threshold.lower() in ['critical', 'high']
         ):
             logger.warning(
                 'HIGH risk action blocked in autonomous mode: %s',

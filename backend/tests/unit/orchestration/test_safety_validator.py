@@ -410,6 +410,32 @@ class TestSafetyValidator:
         should_block = validator._should_block_action(assessment, context)
         assert should_block is False
 
+    def test_should_block_action_honors_uppercase_high_threshold(self):
+        """Autonomous HIGH blocking should normalize risk_threshold casing."""
+        config = self.create_mock_config(
+            environment='development',
+            risk_threshold='HIGH',
+        )
+        validator = SafetyValidator(config)
+
+        from types import SimpleNamespace
+
+        assessment = SimpleNamespace(
+            risk_category=RiskCategory.HIGH,
+            risk_level=ActionSecurityRisk.HIGH,
+            reason='high autonomous risk',
+        )
+        context = ExecutionContext(
+            session_id='test',
+            iteration=1,
+            agent_state='running',
+            recent_errors=[],
+            is_autonomous=True,
+        )
+
+        should_block = validator._should_block_action(assessment, context)
+        assert should_block is True
+
     def test_requires_human_review_false_when_disabled(self):
         """Test _requires_human_review returns False when disabled."""
         config = self.create_mock_config(require_review_for_high_risk=False)
