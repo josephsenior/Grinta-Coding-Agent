@@ -265,9 +265,7 @@ class RendererDebuggerMixin:
     def _handle_debugger_observation_card(self, observation: Any) -> None:
         payload = dict(getattr(observation, 'payload', None) or {})
         session_id = str(
-            getattr(observation, 'session_id', None)
-            or payload.get('session_id')
-            or ''
+            getattr(observation, 'session_id', None) or payload.get('session_id') or ''
         )
         state = str(getattr(observation, 'state', None) or payload.get('state') or '')
         verb = _STATE_VERBS.get(state, 'Debugger')

@@ -227,6 +227,7 @@ async def test_tui_live_response_follows_tail_when_not_user_scrolled(
             'Starting response.\n' + '\n'.join(f'new line {idx}' for idx in range(20))
         )
         await pilot.pause()
+        await _await_at_bottom(display, pilot)
 
         assert display._user_scrolled_away is False
         assert display._was_at_bottom()

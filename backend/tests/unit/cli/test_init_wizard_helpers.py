@@ -75,7 +75,16 @@ def test_load_existing_handles_missing_and_invalid_json(tmp_path: Path) -> None:
 def test_get_platform_info_includes_os_name() -> None:
     from backend.cli.onboarding.init_wizard import _get_platform_info
 
-    assert platform.system() in _get_platform_info()
+    info = _get_platform_info()
+    system = platform.system()
+    if system == 'Darwin':
+        assert info == 'macOS'
+    elif system == 'Windows':
+        assert info == 'Windows'
+    elif system == 'Linux':
+        assert info == 'Linux'
+    else:
+        assert system in info
 
 
 def test_settings_path_uses_canonical_location(monkeypatch: pytest.MonkeyPatch) -> None:
