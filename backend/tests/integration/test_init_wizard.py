@@ -194,7 +194,7 @@ class TestProviderPresets:
         """Verify local providers have localhost URLs."""
         from backend.cli.onboarding.init_wizard import _PROVIDER_PRESETS
 
-        local_providers = ['ollama', 'lm_studio']
+        local_providers = ['ollama', 'lm_studio', 'vllm']
         for provider in local_providers:
             preset = _PROVIDER_PRESETS[provider]
             assert 'localhost' in preset['base_url'], (
@@ -247,8 +247,11 @@ class TestExitCodes:
                             side_effect=['openai', 'test-model', '', ''],
                         ):
                             with patch(
-                                'backend.cli.onboarding.init_wizard._atomic_json_write'
+                                'backend.cli.onboarding.init_wizard.validate_connection'
                             ):
-                                result = run_init(console=mock_console)
+                                with patch(
+                                    'backend.cli.onboarding.init_wizard._atomic_json_write'
+                                ):
+                                    result = run_init(console=mock_console)
 
         assert result == 0

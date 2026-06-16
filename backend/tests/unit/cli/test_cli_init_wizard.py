@@ -15,9 +15,7 @@ from backend.cli.onboarding.init_wizard import (
     _confirm_overwrite_existing,
     _detect_local,
     _http_ok,
-    _lmstudio_running,
     _load_existing,
-    _ollama_running,
     _print_provider_table,
     _settings_path,
     run_init,
@@ -64,72 +62,32 @@ class TestHttpOk:
             assert _http_ok('http://localhost:99999') is False
 
 
-class TestOllamaRunning:
-    def test_running(self) -> None:
-        with patch('backend.cli.onboarding.init_wizard._http_ok', return_value=True):
-            assert _ollama_running('http://localhost:11434') is True
-
-    def test_not_running(self) -> None:
-        with patch('backend.cli.onboarding.init_wizard._http_ok', return_value=False):
-            assert _ollama_running('http://localhost:11434') is False
-
-
-class TestLmstudioRunning:
-    def test_running(self) -> None:
-        with patch('backend.cli.onboarding.init_wizard._http_ok', return_value=True):
-            assert _lmstudio_running('http://localhost:1234/v1') is True
-
-    def test_not_running(self) -> None:
-        with patch('backend.cli.onboarding.init_wizard._http_ok', return_value=False):
-            assert _lmstudio_running('http://localhost:1234/v1') is False
-
-
 class TestDetectLocal:
     def test_none_detected(self) -> None:
-        with (
-            patch(
-                'backend.cli.onboarding.init_wizard._ollama_running', return_value=False
-            ),
-            patch(
-                'backend.cli.onboarding.init_wizard._lmstudio_running',
-                return_value=False,
-            ),
+        with patch(
+            'backend.cli.onboarding.init_wizard.check_local_providers',
+            return_value={'ollama': False, 'lm_studio': False, 'vllm': False},
         ):
             assert _detect_local() == []
 
     def test_ollama_detected(self) -> None:
-        with (
-            patch(
-                'backend.cli.onboarding.init_wizard._ollama_running', return_value=True
-            ),
-            patch(
-                'backend.cli.onboarding.init_wizard._lmstudio_running',
-                return_value=False,
-            ),
+        with patch(
+            'backend.cli.onboarding.init_wizard.check_local_providers',
+            return_value={'ollama': True, 'lm_studio': False, 'vllm': False},
         ):
             assert _detect_local() == ['ollama']
 
-    def test_lmstudio_detected(self) -> None:
-        with (
-            patch(
-                'backend.cli.onboarding.init_wizard._ollama_running', return_value=False
-            ),
-            patch(
-                'backend.cli.onboarding.init_wizard._lmstudio_running',
-                return_value=True,
-            ),
+    def test_vllm_detected(self) -> None:
+        with patch(
+            'backend.cli.onboarding.init_wizard.check_local_providers',
+            return_value={'ollama': False, 'lm_studio': False, 'vllm': True},
         ):
-            assert _detect_local() == ['lm_studio']
+            assert _detect_local() == ['vllm']
 
-    def test_both_detected(self) -> None:
-        with (
-            patch(
-                'backend.cli.onboarding.init_wizard._ollama_running', return_value=True
-            ),
-            patch(
-                'backend.cli.onboarding.init_wizard._lmstudio_running',
-                return_value=True,
-            ),
+    def test_multiple_detected(self) -> None:
+        with patch(
+            'backend.cli.onboarding.init_wizard.check_local_providers',
+            return_value={'ollama': True, 'lm_studio': True, 'vllm': False},
         ):
             result = _detect_local()
             assert 'ollama' in result
@@ -220,6 +178,11 @@ class TestCollectApiKey:
 
 
 class TestRunInit:
+    @pytest.fixture(autouse=True)
+    def _skip_connection_validation(self) -> None:
+        with patch('backend.cli.onboarding.init_wizard.validate_connection'):
+            yield
+
     def _patch_prompts(
         self,
         provider: str = 'openai',

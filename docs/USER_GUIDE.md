@@ -44,6 +44,10 @@ uv run python -m backend.cli.entry init
 uv run python -m backend.cli.entry
 ```
 
+`grinta init` and the first-run wizard shown when you launch `grinta` without
+configuration use the same shared setup flow (provider picker, optional
+connection check, `settings.json` + `.env`).
+
 Interactive TTY sessions start the Textual app. If you pipe input into Grinta,
 it uses the non-interactive runner so scripts can call it without a full-screen
 terminal.
@@ -82,7 +86,7 @@ Grinta supports layered configuration. Installed runs use `~/.grinta/settings.js
 ```json
 {
   "llm_provider": "openai",
-  "llm_model": "openai/gpt-4o-mini",
+  "llm_model": "openai/gpt-5.1",
   "llm_api_key": "${LLM_API_KEY}",
   "llm_base_url": ""
 }
@@ -170,7 +174,7 @@ OpenAI:
 
 ```json
 {
-  "llm_model": "openai/gpt-4o-mini",
+  "llm_model": "openai/gpt-5.1",
   "llm_api_key": "${LLM_API_KEY}"
 }
 ```
@@ -179,7 +183,7 @@ Anthropic:
 
 ```json
 {
-  "llm_model": "anthropic/claude-sonnet-4-20250514",
+  "llm_model": "anthropic/claude-sonnet-4.6",
   "llm_api_key": "${LLM_API_KEY}"
 }
 ```
@@ -188,7 +192,7 @@ Google:
 
 ```json
 {
-  "llm_model": "google/gemini-2.5-pro",
+  "llm_model": "google/gemini-3-flash",
   "llm_api_key": "${LLM_API_KEY}"
 }
 ```

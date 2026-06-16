@@ -143,35 +143,36 @@ class TestCLISettingsE2E:
     """E2E tests for settings handling."""
 
     @pytest.mark.e2e
-    def test_init_creates_settings_file(self, tmp_path: Path) -> None:
-        """Verify 'grinta init' creates settings file."""
+    def test_init_rejects_non_interactive_stdin(self, tmp_path: Path) -> None:
+        """Verify 'grinta init' fails fast when stdin is not a TTY."""
+        app_root = tmp_path / 'app'
+        app_root.mkdir()
         project_root = tmp_path / 'project'
         project_root.mkdir()
 
         env = _get_base_env(tmp_path)
-        env['APP_ROOT'] = str(tmp_path / 'app')
-        (tmp_path / 'app').mkdir()
+        env['APP_ROOT'] = str(app_root)
 
         result = subprocess.run(
             [
                 sys.executable,
                 '-m',
                 'backend.cli.entry',
-                'init',
                 '--project',
                 str(project_root),
+                'init',
             ],
             cwd=_REPO_ROOT,
             capture_output=True,
             text=True,
             timeout=30,
             env=env,
+            input='',
         )
 
-        settings_path = project_root / 'settings.json'
-        if settings_path.exists():
-            content = json.loads(settings_path.read_text(encoding='utf-8'))
-            assert 'llm_model' in content or 'llm_provider' in content
+        assert result.returncode == 3
+        assert 'grinta init is interactive' in result.stderr
+        assert not (app_root / 'settings.json').exists()
 
 
 class TestCLIProjectPathE2E:

@@ -187,7 +187,7 @@ Minimal config:
 ```json
 {
   "llm_provider": "openai",
-  "llm_model": "openai/gpt-4o-mini",
+  "llm_model": "openai/gpt-5.1",
   "llm_api_key": "${LLM_API_KEY}",
   "llm_base_url": ""
 }
@@ -197,9 +197,9 @@ For manual setup, put the real value in a sibling `.env` file or your shell envi
 
 Common model ids:
 
-- `openai/gpt-4o-mini`
-- `anthropic/claude-sonnet-4-20250514`
-- `google/gemini-2.5-pro`
+- `openai/gpt-5.1`
+- `anthropic/claude-sonnet-4.6`
+- `google/gemini-3-flash`
 - `ollama/llama3.2`
 
 ## Core Concepts

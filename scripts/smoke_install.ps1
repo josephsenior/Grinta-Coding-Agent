@@ -65,4 +65,27 @@ Write-Host '==> Smoke-test: optional-imports verifier'
 & $pythonExe backend\scripts\verify\verify_optional_imports.py
 
 Write-Host ''
+Write-Host '==> Smoke-test: init rejects non-interactive stdin'
+$smokeAppRoot = Join-Path $env:TEMP 'grinta-smoke-app'
+if (Test-Path $smokeAppRoot) { Remove-Item -Recurse -Force $smokeAppRoot }
+New-Item -ItemType Directory -Path $smokeAppRoot | Out-Null
+$prevAppRoot = $env:APP_ROOT
+$env:APP_ROOT = $smokeAppRoot
+try {
+    $null | & $pythonExe -m backend.cli.entry init 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 3) {
+        throw "Expected grinta init exit 3 without TTY, got $LASTEXITCODE"
+    }
+    if (Test-Path (Join-Path $smokeAppRoot 'settings.json')) {
+        throw 'grinta init should not write settings.json without a TTY'
+    }
+} finally {
+    if ($null -eq $prevAppRoot) {
+        Remove-Item Env:APP_ROOT -ErrorAction SilentlyContinue
+    } else {
+        $env:APP_ROOT = $prevAppRoot
+    }
+}
+
+Write-Host ''
 Write-Host "==> Done. Extras installed: $($Extras -join ', ')"

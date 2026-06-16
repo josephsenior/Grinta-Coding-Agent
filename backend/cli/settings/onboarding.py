@@ -6,38 +6,20 @@ import logging
 import os
 
 from rich.console import Console
-from rich.panel import Panel
-from rich.prompt import Prompt
-from rich.text import Text
 
+from backend.cli.onboarding.connection_check import _test_llm_call
 from backend.cli.theme import (
-    CLR_BRAND,
-    CLR_CARD_BORDER,
-    CLR_META,
-    CLR_SPINNER,
     CLR_STATUS_ERR,
-    CLR_STATUS_OK,
-    CLR_STATUS_WARN,
     no_color_enabled,
 )
 from backend.core.config import AppConfig, load_app_config
-from backend.core.config.dotenv_keys import (
-    persist_llm_api_key_to_dotenv,
-)
-from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
 
 logger = logging.getLogger(__name__)
 _console = Console(no_color=no_color_enabled())
 
 from backend.cli.settings.constants import (
-    _PROVIDERS,
     DEFAULT_MODEL_BY_PROVIDER,
     DEFAULT_ONBOARDING_MODEL,
-)
-from backend.cli.settings.storage import (
-    _load_raw_settings,
-    _save_raw_settings,
-    _settings_path,
 )
 
 
@@ -130,7 +112,6 @@ def auto_detect_api_keys(config: AppConfig) -> str | None:
         if not env_key:
             continue
 
-        # Found a key — set it in the config
         llm_cfg.api_key = SecretStr(env_key)
         if not (getattr(llm_cfg, 'model', None) or '').strip():
             llm_cfg.model = _default_model_for_provider(provider)
@@ -141,7 +122,7 @@ def auto_detect_api_keys(config: AppConfig) -> str | None:
 
 
 def run_onboarding() -> AppConfig:
-    """Interactive first-run setup. Clean, minimal, validates before saving."""
+    """Interactive first-run setup via the shared ``grinta init`` wizard."""
     if not os.isatty(0):
         _console.print(
             f'[{CLR_STATUS_ERR}]No API key configured.[/]\n'
@@ -150,431 +131,17 @@ def run_onboarding() -> AppConfig:
         )
         raise SystemExit(1)
 
-    _console.print()
-    try:
-        from backend import get_version
+    from backend.cli.onboarding.init_wizard import run_init
 
-        version = get_version()
-    except Exception:
-        version = ''
-    version_str = f' v{version}' if version else ''
-    _console.print(
-        Panel(
-            Text.from_markup(
-                f'[{CLR_BRAND}]Welcome to Grinta{version_str}[/]\n\n'
-                "Let's get you connected to an LLM so you can start coding.\n\n"
-                f'[{CLR_META}]  Settings saved locally — never sent anywhere.\n'
-                '  API keys stored in [bold].env[/bold], never in code.\n'
-                f'  No telemetry by default.[/]'
-            ),
-            border_style=CLR_CARD_BORDER,
-            padding=(1, 3),
-        ),
-    )
-    _console.print()
-    _console.print(
-        Text.from_markup(
-            f'[{CLR_META}]Need help? [bold]grinta --help[/bold]  ·  '
-            f'[bold]docs: https://opencode.ai[/bold][/{CLR_META}]'
-        )
-    )
-    _console.print()
-
-    # ── Provider selection ──
-    provider_key, base_url, custom_provider_name = _select_provider()
-
-    # ── Model selection ──
-    full_model = _select_model(provider_key, custom_provider_name)
-
-    # ── API key ──
-    api_key = _collect_api_key(provider_key)
-
-    # ── Validate connection ──
-    _validate_connection(full_model, api_key, base_url)
-
-    # ── Persist ── (secret in .env only; settings.json references LLM_API_KEY)
-    settings = _load_raw_settings()
-    settings['llm_model'] = full_model
-    settings['llm_api_key'] = LLM_API_KEY_SETTINGS_PLACEHOLDER
-    if provider_key and provider_key != 'custom':
-        settings['llm_provider'] = provider_key
-    elif custom_provider_name:
-        settings['llm_provider'] = custom_provider_name
-    if base_url:
-        settings['llm_base_url'] = base_url
-    _save_raw_settings(settings)
-    persist_llm_api_key_to_dotenv(api_key, settings_json_path=_settings_path())
-
-    _console.print()
-    _console.print(
-        Panel(
-            Text.from_markup(
-                f'[bold {CLR_STATUS_OK}]✓ Ready to go![/]\n\n'
-                f'  Provider  [bold]{custom_provider_name or provider_key}[/bold]\n'
-                f'  Model     [bold]{full_model}[/bold]\n\n'
-                '[bold]Next steps[/bold]\n'
-                '  • Describe what you want in plain language, or type [bold]/help[/bold] for commands\n'
-                '  • [bold]grinta -p /path/to/repo[/bold] — pin a project directory (or stay in the current folder)\n'
-                '  • [bold]/autonomy[/bold] — choose conservative, balanced, or full autonomy\n'
-                '  • REPL: [bold]/sessions[/bold], [bold]/resume[/bold] · Shell: [bold]grinta sessions list[/bold]\n'
-                '  • [bold]/settings[/bold] — change model, API key, or MCP servers anytime\n\n'
-                f'[{CLR_META}]Tip: run [bold]grinta --help[/bold] for CLI flags.[/]'
-            ),
-            border_style=CLR_STATUS_OK,
-            padding=(1, 3),
-        ),
-    )
-    _console.print()
-
+    rc = run_init(console=_console)
+    if rc != 0:
+        raise SystemExit(rc)
     return load_app_config()
 
 
-def _select_provider() -> tuple[str, str | None, str | None]:
-    """Provider picker. Returns (provider_key, base_url, custom_name)."""
-    _console.print('[bold]Choose your LLM provider[/bold]\n')
-    provider_map, custom_idx = _print_provider_categories()
-
-    while True:
-        choice = Prompt.ask('[bold]Provider[/bold]', console=_console).strip()
-        try:
-            num = int(choice)
-        except ValueError:
-            _console.print(f'[{CLR_STATUS_ERR}]  Enter a number from the list.[/]')
-            continue
-
-        if num in provider_map:
-            provider_key, _ = provider_map[num]
-            return provider_key, None, None
-        if num == custom_idx:
-            return _collect_custom_provider()
-        _console.print(f'[{CLR_STATUS_ERR}]  Enter a number from the list.[/]')
-
-
-def _print_provider_categories() -> tuple[dict[int, tuple[str, str]], int]:
-    cloud = [(k, l) for k, l, c in _PROVIDERS if c == 'cloud']  # noqa: E741
-    aggregator = [(k, l) for k, l, c in _PROVIDERS if c == 'aggregator']  # noqa: E741
-    local = [(k, l) for k, l, c in _PROVIDERS if c == 'local']  # noqa: E741
-
-    provider_map: dict[int, tuple[str, str]] = {}
-    idx = _print_cloud_providers(cloud, provider_map, start_idx=1)
-    _console.print()
-    idx = _print_simple_providers(aggregator, provider_map, idx, dim_label=True)
-    _console.print()
-    idx = _print_simple_providers(
-        local, provider_map, idx, suffix=' [dim](local)[/dim]'
-    )
-
-    custom_idx = idx
-    _console.print(f'\n  [{CLR_BRAND}]{custom_idx:>2}[/]  [dim]Custom endpoint[/dim]')
-    _console.print()
-    return provider_map, custom_idx
-
-
-def _print_cloud_providers(
-    items: list[tuple[str, str]],
-    provider_map: dict[int, tuple[str, str]],
-    *,
-    start_idx: int,
-) -> int:
-    idx = start_idx
-    for key, label in items:
-        marker = ' [dim](recommended)[/dim]' if key in ('openai', 'anthropic') else ''
-        _console.print(f'  [{CLR_BRAND}]{idx:>2}[/]  {label}{marker}')
-        provider_map[idx] = (key, label)
-        idx += 1
-    return idx
-
-
-def _print_simple_providers(
-    items: list[tuple[str, str]],
-    provider_map: dict[int, tuple[str, str]],
-    start_idx: int,
-    *,
-    dim_label: bool = False,
-    suffix: str = '',
-) -> int:
-    idx = start_idx
-    for key, label in items:
-        rendered = f'[dim]{label}[/dim]' if dim_label else label
-        _console.print(f'  [{CLR_BRAND}]{idx:>2}[/]  {rendered}{suffix}')
-        provider_map[idx] = (key, label)
-        idx += 1
-    return idx
-
-
-def _collect_custom_provider() -> tuple[str, str | None, str | None]:
-    """Collect custom OpenAI-compatible provider details."""
-    _console.print('\n[bold]Custom Provider[/bold]\n')
-
-    name = Prompt.ask(
-        '  Name [dim](e.g. together, fireworks)[/dim]',
-        console=_console,
-    ).strip()
-
-    base_url = Prompt.ask(
-        '  Base URL [dim](e.g. https://api.together.xyz/v1)[/dim]',
-        console=_console,
-    ).strip()
-    if not base_url:
-        _console.print(f'[{CLR_STATUS_ERR}]  Base URL is required.[/]')
-        raise SystemExit(1)
-
-    return 'custom', base_url, name or 'custom'
-
-
-def _select_model(provider_key: str, custom_name: str | None = None) -> str:
-    """Model selection with smart defaults."""
-    _console.print()
-
-    default = DEFAULT_MODEL_BY_PROVIDER.get(provider_key, '')
-    options = _provider_model_options(provider_key, custom_name=custom_name)
-    if options:
-        chosen = _select_predefined_or_custom_model(provider_key, options, default)
-        if chosen:
-            return chosen
-
-    if default:
-        _console.print(f'[bold]Model[/bold] [dim](Enter for {default})[/dim]\n')
-    else:
-        _console.print('[bold]Model[/bold] [dim](e.g. provider/model-name)[/dim]\n')
-
-    model_input = (
-        Prompt.ask(
-            '  Model',
-            default=default or None,
-            console=_console,
-        )
-        or ''
-    ).strip()
-
-    if not model_input:
-        if default:
-            model_input = default
-        else:
-            _console.print(f'[{CLR_STATUS_ERR}]  Model name is required.[/]')
-            raise SystemExit(1)
-
-    # Ensure provider prefix
-    if '/' not in model_input:
-        prefix = custom_name or provider_key
-        return f'{prefix}/{model_input}'
-    return model_input
-
-
-def _provider_model_options(
-    provider_key: str, *, custom_name: str | None = None
-) -> list[str]:
-    if custom_name:
-        return []
-    try:
-        from backend.inference.registry import list_model_names
-
-        return list_model_names(provider_key)
-    except Exception:
-        logger.debug('Could not load provider model options', exc_info=True)
-        return []
-
-
-def _select_predefined_or_custom_model(
-    provider_key: str,
-    options: list[str],
-    default: str,
-) -> str | None:
-    default_bare = default.split('/', 1)[1] if '/' in default else default
-    if default_bare not in options and options:
-        default_bare = options[0]
-
-    _console.print('[bold]Model[/bold]\n')
-    for idx, model_id in enumerate(options, 1):
-        marker = ' [dim](default)[/dim]' if model_id == default_bare else ''
-        _console.print(f'  [{CLR_BRAND}]{idx:>2}[/]  {model_id}{marker}')
-    custom_idx = len(options) + 1
-    _console.print(f'  [{CLR_BRAND}]{custom_idx:>2}[/]  [dim]Custom model id[/dim]\n')
-
-    choice = Prompt.ask(
-        '  Model number',
-        default=str(options.index(default_bare) + 1)
-        if default_bare in options
-        else '1',
-        console=_console,
-    ).strip()
-    try:
-        selected = int(choice)
-    except ValueError:
-        model_input = choice
-    else:
-        if 1 <= selected <= len(options):
-            return f'{provider_key}/{options[selected - 1]}'
-        if selected == custom_idx:
-            model_input = Prompt.ask('  Custom model id', console=_console).strip()
-        else:
-            _console.print(f'[{CLR_STATUS_ERR}]  Enter a number from the list.[/]')
-            return None
-
-    if not model_input:
-        _console.print(f'[{CLR_STATUS_ERR}]  Model name is required.[/]')
-        raise SystemExit(1)
-    return model_input if '/' in model_input else f'{provider_key}/{model_input}'
-
-
-def _collect_api_key(provider_key: str) -> str:
-    """Collect API key with password masking. Skip for local providers."""
-    _console.print()
-
-    local_providers = {'ollama', 'lm_studio', 'vllm'}
-    if provider_key in local_providers:
-        _console.print('[dim]  Local provider — no API key needed.[/dim]')
-        key = Prompt.ask(
-            '  API Key [dim](Enter to skip)[/dim]',
-            default='',
-            console=_console,
-            password=True,
-        ).strip()
-        return key
-
-    _console.print('[bold]API Key[/bold]\n')
-    while True:
-        key = Prompt.ask('  Key', console=_console, password=True).strip()
-        if key:
-            return key
-        _console.print(f'[{CLR_STATUS_ERR}]  API key is required for this provider.[/]')
-
-
-def _validate_connection(model: str, api_key: str, base_url: str | None) -> None:
-    """Test the LLM connection with a minimal request. Non-fatal on failure."""
-    if not api_key:
-        return
-
-    from rich.live import Live
-    from rich.spinner import Spinner
-
-    spinner = Spinner('dots', text='  Validating connection…', style=CLR_SPINNER)
-    try:
-        with Live(spinner, console=_console, transient=True):
-            import asyncio
-
-            async def _run_with_timeout_update() -> bool | str:
-                async def _update_spinner_text() -> None:
-                    await asyncio.sleep(5)
-                    spinner.text = Text(
-                        '  Still waiting on provider... (this might take up to 15s)',
-                        style=CLR_SPINNER,
-                    )
-
-                update_task = asyncio.create_task(_update_spinner_text())
-                try:
-                    return await _test_llm_call(model, api_key, base_url)
-                finally:
-                    update_task.cancel()
-
-            result = asyncio.run(_run_with_timeout_update())
-
-        if result is True:
-            _console.print(f'  [{CLR_STATUS_OK}]✓[/] Connection verified')
-        elif isinstance(result, str):
-            _console.print(f'  [{CLR_STATUS_WARN}]⚠[/] [{CLR_META}]{result}[/]')
-            _console.print(
-                f'  [{CLR_META}]Settings saved anyway — you can fix this in /settings[/]'
-            )
-    except Exception:
-        _console.print(
-            '  [dim]⚠ Could not verify (will try when you send a message)[/dim]'
-        )
-
-
-async def _test_llm_call(model: str, api_key: str, base_url: str | None) -> bool | str:
-    """Make a minimal LLM call to verify credentials. Returns True or error string."""
-    try:
-        from backend.inference.direct_clients import get_direct_client
-        from backend.inference.exceptions import (
-            APIConnectionError,
-            AuthenticationError,
-            BadRequestError,
-            NotFoundError,
-            RateLimitError,
-            Timeout,
-        )
-
-        client = get_direct_client(
-            model=model,
-            api_key=api_key or 'not-needed',
-            base_url=base_url,
-            timeout=15.0,
-        )
-        await client.acompletion(
-            messages=[{'role': 'user', 'content': 'Say "ok" and nothing else.'}],
-            model=model,
-            max_tokens=5,
-            temperature=0,
-        )
-        return True
-    except Timeout:
-        return 'Connection timed out — check your network'
-    except APIConnectionError:
-        return 'Could not connect — check the base URL'
-    except AuthenticationError:
-        return 'Invalid API key'
-    except NotFoundError:
-        return f'Model not found: {_strip_provider_prefix(model)}'
-    except RateLimitError:
-        return 'Rate limited — but credentials look valid'
-    except BadRequestError as e:
-        return f'Request rejected: {e.message}'
-    except Exception as e:
-        return f'Connection error: {type(e).__name__}'
-
-
-def _normalize_test_url(url: str) -> str:
-    url = url.rstrip('/')
-    if not url.endswith('/v1'):
-        url = f'{url}/v1'
-    return url
-
-
-def _strip_provider_prefix(model: str) -> str:
-    if '/' not in model:
-        return model
-    parts = model.split('/', 1)
-    # Keep compound model names (e.g. meta-llama/Llama-3), strip simple provider prefix
-    if parts[0] in (
-        'openai',
-        'anthropic',
-        'google',
-        'groq',
-        'xai',
-        'deepseek',
-        'opencode',
-        'opencode-go',
-        'vercel',
-    ):
-        return parts[1]
-    return model
-
-
-def _interpret_test_response(status_code: int, api_model: str) -> bool | str:
-    if status_code == 200:
-        return True
-    if status_code == 401:
-        return 'Invalid API key (401 Unauthorized)'
-    if status_code == 404:
-        return f'Model not found: {api_model}'
-    if status_code == 429:
-        return 'Rate limited — but credentials look valid'
-    return f'API returned {status_code}'
-
-
-def _provider_base_url(provider: str) -> str | None:
-    """Map provider key to base API URL for validation."""
-    urls: dict[str, str] = {
-        'openai': 'https://api.openai.com',
-        'groq': 'https://api.groq.com/openai',
-        'xai': 'https://api.x.ai',
-        'deepseek': 'https://api.deepseek.com',
-        'openrouter': 'https://openrouter.ai/api',
-        'vercel': 'https://ai-gateway.vercel.sh',
-        'lightning': 'https://lightning.ai/api',
-        'opencode': 'https://opencode.ai/zen',
-        'opencode-go': 'https://opencode.ai/zen/go',
-        'nvidia': 'https://integrate.api.nvidia.com',
-    }
-    return urls.get(provider)
+__all__ = [
+    '_test_llm_call',
+    'auto_detect_api_keys',
+    'needs_onboarding',
+    'run_onboarding',
+]

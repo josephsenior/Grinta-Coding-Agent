@@ -1,6 +1,6 @@
 """First-run interactive wizard for ``grinta init``.
 
-Goal: zero-friction setup. Detect local model servers (Ollama, LM Studio),
+Goal: zero-friction setup. Detect local model servers (Ollama, LM Studio, vLLM),
 prompt the user for a provider + key, write a valid ``settings.json``.
 
 Re-runnable: existing settings are shown and the user can keep them.
@@ -28,7 +28,8 @@ from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
-from backend.cli.settings import DEFAULT_MODEL_BY_PROVIDER
+from backend.cli.onboarding.connection_check import validate_connection
+from backend.cli.onboarding.provider_presets import ONBOARDING_PROVIDER_PRESETS
 from backend.cli.theme import (
     CLR_BRAND,
     CLR_CARD_BORDER,
@@ -41,51 +42,9 @@ from backend.cli.theme import (
 from backend.core.app_paths import get_canonical_settings_path
 from backend.core.config.dotenv_keys import persist_llm_api_key_to_dotenv
 from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
+from backend.inference.provider_resolver import check_local_providers
 
-_PROVIDER_PRESETS: dict[str, dict[str, str]] = {
-    'openai': {
-        'env': 'OPENAI_API_KEY',
-        'default_model': DEFAULT_MODEL_BY_PROVIDER['openai'],
-        'base_url': '',
-        'help': 'OpenAI / compatible (gpt-4o, gpt-5.x, ...)',
-    },
-    'anthropic': {
-        'env': 'ANTHROPIC_API_KEY',
-        'default_model': DEFAULT_MODEL_BY_PROVIDER['anthropic'],
-        'base_url': '',
-        'help': 'Anthropic (claude-sonnet-4-6, claude-opus-4-7, claude-haiku-4-5, ...)',
-    },
-    'google': {
-        'env': 'GEMINI_API_KEY',
-        'default_model': DEFAULT_MODEL_BY_PROVIDER['google'],
-        'base_url': '',
-        'help': 'Google Gemini (gemini-2.5-pro, gemini-3-flash, ...)',
-    },
-    'ollama': {
-        'env': '',
-        'default_model': 'ollama/llama3.2',
-        'base_url': 'http://localhost:11434',
-        'help': 'Local Ollama server (any pulled model)',
-    },
-    'lm_studio': {
-        'env': '',
-        'default_model': 'lm_studio/local-model',
-        'base_url': 'http://localhost:1234/v1',
-        'help': 'Local LM Studio (OpenAI-compatible at /v1)',
-    },
-    'openrouter': {
-        'env': 'OPENROUTER_API_KEY',
-        'default_model': DEFAULT_MODEL_BY_PROVIDER['openrouter'],
-        'base_url': 'https://openrouter.ai/api/v1',
-        'help': 'OpenRouter (proxy to many providers)',
-    },
-    'vercel': {
-        'env': 'VERCEL_API_KEY',
-        'default_model': DEFAULT_MODEL_BY_PROVIDER['vercel'],
-        'base_url': 'https://ai-gateway.vercel.sh/v1',
-        'help': 'Vercel AI Gateway (OpenAI-compatible, 200+ models)',
-    },
-}
+_PROVIDER_PRESETS = ONBOARDING_PROVIDER_PRESETS
 
 
 def _get_platform_info() -> str:
@@ -123,37 +82,17 @@ def _http_ok(url: str, timeout: float = 1.0) -> bool:
         return False
 
 
-def _ollama_running(base_url: str) -> bool:
-    """Check if Ollama server is running."""
-    return _http_ok(f'{base_url}/api/tags')
-
-
-def _lmstudio_running(base_url: str) -> bool:
-    """Check if LM Studio server is running."""
-    return _http_ok(f'{base_url}/models')
-
-
 def _detect_local() -> list[str]:
-    """Detect locally running model servers (Ollama, LM Studio).
+    """Detect locally running model servers (Ollama, LM Studio, vLLM).
 
     Returns list of detected providers. Empty list if no local servers found.
     This is a best-effort detection and should not block setup.
     """
-    found: list[str] = []
-
     try:
-        if _ollama_running(_PROVIDER_PRESETS['ollama']['base_url']):
-            found.append('ollama')
+        status = check_local_providers()
+        return [provider for provider, running in status.items() if running]
     except Exception:
-        pass
-
-    try:
-        if _lmstudio_running(_PROVIDER_PRESETS['lm_studio']['base_url']):
-            found.append('lm_studio')
-    except Exception:
-        pass
-
-    return found
+        return []
 
 
 def _provider_requires_api_key(provider: str) -> bool:
@@ -451,6 +390,7 @@ def _collect_and_persist(
     if choices is None:
         return None
     provider, model, api_key, base_url = choices
+    validate_connection(console, model, api_key, base_url or None)
     err = _write_settings_file(
         console, settings_file, provider, model, api_key, base_url
     )

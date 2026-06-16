@@ -26,6 +26,7 @@ DEFAULT_MODEL_BY_PROVIDER: dict[str, str] = {
     'vercel': 'vercel/anthropic/claude-haiku-4.5',
     'xai': 'xai/grok-build-0.1',
     'deepseek': 'deepseek/deepseek-v4-flash',
+    'nvidia': 'nvidia/meta/llama-3.1-8b-instruct',
 }
 
 # Provider registry — grouped for clean onboarding display.
@@ -45,4 +46,5 @@ _PROVIDERS: list[tuple[str, str, str]] = [
     ('nvidia', 'NVIDIA NIM', 'aggregator'),
     ('ollama', 'Ollama', 'local'),
     ('lm_studio', 'LM Studio', 'local'),
+    ('vllm', 'vLLM', 'local'),
 ]
