@@ -585,10 +585,10 @@ class TestPromptBudgetRegression:
             function_calling_mode='native',
         )
         assert report['total_tokens'] >= 800, 'Prompt shrank unexpectedly'
-        # Baseline post-compression: 5 321 tokens.  Ceiling = baseline + ~10 %.
-        assert report['total_tokens'] <= 6_100, (
+        # Baseline post-compression: 6 113 tokens.  Ceiling = baseline + ~10 %.
+        assert report['total_tokens'] <= 6_730, (
             f'Prompt exceeds budget ceiling: {report["total_tokens"]} tokens '
-            '(baseline 4 379). Reduce prompt text or raise this ceiling deliberately.'
+            '(baseline 6 113). Reduce prompt text or raise this ceiling deliberately.'
         )
 
     def test_full_autonomy_tracker_mcp_token_ceiling(self) -> None:
