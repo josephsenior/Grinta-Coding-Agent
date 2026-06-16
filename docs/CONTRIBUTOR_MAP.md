@@ -82,7 +82,7 @@ with `backend/engine/tool_registry.py` (LLM tool name validation).
 2. Run the matching unit test directory before and after your edit.
 3. For user-visible behavior, update `docs/USER_GUIDE.md` or `docs/TROUBLESHOOTING.md`.
 4. For bugfixes, add a regression test per [REGRESSION_TESTS.md](REGRESSION_TESTS.md).
-5. PR gates require `pytest backend/tests/unit` on Linux and Windows — see [CI.md](CI.md).
+5. PR gates: Linux runs full `backend/tests` with coverage; Windows and advisory macOS run `backend/tests/unit` — see [CI.md](CI.md).
 
 ## Platform expectations
 

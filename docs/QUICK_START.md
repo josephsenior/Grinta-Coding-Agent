@@ -10,7 +10,7 @@
 From the repo root:
 
 ```powershell
-python scripts/bootstrap_env.py base
+python scripts/bootstrap_env.py dev-test
 uv run python -m backend.cli.entry init
 uv run python -m backend.cli.entry
 ```
@@ -19,6 +19,8 @@ That is the canonical contributor path. It creates or updates the project-local
 `.venv`, writes source-checkout settings to `settings.json`, and starts the
 interactive terminal app. If stdin is not a TTY, Grinta uses the non-interactive
 runner instead of the Textual app.
+
+For a minimal runtime-only sync (no dev/test tools), use `python scripts/bootstrap_env.py base`.
 
 ## Option 2: Windows convenience script
 

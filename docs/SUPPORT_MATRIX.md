@@ -6,8 +6,8 @@ This matrix defines what Grinta currently supports for official OSS releases.
 
 | Platform | Status | Notes |
 | --- | --- | --- |
-| Linux | Supported | Required CI gate (`gates-on-linux`). |
-| Windows | Supported | Required CI gate (`gates-on-windows`). |
+| Linux | Supported | Required CI gate runs full `backend/tests` with coverage (`gates-on-linux`). |
+| Windows | Supported | Required CI gate runs `backend/tests/unit` (`gates-on-windows`). |
 | macOS | Best effort | CI runs in advisory mode (`continue-on-error: true`). |
 
 ### macOS platform policy

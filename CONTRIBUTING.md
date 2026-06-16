@@ -8,7 +8,7 @@ Thank you for your interest in contributing to Grinta! This guide will help you 
 
 - Python 3.12+
 - Git
-- (Optional) PostgreSQL 14+ for database-backed storage
+- `uv` (for source development)
 
 ### Getting Started
 
@@ -18,7 +18,7 @@ git clone https://github.com/josephsenior/Grinta-Coding-Agent.git
 cd Grinta-Coding-Agent
 
 # Install dependencies
-python scripts/bootstrap_env.py base
+python scripts/bootstrap_env.py dev-test
 
 # Start the CLI
 uv run python -m backend.cli.entry
@@ -48,12 +48,23 @@ uv run python -m backend.cli.entry
 
 ### Testing before a pull request
 
-**Required** GitHub Actions jobs on Linux and Windows run the full **unit** corpus only. Match that locally before you open a PR:
+**Required** GitHub Actions jobs differ by platform ([docs/CI.md](docs/CI.md)):
+
+- **Linux (`gates-on-linux`):** full `backend/tests` corpus with coverage — match locally with:
+
+```bash
+python scripts/bootstrap_env.py dev-test
+PYTHONPATH=. uv run pytest --cov=backend --cov-fail-under=75 backend/tests
+```
+
+- **Windows (`gates-on-windows`):** `backend/tests/unit` only — match locally with:
 
 ```bash
 python scripts/bootstrap_env.py dev-test
 PYTHONPATH=. uv run pytest backend/tests/unit
 ```
+
+For day-to-day edits, `pytest backend/tests/unit` is usually enough before you push. Run the full Linux corpus when your change touches integration, e2e, stress, or cross-cutting orchestration paths.
 
 Optional: `uv run pytest backend/tests/unit -q` for quieter output.
 

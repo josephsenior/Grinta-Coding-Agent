@@ -37,7 +37,7 @@ Direct link if the animation does not load: [`docs/grinta-demo.gif`](docs/grinta
 | --------------------------------------------------------------------------------- | ------------------- | ------- | ----------------- | -------------- |
 | Provider-agnostic (OpenAI / Anthropic / Google / Ollama / LM Studio / OpenRouter) | ✅                  | ✅      | ❌ Anthropic only | ❌ OpenAI only |
 | Local-first (works fully offline w/ Ollama)                                       | ✅ auto-detected    | partial | ❌                | ❌             |
-| LSP integration (auto-discovers 17 servers)                                       | ✅                  | ❌      | partial           | ❌             |
+| LSP integration (auto-discovers 40+ language servers on PATH)                     | ✅                  | ❌      | partial           | ❌             |
 | DAP debugger integration                                                          | ✅ auto-discovered  | ❌      | ❌                | ❌             |
 | Cost / token / latency HUD                                                        | ✅ live             | partial | ❌                | partial        |
 | Stuck-loop + cost-acceleration detection                                          | ✅                  | ❌      | partial           | ❌             |
@@ -78,20 +78,33 @@ The base install keeps RAG, document parsing, and browser automation out of the 
 - **Durable long sessions.** Event-stream ledger, automatic compaction, manual `/checkpoint`, and revert.
 - **Terminal UI.** Interactive TTY sessions launch the Textual app with HUD, transcript cards, settings/sessions dialogs, and slash commands; piped input uses a non-interactive fallback.
 
+## Interaction modes
+
+Grinta exposes three modes in the Textual HUD (Chat, Plan, Agent). They change the conversational contract, not just the prompt tone:
+
+- **Chat** — read-only Q&A and discovery tools; no edits or shell.
+- **Plan** — read-only investigation plus a structured plan before execution.
+- **Agent** — full task loop (default for direct work).
+
+Autonomy (`/autonomy`: conservative, balanced, full) controls confirmation prompts in **Agent** mode only.
+
 ## Common slash commands
 
 | Command       | What it does                                               |
 | ------------- | ---------------------------------------------------------- |
 | `/help`       | Full slash-command reference                               |
+| `/settings`   | Model, API key, and MCP configuration                      |
+| `/sessions`   | List past sessions; `/resume <N\|id>` to continue one      |
+| `/model`      | Show or switch the active provider/model                     |
+| `/autonomy`   | View or set confirmation behavior                          |
 | `/cost`       | Tokens, calls, USD spent this session                      |
 | `/diff`       | Workspace git changes (`--stat`, `--name-only`, `--patch`) |
-| `/sessions`   | Recent sessions, with optional limit (`/sessions list 10`) |
-| `/think`      | Toggle the optional reasoning scratchpad                   |
-| `/model`      | Show or switch the active provider/model                   |
 | `/health`     | Fast self-check for debugpy, ripgrep, git, and model setup |
 | `/checkpoint` | Snapshot the workspace (revertable)                        |
 | `/status`     | HUD snapshot; `/status verbose` adds diagnostics           |
 | `/compact`    | Force context compaction now                               |
+
+Playbook workflows (`/debug`, `/testing`, `/feature`, …) and the full registry are in `/help`.
 
 ## Security boundary
 
@@ -117,7 +130,7 @@ graph TB
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the deep dive.
 
-Contributors: CI runs the full unit corpus on Linux and Windows ([docs/CI.md](docs/CI.md)); match that locally before opening a PR ([CONTRIBUTING.md](CONTRIBUTING.md#testing-before-a-pull-request)).
+Contributors: Linux PR gates run the full `backend/tests` corpus with coverage; Windows gates run `backend/tests/unit` ([docs/CI.md](docs/CI.md)). Match the tier you are changing before opening a PR ([CONTRIBUTING.md](CONTRIBUTING.md#testing-before-a-pull-request)).
 
 ## The story behind Grinta
 
@@ -136,10 +149,10 @@ Grinta is a single-author project, written and rewritten in public. The journey 
 1. Install dependencies **in this repo's environment only** (creates/updates `.venv/`; do not rely on a global `pip install` mixed with unrelated tools):
 
 ```bash
-python scripts/bootstrap_env.py browser
+python scripts/bootstrap_env.py dev-test
 ```
 
-Optional dev/test tools: `python scripts/bootstrap_env.py dev-test-browser`.
+Profiles: `base` (runtime only), `dev-test` (contributor default), `browser` / `dev-test-browser` when working on browser automation.
 
 1. Create local settings:
 

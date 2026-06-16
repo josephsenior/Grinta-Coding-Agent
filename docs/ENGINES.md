@@ -132,13 +132,17 @@ The default agent name in the current codebase is `Orchestrator`.
 
 Custom agents can be registered through the config loader with a `classpath` entry. The app config stores a dictionary of named agents plus the `default_agent` name that should be used by default.
 
-Example pattern:
+Example pattern in `settings.json`:
 
-```toml
-default_agent = "MyCustomAgent"
-
-[agent.MyCustomAgent]
-classpath = "my_package.my_module.MyAgent"
+```json
+{
+  "default_agent": "MyCustomAgent",
+  "agent": {
+    "MyCustomAgent": {
+      "classpath": "my_package.my_module.MyAgent"
+    }
+  }
+}
 ```
 
 See:

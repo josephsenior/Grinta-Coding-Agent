@@ -10,18 +10,22 @@ Choose a path:
 
 ## The Book of Grinta (narrative)
 
-Long-form engineering memoir and technical chapters: **[journey/README.md](journey/README.md)**. Start at [Preface: Why This Story Matters](journey/preface-why-this-story-matters.md).
+Long-form engineering memoir and technical chapters: **[journey/README.md](journey/README.md)**. Start at [Preface: Why This Story Matters](journey/preface-why-this-story-matters.md). Journey chapters are historical narrative and may not reflect the current product surface.
 
 ## More reference
 
 | Topic | Doc |
 | --- | --- |
+| Agent engines and tool surface | [ENGINES.md](ENGINES.md) |
+| LLM providers vs MCP vs native tools | [INFERENCE_AND_INTEGRATIONS.md](INFERENCE_AND_INTEGRATIONS.md) |
+| File editing tools (`read`, `edit_symbol`, …) | [TWO_MODE_FILE_EDITING.md](TWO_MODE_FILE_EDITING.md) |
 | Reliability, timeouts | [RELIABILITY.md](RELIABILITY.md) |
 | Performance | [PERFORMANCE.md](PERFORMANCE.md) |
 | Security checklist | [SECURITY_CHECKLIST.md](SECURITY_CHECKLIST.md) |
 | Terminal UI and themes | [CLI_THEME_CONTRACT.md](CLI_THEME_CONTRACT.md) |
 | Plugins | [PLUGIN_GUIDE.md](PLUGIN_GUIDE.md), [plugins/authoring_guide.md](plugins/authoring_guide.md) |
 | MCP integration | [MCP_EXAMPLES.md](MCP_EXAMPLES.md), [mcp/integration_examples.md](mcp/integration_examples.md) |
+| Release / GA gates | [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) |
 | ADRs | [ADR.md](ADR.md) |
 
 The repository root [README.md](../README.md) links here and to the rest of the project.

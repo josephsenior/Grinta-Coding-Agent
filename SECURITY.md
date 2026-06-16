@@ -97,16 +97,15 @@ captures the boundaries operators care about most.
   you configure and the MCP servers you enable.
 - Telemetry and crash reporting are **off by default** and require explicit
   opt-in. See `backend/telemetry/`.
-- The legacy local web surface — when enabled — restricts CORS to localhost,
+- The legacy local web surface — when enabled for tooling — restricts CORS to localhost,
   ships strict security headers, and supports CSRF protection via
-  `APP_CSRF_ENABLED`. The supported interactive surface for 1.0 is the CLI.
+  `APP_CSRF_ENABLED`. The supported interactive surface for 1.0 is the Textual TUI and non-interactive CLI runner.
 
 ### Data storage
 
 - File-based storage (default): all session state, ledgers, audit logs, and
   checkpoints stay on the local disk under `~/.grinta/`.
-- PostgreSQL (optional): connections use `asyncpg` with pool management; you
-  are responsible for transport encryption and credential management.
+- PostgreSQL (optional, knowledge-base migrations only): `backend/persistence/knowledge_base/migrations/` can apply SQL migrations when you opt into a Postgres-backed knowledge store. You are responsible for transport encryption and credential management. This is **not** required for normal CLI usage.
 - Workspace data is never uploaded to a third party by Grinta itself.
 
 ### Supply chain
