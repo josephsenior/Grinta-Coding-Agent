@@ -23,7 +23,7 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-  "aiohttp>=3.9,!=3.11.13",
+  "aiohttp>=3.14.1",
   "anthropic>=0.40,<1",
   "anyio>=4.9,<5",
   "bashlex>=0.18,<0.19",
@@ -46,7 +46,7 @@ dependencies = [
   "ptyprocess>=0.7,<1; sys_platform!='win32'",
   "pyfiglet>=1.0.4",
   "pyperclip>=1.9,<2",
-  "python-dotenv>=1.1.1,<2",
+  "python-dotenv>=1.2.2,<2",
   "python-frontmatter>=1.1,<2",
   "python-json-logger>=3.2.1,<4",
   "python-multipart>=0.0.20,<1",
@@ -69,7 +69,7 @@ optional-dependencies.all = [
   "browser-use>=0.12,<0.15",
   "chromadb>=1.4,<2",
   "pylatexenc>=2.10,<3",
-  "pypdf2>=3,<4",
+  "pypdf>=6.12,<7",
   "python-docx>=1.1,<2",
   "python-pptx>=1,<2",
 ]
@@ -78,7 +78,7 @@ optional-dependencies.browser = [
 ]
 optional-dependencies.documents = [
   "pylatexenc>=2.10,<3",
-  "pypdf2>=3,<4",
+  "pypdf>=6.12,<7",
   "python-docx>=1.1,<2",
   "python-pptx>=1,<2",
 ]
@@ -105,8 +105,8 @@ dev = [
   "mypy==1.17",
   "pre-commit==4.6",
   "pylint>=4.0.5,<5",
-  "pytest>=8.4",
-  "pytest-asyncio>=0.26",
+  "pytest>=9.0.3",
+  "pytest-asyncio>=1.4,<2",
   "ruff==0.12.5",
   "tiktoken>=0.12",
   "types-pyyaml>=6.0.12.20250516",
@@ -116,8 +116,8 @@ dev = [
   "vulture>=2.14",
 ]
 test = [
-  "pytest>=8.4",
-  "pytest-asyncio>=0.21.1,<1",
+  "pytest>=9.0.3",
+  "pytest-asyncio>=1.4,<2",
   "pytest-cov>=4.1,<7",
   "pytest-timeout>=2.4",
   "pytest-xdist>=3.8,<4",
@@ -289,4 +289,11 @@ min_confidence = 90
 sort_by_size = true
 
 [tool.uv]
-constraint-dependencies = [ "transformers<4.47.0" ]
+constraint-dependencies = [
+  "transformers<4.47.0",
+  "pypdf>=6.12.0",
+]
+override-dependencies = [
+  "aiohttp>=3.14.1",
+  "pypdf>=6.12.0",
+]

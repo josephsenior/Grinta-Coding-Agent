@@ -20,7 +20,6 @@ OPTIONAL_TOP_LEVEL_MODULES = {
     'docx',
     'pptx',
     'pylatexenc',
-    'PyPDF2',
     'pypdf',
     # browser (extras: browser)
     'browser_use',
