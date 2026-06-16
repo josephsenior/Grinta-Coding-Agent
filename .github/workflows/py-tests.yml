@@ -58,7 +58,7 @@ jobs:
         run: uv run python -m compileall backend
       - name: Run unit tests shard A with coverage
         run: >-
-          PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q -n 2
+          PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q
           --cov=backend --cov-report= --cov-fail-under=0
           backend/tests/unit/cli backend/tests/unit/client backend/tests/unit/context
           backend/tests/unit/engine backend/tests/unit/eval
@@ -96,7 +96,7 @@ jobs:
         run: uv run python -m compileall backend
       - name: Run unit tests shard B with coverage
         run: >-
-          PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q -n 2
+          PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q
           --cov=backend --cov-report= --cov-fail-under=0
           backend/tests/unit/core backend/tests/unit/execution backend/tests/unit/inference
           backend/tests/unit/test_bounded_pipeline.py backend/tests/unit/test_backend_conftest.py
@@ -135,7 +135,7 @@ jobs:
         run: uv run python -m compileall backend
       - name: Run unit tests shard C with coverage
         run: >-
-          PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q -n 2
+          PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q
           --cov=backend --cov-report= --cov-fail-under=0
           backend/tests/unit/integrations backend/tests/unit/knowledge backend/tests/unit/ledger
           backend/tests/unit/orchestration backend/tests/unit/persistence backend/tests/unit/playbooks
