@@ -28,6 +28,9 @@ class DAPDebugSession:
         *,
         workspace_root: str,
         adapter_command: list[str],
+        adapter_transport: str,
+        adapter_host: str | None,
+        adapter_port: int | None,
         adapter_id: str,
         language: str | None,
         request: str,
@@ -44,6 +47,9 @@ class DAPDebugSession:
         self.session_id = session_id
         self.workspace_root = Path(workspace_root).resolve()
         self.adapter_command = adapter_command
+        self.adapter_transport = adapter_transport
+        self.adapter_host = adapter_host
+        self.adapter_port = adapter_port
         self.adapter_id = adapter_id
         self.language = language
         self.request = request
@@ -57,7 +63,11 @@ class DAPDebugSession:
         self.initialize_options = initialize_options
         self.python = python
         self.client = DAPClient(
-            adapter_command, cwd=self.cwd or str(self.workspace_root)
+            adapter_command,
+            cwd=self.cwd or str(self.workspace_root),
+            transport=adapter_transport,
+            host=adapter_host,
+            port=adapter_port,
         )
         self.current_thread_id: int | None = None
         self.debuggee_process_ids: set[int] = set()
@@ -92,6 +102,9 @@ class DAPDebugSession:
             launch_request=self.request,
             program=target,
             adapter_argv0=(self.adapter_command[0] if self.adapter_command else None),
+            adapter_transport=self.adapter_transport,
+            adapter_host=self.adapter_host,
+            adapter_port=self.adapter_port,
             adapter_id=self.adapter_id,
             cwd=self.client.cwd,
         )
@@ -133,6 +146,7 @@ class DAPDebugSession:
                 adapter_argv0=(
                     self.adapter_command[0] if self.adapter_command else None
                 ),
+                adapter_transport=self.adapter_transport,
             )
             return self._snapshot(
                 state='started',
@@ -166,6 +180,7 @@ class DAPDebugSession:
             dap_session_id=self.session_id,
             adapter_pid=getattr(proc, 'pid', None) if proc else None,
             process_poll=proc.poll() if proc is not None else None,
+            adapter_transport=self.adapter_transport,
             elapsed_seconds=round(time.monotonic() - session_started, 3),
         )
         _dap_log(

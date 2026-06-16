@@ -19,6 +19,9 @@ class DebuggerAction(Action):
     adapter: str | None = None
     adapter_id: str | None = None
     adapter_command: list[str] = field(default_factory=list)
+    adapter_transport: str | None = None
+    adapter_host: str | None = None
+    adapter_port: int | None = None
     language: str | None = None
     request: str = 'launch'
     program: str | None = None

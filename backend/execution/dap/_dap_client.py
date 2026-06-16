@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import queue
+import socket
 import subprocess
 import threading
 import time
@@ -21,12 +22,25 @@ from backend.execution.dap._dap_logging import _dap_log
 
 
 class DAPClient:
-    """Minimal DAP client that talks to a debug adapter over stdio."""
+    """Minimal DAP client that talks to a debug adapter over stdio or TCP."""
 
-    def __init__(self, adapter_command: list[str], cwd: str | None = None) -> None:
+    def __init__(
+        self,
+        adapter_command: list[str],
+        cwd: str | None = None,
+        *,
+        transport: str = 'stdio',
+        host: str | None = None,
+        port: int | None = None,
+    ) -> None:
         self.adapter_command = adapter_command
         self.cwd = cwd
+        self.transport = transport
+        self.host = host or '127.0.0.1'
+        self.port = int(port) if port is not None else None
         self.process: subprocess.Popen[bytes] | None = None
+        self._socket: socket.socket | None = None
+        self._socket_file: Any | None = None
         self._seq = 0
         self._pending: dict[int, queue.Queue[dict[str, Any]]] = {}
         self._events: list[dict[str, Any]] = []
@@ -35,30 +49,44 @@ class DAPClient:
         self._event_condition = threading.Condition(self._lock)
         self._reader: threading.Thread | None = None
         self._stderr_reader: threading.Thread | None = None
+        self._stdout_reader: threading.Thread | None = None
         self._closed = False
 
     def start(self) -> None:
         """Start the adapter subprocess and reader threads."""
-        if self.process is not None:
+        if self.process is not None or self._socket is not None:
             return
-        if not self.adapter_command:
+        if self.transport not in {'stdio', 'tcp'}:
+            raise DAPError(f'Unsupported DAP adapter transport: {self.transport}')
+        if not self.adapter_command and self.transport != 'tcp':
             raise DAPError('DAP adapter command is empty')
+        if self.transport == 'tcp' and self.port is None:
+            raise DAPError('TCP DAP adapter transport requires a port')
         _dap_log(
             logging.INFO,
-            f'spawning adapter {self.adapter_command[0]} (cwd={self.cwd})',
+            f'starting adapter over {self.transport} (cwd={self.cwd})',
             msg_type='DAP_ADAPTER_SPAWN',
-            adapter_argv0=self.adapter_command[0],
+            adapter_argv0=self.adapter_command[0] if self.adapter_command else None,
             dap_cwd=self.cwd,
+            dap_transport=self.transport,
+            dap_host=self.host if self.transport == 'tcp' else None,
+            dap_port=self.port if self.transport == 'tcp' else None,
         )
         spawn_started = time.monotonic()
+        output_readers_started = False
         try:
-            self.process = subprocess.Popen(
-                self.adapter_command,
-                cwd=self.cwd,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
+            if self.adapter_command:
+                self.process = self._spawn_adapter()
+                if self.transport == 'tcp':
+                    self._start_output_readers()
+                    output_readers_started = True
+            if self.transport == 'tcp':
+                self._connect_tcp()
+            else:
+                self._verify_stdio_process()
+        except DAPError:
+            self.close()
+            raise
         except (OSError, ValueError) as exc:
             # ``Popen`` itself can fail (e.g. executable missing on Windows,
             # invalid argv). No subprocess exists yet, but raise a typed error
@@ -66,15 +94,16 @@ class DAPClient:
             # ``FileNotFoundError`` deep in the stack.
             self.process = None
             raise DAPError(
-                f'Failed to spawn DAP adapter {self.adapter_command[0]!r}: {exc}'
+                f'Failed to start DAP adapter {self.adapter_command[0]!r}: {exc}'
             ) from exc
+        except Exception:
+            self.close()
+            raise
         try:
             self._reader = threading.Thread(target=self._reader_loop, daemon=True)
             self._reader.start()
-            self._stderr_reader = threading.Thread(
-                target=self._stderr_loop, daemon=True
-            )
-            self._stderr_reader.start()
+            if not output_readers_started:
+                self._start_output_readers()
         except Exception:
             # Reader thread creation failure is exotic but recoverable: kill
             # the half-spawned subprocess so we never leak a debugpy.adapter.
@@ -82,20 +111,74 @@ class DAPClient:
             raise
         _dap_log(
             logging.INFO,
-            'adapter subprocess alive after spawn',
+            'adapter transport ready after start',
             msg_type='DAP_ADAPTER_SPAWN',
             adapter_pid=getattr(self.process, 'pid', None),
+            dap_transport=self.transport,
             spawn_elapsed_seconds=round(time.monotonic() - spawn_started, 3),
         )
+
+    def _spawn_adapter(self) -> subprocess.Popen[bytes]:
+        stdin = subprocess.PIPE if self.transport == 'stdio' else subprocess.DEVNULL
+        return subprocess.Popen(
+            self.adapter_command,
+            cwd=self.cwd,
+            stdin=stdin,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+    def _verify_stdio_process(self) -> None:
+        if (
+            self.process is None
+            or self.process.stdin is None
+            or self.process.stdout is None
+        ):
+            raise DAPError('DAP stdio adapter did not expose stdin/stdout pipes')
+
+    def _connect_tcp(self) -> None:
+        if self.port is None:
+            raise DAPError('TCP DAP adapter transport requires a port')
+        deadline = time.monotonic() + 5.0
+        while True:
+            process = self.process
+            if process is not None and process.poll() is not None:
+                raise DAPError(
+                    'DAP TCP adapter exited before accepting a connection '
+                    f'(exit={process.poll()})'
+                )
+            try:
+                sock = socket.create_connection((self.host, self.port), timeout=0.25)
+                sock.settimeout(None)
+                self._socket = sock
+                self._socket_file = sock.makefile('rwb', buffering=0)
+                return
+            except OSError as exc:
+                if time.monotonic() >= deadline:
+                    raise DAPError(
+                        f'Failed to connect to DAP adapter at '
+                        f'{self.host}:{self.port}: {exc}'
+                    ) from exc
+                time.sleep(0.05)
+
+    def _start_output_readers(self) -> None:
+        if self.process is None:
+            return
+        self._stderr_reader = threading.Thread(target=self._stderr_loop, daemon=True)
+        self._stderr_reader.start()
+        if self.transport == 'tcp':
+            self._stdout_reader = threading.Thread(
+                target=self._stdout_log_loop, daemon=True
+            )
+            self._stdout_reader.start()
 
     def close(self) -> None:
         """Terminate the adapter subprocess."""
         self._closed = True
+        self._close_socket()
         process = self.process
-        if process is None:
-            return
         try:
-            if process.poll() is None:
+            if process is not None and process.poll() is None:
                 process.terminate()
                 try:
                     process.wait(timeout=2)
@@ -110,7 +193,7 @@ class DAPClient:
             # asynchronous.
             with self._lock:
                 self._event_condition.notify_all()
-            for reader in (self._reader, self._stderr_reader):
+            for reader in (self._reader, self._stderr_reader, self._stdout_reader):
                 if reader is not None and reader.is_alive():
                     try:
                         reader.join(timeout=1.0)
@@ -118,6 +201,33 @@ class DAPClient:
                         pass
             self._reader = None
             self._stderr_reader = None
+            self._stdout_reader = None
+
+    def _close_socket(self) -> None:
+        socket_file = self._socket_file
+        sock = self._socket
+        self._socket_file = None
+        self._socket = None
+        try:
+            if socket_file is not None:
+                socket_file.close()
+        except Exception:
+            pass
+        try:
+            if sock is not None:
+                sock.close()
+        except Exception:
+            pass
+        with self._lock:
+            self._event_condition.notify_all()
+
+    def is_running(self) -> bool:
+        """Return whether the adapter transport still appears usable."""
+        if self._closed:
+            return False
+        if self.transport == 'tcp' and self._socket is not None:
+            return self.process is None or self.process.poll() is None
+        return self.process is not None and self.process.poll() is None
 
     def request(
         self,
@@ -167,7 +277,7 @@ class DAPClient:
                 pending_count=len(self._pending),
                 stderr_tail=self.stderr_tail(10),
                 process_alive=(
-                    self.process is not None and self.process.poll() is None
+                    self.is_running()
                 ),
             )
             raise DAPError(f'DAP request {request_seq} timed out') from exc
@@ -217,7 +327,7 @@ class DAPClient:
     def _log_event_timeout(self, event: str) -> None:
         ev_names = [str(m.get('event') or '?') for m in self._events]
         proc = self.process
-        alive = proc is not None and proc.poll() is None
+        alive = self.is_running()
         poll = proc.poll() if proc is not None else None
         _dap_log(
             logging.WARNING,
@@ -244,16 +354,21 @@ class DAPClient:
             return self._stderr[-limit:]
 
     def _send(self, message: dict[str, Any]) -> None:
-        process = self.process
-        if process is None or process.stdin is None:
-            raise DAPError('DAP adapter is not running')
         payload = json.dumps(message, separators=(',', ':')).encode('utf-8')
         header = f'Content-Length: {len(payload)}\r\n\r\n'.encode('ascii')
         try:
-            process.stdin.write(header + payload)
-            process.stdin.flush()
-        except BrokenPipeError as exc:
-            raise DAPError('DAP adapter pipe closed') from exc
+            if self.transport == 'tcp':
+                if self._socket is None:
+                    raise DAPError('DAP adapter is not running')
+                self._socket.sendall(header + payload)
+            else:
+                process = self.process
+                if process is None or process.stdin is None:
+                    raise DAPError('DAP adapter is not running')
+                process.stdin.write(header + payload)
+                process.stdin.flush()
+        except (BrokenPipeError, OSError) as exc:
+            raise DAPError('DAP adapter connection closed') from exc
 
     def _reader_loop(self) -> None:
         while not self._closed:
@@ -266,11 +381,10 @@ class DAPClient:
             if message is None:
                 _dap_log(
                     logging.INFO,
-                    'DAP adapter stdout closed (EOF)',
+                    'DAP adapter message stream closed (EOF)',
                     msg_type='DAP_ADAPTER_EOF',
-                    process_alive=(
-                        self.process is not None and self.process.poll() is None
-                    ),
+                    dap_transport=self.transport,
+                    process_alive=self.is_running(),
                     process_poll=(
                         None if self.process is None else self.process.poll()
                     ),
@@ -290,13 +404,26 @@ class DAPClient:
                 self._stderr.append(line.decode('utf-8', errors='replace').rstrip())
                 del self._stderr[:-100]
 
-    def _read_message(self) -> dict[str, Any] | None:
+    def _stdout_log_loop(self) -> None:
         process = self.process
         if process is None or process.stdout is None:
+            return
+        while not self._closed:
+            line = process.stdout.readline()
+            if not line:
+                return
+            with self._lock:
+                decoded = line.decode('utf-8', errors='replace').rstrip()
+                self._stderr.append(f'[stdout] {decoded}')
+                del self._stderr[:-100]
+
+    def _read_message(self) -> dict[str, Any] | None:
+        stream = self._message_stream()
+        if stream is None:
             return None
         content_length: int | None = None
         while True:
-            line = process.stdout.readline()
+            line = stream.readline()
             if not line:
                 return None
             if line in (b'\r\n', b'\n'):
@@ -307,10 +434,18 @@ class DAPClient:
                 content_length = int(value.strip())
         if content_length is None:
             raise DAPError('DAP message missing Content-Length')
-        payload = process.stdout.read(content_length)
+        payload = stream.read(content_length)
         if len(payload) != content_length:
             raise DAPError('DAP message payload ended early')
         return json.loads(payload.decode('utf-8'))
+
+    def _message_stream(self) -> Any | None:
+        if self.transport == 'tcp':
+            return self._socket_file
+        process = self.process
+        if process is None:
+            return None
+        return process.stdout
 
     def _handle_message(self, message: dict[str, Any]) -> None:
         message_type = message.get('type')

@@ -273,6 +273,10 @@ class OrchestratorPlanner:
 
             tools.append(create_terminal_manager_tool())
         if getattr(self._config, 'enable_debugger', False):
+            from backend.utils.runtime_detect import has_any_debug_adapter
+
+            if not has_any_debug_adapter():
+                return
             from backend.engine.tools.debugger import (
                 create_debugger_tool,
             )
