@@ -1,0 +1,60 @@
+name: Smoke Install
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: smoke-install-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  smoke-install:
+    name: Smoke install (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ['3.12']
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Build wheel
+        run: uv build --wheel
+
+      - name: Run wheel smoke install (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          chmod +x scripts/smoke_install.sh scripts/smoke_source_onboarding.sh
+          WHEEL_DIR=./dist ./scripts/smoke_install.sh
+
+      - name: Run wheel smoke install (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:WHEEL_DIR = '.\dist'
+          .\scripts\smoke_install.ps1
+
+      - name: Run source onboarding smoke (Unix)
+        if: runner.os != 'Windows'
+        run: ./scripts/smoke_source_onboarding.sh
+
+      - name: Run source onboarding smoke (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .\scripts\smoke_source_onboarding.ps1

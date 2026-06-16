@@ -25,7 +25,7 @@ Long-form engineering memoir and technical chapters: **[journey/README.md](journ
 | Terminal UI and themes | [CLI_THEME_CONTRACT.md](CLI_THEME_CONTRACT.md) |
 | Plugins | [PLUGIN_GUIDE.md](PLUGIN_GUIDE.md), [plugins/authoring_guide.md](plugins/authoring_guide.md) |
 | MCP integration | [MCP_EXAMPLES.md](MCP_EXAMPLES.md), [mcp/integration_examples.md](mcp/integration_examples.md) |
-| Release / GA gates | [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) |
+| Release / GA gates | [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md), [FRESH_MACHINE_ONBOARDING.md](FRESH_MACHINE_ONBOARDING.md) |
 | ADRs | [ADR.md](ADR.md) |
 
 The repository root [README.md](../README.md) links here and to the rest of the project.
