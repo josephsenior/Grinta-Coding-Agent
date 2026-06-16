@@ -26,20 +26,18 @@ concurrency:
   cancel-in-progress: true
 
 # CI tiers (see docs/CI.md):
-# - gates-on-linux: full backend/tests corpus + Codecov coverage (matches pytest.ini testpaths).
+# - gates-on-linux-coverage / gates-on-linux-extended: full backend/tests corpus split
+#   across two jobs so each finishes before hosted-runner maintenance shutdowns.
 # - gates-on-windows / gates-on-macos: unit-only PR gates for cross-platform smoke.
 # - heavy-tests: marker-filtered heavy | integration | benchmark (schedule, main, manual).
 jobs:
-  gates-on-linux:
-    name: Python Gates on Linux
-    # ubuntu-latest (24.04) can cancel long steps when needrestart restarts runner-provisioner.
+  gates-on-linux-coverage:
+    name: Python Gates on Linux (coverage)
     runs-on: ubuntu-22.04
-    timeout-minutes: 45
+    timeout-minutes: 30
     strategy:
-      fail-fast: false
-      max-parallel: 1
       matrix:
-        python-version: ['3.12', '3.13']
+        python-version: ['3.12']
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - name: Install uv
@@ -58,11 +56,10 @@ jobs:
         run: python backend/scripts/verify/verify_optional_imports.py
       - name: Compile backend (syntax gate)
         run: uv run python -m compileall backend
-      - name: Run tests with coverage (full corpus)
-        run: PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q --cov=backend --cov-fail-under=75 --cov-report=xml:coverage.xml backend/tests
-
+      - name: Run unit tests with coverage
+        run: PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q -n auto --cov=backend --cov-fail-under=75 --cov-report=xml:coverage.xml backend/tests/unit
       - name: Upload coverage to Codecov
-        if: always() && matrix.python-version == '3.12'
+        if: always()
         uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2
         with:
           use_oidc: true
@@ -71,6 +68,64 @@ jobs:
           name: python-linux
           fail_ci_if_error: false
           verbose: true
+
+  gates-on-linux-extended:
+    name: Python Gates on Linux (extended)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    needs: gates-on-linux-coverage
+    strategy:
+      matrix:
+        python-version: ['3.12']
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Install uv
+        uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f
+        with:
+          enable-cache: true
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Lockfile validation
+        run: uv lock --check
+      - name: Install Python dependencies
+        run: python scripts/bootstrap_env.py dev-test
+      - name: Verify optional imports
+        run: python backend/scripts/verify/verify_optional_imports.py
+      - name: Compile backend (syntax gate)
+        run: uv run python -m compileall backend
+      - name: Run integration, e2e, and stress tests
+        run: PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q -n auto backend/tests/integration backend/tests/e2e backend/tests/stress
+
+  gates-on-linux-py313:
+    name: Python Gates on Linux (3.13 unit)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    continue-on-error: true
+    strategy:
+      matrix:
+        python-version: ['3.13']
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Install uv
+        uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f
+        with:
+          enable-cache: true
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Lockfile validation
+        run: uv lock --check
+      - name: Install Python dependencies
+        run: python scripts/bootstrap_env.py dev-test
+      - name: Verify optional imports
+        run: python backend/scripts/verify/verify_optional_imports.py
+      - name: Compile backend (syntax gate)
+        run: uv run python -m compileall backend
+      - name: Run unit tests (Python 3.13 advisory)
+        run: PYTHONPATH=".:$PYTHONPATH" uv run pytest -q backend/tests/unit
 
   gates-on-windows:
     name: Python Gates on Windows
