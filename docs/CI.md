@@ -6,7 +6,7 @@ This document describes what runs in GitHub Actions and how it relates to local 
 
 | Workflow | Job | What runs |
 |----------|-----|-----------|
-| **Run Python Tests** | `gates-on-linux-coverage-{a,b,d,c,report}` + `gates-on-linux-extended` | Unit tests with coverage sharded across four Linux jobs, combined in a fifth; then integration/e2e/stress. |
+| **Run Python Tests** | `gates-on-linux-coverage-{a,b,d,e,c,report}` + `gates-on-linux-extended` | Unit tests with coverage sharded across five Linux jobs, combined in a sixth; then integration/e2e/stress. |
 | **Run Python Tests** | `gates-on-windows` | Same unit corpus as `gates-on-linux` on `windows-latest`. |
 | **Run Python Tests** | `gates-on-macos` | Same unit corpus as `gates-on-linux` on `macos-latest` — **advisory only** (`continue-on-error: true`) until the matrix is promoted to required. |
 | **Lint** | pre-commit, mypy, version check | See [`.github/workflows/lint.yml`](../.github/workflows/lint.yml). |
