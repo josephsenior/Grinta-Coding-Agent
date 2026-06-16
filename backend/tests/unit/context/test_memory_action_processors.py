@@ -45,6 +45,7 @@ class TestIsToolBasedActionProc:
 
         action = MagicMock(spec=CmdRunAction)
         action.source = EventSource.USER
+        action.tool_call_metadata = None
         assert _is_tool_based_action(action) is False
 
     def test_message_action_is_not_tool(self):
@@ -52,6 +53,7 @@ class TestIsToolBasedActionProc:
 
         action = MagicMock(spec=MessageAction)
         action.source = EventSource.USER
+        action.tool_call_metadata = None
         assert _is_tool_based_action(action) is False
 
 
