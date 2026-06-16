@@ -31,6 +31,7 @@ jobs:
         run: |
           required=(
             "backend/evaluation/agent_eval_pack.py"
+            "evaluation/integration_tests/scripts/run_infer.sh"
           )
 
           missing=()

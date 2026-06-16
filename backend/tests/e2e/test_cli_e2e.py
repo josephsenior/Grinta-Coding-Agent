@@ -6,7 +6,6 @@ testing the paths that don't require a full runtime with LLM.
 
 from __future__ import annotations
 
-import json
 import os
 import subprocess
 import sys
