@@ -110,7 +110,7 @@ def run_production_health_check(raise_on_failure: bool = True) -> HealthCheckRes
 
     """
     logger.info('=' * 60)
-    logger.info('🏥 APP PRODUCTION HEALTH CHECK')
+    logger.info('🏥 STARTUP DEPENDENCY CHECK')
     logger.info('=' * 60)
 
     # Check Structure Editor (CRITICAL)
@@ -146,20 +146,25 @@ def run_production_health_check(raise_on_failure: bool = True) -> HealthCheckRes
     if critical_failures:
         results['overall_status'] = 'CRITICAL_FAILURE'
         logger.error('=' * 60)
-        logger.error('❌ HEALTH CHECK FAILED')
+        logger.error('❌ STARTUP DEPENDENCY CHECK FAILED')
         logger.error('   Critical failures: %s', ', '.join(critical_failures))
         logger.error('=' * 60)
 
         if raise_on_failure:
             raise RuntimeError(
-                f'Production health check failed! Critical dependencies missing: {critical_failures}\n'
+                f'Startup dependency check failed! Critical dependencies missing: {critical_failures}\n'
                 'Grinta cannot operate without Ultimate Editor (Tree-sitter).'
             )
     else:
         results['overall_status'] = 'HEALTHY'
         logger.info('=' * 60)
-        logger.info('✅ HEALTH CHECK PASSED')
-        logger.info('   Grinta is production-ready!')
+        logger.info('✅ STARTUP DEPENDENCY CHECK PASSED')
+        logger.info(
+            '   Core editing dependencies are available (structure editor, atomic refactor).'
+        )
+        logger.info(
+            '   Does not validate LLM providers, MCP servers, persistence, or release readiness.'
+        )
         logger.info('=' * 60)
 
     return results

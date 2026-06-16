@@ -74,7 +74,10 @@ class GitSetupMixin:
                     'No repository selected. Initializing a new git repository in the workspace.'
                 )
                 action = CmdRunAction(
-                    command=f'git init && git config --global --add safe.directory {self.workspace_root}',
+                    command=(
+                        f'git init && git config --local --add safe.directory '
+                        f'"{self.workspace_root}"'
+                    ),
                 )
                 await call_sync_from_async(self.run_action, action)
             else:
@@ -254,24 +257,22 @@ class GitSetupMixin:
     # ------------------------------------------------------------------
 
     def _setup_git_config(self) -> None:
-        """Configure git user settings during initial environment setup."""
+        """Configure git author identity via session env vars (no global git config)."""
         vcs_user_name = self.config.vcs_user_name
         vcs_user_email = self.config.vcs_user_email
-        cmd = f'git config --global user.name "{vcs_user_name}" && git config --global user.email "{vcs_user_email}"'
         try:
-            action = CmdRunAction(command=cmd)
-            obs = cast(Any, self.run(action))
-            if isinstance(obs, CmdOutputObservation) and obs.exit_code != 0:
-                logger.warning(
-                    'Git config command failed: %s, error: %s', cmd, obs.content
-                )
-            else:
-                logger.info(
-                    'Successfully configured git: name=%s, email=%s',
-                    vcs_user_name,
-                    vcs_user_email,
-                )
-        except Exception as e:
-            logger.warning(
-                'Failed to execute git config command: %s, error: %s', cmd, e
+            self.add_env_vars(
+                {
+                    'GIT_AUTHOR_NAME': vcs_user_name,
+                    'GIT_COMMITTER_NAME': vcs_user_name,
+                    'GIT_AUTHOR_EMAIL': vcs_user_email,
+                    'GIT_COMMITTER_EMAIL': vcs_user_email,
+                }
             )
+            logger.info(
+                'Configured git identity via session env vars: name=%s, email=%s',
+                vcs_user_name,
+                vcs_user_email,
+            )
+        except Exception as e:
+            logger.warning('Failed to configure git identity env vars: %s', e)

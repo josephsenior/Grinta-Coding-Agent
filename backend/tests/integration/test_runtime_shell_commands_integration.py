@@ -15,11 +15,15 @@ def test_runtime_executor_shell_git_config_commands_include_identity_fields(
     ps = ex._build_shell_git_config_command(True)  # noqa: SLF001
     sh = ex._build_shell_git_config_command(False)  # noqa: SLF001
     for fragment in (
-        'git config --global user.email ',
-        'git config --global user.name ',
+        'GIT_AUTHOR_EMAIL',
+        'GIT_AUTHOR_NAME',
+        'GIT_COMMITTER_EMAIL',
+        'GIT_COMMITTER_NAME',
     ):
         assert fragment in ps
         assert fragment in sh
+    assert 'git config --global' not in ps
+    assert 'git config --global' not in sh
 
 
 @pytest.mark.integration

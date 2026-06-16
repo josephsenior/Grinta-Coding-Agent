@@ -731,7 +731,7 @@ class TestHealthCheck:
                 return_value=(True, 'ok'),
             ),
         ):
-            with pytest.raises(RuntimeError, match='health check failed'):
+            with pytest.raises(RuntimeError, match='Startup dependency check failed'):
                 run_production_health_check(raise_on_failure=True)
 
     def test_critical_failure_no_raise_returns_critical(self):
