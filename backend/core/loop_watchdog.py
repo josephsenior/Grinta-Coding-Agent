@@ -193,7 +193,7 @@ class _LoopWatchdog:
             if loop_age >= self._stall_seconds:
                 if self._stalled_since is None:
                     self._stalled_since = self._loop_tick
-                if now - self._last_dump >= self._redump_seconds:
+                if self._last_dump <= 0.0 or now - self._last_dump >= self._redump_seconds:
                     self._last_dump = now
                     self._log_stall(loop_age)
             elif self._stalled_since is not None:
