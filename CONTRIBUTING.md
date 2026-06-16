@@ -20,9 +20,38 @@ cd Grinta-Coding-Agent
 # Install dependencies
 python scripts/bootstrap_env.py dev-test
 
+# First-run LLM setup (interactive; writes settings.json + .env)
+uv run python -m backend.cli.entry init
+
 # Start the CLI
 uv run python -m backend.cli.entry
 ```
+
+On Windows PowerShell you can use the convenience wrapper instead:
+
+```powershell
+.\START_HERE.ps1
+```
+
+That script syncs `dev-test` dependencies, checks local model servers, runs `init`
+when `settings.json` is missing, then launches the CLI.
+
+### Local configuration (source checkout)
+
+- **`settings.json`** at the repository root holds non-secret defaults (`llm_model`,
+  `llm_provider`, `${LLM_API_KEY}` placeholder).
+- **`.env`** beside `settings.json` stores the real `LLM_API_KEY` (copy from
+  [`.env.template`](.env.template); never commit secrets).
+- **`APP_ROOT`** overrides where `settings.json` is resolved when you need an
+  isolated config directory (for example smoke tests or multiple profiles).
+- Installed runs (`pipx`, Homebrew, Scoop) use `~/.grinta/settings.json` instead
+  of the repo root unless `APP_ROOT` is set.
+
+Launching `grinta` or `uv run python -m backend.cli.entry` without a configured
+key runs the same shared setup wizard as `grinta init`. Prefer `init` for an
+explicit first-time setup step.
+
+See also [docs/QUICK_START.md](docs/QUICK_START.md) and [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 
 ## How to Contribute
 
