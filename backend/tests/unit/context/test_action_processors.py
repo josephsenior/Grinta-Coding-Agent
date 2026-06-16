@@ -16,7 +16,9 @@ from backend.ledger.action import (
     MessageAction,
 )
 from backend.ledger.action.message import SystemMessageAction
+from backend.ledger.action.search import GlobAction
 from backend.ledger.event import EventSource
+from backend.ledger.tool import ToolCallMetadata
 
 # ── _is_tool_based_action ───────────────────────────────────────────
 
@@ -39,6 +41,37 @@ class TestIsToolBasedAction:
     def test_message_action_not_tool_based(self):
         action = MessageAction(content='hello')
         assert _is_tool_based_action(action) is False
+
+    def test_any_action_with_tool_call_metadata_is_tool_based(self):
+        action = GlobAction(pattern='**/*.py')
+        action.tool_call_metadata = ToolCallMetadata(
+            function_name='glob',
+            tool_call_id='call_glob',
+            model_response={
+                'id': 'resp_glob',
+                'choices': [
+                    {
+                        'message': {
+                            'role': 'assistant',
+                            'content': '',
+                            'tool_calls': [
+                                {
+                                    'id': 'call_glob',
+                                    'type': 'function',
+                                    'function': {
+                                        'name': 'glob',
+                                        'arguments': '{"pattern":"**/*.py"}',
+                                    },
+                                }
+                            ],
+                        }
+                    }
+                ],
+            },
+            total_calls_in_response=1,
+        )
+
+        assert _is_tool_based_action(action) is True
 
 
 # ── _handle_message_action ──────────────────────────────────────────

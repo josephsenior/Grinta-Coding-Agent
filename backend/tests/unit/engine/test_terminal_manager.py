@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from backend.core.errors import FunctionCallValidationError
+from backend.core.enums import ActionSecurityRisk
 from backend.engine.tools.terminal_manager import handle_terminal_manager_tool
 from backend.ledger.action.terminal import (
     TerminalInputAction,
@@ -29,6 +30,16 @@ def test_open_maps_rows_and_cols() -> None:
     assert act.cwd == '/tmp'
     assert act.rows == 30
     assert act.cols == 120
+    assert act.security_risk == ActionSecurityRisk.LOW
+
+
+def test_open_preserves_declared_security_risk() -> None:
+    act = handle_terminal_manager_tool(
+        {'action': 'open', 'command': 'echo hi', 'security_risk': 'HIGH'}
+    )
+
+    assert isinstance(act, TerminalRunAction)
+    assert act.security_risk == ActionSecurityRisk.HIGH
 
 
 def test_input_maps_control_and_resize() -> None:

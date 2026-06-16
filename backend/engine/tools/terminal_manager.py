@@ -1,7 +1,10 @@
 from typing import Any
 
 from backend.core.errors import FunctionCallValidationError
-from backend.engine.function_calling_helpers import validate_security_risk
+from backend.engine.function_calling_helpers import (
+    set_security_risk,
+    validate_security_risk,
+)
 from backend.inference.tool_names import TERMINAL_MANAGER_TOOL_NAME
 from backend.ledger.action.terminal import (
     TerminalInputAction,
@@ -178,12 +181,14 @@ def _handle_open_action(arguments: dict) -> TerminalRunAction:
     if not cmd:
         raise ValueError("Terminal 'open' action requires 'command'")
     validate_security_risk(arguments, TERMINAL_MANAGER_TOOL_NAME)
-    return TerminalRunAction(
+    action = TerminalRunAction(
         command=cmd,
         cwd=arguments.get('cwd'),
         rows=_opt_int(arguments.get('rows')),
         cols=_opt_int(arguments.get('cols')),
     )
+    set_security_risk(action, arguments)
+    return action
 
 
 def _has_input_content(

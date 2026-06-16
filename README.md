@@ -86,7 +86,7 @@ Grinta exposes three modes in the Textual HUD (Chat, Plan, Agent). They change t
 - **Plan** — read-only investigation plus a structured plan before execution.
 - **Agent** — full task loop (default for direct work).
 
-Autonomy (`/autonomy`: conservative, balanced, full) controls confirmation prompts in **Agent** mode only.
+Autonomy (`/autonomy`: conservative, balanced, full) controls confirmation prompts in **Agent** mode only. Runtime hardening is configured separately with `security.execution_profile` (`standard`, `hardened_local`, `sandboxed_local`).
 
 ## Common slash commands
 
@@ -108,7 +108,7 @@ Playbook workflows (`/debug`, `/testing`, `/feature`, …) and the full registry
 
 ## Security boundary
 
-Grinta executes actions on the local host. `hardened_local` adds stricter policy checks but **is not** sandboxing or process isolation. Read [docs/SECURITY_CHECKLIST.md](docs/SECURITY_CHECKLIST.md) **before pointing Grinta at code you do not trust** — for hostile codebases, run inside a VM or container.
+Grinta executes actions on the local host. `hardened_local` adds stricter policy checks but **is not** sandboxing or process isolation; `sandboxed_local` adds process isolation only for non-interactive commands. Read [docs/SECURITY_CHECKLIST.md](docs/SECURITY_CHECKLIST.md) **before pointing Grinta at code you do not trust** — for hostile codebases, run inside a VM or container.
 
 ## Architecture (high level)
 

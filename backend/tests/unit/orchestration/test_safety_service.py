@@ -15,7 +15,12 @@ from backend.ledger.action import (
     CmdRunAction,
     FileEditAction,
     FileReadAction,
+    FileWriteAction,
+    TerminalInputAction,
+    TerminalRunAction,
 )
+from backend.ledger.action.agent import BlackboardAction, DelegateTaskAction
+from backend.ledger.action.mcp import MCPAction
 from backend.orchestration.services.safety_service import SafetyService
 
 
@@ -46,6 +51,18 @@ class TestActionRequiresConfirmation:
         svc = SafetyService(_make_context())
         action = FileEditAction(path='/tmp/x.py', new_str='x')
         assert svc.action_requires_confirmation(action) is True
+
+    def test_mutating_and_external_actions_require_confirmation_flow(self):
+        svc = SafetyService(_make_context())
+        actions = [
+            FileWriteAction(path='/tmp/x.py', content='x'),
+            TerminalRunAction(command='pytest -q'),
+            TerminalInputAction(session_id='term-1', input='pytest -q'),
+            MCPAction(name='tool_x', arguments={}),
+            DelegateTaskAction(task_description='inspect module'),
+            BlackboardAction(command='set', key='status', value='ready'),
+        ]
+        assert all(svc.action_requires_confirmation(action) for action in actions)
 
     def test_file_read_does_not_require_confirmation(self):
         svc = SafetyService(_make_context())
@@ -108,12 +125,12 @@ class TestEvaluateSecurityRisk:
 
 class TestAnalyzeSecurity:
     @pytest.mark.asyncio
-    async def test_no_analyzer_sets_unknown(self):
+    async def test_no_analyzer_preserves_declared_risk(self):
         ctx = _make_context(security_analyzer=None)
         svc = SafetyService(ctx)
         action = _as_action(SimpleNamespace(security_risk=ActionSecurityRisk.LOW))
         await svc.analyze_security(action)
-        assert action.security_risk == ActionSecurityRisk.UNKNOWN
+        assert action.security_risk == ActionSecurityRisk.LOW
 
     @pytest.mark.asyncio
     async def test_with_analyzer_sets_risk(self):
@@ -169,7 +186,7 @@ class TestApplyConfirmationState:
             action.confirmation_state == ActionConfirmationStatus.AWAITING_CONFIRMATION
         )
 
-    def test_autonomous_no_confirmation(self):
+    def test_high_risk_prompts_even_when_autonomy_would_skip(self):
         autonomy = MagicMock()
         autonomy.should_request_confirmation.return_value = False
         controller = MagicMock()
@@ -180,7 +197,9 @@ class TestApplyConfirmationState:
         svc.apply_confirmation_state(
             action, is_high_security_risk=True, is_ask_for_every_action=True
         )
-        assert action.confirmation_state is None  # untouched
+        assert (
+            action.confirmation_state == ActionConfirmationStatus.AWAITING_CONFIRMATION
+        )
 
     def test_full_autonomy_never_marks_awaiting_confirmation(self):
         autonomy = MagicMock()

@@ -175,6 +175,30 @@ class TestEnforceSecurity:
                 result = rt._enforce_security(action)
         assert result is None
 
+    def test_critical_command_blocked_without_configured_analyzer(self):
+        from backend.ledger.action import CmdRunAction
+
+        rt = _FakeRuntime(analyzer=None, enforce=True, block_high=False)
+        action = CmdRunAction(command='rm -rf /')
+
+        result = rt._enforce_security(action)
+
+        assert result is not None
+        assert result.__class__.__name__ == 'ErrorObservation'
+        assert 'risk=CRITICAL' in result.content
+
+    def test_critical_terminal_input_blocked_without_configured_analyzer(self):
+        from backend.ledger.action import TerminalInputAction
+
+        rt = _FakeRuntime(analyzer=None, enforce=True, block_high=False)
+        action = TerminalInputAction(session_id='term-1', input='rm -rf /')
+
+        result = rt._enforce_security(action)
+
+        assert result is not None
+        assert result.__class__.__name__ == 'ErrorObservation'
+        assert 'risk=CRITICAL' in result.content
+
     def test_production_analyzer_uses_sync_path_without_bridge(self):
         from backend.ledger.action import CmdRunAction
         from backend.security.analyzer import SecurityAnalyzer

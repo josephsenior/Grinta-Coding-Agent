@@ -48,8 +48,8 @@ The original three modes — `supervised`, `balanced`, `full` — branched in fi
 
 The collapse: autonomy is now a **single-axis knob** that controls *exactly one thing* — when the runtime stops to ask the user before running an action. That’s it.
 
-- `conservative` (renamed from `supervised`): ask before every action.
-- `balanced`: ask only for high-risk actions (where “high-risk” means the analyzer or the model labeled the action HIGH).
+- `conservative` (renamed from `supervised`): ask before every command, mutation, external tool call, terminal/browser action, or worker-coordination action in the confirmation flow.
+- `balanced`: ask for high-risk or high-impact actions (where “high-risk” includes analyzer or model/tool labels of HIGH).
 - `full`: never ask.
 
 Execution is identical across modes. Prompting is identical across modes — the system prompt no longer branches on autonomy. Retry logic is identical. Cost caps and iteration limits were extracted into their own standalone config keys (`max_cost_per_task`, `warn_at_cost`, `max_autonomous_iterations`, `stuck_threshold_iterations`) with global defaults that apply universally regardless of mode.

@@ -18,8 +18,9 @@ Grinta is **local-first** and runs with **your** user privileges. It is **not** 
 
 | Protection | What it does |
 | --- | --- |
-| **Hardened-local policy** | `command_analyzer.py` classifies commands: NONE / LOW / MEDIUM / HIGH / CRITICAL |
-| **CRITICAL refusal gate** | `safety_validator.py::_should_block_action` blocks all CRITICAL actions regardless of profile |
+| **Runtime critical-command gate** | Blocks CRITICAL-classified shell and terminal commands while security enforcement is enabled |
+| **Hardened-local policy** | When `security.execution_profile` is `hardened_local` or `sandboxed_local`, blocks workspace escapes, package installs, network-capable commands, background processes, and sensitive path access unless explicitly allowed |
+| **Autonomy confirmation gate** | `/autonomy conservative|balanced|full` controls when the agent pauses for approval; it is not the security profile |
 | **Audit log** | Every action logged to `~/.grinta/workspaces/<id>/storage/<session>/audit/` with risk classification |
 | **Secret masker** | Known secret patterns stripped from output before display/logging |
 | **Shell guard** | Detects `rm -rf /`, force pushes, encoded payloads, privilege escalation, network exfiltration |
@@ -29,7 +30,7 @@ Grinta is **local-first** and runs with **your** user privileges. It is **not** 
 | Misconception | Reality |
 | --- | --- |
 | A sandbox | Pattern matching can be bypassed by clever prompt injection or obfuscation |
-| Isolated from filesystem | `hardened_local` *prefers* workspace boundaries but does not strictly enforce them |
+| Isolated from filesystem | `hardened_local` enforces Grinta policy checks, but actions still run with your host-user permissions |
 | Safe against malicious builds | Authorized tools (e.g., `npm install` on untrusted `package.json`) can trigger malicious scripts |
 
 ## Hardening recommendations

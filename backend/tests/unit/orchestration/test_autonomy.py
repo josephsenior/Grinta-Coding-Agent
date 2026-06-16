@@ -11,11 +11,15 @@ Tests cover:
 from unittest.mock import MagicMock
 
 from backend.ledger.action import (
+    ActionSecurityRisk,
     CmdRunAction,
     FileEditAction,
     FileReadAction,
     FileWriteAction,
+    TerminalInputAction,
+    TerminalRunAction,
 )
+from backend.ledger.action.agent import BlackboardAction, DelegateTaskAction
 from backend.orchestration.autonomy import AutonomyController, AutonomyLevel
 
 
@@ -142,6 +146,55 @@ class TestShouldRequestConfirmation:
         # Safe action
         safe_action = FileReadAction(path='/tmp/file.txt')
         assert controller.should_request_confirmation(safe_action) is False
+
+    def test_balanced_honors_declared_high_risk(self):
+        """BALANCED mode must honor model/tool-declared HIGH risk."""
+        config = MagicMock()
+        config.autonomy_level = 'balanced'
+        controller = AutonomyController(config)
+
+        action = CmdRunAction(command='echo harmless')
+        action.security_risk = ActionSecurityRisk.HIGH
+
+        assert controller.should_request_confirmation(action) is True
+
+    def test_balanced_detects_terminal_command_risk(self):
+        """Terminal open/input commands use the same command classifier."""
+        config = MagicMock()
+        config.autonomy_level = 'balanced'
+        controller = AutonomyController(config)
+
+        assert (
+            controller.should_request_confirmation(
+                TerminalRunAction(command='rm -rf /tmp/demo')
+            )
+            is True
+        )
+        assert (
+            controller.should_request_confirmation(
+                TerminalInputAction(session_id='term-1', input='rm -rf /tmp/demo')
+            )
+            is True
+        )
+
+    def test_balanced_prompts_for_concurrency_coordination_actions(self):
+        """Experimental worker orchestration actions should be user-visible."""
+        config = MagicMock()
+        config.autonomy_level = 'balanced'
+        controller = AutonomyController(config)
+
+        assert (
+            controller.should_request_confirmation(
+                DelegateTaskAction(task_description='inspect module')
+            )
+            is True
+        )
+        assert (
+            controller.should_request_confirmation(
+                BlackboardAction(command='set', key='status', value='ready')
+            )
+            is True
+        )
 
 
 class TestHighRiskDetection:
