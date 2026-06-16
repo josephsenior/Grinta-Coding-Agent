@@ -20,9 +20,27 @@ def _assert_debugger_attrs(action: DebuggerAction, expected: dict[str, object]) 
 def test_create_debugger_tool_is_generic() -> None:
     tool = create_debugger_tool()
     assert tool['function']['name'] == DEBUGGER_TOOL_NAME
+    assert 'DAP-over-TCP' in tool['function']['description']
     properties = tool['function']['parameters']['properties']
     assert 'adapter_command' in properties
+    assert 'adapter_transport' in properties
+    assert 'adapter_host' in properties
+    assert 'adapter_port' in properties
     assert 'launch_config' in properties
+    assert '{port}' in properties['adapter_command']['description']
+    all_of = tool['function']['parameters']['allOf']
+    session_rules = [
+        rule
+        for rule in all_of
+        if rule.get('then', {}).get('required') == ['session_id']
+    ]
+    assert session_rules
+    set_breakpoint_rules = [
+        rule
+        for rule in all_of
+        if rule.get('then', {}).get('required') == ['session_id', 'file']
+    ]
+    assert set_breakpoint_rules
 
 
 def test_start_maps_generic_dap_args() -> None:
@@ -32,6 +50,9 @@ def test_start_maps_generic_dap_args() -> None:
             'adapter': 'node',
             'adapter_id': 'pwa-node',
             'adapter_command': ['node', 'adapter.js'],
+            'adapter_transport': 'tcp',
+            'adapter_host': '127.0.0.1',
+            'adapter_port': '12345',
             'request': 'launch',
             'launch_config': {'type': 'pwa-node', 'program': 'server.js'},
             'initialize_options': {'client': 'test'},
@@ -49,6 +70,9 @@ def test_start_maps_generic_dap_args() -> None:
             'adapter': 'node',
             'adapter_id': 'pwa-node',
             'adapter_command': ['node', 'adapter.js'],
+            'adapter_transport': 'tcp',
+            'adapter_host': '127.0.0.1',
+            'adapter_port': 12345,
             'launch_config': {'type': 'pwa-node', 'program': 'server.js'},
             'initialize_options': {'client': 'test'},
             'args': ['--x', '1'],

@@ -20,7 +20,9 @@ def create_debugger_tool() -> dict[str, Any]:
                 'set breakpoints, step, inspect stack frames/scopes/variables, evaluate '
                 'expressions, continue, pause, status, or stop. For Python, adapter="python" '
                 'or a .py program uses the built-in debugpy adapter. For other languages, '
-                'provide adapter_command and adapter-specific launch_config.'
+                'the runtime can auto-resolve detected stdio and DAP-over-TCP adapters; '
+                'pass adapter_command only for a custom adapter and provide '
+                'adapter-specific launch_config as needed.'
             ),
             'parameters': {
                 'type': 'object',
@@ -50,7 +52,7 @@ def create_debugger_tool() -> dict[str, Any]:
                     },
                     'adapter': {
                         'type': 'string',
-                        'description': 'DAP adapter preset/name. Built-in preset: python. Other languages should pass adapter_command.',
+                        'description': 'DAP adapter preset/name. Built-in preset: python. Other detected stdio or DAP-over-TCP adapters may be auto-resolved.',
                     },
                     'adapter_id': {
                         'type': 'string',
@@ -63,7 +65,20 @@ def create_debugger_tool() -> dict[str, Any]:
                     'adapter_command': {
                         'type': 'array',
                         'items': {'type': 'string'},
-                        'description': 'Command and arguments that start a DAP adapter over stdio, e.g. ["node", "path/to/adapter.js"].',
+                        'description': 'Command and arguments that start a custom DAP adapter. Defaults to stdio. For adapter_transport="tcp", use {port} in an argument to receive an allocated localhost port.',
+                    },
+                    'adapter_transport': {
+                        'type': 'string',
+                        'enum': ['stdio', 'tcp'],
+                        'description': 'Transport for a custom adapter_command. Defaults to stdio. Use tcp only for adapters that speak DAP over a localhost socket.',
+                    },
+                    'adapter_host': {
+                        'type': 'string',
+                        'description': 'Host for a custom DAP-over-TCP adapter. Defaults to 127.0.0.1.',
+                    },
+                    'adapter_port': {
+                        'type': 'integer',
+                        'description': 'Port for a custom DAP-over-TCP adapter. If omitted, adapter_command must include {port}; the runtime allocates a free local port and substitutes it.',
                     },
                     'request': {
                         'type': 'string',
@@ -166,6 +181,37 @@ def create_debugger_tool() -> dict[str, Any]:
                 'required': ['action'],
                 'allOf': [
                     {
+                        'if': {
+                            'properties': {
+                                'action': {
+                                    'enum': [
+                                        'set_breakpoints',
+                                        'continue',
+                                        'next',
+                                        'step_in',
+                                        'step_out',
+                                        'pause',
+                                        'stack',
+                                        'scopes',
+                                        'variables',
+                                        'evaluate',
+                                        'status',
+                                        'stop',
+                                    ]
+                                }
+                            }
+                        },
+                        'then': {'required': ['session_id']},
+                    },
+                    {
+                        'if': {
+                            'properties': {
+                                'action': {'const': 'set_breakpoints'}
+                            }
+                        },
+                        'then': {'required': ['session_id', 'file']},
+                    },
+                    {
                         'if': {'properties': {'action': {'const': 'scopes'}}},
                         'then': {'required': ['session_id', 'frame_id']},
                     },
@@ -256,6 +302,9 @@ def handle_debugger_tool(arguments: dict[str, Any]) -> DebuggerAction:
         adapter=arguments.get('adapter'),
         adapter_id=arguments.get('adapter_id'),
         adapter_command=_list_str(arguments.get('adapter_command')),
+        adapter_transport=arguments.get('adapter_transport'),
+        adapter_host=arguments.get('adapter_host'),
+        adapter_port=_opt_int(arguments.get('adapter_port')),
         language=arguments.get('language'),
         request=str(arguments.get('request') or 'launch').strip().lower(),
         program=arguments.get('program'),

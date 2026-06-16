@@ -472,15 +472,18 @@ def has_any_lsp_server() -> bool:
 
 
 def has_any_debug_adapter() -> bool:
-    """True when at least one DAP adapter is available locally.
+    """True when at least one DAP adapter is usable by this runtime.
 
-    Python (debugpy) is bundled, so this should effectively always return
-    True in a working install. The probe still runs because users can
-    disable detection via ``GRINTA_DISABLE_DEBUGGER_DETECTION=1``.
+    Python (debugpy) is bundled, so this should effectively return True in a
+    working install. PATH probes may also find non-DAP debug servers; those are
+    reported for diagnostics but do not make the ``debugger`` tool available.
     """
     if os.getenv('GRINTA_DISABLE_DEBUGGER_DETECTION') == '1':
         return False
-    return any(entry.get('available') for entry in detect_debug_adapters_summary())
+    return any(
+        entry.get('auto_resolvable', entry.get('available'))
+        for entry in detect_debug_adapters_summary()
+    )
 
 
 def detection_summary() -> dict[str, list[str]]:
@@ -494,7 +497,15 @@ def detection_summary() -> dict[str, list[str]]:
             t.spec.name for t in detect_lsp_servers().values() if not t.available
         ),
         'debug_available': sorted(
-            f'{e["language"]}:{e["adapter"]}' for e in debug if e.get('available')
+            f'{e["language"]}:{e["adapter"]}'
+            for e in debug
+            if e.get('auto_resolvable', e.get('available'))
+        ),
+        'debug_unsupported': sorted(
+            f'{e["language"]}:{e["adapter"]}({e.get("transport", "unknown")})'
+            for e in debug
+            if e.get('available')
+            and not e.get('auto_resolvable', e.get('available'))
         ),
         'debug_missing': sorted(
             f'{e["language"]}:{e["adapter"]}' for e in debug if not e.get('available')

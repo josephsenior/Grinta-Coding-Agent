@@ -15,8 +15,11 @@ from typing import Any
 
 from backend.core.logger import app_logger as logger
 from backend.execution.dap._dap_adapters import (
+    DAPAdapterSpec,
     _language_from_extension,
-    _resolve_recipe,
+    _resolve_adapter_spec,
+    _unsupported_recipe_hint,
+    build_custom_adapter_spec,
 )
 from backend.execution.dap._dap_errors import DAPError
 from backend.execution.dap._dap_logging import _dap_log
@@ -93,6 +96,29 @@ class DAPDebugManager:
         except Exception:
             logger.debug('DAP session close after dispatch error failed', exc_info=True)
 
+    @staticmethod
+    def _session_process_alive(session: DAPDebugSession) -> bool:
+        try:
+            is_running = getattr(session.client, 'is_running', None)
+            if callable(is_running):
+                return bool(is_running())
+            process = session.client.process
+        except Exception:
+            return False
+        return process is not None and process.poll() is None
+
+    def _should_drop_session_after_error(
+        self, session: DAPDebugSession, exc: Exception
+    ) -> bool:
+        if not self._session_process_alive(session):
+            return True
+        message = str(exc).lower()
+        return (
+            'pipe closed' in message
+            or 'connection closed' in message
+            or 'adapter is not running' in message
+        )
+
     def _handle_dispatch_exception(
         self, exc: Exception, action: DebuggerAction, debug_action: str
     ) -> ErrorObservation:
@@ -145,14 +171,17 @@ class DAPDebugManager:
             raise DAPError(f'Debug session already exists: {session_id}')
 
         adapter = self._adapter_name(action)
-        adapter_command = self._adapter_command(action, adapter)
+        adapter_spec = self._adapter_spec(action, adapter)
         _dap_log(
             logging.INFO,
-            'DAP adapter command resolved',
+            'DAP adapter resolved',
             msg_type='DAP_ADAPTER_RESOLVED',
             dap_session_id=session_id,
             adapter=adapter,
-            adapter_argv0=adapter_command[0] if adapter_command else None,
+            adapter_argv0=adapter_spec.command[0] if adapter_spec.command else None,
+            adapter_transport=adapter_spec.transport,
+            adapter_host=adapter_spec.host,
+            adapter_port=adapter_spec.port,
             program=action.program,
         )
         adapter_id = action.adapter_id or adapter or 'generic'
@@ -164,7 +193,7 @@ class DAPDebugManager:
             adapter_id,
             language,
             request,
-            adapter_command,
+            adapter_spec,
         )
         self.sessions[session_id] = session
         try:
@@ -181,12 +210,15 @@ class DAPDebugManager:
         adapter_id: str,
         language: str,
         request: str,
-        adapter_command: list[str],
+        adapter_spec: DAPAdapterSpec,
     ) -> DAPDebugSession:
         return DAPDebugSession(
             session_id,
             workspace_root=self.workspace_root,
-            adapter_command=adapter_command,
+            adapter_command=adapter_spec.command,
+            adapter_transport=adapter_spec.transport,
+            adapter_host=adapter_spec.host,
+            adapter_port=adapter_spec.port,
             adapter_id=adapter_id,
             language=language,
             request=request,
@@ -214,8 +246,9 @@ class DAPDebugManager:
             raise DAPError(f'Unknown debugger action: {debug_action}')
         try:
             return handler(self, session, action, timeout)
-        except Exception:
-            self._drop_session(session)
+        except Exception as exc:
+            if self._should_drop_session_after_error(session, exc):
+                self._drop_session(session)
             raise
 
     def _action_set_breakpoints(
@@ -309,31 +342,53 @@ class DAPDebugManager:
             return self._EXTENSION_ADAPTERS.get(Path(action.program).suffix.lower())
         return None
 
-    def _adapter_command(
+    def _adapter_spec(
         self, action: DebuggerAction, adapter: str | None
-    ) -> list[str]:
+    ) -> DAPAdapterSpec:
         if action.adapter_command:
-            return action.adapter_command
+            return build_custom_adapter_spec(
+                action.adapter_command,
+                transport=(action.adapter_transport or 'stdio').strip().lower(),
+                host=action.adapter_host,
+                port=action.adapter_port,
+            )
         if adapter in self._PYTHON_ADAPTERS:
-            return [action.python or sys.executable, '-m', 'debugpy.adapter']
+            return DAPAdapterSpec(
+                [action.python or sys.executable, '-m', 'debugpy.adapter'],
+                transport='stdio',
+            )
         # Auto-discovery: probe PATH for a known adapter so the model
         # doesn't have to hand-roll ``adapter_command`` for the common
         # languages (Go/dlv, Rust/codelldb, JS/js-debug, C#/netcoredbg, …).
-        discovered: list[str] | None = None
+        discovered: DAPAdapterSpec | None = None
         if adapter:
-            discovered = _resolve_recipe(adapter)
+            discovered = _resolve_adapter_spec(adapter)
         if discovered is None and action.program:
             lang = _language_from_extension(Path(action.program).suffix)
             if lang:
-                discovered = _resolve_recipe(lang)
+                discovered = _resolve_adapter_spec(lang)
         if discovered is not None:
             return discovered
         hint = f' for adapter {adapter!r}' if adapter else ''
+        unsupported = ''
+        unsupported_language = adapter
+        if unsupported_language is None and action.program:
+            unsupported_language = _language_from_extension(Path(action.program).suffix)
+        if unsupported_language:
+            unsupported_hint = _unsupported_recipe_hint(unsupported_language)
+            if unsupported_hint:
+                unsupported = (
+                    f' Found installed adapter(s) with unsupported transport: '
+                    f'{unsupported_hint}. This runtime currently supports stdio '
+                    'and DAP-over-TCP adapters only.'
+                )
         raise DAPError(
             'debugger start requires adapter_command'
             f'{hint}. No DAP adapter found on PATH; install one '
-            '(e.g. dlv for Go, codelldb for Rust/C++, js-debug-adapter for '
-            'Node/TS, netcoredbg for C#) or pass adapter_command explicitly.'
+            '(e.g. dlv for Go, codelldb or lldb-dap for Rust/C/C++, '
+            'js-debug-adapter for Node/TS, netcoredbg for C#) or pass a '
+            'stdio-compatible adapter_command or DAP-over-TCP adapter_command '
+            f'explicitly.{unsupported}'
         )
 
     def _get_session(self, session_id: str | None) -> DAPDebugSession:

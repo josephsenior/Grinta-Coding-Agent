@@ -60,10 +60,11 @@ def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
         debug_available = summary.get('debug_available', []) if any_dap else []
         if debug_available:
             dap_line = (
-                '- **Debug adapters (DAP / `debugger`)**: detected → '
+                '- **Debug adapters (DAP / `debugger`)**: usable adapters detected → '
                 f'{", ".join(debug_available)}. The `debugger` tool resolves the right '
                 'adapter automatically from the file extension or `adapter` field; do not '
-                'pass `adapter_command` unless you have a custom binary.'
+                'pass `adapter_command` unless you have a custom stdio or DAP-over-TCP '
+                'adapter binary.'
             )
         else:
             dap_line = ''

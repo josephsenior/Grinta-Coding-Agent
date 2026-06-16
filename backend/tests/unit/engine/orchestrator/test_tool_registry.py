@@ -111,6 +111,16 @@ class TestFeatureFlagToolPresence:
         assert 'debugger' in names
         self._assert_dispatch_covered(names)
 
+    def test_debugger_absent_without_supported_adapter(self):
+        from unittest.mock import patch
+
+        with patch(
+            'backend.utils.runtime_detect.has_any_debug_adapter',
+            return_value=False,
+        ):
+            names = _build_toolset(enable_debugger=True)
+        assert 'debugger' not in names
+
     def test_debugger_disabled(self):
         names = _build_toolset(enable_debugger=False)
         assert 'debugger' not in names
