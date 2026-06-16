@@ -675,9 +675,6 @@ class RendererDisplayMixin:
         self._clear_last_active_card_processing()
         widget = OrientLine(model)
         self._append_transcript_widget(widget)
-        self._orient_burst_lines.append(model)
-        self._orient_burst_widgets.append(widget)
-        self._orient_burst_area = model.area or self._orient_burst_area
         self._tui.set_current_operation(
             f'{model.verb} {model.target}'.strip(),
             meta=model.result,
@@ -686,25 +683,10 @@ class RendererDisplayMixin:
         return widget
 
     def _flush_orient_burst(self) -> None:
-        lines = list(getattr(self, '_orient_burst_lines', []) or [])
-        widgets = list(getattr(self, '_orient_burst_widgets', []) or [])
-        if not lines:
-            return
+        """No-op — orient lines stay as individual transcript rows."""
         self._orient_burst_lines = []
         self._orient_burst_widgets = []
-        area = getattr(self, '_orient_burst_area', 'codebase')
         self._orient_burst_area = 'codebase'
-        if len(lines) < 3:
-            return
-        for widget in widgets:
-            try:
-                widget.remove()
-            except Exception:
-                pass
-        from backend.cli.tui.widgets.activity_card import OrientBurst
-
-        burst = OrientBurst(area, lines, collapsed=True)
-        self._append_transcript_widget(burst)
 
     def _apply_card_final_state(
         self,
