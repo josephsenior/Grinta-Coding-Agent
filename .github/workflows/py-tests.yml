@@ -62,11 +62,13 @@ jobs:
           --cov=backend --cov-fail-under=0
           backend/tests/unit/cli backend/tests/unit/client backend/tests/unit/context
           backend/tests/unit/engine backend/tests/unit/eval
+      - name: Stage coverage data
+        run: cp .coverage coverage-shard-a.dat
       - name: Upload coverage data
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: coverage-linux-a
-          path: .coverage
+          path: coverage-shard-a.dat
           if-no-files-found: error
 
   gates-on-linux-coverage-b:
@@ -101,11 +103,13 @@ jobs:
           backend/tests/unit/core backend/tests/unit/execution backend/tests/unit/inference
           backend/tests/unit/test_bounded_pipeline.py backend/tests/unit/test_backend_conftest.py
           backend/tests/unit/test_package_version.py backend/tests/unit/test_start_server.py
+      - name: Stage coverage data
+        run: cp .coverage coverage-shard-b.dat
       - name: Upload coverage data
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: coverage-linux-b
-          path: .coverage
+          path: coverage-shard-b.dat
           if-no-files-found: error
 
   gates-on-linux-coverage-c:
@@ -141,11 +145,13 @@ jobs:
           backend/tests/unit/orchestration backend/tests/unit/persistence backend/tests/unit/playbooks
           backend/tests/unit/security backend/tests/unit/telemetry backend/tests/unit/tools
           backend/tests/unit/utils backend/tests/unit/validation
+      - name: Stage coverage data
+        run: cp .coverage coverage-shard-c.dat
       - name: Upload coverage data
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: coverage-linux-c
-          path: .coverage
+          path: coverage-shard-c.dat
           if-no-files-found: error
 
   gates-on-linux-coverage-report:
@@ -177,9 +183,9 @@ jobs:
           path: coverage-shards
       - name: Combine coverage and enforce threshold
         run: |
-          cp coverage-shards/coverage-linux-a/.coverage .coverage.a
-          cp coverage-shards/coverage-linux-b/.coverage .coverage.b
-          cp coverage-shards/coverage-linux-c/.coverage .coverage.c
+          cp coverage-shards/coverage-linux-a/coverage-shard-a.dat .coverage.a
+          cp coverage-shards/coverage-linux-b/coverage-shard-b.dat .coverage.b
+          cp coverage-shards/coverage-linux-c/coverage-shard-c.dat .coverage.c
           uv run coverage combine .coverage.a .coverage.b .coverage.c
           uv run coverage report --fail-under=75
           uv run coverage xml -o coverage.xml
