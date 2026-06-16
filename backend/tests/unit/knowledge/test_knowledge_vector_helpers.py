@@ -20,7 +20,11 @@ def test_vector_hit_metadata_filters_reserved_and_non_scalars() -> None:
         'nested': {'x': 1},
     }
     metadata = _vector_hit_metadata(result)
-    assert metadata == {'document_id': 'doc-1', 'chunk_index': 2, 'filename': 'readme.md'}
+    assert metadata == {
+        'document_id': 'doc-1',
+        'chunk_index': 2,
+        'filename': 'readme.md',
+    }
 
 
 def test_required_vector_text_strips_and_rejects_invalid() -> None:

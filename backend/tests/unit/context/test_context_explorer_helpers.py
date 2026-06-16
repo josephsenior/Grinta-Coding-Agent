@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
-
-import pytest
 
 from backend.context import context_explorer as ce
 
@@ -118,7 +115,9 @@ def test_run_returns_none_on_subprocess_error(tmp_path: Path, monkeypatch) -> No
     assert ce._run(['git', 'status'], tmp_path) is None
 
 
-def test_git_status_lines_returns_empty_when_git_fails(tmp_path: Path, monkeypatch) -> None:
+def test_git_status_lines_returns_empty_when_git_fails(
+    tmp_path: Path, monkeypatch
+) -> None:
     class Result:
         returncode = 1
         stdout = ''
@@ -127,7 +126,9 @@ def test_git_status_lines_returns_empty_when_git_fails(tmp_path: Path, monkeypat
     assert ce.git_status_lines(tmp_path) == []
 
 
-def test_content_hits_skips_short_terms_and_too_many_paths(tmp_path: Path, monkeypatch) -> None:
+def test_content_hits_skips_short_terms_and_too_many_paths(
+    tmp_path: Path, monkeypatch
+) -> None:
     monkeypatch.setattr(ce, '_run', lambda *_a, **_k: None)
     assert ce._content_hits(tmp_path, ['ab', 'token']) == {}
     many_paths = '\n'.join(f'file{i}.py' for i in range(100))

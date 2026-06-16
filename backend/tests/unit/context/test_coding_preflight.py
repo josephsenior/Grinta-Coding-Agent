@@ -104,7 +104,10 @@ def test_already_started_skips_preflight(tmp_path) -> None:
     config = SimpleNamespace()
     messages = [{'role': 'user', 'content': 'Refactor backend/auth.py token refresh'}]
     with patch.object(cp, 'resolve_cli_workspace_directory', return_value=tmp_path):
-        assert cp.build_coding_preflight_block(messages, state, config, mode='default') == ''
+        assert (
+            cp.build_coding_preflight_block(messages, state, config, mode='default')
+            == ''
+        )
 
 
 def test_source_name_handles_enum_like_values() -> None:

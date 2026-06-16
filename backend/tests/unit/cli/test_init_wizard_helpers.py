@@ -27,7 +27,9 @@ def test_provider_requires_api_key() -> None:
 
 
 def test_settings_api_key_value_uses_placeholder_for_env_providers() -> None:
-    assert _settings_api_key_value('openai', 'sk-test') == LLM_API_KEY_SETTINGS_PLACEHOLDER
+    assert (
+        _settings_api_key_value('openai', 'sk-test') == LLM_API_KEY_SETTINGS_PLACEHOLDER
+    )
     assert _settings_api_key_value('ollama', '') == ''
 
 
@@ -44,7 +46,9 @@ def test_atomic_json_write_creates_valid_file(tmp_path: Path) -> None:
     assert json.loads(target.read_text(encoding='utf-8')) == data
 
 
-def test_is_global_settings_detects_home_grinta_path(tmp_path: Path, monkeypatch) -> None:
+def test_is_global_settings_detects_home_grinta_path(
+    tmp_path: Path, monkeypatch
+) -> None:
     monkeypatch.setattr(Path, 'home', lambda: tmp_path)
     global_settings = tmp_path / '.grinta' / 'settings.json'
     global_settings.parent.mkdir(parents=True)

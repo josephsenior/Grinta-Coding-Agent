@@ -6,8 +6,8 @@ import subprocess
 from unittest.mock import MagicMock, patch
 
 from backend.utils.runtime_detect import (
-    DetectedTool,
     LSP_SERVERS,
+    DetectedTool,
     ToolSpec,
     _detect_all,
     _probe,
@@ -101,7 +101,9 @@ def test_detect_all_catches_probe_exceptions() -> None:
 def test_detect_lsp_servers_uses_cache() -> None:
     reset_detection_cache()
     fake = DetectedTool(spec=LSP_SERVERS[0], available=True, detail='ok')
-    with patch('backend.utils.runtime_detect._detect_all', return_value={'pylsp': fake}) as detect:
+    with patch(
+        'backend.utils.runtime_detect._detect_all', return_value={'pylsp': fake}
+    ) as detect:
         first = detect_lsp_servers()
         second = detect_lsp_servers()
     assert detect.call_count == 1

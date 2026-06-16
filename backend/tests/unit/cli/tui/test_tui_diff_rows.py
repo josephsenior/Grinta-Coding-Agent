@@ -50,7 +50,10 @@ def test_split_diff_opcode_rows_dispatches() -> None:
     new_lines = ['y']
     rows = _split_diff_opcode_rows('replace', old_lines, new_lines, 0, 1, 0, 1, pad=2)
     assert rows
-    assert _split_diff_opcode_rows('unknown', old_lines, new_lines, 0, 1, 0, 1, pad=2) == []
+    assert (
+        _split_diff_opcode_rows('unknown', old_lines, new_lines, 0, 1, 0, 1, pad=2)
+        == []
+    )
 
 
 def test_encode_diff_view_from_contents() -> None:

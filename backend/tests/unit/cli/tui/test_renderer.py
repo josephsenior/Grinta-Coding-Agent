@@ -1319,7 +1319,8 @@ async def test_tui_streamed_response_clears_before_tool_action(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_tui_duplicate_thinking_payload_renders_once(mock_config):
+async def test_tui_duplicate_thinking_payload_renders_once(mock_config, monkeypatch):
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -1355,8 +1356,11 @@ async def test_tui_duplicate_thinking_payload_renders_once(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_tui_thinking_indicator_shows_content_without_collapse(mock_config):
+async def test_tui_thinking_indicator_shows_content_without_collapse(
+    mock_config, monkeypatch
+):
     """Thinking indicator shows content directly with no collapse/expand or duration."""
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)

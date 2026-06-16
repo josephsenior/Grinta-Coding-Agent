@@ -34,7 +34,9 @@ class TestHelperFunctions(TestCase):
         self.assertFalse(_stream_supports('✓', stream))
 
     def test_icon_fallback_when_stream_cannot_encode(self):
-        with patch('backend.inference.discover_models._stream_supports', return_value=False):
+        with patch(
+            'backend.inference.discover_models._stream_supports', return_value=False
+        ):
             self.assertEqual(_icon('✓', '[OK]'), '[OK]')
 
     def test_display_provider_name(self):

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from importlib.metadata import PackageNotFoundError
 from unittest.mock import patch
 
 import pytest
-from importlib.metadata import PackageNotFoundError
 
 import backend
 

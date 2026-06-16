@@ -31,7 +31,9 @@ def test_chunk_markdown_splits_on_headers() -> None:
     chunks = chunker.chunk_markdown(content, 'doc1', {'source': 'readme'})
     assert chunks
     assert all(chunk.document_id == 'doc1' for chunk in chunks)
-    assert any('Title' in chunk.content or 'Section' in chunk.content for chunk in chunks)
+    assert any(
+        'Title' in chunk.content or 'Section' in chunk.content for chunk in chunks
+    )
 
 
 def test_chunk_json_by_top_level_keys() -> None:
@@ -69,6 +71,8 @@ def test_sliding_window_chunk_produces_multiple_chunks() -> None:
 def test_chunk_code_falls_back_to_sliding_window() -> None:
     chunker = SmartChunker()
     source = '\n'.join(f'def func_{idx}():\n    return {idx}\n' for idx in range(20))
-    chunks = chunker.chunk_code(source, 'doc6', 'module.py', metadata={'lang': 'python'})
+    chunks = chunker.chunk_code(
+        source, 'doc6', 'module.py', metadata={'lang': 'python'}
+    )
     assert chunks
     assert all(chunk.document_id == 'doc6' for chunk in chunks)

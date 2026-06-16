@@ -67,12 +67,16 @@ def test_add_chunks_to_vector_store_handles_batch_failure(
             content='hello',
         )
     ]
-    assert manager._add_chunks_to_vector_store('col1', chunks, document, 'readme.md') == 0
+    assert (
+        manager._add_chunks_to_vector_store('col1', chunks, document, 'readme.md') == 0
+    )
 
 
 @patch('backend.knowledge.knowledge_base_manager.get_knowledge_base_store')
 @patch('backend.knowledge.knowledge_base_manager.EnhancedVectorStore')
-def test_search_skips_invalid_score_types(mock_vector_store_cls, mock_get_store) -> None:
+def test_search_skips_invalid_score_types(
+    mock_vector_store_cls, mock_get_store
+) -> None:
     mock_store = MagicMock()
     mock_store.get_collection.return_value = KnowledgeBaseCollection(
         id='col1', user_id='user123', name='Test'
@@ -97,7 +101,9 @@ def test_search_skips_invalid_score_types(mock_vector_store_cls, mock_get_store)
     ]
     mock_vector_store_cls.return_value = vector_store
     manager = KnowledgeBaseManager(user_id='user123')
-    assert manager.search('query', collection_ids=['col1'], relevance_threshold=0.1) == []
+    assert (
+        manager.search('query', collection_ids=['col1'], relevance_threshold=0.1) == []
+    )
 
 
 @patch('backend.knowledge.knowledge_base_manager.get_knowledge_base_store')
