@@ -1,5 +1,11 @@
 # LLM Integration System
 
+> **Current spec:** For the maintained provider/MCP map, see
+> [`docs/INFERENCE_AND_INTEGRATIONS.md`](../docs/INFERENCE_AND_INTEGRATIONS.md).
+> User configuration is `settings.json` (not TOML). Some sections below retain
+> older `config.toml` examples from a previous config surface — prefer
+> `settings.json` and [`backend/core/config/README.md`](../core/config/README.md).
+
 ## Overview
 
 Grinta's LLM system provides a robust, provider-agnostic abstraction layer using direct SDK clients for major providers (OpenAI, Anthropic, Google Gemini, and xAI Grok). This approach ensures maximum stability, performance, and access to the latest provider-specific features.

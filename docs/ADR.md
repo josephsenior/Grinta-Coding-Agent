@@ -141,8 +141,7 @@ filtering.
 
 **Decision:** Implement 8 compactor strategies behind a common interface,
 with a `smart` default that adapts automatically. Users can select and
-configure compactors per agent. The current code/config surface may still use
-`condenser` during the migration window.
+configure compactors per agent.
 
 **Compactors:** smart, observation_masking, recent, amortized,
 structured_summary, no_op, pipeline, auto.
@@ -293,10 +292,9 @@ alongside built-in tools.
 
 ## ADR-014: FastAPI for the Server Layer
 
-**Status:** Accepted  
+**Status:** Historical (legacy server phase)  
 **Date:** 2024-12  
-**Context:** Need a high-performance async HTTP framework that integrates
-well with ASGI middleware patterns and provides automatic API documentation.
+**Context:** Earlier builds exposed a hosted web surface that needed a high-performance async HTTP framework with automatic API documentation.
 
 **Decision:** Use FastAPI with Uvicorn ASGI server.
 
@@ -308,28 +306,25 @@ well with ASGI middleware patterns and provides automatic API documentation.
 - ✅ High performance (ASGI)
 - ⚠️ Middleware ordering is order-sensitive
 
+**Note (current state):** Grinta is terminal-first. FastAPI/uvicorn remain in the dependency tree for MCP proxy and related plumbing, but the supported interactive product surface is the Textual TUI and non-interactive CLI runner — not a browser client.
+
 ---
 
-## ADR-015: Textual TUI over Web Frontend
+## ADR-015: Textual TUI as Primary Interactive Surface
 
-**Status:** Superseded — Grinta is CLI-first in current local workflows. The
-Python package **`client`** remains for tests and automation.
+**Status:** Accepted  
+**Date:** 2025-01 (reaffirmed 2026-03)  
+**Context:** Developers using a coding agent prefer a terminal-native interface over a browser-based one. A TUI avoids Node.js dependencies and integrates naturally into terminal workflows.
 
-**Date:** 2025-01 (superseded 2026-03)  
-**Context:** Developers using a coding agent likely prefer a terminal-native
-interface over a browser-based one. A TUI avoids Node.js dependencies and
-integrates naturally into terminal workflows.
+**Decision:** Build the primary interactive surface as a Textual TUI for TTY sessions. Piped stdin uses the non-interactive runner (`backend/cli/repl_noninteractive.py`). Prompt-toolkit REPL code remains as shared slash-command and fallback infrastructure.
 
-**Decision (historical):** Build the primary UI as a Textual TUI. A web frontend existed
-as an alternative during that phase.
+**Consequences:**
 
-**Consequences (historical):**
-
-- ✅ Zero Node.js/browser dependency for TUI users
-- ✅ Native terminal integration
+- ✅ Zero Node.js/browser dependency for interactive use
+- ✅ Native terminal integration (HUD, transcript cards, dialogs)
 - ✅ Keyboard-driven workflow
 - ⚠️ Limited to terminal capabilities (no rich media)
-- ⚠️ Textual framework learning curve
+- ⚠️ Textual framework learning curve for contributors
 
 ---
 

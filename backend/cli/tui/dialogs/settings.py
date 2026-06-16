@@ -37,8 +37,12 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         background: #08101d;
         border: round #1b233a;
         border-left: heavy #5eead4;
-        padding: 1 1 0 1;
+        padding: 1;
         height: auto;
+        max-height: 24;
+        overflow-y: auto;
+        scrollbar-size-vertical: 1;
+        scrollbar-color: #64748b #0f172a;
     }
     GrintaSettingsDialog .field-label {
         margin-top: 0;
@@ -58,11 +62,54 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
     GrintaSettingsDialog #settings-custom-model,
     GrintaSettingsDialog #settings-api-key {
         height: 1;
+        min-height: 1;
         margin-bottom: 1;
         border: none;
         background: #0a1323;
         color: #c8d4e8;
         padding: 0 1;
+    }
+    GrintaSettingsDialog #settings-provider SelectCurrent,
+    GrintaSettingsDialog #settings-model SelectCurrent,
+    GrintaSettingsDialog #settings-reasoning SelectCurrent {
+        border: none;
+        background: #0a1323;
+        color: #c8d4e8;
+        padding: 0 1;
+        height: 1;
+        min-height: 1;
+    }
+    GrintaSettingsDialog #settings-provider SelectCurrent:focus,
+    GrintaSettingsDialog #settings-model SelectCurrent:focus,
+    GrintaSettingsDialog #settings-reasoning SelectCurrent:focus {
+        background: #12223a;
+    }
+    GrintaSettingsDialog #settings-provider SelectCurrent #label,
+    GrintaSettingsDialog #settings-model SelectCurrent #label,
+    GrintaSettingsDialog #settings-reasoning SelectCurrent #label {
+        color: #c8d4e8;
+        padding: 0;
+        margin: 0;
+        height: 1;
+    }
+    GrintaSettingsDialog #settings-provider SelectCurrent .arrow,
+    GrintaSettingsDialog #settings-model SelectCurrent .arrow,
+    GrintaSettingsDialog #settings-reasoning SelectCurrent .arrow {
+        height: 1;
+        padding: 0;
+        margin: 0;
+        color: #8f9fc1;
+    }
+    GrintaSettingsDialog #settings-provider:focus,
+    GrintaSettingsDialog #settings-model:focus,
+    GrintaSettingsDialog #settings-reasoning:focus,
+    GrintaSettingsDialog #settings-custom-model:focus,
+    GrintaSettingsDialog #settings-api-key:focus {
+        border: none;
+    }
+    GrintaSettingsDialog #settings-custom-model:focus,
+    GrintaSettingsDialog #settings-api-key:focus {
+        background: #12223a;
     }
     GrintaSettingsDialog #settings-model-meta {
         height: auto;
@@ -190,7 +237,7 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
                     classes='field-label',
                     id='settings-custom-model-label',
                 )
-                yield Input(value=current_custom_model, id='settings-custom-model')
+                yield Input(value=current_custom_model, id='settings-custom-model', compact=True)
                 yield Label('', id='settings-model-meta')
                 yield Label(
                     'Reasoning effort',
@@ -204,7 +251,7 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
                     id='settings-reasoning',
                 )
                 yield Label('API key (blank = keep current)', classes='field-label')
-                yield Input(password=True, id='settings-api-key')
+                yield Input(password=True, id='settings-api-key', compact=True)
             yield Label('', id='dialog-feedback')
             with Horizontal(id='dialog-buttons'):
                 yield Button('Save', id='settings-save', variant='primary')

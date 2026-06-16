@@ -39,7 +39,7 @@ grinta
 For source development:
 
 ```bash
-python scripts/bootstrap_env.py base
+python scripts/bootstrap_env.py dev-test
 uv run python -m backend.cli.entry init
 uv run python -m backend.cli.entry
 ```
@@ -254,7 +254,7 @@ See also [SECURITY_CHECKLIST.md](SECURITY_CHECKLIST.md).
 Install + run:
 
 ```bash
-python scripts/bootstrap_env.py base
+python scripts/bootstrap_env.py dev-test
 uv run python -m backend.cli.entry
 ```
 

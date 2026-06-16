@@ -21,7 +21,7 @@ Requires Python 3.12+ and `uv`.
 ```bash
 git clone https://github.com/josephsenior/Grinta-Coding-Agent.git
 cd Grinta-Coding-Agent
-python scripts/bootstrap_env.py base
+python scripts/bootstrap_env.py dev-test
 uv run python -m backend.cli.entry init
 uv run python -m backend.cli.entry
 ```
