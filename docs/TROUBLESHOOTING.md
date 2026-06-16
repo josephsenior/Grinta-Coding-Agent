@@ -122,7 +122,7 @@ Minimal known-good example:
 ```json
 {
   "llm_provider": "openai",
-  "llm_model": "openai/gpt-4o-mini",
+  "llm_model": "openai/gpt-5.1",
   "llm_api_key": "${LLM_API_KEY}",
   "llm_base_url": ""
 }
@@ -154,8 +154,8 @@ See [USER_GUIDE.md](USER_GUIDE.md#llm-provider-setup) for configuration examples
 **Symptom:** Model doesn't exist or isn't available.
 
 **Fix:** Use provider-qualified model IDs:
-- `openai/gpt-4o-mini`
-- `anthropic/claude-sonnet-4-20250514`
+- `openai/gpt-5.1`
+- `anthropic/claude-sonnet-4.6`
 - `google/gemini-2.5-pro`
 - `ollama/llama3.2`
 

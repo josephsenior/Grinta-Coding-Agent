@@ -1200,40 +1200,22 @@ def test_ensure_default_model_uses_provider_specific_env_var() -> None:
     assert llm_cfg.model == 'openai/gpt-5.1'
 
 
-def test_run_onboarding_uses_provider_default_model(tmp_path: Path) -> None:
+def test_run_onboarding_delegates_to_init_wizard(tmp_path: Path) -> None:
     from backend.cli.settings import run_onboarding
 
-    settings_file = tmp_path / 'settings.json'
-    # New flow: 1) provider number (2 = Anthropic), 2) model (accept default), 3) API key
-    entered = iter(['2', '', 'sk-ant-api03-test-value'])
     loaded_config = MagicMock()
 
-    with patch(
-        'backend.cli.settings.storage._settings_path', return_value=settings_file
-    ):
+    with patch('os.isatty', return_value=True):
         with patch(
-            'backend.cli.settings.onboarding._settings_path',
-            return_value=settings_file,
-        ):
+            'backend.cli.onboarding.init_wizard.run_init', return_value=0
+        ) as mock_init:
             with patch(
-                'backend.cli.settings.onboarding.Prompt.ask',
-                side_effect=lambda *args, **kwargs: next(entered)
-                or str(kwargs.get('default', '')),
+                'backend.cli.settings.onboarding.load_app_config',
+                return_value=loaded_config,
             ):
-                with patch(
-                    'backend.cli.settings.onboarding.load_app_config',
-                    return_value=loaded_config,
-                ):
-                    with patch('os.isatty', return_value=True):
-                        result = run_onboarding()
+                result = run_onboarding()
 
-    saved = json.loads(settings_file.read_text(encoding='utf-8'))
-    assert saved['llm_api_key'] == LLM_API_KEY_SETTINGS_PLACEHOLDER
-    assert saved['llm_model'] == 'anthropic/claude-haiku-4-5'
-    assert saved['llm_provider'] == 'anthropic'
-    env_file = settings_file.parent / '.env'
-    assert env_file.is_file()
-    assert 'sk-ant-api03-test-value' in env_file.read_text(encoding='utf-8')
+    mock_init.assert_called_once()
     assert result is loaded_config
 
 

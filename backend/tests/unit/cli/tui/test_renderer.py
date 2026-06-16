@@ -588,6 +588,67 @@ async def test_tui_lsp_sidebar_lists_detected_servers(mock_config):
 
 
 @pytest.mark.asyncio
+async def test_tui_dap_sidebar_lists_detected_adapters(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+        from backend.cli.tui.widgets.collapsible import CollapsibleSection, SidebarRow
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        renderer._dap_adapters_cache = [
+            {
+                'language': 'python',
+                'adapter': 'debugpy',
+                'available': True,
+                'auto_resolvable': True,
+            },
+            {
+                'language': 'go',
+                'adapter': 'dlv',
+                'available': False,
+                'auto_resolvable': False,
+            },
+            {
+                'language': 'javascript',
+                'adapter': 'js-debug',
+                'available': True,
+                'auto_resolvable': False,
+            },
+        ]
+        renderer._last_dap_sidebar_signature = None
+        renderer._refresh_dap_sidebar()
+        await pilot.pause()
+
+        dap_section = s.query_one('#sidebar-dap', CollapsibleSection)
+        assert dap_section._section_title == 'Debug Adapters (2)'
+
+        rows = [
+            row
+            for row in dap_section.query(SidebarRow).results()
+            if getattr(row, 'item_id', '').startswith('dap:')
+        ]
+        assert len(rows) == 2
+        by_language = {row._label: row for row in rows}
+        assert by_language['python']._meta == 'debugpy'
+        assert by_language['python']._status == 'ok'
+        assert by_language['javascript']._meta == 'js-debug'
+        assert by_language['javascript']._status == 'warn'
+        assert dap_section.is_collapsed is False
+
+
+@pytest.mark.asyncio
 async def test_tui_task_sidebar_does_not_clear_on_empty_view_payload(
     mock_config, monkeypatch
 ):

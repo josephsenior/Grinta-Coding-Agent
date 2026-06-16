@@ -28,13 +28,8 @@ if ($pythonVersion -match 'Python 3\.(1[2-9]|[2-9][0-9])') {
     exit 1
 }
 
-# Check for settings.json
-if (-not (Test-Path 'settings.json')) {
-    Write-Host 'No settings.json found. Run uv run python -m backend.cli.entry init after dependencies sync if configuration is needed.' -ForegroundColor Cyan
-}
-
-Write-Host 'Step 1: Syncing dependencies with the shared browser bootstrap profile...' -ForegroundColor Yellow
-& uv run python scripts/bootstrap_env.py browser
+Write-Host 'Step 1: Syncing dependencies (dev-test profile)...' -ForegroundColor Yellow
+& uv run python scripts/bootstrap_env.py dev-test
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host '[ERROR] Failed to sync dependencies' -ForegroundColor Red
@@ -43,12 +38,25 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# Step 1.5: Auto-discover local models
-Write-Host 'Step 1.5: Discovering local models (Ollama/LM Studio/vLLM)...' -ForegroundColor Yellow
-& uv run python -m backend.llm.discover_models aliases
-Write-Host '[OK] Model aliases updated in settings.json' -ForegroundColor Green
-
 Write-Host '[OK] Dependencies synced!' -ForegroundColor Green
+
+# Step 1.5: Report local model provider status (optional; does not modify settings)
+Write-Host 'Step 1.5: Checking local model servers (Ollama/LM Studio/vLLM)...' -ForegroundColor Yellow
+& uv run python -m backend.inference.discover_models status
+if ($LASTEXITCODE -ne 0) {
+    Write-Host '[WARN] Local model status check failed; continuing.' -ForegroundColor Yellow
+}
+
+# Step 1.75: First-run configuration
+if (-not (Test-Path 'settings.json')) {
+    Write-Host 'Step 1.75: No settings.json found. Starting first-run wizard...' -ForegroundColor Yellow
+    & uv run python -m backend.cli.entry init
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host '[ERROR] Setup wizard did not complete. Fix settings.json, then rerun this script.' -ForegroundColor Red
+        Read-Host 'Press Enter to exit'
+        exit $LASTEXITCODE
+    }
+}
 
 # Step 2: Launch Grinta CLI
 Write-Host 'Step 2: Starting Grinta CLI...' -ForegroundColor Yellow

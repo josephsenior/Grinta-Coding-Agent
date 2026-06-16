@@ -86,6 +86,7 @@ class RendererDisplayMixin:
         """Refresh derived sidebar state; transcript writes are incremental."""
         self._refresh_tasks_sidebar()
         self._refresh_lsp_sidebar()
+        self._refresh_dap_sidebar()
         if skip_sidebar:
             return
         mcp_count = self._hud.state.mcp_servers
@@ -139,20 +140,40 @@ class RendererDisplayMixin:
         import asyncio
         import os
 
-        if os.getenv('GRINTA_DISABLE_LSP_DETECTION') == '1':
+        disable_lsp = os.getenv('GRINTA_DISABLE_LSP_DETECTION') == '1'
+        disable_dap = os.getenv('GRINTA_DISABLE_DEBUGGER_DETECTION') == '1'
+        if disable_lsp:
             self._lsp_servers_cache = {}
-            self._last_lsp_sidebar_signature = None
-            self._refresh_lsp_sidebar()
-            return
+        if disable_dap:
+            self._dap_adapters_cache = []
 
         try:
-            from backend.utils.runtime_detect import detect_lsp_servers
+            from backend.utils.runtime_detect import (
+                detect_debug_adapters_summary,
+                detect_lsp_servers,
+            )
 
-            self._lsp_servers_cache = await asyncio.to_thread(detect_lsp_servers)
+            probes: list[tuple[str, Any]] = []
+            if not disable_lsp:
+                probes.append(('lsp', asyncio.to_thread(detect_lsp_servers)))
+            if not disable_dap:
+                probes.append(('dap', asyncio.to_thread(detect_debug_adapters_summary)))
+            if probes:
+                results = await asyncio.gather(*(coro for _, coro in probes))
+                for (kind, _), result in zip(probes, results, strict=True):
+                    if kind == 'lsp':
+                        self._lsp_servers_cache = result
+                    else:
+                        self._dap_adapters_cache = result
         except Exception:
-            self._lsp_servers_cache = {}
+            if not disable_lsp and getattr(self, '_lsp_servers_cache', None) is None:
+                self._lsp_servers_cache = {}
+            if not disable_dap and getattr(self, '_dap_adapters_cache', None) is None:
+                self._dap_adapters_cache = []
         self._last_lsp_sidebar_signature = None
+        self._last_dap_sidebar_signature = None
         self._refresh_lsp_sidebar()
+        self._refresh_dap_sidebar()
 
     def _lsp_sidebar_signature(self) -> tuple[Any, ...]:
         cache = getattr(self, '_lsp_servers_cache', None)
@@ -214,6 +235,79 @@ class RendererDisplayMixin:
                 continue
             seen_languages.add(language)
             items.append((language, f'lsp:{language}', False, 'ok', None, False))
+        return items
+
+    def _dap_sidebar_signature(self) -> tuple[Any, ...]:
+        cache = getattr(self, '_dap_adapters_cache', None)
+        if cache is None:
+            return ('pending',)
+        return tuple(
+            sorted(
+                (
+                    entry.get('language'),
+                    entry.get('adapter'),
+                    bool(entry.get('available')),
+                    bool(entry.get('auto_resolvable', entry.get('available'))),
+                )
+                for entry in cache
+            )
+        )
+
+    def _refresh_dap_sidebar(self) -> None:
+        from textual.widgets import Static
+
+        from backend.cli.tui.widgets.collapsible import CollapsibleSection
+
+        signature = self._dap_sidebar_signature()
+        if signature == getattr(self, '_last_dap_sidebar_signature', None):
+            return
+        self._last_dap_sidebar_signature = signature
+
+        try:
+            section = self._tui.query_one('#sidebar-dap', CollapsibleSection)
+        except Exception:
+            return
+
+        cache = getattr(self, '_dap_adapters_cache', None)
+        if cache is None:
+            section.set_title('Debug Adapters')
+            try:
+                empty = section.query_one('#empty-text', Static)
+                empty.update(section._empty_markup('Scanning local PATH...'))
+            except Exception:
+                section.set_content('Scanning local PATH...')
+            return
+
+        items = self._build_dap_sidebar_items(cache)
+        available_count = len(items)
+        title = (
+            f'Debug Adapters ({available_count})'
+            if available_count
+            else 'Debug Adapters (0)'
+        )
+        section.set_title(title)
+        if items:
+            section.set_items(items)
+        else:
+            section.set_content('No debug adapters detected on PATH')
+
+    def _build_dap_sidebar_items(self, adapters: list[dict[str, Any]]) -> list[tuple]:
+        items: list[tuple] = []
+        for entry in sorted(
+            adapters,
+            key=lambda row: (
+                not row.get('available'),
+                str(row.get('language') or ''),
+                str(row.get('adapter') or ''),
+            ),
+        ):
+            if not entry.get('available'):
+                continue
+            language = str(entry.get('language') or 'unknown')
+            adapter = str(entry.get('adapter') or 'unknown')
+            auto_resolvable = entry.get('auto_resolvable', entry.get('available'))
+            status = 'ok' if auto_resolvable else 'warn'
+            items.append((language, f'dap:{language}', False, status, adapter, False))
         return items
 
     def _refresh_tasks_sidebar(self) -> None:

@@ -96,6 +96,14 @@ class ScreenLifecycleMixin:
                         id='sidebar-lsp',
                     )
                     yield CollapsibleSection(
+                        title='Debug Adapters',
+                        content='Scanning local PATH...',
+                        collapsed=False,
+                        accent_color='#f6a657',
+                        section_icon='◆',
+                        id='sidebar-dap',
+                    )
+                    yield CollapsibleSection(
                         title='Skills',
                         content='Loading skills...',
                         collapsed=False,

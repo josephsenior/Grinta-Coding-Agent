@@ -52,5 +52,25 @@ echo "==> Smoke-test: optional-imports verifier"
 python backend/scripts/verify/verify_optional_imports.py
 
 echo
+echo "==> Smoke-test: init rejects non-interactive stdin"
+SMOKE_APP_ROOT="/tmp/grinta-smoke-app"
+rm -rf "$SMOKE_APP_ROOT"
+mkdir -p "$SMOKE_APP_ROOT"
+export APP_ROOT="$SMOKE_APP_ROOT"
+set +e
+printf '' | python -m backend.cli.entry init >/dev/null 2>&1
+init_rc=$?
+set -e
+if [ "$init_rc" -ne 3 ]; then
+  echo "Expected grinta init exit 3 without TTY, got $init_rc"
+  exit 1
+fi
+if [ -f "$SMOKE_APP_ROOT/settings.json" ]; then
+  echo "grinta init should not write settings.json without a TTY"
+  exit 1
+fi
+unset APP_ROOT
+
+echo
 echo "==> Done. Extras installed: ${EXTRAS:-(none)}"
 deactivate

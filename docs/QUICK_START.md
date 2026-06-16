@@ -33,8 +33,9 @@ From PowerShell in the repo root:
 This script is a convenience wrapper around dependency sync and startup:
 
 - Checks for `uv` and Python versions
-- Syncs dependencies
-- Attempts local model discovery
+- Syncs dependencies with the `dev-test` profile
+- Checks local model server status (`discover_models status`)
+- Runs `grinta init` when `settings.json` is missing
 - Starts the Grinta terminal app
 
 ## Optional: local model discovery
