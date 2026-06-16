@@ -78,7 +78,10 @@ def test_lsp_action_and_result_variants() -> None:
 def test_analyze_action_and_result() -> None:
     action = analyze_action_model(SimpleNamespace(command='tree', path='.'))
     assert action.tool == 'analyze_project_structure'
-    assert analyze_result(command='imports', content='import os\nimport sys') == 'completed'
+    assert (
+        analyze_result(command='imports', content='import os\nimport sys')
+        == 'completed'
+    )
 
 
 @pytest.mark.parametrize(
@@ -111,7 +114,9 @@ def test_mcp_action_models_for_docs_and_fetch() -> None:
 
 def test_library_and_fetch_target_edge_cases() -> None:
     assert _library_target('react', '') == 'react'
-    assert _fetch_target({'urls': ['https://a.com', 'https://b.com']}).startswith('a.com')
+    assert _fetch_target({'urls': ['https://a.com', 'https://b.com']}).startswith(
+        'a.com'
+    )
 
 
 def test_read_symbols_result_mixed_statuses() -> None:

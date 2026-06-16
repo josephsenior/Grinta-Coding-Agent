@@ -27,4 +27,6 @@ def test_error_guidance_matches_auth_failure() -> None:
 def test_notice_panel_title_uses_rule_table() -> None:
     assert notice_panel_title('rate limit exceeded') == 'Rate or quota limit'
     assert notice_panel_title('connection reset by peer') == 'Connection issue'
-    assert notice_panel_title('request timed out waiting for model') == 'Request timed out'
+    assert (
+        notice_panel_title('request timed out waiting for model') == 'Request timed out'
+    )

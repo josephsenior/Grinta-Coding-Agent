@@ -56,6 +56,9 @@ coverage/
 .coverage
 .coverage.*
 coverage.json
+coverage.xml
+coverage-full.xml
+coverage_report.json
 *.cover
 htmlcov/
 

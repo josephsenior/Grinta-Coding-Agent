@@ -5,8 +5,6 @@ from __future__ import annotations
 from rich.panel import Panel
 from rich.text import Text
 
-from rich.text import Text
-
 from backend.cli.event_rendering.error_panel import (
     build_error_panel,
     build_llm_stream_fallback_panel,

@@ -3,10 +3,7 @@
 from __future__ import annotations
 
 import os
-from io import StringIO
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from backend.cli.display import notifications as notify_mod
 
@@ -35,7 +32,12 @@ def test_do_notify_windows_path() -> None:
 def test_do_notify_macos_path() -> None:
     with (
         patch('os.name', 'posix'),
-        patch('shutil.which', side_effect=lambda cmd: '/usr/bin/osascript' if cmd == 'osascript' else None),
+        patch(
+            'shutil.which',
+            side_effect=lambda cmd: '/usr/bin/osascript'
+            if cmd == 'osascript'
+            else None,
+        ),
         patch.object(notify_mod, '_notify_macos') as mac,
     ):
         notify_mod._do_notify('title', 'body', urgency='normal')
@@ -45,7 +47,12 @@ def test_do_notify_macos_path() -> None:
 def test_do_notify_linux_path() -> None:
     with (
         patch('os.name', 'posix'),
-        patch('shutil.which', side_effect=lambda cmd: '/usr/bin/notify-send' if cmd == 'notify-send' else None),
+        patch(
+            'shutil.which',
+            side_effect=lambda cmd: '/usr/bin/notify-send'
+            if cmd == 'notify-send'
+            else None,
+        ),
         patch.object(notify_mod, '_notify_linux') as linux,
     ):
         notify_mod._do_notify('title', 'body', urgency='critical')

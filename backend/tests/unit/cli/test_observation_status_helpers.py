@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-import pytest
-
 from backend.cli.event_rendering.observations.status import _ObsStatusMixin
 
 

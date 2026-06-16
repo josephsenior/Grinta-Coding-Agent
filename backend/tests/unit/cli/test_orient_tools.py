@@ -177,11 +177,17 @@ def test_file_read_action_model_includes_symbol() -> None:
     [
         ([], '', 'no symbols'),
         ([{'status': 'resolved'}], '', '1 resolved'),
-        ([{'status': 'resolved'}, {'status': 'ambiguous'}], '', '1 resolved, 1 ambiguous'),
+        (
+            [{'status': 'resolved'}, {'status': 'ambiguous'}],
+            '',
+            '1 resolved, 1 ambiguous',
+        ),
         ([{'status': 'not_found'}], 'boom', 'failed'),
     ],
 )
-def test_read_symbols_result(results: list[dict[str, str]], error: str, expected: str) -> None:
+def test_read_symbols_result(
+    results: list[dict[str, str]], error: str, expected: str
+) -> None:
     assert read_symbols_result(results, error=error) == expected
 
 
@@ -209,9 +215,7 @@ def test_read_symbols_observation_model() -> None:
         ('anything', '', True, 'no output'),
     ],
 )
-def test_lsp_result(
-    command: str, content: str, available: bool, expected: str
-) -> None:
+def test_lsp_result(command: str, content: str, available: bool, expected: str) -> None:
     assert lsp_result(command=command, content=content, available=available) == expected
 
 
@@ -244,7 +248,9 @@ def test_analyze_result(command: str, content: str, error: str, expected: str) -
 
 
 def test_analyze_observation_model() -> None:
-    obs = SimpleNamespace(command='callers', path='.', content='{"callers": [1]}', error='')
+    obs = SimpleNamespace(
+        command='callers', path='.', content='{"callers": [1]}', error=''
+    )
     model = analyze_observation_model(obs)
     assert model.result == '1 caller'
 
@@ -254,7 +260,11 @@ def test_analyze_observation_model() -> None:
     [
         ('web_search_exa', {'query': 'pytest'}, 'web_search'),
         ('web_fetch_exa', {'urls': ['https://example.com/docs']}, 'web_fetch'),
-        ('resolve-library-id', {'libraryName': 'react', 'query': 'hooks'}, 'docs_resolve'),
+        (
+            'resolve-library-id',
+            {'libraryName': 'react', 'query': 'hooks'},
+            'docs_resolve',
+        ),
         ('query-docs', {'library_id': '/react', 'query': 'state'}, 'docs_query'),
     ],
 )
@@ -285,9 +295,9 @@ def test_library_and_fetch_target_helpers() -> None:
     assert _library_target('react', 'hooks') == 'react · "hooks"'
     assert _library_target('', 'only-query') == '"only-query"'
     assert _fetch_target({}) == 'web'
-    assert _fetch_target({'url': 'https://docs.python.org/3/library/os.html'}).startswith(
-        'docs.python.org'
-    )
+    assert _fetch_target(
+        {'url': 'https://docs.python.org/3/library/os.html'}
+    ).startswith('docs.python.org')
 
 
 def test_count_result_lines_and_json_helpers() -> None:
@@ -300,6 +310,9 @@ def test_count_result_lines_and_json_helpers() -> None:
     assert _count_result_lines('a\n\nb\n') == 2
     assert _extract_json_list_count({'items': [1, 2]}, 'items') == 2
     assert _extract_json_list_count('plain', 'items') is None
-    assert _file_count_from_candidates(
-        [{'path': 'a.py'}, {'path': 'b.py'}, {'path': 'a.py'}]
-    ) == 2
+    assert (
+        _file_count_from_candidates(
+            [{'path': 'a.py'}, {'path': 'b.py'}, {'path': 'a.py'}]
+        )
+        == 2
+    )

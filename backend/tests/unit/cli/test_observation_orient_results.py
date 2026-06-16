@@ -31,7 +31,9 @@ class TestOrientLspResult:
         self, available: bool, content: str, expected: str | None
     ) -> None:
         assert (
-            _ObsExplorationMixin._orient_lsp_result(available=available, content=content)
+            _ObsExplorationMixin._orient_lsp_result(
+                available=available, content=content
+            )
             == expected
         )
 
@@ -195,5 +197,7 @@ class TestOrientMcpResult:
             ('web_search', 'not json', None),
         ],
     )
-    def test_orient_mcp_result(self, name: str, content: str, expected: str | None) -> None:
+    def test_orient_mcp_result(
+        self, name: str, content: str, expected: str | None
+    ) -> None:
         assert _ObsMcpMixin._orient_mcp_result(name, content) == expected
