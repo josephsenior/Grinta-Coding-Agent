@@ -84,10 +84,21 @@ def init_shell_commands(executor: Any) -> None:
 
 
 def build_shell_git_config_command(executor: Any, use_powershell: bool) -> str:
-    separator = ';' if use_powershell else '&&'
+    """Set git author identity for this shell session without mutating global config."""
+    name = str(executor.username).replace('"', '\\"')
+    email = f'{executor.username}@example.com'.replace('"', '\\"')
+    if use_powershell:
+        return (
+            f'$env:GIT_AUTHOR_NAME = "{name}"; '
+            f'$env:GIT_COMMITTER_NAME = "{name}"; '
+            f'$env:GIT_AUTHOR_EMAIL = "{email}"; '
+            f'$env:GIT_COMMITTER_EMAIL = "{email}"'
+        )
     return (
-        f'git config --global user.name "{executor.username}" '
-        f'{separator} git config --global user.email "{executor.username}@example.com"'
+        f'export GIT_AUTHOR_NAME="{name}" '
+        f'GIT_COMMITTER_NAME="{name}" '
+        f'GIT_AUTHOR_EMAIL="{email}" '
+        f'GIT_COMMITTER_EMAIL="{email}"'
     )
 
 

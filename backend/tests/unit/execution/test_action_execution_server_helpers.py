@@ -41,8 +41,12 @@ def test_build_shell_git_and_env_commands() -> None:
     ex = _executor()
     cmd_ps = h.build_shell_git_config_command(ex, True)
     cmd_bash = h.build_shell_git_config_command(ex, False)
-    assert '; git config --global user.email ' in cmd_ps
-    assert '&& git config --global user.email ' in cmd_bash
+    assert '$env:GIT_AUTHOR_NAME = "u"' in cmd_ps
+    assert '$env:GIT_AUTHOR_EMAIL = "u@example.com"' in cmd_ps
+    assert 'export GIT_AUTHOR_NAME="u"' in cmd_bash
+    assert 'GIT_COMMITTER_EMAIL="u@example.com"' in cmd_bash
+    assert 'git config --global' not in cmd_ps
+    assert 'git config --global' not in cmd_bash
     assert 'function global:env_check' in h.build_env_check_command(True)
     assert "alias env_check='" in h.build_env_check_command(False)
 

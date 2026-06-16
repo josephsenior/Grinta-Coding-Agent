@@ -239,9 +239,11 @@ def test_init_shell_commands_uses_powershell_helpers_on_windows(mock_executor):
     first_command = mock_session.execute.call_args_list[0][0][0].command
     second_command = mock_session.execute.call_args_list[1][0][0].command
 
-    assert 'git config --global user.name ' in first_command
-    assert 'git config --global user.email ' in first_command
-    assert (' ; ' in first_command) or (' && ' in first_command)
+    assert '$env:GIT_AUTHOR_NAME = "testuser"' in first_command or (
+        'export GIT_AUTHOR_NAME="testuser"' in first_command
+    )
+    assert 'GIT_AUTHOR_EMAIL' in first_command
+    assert 'git config --global' not in first_command
     assert ('function global:env_check' in second_command) or (
         'alias env_check=' in second_command
     )
@@ -266,7 +268,8 @@ def test_init_shell_commands_keeps_bash_helpers_when_not_powershell(mock_executo
     first_command = mock_session.execute.call_args_list[0][0][0].command
     second_command = mock_session.execute.call_args_list[1][0][0].command
 
-    assert '&& git config --global user.email ' in first_command
+    assert '&& git config --global user.email ' not in first_command
+    assert 'GIT_AUTHOR_EMAIL' in first_command
     assert "alias env_check='" in second_command
     assert 'python3 --version 2>/dev/null' in second_command
 
