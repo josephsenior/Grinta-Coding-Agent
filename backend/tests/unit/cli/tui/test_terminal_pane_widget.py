@@ -20,6 +20,14 @@ def test_terminal_pane_prompt_and_title_markup() -> None:
     assert 'terminal' in terminal._title_markup()
     assert 'sess-12345'[:12] in terminal._title_markup()
 
+    debugger = TerminalPane(
+        shell_kind='debugger', command='variables', session_id='dbg-session-1'
+    )
+    assert 'debugger' in debugger._title_markup()
+    assert 'dbg-session-1'[:12] in debugger._title_markup()
+    assert 'DAP>' in debugger._prompt_markup()
+    assert 'variables' in debugger._prompt_markup()
+
 
 def test_terminal_pane_footer_and_output_renderable() -> None:
     pane = TerminalPane(cwd='/work', running=True, footer='custom footer')

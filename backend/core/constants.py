@@ -330,8 +330,9 @@ DEFAULT_AGENT_AUTO_LINT_ENABLED = True
 DEFAULT_AGENT_CONFIRM_ACTIONS = False
 DEFAULT_AGENT_AUTO_RETRY_ON_ERROR = True
 DEFAULT_AGENT_AUTONOMY_LEVEL = 'balanced'
-# DAP / interactive debugger: off by default; enable per agent when stable for your release.
-DEFAULT_AGENT_DEBUGGER_ENABLED = False
+# DAP / interactive debugger: enabled by default, then runtime-gated by adapter
+# detection so the tool appears only when at least one usable adapter is present.
+DEFAULT_AGENT_DEBUGGER_ENABLED = True
 
 # Optional LLM-initiated compaction; automatic condensation still runs when needed.
 DEFAULT_AGENT_CONDENSATION_REQUEST_ENABLED = False

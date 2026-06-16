@@ -2740,6 +2740,65 @@ async def test_terminal_append_does_not_remount_all_children(mock_config):
 
 
 @pytest.mark.asyncio
+async def test_tui_debugger_events_render_terminal_style_card(mock_config, monkeypatch):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+        from backend.cli.tui.widgets.terminal_pane import TerminalPane
+        from backend.ledger.action.debugger import DebuggerAction
+        from backend.ledger.observation.debugger import DebuggerObservation
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        renderer._process_event(
+            DebuggerAction(
+                debug_action='start',
+                adapter='python',
+                program='tests/demo.py',
+            )
+        )
+        renderer._process_event(
+            DebuggerObservation(
+                content='debugger started',
+                session_id='dbg-session-1',
+                state='started',
+                payload={
+                    'session_id': 'dbg-session-1',
+                    'state': 'started',
+                    'target': 'tests/demo.py',
+                    'current_thread_id': 1,
+                },
+            )
+        )
+        await pilot.pause()
+
+        debugger_cards = [
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-debugger' in card.classes
+        ]
+        assert len(debugger_cards) == 1
+        card = debugger_cards[0]
+        assert 'processing' not in card.classes
+        assert card._shell_kind == 'debugger'
+        pane = card.query_one('#terminal-pane', TerminalPane)
+        assert pane is not None
+        assert 'DAP>' in pane._prompt_markup()
+        assert 'dbg-session-1'[:12] in pane._title_markup()
+
+
+@pytest.mark.asyncio
 async def test_tui_live_response_uses_streaming_widget(mock_config, monkeypatch):
     console = RichConsole()
     loop = asyncio.get_running_loop()

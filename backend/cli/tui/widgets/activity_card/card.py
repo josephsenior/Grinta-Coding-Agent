@@ -62,21 +62,25 @@ class ActivityCard(Container):
         border: round #26365b;
     }
     ActivityCard.-category-shell,
-    ActivityCard.-category-terminal {
+    ActivityCard.-category-terminal,
+    ActivityCard.-category-debugger {
         border: round #24385c;
         background: #050913;
     }
     ActivityCard.-category-shell.-running,
-    ActivityCard.-category-terminal.-running {
+    ActivityCard.-category-terminal.-running,
+    ActivityCard.-category-debugger.-running {
         border-left: heavy #5eead4;
     }
     ActivityCard.-expanded.-category-shell,
-    ActivityCard.-expanded.-category-terminal {
+    ActivityCard.-expanded.-category-terminal,
+    ActivityCard.-expanded.-category-debugger {
         border: round #24385c;
         padding: 0;
     }
     ActivityCard.-collapsed.-category-shell .card-collapsed-text,
-    ActivityCard.-collapsed.-category-terminal .card-collapsed-text {
+    ActivityCard.-collapsed.-category-terminal .card-collapsed-text,
+    ActivityCard.-collapsed.-category-debugger .card-collapsed-text {
         color: #cbd5e1;
     }
     ActivityCard.-category-grep,
@@ -113,7 +117,8 @@ class ActivityCard(Container):
         border-left: solid #26365b;
     }
     ActivityCard.-collapsed.-category-shell,
-    ActivityCard.-collapsed.-category-terminal {
+    ActivityCard.-collapsed.-category-terminal,
+    ActivityCard.-collapsed.-category-debugger {
         border-left: solid #24385c;
     }
     ActivityCard.-collapsed.-category-grep,
@@ -275,12 +280,14 @@ class ActivityCard(Container):
     def _default_shell_kind(self) -> str:
         if self._badge_category == 'terminal':
             return 'terminal'
+        if self._badge_category == 'debugger':
+            return 'debugger'
         if self._badge_category == 'shell':
             return infer_display_shell_kind(self._terminal_command)
         return 'bash'
 
     def _is_terminal_card(self) -> bool:
-        return self._badge_category in {'shell', 'terminal'}
+        return self._badge_category in {'shell', 'terminal', 'debugger'}
 
     def _sync_running_class(self) -> None:
         if not self._is_terminal_card():
@@ -476,7 +483,7 @@ class ActivityCard(Container):
 
         icon_part = f'[{color}]{icon}[/]'
 
-        if self._is_terminal_card():
+        if self._is_terminal_card() and self._badge_category != 'debugger':
             command = self._terminal_command or self._command_from_detail(self._detail)
             if self._shell_kind == 'pwsh':
                 prompt = f'[#7dd3fc]PS>[/] [#e2e8f0]{command}[/]'

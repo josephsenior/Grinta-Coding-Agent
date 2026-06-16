@@ -23,6 +23,10 @@ class TestToolHeadline(unittest.TestCase):
         _, label = tool_headline('execute_bash')
         self.assertEqual(label, 'Shell')
 
+    def test_debugger_tool(self) -> None:
+        _, label = tool_headline('debugger')
+        self.assertEqual(label, 'Debugger')
+
     def test_unknown_tool_title_cased(self) -> None:
         _, label = tool_headline('my_custom_tool')
         self.assertEqual(label, 'My Custom Tool')
@@ -93,6 +97,10 @@ class TestFriendlyVerbForTool(unittest.TestCase):
     def test_terminal_manager_read(self) -> None:
         v = friendly_verb_for_tool('terminal_manager', {'action': 'read'})
         self.assertEqual(v, 'Read')
+
+    def test_debugger_evaluate(self) -> None:
+        v = friendly_verb_for_tool('debugger', {'action': 'evaluate'})
+        self.assertEqual(v, 'Evaluated')
 
     def test_terminal_manager_unknown_action(self) -> None:
         # Falls back to title-cased tool name
@@ -175,6 +183,17 @@ class TestToolActivityStatsHint(unittest.TestCase):
     def test_lsp_with_command(self) -> None:
         hint = tool_activity_stats_hint('lsp', {'command': 'goto_def'})
         self.assertEqual(hint, 'goto_def')
+
+    def test_debugger_with_session(self) -> None:
+        hint = tool_activity_stats_hint(
+            'debugger',
+            {
+                'action': 'variables',
+                'session_id': 'dbg-session',
+            },
+        )
+        self.assertIsNotNone(hint)
+        self.assertIn('dbg-session', hint)  # type: ignore[arg-type]
 
     def test_unknown_tool_returns_none(self) -> None:
         hint = tool_activity_stats_hint('some_random_tool', {'x': 1})
@@ -336,6 +355,30 @@ class TestSummarizeToolArguments(unittest.TestCase):
     def test_lsp(self) -> None:
         s = summarize_tool_arguments('lsp', {'command': 'hover', 'symbol': 'Foo'})
         self.assertIn('Foo', s)
+
+    def test_debugger_start(self) -> None:
+        s = summarize_tool_arguments(
+            'debugger',
+            {
+                'action': 'start',
+                'program': 'tests/demo.py',
+                'adapter': 'python',
+            },
+        )
+        self.assertIn('start', s)
+        self.assertIn('tests/demo.py', s)
+
+    def test_debugger_breakpoints(self) -> None:
+        s = summarize_tool_arguments(
+            'debugger',
+            {
+                'action': 'set_breakpoints',
+                'file': 'tests/demo.py',
+                'lines': [10, 12],
+            },
+        )
+        self.assertIn('breakpoints', s)
+        self.assertIn('tests/demo.py:10,12', s)
 
     def test_analyze_project(self) -> None:
         s = summarize_tool_arguments('analyze_project_structure', {})

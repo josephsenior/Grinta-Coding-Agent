@@ -140,6 +140,9 @@ class TerminalPane(Vertical):
         self._output_text = '\n'.join(lines[-_TUI_TERMINAL_DISPLAY_LINE_CAP:])
 
     def _title_markup(self) -> str:
+        if self._shell_kind == 'debugger':
+            label = self._session_id[:12] if self._session_id else 'session'
+            return f'[#8f9fc1]debugger · {label}[/]'
         if self._shell_kind == 'terminal':
             label = self._session_id[:12] if self._session_id else 'session'
             return f'[#8f9fc1]terminal · {label}[/]'
@@ -148,6 +151,8 @@ class TerminalPane(Vertical):
 
     def _prompt_markup(self) -> str:
         command = self._command or '…'
+        if self._shell_kind == 'debugger':
+            return f'[#5eead4]DAP>[/] [#e2e8f0]{command}[/]'
         if self._shell_kind == 'pwsh':
             path = self._cwd or '~'
             return f'[#7dd3fc]PS {path}>[/] [#e2e8f0]{command}[/]'

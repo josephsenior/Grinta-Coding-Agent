@@ -42,6 +42,7 @@ from backend.engine.prompts.section_renderers._common import (
 )
 from backend.engine.prompts.section_renderers._critical import _render_critical
 from backend.engine.prompts.section_renderers._env_hints import (
+    _debugger_available,
     _explore_hint,
     _lsp_available,
     _path_uncertainty_hint,
@@ -77,6 +78,7 @@ __all__ = [
     '_build_when_to_use_context',
     '_choose',
     '_count_section_tokens',
+    '_debugger_available',
     '_explore_hint',
     '_lsp_available',
     '_mcp_tail_render_kwargs',

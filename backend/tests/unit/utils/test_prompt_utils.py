@@ -636,6 +636,7 @@ def _base_config(**overrides: object) -> SimpleNamespace:
             overrides.get('enable_condensation_request', False)
         ),
         enable_terminal=bool(overrides.get('enable_terminal', True)),
+        enable_debugger=bool(overrides.get('enable_debugger', False)),
         enable_web=bool(overrides.get('enable_web', True)),
         enable_docs=bool(overrides.get('enable_docs', True)),
         enable_browsing=bool(overrides.get('enable_browsing', True)),
@@ -989,6 +990,43 @@ class TestBuildSystemPromptRenders:
                 function_calling_mode='native',
             )
         assert 'lsp' in result
+
+    def test_debugger_routing_available(self) -> None:
+        with (
+            patch(
+                'backend.utils.runtime_detect.has_any_debug_adapter',
+                return_value=True,
+            ),
+            patch(
+                'backend.utils.runtime_detect.detection_summary',
+                return_value={
+                    'lsp_available': [],
+                    'debug_available': ['debugpy'],
+                },
+            ),
+        ):
+            result = self._assert_renders_cleanly(
+                active_llm_model='gpt-4o',
+                is_windows=False,
+                config=_base_config(enable_debugger=True),
+                function_calling_mode='native',
+            )
+        assert '→ `debugger`' in result or '-> `debugger`' in result
+        assert 'Runtime bugs' in result
+
+    def test_debugger_routing_omitted_in_plan_mode(self) -> None:
+        with patch(
+            'backend.utils.runtime_detect.has_any_debug_adapter',
+            return_value=True,
+        ):
+            result = self._assert_renders_cleanly(
+                active_llm_model='gpt-4o',
+                is_windows=False,
+                config=_base_config(enable_debugger=True, mode='plan'),
+                function_calling_mode='native',
+            )
+        assert '→ `debugger`' not in result
+        assert '-> `debugger`' not in result
 
     def test_unknown_function_calling_mode(self) -> None:
         result = self._assert_renders_cleanly(
