@@ -33,7 +33,7 @@ concurrency:
 jobs:
   gates-on-linux-coverage:
     name: Python Gates on Linux (coverage)
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       matrix:
@@ -72,7 +72,7 @@ jobs:
 
   gates-on-linux-extended:
     name: Python Gates on Linux (extended)
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: gates-on-linux-coverage
     strategy:
@@ -101,7 +101,7 @@ jobs:
 
   gates-on-linux-py313:
     name: Python Gates on Linux (3.13 unit)
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: gates-on-linux-extended
     continue-on-error: true
@@ -161,7 +161,7 @@ jobs:
 
   heavy-tests:
     name: Heavy / Integration Tests
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
     strategy:
       matrix:
