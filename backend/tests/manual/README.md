@@ -1,7 +1,7 @@
-# Manual TUI smoke scripts
+# Manual verification scripts
 
-This folder holds **manual** Textual UI smoke / inspection scripts. They are
-**not** collected by `pytest` (the folder is excluded via `norecursedirs` in
+This folder holds **manual** smoke and inspection scripts. They are **not**
+collected by `pytest` (the folder is excluded via `norecursedirs` in
 `pytest.ini`, and no file name starts with `test_`).
 
 Run them by hand when you are working on TUI rendering changes and want a
@@ -16,6 +16,7 @@ expect.
 | `smoke_test_tui.py` | Mounts both `file_create` and `file_read` cards and prints their structured fields plus rendered text. Complements `inspect_tui.py`. |
 | `tui_diff_smoke.py` | Renders an `ActivityCard` containing an encoded unified-diff payload. Use after touching `_encode_unified_diff_text` or diff rendering. |
 | `tui_dot_smoke.py` | Tiny `Static` widget probe for the `\x1fgrinta-diff-ctx\x1f` sentinel handling. Writes a rendering trace to `test_output.txt` (gitignored). |
+| `chess_e2e_verify.py` | End-to-end check that over-escaped HTML/CSS tool payloads are repaired and written via `FileEditor`. Not a TUI script; exercises `content_escape_repair` + execution. |
 
 ## How to run
 
@@ -26,6 +27,7 @@ uv run python backend/tests/manual/inspect_tui.py
 uv run python backend/tests/manual/smoke_test_tui.py
 uv run python backend/tests/manual/tui_diff_smoke.py
 uv run python backend/tests/manual/tui_dot_smoke.py
+uv run python backend/tests/manual/chess_e2e_verify.py
 ```
 
 Each script is self-contained and runs headlessly. If a script needs UTF-8
