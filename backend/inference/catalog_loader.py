@@ -1078,8 +1078,12 @@ def _apply_prompt_cache_call_kwargs(
     call_kwargs['prompt_cache_key'] = implicit_prompt_cache_key(entry)
 
 
-def _apply_thinking_disabled(call_kwargs: dict) -> None:
+def _apply_thinking_disabled(call_kwargs: dict, entry: ModelEntry) -> None:
     call_kwargs['thinking'] = {'type': 'disabled'}
+    from backend.inference.reasoning import infer_family
+
+    if infer_family(entry).startswith('qwen'):
+        call_kwargs['enable_thinking'] = False
     call_kwargs.pop('reasoning_effort', None)
 
 
@@ -1122,7 +1126,7 @@ def _apply_thinking_mode(
     """
     mode = entry.thinking_mode
     if mode == 'disabled':
-        _apply_thinking_disabled(call_kwargs)
+        _apply_thinking_disabled(call_kwargs, entry)
     elif mode and mode.startswith('budget:'):
         _apply_thinking_budget(call_kwargs, mode, entry, is_stream)
     elif mode and mode.startswith('enabled:'):

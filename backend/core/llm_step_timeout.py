@@ -1,26 +1,22 @@
-"""Wall-clock cap for a single LLM step (``astep``) or one streaming call.
+"""Optional wall-clock cap for a single LLM step (``astep``).
 
-Unset or empty ``APP_LLM_STEP_TIMEOUT_SECONDS`` falls back to the safe
-default (300s) so a hung LLM provider cannot wedge the agent.  Set a
-positive number to override; zero or negative is treated as unlimited
-(explicit user opt-out).
+Unset or empty ``APP_LLM_STEP_TIMEOUT_SECONDS`` leaves the step uncapped.
+Set a positive number to opt into an outer wall-clock cap; zero or negative
+also means uncapped.
 
-This default is intentionally conservative: production providers
-should return within 5 minutes for any single streaming call.  Hung
-sockets, broken keepalives, or provider stalls all surface as
-``asyncio.TimeoutError`` in ``action_execution_service`` and become
-an ``ErrorObservation`` that the agent can recover from.
+Streaming calls have their own first-chunk and per-chunk stall timeouts in the
+executor.  A blind whole-step cap is not progress-aware, so it must stay
+opt-in; otherwise it can kill a healthy long reasoning/tool-call stream before
+the provider finalizes the response.
 """
 
 from __future__ import annotations
 
 import os
 
-# Production default: 5 minutes per LLM step.  Long enough for a
-# genuinely large tool-call response from a non-streaming provider,
-# short enough to recover from a hung socket within one user-visible
-# poll cycle.  Override via APP_LLM_STEP_TIMEOUT_SECONDS.
-DEFAULT_LLM_STEP_TIMEOUT_SECONDS: float = 300.0
+# No production default for the outer step cap. Streaming liveness is handled
+# by first-chunk/per-chunk timeouts, which are progress-aware.
+DEFAULT_LLM_STEP_TIMEOUT_SECONDS: float | None = None
 
 
 def llm_step_timeout_seconds_from_env() -> float | None:
@@ -28,10 +24,7 @@ def llm_step_timeout_seconds_from_env() -> float | None:
 
     Returns:
         - A positive float from ``APP_LLM_STEP_TIMEOUT_SECONDS`` if set.
-        - ``None`` only if the env var is explicitly set to a non-positive
-          value (treated as "unlimited" — the user opt-out escape hatch).
-        - :data:`DEFAULT_LLM_STEP_TIMEOUT_SECONDS` (300s) when the env
-          var is unset or empty.  This is the production safe default.
+        - ``None`` if unset, empty, invalid, zero, or negative.
     """
     raw = os.getenv('APP_LLM_STEP_TIMEOUT_SECONDS', '').strip()
     if not raw:

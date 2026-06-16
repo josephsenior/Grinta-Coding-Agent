@@ -237,7 +237,6 @@ def _resolve_wire_schema(entry: ModelEntry, family: str) -> str:
         if entry.reasoning_wire in {
             WIRE_OPENAI_REASONING_EFFORT,
             WIRE_GEMINI_OPENAI_COMPAT,
-            WIRE_OPENAI_THINKING_ENABLED,
         }:
             return WIRE_VERCEL_GATEWAY_REASONING
 
@@ -574,6 +573,14 @@ def resolve_reasoning_plan(
     if wire == WIRE_VERCEL_GATEWAY_REASONING and resolved == 'max':
         resolved = 'xhigh' if 'xhigh' in allowed else resolved
     if resolved is None:
+        if wire == WIRE_OPENAI_THINKING_ENABLED and family.startswith('qwen'):
+            return ReasoningPlan(
+                enabled=True,
+                wire=wire,
+                resolved_effort='none',
+                allowed_efforts=allowed,
+                kwargs_patch={'enable_thinking': False},
+            )
         return ReasoningPlan(
             enabled=False,
             wire=wire,

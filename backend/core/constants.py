@@ -66,9 +66,9 @@ DEFAULT_PENDING_ACTION_TIMEOUT = 120.0
 DEFAULT_OBSERVATION_HANDLER_TIMEOUT_SECONDS = 10.0
 # Wall-clock cap on a single step drain iteration.  If a single
 # ``_step_inner`` call exceeds this, we force-complete the step task so
-# the next iteration can start.  Mirrors the LLM step timeout (default
-# 300s) but applied at the controller layer, catching hangs in action
-# execution, tool pipelines, plugin hooks, etc.
+# the next iteration can start.  This is a coarse controller backstop for
+# non-LLM hangs in action execution, tool pipelines, plugin hooks, etc.;
+# LLM streaming liveness is handled by first-chunk/per-chunk timeouts.
 DEFAULT_STEP_TASK_LIVENESS_SECONDS = 600.0
 # Hard cap on how long run_agent_until_done polls before forcing termination.
 # 0 or negative = disabled (no hard cap).  Set
