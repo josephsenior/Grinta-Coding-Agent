@@ -9,10 +9,16 @@ on:
     branches:
       - main
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
   id-token: write
+
+env:
+  # GitHub-hosted runners default to Node 24 for actions starting 2026-06-16; opt in
+  # explicitly so checkout/setup steps do not recycle mid-job on Node 20 actions.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 # If triggered by a PR, it will be in the same group. However, each commit on main will be in its own unique group
 concurrency:
@@ -28,8 +34,10 @@ jobs:
     name: Python Gates on Linux
     # ubuntu-latest (24.04) can cancel long steps when needrestart restarts runner-provisioner.
     runs-on: ubuntu-22.04
+    timeout-minutes: 45
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         python-version: ['3.12', '3.13']
     steps:
