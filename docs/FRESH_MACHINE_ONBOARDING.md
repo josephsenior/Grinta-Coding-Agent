@@ -1,0 +1,129 @@
+# Fresh-machine onboarding checklist
+
+Use this checklist before GA promotion and when validating onboarding changes.
+It implements the **CLI onboarding confidence** gate in
+[RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
+
+## What CI automates
+
+The [**Smoke Install** workflow](../.github/workflows/smoke-install.yml) runs on
+every PR and on `main` for **Linux** and **Windows**:
+
+| Check | Wheel install (`scripts/smoke_install.*`) | Source checkout (`scripts/smoke_source_onboarding.*`) |
+| --- | --- | --- |
+| Clean venv / dependency sync | Yes | Yes (`bootstrap_env.py base`) |
+| `import backend` + `grinta --help` | Yes | Yes |
+| Optional-imports verifier | Yes (from repo checkout) | No |
+| `grinta init` rejects non-TTY (exit 3) | Yes | Yes |
+| Interactive `grinta init` | No | No |
+| First real agent task | No | No |
+
+CI builds a **local wheel** (`uv build --wheel`) and installs it into a throwaway
+venv — it does not hit PyPI unless you run the scripts without `WHEEL_DIR` set.
+
+Local equivalents:
+
+```bash
+uv build --wheel
+WHEEL_DIR=./dist ./scripts/smoke_install.sh
+./scripts/smoke_source_onboarding.sh
+```
+
+```powershell
+uv build --wheel
+$env:WHEEL_DIR = '.\dist'
+.\scripts\smoke_install.ps1
+.\scripts\smoke_source_onboarding.ps1
+```
+
+## What you must run manually (GA gate)
+
+Before **1.0.0 GA**, collect **at least three successful reports** for each
+required path below. Use a machine or VM that has **never** run Grinta before (no
+`~/.grinta`, no prior `settings.json` in the target directory).
+
+### A. `pipx` install (required ×3)
+
+Prerequisites: Python 3.12+, [pipx](https://pipx.pypa.io/).
+
+```bash
+pipx install grinta-ai
+grinta init
+grinta
+```
+
+First task example (after the TUI loads):
+
+```text
+Run /health and tell me whether git and ripgrep are detected.
+```
+
+Record:
+
+- OS and version (Linux or Windows)
+- Python version
+- Provider chosen in `grinta init`
+- Pass / fail for: install, init, TUI launch, first task
+- Notes (errors, friction, screenshots)
+
+### B. Source `uv` checkout (required ×3)
+
+Prerequisites: Python 3.12+, [uv](https://docs.astral.sh/uv/).
+
+```bash
+git clone https://github.com/josephsenior/Grinta-Coding-Agent.git
+cd Grinta-Coding-Agent
+python scripts/bootstrap_env.py dev-test
+uv run python -m backend.cli.entry init
+uv run python -m backend.cli.entry
+```
+
+Windows alternative:
+
+```powershell
+.\START_HERE.ps1
+```
+
+Same first-task prompt as above. Record the same fields.
+
+### C. Docker (optional ×1)
+
+Experimental path — one successful report is enough for signal, not a merge blocker.
+
+```bash
+docker pull ghcr.io/josephsenior/grinta:latest
+docker run -it --rm -v "$PWD:/work" -w /work \
+  -e LLM_API_KEY=${LLM_API_KEY} \
+  ghcr.io/josephsenior/grinta:latest
+```
+
+## Report template
+
+Copy into a release issue, RC feedback issue, or internal GA doc:
+
+| # | Path | OS | Python | Install OK | `init` OK | TUI / CLI OK | First task OK | Tester | Date | Notes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | pipx | | | | | | | | | |
+| 2 | pipx | | | | | | | | | |
+| 3 | pipx | | | | | | | | | |
+| 4 | source uv | | | | | | | | | |
+| 5 | source uv | | | | | | | | | |
+| 6 | source uv | | | | | | | | | |
+| 7 | docker (opt.) | | | | | | | | | |
+
+**GA criteria:** rows 1–6 all pass with no P0 friction; row 7 optional.
+
+## When something fails
+
+1. Note the exact command, exit code, and stderr.
+2. Check [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+3. Open an issue with the [RC Feedback template](../.github/ISSUE_TEMPLATE/rc_feedback.yml)
+   or a bug report if it is a defect.
+
+## Related docs
+
+- [INSTALL.md](INSTALL.md) — install paths
+- [QUICK_START.md](QUICK_START.md) — contributor quick start
+- [USER_GUIDE.md](USER_GUIDE.md) — configuration and first run
+- [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) — full GA gates
+- [CI.md](CI.md) — how Smoke Install fits in CI

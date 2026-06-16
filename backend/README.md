@@ -55,7 +55,7 @@ make test-unit
 
 ## Scripts
 
-`backend/scripts/` currently holds **verification** utilities used in CI and local gates (`verify/`). One-off automation, smoke installs, and eval helpers live under the repository root [`scripts/`](../scripts/) instead.
+`backend/scripts/` currently holds **verification** utilities used in CI and local gates (`verify/`). One-off automation, smoke installs, and eval helpers live under the repository root [`scripts/`](../scripts/) instead — see [`scripts/README.md`](../scripts/README.md) for the full index.
 
 From the project root:
 
