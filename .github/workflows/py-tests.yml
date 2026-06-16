@@ -26,8 +26,7 @@ concurrency:
   cancel-in-progress: true
 
 # CI tiers (see docs/CI.md):
-# - gates-on-linux-coverage-{a,b,report}: unit tests sharded for coverage on Linux
-#   (hosted runners have been recycling mid-job during long pytest+cov steps).
+# - gates-on-linux-coverage-{a,b,c,report}: unit tests sharded for coverage on Linux.
 # - gates-on-linux-extended: integration/e2e/stress after coverage gate passes.
 # - gates-on-windows / gates-on-macos: unit-only PR gates for cross-platform smoke.
 # - heavy-tests: marker-filtered heavy | integration | benchmark (schedule, main, manual).
@@ -59,12 +58,10 @@ jobs:
         run: uv run python -m compileall backend
       - name: Run unit tests shard A with coverage
         run: >-
-          PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q --cov=backend --cov-report=
+          PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q -n 2
+          --cov=backend --cov-report= --cov-fail-under=0
           backend/tests/unit/cli backend/tests/unit/client backend/tests/unit/context
-          backend/tests/unit/core backend/tests/unit/engine backend/tests/unit/eval
-          backend/tests/unit/execution backend/tests/unit/inference
-          backend/tests/unit/test_bounded_pipeline.py backend/tests/unit/test_backend_conftest.py
-          backend/tests/unit/test_package_version.py backend/tests/unit/test_start_server.py
+          backend/tests/unit/engine backend/tests/unit/eval
       - name: Upload coverage data
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -99,7 +96,47 @@ jobs:
         run: uv run python -m compileall backend
       - name: Run unit tests shard B with coverage
         run: >-
-          PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q --cov=backend --cov-report=
+          PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q -n 2
+          --cov=backend --cov-report= --cov-fail-under=0
+          backend/tests/unit/core backend/tests/unit/execution backend/tests/unit/inference
+          backend/tests/unit/test_bounded_pipeline.py backend/tests/unit/test_backend_conftest.py
+          backend/tests/unit/test_package_version.py backend/tests/unit/test_start_server.py
+      - name: Upload coverage data
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: coverage-linux-b
+          path: .coverage
+          if-no-files-found: error
+
+  gates-on-linux-coverage-c:
+    name: Python Gates on Linux (coverage C)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        python-version: ['3.12']
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Install uv
+        uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f
+        with:
+          enable-cache: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Lockfile validation
+        run: uv lock --check
+      - name: Install Python dependencies
+        run: python scripts/bootstrap_env.py dev-test
+      - name: Verify optional imports
+        run: python backend/scripts/verify/verify_optional_imports.py
+      - name: Compile backend (syntax gate)
+        run: uv run python -m compileall backend
+      - name: Run unit tests shard C with coverage
+        run: >-
+          PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q -n 2
+          --cov=backend --cov-report= --cov-fail-under=0
           backend/tests/unit/integrations backend/tests/unit/knowledge backend/tests/unit/ledger
           backend/tests/unit/orchestration backend/tests/unit/persistence backend/tests/unit/playbooks
           backend/tests/unit/security backend/tests/unit/telemetry backend/tests/unit/tools
@@ -107,7 +144,7 @@ jobs:
       - name: Upload coverage data
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: coverage-linux-b
+          name: coverage-linux-c
           path: .coverage
           if-no-files-found: error
 
@@ -118,6 +155,7 @@ jobs:
     needs:
       - gates-on-linux-coverage-a
       - gates-on-linux-coverage-b
+      - gates-on-linux-coverage-c
     strategy:
       matrix:
         python-version: ['3.12']
@@ -141,7 +179,8 @@ jobs:
         run: |
           cp coverage-shards/coverage-linux-a/.coverage .coverage.a
           cp coverage-shards/coverage-linux-b/.coverage .coverage.b
-          uv run coverage combine .coverage.a .coverage.b
+          cp coverage-shards/coverage-linux-c/.coverage .coverage.c
+          uv run coverage combine .coverage.a .coverage.b .coverage.c
           uv run coverage report --fail-under=75
           uv run coverage xml -o coverage.xml
       - name: Upload coverage to Codecov
