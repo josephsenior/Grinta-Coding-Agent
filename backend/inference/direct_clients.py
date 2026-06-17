@@ -126,12 +126,16 @@ def _shared_llm_pool_timeout() -> httpx.Timeout:
     These transports serve streaming completions; use the streaming read
     ceiling so inter-chunk pauses are not capped at 30s by the pool default.
     """
-    from backend.core.llm_step_timeout import DEFAULT_LLM_STEP_TIMEOUT_SECONDS
+    from backend.core.constants import LLM_STREAM_CHUNK_TIMEOUT_SECONDS
+    from backend.core.llm_step_timeout import llm_step_timeout_seconds_from_env
 
-    return bounded_llm_http_timeout(
-        DEFAULT_LLM_STEP_TIMEOUT_SECONDS,
-        streaming=True,
-    )
+    step_timeout = llm_step_timeout_seconds_from_env()
+    if step_timeout is None:
+        # No outer step cap: align pool read with inter-chunk streaming budget.
+        request_budget = LLM_STREAM_CHUNK_TIMEOUT_SECONDS
+    else:
+        request_budget = step_timeout
+    return bounded_llm_http_timeout(request_budget, streaming=True)
 
 
 def _coerce_bounded_request_timeout(
