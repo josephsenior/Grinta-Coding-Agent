@@ -33,7 +33,6 @@ from backend.ledger.action.empty import NullAction
 from backend.ledger.action.files import (
     FileEditAction,
     FileReadAction,
-    FileWriteAction,
 )
 from backend.ledger.action.mcp import MCPAction
 from backend.ledger.action.memory_tools import (
@@ -66,7 +65,6 @@ actions = (
     NullAction,
     CmdRunAction,
     FileReadAction,
-    FileWriteAction,
     FileEditAction,
     AgentThinkAction,
     AgentRejectAction,

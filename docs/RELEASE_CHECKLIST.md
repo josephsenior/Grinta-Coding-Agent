@@ -11,6 +11,7 @@ Use this list before declaring a **1.0.0** (or any major) release and before pub
 - [ ] **Integration suite (RC / GA):** `make test-integration` or `PYTHONPATH=. uv run pytest backend/tests/integration -m integration -q` passes (includes hung-action recovery, persistence health, trajectory regression).
 - [ ] **Optional — full Python test tree:** `PYTHONPATH=. uv run pytest` from the repo root (discovers `backend/tests` per [`pytest.ini`](../pytest.ini); long run; may need services). Run before a major release if you want confidence beyond the unit gates.
 - [ ] **Lint:** pre-commit and mypy pass (see [lint workflow](../.github/workflows/lint.yml)); run `pre-commit run --all-files` locally if you change Python.
+- [ ] **Source tree hygiene:** no tracked cache/build/runtime artifacts remain in the release branch (`pip/`, temporary diagnostics, stale wheel outputs, local logs, or stray `__pycache__` files).
 - [ ] **CLI smoke:** from a clean venv or `uv run`, start `grinta` or `uv run python -m backend.cli.entry` and confirm the Textual app loads on a TTY; run [e2e-tests workflow](../.github/workflows/e2e-tests.yml) steps locally if you changed CLI/launch/packaging:
   - `uv run pytest -m integration backend/tests/integration/test_cli_entry_integration.py backend/tests/integration/test_cli_task_e2e.py -q`
 - [ ] **Smoke install (automated):** [smoke-install workflow](../.github/workflows/smoke-install.yml) is green on the PR (wheel + source onboarding scripts on Linux and Windows).
@@ -39,6 +40,6 @@ Use this gate when deciding whether to move from a public RC to an official GA t
 - [ ] **Required CI stays green for a sustained window:** Linux + Windows required jobs and lint are green on `main` for at least 7 consecutive days.
 - [ ] **CLI onboarding confidence:** at least 3 fresh-machine install + `grinta init` + first-task reports complete successfully across supported install paths (`pipx` required; source `uv run` required; Docker optional). Use the table in [FRESH_MACHINE_ONBOARDING.md](FRESH_MACHINE_ONBOARDING.md); automated partial coverage runs in [smoke-install workflow](../.github/workflows/smoke-install.yml).
 - [ ] **RC feedback triage complete:** all high-severity RC feedback issues are either fixed and verified or explicitly documented as post-GA follow-up.
-- [ ] **Docs match real behavior:** `README.md`, `docs/USER_GUIDE.md`, `docs/TROUBLESHOOTING.md`, and `docs/SUPPORT_MATRIX.md` reflect the exact current CLI UX and platform support stance.
+- [ ] **Docs match real behavior:** `README.md`, `docs/USER_GUIDE.md`, `docs/TROUBLESHOOTING.md`, and `docs/SUPPORT_MATRIX.md` reflect the exact current CLI UX, platform support stance, and completion-validation behavior.
 - [ ] **Packaging artifacts validated:** PyPI package install path, Scoop, and Homebrew metadata are verified against the published artifacts for the target version.
 - [ ] **Known limitations are explicit:** any remaining gaps (for example macOS best-effort caveats) are clearly listed in release notes and support docs.

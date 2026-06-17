@@ -236,13 +236,13 @@ class FileStateMiddleware(ToolInvocationMiddleware):
         try:
             if action_cls == 'FileEditAction':
                 path = getattr(action, 'path', '')
-                command = getattr(action, 'command', '') or 'write'
                 if observation_failed:
                     return ''
+                command = getattr(action, 'command', '') or 'edit'
                 if command == 'create_file':
                     self._tracker.record(path, 'created')
                     return path
-                elif command == 'read_file':
+                if command == 'read_file':
                     self._tracker.record(path, 'read')
                 else:
                     self._tracker.record(path, 'modified')
@@ -252,12 +252,6 @@ class FileStateMiddleware(ToolInvocationMiddleware):
                     return ''
                 path = getattr(action, 'path', '')
                 self._tracker.record(path, 'read')
-            elif action_cls == 'FileWriteAction':
-                if observation_failed:
-                    return ''
-                path = getattr(action, 'path', '')
-                self._tracker.record(path, 'created')
-                return path
         except Exception:
             logger.debug('FileStateMiddleware: failed to record action', exc_info=True)
         return ''

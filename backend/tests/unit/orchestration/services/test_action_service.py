@@ -107,10 +107,11 @@ class TestActionService(unittest.IsolatedAsyncioTestCase):
 
         await self.service.run(mock_action, mock_ctx)
 
-        # Should stop after execute blocks
+        # Should stop after execute blocks without entering confirmation gate
         self.mock_controller.handle_blocked_invocation.assert_called_once_with(
             mock_action, mock_ctx
         )
+        self.mock_confirmation_service.handle_pending_confirmation.assert_not_called()
 
     async def test_run_blocked_after_runnable(self):
         """Test run handles blocked action after runnable processing."""

@@ -383,7 +383,13 @@ def test_build_prompt_events_injects_context_packet(pipeline):
     assert isinstance(packet, AgentCondensationObservation)
     assert packet.is_working_set is True
     assert '<CONTEXT_PACKET>' in packet.content
-    assert 'implement feature X' in packet.content
+    # User turns already in the prompt tail must not be duplicated in the packet.
+    assert 'RECENT_USER_REQUEST_CONTEXT' not in packet.content
+    assert 'implement feature X' not in packet.content
+    assert any(
+        isinstance(event, MessageAction) and event.content == 'implement feature X'
+        for event in prompt_events
+    )
 
 
 def test_build_prompt_events_injects_context_packet_on_fresh_session(
@@ -407,7 +413,12 @@ def test_build_prompt_events_injects_context_packet_on_fresh_session(
     assert isinstance(packet, AgentCondensationObservation)
     assert packet.is_working_set is True
     assert '<CONTEXT_PACKET>' in packet.content
-    assert 'Build a raft kv store' in packet.content
+    assert 'RECENT_USER_REQUEST_CONTEXT' not in packet.content
+    assert 'Build a raft kv store' not in packet.content
+    assert any(
+        isinstance(event, MessageAction) and event.content == 'Build a raft kv store'
+        for event in prompt_events
+    )
 
 
 def test_note_llm_step_does_not_clear_ineffective_compaction_backoff(pipeline):

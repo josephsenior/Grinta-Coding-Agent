@@ -1,8 +1,8 @@
 """Pre-execution diff preview middleware.
 
-Generates a unified diff showing what a FileEditAction or FileWriteAction
-*will* change **before** it runs, and attaches it to the tool-invocation
-context so that audit logs and the debug endpoint can surface it.
+Generates a unified diff showing what a file mutation action *will* change
+**before** it runs, and attaches it to the tool-invocation context so that
+audit logs and the debug endpoint can surface it.
 """
 
 from __future__ import annotations
@@ -28,24 +28,19 @@ class PreExecDiffMiddleware(ToolInvocationMiddleware):
     In the observe stage, the diff is appended to the observation content
     so the LLM can verify what actually changed.
 
-    Only activates for ``FileEditAction`` and ``FileWriteAction``.
+    Only activates for ``FileEditAction``.
     """
 
     # -----------------------------------------------------------------
     # execute stage — runs before the action is dispatched to runtime
     # -----------------------------------------------------------------
     async def execute(self, ctx: ToolInvocationContext) -> None:
+        from backend.ledger.action import FileEditAction
+
         action = ctx.action
-
-        try:
-            from backend.ledger.action import FileEditAction, FileWriteAction
-        except ImportError:
+        if not isinstance(action, FileEditAction):
             return
-
-        if isinstance(action, FileEditAction):
-            await self._diff_for_edit(ctx, action)
-        elif isinstance(action, FileWriteAction):
-            await self._diff_for_write(ctx, action)
+        await self._diff_for_edit(ctx, action)
 
     # -----------------------------------------------------------------
     # observe stage — append diff summary to observation content
@@ -157,31 +152,6 @@ class PreExecDiffMiddleware(ToolInvocationMiddleware):
         if action.command == 'edit' and getattr(action, 'edit_mode', None) == 'range':
             return self._simulate_range_edit(old_content, action)
         return None  # view or unknown — nothing to diff
-
-    async def _diff_for_write(self, ctx: ToolInvocationContext, action) -> None:
-        """Compute the diff that a FileWriteAction will produce."""
-        try:
-            path = self._resolve_path(action.path, ctx)
-            old_content = ''
-            if path and os.path.isfile(path):
-                old_content = self._read_file(path) or ''
-
-            new_content = action.content if hasattr(action, 'content') else ''
-            if old_content == new_content:
-                return
-
-            from backend.execution.utils.diff import get_diff
-
-            diff = get_diff(old_content, new_content, path=action.path)
-            if diff:
-                ctx.metadata['pre_exec_diff'] = diff
-                logger.debug(
-                    'Pre-exec diff generated for %s (%d chars)',
-                    action.path,
-                    len(diff),
-                )
-        except Exception:
-            logger.debug('Pre-exec diff skipped for FileWriteAction', exc_info=True)
 
     @staticmethod
     def _resolve_path(rel_path: str, ctx: ToolInvocationContext) -> str | None:

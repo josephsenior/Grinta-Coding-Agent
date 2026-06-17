@@ -303,6 +303,15 @@ class ScreenLifecycleMixin:
             self._memory_stub = memory
             self._controller = controller
 
+            from backend.cli.settings import sync_persisted_autonomy_to_controller
+
+            autonomy_level = sync_persisted_autonomy_to_controller(
+                controller,
+                self._active_agent_name(),
+                config=config,
+            )
+            self._hud.update_autonomy(autonomy_level)
+
             from backend.utils.async_utils import set_main_event_loop
 
             set_main_event_loop(self._loop)

@@ -56,25 +56,6 @@ class FileReadActionSchema(ActionSchemaV1):
         return validate_non_empty_string(v, name='path')
 
 
-class FileWriteActionSchema(ActionSchemaV1):
-    """Schema for FileWriteAction."""
-
-    action_type: Literal['write'] = Field(ActionType.WRITE.value, frozen=True)
-    runnable: bool = Field(True, frozen=True)
-    path: str = Field(..., min_length=1, description='Path to file to write')
-    content: str = Field(..., description='Content to write to file')
-    start: int = Field(default=0, ge=0, description='Starting line number (0-indexed)')
-    end: int = Field(default=-1, description='Ending line number (-1 for end of file)')
-
-    @field_validator('path')
-    @classmethod
-    def validate_path(cls, v: str) -> str:
-        """Validate path is non-empty."""
-        from backend.core.type_safety.type_safety import validate_non_empty_string
-
-        return validate_non_empty_string(v, name='path')
-
-
 class FileEditActionSchema(ActionSchemaV1):
     """Schema for FileEditAction."""
 
@@ -642,7 +623,6 @@ class CondensationRequestActionSchema(ActionSchemaV1):
 # Union type for all action schemas
 ActionSchemaUnion = (
     FileReadActionSchema
-    | FileWriteActionSchema
     | FileEditActionSchema
     | CmdRunActionSchema
     | MessageActionSchema

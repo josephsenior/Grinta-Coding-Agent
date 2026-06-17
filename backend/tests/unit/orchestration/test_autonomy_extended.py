@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.ledger.action import CmdRunAction, FileEditAction, FileWriteAction
+from backend.ledger.action import CmdRunAction, FileEditAction
 from backend.orchestration.autonomy import AutonomyController, AutonomyLevel
 
 
@@ -103,9 +103,11 @@ class TestShouldRequestConfirmation:
         action = FileEditAction(path='/tmp/test.py', new_str='pass')
         assert ctrl.should_request_confirmation(action) is True
 
-    def test_balanced_file_write_not_high_risk(self):
+    def test_balanced_file_edit_create_not_high_risk(self):
         ctrl = self._make('balanced')
-        action = FileWriteAction(path='/tmp/test.py', content='pass')
+        action = FileEditAction(
+            path='/tmp/test.py', command='create_file', file_text='pass'
+        )
         assert ctrl.should_request_confirmation(action) is False
 
 

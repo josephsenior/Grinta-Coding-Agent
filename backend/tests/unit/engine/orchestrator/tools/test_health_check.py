@@ -135,7 +135,9 @@ class TestRunProductionHealthCheck:
                 'backend.engine.tools.health_check.check_atomic_refactor_dependencies',
                 return_value=(True, 'AR OK'),
             ):
-                with pytest.raises(RuntimeError, match='health check failed'):
+                with pytest.raises(
+                    RuntimeError, match='Startup dependency check failed'
+                ):
                     run_production_health_check(raise_on_failure=True)
 
     def test_critical_failure_no_raise_when_disabled(self):

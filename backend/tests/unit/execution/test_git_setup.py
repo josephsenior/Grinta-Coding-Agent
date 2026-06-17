@@ -7,13 +7,13 @@ Targets 16.7% coverage (126 statements) by testing:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from backend.execution.git_setup import GitSetupMixin
-from backend.ledger.action import CmdRunAction, FileReadAction, FileWriteAction
+from backend.ledger.action import CmdRunAction, FileEditAction, FileReadAction
 from backend.ledger.observation import CmdOutputObservation, ErrorObservation
 
 # -----------------------------------------------------------
@@ -37,6 +37,10 @@ class _FakeGitRuntime(GitSetupMixin):
         self._read_results: dict[str, Any] = {}
         self._write_results: dict[str, Any] = {}
         self._run_results: list[Any] = []
+        self._env_vars: dict[str, str] = {}
+
+    def add_env_vars(self, env_vars: dict[str, str]) -> None:
+        self._env_vars.update(env_vars)
 
     def log(self, level: str, message: str) -> None:
         pass
@@ -44,7 +48,7 @@ class _FakeGitRuntime(GitSetupMixin):
     def read(self, action: FileReadAction) -> Any:
         return self._read_results.get(action.path, ErrorObservation('Not found'))
 
-    def write(self, action: FileWriteAction) -> Any:
+    def edit(self, action: FileEditAction) -> Any:
         return self._write_results.get(action.path, MagicMock())
 
     def run(self, action: CmdRunAction) -> Any:
@@ -57,8 +61,8 @@ class _FakeGitRuntime(GitSetupMixin):
             return self.run(action)
         if isinstance(action, FileReadAction):
             return self.read(action)
-        if isinstance(action, FileWriteAction):
-            return self.write(action)
+        if isinstance(action, FileEditAction):
+            return self.edit(action)
         return MagicMock()
 
     def set_runtime_status(
@@ -360,30 +364,27 @@ class TestMaybeSetupGitHooks:
 class TestSetupGitConfig:
     def test_success(self):
         runtime = _FakeGitRuntime()
-        runtime._run_results = [
-            CmdOutputObservation(content='', command='git config', exit_code=0)
-        ]
         runtime._setup_git_config()
-        # Should succeed without error
+        assert runtime._env_vars['GIT_AUTHOR_NAME'] == 'Test User'
+        assert runtime._env_vars['GIT_COMMITTER_EMAIL'] == 'test@example.com'
 
     def test_command_fails(self):
         runtime = _FakeGitRuntime()
-        runtime._run_results = [
-            CmdOutputObservation(
-                content='git config failed', command='git config', exit_code=1
-            )
-        ]
+
+        def raise_on_add(_env_vars: dict[str, str]) -> None:
+            raise RuntimeError('env setup failed')
+
+        runtime.add_env_vars = raise_on_add
         runtime._setup_git_config()
         # Should log warning but not raise
 
     def test_exception_raised(self):
         runtime = _FakeGitRuntime()
-        runtime._run_results = [ErrorObservation('Error')]
 
-        def raise_error(_action):
+        def raise_on_add(_env_vars: dict[str, str]) -> None:
             raise RuntimeError('git config error')
 
-        cast(Any, runtime).run = raise_error
+        runtime.add_env_vars = raise_on_add
         runtime._setup_git_config()
         # Should log warning but not raise
 

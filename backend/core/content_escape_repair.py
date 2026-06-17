@@ -324,9 +324,8 @@ CONTENT_ARG_NAMES: tuple[str, ...] = (
 
 
 SERIALIZED_PAYLOAD_ERROR = (
-    'CONTENT_APPEARS_SERIALIZED:\n'
-    'The content contains literal JSON escape sequences like \\n or \\".\n'
-    'Use real newlines and real quotes. Do not serialize the file content as a JSON string.'
+    'CONTENT_APPEARS_SERIALIZED: content contains literal JSON escape sequences '
+    '(e.g. \\n, \\").'
 )
 
 

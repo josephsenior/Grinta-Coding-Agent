@@ -31,6 +31,7 @@ from backend.cli.tui.main import GrintaTUIApp
 from backend.cli.tui.widgets.activity_card import (
     ActivityCard as TUIActivityCard,
 )
+from backend.cli.tui.widgets.file_change_card import FileChangeCard
 from backend.cli.tui.widgets.activity_card import (
     AgentMessage,
     LiveResponse,
@@ -51,7 +52,6 @@ from backend.ledger.action import (
     EscalateToHumanAction,
     FileEditAction,
     FileReadAction,
-    FileWriteAction,
     InformAction,
     MessageAction,
     ProposalAction,
@@ -83,7 +83,6 @@ from backend.ledger.observation.error import ErrorObservation
 from backend.ledger.observation.files import (
     FileEditObservation,
     FileReadObservation,
-    FileWriteObservation,
 )
 from backend.ledger.observation.mcp import MCPObservation
 from backend.ledger.observation.task_tracking import TaskTrackingObservation
@@ -95,14 +94,28 @@ def _get_screen(app: GrintaTUIApp) -> GrintaScreen:
     return app.screen  # type: ignore[return-value]
 
 
-async def _await_at_bottom(display, pilot, *, attempts: int = 12) -> None:
+def _file_change_cards(screen: GrintaScreen) -> list[FileChangeCard]:
+    return list(screen.query(FileChangeCard).results())
+
+
+async def _await_at_bottom(display, pilot, *, attempts: int = 40) -> None:
     """Wait for programmatic follow-tail / force_scroll_end to settle."""
     for _ in range(attempts):
+        if getattr(display, '_suppress_scroll_sync', False):
+            await pilot.pause()
+            continue
         display._sync_scroll_state_from_position()
         if display._was_at_bottom():
             return
         await pilot.pause()
+    if getattr(display, '_suppress_scroll_sync', False):
+        display._release_programmatic_scroll()
+        await pilot.pause()
     display._sync_scroll_state_from_position()
+    if not display._was_at_bottom():
+        display.force_scroll_end()
+        await pilot.pause()
+        display._sync_scroll_state_from_position()
     assert display._was_at_bottom()
 
 

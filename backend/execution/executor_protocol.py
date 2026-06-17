@@ -20,7 +20,6 @@ from backend.ledger.action import (
     DebuggerAction,
     FileEditAction,
     FileReadAction,
-    FileWriteAction,
     LspQueryAction,
 )
 from backend.ledger.action.memory_tools import (
@@ -91,8 +90,6 @@ class RuntimeExecutorProtocol(Protocol):
     async def debugger(self, action: DebuggerAction) -> Observation: ...
 
     async def read(self, action: FileReadAction) -> Observation: ...
-
-    async def write(self, action: FileWriteAction) -> Observation: ...
 
     async def edit(self, action: FileEditAction) -> Observation: ...
 

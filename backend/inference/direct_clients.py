@@ -123,14 +123,31 @@ def bounded_llm_http_timeout(
 def _shared_llm_pool_timeout() -> httpx.Timeout:
     """Default socket timeouts for pooled LLM httpx clients.
 
-    These transports serve streaming completions; use the streaming read
-    ceiling so inter-chunk pauses are not capped at 30s by the pool default.
+    These transports serve streaming completions. When
+    ``APP_LLM_STEP_TIMEOUT_SECONDS`` is unset (default), there is no outer
+    wall-clock cap on the whole completion—only inter-chunk stalls are bounded
+    via ``APP_LLM_STREAM_CHUNK_TIMEOUT_SECONDS`` at the socket read layer and
+    the executor chunk watchdog. Set ``APP_LLM_STEP_TIMEOUT_SECONDS`` only when
+    opting into a blunt whole-step cap.
     """
-    from backend.core.llm_step_timeout import DEFAULT_LLM_STEP_TIMEOUT_SECONDS
+    from backend.core.constants import (
+        LLM_HTTP_CONNECT_TIMEOUT_SECONDS,
+        LLM_HTTP_POOL_TIMEOUT_SECONDS,
+        LLM_HTTP_WRITE_TIMEOUT_SECONDS,
+        LLM_STREAM_CHUNK_TIMEOUT_SECONDS,
+    )
+    from backend.core.llm_step_timeout import llm_step_timeout_seconds_from_env
 
-    return bounded_llm_http_timeout(
-        DEFAULT_LLM_STEP_TIMEOUT_SECONDS,
-        streaming=True,
+    step_timeout = llm_step_timeout_seconds_from_env()
+    if step_timeout is not None:
+        return bounded_llm_http_timeout(step_timeout, streaming=True)
+
+    return httpx.Timeout(
+        timeout=None,
+        connect=LLM_HTTP_CONNECT_TIMEOUT_SECONDS,
+        read=LLM_STREAM_CHUNK_TIMEOUT_SECONDS,
+        write=LLM_HTTP_WRITE_TIMEOUT_SECONDS,
+        pool=LLM_HTTP_POOL_TIMEOUT_SECONDS,
     )
 
 

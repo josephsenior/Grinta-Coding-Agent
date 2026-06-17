@@ -222,8 +222,9 @@ uv run python -m backend.inference.discover_models status
 Grinta executes locally on your host machine.
 
 - Default mode is local execution.
-- `hardened_local` adds stricter policy checks.
-- `hardened_local` is not sandboxing or process isolation.
+- `security.execution_profile="hardened_local"` adds stricter policy checks for command cwd, package installs, network-capable commands, background processes, and sensitive workspace paths.
+- `security.execution_profile="sandboxed_local"` adds those same checks plus OS-native process isolation for non-interactive command execution.
+- `hardened_local` is not sandboxing or process isolation. Interactive terminal sessions also bypass process isolation under `sandboxed_local`.
 
 Use Grinta in trusted repositories and environments.
 
@@ -243,11 +244,13 @@ current slash-command registry does not expose a `/mode` command.
 
 There are three stored levels: **conservative**, **balanced**, and **full**. They differ only in **when the agent asks you before running an action**; execution, retries, and prompts are otherwise the same.
 
-- **Conservative** — confirm before every runnable action.
-- **Balanced** (default) — confirm only for high-risk actions.
+- **Conservative** — confirm before every command, mutation, terminal/browser action, MCP call, or worker-coordination action in the confirmation flow.
+- **Balanced** (default) — confirm for high-risk or high-impact actions, including declared `HIGH` risk, dangerous commands, file edits, browser actions, worker delegation, and blackboard writes.
 - **Full** — never prompt for confirmation; hard safety blocks (for example CRITICAL-classified commands) still apply.
 
 Autonomy level is only meaningful in **Agent** mode. Chat and Plan modes have their own interaction contracts independent of autonomy.
+
+Autonomy is separate from `security.execution_profile`: autonomy controls prompts, while the execution profile controls runtime hardening.
 
 See also [SECURITY_CHECKLIST.md](SECURITY_CHECKLIST.md).
 

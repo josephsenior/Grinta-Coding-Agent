@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from backend.cli._typing import ObservationRenderersHost
@@ -15,9 +15,6 @@ else:
 from rich.padding import Padding
 
 from backend.cli._typing import ObservationRenderersHost
-from backend.cli.display.transcript import (
-    format_activity_delta_secondary,
-)
 from backend.cli.layout_tokens import ACTIVITY_BLOCK_BOTTOM_PAD
 from backend.cli.orient_tools import (
     file_read_observation_model,
@@ -25,7 +22,6 @@ from backend.cli.orient_tools import (
 from backend.ledger.observation import (
     FileEditObservation,
     FileReadObservation,
-    FileWriteObservation,
 )
 
 logger = logging.getLogger(__name__)
@@ -57,22 +53,6 @@ class _ObsFileMixin(_ObservationRenderersBase):
                 pad=ACTIVITY_BLOCK_BOTTOM_PAD,
             )
         )
-
-    def _render_file_write_observation(self, obs: FileWriteObservation) -> None:
-        del obs
-        self._stop_reasoning()
-        pending = cast(Any, self._take_pending_activity_card('file_write'))
-        line_count = 0
-        if pending and pending.payload:
-            raw_line_count = pending.payload.get('line_count', 0)
-            if isinstance(raw_line_count, int):
-                line_count = raw_line_count
-        delta = format_activity_delta_secondary(added=line_count)
-        extra_lines: list[Any] = []
-        if delta is not None:
-            extra_lines.append(delta)
-        if pending is not None:
-            self._render_pending_activity_card(pending, extra_lines=extra_lines)
 
     def _render_file_read_observation(self, obs: FileReadObservation) -> None:
         self._stop_reasoning()

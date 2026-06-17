@@ -91,12 +91,7 @@ def apply_edit_logic(
             return _tool_result(
                 output='',
                 error=(
-                    f'[ERROR] edit_mode=range requires start_line and end_line. '
-                    f'[CAUSE] {missing_str} {"was" if len(missing) == 1 else "were"} omitted from the tool call. '
-                    f'[SUGGESTION] Provide both start_line and end_line as integers (1-based, inclusive) '
-                    f'alongside new_str. '
-                    f'Example: {{"command": "edit", "edit_mode": "range", "start_line": 1, '
-                    f'"end_line": 10, "new_str": "...replacement text..."}}.'
+                    f'edit requires start_line and end_line (missing: {missing_str}).'
                 ),
                 new_content=old_content_str,
             )

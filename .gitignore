@@ -5,6 +5,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+pip/
 
 # Node (residual)
 node_modules/
@@ -77,6 +78,9 @@ mypy_*.txt
 pylint_*.txt
 *_results.txt
 *_check.txt
+
+# Local pip download cache (must not be tracked)
+pip/cache/
 
 # Grinta runtime logs (always under install tree ``logs/``, not workspace cwd)
 logs/

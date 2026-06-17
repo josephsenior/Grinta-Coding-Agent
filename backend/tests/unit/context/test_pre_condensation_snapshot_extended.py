@@ -11,7 +11,7 @@ from backend.context import pre_condensation_snapshot as snapshot_module
 from backend.context.pre_condensation_snapshot import extract_snapshot
 from backend.ledger.action.agent import AgentThinkAction, TaskTrackingAction
 from backend.ledger.action.commands import CmdRunAction
-from backend.ledger.action.files import FileEditAction, FileWriteAction
+from backend.ledger.action.files import FileEditAction
 from backend.ledger.action.message import MessageAction
 from backend.ledger.event import EventSource
 from backend.ledger.observation.commands import CmdOutputObservation
@@ -139,7 +139,11 @@ class TestPreCondensationSnapshot(unittest.TestCase):
     def test_extract_snapshot_records_file_hashes(self):
         events = [
             FileReadObservation(path='src/read.py', content='print("read")\n'),
-            FileWriteAction(path='src/write.py', content='print("write")\n'),
+            FileEditAction(
+                path='src/write.py',
+                command='create_file',
+                file_text='print("write")\n',
+            ),
             FileEditObservation(
                 content='edited',
                 path='src/edit.py',
@@ -153,8 +157,8 @@ class TestPreCondensationSnapshot(unittest.TestCase):
         files = snapshot['files_touched']
         assert files['src/read.py']['hash_source'] == 'read_observation'
         assert files['src/read.py']['size'] == len('print("read")\n')
-        assert files['src/write.py']['hash_source'] == 'write_content'
-        assert files['src/write.py']['type'] == 'write'
+        assert files['src/write.py']['hash_source'] == 'edit_payload'
+        assert files['src/write.py']['type'] == 'edit'
         assert files['src/edit.py']['sha256'] == 'abc123def456'
         assert files['src/edit.py']['hash_source'] == 'edit_observation'
 
@@ -228,6 +232,10 @@ class TestPreCondensationSnapshot(unittest.TestCase):
 
         assert snapshot['objective'] == 'Fix long-running compaction'
         assert snapshot['latest_directive'] == 'Also preserve background processes'
+        assert snapshot['recent_user_messages'] == [
+            {'text': 'Fix long-running compaction'},
+            {'text': 'Also preserve background processes'},
+        ]
         assert snapshot['background_tasks'] == [
             {
                 'session_id': 'terminal_9',

@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any
 from backend.core.logger import app_logger as logger
 from backend.execution.editor_only_shell_policy import evaluate_editor_only_shell_block
 from backend.execution.sandboxing import is_workspace_restricted_profile
-from backend.security.command_analyzer import CommandAnalyzer
+from backend.security.command_analyzer import CommandAnalyzer, RiskCategory
 
 if TYPE_CHECKING:
     from backend.ledger.action import Action
@@ -148,6 +148,42 @@ def path_is_within_workspace(path: str | Path, workspace_root: str | Path) -> bo
         return True
     except ValueError:
         return False
+
+
+def _security_command_text(action: Any) -> str:
+    """Return command text for command-like actions, else an empty string."""
+    from backend.ledger.action import (
+        CmdRunAction,
+        TerminalInputAction,
+        TerminalRunAction,
+    )
+
+    if isinstance(action, CmdRunAction):
+        return action.command or ''
+    if isinstance(action, TerminalRunAction):
+        return action.command or ''
+    if isinstance(action, TerminalInputAction) and not action.is_control:
+        return (action.input or '').rstrip('\r\n')
+    return ''
+
+
+def _critical_command_block_message(action: Any) -> str | None:
+    command = _security_command_text(action)
+    if not command.strip():
+        return None
+    assessment = CommandAnalyzer({}).analyze_command(command)
+    if assessment.risk_category != RiskCategory.CRITICAL:
+        return None
+    action_desc = f'{getattr(action, "action", type(action).__name__)}: {command[:120]}'
+    logger.warning(
+        'Security BLOCKED critical command (%s): %s',
+        assessment.reason,
+        action_desc,
+    )
+    return (
+        'Action blocked by security policy '
+        f'(risk=CRITICAL, reason={assessment.reason}). Action: {action_desc}'
+    )
 
 
 def resolve_command_cwd(
@@ -419,6 +455,11 @@ class SecurityEnforcementMixin:
         if not sec_cfg.enforce_security:
             return decision
 
+        critical_message = _critical_command_block_message(action)
+        if critical_message is not None:
+            decision.block_message = critical_message
+            return decision
+
         risk = self._resolve_security_risk(action)
         if risk is None:
             return decision
@@ -527,12 +568,7 @@ class SecurityEnforcementMixin:
 
     def _enforce_hardened_local_policy(self, action: Action) -> Observation | None:
         """Apply deterministic local policy gates before heuristic risk handling."""
-        from backend.ledger.action import (
-            CmdRunAction,
-            FileEditAction,
-            FileReadAction,
-            FileWriteAction,
-        )
+        from backend.ledger.action import CmdRunAction, FileEditAction, FileReadAction
         from backend.ledger.observation import ErrorObservation
 
         sec_cfg = self.config.security  # type: ignore[attr-defined]
@@ -550,7 +586,7 @@ class SecurityEnforcementMixin:
             if block_message is not None:
                 return ErrorObservation(content=block_message)
 
-        if isinstance(action, (FileReadAction, FileWriteAction, FileEditAction)):
+        if isinstance(action, (FileReadAction, FileEditAction)):
             block_message = evaluate_hardened_local_file_policy(
                 path=getattr(action, 'path', ''),
                 security_config=sec_cfg,

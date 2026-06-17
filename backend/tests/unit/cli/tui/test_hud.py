@@ -183,6 +183,25 @@ async def test_tui_hud_autonomy_selector_updates_controller(mock_config):
 
 
 @pytest.mark.asyncio
+async def test_tui_hud_autonomy_persists(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        s._config = mock_config
+        s._apply_autonomy_level('full')
+        await pilot.pause()
+
+        from backend.cli.settings import get_persisted_autonomy_level
+
+        assert get_persisted_autonomy_level('agent') == 'full'
+
+
+@pytest.mark.asyncio
 async def test_tui_hud_autonomy_sync_uses_agent_config_without_applying_default(
     mock_config, monkeypatch
 ):

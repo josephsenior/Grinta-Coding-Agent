@@ -1,0 +1,17 @@
+* { box-sizing: border-box; }
+body { font-family: system-ui, sans-serif; margin: 0; background: #222; color: #eee; }
+header { display: flex;
+    gap: 16px; align-items: center; padding: 12px 20px; background: #111; }
+header h1 { margin: 0; font-size: 20px; }
+#status { flex: 1; font-weight: 600; }
+button { padding: 6px 14px; background: #4a90e2; color: white; border: 0; border-radius: 4px; cursor: pointer; }
+button:hover { background: #3a7bc8; }
+main { display: grid; grid-template-columns: auto 200px; gap: 20px; padding: 20px; }
+.board { display: grid; grid-template-columns: repeat(8, 60px); grid-template-rows: repeat(8, 60px); border: 3px solid #555; width: max-content; }
+.square { display: flex; align-items: center; justify-content: center; font-size: 40px; cursor: pointer; user-select: none; position: relative; }
+.square.light { background: #f0d9b5; color: #333; }
+.square.dark { background: #b58863; color: #222; }
+.square.selected { outline: 3px solid #ffd700; outline-offset: -3px; }
+.square.legal::after { content: ""; width: 14px; height: 14px; border-radius: 50%; background: rgba(0,0,0,0.3); position: absolute; }
+.captures { display: flex; flex-direction: column; gap: 10px; }
+.cap-row { display: flex; flex-wrap: wrap; gap: 4px; min-height: 40px; background: #333; padding: 6px; border-radius: 4px; font-size: 26px; }

@@ -4,7 +4,6 @@ Tests cover:
 - PreExecDiffMiddleware initialization
 - execute() method dispatch for different action types
 - _diff_for_edit with various FileEditAction commands
-- _diff_for_write for FileWriteAction
 - _simulate_edit for edit, create_file, insert_text commands
 - _resolve_path helper
 - _read_file helper with size limits
@@ -15,7 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, mock_open, patch
 
 import pytest
 
-from backend.ledger.action import CmdRunAction, FileEditAction, FileWriteAction
+from backend.ledger.action import CmdRunAction, FileEditAction
 from backend.orchestration.pre_exec_diff import PreExecDiffMiddleware
 
 
@@ -35,7 +34,7 @@ class TestExecuteMethod:
 
     @pytest.mark.asyncio
     async def test_execute_ignores_non_file_actions(self):
-        """Execute should ignore actions that aren't FileEdit or FileWrite."""
+        """Execute should ignore actions that aren't file mutations."""
         middleware = PreExecDiffMiddleware()
         action = CmdRunAction(command='ls -la')
 
@@ -78,10 +77,12 @@ class TestExecuteMethod:
             mock_diff.assert_called_once_with(ctx, action)
 
     @pytest.mark.asyncio
-    async def test_execute_calls_diff_for_write(self):
-        """Execute should call _diff_for_write for FileWriteAction."""
+    async def test_execute_calls_diff_for_create_file(self):
+        """Execute should normalize create_file FileEditAction through _diff_for_edit."""
         middleware = PreExecDiffMiddleware()
-        action = FileWriteAction(path='test.txt', content='new content')
+        action = FileEditAction(
+            path='test.txt', command='create_file', file_text='new content'
+        )
 
         controller = MagicMock()
         state = MagicMock()
@@ -91,9 +92,10 @@ class TestExecuteMethod:
         ctx.state = state
         ctx.metadata = {}
 
-        with patch.object(middleware, '_diff_for_write', new=AsyncMock()) as mock_diff:
+        with patch.object(middleware, '_diff_for_edit', new=AsyncMock()) as mock_diff:
             await middleware.execute(ctx)
-            mock_diff.assert_called_once_with(ctx, action)
+            mock_diff.assert_called_once()
+            assert mock_diff.call_args.args[1].command == 'create_file'
 
 
 class TestDiffForEdit:
@@ -193,117 +195,6 @@ class TestDiffForEdit:
         ):
             # Should not raise
             await middleware._diff_for_edit(ctx, action)
-
-        assert 'pre_exec_diff' not in ctx.metadata
-
-
-class TestDiffForWrite:
-    """Test _diff_for_write method."""
-
-    @pytest.mark.asyncio
-    async def test_diff_for_write_new_file(self):
-        """Should generate diff for new file creation."""
-        middleware = PreExecDiffMiddleware()
-        action = FileWriteAction(path='newfile.txt', content='new content')
-
-        controller = MagicMock()
-        controller.runtime.workspace_dir = '/workspace'
-        state = MagicMock()
-        ctx = MagicMock()
-        ctx.action = action
-        ctx.controller = controller
-        ctx.state = state
-        ctx.metadata = {}
-
-        with (
-            patch.object(
-                middleware, '_resolve_path', return_value='/workspace/newfile.txt'
-            ),
-            patch('os.path.isfile', return_value=False),
-            patch(
-                'backend.execution.utils.diff.get_diff',
-                return_value='+ new content',
-            ),
-        ):
-            await middleware._diff_for_write(ctx, action)
-
-        assert 'pre_exec_diff' in ctx.metadata
-
-    @pytest.mark.asyncio
-    async def test_diff_for_write_existing_file(self):
-        """Should generate diff for overwriting existing file."""
-        middleware = PreExecDiffMiddleware()
-        action = FileWriteAction(path='existing.txt', content='new content')
-
-        controller = MagicMock()
-        controller.runtime.workspace_dir = '/workspace'
-        state = MagicMock()
-        ctx = MagicMock()
-        ctx.action = action
-        ctx.controller = controller
-        ctx.state = state
-        ctx.metadata = {}
-
-        with (
-            patch.object(
-                middleware, '_resolve_path', return_value='/workspace/existing.txt'
-            ),
-            patch('os.path.isfile', return_value=True),
-            patch.object(middleware, '_read_file', return_value='old content'),
-            patch(
-                'backend.execution.utils.diff.get_diff',
-                return_value='- old content\\n+ new content',
-            ),
-        ):
-            await middleware._diff_for_write(ctx, action)
-
-        assert 'pre_exec_diff' in ctx.metadata
-
-    @pytest.mark.asyncio
-    async def test_diff_for_write_identical_content_skips_diff(self):
-        """Should skip diff if content is identical."""
-        middleware = PreExecDiffMiddleware()
-        action = FileWriteAction(path='file.txt', content='same content')
-
-        controller = MagicMock()
-        state = MagicMock()
-        ctx = MagicMock()
-        ctx.action = action
-        ctx.controller = controller
-        ctx.state = state
-        ctx.metadata = {}
-
-        with (
-            patch.object(
-                middleware, '_resolve_path', return_value='/workspace/file.txt'
-            ),
-            patch('os.path.isfile', return_value=True),
-            patch.object(middleware, '_read_file', return_value='same content'),
-        ):
-            await middleware._diff_for_write(ctx, action)
-
-        # Should not add diff for identical content
-        assert 'pre_exec_diff' not in ctx.metadata
-
-    @pytest.mark.asyncio
-    async def test_diff_for_write_handles_exceptions(self):
-        """Should handle exceptions gracefully."""
-        middleware = PreExecDiffMiddleware()
-        action = FileWriteAction(path='file.txt', content='content')
-
-        controller = MagicMock()
-        state = MagicMock()
-        ctx = MagicMock()
-        ctx.action = action
-        ctx.controller = controller
-        ctx.state = state
-        ctx.metadata = {}
-
-        with patch.object(
-            middleware, '_resolve_path', side_effect=RuntimeError('Test error')
-        ):
-            # Should not raise
-            await middleware._diff_for_write(ctx, action)
 
         assert 'pre_exec_diff' not in ctx.metadata
 

@@ -66,6 +66,157 @@ ActivityCard {
     transition: background 150ms, border 150ms;
 }
 
+/* ── File change cards ───────────────────────────────── */
+FileChangeCard {
+    width: 100%;
+    height: auto;
+    margin: 0 0 1 0;
+    border: round #1b233a;
+    background: #08101d;
+    padding: 0 0 1 0;
+}
+
+FileChangeCard.-create {
+    border-left: heavy #54efae;
+}
+
+FileChangeCard.-edit {
+    border-left: heavy #91abec;
+}
+
+/* ── Unified diff view ───────────────────────────────── */
+UnifiedDiffView {
+    width: 100%;
+    height: auto;
+    max-height: 24;
+    border-top: solid #1b233a;
+    background: #060a14;
+    scrollbar-size-vertical: 1;
+    scrollbar-color: #33405d #060a14;
+}
+
+UnifiedDiffView .diff-truncated {
+    color: #969aad;
+    background: #0a1224;
+}
+
+UnifiedDiffRow .diff-gutter {
+    color: #5a6478;
+}
+
+UnifiedDiffRow .diff-gutter.add {
+    color: #6f9f82;
+    background: #122a22;
+}
+
+UnifiedDiffRow .diff-gutter.rem {
+    color: #b87a7a;
+    background: #2a1a1a;
+}
+
+UnifiedDiffRow .diff-code.ctx {
+    color: #c8ceda;
+}
+
+UnifiedDiffRow .diff-code.add {
+    background: #122a22;
+}
+
+UnifiedDiffRow .diff-code.rem {
+    background: #2a1a1a;
+}
+
+UnifiedDiffRow .diff-code.hdr {
+    color: #91abec;
+    background: #0a1224;
+}
+
+UnifiedDiffRow .diff-sign {
+    color: #5a6478;
+}
+
+UnifiedDiffRow .diff-sign.add {
+    color: #54efae;
+    background: #122a22;
+}
+
+UnifiedDiffRow .diff-sign.rem {
+    color: #fd8383;
+    background: #2a1a1a;
+}
+
+/* ── Legacy diff line widgets (ActivityCard fallback) ── */
+DiffLine.add {
+    background: #122a22;
+    color: #7de6a1;
+}
+
+DiffLine.rem {
+    background: #2a1a1a;
+    color: #ff9a9a;
+}
+
+DiffLine.ctx {
+    background: transparent;
+    color: #969aad;
+}
+
+SplitDiffLine .split-pane.left {
+    border-right: solid #26324f;
+}
+
+SplitDiffLine .split-pane.add {
+    background: #122a22;
+    color: #7de6a1;
+}
+
+SplitDiffLine .split-pane.rem {
+    background: #2a1a1a;
+    color: #ff9a9a;
+}
+
+SplitDiffLine .split-pane.ctx {
+    background: transparent;
+    color: #969aad;
+}
+
+/* ── Terminal pane ───────────────────────────────────── */
+TerminalPane {
+    background: #0a0e14;
+}
+
+TerminalPane .terminal-titlebar {
+    background: #141c2e;
+    color: #8f9fc1;
+}
+
+TerminalPane .terminal-prompt {
+    background: #0a0e14;
+}
+
+TerminalPane .terminal-output-wrap {
+    max-height: 24;
+    background: #080c12;
+    scrollbar-color: #33405d #060a14;
+}
+
+TerminalPane .terminal-output {
+    background: #080c12;
+    color: #cbd5e1;
+}
+
+TerminalPane .terminal-footer {
+    background: #0d1219;
+    color: #54597b;
+}
+
+/* ── Terminal activity cards (expanded status strip) ─── */
+ActivityCard.-expanded.-category-shell #collapsed-row-container,
+ActivityCard.-expanded.-category-terminal #collapsed-row-container,
+ActivityCard.-expanded.-category-debugger #collapsed-row-container {
+    height: 1;
+}
+
 CollapsibleSection {
     transition: background 150ms, border-left 150ms;
     border-left: transparent;
@@ -330,7 +481,7 @@ HUD,
 #hud-line-1 {
     height: 1;
     text-style: none;
-    margin-right: 1;
+    margin-right: 3;
 }
 
 #hud-line-1-row {
@@ -341,21 +492,21 @@ HUD,
     padding: 0;
 }
 
-#hud-label-model,
-#hud-label-reasoning {
+#hud-label-model {
     height: 1;
     padding: 0 1 0 0;
-    margin: 0;
+    margin: 0 0 0 2;
 }
 
 #hud-label-reasoning {
-    margin-left: 4;
-    padding-left: 2;
+    height: 1;
+    padding: 0 1 0 0;
+    margin: 0 0 0 3;
 }
 
 #hud-model-name {
     height: 1;
-    margin-right: 2;
+    margin-right: 1;
     color: #c8d4e8;
 }
 
@@ -383,15 +534,18 @@ HUD,
 }
 
 #hud-label-autonomy,
-#hud-label-mode,
-#hud-label-reasoning {
+#hud-label-mode {
     height: 1;
     padding: 0 1 0 0;
     margin: 0;
 }
 
+#hud-label-autonomy {
+    margin-left: 3;
+}
+
 #hud-reasoning {
-    width: 16;
+    width: 20;
     margin-right: 1;
     background: transparent;
     border: none;
@@ -431,6 +585,7 @@ HUD,
 #hud-reasoning SelectOverlay {
     background: #0d1a30;
     border: solid #6a5020;
+    min-width: 20;
 }
 
 #hud-reasoning SelectOverlay .option-list--option {
@@ -760,9 +915,10 @@ UserMessage {
     height: auto;
     margin: 1 0;
     padding: 1 2;
-    background: #091522;
-    border: round #18485a;
-    color: #f8fafc;
+    background: #111b29;
+    border: round #384673;
+    border-right: solid #91abec;
+    color: #e9e9e9;
 }
 
 AgentMessage {

@@ -69,7 +69,6 @@ class RendererActionHandlersMixin:
         *,
         content: str = '',
         pending_attr: str | None = None,
-        operation_label: str | None = None,
         force_err: bool = False,
     ) -> None:
         """Render or finalize an exploration activity card in-place."""
@@ -92,7 +91,6 @@ class RendererActionHandlersMixin:
                     outcome=card.secondary or 'completed',
                     extra_content=extra_content,
                     meta_lines=card.meta_lines or None,
-                    operation_label=operation_label or card.detail,
                 )
                 setattr(self, pending_attr, None)
                 return
@@ -131,7 +129,6 @@ class RendererActionHandlersMixin:
             card,
             content=content,
             pending_attr=pending_attr,
-            operation_label=query,
         )
 
     @staticmethod

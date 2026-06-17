@@ -63,7 +63,7 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
         self.controller.event_stream.add_event.assert_called()
         args, kwargs = self.controller.event_stream.add_event.call_args
         self.assertIsInstance(args[0], ErrorObservation)
-        self.assertIn('STUCK LOOP DETECTED', args[0].content)
+        self.assertIn('STUCK_LOOP', args[0].content)
         self.assertEqual(args[1], EventSource.ENVIRONMENT)
 
     async def test_handle_stuck_detection_repeated_stuck_still_replans(self):

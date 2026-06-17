@@ -175,6 +175,18 @@ class TestSharedHttpClients:
         )
         assert client.timeout.read == LLM_STREAM_CHUNK_TIMEOUT_SECONDS
 
+    def test_shared_pool_has_no_outer_step_cap_by_default(self, monkeypatch):
+        from backend.core.constants import LLM_STREAM_CHUNK_TIMEOUT_SECONDS
+        from backend.inference.direct_clients import _shared_llm_pool_timeout
+
+        monkeypatch.delenv('APP_LLM_STEP_TIMEOUT_SECONDS', raising=False)
+
+        client = get_shared_async_http_client(
+            'test_pool_no_outer_step_cap', 'http://test'
+        )
+        assert client.timeout == _shared_llm_pool_timeout()
+        assert client.timeout.read == LLM_STREAM_CHUNK_TIMEOUT_SECONDS
+
     @pytest.mark.asyncio
     async def test_aclose_shared_clients_clears_pools(self):
         sync_client = get_shared_http_client('test_provider_close', 'http://test')

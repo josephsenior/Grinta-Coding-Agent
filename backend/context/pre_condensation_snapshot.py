@@ -38,6 +38,7 @@ _MAX_TEST_RESULTS = 8
 _MAX_INVALIDATED_ASSUMPTIONS = 12
 _MAX_CONTENT_LENGTH = 500
 _MAX_TASKS = 20
+_MAX_RECENT_USER_MESSAGES = 8
 
 
 def _agent_debug_log(
@@ -135,6 +136,7 @@ def extract_snapshot(events: list[Event]) -> dict[str, Any]:
         'events_condensed': len(events),
         'objective': '',
         'latest_directive': '',
+        'recent_user_messages': [],
         'files_touched': {},
         'recent_errors': [],
         'decisions': [],
@@ -252,23 +254,6 @@ def _extract_read_file_info(event: Event, files: dict) -> None:
             _update_file_record(files, path, action='read', record_type='read')
 
 
-def _extract_write_file_info(event: Event, files: dict) -> None:
-    """Extract file path and hash from FileWrite* events."""
-    path = getattr(event, 'path', '')
-    content = getattr(event, 'content', None)
-    if isinstance(content, str):
-        _update_file_record(
-            files,
-            path,
-            action='write',
-            record_type='write',
-            content=content,
-            hash_source='write_content',
-        )
-    elif path:
-        _update_file_record(files, path, action='write', record_type='write')
-
-
 def _extract_cmd_run_file_paths(event: Event, files: dict) -> None:
     """Extract file paths from simple cat/head/tail command reads."""
     cmd = getattr(event, 'command', '')
@@ -289,8 +274,6 @@ def _extract_file_info(event: Event, snapshot: dict) -> None:
 
     if cls_name in ('FileEditAction', 'FileEditObservation'):
         _extract_edit_file_info(event, files)
-    elif cls_name in ('FileWriteAction', 'FileWriteObservation'):
-        _extract_write_file_info(event, files)
     elif cls_name in ('FileReadAction', 'FileReadObservation'):
         _extract_read_file_info(event, files)
     elif cls_name == 'CmdRunAction':
@@ -311,6 +294,22 @@ def _extract_user_directive(event: Event, snapshot: dict) -> None:
     if not snapshot.get('objective'):
         snapshot['objective'] = content[:_MAX_CONTENT_LENGTH]
     snapshot['latest_directive'] = content[:_MAX_CONTENT_LENGTH]
+    _append_recent_user_message(event, content, snapshot)
+
+
+def _append_recent_user_message(event: Event, content: str, snapshot: dict) -> None:
+    recent = snapshot.setdefault('recent_user_messages', [])
+    if not isinstance(recent, list):
+        recent = []
+        snapshot['recent_user_messages'] = recent
+    event_id = getattr(event, 'id', None)
+    item: dict[str, Any] = {'text': content[:_MAX_CONTENT_LENGTH]}
+    if isinstance(event_id, int) and event_id >= 0:
+        item['event_id'] = event_id
+    elif isinstance(event_id, str) and event_id:
+        item['event_id'] = event_id
+    recent.append(item)
+    del recent[:-_MAX_RECENT_USER_MESSAGES]
 
 
 def _extract_task_plan(event: Event, snapshot: dict) -> None:

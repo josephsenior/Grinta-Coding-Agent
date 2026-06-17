@@ -30,7 +30,6 @@ from backend.ledger.action.empty import NullAction
 from backend.ledger.action.files import (
     FileEditAction,
     FileReadAction,
-    FileWriteAction,
 )
 from backend.ledger.action.mcp import MCPAction
 from backend.ledger.action.memory_tools import (
@@ -81,7 +80,6 @@ __all__ = [
     'EscalateToHumanAction',
     'FileEditAction',
     'FileReadAction',
-    'FileWriteAction',
     'InformAction',
     'LspQueryAction',
     'GrepAction',

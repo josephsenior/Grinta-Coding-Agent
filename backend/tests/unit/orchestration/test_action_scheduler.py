@@ -79,8 +79,8 @@ def test_read_only_mcp_tools_parallel() -> None:
 def test_same_type_file_write_different_paths_parallel() -> None:
     scheduler = ActionScheduler(enabled=True)
     actions = [
-        _FakeAction('write', path='/a.txt'),
-        _FakeAction('write', path='/b.txt'),
+        _FakeAction('edit', path='/a.txt'),
+        _FakeAction('edit', path='/b.txt'),
     ]
     decision = scheduler.decide_parallel_batch(actions)
     assert decision.should_execute_parallel is True
@@ -90,8 +90,8 @@ def test_same_type_file_write_different_paths_parallel() -> None:
 def test_same_type_file_write_same_path_sequential() -> None:
     scheduler = ActionScheduler(enabled=True)
     actions = [
-        _FakeAction('write', path='/same.txt'),
-        _FakeAction('write', path='/same.txt'),
+        _FakeAction('edit', path='/same.txt'),
+        _FakeAction('edit', path='/same.txt'),
     ]
     decision = scheduler.decide_parallel_batch(actions)
     assert decision.should_execute_parallel is False
@@ -145,7 +145,7 @@ def test_same_type_terminal_same_session_sequential() -> None:
 
 def test_mixed_type_batch_sequential() -> None:
     scheduler = ActionScheduler(enabled=True)
-    actions = [_FakeAction('read'), _FakeAction('write', path='/a.txt')]
+    actions = [_FakeAction('read'), _FakeAction('edit', path='/a.txt')]
     decision = scheduler.decide_parallel_batch(actions)
     assert decision.should_execute_parallel is False
     assert decision.reason == 'mixed_batch_sequential'

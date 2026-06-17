@@ -28,6 +28,7 @@ Direct link if the animation does not load: [`docs/grinta-demo.gif`](docs/grinta
 
 - Latest public build is `v1.0.0-rc1` (release candidate), not final GA.
 - We are actively collecting feedback on first-run setup, UX clarity, and edge-case reliability.
+- Linux and Windows are the current supported release targets; macOS remains best-effort until its CI gate is promoted.
 - If you hit friction, please open an issue with the `RC Feedback` template from the issue chooser.
 - GA criteria and release gate details live in [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md).
 
@@ -43,10 +44,10 @@ Direct link if the animation does not load: [`docs/grinta-demo.gif`](docs/grinta
 | Stuck-loop + cost-acceleration detection                                          | ✅                  | ❌      | partial           | ❌             |
 | Risk-classified actions + audit log                                               | ✅ `hardened_local` | ❌      | partial           | partial        |
 | Session checkpoint / resume / revert                                              | ✅ event-stream     | ✅ git  | partial           | ❌             |
-| Windows-first parity (PowerShell)                                                 | ✅                  | partial | partial           | partial        |
-| MCP support                                                                       | ✅                  | ❌      | ✅ best in class  | partial        |
+| Windows-supported workflow (PowerShell)                                           | ✅                  | partial | partial           | partial        |
+| MCP support                                                                       | ✅                  | ❌      | ✅ strong         | partial        |
 
-The pitch in one sentence: **everything Aider's local-first ethos gives you, plus the depth of tooling Claude Code has, without locking you to a single model vendor.**
+The pitch in one sentence: **a local-first coding agent with deeper built-in tooling than most terminal peers, without locking you to a single model vendor.**
 
 ## Install in 30 seconds
 
@@ -71,7 +72,7 @@ The base install keeps RAG, document parsing, and browser automation out of the 
 
 ## What you get
 
-- **Task completion, not just file edits.** Validation gates and stuck detection block premature "done".
+- **Task completion, not just file edits.** Stuck detection, recovery directives, and optional completion-quality validation help reduce premature "done".
 - **Model-agnostic.** OpenAI, Anthropic, Google, OpenRouter, Ollama, LM Studio — same prompt surface, same tools.
 - **Local-first.** Code stays in your workspace; sessions, checkpoints, and audit logs live under `~/.grinta/workspaces/<id>/storage`.
 - **Strong safety rails.** Risk-classified actions, CRITICAL refusal gate, secret masking, and a session-wide audit trail.
@@ -86,7 +87,7 @@ Grinta exposes three modes in the Textual HUD (Chat, Plan, Agent). They change t
 - **Plan** — read-only investigation plus a structured plan before execution.
 - **Agent** — full task loop (default for direct work).
 
-Autonomy (`/autonomy`: conservative, balanced, full) controls confirmation prompts in **Agent** mode only.
+Autonomy (`/autonomy`: conservative, balanced, full) controls confirmation prompts in **Agent** mode only. Runtime hardening is configured separately with `security.execution_profile` (`standard`, `hardened_local`, `sandboxed_local`).
 
 ## Common slash commands
 
@@ -108,7 +109,7 @@ Playbook workflows (`/debug`, `/testing`, `/feature`, …) and the full registry
 
 ## Security boundary
 
-Grinta executes actions on the local host. `hardened_local` adds stricter policy checks but **is not** sandboxing or process isolation. Read [docs/SECURITY_CHECKLIST.md](docs/SECURITY_CHECKLIST.md) **before pointing Grinta at code you do not trust** — for hostile codebases, run inside a VM or container.
+Grinta executes actions on the local host. `hardened_local` adds stricter policy checks but **is not** sandboxing or process isolation; `sandboxed_local` adds process isolation only for non-interactive commands. Read [docs/SECURITY_CHECKLIST.md](docs/SECURITY_CHECKLIST.md) **before pointing Grinta at code you do not trust** — for hostile codebases, run inside a VM or container.
 
 ## Architecture (high level)
 

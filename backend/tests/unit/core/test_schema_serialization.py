@@ -175,10 +175,10 @@ class TestDeserializeAction(unittest.TestCase):
         a = _deserialize_action(data)
         self.assertIsNotNone(a)
 
-    def test_file_write(self):
+    def test_file_write_removed(self):
         data = {'action_type': 'write', 'path': '/b.py', 'content': 'x'}
-        a = _deserialize_action(data)
-        self.assertIsNotNone(a)
+        with self.assertRaises(ValueError):
+            _deserialize_action(data)
 
     def test_file_edit(self):
         data = {'action_type': 'edit', 'path': '/c.py'}

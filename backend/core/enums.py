@@ -60,7 +60,6 @@ class ActionType(str, Enum):
     SYSTEM = 'system'
     START = 'start'
     READ = 'read'
-    WRITE = 'write'
     EDIT = 'edit'
     RUN = 'run'
     TERMINAL_RUN = 'terminal_run'
@@ -145,7 +144,6 @@ class ObservationType(str, Enum):
     """Enum defining all possible observation types."""
 
     READ = 'read'
-    WRITE = 'write'
     EDIT = 'edit'
     BROWSE = 'browse'
     BROWSER_SCREENSHOT = 'browser_screenshot'

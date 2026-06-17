@@ -8,7 +8,6 @@ from backend.ledger.action import (
     CmdRunAction,
     FileEditAction,
     FileReadAction,
-    FileWriteAction,
 )
 from backend.ledger.action.agent import AgentThinkAction
 from backend.ledger.action.mcp import MCPAction
@@ -26,9 +25,6 @@ class _RuntimeStub(Runtime):
         raise NotImplementedError
 
     def read(self, action: FileReadAction) -> Observation:
-        raise NotImplementedError
-
-    def write(self, action: FileWriteAction) -> Observation:
         raise NotImplementedError
 
     def edit(self, action: FileEditAction) -> Observation:

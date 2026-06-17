@@ -375,10 +375,45 @@ def process_tool_calls(
             response_obj=response,
             total_calls_in_response=len(assistant_msg.tool_calls),
         )
+        _log_emitted_tool_action(
+            action, tool_call, arguments, len(assistant_msg.tool_calls)
+        )
 
         actions.append(action)
 
     return actions
+
+
+def _log_emitted_tool_action(
+    action: Action,
+    tool_call: Any,
+    arguments: dict[str, Any],
+    total_calls: int,
+) -> None:
+    try:
+        logger.info(
+            'LLM emitted tool action: action=%s tool=%s call_id=%s total_calls=%s args=%s',
+            type(action).__name__,
+            _tool_call_function_name(tool_call),
+            getattr(tool_call, 'id', ''),
+            total_calls,
+            _compact_tool_args_for_log(arguments),
+        )
+    except Exception:
+        logger.debug('Failed to log emitted tool action', exc_info=True)
+
+
+def _compact_tool_args_for_log(arguments: dict[str, Any], *, limit: int = 500) -> str:
+    import json as _json
+
+    try:
+        text = _json.dumps(arguments, ensure_ascii=False, sort_keys=True)
+    except (TypeError, ValueError):
+        text = str(arguments)
+    text = ' '.join(text.replace('\r', ' ').replace('\n', ' ').split())
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3].rstrip() + '...'
 
 
 def common_response_to_actions(
@@ -596,13 +631,9 @@ def _enforce_xml_compliance(
             if not allowed:
                 _LOGGER.error('FORMAT_ERROR retry guard: %s', reason)
                 raise CoreFunctionCallValidationError(
-                    f'[FORMAT_ERROR] Retry guard stopped repeated FORMAT_ERROR for '
-                    f'tool `{name}` after multiple attempts. This indicates a '
-                    f'persistent issue with the tool call format.\n'
-                    f'{reason}\n'
-                    f'[SYSTEM_ACTION] Report this as a system/tool error.'
+                    f'[FORMAT_ERROR] Retry guard stopped repeated format errors for '
+                    f'tool `{name}`. {reason}'
                 )
-            example = _xml_format_error_example(name)
             _LOGGER.warning(
                 'FORMAT_ERROR: Tool %s sent via native tool call instead of XML. '
                 'Arguments preview: %s...',
@@ -610,28 +641,8 @@ def _enforce_xml_compliance(
                 raw_arguments[:200],
             )
             raise CoreFunctionCallValidationError(
-                f'[FORMAT_ERROR] Tool `{name}` must use the XML format, not '
-                f'the standard tool calling format.\n'
-                f'[CAUSE] The tool call was sent through JSON function calling, '
-                f'but `{name}` requires the pseudo-XML format so code payloads '
-                f'are not JSON-encoded.\n'
-                f'[ACTION] Re-emit this call using the XML format exactly like this:\n'
-                f'{example}\n'
-                f'[FORMAT] Type rules for XML parameters:\n'
-                f'  - Integer params (start_line, end_line, insert_line): bare numbers (e.g. 7)\n'
-                f'  - Array params (view_range, file_edits, edits): JSON arrays (e.g. [1, 10])\n'
-                f'  - Boolean params (overwrite_existing): true or false (lowercase)\n'
-                f'  - String params (content, path, symbol_name): raw text between tags\n'
+                f'[FORMAT_ERROR] Tool `{name}` must use the XML transport format.'
             )
-
-
-def _xml_format_error_example(tool_name: str) -> str:
-    return (
-        f'  <function={tool_name}>\n'
-        f'  <parameter=command>command_name</parameter>\n'
-        f'  <parameter=security_risk>LOW</parameter>\n'
-        f'  </function>'
-    )
 
 
 class _SyntheticFunction:

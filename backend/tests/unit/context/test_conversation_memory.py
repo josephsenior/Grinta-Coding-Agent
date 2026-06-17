@@ -25,11 +25,13 @@ from backend.integrations.mcp.mcp_utils import call_tool_mcp
 from backend.ledger.action import MessageAction
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.mcp import MCPAction
+from backend.ledger.action.search import GlobAction
 from backend.ledger.event import EventSource
 from backend.ledger.observation import AgentThinkObservation, ErrorObservation
 from backend.ledger.observation.commands import CmdOutputObservation
 from backend.ledger.observation.files import FileEditObservation
 from backend.ledger.observation.mcp import MCPObservation
+from backend.ledger.observation.search import GlobObservation
 from backend.ledger.tool import ToolCallMetadata, build_tool_call_metadata
 
 # ---------------------------------------------------------------------------
@@ -282,6 +284,36 @@ class TestToolPairingMessageShape:
             total_calls_in_response=1,
         )
 
+    @staticmethod
+    def _tool_meta_for_name(tool_name: str, tool_call_id: str) -> ToolCallMetadata:
+        response_obj = SimpleNamespace(
+            id=f'resp_{tool_call_id}',
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(
+                        role='assistant',
+                        content='Inspecting the workspace.',
+                        tool_calls=[
+                            SimpleNamespace(
+                                id=tool_call_id,
+                                type='function',
+                                function=SimpleNamespace(
+                                    name=tool_name,
+                                    arguments='{"pattern":"**/*.py"}',
+                                ),
+                            )
+                        ],
+                    )
+                )
+            ],
+        )
+        return build_tool_call_metadata(
+            function_name=tool_name,
+            tool_call_id=tool_call_id,
+            response_obj=response_obj,
+            total_calls_in_response=1,
+        )
+
     def test_process_events_keeps_assistant_tool_call_when_observation_has_metadata(
         self,
     ):
@@ -311,6 +343,37 @@ class TestToolPairingMessageShape:
 
         assert any(m.role == 'assistant' and m.tool_calls for m in messages)
         assert any(m.role == 'tool' for m in messages)
+
+    def test_process_events_keeps_discovery_tool_action_and_observation(self):
+        mem = _make_memory()
+        initial_user = MessageAction(content='inspect the repo')
+        initial_user.source = EventSource.USER
+
+        action = GlobAction(pattern='**/*.py')
+        action.source = EventSource.AGENT
+        action.tool_call_metadata = self._tool_meta_for_name('glob', 'tc_glob')
+
+        obs = GlobObservation(
+            content='backend/context/conversation_memory.py',
+            pattern='**/*.py',
+            files=['backend/context/conversation_memory.py'],
+            file_count=1,
+        )
+        obs.tool_call_metadata = action.tool_call_metadata
+        obs.tool_result = {'ok': True, 'action': 'glob', 'observation': 'glob_result'}
+
+        messages = mem.process_events(
+            condensed_history=[action, obs],
+            initial_user_action=initial_user,
+            max_message_chars=None,
+            vision_is_active=False,
+        )
+
+        assistant = next(m for m in messages if m.role == 'assistant' and m.tool_calls)
+        tool = next(m for m in messages if m.role == 'tool')
+        assert assistant.tool_calls[0].id == 'tc_glob'
+        assert tool.tool_call_id == 'tc_glob'
+        assert tool.name == 'glob'
 
     def test_process_events_drops_unpaired_assistant_tool_call_without_observation_metadata(
         self,

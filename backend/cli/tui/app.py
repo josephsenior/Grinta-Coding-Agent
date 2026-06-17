@@ -152,7 +152,6 @@ class GrintaScreen(
     _MIN_INPUT_HEIGHT = 6
     _ACTION_TYPE_LABELS: dict[str, str] = {
         'CmdRunAction': 'Run Command',
-        'FileWriteAction': 'Write File',
         'FileEditAction': 'Edit File',
         'FileReadAction': 'Read File',
         'FileEditActionMulti': 'Edit File',
@@ -204,9 +203,6 @@ class GrintaScreen(
         self._command_hint = ''
         self._phase_label = 'Ready'
         self._phase_started_at = time.monotonic()
-        self._current_operation_summary = 'Idle'
-        self._current_operation_meta = 'Waiting for activity'
-        self._current_operation_active = False
         self._worker_summary = 'No delegated work'
         self._worker_meta = 'Idle'
         self._worker_active = False
@@ -302,9 +298,6 @@ class TUIRenderer(
         self._pending_debugger_card: Any | None = None
         self._pending_shell_cards_by_command: dict[str, deque[Any]] = defaultdict(deque)
         self._pending_file_read_cards_by_path: dict[str, deque[Any]] = defaultdict(
-            deque
-        )
-        self._pending_file_create_cards_by_path: dict[str, deque[Any]] = defaultdict(
             deque
         )
         self._active_worker_tasks: list[str] = []

@@ -464,17 +464,26 @@ def render_canonical_state_for_prompt(
     canonical: CanonicalTaskState,
     *,
     char_budget: int = 2800,
+    include_objective: bool = True,
+    include_latest_directive: bool = True,
+    include_next_action: bool = True,
 ) -> str:
     lines = [CANONICAL_STATE_MARKER, 'Canonical task state:']
-    _append(lines, f'- Objective: {canonical.objective}')
+    if include_objective:
+        _append(lines, f'- Objective: {canonical.objective}')
     if canonical.superseding_directive:
         _append(
             lines,
             f'- \u26a0 Objective superseded by: {canonical.superseding_directive}',
         )
-    if canonical.latest_directive and canonical.latest_directive != canonical.objective:
+    if (
+        include_latest_directive
+        and canonical.latest_directive
+        and canonical.latest_directive != canonical.objective
+    ):
         _append(lines, f'- Latest directive: {canonical.latest_directive}')
-    _append(lines, f'- Next action: {canonical.next_action}')
+    if include_next_action:
+        _append(lines, f'- Next action: {canonical.next_action}')
     _append(
         lines, f'- Implementation checkpoint: {canonical.implementation_checkpoint}'
     )

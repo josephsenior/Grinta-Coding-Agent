@@ -115,21 +115,16 @@ class FileEditorRollbackMixin:
         if expected_content is None:
             if file_path.exists() and file_path.is_file():
                 raise ToolError(
-                    'FILE_UNEXPECTEDLY_MODIFIED: file appeared during rollback. '
-                    'Re-read the file and retry the operation.'
+                    'FILE_UNEXPECTEDLY_MODIFIED: file appeared during rollback.'
                 )
             return
 
         if not file_path.exists() or not file_path.is_file():
-            raise ToolError(
-                'FILE_UNEXPECTEDLY_MODIFIED: file changed on disk during rollback. '
-                'Re-read the file and retry the operation.'
-            )
+            raise ToolError('FILE_UNEXPECTEDLY_MODIFIED: file missing during rollback.')
         disk_now = self._read_file(file_path)
         if disk_now != expected_content:
             raise ToolError(
-                'FILE_UNEXPECTEDLY_MODIFIED: file changed on disk during rollback. '
-                'Re-read the file and retry the operation.'
+                'FILE_UNEXPECTEDLY_MODIFIED: file changed on disk during rollback.'
             )
 
     def _delete_file_for_rollback(self, file_path: Path) -> None:
@@ -152,8 +147,8 @@ class FileEditorRollbackMixin:
         Example:
             >>> editor = FileEditor()
             >>> with editor.transaction():
-            ...     editor(command="write", path="file1.txt", new_str="content1")
-            ...     editor(command="write", path="file2.txt", new_str="content2")
+            ...     editor(command="create_file", path="file1.txt", new_str="content1")
+            ...     editor(command="create_file", path="file2.txt", new_str="content2")
             ...     # If any operation fails, both files are restored
         """
         # Create new backup layer

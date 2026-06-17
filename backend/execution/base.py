@@ -45,7 +45,6 @@ from backend.ledger.action import (
     CmdRunAction,
     FileEditAction,
     FileReadAction,
-    FileWriteAction,
     TaskTrackingAction,
     is_debugger_action,
 )
@@ -53,7 +52,6 @@ from backend.ledger.action.mcp import MCPAction
 from backend.ledger.observation import (
     AgentThinkObservation,
     ErrorObservation,
-    FileWriteObservation,
     NullObservation,
     Observation,
 )
@@ -826,7 +824,7 @@ class Runtime(
         self, action: Action, observation: Observation
     ) -> Observation | None:
         """Verify critical actions to prevent hallucinations (Layer 3)."""
-        if not isinstance(action, (FileEditAction, FileWriteAction)):
+        if not isinstance(action, FileEditAction):
             return None
         if isinstance(observation, ErrorObservation):
             return None
@@ -869,16 +867,20 @@ class Runtime(
 
     def _enhance_observation_with_line_count(
         self, observation: Observation, file_path: str, file_on_disk: Path
-    ) -> FileWriteObservation | None:
+    ) -> Observation | None:
+        """Append a line-count footer to *observation* without changing its type."""
         try:
             with file_on_disk.open('r', encoding='utf-8', errors='replace') as f:
                 line_count = sum(1 for _ in f)
-        except Exception:
+        except OSError:
             line_count = None
-        if line_count is not None:
-            enhanced_content = f'{observation.content}\n\nFile written: {file_path} ({line_count} lines)'
-            return FileWriteObservation(content=enhanced_content, path=file_path)
-        return None
+        if line_count is None:
+            return None
+        footer = f'\n\nFile written: {file_path} ({line_count} lines)'
+        current = str(getattr(observation, 'content', '') or '')
+        if footer not in current:
+            observation.content = f'{current}{footer}'
+        return observation
 
     def _validate_action(self, action: Action) -> Observation | None:
         """Validate action type and runtime support."""
@@ -943,10 +945,6 @@ class Runtime(
     @abstractmethod
     def read(self, action: FileReadAction) -> Observation:
         """Read file contents from the runtime filesystem."""
-
-    @abstractmethod
-    def write(self, action: FileWriteAction) -> Observation:
-        """Write content to a file in the runtime filesystem."""
 
     @abstractmethod
     def edit(self, action: FileEditAction) -> Observation:
@@ -1032,7 +1030,9 @@ class Runtime(
 
     def _create_file_fn_git_handler(self, path: str, content: str) -> int:
         """This function is used by the GitHandler to create files in the runtime."""
-        obs = self.write(FileWriteAction(path=path, content=content))
+        obs = self.edit(
+            FileEditAction(path=path, command='create_file', file_text=content)
+        )
         return -1 if isinstance(obs, ErrorObservation) else 0
 
     def additional_agent_instructions(self) -> str:

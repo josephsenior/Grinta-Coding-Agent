@@ -3,118 +3,107 @@
 from __future__ import annotations
 
 from rich.text import Text
-from textual import events
 from textual.app import ComposeResult
-from textual.containers import Container, Horizontal, Vertical
+from textual.containers import Container
 from textual.widgets import Static
 
 from backend.cli.orient_tools import OrientLineModel
+from backend.cli.theme import CLR_REASONING_SNAP
+
+# Left pipe colors — aligned with exploration activity-card accents.
+_ORIENT_PIPE_BY_TOOL: dict[str, str] = {
+    'grep': '#2d4a6a',
+    'glob': '#2d4a6a',
+    'find_symbols': '#2d4a6a',
+    'read_symbols': '#2d4a6a',
+    'analyze_project_structure': '#2d4a6a',
+    'read_file': '#2d4a6a',
+    'lsp': '#2d4a6a',
+    'web_search': '#3a4a6a',
+    'web_fetch': '#3a4a6a',
+    'docs_resolve': '#3a3d5a',
+    'docs_query': '#3a3d5a',
+}
+
+_ORIENT_PREFIX_BY_TOOL: dict[str, str] = {
+    'grep': '#5a7a9a',
+    'glob': '#5a7a9a',
+    'find_symbols': '#5a7a9a',
+    'read_symbols': '#5a7a9a',
+    'analyze_project_structure': '#5a7a9a',
+    'read_file': '#5a7a9a',
+    'lsp': '#5a7a9a',
+    'web_search': '#6a7a9a',
+    'web_fetch': '#6a7a9a',
+    'docs_resolve': '#7a7a9a',
+    'docs_query': '#7a7a9a',
+}
 
 
-class OrientLine(Horizontal):
-    """Flat one-line render for read-only orientation tools."""
+def _pipe_color(tool: str) -> str:
+    return _ORIENT_PIPE_BY_TOOL.get(tool, '#2d4a6a')
+
+
+def _prefix_color(tool: str) -> str:
+    return _ORIENT_PREFIX_BY_TOOL.get(tool, '#5a7a9a')
+
+
+class OrientLine(Container):
+    """Single-line exploration tool row — matches ThinkingIndicator chrome."""
 
     DEFAULT_CSS = """
     OrientLine {
         width: 100%;
-        height: 1;
-        margin: 0;
-        padding: 0 1;
-        border-left: solid #25344f;
-        background: transparent;
+        height: auto;
+        margin: 0 0 1 0;
+        border: transparent;
+        background: #090d18;
+        border-left: solid #2d4a6a;
+        padding: 0 1 0 2;
     }
-    OrientLine .orient-gutter {
-        width: 14;
-        height: 1;
-        color: #5a6a8a;
-    }
-    OrientLine .orient-target {
-        width: 1fr;
-        height: 1;
-        color: #c8d4e8;
-    }
-    OrientLine .orient-sep {
-        width: 3;
-        height: 1;
-        color: #54597b;
-        content-align: center middle;
-    }
-    OrientLine .orient-result {
-        width: 24;
-        height: 1;
-        color: #969aad;
-        content-align: right middle;
+    OrientLine > #orient-content {
+        width: 100%;
+        height: auto;
     }
     """
 
     def __init__(self, model: OrientLineModel, *, id: str | None = None) -> None:
         super().__init__(id=id)
         self.model = model
+        self.styles.border_left = ('solid', _pipe_color(model.tool))
 
-    def _gutter_text(self) -> Text:
+    def _line_text(self) -> Text:
+        prefix = f'{self.model.icon} {self.model.verb}: '
+        target = self.model.target or '…'
+        result = self.model.result or 'completed'
         return Text.assemble(
-            (f'{self.model.icon} ', '#5a6a8a'),
-            (self.model.verb.ljust(9)[:9], '#5a6a8a'),
+            (prefix, _prefix_color(self.model.tool)),
+            (target, '#c8d4e8'),
+            (' · ', '#54597b'),
+            (result, CLR_REASONING_SNAP),
         )
 
-    def _target_text(self) -> Text:
-        return Text(self.model.target or '…', style='#c8d4e8')
-
-    def _result_text(self) -> Text:
-        return Text(self.model.result or 'completed', style='#969aad')
-
     def compose(self) -> ComposeResult:
-        yield Static(self._gutter_text(), classes='orient-gutter')
-        yield Static(self._target_text(), classes='orient-target')
-        yield Static(Text('·', style='#54597b'), classes='orient-sep')
-        yield Static(self._result_text(), classes='orient-result')
+        yield Static(self._line_text(), id='orient-content')
 
     def set_result(self, result: str) -> None:
         self.model = self.model.with_result(result)
         if not self.is_mounted:
             return
         try:
-            self.query_one('.orient-result', Static).update(self._result_text())
+            self.query_one('#orient-content', Static).update(self._line_text())
         except Exception:
             pass
 
 
 class OrientBurst(Container):
-    """Group-level collapsible for dense runs of orient lines."""
+    """Legacy grouped orient container — kept for import compatibility."""
 
     DEFAULT_CSS = """
     OrientBurst {
-        width: 100%;
-        height: auto;
-        margin: 0 0 1 0;
-        padding: 0;
-        border: transparent;
-        background: transparent;
-    }
-    OrientBurst:focus {
-        background: #080f1c;
-        border-left: solid #25344f;
-    }
-    OrientBurst .orient-burst-header {
-        width: 100%;
-        height: 1;
-        padding: 0 1;
-        color: #6f83aa;
-    }
-    OrientBurst .orient-burst-body {
-        width: 100%;
-        height: auto;
-    }
-    OrientBurst .orient-burst-body.-hidden {
         display: none;
     }
     """
-
-    can_focus = True
-    BINDINGS = [
-        ('enter', 'toggle', 'Toggle Expansion'),
-        ('space', 'toggle', 'Toggle Expansion'),
-    ]
 
     def __init__(
         self,
@@ -128,49 +117,3 @@ class OrientBurst(Container):
         self._area = area or 'codebase'
         self._lines = list(lines)
         self._collapsed = collapsed
-
-    def _header_text(self) -> Text:
-        caret = '▸' if self._collapsed else '▾'
-        return Text.assemble(
-            (f'{caret} ', '#54597b'),
-            (f'Exploring {self._area}', '#6f83aa'),
-            (f' · {len(self._lines)} lookups', '#969aad'),
-        )
-
-    def compose(self) -> ComposeResult:
-        yield Static(
-            self._header_text(), id='orient-burst-header', classes='orient-burst-header'
-        )
-        body_classes = (
-            'orient-burst-body -hidden' if self._collapsed else 'orient-burst-body'
-        )
-        with Vertical(id='orient-burst-body', classes=body_classes):
-            for model in self._lines:
-                yield OrientLine(model)
-
-    def _sync_visibility(self) -> None:
-        try:
-            header = self.query_one('#orient-burst-header', Static)
-            header.update(self._header_text())
-            body = self.query_one('#orient-burst-body', Vertical)
-        except Exception:
-            return
-        if self._collapsed:
-            body.add_class('-hidden')
-        else:
-            body.remove_class('-hidden')
-
-    def toggle(self) -> None:
-        self._collapsed = not self._collapsed
-        self._sync_visibility()
-
-    def action_toggle(self) -> None:
-        self.toggle()
-
-    def on_click(self, event: events.Click) -> None:
-        if event.widget and (
-            event.widget.id == 'orient-burst-header' or event.widget == self
-        ):
-            self.toggle()
-            event.prevent_default()
-            event.stop()

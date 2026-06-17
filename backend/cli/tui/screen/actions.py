@@ -119,15 +119,7 @@ class ScreenActionsMixin:
         controller = getattr(self, '_controller', None)
         ac = getattr(controller, 'autonomy_controller', None)
         if ac is not None:
-            raw_level = getattr(ac, 'autonomy_level', '')
-            if normalize_autonomy_level(raw_level) == 'full':
-                return True
-        hud = getattr(self, '_hud', None)
-        state = getattr(hud, 'state', None)
-        if state is not None:
-            return (
-                normalize_autonomy_level(getattr(state, 'autonomy_level', '')) == 'full'
-            )
+            return normalize_autonomy_level(getattr(ac, 'autonomy_level', '')) == 'full'
         return False
 
     def _get_pending_action(self) -> Any:

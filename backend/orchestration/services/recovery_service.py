@@ -645,13 +645,7 @@ class RecoveryService:
             return
 
         ids = ', '.join(getattr(s, 'id', '?') for s in in_progress_steps)
-        directive = (
-            f'A recoverable error just occurred while plan step(s) [{ids}] '
-            f'had status "in_progress". Before any other work, call task_tracker '
-            f'update to reconcile the plan: move failed steps back to "todo" '
-            f'(with a result note), or keep them "in_progress" if you intend to '
-            f'retry immediately. Do NOT leave stale "in_progress" steps unaddressed.'
-        )
+        directive = f'Recoverable error during in_progress plan step(s): [{ids}].'
         state.set_planning_directive(
             directive,
             source=f'RecoveryService.task_reconciliation({type(exc).__name__})',
@@ -734,10 +728,7 @@ def _format_error_guidance(exc: Exception) -> str:
             'Transient provider or network issue; the runtime retries automatically. '
             'No change to your approach is required unless this keeps failing.'
         )
-    return (
-        'A transient error occurred on this step. The error has been recorded. '
-        'Review what went wrong, choose a different approach or tool, and continue.'
-    )
+    return ''
 
 
 def _format_rate_limit_text(exc: Exception, rate_kind, retry_after) -> str:

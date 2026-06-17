@@ -92,6 +92,7 @@ class Transcript(VerticalScroll):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._user_scrolled_away = False
+        self._user_initiated_scroll_away = False
         self._scroll_badge: ScrollTailBadge | None = None
         self._tail_unread_count = 0
         self._suppress_mount_animation = False
@@ -125,6 +126,7 @@ class Transcript(VerticalScroll):
     def _set_user_scrolled_away(self, value: bool) -> None:
         self._user_scrolled_away = value
         if not value:
+            self._user_initiated_scroll_away = False
             self._tail_unread_count = 0
         badge = self._scroll_badge
         if badge is None:
@@ -170,9 +172,6 @@ class Transcript(VerticalScroll):
         if max_y > last_max_y:
             return
 
-        if not self._was_at_bottom():
-            self._set_user_scrolled_away(True)
-
     def set_backpressure(self, active: bool) -> None:
         """Mark whether the renderer is draining a backlog.
 
@@ -200,6 +199,7 @@ class Transcript(VerticalScroll):
         keeps the suppression flag set and the user's scroll is ignored.
         """
         if self.max_scroll_y > 0:
+            self._user_initiated_scroll_away = True
             self._set_user_scrolled_away(True)
 
     def _content_widgets(self) -> list[Widget]:
@@ -315,6 +315,9 @@ class Transcript(VerticalScroll):
 
     def _release_programmatic_scroll(self) -> None:
         self._suppress_scroll_sync = False
+        self._sync_scroll_state_from_position()
+        if self._was_at_bottom() and not self._user_initiated_scroll_away:
+            self._set_user_scrolled_away(False)
 
     def append_widget(self, widget: Widget, *, animate: bool | None = None) -> None:
         """Mount a widget and auto-scroll unless user scrolled up."""
@@ -356,6 +359,7 @@ class Transcript(VerticalScroll):
         self.remove_children()
         self._scroll_badge = None
         self._user_scrolled_away = False
+        self._user_initiated_scroll_away = False
         self._load_earlier_button = None
         self._tail_unread_count = 0
         self.mount(ScrollTailBadge())
