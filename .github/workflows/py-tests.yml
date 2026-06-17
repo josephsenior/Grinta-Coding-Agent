@@ -27,6 +27,7 @@ concurrency:
 
 # CI tiers (see docs/CI.md):
 # - gates-on-linux-coverage-{a,b,d,f,g,e,c,report}: unit tests sharded for coverage on Linux.
+#   Execution shards (d,f,g) skip compileall; syntax is still gated on a/b/c/e shards.
 # - gates-on-linux-extended: integration/e2e/stress after coverage gate passes.
 # - gates-on-windows / gates-on-macos: unit-only PR gates for cross-platform smoke.
 # - heavy-tests: marker-filtered heavy | integration | benchmark (schedule, main, manual).
@@ -135,8 +136,6 @@ jobs:
         run: python scripts/bootstrap_env.py dev-test
       - name: Verify optional imports
         run: python backend/scripts/verify/verify_optional_imports.py
-      - name: Compile backend (syntax gate)
-        run: uv run python -m compileall backend
       - name: Run unit tests shard D with coverage
         run: |
           mapfile -t tests < <(find backend/tests/unit/execution -name 'test_*.py' | sort)
@@ -176,8 +175,6 @@ jobs:
         run: python scripts/bootstrap_env.py dev-test
       - name: Verify optional imports
         run: python backend/scripts/verify/verify_optional_imports.py
-      - name: Compile backend (syntax gate)
-        run: uv run python -m compileall backend
       - name: Run unit tests shard F with coverage
         run: |
           mapfile -t tests < <(find backend/tests/unit/execution -name 'test_*.py' | sort)
@@ -221,8 +218,6 @@ jobs:
         run: python scripts/bootstrap_env.py dev-test
       - name: Verify optional imports
         run: python backend/scripts/verify/verify_optional_imports.py
-      - name: Compile backend (syntax gate)
-        run: uv run python -m compileall backend
       - name: Run unit tests shard G with coverage
         run: |
           mapfile -t tests < <(find backend/tests/unit/execution -name 'test_*.py' | sort)
