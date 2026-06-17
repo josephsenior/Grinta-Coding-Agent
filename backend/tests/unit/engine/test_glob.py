@@ -3,6 +3,7 @@ from __future__ import annotations
 import shutil
 
 from backend.engine.tools.glob import build_glob_action, execute_glob
+from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.search import GlobObservation
 
 
@@ -55,8 +56,9 @@ class TestExecuteGlob:
         action = build_glob_action(pattern='*.py', path=str(tmp_path / 'nope'))
         obs = execute_glob(action)
 
+        assert isinstance(obs, ErrorObservation)
         assert 'Path does not exist' in obs.content
-        assert obs.error
+        assert obs.tool_result['error_code'] == 'PATH_NOT_FOUND'
 
     def test_empty_pattern_rejected(self, tmp_path, monkeypatch) -> None:
         monkeypatch.setattr(shutil, 'which', lambda x: None)
@@ -64,6 +66,6 @@ class TestExecuteGlob:
         action = build_glob_action(pattern='', path=str(tmp_path))
         obs = execute_glob(action)
 
+        assert isinstance(obs, ErrorObservation)
         assert 'non-empty' in obs.content
-        assert obs.error
-        assert 'grep' in obs.content
+        assert obs.tool_result['error_code'] == 'VALIDATION_ERROR'

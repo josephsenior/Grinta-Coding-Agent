@@ -93,7 +93,7 @@ class ActionVerifier:
             if not isinstance(verify_obs, CmdOutputObservation):
                 return (
                     False,
-                    '❌ Verification failed: unexpected observation type',
+                    'File verification failed: unexpected observation type.',
                     verify_obs,
                 )
 
@@ -104,7 +104,7 @@ class ActionVerifier:
                 )
                 return (
                     False,
-                    f'❌ CRITICAL: File {path} was NOT created despite the file-edit action',
+                    f'File verification failed: {path} does not exist after file-edit action.',
                     verify_obs,
                 )
 
@@ -154,8 +154,8 @@ class ActionVerifier:
 
         except Exception as e:
             logger.error('Verification error for %s: %s', action.path, e)
-            error_obs = ErrorObservation(content=f'Verification failed: {str(e)}')
-            return False, f'❌ Verification error: {str(e)}', error_obs
+            error_obs = ErrorObservation(content=f'File verification failed: {e}')
+            return False, f'File verification failed: {e}', error_obs
 
     def should_verify(self, action: Action) -> bool:
         """Determine if an action should be verified.

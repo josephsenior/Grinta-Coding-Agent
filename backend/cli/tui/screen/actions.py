@@ -50,12 +50,15 @@ class ScreenActionsMixin:
 
     def _iter_activity_cards(self) -> list[Any]:
         from backend.cli.tui.widgets.activity_card import ActivityCard
+        from backend.cli.tui.widgets.record_panel import RecordPanel
 
         try:
             display = self._get_display()
         except Exception:
             return []
-        return list(display.query(ActivityCard))
+        cards = list(display.query(ActivityCard))
+        cards.extend(display.query(RecordPanel))
+        return cards
 
     def action_collapse_activity_cards(self) -> None:
         """Collapse all unpinned activity cards in the transcript."""

@@ -42,6 +42,8 @@ from backend.cli.layout_tokens import (
     LIVE_PANEL_ACCENT_STYLE,
 )
 from backend.cli.theme import (
+    CLR_ERROR_BODY,
+    CLR_ERROR_PREFIX,
     CLR_META,
     CLR_RECOVERY_HINT,
     CLR_RECOVERY_HINT_DIM,
@@ -50,6 +52,7 @@ from backend.cli.theme import (
 )
 from backend.ledger.observation.error import (
     ERROR_CATEGORY_AUTH,
+    ERROR_CATEGORY_BAD_REQUEST,
     ERROR_CATEGORY_CONTENT_POLICY,
     ERROR_CATEGORY_CONTEXT_WINDOW,
     ERROR_CATEGORY_MODEL_NOT_FOUND,
@@ -72,6 +75,7 @@ _NOTICE_CATEGORIES: frozenset[str] = frozenset(
 _CRITICAL_CATEGORIES: frozenset[str] = frozenset(
     {
         ERROR_CATEGORY_AUTH,
+        ERROR_CATEGORY_BAD_REQUEST,
         ERROR_CATEGORY_CONTENT_POLICY,
         ERROR_CATEGORY_CONTEXT_WINDOW,
         ERROR_CATEGORY_MODEL_NOT_FOUND,
@@ -175,13 +179,18 @@ def build_recovery_text(
     guidance: ErrorGuidance,
     *,
     for_notice: bool = False,
+    for_tui: bool = False,
     wrap_width: int | None = None,
 ) -> Text:
     """Render a guidance block for the error / notice panel."""
     from backend.cli.path_links import linkify_plain
 
     recovery = Text()
-    if for_notice:
+    if for_tui:
+        recovery.append('What you can try\n', style=CLR_ERROR_PREFIX)
+        sum_style = CLR_ERROR_BODY
+        step_style = CLR_ERROR_BODY
+    elif for_notice:
         recovery.append('Next steps\n', style=f'bold dim {CLR_RECOVERY_HINT}')
         sum_style = CLR_RECOVERY_HINT
         step_style = CLR_RECOVERY_HINT_DIM
@@ -361,6 +370,58 @@ def build_error_panel(
     return Panel(Group(*body_parts), **panel_kw)
 
 
+def build_error_tui_renderable(
+    error_text: str,
+    *,
+    title: str = 'Error',
+    error_category: str | None = None,
+    content_width: int | None = None,
+) -> Any:
+    """Build inline error content for TUI blocks (no Rich Panel border)."""
+    from backend.cli.tui.widgets.error_block import prefix_error_renderable
+
+    is_rate_limit = error_category == ERROR_CATEGORY_RATE_LIMIT
+    if not is_rate_limit:
+        guidance = error_guidance(error_text)
+        is_rate_limit = (
+            guidance is not None
+            and guidance.error_code is not None
+            and guidance.error_code.startswith('ERR-RATE')
+        )
+    else:
+        guidance = error_guidance(error_text)
+    if is_rate_limit:
+        from backend.cli.tui.widgets.error_block import ErrorBlock
+
+        return ErrorBlock.simple_message(
+            'Rate or quota limit reached — retrying automatically.'
+        )
+
+    wrap_w = error_panel_text_wrap_width(content_width)
+    summary, detail = split_error_text(error_text)
+    use_notice = use_recoverable_notice_style(
+        error_text, error_category=error_category
+    )
+    body_parts = _build_error_body(
+        error_text=error_text,
+        summary=summary,
+        detail=detail,
+        guidance=guidance,
+        use_notice=use_notice,
+        accent_style='red',
+        wrap_w=wrap_w,  # type: ignore[arg-type]
+        headline_style=CLR_ERROR_PREFIX,
+        detail_style=CLR_ERROR_BODY,
+        recovery_for_tui=True,
+    )
+    prefix = (
+        notice_panel_title(error_text, error_category=error_category)
+        if use_notice
+        else (title.strip() or 'Error')
+    )
+    return prefix_error_renderable(prefix, Group(*body_parts))
+
+
 def _build_error_body(
     *,
     error_text: str,
@@ -370,13 +431,18 @@ def _build_error_body(
     use_notice: bool,
     accent_style: str,
     wrap_w: int,
+    headline_style: str | None = None,
+    detail_style: str | None = None,
+    recovery_for_tui: bool = False,
 ) -> list[Any]:
     from backend.cli.path_links import linkify_plain
 
-    headline_style = (
-        f'bold {LIVE_PANEL_ACCENT_STYLE}' if use_notice else f'{accent_style} bold'
-    )
-    detail_style = f'dim {CLR_META}' if use_notice else f'{accent_style} dim'
+    if headline_style is None:
+        headline_style = (
+            f'bold {LIVE_PANEL_ACCENT_STYLE}' if use_notice else f'{accent_style} bold'
+        )
+    if detail_style is None:
+        detail_style = f'dim {CLR_META}' if use_notice else f'{accent_style} dim'
 
     headline = _resolve_panel_headline(
         error_text, summary=summary, use_notice=use_notice, guidance=guidance
@@ -396,7 +462,12 @@ def _build_error_body(
     if guidance is not None:
         body_parts.append(Text(''))
         body_parts.append(
-            build_recovery_text(guidance, for_notice=use_notice, wrap_width=wrap_w)
+            build_recovery_text(
+                guidance,
+                for_notice=use_notice,
+                for_tui=recovery_for_tui,
+                wrap_width=wrap_w,
+            )
         )
     return body_parts
 
@@ -418,6 +489,7 @@ def _build_panel_title(
 
 __all__ = [
     'build_error_panel',
+    'build_error_tui_renderable',
     'build_llm_stream_fallback_panel',
     'build_recovery_text',
     'build_retry_panel',

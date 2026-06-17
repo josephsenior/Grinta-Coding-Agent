@@ -201,7 +201,7 @@ def _process_single_tool_call(
     if mcp_tool_names and tool_name in mcp_tool_names:
         return _handle_mcp_tool(tool_name, arguments)
     raise FunctionCallNotExistsError(
-        f'Tool {tool_name} is not registered. (arguments: {arguments}). Please check the tool name and retry with an existing tool.'
+        f'Tool {tool_name!r} is not registered. Check the tool name and retry with an existing tool.'
     )
 
 

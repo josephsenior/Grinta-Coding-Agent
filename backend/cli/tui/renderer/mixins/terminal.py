@@ -1,4 +1,4 @@
-"""RendererTerminalMixin: terminal command cards (per-session)."""
+"""RendererTerminalMixin: session-tier panels for shell and terminal tools."""
 
 from __future__ import annotations
 
@@ -9,12 +9,13 @@ from backend.cli.event_rendering.unified_renderer import (
 )
 from backend.cli.tui.helpers import (
     _sanitize_terminal_display_text,
+    infer_display_shell_kind,
 )
-from backend.cli.tui.widgets.activity_card import ActivityCard as TUIActivityCard
+from backend.cli.tui.widgets.session_panel import SessionPanel
 
 
 class RendererTerminalMixin:
-    """terminal command cards (per-session)."""
+    """Session-tier shell and terminal transcript panels."""
 
     def _remember_terminal_command(self, session_id: str, command: str) -> None:
         """Remember the most relevant command for a terminal session."""
@@ -67,6 +68,10 @@ class RendererTerminalMixin:
             self._pending_terminal_card = None
         return widget
 
+    def _mount_session_panel(self, panel: SessionPanel) -> SessionPanel:
+        self._write_session_panel(panel)
+        return panel
+
     def _create_and_write_terminal_card(
         self,
         session_key: str,
@@ -77,21 +82,24 @@ class RendererTerminalMixin:
         secondary_kind: str,
         extra_content: str | None,
     ) -> None:
-        card = ActivityRenderer.terminal_action(
-            verb,
-            detail,
-            secondary=secondary,
-            secondary_kind=secondary_kind,
-            extra_content=extra_content,
-        )
-        widget = self._write_card(card, collapsed=True)
-        widget.enable_incremental_mode()
-        command = TUIActivityCard._command_from_detail(detail)
-        widget.configure_terminal(
-            command=command if not command.startswith('session ') else '',
-            session_id=session_id,
+        del secondary_kind
+        command = SessionPanel._command_from_detail(detail)
+        panel = SessionPanel(
+            verb=verb,
+            detail=detail,
+            badge_category='terminal',
+            status='running' if secondary else 'neutral',
+            outcome=secondary,
             shell_kind='terminal',
+            terminal_command=command if not command.startswith('session ') else '',
+            session_id=session_id,
         )
+        panel.set_processing(True)
+        panel.enable_incremental_mode()
+        if extra_content:
+            panel.update_content(extra_content)
+        widget = self._mount_session_panel(panel)
+        self._activate_activity_card(widget)
         if session_id:
             self._terminal_cards_by_session[session_key] = widget
         else:
@@ -114,6 +122,7 @@ class RendererTerminalMixin:
         secondary: str | None,
         session_key: str,
     ) -> None:
+        del verb, detail, session_key
         if processing:
             self._activate_activity_card(widget)
             return
@@ -152,7 +161,7 @@ class RendererTerminalMixin:
             self._terminal_status_from_kind(secondary_kind),
             outcome=secondary,
         )
-        command = TUIActivityCard._command_from_detail(detail)
+        command = SessionPanel._command_from_detail(detail)
         if command and not command.startswith('session '):
             widget.configure_terminal(
                 command=command,
@@ -173,23 +182,22 @@ class RendererTerminalMixin:
             session_key,
         )
 
-    @staticmethod
-    def _build_shell_meta_header(
-        command: str, cwd: str | None, exit_code: int | None
-    ) -> list[str]:
-        meta_lines = [f'$ {command}']
-        if cwd:
-            meta_lines.append(f'cwd: {cwd}')
-        meta_lines.append(f'exit: {exit_code}')
-        meta_lines.append('─' * 50)
-        return meta_lines
+    def _resolve_shell_panel(self, command: str) -> Any | None:
+        queue = self._pending_shell_cards_by_command.get(command)
+        if queue:
+            return queue[0]
+        try:
+            from backend.cli.tui.widgets.session_panel import SessionPanel
 
-    @staticmethod
-    def _append_card_extra_lines(extra_parts: list[str], card: Any) -> None:
-        if card.extra_lines:
-            for extra in card.extra_lines:
-                indent = '  ' * extra.indent
-                extra_parts.append(f'{indent}{extra.text}')
+            display = self._tui._get_display()
+            for panel in reversed(list(display.query(SessionPanel))):
+                if 'category-shell' not in panel.classes:
+                    continue
+                if panel._terminal_command == command:
+                    return panel
+        except Exception:
+            return None
+        return None
 
     def _complete_shell_command_card(
         self,
@@ -203,19 +211,39 @@ class RendererTerminalMixin:
         widget = queue.popleft() if queue else None
         if queue is not None and not queue:
             self._pending_shell_cards_by_command.pop(command, None)
+        if widget is None:
+            widget = self._resolve_shell_panel(command)
 
         card = ActivityRenderer.shell_command(
             command, output=output, exit_code=exit_code
         )
         if widget is None:
-            self._write_card(card)
+            panel = SessionPanel(
+                verb=card.verb,
+                detail=card.detail,
+                badge_category='shell',
+                status='ok' if exit_code == 0 else 'err',
+                outcome=card.secondary,
+                shell_kind=infer_display_shell_kind(command),
+                terminal_command=command,
+            )
+            panel.configure_terminal(command=command, cwd=cwd, exit_code=exit_code)
+            output_text = output or ''
+            if not output_text and card.extra_lines:
+                output_lines: list[str] = []
+                for extra in card.extra_lines:
+                    indent = '  ' * extra.indent
+                    output_lines.append(f'{indent}{extra.text}')
+                output_text = '\n'.join(output_lines)
+            panel.update_content(output_text)
+            panel.set_processing(False)
+            self._mount_session_panel(panel)
             return
 
         if self._last_active_card is widget:
             self._last_active_card = None
 
         status = 'ok' if exit_code == 0 else 'err'
-        widget.set_status(status, outcome=card.secondary)
         widget.configure_terminal(command=command, cwd=cwd, exit_code=exit_code)
 
         output_text = output or ''
@@ -228,32 +256,24 @@ class RendererTerminalMixin:
 
         widget.update_content(output_text)
         widget.set_processing(False)
+        widget.set_status(status, outcome=card.secondary)
+        return
 
     def _create_shell_command_card(self, command: str) -> Any:
-        from backend.cli.tui.widgets.activity_card import (
-            ActivityCard as TUIActivityCard,
-        )
-
         self.commit_live_thinking()
         card = ActivityRenderer.shell_command(command)
-        from backend.cli.tui.helpers import infer_display_shell_kind
-
-        widget = TUIActivityCard(
+        panel = SessionPanel(
             verb=card.verb,
             detail=card.detail,
-            badge_category=card.badge_category,
+            badge_category='shell',
             status='running',
             outcome=card.secondary,
-            extra_content=None,
-            collapsed=True,
-            collapsible=True,
-            syntax_language=card.syntax_language,
             shell_kind=infer_display_shell_kind(command),
             terminal_command=command,
         )
-        widget.set_processing(True)
-        self._activate_activity_card(widget)
-        self._pending_shell_cards_by_command[command].append(widget)
-        display = self._tui._get_display()
-        display.append_widget(widget)
-        return widget
+        panel.set_processing(True)
+        panel.enable_incremental_mode()
+        self._activate_activity_card(panel)
+        self._pending_shell_cards_by_command[command].append(panel)
+        self._mount_session_panel(panel)
+        return panel

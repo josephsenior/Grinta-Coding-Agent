@@ -19,6 +19,7 @@ from backend.ledger.observation.debugger import DebuggerObservation
 from backend.ledger.observation.empty import NullObservation
 from backend.ledger.observation.error import (
     ERROR_CATEGORY_AUTH,
+    ERROR_CATEGORY_BAD_REQUEST,
     ERROR_CATEGORY_CONTEXT_WINDOW,
     ERROR_CATEGORY_MODEL_NOT_FOUND,
     ERROR_CATEGORY_NETWORK,
@@ -73,6 +74,7 @@ __all__ = [
     'ReadSymbolsObservation',
     'AnalyzeProjectStructureObservation',
     'ERROR_CATEGORY_AUTH',
+    'ERROR_CATEGORY_BAD_REQUEST',
     'ERROR_CATEGORY_CONTEXT_WINDOW',
     'ERROR_CATEGORY_MODEL_NOT_FOUND',
     'ERROR_CATEGORY_NETWORK',

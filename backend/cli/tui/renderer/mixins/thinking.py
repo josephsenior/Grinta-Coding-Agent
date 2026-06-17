@@ -280,10 +280,7 @@ class RendererThinkingMixin:
 
     def _render_error_intent(self, intent: ThinkingRenderIntent) -> None:
         message = intent.detail or intent.text
-        if intent.severity == 'warning':
-            self._tui.add_warning(message)
-        else:
-            self._tui.add_error(message)
+        self._tui.add_error(message)
 
     def _render_thinking_payload(
         self,
@@ -304,6 +301,19 @@ class RendererThinkingMixin:
             return True
 
         if intent.kind == 'memory':
+            return True
+
+        if intent.kind == 'checkpoint':
+            if self._should_render_thinking_artifact(intent):
+                from backend.cli.orient_tools import checkpoint_think_orient_model
+
+                self._write_orient_line(
+                    checkpoint_think_orient_model(
+                        detail=intent.detail,
+                        text=intent.text,
+                        source_tool=intent.source_tool,
+                    )
+                )
             return True
 
         if not self._should_render_thinking_artifact(intent):
@@ -336,24 +346,6 @@ class RendererThinkingMixin:
             detail=card_detail,
             badge_category='memory',
             title='Memory',
-            body=text,
-        )
-
-    def _checkpoint_artifact_card(self, intent: ThinkingRenderIntent) -> ActivityCard:
-        text = intent.text
-        detail = intent.detail or text
-        lowered = text.lower()
-        if 'rollback' in lowered or 'revert' in lowered:
-            verb = 'Rollback'
-            fallback = 'checkpoint rollback'
-        else:
-            verb = 'Checkpoint'
-            fallback = 'checkpoint'
-        return self._compact_activity_card(
-            verb=verb,
-            detail=self._trim_card_detail(detail, fallback=fallback),
-            badge_category='tool',
-            title='Tool',
             body=text,
         )
 
@@ -405,9 +397,6 @@ class RendererThinkingMixin:
                 title='Workers',
                 body=text,
             )
-
-        if intent.kind == 'checkpoint':
-            return self._checkpoint_artifact_card(intent)
 
         if intent.kind == 'code':
             return self._code_artifact_card(intent)

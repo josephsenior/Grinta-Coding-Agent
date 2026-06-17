@@ -18,6 +18,7 @@ from backend.core.schemas import AgentState
 from backend.inference.exceptions import (
     APIConnectionError,
     AuthenticationError,
+    BadRequestError,
     ContentPolicyViolationError,
     ContextWindowExceededError,
     InternalServerError,
@@ -30,6 +31,7 @@ from backend.ledger import EventSource
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.error import (
     ERROR_CATEGORY_AUTH,
+    ERROR_CATEGORY_BAD_REQUEST,
     ERROR_CATEGORY_CONTENT_POLICY,
     ERROR_CATEGORY_CONTEXT_WINDOW,
     ERROR_CATEGORY_MODEL_NOT_FOUND,
@@ -60,6 +62,7 @@ if TYPE_CHECKING:
 # backs off and resumes automatically.
 _HARD_STOP_EXCEPTIONS = (
     AuthenticationError,
+    BadRequestError,
     ContentPolicyViolationError,
     ContextWindowExceededError,
     LLMContextWindowExceedError,
@@ -167,11 +170,12 @@ class RecoveryService:
     def _record_circuit_breaker_error(self, controller, exc: Exception) -> None:
         from backend.inference.exceptions import (
             APIConnectionError,
+            BadRequestError,
             RateLimitError,
             Timeout,
         )
 
-        if isinstance(exc, (RateLimitError, APIConnectionError, Timeout)):
+        if isinstance(exc, (BadRequestError, RateLimitError, APIConnectionError, Timeout)):
             return
 
         try:
@@ -225,6 +229,7 @@ class RecoveryService:
         from backend.inference.exceptions import (
             APIConnectionError,
             AuthenticationError,
+            BadRequestError,
             ContentPolicyViolationError,
             ContextWindowExceededError,
             InternalServerError,
@@ -238,6 +243,8 @@ class RecoveryService:
             return ERROR_CATEGORY_RATE_LIMIT
         if isinstance(exc, AuthenticationError):
             return ERROR_CATEGORY_AUTH
+        if isinstance(exc, BadRequestError):
+            return ERROR_CATEGORY_BAD_REQUEST
         if isinstance(exc, (ContextWindowExceededError, LLMContextWindowExceedError)):
             return ERROR_CATEGORY_CONTEXT_WINDOW
         if isinstance(exc, Timeout):
@@ -548,12 +555,15 @@ class RecoveryService:
         #     empty response) the ``ErrorObservation`` is ``notify_ui_only``
         #     (HUD), not embedded in the LLM transcript.
         #
-        # All other errors (transient 5xx, bad-request from wrong tool args,
-        #   timeout, unexpected runtime exceptions):
+        # All other errors (unexpected runtime exceptions, tool failures):
         #   → Stay RUNNING — the error observation is already in the model's
         #     context; it can read it and adapt its next action.  The circuit
         #     breaker (default: 5 consecutive errors) acts as the safety net
         #     against infinite failure loops.
+        #
+        # BadRequestError (invalid temperature, unsupported params, etc.) is a
+        # hard stop with ``notify_ui_only`` — user/config must change first.
+        # Malformed tool-call JSON is handled earlier in ActionExecutionService.
         # ------------------------------------------------------------------ #
         if await self._route_exception_recovery(controller, exc):
             return
@@ -674,6 +684,8 @@ class RecoveryService:
 def _resolve_error_id(exc: Exception) -> str:
     if isinstance(exc, Timeout):
         return 'LLM_TIMEOUT'
+    if isinstance(exc, BadRequestError):
+        return 'LLM_BAD_REQUEST'
     if isinstance(exc, LLMContextWindowExceedError | ContextWindowExceededError):
         return 'LLM_CONTEXT_WINDOW_EXCEEDED'
     if isinstance(exc, AgentRuntimeDisconnectedError):
@@ -692,6 +704,14 @@ def _format_error_text(exc: Exception) -> str:
             f'The LLM provider ({provider}) rejected access to model "{model}".\n'
             f'Run /settings to update your model or API key.'
         )
+    if isinstance(exc, BadRequestError):
+        model = getattr(exc, 'model', None) or '?'
+        provider = getattr(exc, 'llm_provider', None) or '?'
+        return (
+            f'{exc}\n'
+            f'The LLM provider ({provider}) rejected the request for model "{model}".\n'
+            f'Run /settings to review model parameters (temperature, max tokens, etc.).'
+        )
     if isinstance(exc, _RATE_LIMITED_EXCEPTIONS):
         return _format_rate_limit_text(
             exc, getattr(exc, 'kind', None), getattr(exc, 'retry_after', None)
@@ -708,6 +728,11 @@ def _format_error_guidance(exc: Exception) -> str:
         )
     if isinstance(exc, AuthenticationError):
         return ''
+    if isinstance(exc, BadRequestError):
+        return (
+            'This error requires user intervention (check model settings and '
+            'provider-supported parameters). Wait for the user to fix the configuration.'
+        )
     if isinstance(exc, _HARD_STOP_EXCEPTIONS):
         return (
             'This error requires user intervention (check credentials, model name, '

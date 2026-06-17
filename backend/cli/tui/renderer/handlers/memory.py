@@ -4,6 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from backend.cli.orient_tools import (
+    OrientLineModel,
+    checkpoint_action_model,
+    checkpoint_observation_model,
+    checkpoint_result,
+)
 from backend.ledger.action.memory_tools import (
     CheckpointAction,
     MemoryPersistAction,
@@ -27,32 +33,15 @@ if TYPE_CHECKING:
     )
 
 
-def _render_checkpoint_card(
-    orch: 'RendererEventProcessorMixin',
-    content: str,
-    *,
-    source_tool: str = '',
-) -> None:
-    from backend.cli.tui.renderer.mixins.thinking import ThinkingRenderIntent
-
-    text = (content or '').strip()
-    if not text:
-        return
-    intent = ThinkingRenderIntent(
-        kind='checkpoint',
-        text=text,
-        detail=text,
-        source_tool=source_tool,
-    )
-    card = orch._thinking_artifact_card(intent)
-    if card is not None:
-        orch._write_card(card)
-
-
 def _handle_checkpoint_observation(
     orch: 'RendererEventProcessorMixin', event: CheckpointObservation
 ) -> None:
-    _render_checkpoint_card(orch, event.content, source_tool='checkpoint')
+    pending = getattr(orch, '_pending_checkpoint_line', None)
+    if isinstance(pending, OrientLineModel):
+        orch._write_orient_line(pending.with_result(checkpoint_result(event)))
+    else:
+        orch._write_orient_line(checkpoint_observation_model(event))
+    orch._pending_checkpoint_line = None
 
 
 def _handle_working_memory_observation(
@@ -88,8 +77,7 @@ def _handle_scratchpad_recall_observation(
 def _handle_checkpoint_action(
     orch: 'RendererEventProcessorMixin', event: CheckpointAction
 ) -> None:
-    detail = event.label or event.command or 'checkpoint'
-    _render_checkpoint_card(orch, detail, source_tool='checkpoint')
+    orch._pending_checkpoint_line = checkpoint_action_model(event)
 
 
 def _handle_working_memory_action(

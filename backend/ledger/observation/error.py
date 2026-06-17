@@ -16,6 +16,7 @@ ERROR_CATEGORY_NETWORK = 'network'
 ERROR_CATEGORY_MODEL_NOT_FOUND = 'model_not_found'
 ERROR_CATEGORY_RUNTIME_DISCONNECTED = 'runtime_disconnected'
 ERROR_CATEGORY_CONTENT_POLICY = 'content_policy'
+ERROR_CATEGORY_BAD_REQUEST = 'bad_request'
 
 
 @dataclass

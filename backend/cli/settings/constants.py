@@ -26,6 +26,7 @@ DEFAULT_MODEL_BY_PROVIDER: dict[str, str] = {
     'vercel': 'vercel/anthropic/claude-haiku-4.5',
     'xai': 'xai/grok-build-0.1',
     'deepseek': 'deepseek/deepseek-v4-flash',
+    'moonshot': 'moonshot/kimi-k2.5',
     'nvidia': 'nvidia/meta/llama-3.1-8b-instruct',
 }
 
@@ -38,6 +39,7 @@ _PROVIDERS: list[tuple[str, str, str]] = [
     ('groq', 'Groq', 'cloud'),
     ('xai', 'xAI (Grok)', 'cloud'),
     ('deepseek', 'DeepSeek', 'cloud'),
+    ('moonshot', 'Moonshot (Kimi)', 'cloud'),
     ('openrouter', 'OpenRouter', 'aggregator'),
     ('vercel', 'Vercel AI Gateway', 'aggregator'),
     ('lightning', 'Lightning AI', 'aggregator'),

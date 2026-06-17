@@ -29,6 +29,7 @@ from backend.engine.tools._search_helpers import (
 from backend.engine.tools.common import create_tool_definition
 from backend.inference.tool_names import GLOB_TOOL_NAME
 from backend.ledger.action.search import GlobAction
+from backend.ledger.observation import Observation
 from backend.ledger.observation.search import GlobObservation
 
 _GLOB_DESCRIPTION = """\
@@ -101,7 +102,18 @@ def build_glob_action(
     )
 
 
-def execute_glob(action: GlobAction) -> GlobObservation:
+def _glob_failure(*, message: str, pattern: str, path: str) -> Observation:
+    from backend.execution.structured_edit_errors import build_search_error_observation
+
+    return build_search_error_observation(
+        tool='glob',
+        message=message,
+        pattern=pattern,
+        path=path,
+    )
+
+
+def execute_glob(action: GlobAction) -> Observation:
     """List files matching ``action.pattern`` under ``action.path``."""
     path = action.path or '.'
     pattern = action.pattern or ''
@@ -112,23 +124,11 @@ def execute_glob(action: GlobAction) -> GlobObservation:
             'glob requires a non-empty `pattern` argument. '
             'Use the `grep` tool to search inside files.'
         )
-        return make_glob_observation(
-            pattern=pattern,
-            path=path,
-            files=[],
-            content=message,
-            error=message,
-        )
+        return _glob_failure(message=message, pattern=pattern, path=path)
 
     missing_path_error = path_exists_error(path)
     if missing_path_error is not None:
-        return make_glob_observation(
-            pattern=pattern,
-            path=path,
-            files=[],
-            content=missing_path_error,
-            error=missing_path_error,
-        )
+        return _glob_failure(message=missing_path_error, pattern=pattern, path=path)
 
     rg_path = has_ripgrep()
     if rg_path:
@@ -142,22 +142,10 @@ def execute_glob(action: GlobAction) -> GlobObservation:
             )
         except Exception as exc:
             message = f'Error running ripgrep: {exc}'
-            return make_glob_observation(
-                pattern=pattern,
-                path=path,
-                files=[],
-                content=message,
-                error=message,
-            )
+            return _glob_failure(message=message, pattern=pattern, path=path)
         if getattr(result, 'timed_out', False):
             message = 'Search timed out after 30s'
-            return make_glob_observation(
-                pattern=pattern,
-                path=path,
-                files=[],
-                content=message,
-                error=message,
-            )
+            return _glob_failure(message=message, pattern=pattern, path=path)
         files = [line for line in result.stdout.splitlines() if line]
         content = paginate_line_output(
             files,

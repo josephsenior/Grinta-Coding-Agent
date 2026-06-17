@@ -34,7 +34,7 @@ def _update_browser_screenshot_card(
         image_path=image_path,
     )
     extra_content = ActivityRenderer.format_extra_lines(card.extra_lines)
-    orch._update_activity_card_outcome(
+    orch._update_record_panel_outcome(
         prev,
         status='ok',
         outcome=card.secondary or 'captured',
@@ -61,7 +61,7 @@ def _handle_browser_tool_action(
     action_name = getattr(event, 'command', 'browser') or 'browser'
     url = resolve_browser_action_url(action_name, event)
     card = ActivityRenderer.browser_action(action_name, url)
-    widget = orch._write_card(card)
+    widget = orch._write_record_card(card, processing=True)
     orch._last_browser_action_card = widget
     orch._last_browser_cmd = action_name
 
@@ -72,7 +72,7 @@ def _handle_browse_interactive_action(
     actions = getattr(event, 'browser_actions', '') or ''
     detail = actions[:80] + ('...' if len(actions) > 80 else '') if actions else ''
     card = ActivityRenderer.browser_action('browse', detail)
-    widget = orch._write_card(card)
+    widget = orch._write_record_card(card, processing=True)
     orch._last_browser_action_card = widget
     orch._last_browser_cmd = 'browse'
 
@@ -99,4 +99,4 @@ def _handle_browser_screenshot_observation(
             image_path=image_path,
         )
     else:
-        orch._write_card(card)
+        orch._write_record_card(card)

@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, NoReturn, cast
 
 from backend.core.enums import FileEditSource, FileReadSource
-from backend.core.errors import FunctionCallValidationError
+from backend.core.errors import FunctionCallValidationError, ToolExecutionError
 from backend.engine.function_calling_helpers import (
     parse_bool_argument,
     require_tool_argument,
@@ -35,7 +35,6 @@ from backend.engine.tools._file_ops import (
     _safe_workspace_path,
     _sha256_text,
     _single_symbol_candidate,
-    _symbol_action_ambiguity_error,
 )
 from backend.inference.tool_names import (
     CREATE_TOOL_NAME,
@@ -270,20 +269,31 @@ def _build_read_symbol_final(
     display_target: str,
     symbol_name: str,
 ) -> dict[str, Any]:
+    from backend.execution.structured_edit_errors import (
+        compact_symbol_candidates,
+        symbol_ambiguity_summary,
+    )
+
     if not candidates:
         return {
             'status': 'not_found',
             'target': display_target,
             'symbol_name': symbol_name,
-            'message': f"Symbol '{symbol_name}' was not found.",
+            'message': (
+                f"read_symbols failed: symbol '{symbol_name}' not found."
+                if symbol_name
+                else 'read_symbols failed: symbol not found.'
+            ),
         }
     if len(candidates) > 1:
+        compact = compact_symbol_candidates(candidates)
         return {
             'status': 'ambiguous',
             'target': display_target,
             'symbol_name': symbol_name,
-            'message': f"Symbol '{symbol_name}' is ambiguous.",
-            'candidates': candidates,
+            'message': symbol_ambiguity_summary(symbol_name, candidates).split('\n')[0],
+            'hint': 'Retry with path + qualified_name + symbol_kind, or use symbol_id.',
+            'candidates': compact,
         }
     candidate = candidates[0]
     if not path:
@@ -398,15 +408,76 @@ def _build_read_symbols_payload(action: ReadSymbolsAction) -> dict[str, Any]:
     }
 
 
-def execute_read_symbols(action: ReadSymbolsAction) -> ReadSymbolsObservation:
+_SYMBOL_READ_SUCCESS_STATUSES = frozenset({'ok', 'resolved'})
+
+
+def _build_read_symbols_tool_result(results: list[dict[str, Any]]) -> dict[str, Any]:
+    failed = [
+        result
+        for result in results
+        if isinstance(result, dict)
+        and result.get('status') not in _SYMBOL_READ_SUCCESS_STATUSES
+    ]
+    if not failed:
+        return {
+            'tool': 'read_symbols',
+            'ok': True,
+            'count': len(results),
+        }
+    first = failed[0]
+    status = str(first.get('status') or 'error')
+    code_map = {
+        'not_found': 'SYMBOL_NOT_FOUND',
+        'ambiguous': 'SYMBOL_AMBIGUOUS',
+    }
+    tool_result: dict[str, Any] = {
+        'tool': 'read_symbols',
+        'ok': False,
+        'error_code': code_map.get(status, 'SYMBOL_LOOKUP_FAILED'),
+        'retryable': True,
+        'symbol': first.get('symbol_name') or first.get('target'),
+        'failed_count': len(failed),
+    }
+    if first.get('hint'):
+        tool_result['hint'] = first['hint']
+    if first.get('candidates'):
+        tool_result['candidates'] = first['candidates']
+    return tool_result
+
+
+def execute_read_symbols(action: ReadSymbolsAction) -> Any:
+    from backend.execution.structured_edit_errors import (
+        build_read_symbols_error_observation,
+        compact_symbol_read_result,
+    )
+
     payload = _build_read_symbols_payload(action)
+    compact_results = [
+        compact_symbol_read_result(result)
+        if isinstance(result, dict)
+        else result
+        for result in payload['results']
+    ]
+    failed = [
+        result
+        for result in compact_results
+        if isinstance(result, dict)
+        and result.get('status') not in _SYMBOL_READ_SUCCESS_STATUSES
+    ]
+    if failed:
+        return build_read_symbols_error_observation(
+            failed,
+            total=len(compact_results),
+        )
+
+    payload = {**payload, 'results': compact_results}
     observation = ReadSymbolsObservation(
         content=json.dumps(payload, indent=2),
         path=action.path,
         symbol_kind=action.symbol_kind,
-        results=payload['results'],
+        results=compact_results,
     )
-    observation.tool_result = dict(payload)
+    observation.tool_result = _build_read_symbols_tool_result(compact_results)
     return observation
 
 
@@ -442,7 +513,13 @@ def execute_find_symbols(action: FindSymbolsAction) -> FindSymbolsObservation:
         include_private=action.include_private,
         candidates=candidates,
     )
-    observation.tool_result = dict(payload)
+    observation.tool_result = {
+        'tool': 'find_symbols',
+        'ok': True,
+        'query': action.query,
+        'path': action.path,
+        'count': len(candidates),
+    }
     return observation
 
 
@@ -652,6 +729,8 @@ def _select_and_validate_symbol(
     requested_start: int | None,
     requested_end: int | None,
     index: int,
+    *,
+    path: str | None = None,
 ) -> dict[str, Any]:
     if requested_start is not None:
         candidates = [
@@ -662,12 +741,25 @@ def _select_and_validate_symbol(
         ]
     if not candidates:
         target = symbol_id or symbol_name
-        raise FunctionCallValidationError(
-            f'edit_symbol could not find symbol {target!r}.'
+        _multi_edit_raise(
+            'edit_symbol failed: symbol not found.',
+            error_code='SYMBOL_NOT_FOUND',
+            path=path,
+            operation='edit_symbol',
+            symbol=target,
+            retryable=True,
         )
     if len(candidates) > 1:
-        raise FunctionCallValidationError(
-            _symbol_action_ambiguity_error(symbol_name, candidates)
+        from backend.execution.structured_edit_errors import symbol_ambiguity_summary
+
+        _multi_edit_raise(
+            symbol_ambiguity_summary(symbol_name, candidates).split('\n')[0],
+            error_code='SYMBOL_AMBIGUOUS',
+            path=path,
+            operation='edit_symbol',
+            symbol=symbol_name,
+            candidates=candidates,
+            retryable=True,
         )
     return candidates[0]
 
@@ -869,10 +961,41 @@ def _resolve_multi_edit_path(raw_path: str, item_index: int) -> tuple[str, str]:
     return str(safe_path.path), safe_path.relative_to_workspace()
 
 
-def _multi_edit_raise(message: str, *, path: str | None = None) -> NoReturn:
-    from backend.core.errors import ToolExecutionError
+def _multi_edit_raise(
+    summary: str,
+    *,
+    error_code: str,
+    path: str | None = None,
+    operation: str | None = None,
+    failed_op_index: int | None = None,
+    total_ops: int | None = None,
+    retryable: bool = True,
+    detail: str | None = None,
+    line: int | None = None,
+    symbol: str | None = None,
+    candidates: list[dict[str, Any]] | None = None,
+    match_count: int | None = None,
+    transaction_rolled_back: bool = False,
+    hint: str | None = None,
+) -> NoReturn:
+    from backend.execution.structured_edit_errors import multi_edit_raise
 
-    raise ToolExecutionError(message)
+    multi_edit_raise(
+        summary,
+        error_code=error_code,
+        path=path,
+        operation=operation,
+        failed_op_index=failed_op_index,
+        total_ops=total_ops,
+        retryable=retryable,
+        detail=detail,
+        line=line,
+        symbol=symbol,
+        candidates=candidates,
+        match_count=match_count,
+        transaction_rolled_back=transaction_rolled_back,
+        hint=hint,
+    )
 
 
 def _multi_edit_relative_path(item_path: str, workspace_root: str | Path) -> str:
@@ -973,7 +1096,13 @@ def _resolve_symbol_edit_on_temp_file(
         ]
 
     candidate = _select_and_validate_symbol(
-        candidates, symbol_id, symbol_name, requested_start, requested_end, index
+        candidates,
+        symbol_id,
+        symbol_name,
+        requested_start,
+        requested_end,
+        index,
+        path=display_path,
     )
     return {
         'path': display_path,
@@ -1001,20 +1130,35 @@ def _validate_symbol_range_on_temp(
     start_line: int,
     end_line: int,
     rel_path: str,
+    *,
+    failed_op_index: int | None = None,
+    total_ops: int | None = None,
 ) -> None:
     """Reject stale line ranges after prior batch edits on the temp copy."""
     if not temp_path.exists():
         _multi_edit_raise(
-            f'❌ multi_edit symbol range failed for {rel_path}: file not found.',
+            'edit_symbol failed: file not found.',
+            error_code='FILE_NOT_FOUND',
             path=rel_path,
+            operation='edit_symbol',
+            failed_op_index=failed_op_index,
+            total_ops=total_ops,
+            retryable=False,
         )
     line_count = len(temp_path.read_text(encoding='utf-8').splitlines())
     if start_line < 1 or end_line < start_line or end_line > line_count:
         _multi_edit_raise(
-            f'❌ multi_edit symbol range {start_line}-{end_line} is invalid for '
-            f'{rel_path} ({line_count} lines after prior batch edits). '
-            'Use edit_symbol instead of line ranges when combining edits.',
+            'edit_symbol failed: symbol line range is invalid after prior batch edits.',
+            error_code='INVALID_SYMBOL_RANGE',
             path=rel_path,
+            operation='edit_symbol',
+            failed_op_index=failed_op_index,
+            total_ops=total_ops,
+            detail=(
+                f'range {start_line}-{end_line} invalid for {line_count} lines; '
+                'use edit_symbol instead of line ranges when combining edits.'
+            ),
+            retryable=True,
         )
 
 
@@ -1023,7 +1167,15 @@ def _validate_multi_edit_file_final(
     temp_path: Path,
     rel_path: str,
     original_content: str | None,
+    *,
+    failed_op_index: int | None = None,
+    total_ops: int | None = None,
 ) -> None:
+    from backend.execution.structured_edit_errors import (
+        compact_syntax_detail,
+        extract_syntax_line,
+    )
+
     if not temp_path.exists():
         return
     final_content = temp_path.read_text(encoding='utf-8')
@@ -1035,8 +1187,15 @@ def _validate_multi_edit_file_final(
     )
     if regression_error is not None:
         _multi_edit_raise(
-            f'❌ multi_edit syntax regression for {rel_path}: {regression_error}',
+            'multi_edit failed: introduced syntax error.',
+            error_code='INTRODUCED_SYNTAX_ERROR',
             path=rel_path,
+            operation='multi_edit',
+            failed_op_index=failed_op_index,
+            total_ops=total_ops,
+            line=extract_syntax_line(regression_error),
+            detail=compact_syntax_detail(regression_error),
+            retryable=True,
         )
 
     is_valid, msg = temp_editor._maybe_validate_syntax_for_file(
@@ -1044,8 +1203,15 @@ def _validate_multi_edit_file_final(
     )
     if not is_valid:
         _multi_edit_raise(
-            f'❌ multi_edit syntax validation failed for {rel_path}: {msg}',
+            'multi_edit failed: syntax validation failed.',
+            error_code='SYNTAX_VALIDATION_FAILED',
             path=rel_path,
+            operation='multi_edit',
+            failed_op_index=failed_op_index,
+            total_ops=total_ops,
+            line=extract_syntax_line(str(msg or '')),
+            detail=compact_syntax_detail(str(msg or '')),
+            retryable=True,
         )
 
 
@@ -1056,7 +1222,11 @@ def _apply_multi_edit_operation(
     operation: str,
     item: dict[str, Any],
     temp_editor: Any,
+    failed_op_index: int | None = None,
+    total_ops: int | None = None,
 ) -> None:
+    from backend.execution.structured_edit_errors import summarize_editor_error
+
     if operation == 'edit_symbol_deferred':
         edits = item.get('edits')
         if not isinstance(edits, list) or not edits:
@@ -1065,8 +1235,13 @@ def _apply_multi_edit_operation(
             )
         if not temp_path.exists():
             _multi_edit_raise(
-                f'❌ multi_edit edit_symbol failed for {rel_path}: file not found.',
+                'edit_symbol failed: file not found.',
+                error_code='FILE_NOT_FOUND',
                 path=rel_path,
+                operation='edit_symbol',
+                failed_op_index=failed_op_index,
+                total_ops=total_ops,
+                retryable=False,
             )
         resolved_ops = _resolve_deferred_edit_symbol(temp_path, rel_path, edits)
         for resolved in resolved_ops:
@@ -1076,6 +1251,8 @@ def _apply_multi_edit_operation(
                 operation='symbol_body_replacement',
                 item=resolved,
                 temp_editor=temp_editor,
+                failed_op_index=failed_op_index,
+                total_ops=total_ops,
             )
         return
 
@@ -1094,9 +1271,18 @@ def _apply_multi_edit_operation(
             replace_all=parse_bool_argument(item.get('replace_all', False)),
         )
         if result.error:
+            error_code, summary, retryable, extra = summarize_editor_error(result)
             _multi_edit_raise(
-                f'❌ multi_edit replace_string failed for {rel_path}: {result.error}',
+                summary,
+                error_code=error_code,
                 path=rel_path,
+                operation='replace_string',
+                failed_op_index=failed_op_index,
+                total_ops=total_ops,
+                retryable=retryable,
+                detail=extra.get('detail'),
+                line=extra.get('line'),
+                match_count=extra.get('match_count'),
             )
         return
 
@@ -1110,7 +1296,14 @@ def _apply_multi_edit_operation(
             )
         start = int(start_line)
         end = int(end_line)
-        _validate_symbol_range_on_temp(temp_path, start, end, rel_path)
+        _validate_symbol_range_on_temp(
+            temp_path,
+            start,
+            end,
+            rel_path,
+            failed_op_index=failed_op_index,
+            total_ops=total_ops,
+        )
         result = temp_editor(
             command='edit',
             path=rel_path,
@@ -1120,9 +1313,17 @@ def _apply_multi_edit_operation(
             new_str=content,
         )
         if result.error:
+            error_code, summary, retryable, extra = summarize_editor_error(result)
             _multi_edit_raise(
-                f'❌ multi_edit symbol body replacement failed for {rel_path}: {result.error}',
+                summary,
+                error_code=error_code,
                 path=rel_path,
+                operation='edit_symbol',
+                failed_op_index=failed_op_index,
+                total_ops=total_ops,
+                retryable=retryable,
+                detail=extra.get('detail'),
+                line=extra.get('line'),
             )
         return
 
@@ -1157,7 +1358,7 @@ def _parse_multi_edit_items(
         item_path = item.get('path')
         if not isinstance(item_path, str) or not item_path.strip():
             raise FunctionCallValidationError(
-                f"multi_edit item {idx} is missing required 'path'."
+                f"multiedit validation failed: item {idx} missing required field 'path'."
             )
         requested_path = item_path.strip()
         canonical_path, display_path = _resolve_multi_edit_path(requested_path, idx)
@@ -1183,7 +1384,7 @@ def _apply_multi_edit_to_temp_files(
     final_contents: dict[str, str] = {}
     temp_paths: dict[str, Path] = {}
 
-    for item_path, _display_path, operation, item in parsed:
+    for op_index, (item_path, _display_path, operation, item) in enumerate(parsed):
         real_path = Path(item_path)
         rel_path = _multi_edit_relative_path(item_path, workspace_root)
         temp_path = temp_root / rel_path
@@ -1201,20 +1402,27 @@ def _apply_multi_edit_to_temp_files(
             operation=operation,
             item=item,
             temp_editor=temp_editor,
+            failed_op_index=op_index,
+            total_ops=len(parsed),
         )
 
     for item_path, temp_path in temp_paths.items():
         rel_path = _multi_edit_relative_path(item_path, workspace_root)
         if not temp_path.exists():
             _multi_edit_raise(
-                f'❌ multi_edit produced no output file for {rel_path}.',
+                'multi_edit failed: produced no output file.',
+                error_code='NO_OUTPUT_FILE',
                 path=rel_path,
+                operation='multi_edit',
+                retryable=True,
             )
         _validate_multi_edit_file_final(
             temp_editor,
             temp_path,
             rel_path,
             original_snapshots.get(item_path),
+            failed_op_index=len(parsed) - 1 if parsed else None,
+            total_ops=len(parsed) or None,
         )
         final_contents[item_path] = temp_path.read_text(encoding='utf-8')
 
@@ -1230,8 +1438,12 @@ def _verify_no_concurrent_modifications(
         disk_now = real_path.read_text(encoding='utf-8') if real_path.exists() else None
         if disk_now != old_content:
             _multi_edit_raise(
-                '❌ multi_edit aborted because the file changed on disk during batch preparation. Re-read and retry.',
+                'multi_edit aborted: file changed on disk during batch preparation.',
+                error_code='CONCURRENT_MODIFICATION',
                 path=_multi_edit_relative_path(item_path, workspace_root),
+                operation='multi_edit',
+                detail='Re-read the file and retry.',
+                retryable=True,
             )
 
 
@@ -1265,9 +1477,15 @@ def _format_multi_edit_success(parsed: list, result: Any) -> MessageAction:
 
 
 def _format_multi_edit_failure(result: Any) -> None:
-    err_lines = '\n'.join(f'  - {e}' for e in (result.errors or [result.message]))
+    errors = list(result.errors or [result.message])
+    primary = str(errors[0] if errors else 'transaction failed')
     _multi_edit_raise(
-        f'❌ multi_edit transaction rolled back — no files modified.\n{err_lines}'
+        'multi_edit transaction rolled back.',
+        error_code='TRANSACTION_ROLLBACK',
+        operation='multi_edit',
+        detail=primary,
+        transaction_rolled_back=True,
+        retryable=True,
     )
 
 
@@ -1290,7 +1508,11 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
         from backend.execution.utils.file_editor import FileEditor, _file_lock_for_path
     except Exception as e:  # pragma: no cover - defensive import guard
         _multi_edit_raise(
-            f'❌ multi_edit unavailable: AtomicRefactor import failed: {e}'
+            'multi_edit unavailable: AtomicRefactor import failed.',
+            error_code='MULTI_EDIT_UNAVAILABLE',
+            operation='multi_edit',
+            detail=str(e),
+            retryable=False,
         )
 
     workspace_root = require_effective_workspace_root()
@@ -1319,13 +1541,20 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
             )
     except FunctionCallValidationError:
         raise
+    except ToolExecutionError:
+        raise
     except Exception as e:
         try:
             refactor.rollback(transaction)
         except Exception:
             pass
         _multi_edit_raise(
-            f'❌ multi_edit failed before commit: {e}. No files modified.'
+            'multi_edit failed before commit.',
+            error_code='MULTI_EDIT_COMMIT_FAILED',
+            operation='multi_edit',
+            detail=str(e),
+            transaction_rolled_back=True,
+            retryable=True,
         )
 
     if result.success:

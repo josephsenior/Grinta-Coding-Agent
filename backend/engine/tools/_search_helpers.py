@@ -136,7 +136,7 @@ def make_grep_observation(
 ) -> GrepObservation:
     """Build a structured grep observation from execution output."""
     match_count, file_count = _count_grep_stats(lines, output_mode)
-    return GrepObservation(
+    obs = GrepObservation(
         content=content,
         pattern=pattern,
         path=path,
@@ -146,6 +146,15 @@ def make_grep_observation(
         file_count=file_count,
         error=error,
     )
+    if error:
+        attach_search_error_tool_result(
+            obs,
+            tool='grep',
+            pattern=pattern,
+            path=path,
+            output_mode=output_mode,
+        )
+    return obs
 
 
 def make_glob_observation(
@@ -158,13 +167,41 @@ def make_glob_observation(
 ) -> GlobObservation:
     """Build a structured glob observation from execution output."""
     file_count = len(files)
-    return GlobObservation(
+    obs = GlobObservation(
         content=content,
         pattern=pattern,
         path=path,
         files=files,
         file_count=file_count,
         error=error,
+    )
+    if error:
+        attach_search_error_tool_result(
+            obs,
+            tool='glob',
+            pattern=pattern,
+            path=path,
+        )
+    return obs
+
+
+def attach_search_error_tool_result(
+    observation: GrepObservation | GlobObservation,
+    *,
+    tool: str,
+    pattern: str,
+    path: str,
+    output_mode: str | None = None,
+) -> None:
+    from backend.execution.structured_edit_errors import build_search_error_tool_result
+
+    message = str(getattr(observation, 'error', '') or observation.content or '')
+    observation.tool_result = build_search_error_tool_result(
+        tool=tool,
+        message=message,
+        pattern=pattern,
+        path=path,
+        output_mode=output_mode,
     )
 
 

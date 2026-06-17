@@ -23,6 +23,7 @@ _ORIENT_PIPE_BY_TOOL: dict[str, str] = {
     'web_fetch': '#3a4a6a',
     'docs_resolve': '#3a3d5a',
     'docs_query': '#3a3d5a',
+    'checkpoint': '#2d4a6a',
 }
 
 _ORIENT_PREFIX_BY_TOOL: dict[str, str] = {
@@ -37,6 +38,7 @@ _ORIENT_PREFIX_BY_TOOL: dict[str, str] = {
     'web_fetch': '#6a7a9a',
     'docs_resolve': '#7a7a9a',
     'docs_query': '#7a7a9a',
+    'checkpoint': '#5a7a9a',
 }
 
 

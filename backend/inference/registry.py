@@ -34,6 +34,7 @@ PROVIDER_DEFAULT_URLS: dict[str, str] = {
     'groq': 'https://api.groq.com/openai/v1',
     'xai': 'https://api.x.ai/v1',
     'deepseek': 'https://api.deepseek.com/v1',
+    'moonshot': 'https://api.moonshot.ai/v1',
     'openrouter': 'https://openrouter.ai/api/v1',
     'vercel': 'https://ai-gateway.vercel.sh/v1',
     'nvidia': 'https://integrate.api.nvidia.com/v1',
@@ -63,6 +64,7 @@ KNOWN_PROVIDER_PREFIXES: frozenset[str] = frozenset(
         'lightning',
         'lm_studio',
         'mistral',
+        'moonshot',
         'nvidia',
         'ollama',
         'openai',
@@ -93,6 +95,7 @@ OPENAI_COMPATIBLE_REMOTE_PROVIDERS: frozenset[str] = frozenset(
         'lightning',
         'cerebras',
         'mistral',
+        'moonshot',
         'digitalocean',
         'deepinfra',
         'fireworks',
@@ -117,7 +120,7 @@ TIER_1_PROVIDERS: frozenset[str] = frozenset(
 )
 
 TIER_2_PROVIDERS: frozenset[str] = frozenset(
-    {'openrouter', 'vercel', 'mistral', 'deepseek', 'xai'}
+    {'openrouter', 'vercel', 'mistral', 'deepseek', 'moonshot', 'xai'}
 )
 
 

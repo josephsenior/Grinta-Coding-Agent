@@ -1,4 +1,4 @@
-"""Tests for activity card expand/collapse policy."""
+"""Tests for session-tier shell panel and record-tier collapse behavior."""
 
 from __future__ import annotations
 
@@ -9,14 +9,15 @@ from backend.cli.display.hud import HUDBar
 from backend.cli.display.reasoning_display import ReasoningDisplay
 from backend.cli.tui.app import TUIRenderer
 from backend.cli.tui.main import GrintaTUIApp
-from backend.cli.tui.widgets.activity_card import ActivityCard as TUIActivityCard
-from backend.ledger.action import CmdRunAction
-from backend.ledger.observation import CmdOutputObservation
+from backend.cli.tui.widgets.record_panel import RecordPanel
+from backend.cli.tui.widgets.session_panel import SessionPanel
+from backend.ledger.action import CmdRunAction, MCPAction
+from backend.ledger.observation import CmdOutputObservation, MCPObservation
 from backend.tests.unit.cli.tui._shared import _get_screen
 
 
 @pytest.mark.asyncio
-async def test_active_card_collapses_when_next_shell_starts(mock_config) -> None:
+async def test_shell_session_panels_stay_open_when_next_shell_starts(mock_config) -> None:
     console = RichConsole()
     loop = __import__('asyncio').get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -38,29 +39,21 @@ async def test_active_card_collapses_when_next_shell_starts(mock_config) -> None
         )
         await pilot.pause()
 
-        first = next(
-            card
-            for card in screen.query(TUIActivityCard).results()
-            if 'category-shell' in card.classes
-        )
-        first.expand()
-        assert '-expanded' in first.classes
-
         renderer._process_event(CmdRunAction(command='npm test'))
         await pilot.pause()
 
-        assert '-collapsed' in first.classes
-        shell_cards = [
-            card
-            for card in screen.query(TUIActivityCard).results()
-            if 'category-shell' in card.classes
+        shell_panels = [
+            panel
+            for panel in screen.query(SessionPanel).results()
+            if 'category-shell' in panel.classes
         ]
-        assert len(shell_cards) == 2
-        assert '-expanded' in shell_cards[1].classes
+        assert len(shell_panels) == 2
+        assert shell_panels[0].query_one('#terminal-prompt')
+        assert shell_panels[1].query_one('#terminal-prompt')
 
 
 @pytest.mark.asyncio
-async def test_pinned_card_stays_expanded_when_next_shell_starts(mock_config) -> None:
+async def test_shell_session_panel_keeps_body_visible_after_completion(mock_config) -> None:
     console = RichConsole()
     loop = __import__('asyncio').get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -82,14 +75,45 @@ async def test_pinned_card_stays_expanded_when_next_shell_starts(mock_config) ->
         )
         await pilot.pause()
 
-        first = next(
-            card
-            for card in screen.query(TUIActivityCard).results()
-            if 'category-shell' in card.classes
+        panel = next(
+            p for p in screen.query(SessionPanel).results() if 'category-shell' in p.classes
         )
-        first.set_pinned(True)
-        renderer._process_event(CmdRunAction(command='npm test'))
+        assert '-running' not in panel.classes
+        assert panel.query_one('#terminal-output-wrap')
+
+
+@pytest.mark.asyncio
+async def test_record_panel_stays_collapsed_until_user_expands(mock_config) -> None:
+    console = RichConsole()
+    loop = __import__('asyncio').get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+        screen = _get_screen(app)
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=screen,
+            loop=loop,
+        )
+
+        renderer._process_event(MCPAction(name='docs_tool', arguments={'q': 'api'}))
+        renderer._process_event(
+            MCPObservation(
+                name='docs_tool',
+                arguments={'q': 'api'},
+                content='long result payload for the record body',
+            )
+        )
         await pilot.pause()
 
-        assert first.is_pinned
-        assert '-expanded' in first.classes
+        panel = next(
+            p for p in screen.query(RecordPanel).results() if 'category-mcp' in p.classes
+        )
+        assert '-collapsed' in panel.classes
+        panel.expand()
+        assert '-expanded' in panel.classes
+        panel.collapse()
+        assert '-collapsed' in panel.classes

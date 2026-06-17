@@ -34,6 +34,7 @@ from backend.engine.tools._search_helpers import (
 from backend.engine.tools.common import create_tool_definition
 from backend.inference.tool_names import GREP_TOOL_NAME
 from backend.ledger.action.search import GrepAction
+from backend.ledger.observation import Observation
 from backend.ledger.observation.search import GrepObservation
 
 _GREP_DESCRIPTION = """\
@@ -147,7 +148,25 @@ def build_grep_action(
     )
 
 
-def execute_grep(action: GrepAction) -> GrepObservation:
+def _grep_failure(
+    *,
+    message: str,
+    pattern: str,
+    path: str,
+    output_mode: str,
+) -> Observation:
+    from backend.execution.structured_edit_errors import build_search_error_observation
+
+    return build_search_error_observation(
+        tool='grep',
+        message=message,
+        pattern=pattern,
+        path=path,
+        output_mode=output_mode,
+    )
+
+
+def execute_grep(action: GrepAction) -> Observation:
     """Execute a regex text search and return a structured observation."""
     pattern = action.pattern
     path = action.path or '.'
@@ -160,13 +179,11 @@ def execute_grep(action: GrepAction) -> GrepObservation:
             'grep requires a non-empty `pattern` argument. '
             'Use the `glob` tool to list files.'
         )
-        return make_grep_observation(
+        return _grep_failure(
+            message=message,
             pattern=pattern,
             path=path,
             output_mode=mode,
-            lines=[],
-            content=message,
-            error=message,
         )
 
     regex, regex_error = compile_search_regex(
@@ -178,24 +195,20 @@ def execute_grep(action: GrepAction) -> GrepObservation:
         ),
     )
     if regex_error is not None:
-        return make_grep_observation(
+        return _grep_failure(
+            message=regex_error,
             pattern=pattern,
             path=path,
             output_mode=mode,
-            lines=[],
-            content=regex_error,
-            error=regex_error,
         )
 
     if not os.path.exists(path):
         message = f'Path does not exist: {path}'
-        return make_grep_observation(
+        return _grep_failure(
+            message=message,
             pattern=pattern,
             path=path,
             output_mode=mode,
-            lines=[],
-            content=message,
-            error=message,
         )
 
     rg_path = has_ripgrep()
@@ -231,7 +244,7 @@ def _run_ripgrep_mode(
     output_mode: str,
     regex: object,
     empty_message: str,
-) -> GrepObservation:
+) -> GrepObservation | Observation:
     if output_mode == 'files_with_matches':
         args = build_ripgrep_files_with_matches_args(
             rg_path,
@@ -261,23 +274,19 @@ def _run_ripgrep_mode(
         result = run_ripgrep_command(args)
     except Exception as exc:
         message = f'Error running ripgrep: {exc}'
-        return make_grep_observation(
+        return _grep_failure(
+            message=message,
             pattern=pattern,
             path=path,
             output_mode=output_mode,
-            lines=[],
-            content=message,
-            error=message,
         )
     if getattr(result, 'timed_out', False):
         message = 'Search timed out after 30s'
-        return make_grep_observation(
+        return _grep_failure(
+            message=message,
             pattern=pattern,
             path=path,
             output_mode=output_mode,
-            lines=[],
-            content=message,
-            error=message,
         )
     lines = [line for line in result.stdout.splitlines() if line]
     content = paginate_line_output(
@@ -303,7 +312,7 @@ def _run_python_mode(
     output_mode: str,
     regex: object,
     empty_message: str,
-) -> GrepObservation:
+) -> GrepObservation | Observation:
     target_files = collect_python_target_files(path, file_pattern)
     if not target_files:
         return make_grep_observation(

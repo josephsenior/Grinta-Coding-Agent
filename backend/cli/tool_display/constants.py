@@ -28,6 +28,7 @@ ORIENT_TOOLS: frozenset[str] = frozenset(
         'web_fetch',
         'docs_resolve',
         'docs_query',
+        'checkpoint',
     }
 )
 

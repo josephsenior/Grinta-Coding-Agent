@@ -5,9 +5,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from backend.cli.event_rendering.unified_renderer import ActivityRenderer
 from backend.cli.tui.helpers import _join_secondary_parts
-from backend.cli.tui.widgets.activity_card import ActivityCard as TUIActivityCard
+from backend.cli.tui.widgets.session_panel import SessionPanel
 
 _ACTION_VERBS: dict[str, str] = {
     'start': 'Starting',
@@ -115,20 +114,23 @@ class RendererDebuggerMixin:
         secondary_kind: str,
         extra_content: str | None,
     ) -> None:
-        card = ActivityRenderer.debugger_action(
-            verb,
-            detail,
-            secondary=secondary,
-            secondary_kind=secondary_kind,
-            extra_content=extra_content,
-        )
-        widget = self._write_card(card, collapsed=True)
-        widget.enable_incremental_mode()
-        widget.configure_terminal(
-            command=TUIActivityCard._command_from_detail(detail),
-            session_id=session_id,
+        del secondary_kind
+        panel = SessionPanel(
+            verb=verb,
+            detail=detail,
+            badge_category='debugger',
+            status='running',
+            outcome=secondary,
             shell_kind='debugger',
+            terminal_command=SessionPanel._command_from_detail(detail),
+            session_id=session_id,
         )
+        panel.set_processing(True)
+        panel.enable_incremental_mode()
+        if extra_content:
+            panel.update_content(extra_content)
+        widget = self._mount_session_panel(panel)
+        self._activate_activity_card(widget)
         if session_id:
             self._debugger_cards_by_session[session_key] = widget
         else:
@@ -182,7 +184,7 @@ class RendererDebuggerMixin:
             outcome=secondary,
         )
         widget.configure_terminal(
-            command=TUIActivityCard._command_from_detail(detail),
+            command=SessionPanel._command_from_detail(detail),
             session_id=session_id,
             shell_kind='debugger',
         )

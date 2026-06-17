@@ -268,9 +268,11 @@ class TestExecuteFileEditor:
         output, (old, new), tool_result = execute_file_editor(
             editor, 'edit', '/test.py'
         )
-        assert output == 'Something went wrong'
+        assert 'edit failed' in output or 'Something went wrong' in output
         assert old is None and new is None
         assert tool_result['ok'] is False
+        assert tool_result['error_code'] == 'EDITOR_ERROR'
+        assert 'payload' not in tool_result
 
     def test_invalid_insert_line(self):
         editor = MagicMock()

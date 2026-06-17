@@ -346,10 +346,15 @@ def _resolve_symbol_candidates(
 def _symbol_action_ambiguity_error(
     symbol_name: str, candidates: list[dict[str, Any]]
 ) -> str:
+    from backend.execution.structured_edit_errors import (
+        compact_symbol_candidates,
+        symbol_ambiguity_summary,
+    )
+
+    compact = compact_symbol_candidates(candidates)
     return (
-        f'Symbol \'{symbol_name}\' is ambiguous. Use find_symbols or read(type="symbols") output '
-        f'to retry with path, qualified_name, and symbol_kind.\n'
-        + json.dumps({'candidates': candidates}, indent=2)
+        f'{symbol_ambiguity_summary(symbol_name, candidates)}\n'
+        + json.dumps({'candidates': compact}, separators=(',', ':'))
     )
 
 
@@ -370,7 +375,7 @@ def _single_symbol_candidate(
     )
     if not candidates:
         raise FunctionCallValidationError(
-            f"Symbol '{symbol_name}' not found in {path}."
+            f"edit_symbol failed: symbol not found.\nFile: {path}\nSymbol: {symbol_name}"
         )
     if len(candidates) > 1:
         raise FunctionCallValidationError(

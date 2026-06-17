@@ -116,6 +116,11 @@ CLR_AUTONOMY_CONSERVATIVE = '#91abec bold'  # conservative autonomy (blue)
 # ── Orient tool gutter ────────────────────────────────────────────────────────
 CLR_ORIENT_GUTTER = '#5a6a8a'  # dim blue-gray — orient tool icon/verb gutter
 
+# ── Error transcript block chrome (matches thinking/orient layout) ─────────────
+CLR_ERROR_PIPE = '#5a2d2d'  # left gutter pipe
+CLR_ERROR_PREFIX = '#fd8383'  # "Error:" label
+CLR_ERROR_BODY = 'dim #fd8383'  # error detail body
+
 # ── Section divider ────────────────────────────────────────────────────────────
 CLR_SECTION_RULE = '#32416a'  # "Tools & commands" divider rule
 

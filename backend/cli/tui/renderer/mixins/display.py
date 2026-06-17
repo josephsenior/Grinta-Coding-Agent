@@ -52,6 +52,7 @@ class RendererDisplayMixin:
         self._pending_terminal_card = None
         self._pending_shell_cards_by_command = defaultdict(deque)
         self._pending_file_read_cards_by_path = defaultdict(deque)
+        self._pending_checkpoint_line = None
         self._orient_burst_lines = []
         self._orient_burst_widgets = []
         self._orient_burst_area = 'codebase'
@@ -690,6 +691,73 @@ class RendererDisplayMixin:
         widget = OrientLine(model)
         self._append_transcript_widget(widget)
         return widget
+
+    def _write_session_panel(self, panel: Any) -> Any:
+        """Mount a session-tier panel (always-open body)."""
+        self._flush_orient_burst()
+        self.commit_live_thinking()
+        self._clear_last_active_card_processing()
+        self._append_transcript_widget(panel)
+        return panel
+
+    def _write_record_card(
+        self,
+        card: ActivityCard,
+        *,
+        processing: bool = False,
+    ) -> Any:
+        """Mount a record-tier panel (collapsed body until user expands)."""
+        from backend.cli.tui.widgets.record_panel import RecordPanel
+
+        self._flush_orient_burst()
+        self.commit_live_thinking()
+        self._clear_last_active_card_processing()
+        panel = RecordPanel.from_activity_card(
+            card,
+            processing=processing,
+            collapsed=True,
+        )
+        if processing:
+            self._activate_activity_card(panel)
+        self._append_transcript_widget(panel)
+        return panel
+
+    def _update_record_panel_outcome(
+        self,
+        widget: Any,
+        *,
+        status: str,
+        outcome: str | None = None,
+        extra_content: str | None = None,
+        meta_lines: list[str] | None = None,
+    ) -> None:
+        """Finalize a record-tier panel in place; always leave body collapsed."""
+        if widget is None:
+            return
+        if self._last_active_card is widget:
+            self._last_active_card = None
+        try:
+            widget.set_processing(False)
+        except Exception:
+            pass
+        try:
+            widget.set_status(status, outcome=outcome)
+        except Exception:
+            pass
+        if extra_content is not None:
+            try:
+                widget.update_content(extra_content)
+            except Exception:
+                pass
+        if meta_lines:
+            try:
+                widget.set_meta(*meta_lines)
+            except Exception:
+                pass
+        try:
+            widget.collapse()
+        except Exception:
+            pass
 
     def _flush_orient_burst(self) -> None:
         """No-op — orient lines stay as individual transcript rows."""

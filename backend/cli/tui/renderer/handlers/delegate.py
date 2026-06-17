@@ -56,7 +56,7 @@ def _update_or_write_delegate_card(
     if pending is not None:
         status = 'ok' if success else 'err'
         outcome = 'completed' if success else 'failed'
-        orch._update_activity_card_outcome(
+        orch._update_record_panel_outcome(
             pending,
             status=status,
             outcome=outcome,
@@ -64,7 +64,7 @@ def _update_or_write_delegate_card(
         )
         orch._pending_delegate_card = None
     else:
-        orch._write_card(card)
+        orch._write_record_card(card)
 
 
 def _handle_delegate_task_action(
@@ -77,7 +77,7 @@ def _handle_delegate_task_action(
         orch._active_worker_tasks.append(orch._summarize_worker_task(task))
     orch._sync_worker_strip()
     card = ActivityRenderer.delegation(task, worker)
-    widget = orch._write_card(card)
+    widget = orch._write_record_card(card, processing=True)
     orch._pending_delegate_card = widget
 
 

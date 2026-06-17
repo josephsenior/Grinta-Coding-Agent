@@ -1,0 +1,96 @@
+{
+  "provider": "moonshot",
+  "client": "openai_compatible",
+  "models": {
+    "kimi-k2.7-code": {
+      "runtime": {
+        "aliases": [
+          "moonshot/kimi-k2.7-code",
+          "moonshotai/kimi-k2.7-code",
+          "kimi-k2.7-code"
+        ],
+        "context_window_tokens": 256000,
+        "max_input_tokens": 223232,
+        "max_output_tokens": 32768,
+        "input_price_per_m": 0.95,
+        "output_price_per_m": 4.0,
+        "verified": true,
+        "featured": true,
+        "default_temperature": 1.0,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_reasoning_effort": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "reasoning_wire": "openai_thinking_enabled"
+      },
+      "metadata": {
+        "display_name": "Kimi K2.7 Code"
+      }
+    },
+    "kimi-k2.5": {
+      "runtime": {
+        "aliases": [
+          "moonshot/kimi-k2.5",
+          "moonshotai/kimi-k2.5",
+          "kimi-k2.5"
+        ],
+        "context_window_tokens": 262144,
+        "max_input_tokens": 196578,
+        "max_output_tokens": 65536,
+        "input_price_per_m": 0.6,
+        "output_price_per_m": 3.0,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_vision": true,
+        "supports_reasoning_effort": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "reasoning_wire": "openai_thinking_enabled"
+      },
+      "metadata": {
+        "display_name": "Kimi K2.5"
+      }
+    },
+    "kimi-k2.6": {
+      "runtime": {
+        "aliases": [
+          "moonshot/kimi-k2.6",
+          "moonshotai/kimi-k2.6",
+          "kimi-k2.6"
+        ],
+        "context_window_tokens": 262144,
+        "max_input_tokens": 250048,
+        "max_output_tokens": 8192,
+        "input_price_per_m": 0.95,
+        "output_price_per_m": 4.0,
+        "verified": true,
+        "featured": true,
+        "default_temperature": 1.0,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_reasoning_effort": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "reasoning_wire": "openai_thinking_enabled"
+      },
+      "metadata": {
+        "display_name": "Kimi K2.6"
+      }
+    }
+  }
+}

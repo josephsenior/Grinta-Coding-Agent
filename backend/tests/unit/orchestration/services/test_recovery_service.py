@@ -15,6 +15,7 @@ from backend.core.schemas import AgentState
 from backend.inference.exceptions import (
     APIConnectionError,
     AuthenticationError,
+    BadRequestError,
     ContentPolicyViolationError,
     ContextWindowExceededError,
     InternalServerError,
@@ -214,9 +215,28 @@ class TestRecoveryService:
         err_obs = mock_context.emit_event.call_args[0][0]
         assert err_obs.notify_ui_only is True
 
+    @pytest.mark.asyncio
+    async def test_bad_request_sets_notify_ui_only_and_skips_circuit_breaker(
+        self, mock_context, ctrl
+    ):
+        svc = RecoveryService(mock_context)
+        await svc.react_to_exception(
+            BadRequestError('invalid temperature: only 1 is allowed for this model')
+        )
+
+        ctrl.circuit_breaker_service.record_error.assert_not_called()
+        err_obs = mock_context.emit_event.call_args[0][0]
+        assert err_obs.notify_ui_only is True
+        assert err_obs.error_id == 'LLM_BAD_REQUEST'
+        assert err_obs.error_category == 'bad_request'
+        mock_context.set_agent_state.assert_awaited_once_with(
+            AgentState.AWAITING_USER_INPUT
+        )
+
     @pytest.mark.parametrize(
         'exc',
         [
+            BadRequestError('invalid temperature'),
             ContentPolicyViolationError('blocked'),
             ContextWindowExceededError('too long'),
             LLMContextWindowExceedError('too long'),

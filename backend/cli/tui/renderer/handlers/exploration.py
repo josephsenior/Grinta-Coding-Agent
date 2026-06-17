@@ -42,6 +42,15 @@ if TYPE_CHECKING:
     )
 
 
+def clear_pending_exploration_cards(orch: 'RendererEventProcessorMixin') -> None:
+    """Drop in-flight orient/search cards when a tool resolves as ErrorObservation."""
+    orch._pending_search_card = None
+    orch._pending_search_tool = ''
+    orch._pending_find_symbols_card = None
+    orch._pending_read_symbols_card = None
+    orch._pending_exploration_meta = None
+
+
 def _update_or_write_lsp_card(
     orch: 'RendererEventProcessorMixin',
     card: Any,
