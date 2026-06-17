@@ -10,6 +10,7 @@ from textual.containers import Container
 from textual.widgets import Static
 
 from backend.cli.theme import CLR_REASONING_SNAP
+from backend.cli.tui.image_attachments import image_attachment_status_text
 
 
 class TurnCompletion(Static):
@@ -51,11 +52,10 @@ class UserMessage(Static):
         body = (text or '').rstrip()
         parts: list[Any] = []
         if image_count > 0:
-            label = 'image' if image_count == 1 else 'images'
             parts.append(
                 Text(
-                    f'{image_count} {label} attached',
-                    style='#91abec italic',
+                    image_attachment_status_text(image_count),
+                    style='bold #5eead4',
                 )
             )
         if body:
