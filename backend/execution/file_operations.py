@@ -508,6 +508,42 @@ def read_video_file(filepath: str) -> FileReadObservation:
     return FileReadObservation(path=filepath, content=encoded_video)
 
 
+def _read_document_text(
+    filepath: str,
+    *,
+    label: str,
+    extractor,
+) -> FileReadObservation | ErrorObservation:
+    try:
+        content = extractor(filepath)
+    except RuntimeError as exc:
+        return ErrorObservation(str(exc))
+    except Exception as exc:
+        return ErrorObservation(f'Failed to read {label}: {filepath}: {exc}')
+    return FileReadObservation(path=filepath, content=content)
+
+
+def read_pdf_text_file(filepath: str) -> FileReadObservation | ErrorObservation:
+    """Extract text from a PDF file."""
+    from backend.execution.document_readers import extract_pdf_text
+
+    return _read_document_text(filepath, label='PDF', extractor=extract_pdf_text)
+
+
+def read_docx_file(filepath: str) -> FileReadObservation | ErrorObservation:
+    """Extract text from a DOCX file."""
+    from backend.execution.document_readers import extract_docx_text
+
+    return _read_document_text(filepath, label='DOCX', extractor=extract_docx_text)
+
+
+def read_pptx_file(filepath: str) -> FileReadObservation | ErrorObservation:
+    """Extract text from a PPTX file."""
+    from backend.execution.document_readers import extract_pptx_text
+
+    return _read_document_text(filepath, label='PPTX', extractor=extract_pptx_text)
+
+
 def read_text_file(filepath: str, action: FileReadAction) -> FileReadObservation:
     """Read a text file with optional line range.
 

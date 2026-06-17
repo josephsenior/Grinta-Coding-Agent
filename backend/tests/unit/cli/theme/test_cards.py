@@ -2,15 +2,7 @@
 
 from __future__ import annotations
 
-from backend.cli.theme.cards import file_change_kind_class, footer_color_for_exit_code
-
-
-def test_file_change_kind_class() -> None:
-    assert file_change_kind_class('+3') == '-create'
-    assert file_change_kind_class('+1 -1') == '-edit'
-    assert file_change_kind_class('-2') == '-edit'
-    assert file_change_kind_class(None) == ''
-    assert file_change_kind_class('') == ''
+from backend.cli.theme.cards import footer_color_for_exit_code
 
 
 def test_footer_color_for_exit_code() -> None:

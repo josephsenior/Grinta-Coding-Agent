@@ -9,19 +9,17 @@ from textual.containers import Container, Vertical
 from textual.widgets import Static
 
 from backend.cli.theme import NAVY_TEXT_MUTED, NAVY_TEXT_PRIMARY, NAVY_TEXT_SECONDARY
-from backend.cli.theme.cards import (
-    CARD_FILE_DELTA_PILL_BG,
-    file_change_kind_class,
-)
+from backend.cli.theme.cards import CARD_FILE_DELTA_PILL_BG
 from backend.cli.tui.widgets.activity_card.diff_lines import _format_file_delta_outcome
 from backend.cli.tui.widgets.unified_diff_view import (
+    DIFF_VIEW_CONTEXT_LINES,
     UnifiedDiffView,
     decode_diff_view_payload,
 )
 
 
 class FileChangeCard(Container):
-    """Path + delta header with a unified diff body scrolled by the transcript."""
+    """Path + delta header with a scroll-aware unified diff body."""
 
     DEFAULT_CSS = """
     FileChangeCard {
@@ -53,9 +51,6 @@ class FileChangeCard(Container):
         id: str | None = None,
     ) -> None:
         super().__init__(id=id, classes='file-change-card')
-        kind_class = file_change_kind_class(outcome)
-        if kind_class:
-            self.add_class(kind_class)
         self._display_path = display_path
         self._outcome = outcome
         self._encoded_diff = encoded_diff
@@ -124,4 +119,5 @@ class FileChangeCard(Container):
             new_content=payload.get('new'),
             patch=payload.get('patch'),
             max_lines=int(payload.get('max_lines') or 200),
+            n_context=int(payload.get('n_context') or DIFF_VIEW_CONTEXT_LINES),
         )

@@ -87,6 +87,15 @@ class TestConvertObservation:
         assert '[FILE_READ' in msg.content[0].text  # type: ignore[union-attr]
         assert 'file content' in msg.content[0].text  # type: ignore[union-attr]
 
+    def test_file_read_observation_image_injects_multimodal_when_vision_active(self):
+        data_url = 'data:image/png;base64,QUJDRA=='
+        obs = FileReadObservation(content=data_url, path='/tmp/a.png')
+        msg = convert_observation_to_message(
+            obs, max_message_chars=None, vision_is_active=True
+        )
+        assert msg.vision_enabled is True
+        assert any(isinstance(part, ImageContent) for part in msg.content)
+
     def test_file_edit_observation(self):
         obs = FileEditObservation(
             content='edited',

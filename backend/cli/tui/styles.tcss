@@ -92,24 +92,31 @@ FileChangeCard {
     height: auto;
     margin: 0 0 2 0;
     border: round #1b233a;
+    border-left: heavy #3d4a66;
     background: #08101d;
     padding: 0 0 1 0;
-}
-
-FileChangeCard.-create {
-    border-left: heavy #54efae;
-}
-
-FileChangeCard.-edit {
-    border-left: heavy #91abec;
 }
 
 /* ── Unified diff view ───────────────────────────────── */
 UnifiedDiffView {
     width: 100%;
-    height: auto;
     border-top: solid #1b233a;
     background: #060a14;
+    scrollbar-size-vertical: 1;
+    scrollbar-size-horizontal: 0;
+    scrollbar-color: #334155 #060a14;
+    scrollbar-color-hover: #475569 #060a14;
+    scrollbar-color-active: #64748b #060a14;
+}
+
+UnifiedDiffView.-compact {
+    height: auto;
+    overflow-y: hidden;
+}
+
+UnifiedDiffView.-scrollable {
+    height: 10;
+    overflow-y: auto;
 }
 
 UnifiedDiffView .diff-truncated {
@@ -144,8 +151,8 @@ UnifiedDiffRow .diff-code.rem {
 }
 
 UnifiedDiffRow .diff-code.hdr {
-    color: #91abec;
-    background: #0a1224;
+    color: #969aad;
+    background: transparent;
 }
 
 UnifiedDiffRow .diff-sign {

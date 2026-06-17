@@ -4,9 +4,11 @@ import asyncio
 import contextlib
 import shlex
 import time
+from pathlib import Path
 from typing import Any
 
 from textual.widgets import (
+    Label,
     ListView,
     TextArea,
 )
@@ -16,6 +18,11 @@ from backend.cli.tui.dialogs import GrintaSessionsDialog, GrintaSettingsDialog
 from backend.cli.tui.helpers import (
     _strip_ansi,
     _strip_terminal_control_literals,
+)
+from backend.cli.tui.image_attachments import (
+    encode_image_path_as_data_url,
+    is_supported_image_path,
+    pick_image_files_blocking,
 )
 from backend.cli.tui.widgets.small import (
     InputBar,
@@ -143,6 +150,80 @@ def _parse_positional_limit_arg(
 
 class ScreenInputMixin:
     """Input-related methods of GrintaScreen."""
+
+    def _max_image_attachment_bytes(self) -> int:
+        uploads = getattr(self._config, 'file_uploads', None)
+        max_mb = getattr(uploads, 'max_file_size_mb', 100) if uploads else 100
+        return int(max_mb) * 1024 * 1024
+
+    def _refresh_input_attachment_hint(self) -> None:
+        try:
+            hint = self.query_one('#input-hint', Label)
+            ta = self.query_one('#input', TextArea)
+        except Exception:
+            return
+        pending = len(getattr(self, '_pending_image_urls', []) or [])
+        if pending > 0:
+            label = 'image' if pending == 1 else 'images'
+            hint.update(
+                f'{pending} {label} attached · '
+                'Ctrl+Shift+X clear · Ctrl+Shift+I add more'
+            )
+            hint.display = True
+            return
+        if ta.text.strip():
+            hint.display = False
+            return
+        self._update_input_identity()
+
+    def action_clear_image_attachments(self) -> None:
+        self._pending_image_urls = []
+        self._pending_image_names = []
+        self._refresh_input_attachment_hint()
+        self.notify('Image attachments cleared.', severity='information', timeout=2.0)
+
+    def action_attach_images(self) -> None:
+        if getattr(self, '_turn_in_flight', False):
+            self.notify_warning('Wait for the current turn to finish.')
+            return
+        self.run_worker(self._attach_images_worker(), exclusive=True)
+
+    async def _attach_images_worker(self) -> None:
+        try:
+            selected = await asyncio.to_thread(pick_image_files_blocking)
+        except Exception as exc:
+            self.notify_error(f'Could not open file picker: {type(exc).__name__}: {exc}')
+            return
+        if not selected:
+            return
+
+        max_bytes = self._max_image_attachment_bytes()
+        added = 0
+        for path in selected:
+            if not is_supported_image_path(path):
+                self.notify_warning(f'Unsupported image type: {path}')
+                continue
+            try:
+                data_url = encode_image_path_as_data_url(path, max_bytes=max_bytes)
+            except ValueError as exc:
+                self.notify_warning(str(exc))
+                continue
+            except OSError as exc:
+                self.notify_warning(f'Could not read {path}: {exc}')
+                continue
+            self._pending_image_urls.append(data_url)
+            self._pending_image_names.append(Path(path).name)
+            added += 1
+
+        if added:
+            self._refresh_input_attachment_hint()
+            self.notify(
+                f'Attached {added} image(s).',
+                severity='information',
+                timeout=2.0,
+            )
+        else:
+            self.notify_warning('No images were attached.')
 
     def action_history_prev(self) -> None:
         """Navigate backward through command history."""
@@ -316,8 +397,9 @@ class ScreenInputMixin:
         if clean_text != ta.text:
             ta.text = clean_text
         text = _strip_ansi(clean_text).strip()
+        pending_images = list(getattr(self, '_pending_image_urls', []) or [])
         _tui_logger.debug(f'action_submit_input: text_len={len(text)}')
-        if not text:
+        if not text and not pending_images:
             self._submit_handle_empty_text()
             return
         if text.startswith('/'):
@@ -386,11 +468,13 @@ class ScreenInputMixin:
         ta.focus()
         self._scroll_to_bottom()
 
-    async def _handle_input_dispatch(self, agent_text: str) -> None:
+    async def _handle_input_dispatch(
+        self, agent_text: str, *, image_urls: list[str] | None = None
+    ) -> None:
         try:
             _tui_logger.debug('_handle_input: calling _dispatch_to_agent()')
             logger.info('[TUI] _handle_input: dispatching to agent')
-            await self._dispatch_to_agent(agent_text)
+            await self._dispatch_to_agent(agent_text, image_urls=image_urls)
             _tui_logger.debug(
                 f'_handle_input: _dispatch_to_agent done, state={self._controller.get_agent_state()}'
             )
@@ -434,6 +518,7 @@ class ScreenInputMixin:
             )
 
         agent_text: str | None = None
+        image_urls: list[str] | None = None
         async with self._input_lock:
             await self._handle_input_prepare_ui()
 
@@ -445,7 +530,11 @@ class ScreenInputMixin:
                 _tui_logger.debug('_handle_input: turn already in flight, ignoring')
                 return
 
-            self.add_user_message(text)
+            image_urls = list(getattr(self, '_pending_image_urls', []) or [])
+            self.add_user_message(text, image_count=len(image_urls))
+            self._pending_image_urls = []
+            self._pending_image_names = []
+            self._refresh_input_attachment_hint()
             self._render_hud_bar()
             self.query_one('#input-bar', InputBar).add_class('processing')
 
@@ -468,7 +557,7 @@ class ScreenInputMixin:
         if agent_text is None:
             return
 
-        await self._handle_input_dispatch(agent_text)
+        await self._handle_input_dispatch(agent_text, image_urls=image_urls)
 
     async def _handle_slash_command(self, text: str) -> None:
         raw = text.strip()

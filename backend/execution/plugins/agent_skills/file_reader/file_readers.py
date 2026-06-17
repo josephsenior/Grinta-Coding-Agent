@@ -22,6 +22,11 @@ Note:
 import base64
 from typing import Any, cast
 
+from backend.execution.document_readers import (
+    extract_docx_text,
+    extract_pdf_text,
+    extract_pptx_text,
+)
 from backend.execution.plugins.agent_skills.utils.config import (
     _get_max_token,
     _get_openai_client,
@@ -34,14 +39,6 @@ _DOCUMENTS_EXTRA_HINT = (
 )
 
 
-def _read_pdf_reader():
-    try:
-        from pypdf import PdfReader
-    except ImportError as exc:
-        raise RuntimeError(_DOCUMENTS_EXTRA_HINT) from exc
-    return PdfReader
-
-
 def parse_pdf(file_path: str) -> None:
     """Parses the content of a PDF file and prints it.
 
@@ -49,12 +46,7 @@ def parse_pdf(file_path: str) -> None:
         file_path: str: The path to the file to open.
 
     """
-    content = _read_pdf_reader()(file_path)
-    output_lines = [f'[Reading PDF file from {file_path}]']
-    for page_idx, page in enumerate(content.pages, start=1):
-        output_lines.append(f'@@ Page {page_idx} @@')
-        output_lines.append(page.extract_text() or '')
-        output_lines.append('')
+    output_lines = [f'[Reading PDF file from {file_path}]', extract_pdf_text(file_path)]
     print('\n'.join(output_lines) + '\n')
 
 
@@ -65,16 +57,7 @@ def parse_docx(file_path: str) -> None:
         file_path: str: The path to the file to open.
 
     """
-    try:
-        import docx  # type: ignore[import-untyped, import-not-found]
-    except ImportError as exc:
-        raise RuntimeError(_DOCUMENTS_EXTRA_HINT) from exc
-    content = docx.Document(file_path)
-    output_lines = [f'[Reading DOCX file from {file_path}]']
-    for i, para in enumerate(content.paragraphs, start=1):
-        output_lines.append(f'@@ Page {i} @@')
-        output_lines.append(para.text)
-        output_lines.append('')
+    output_lines = [f'[Reading DOCX file from {file_path}]', extract_docx_text(file_path)]
     print('\n'.join(output_lines) + '\n')
 
 
@@ -216,21 +199,7 @@ def parse_pptx(file_path: str) -> None:
 
     """
     try:
-        try:
-            from pptx import (
-                Presentation,  # type: ignore[import-untyped, import-not-found]
-            )
-        except ImportError as exc:
-            raise RuntimeError(_DOCUMENTS_EXTRA_HINT) from exc
-        pres = Presentation(file_path)
-        output_lines = [f'[Reading PowerPoint file from {file_path}]']
-        for slide_idx, slide in enumerate(pres.slides, start=1):
-            output_lines.append(f'@@ Slide {slide_idx} @@')
-            for shape in slide.shapes:
-                if hasattr(shape, 'text') and shape.text:
-                    output_lines.append(shape.text)
-            output_lines.append('')  # blank line between slides
-        output = '\n'.join(output_lines).rstrip('\n')
-        print(f'{output}\n')
+        output = f'[Reading PowerPoint file from {file_path}]\n{extract_pptx_text(file_path)}'
+        print(f'{output.rstrip()}\n')
     except Exception:
         pass

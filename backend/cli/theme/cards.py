@@ -5,7 +5,6 @@ from __future__ import annotations
 from backend.cli.theme.navy import (
     NAVY_BG,
     NAVY_BORDER,
-    NAVY_BRAND,
     NAVY_ERROR,
     NAVY_READY,
     NAVY_SCROLLBAR_THUMB,
@@ -27,8 +26,8 @@ DIFF_BG_ADD = '#122a22'
 DIFF_BG_REM = '#2a1a1a'
 DIFF_INLINE_ADD = NAVY_READY
 DIFF_INLINE_REM = NAVY_ERROR
-DIFF_HDR = NAVY_BRAND
-DIFF_HDR_BG = '#0a1224'
+DIFF_HDR = NAVY_TEXT_MUTED
+DIFF_HDR_BG = 'transparent'
 DIFF_TRUNCATED_FG = NAVY_TEXT_MUTED
 DIFF_LINE_ADD_TEXT = '#7de6a1'
 DIFF_LINE_REM_TEXT = '#ff9a9a'
@@ -38,8 +37,7 @@ DIFF_SPLIT_DIVIDER = '#26324f'
 
 CARD_FILE_BG = '#08101d'
 CARD_FILE_BORDER = NAVY_BORDER
-CARD_FILE_CREATE_ACCENT = NAVY_READY
-CARD_FILE_EDIT_ACCENT = NAVY_BRAND
+CARD_FILE_ACCENT = NAVY_TEXT_DIM
 CARD_FILE_DELTA_PILL_BG = '#0a1224'
 
 # ── Activity / terminal cards ──────────────────────────────────────────────────
@@ -75,20 +73,6 @@ TERM_HIDDEN_LINES_FG = '#54597b'
 TRANSCRIPT_BLOCK_MARGIN = 2
 TRANSCRIPT_PADDING_VERTICAL = 2
 
-
-
-def file_change_kind_class(outcome: str | None) -> str:
-    """Return CSS class suffix for file change cards: -create, -edit, or ''."""
-    if not outcome:
-        return ''
-    tokens = outcome.replace(',', ' ').replace('·', ' ').split()
-    has_add = any(t.startswith('+') and t[1:].isdigit() for t in tokens)
-    has_rem = any(t.startswith('-') and t[1:].isdigit() for t in tokens)
-    if has_add and not has_rem:
-        return '-create'
-    if has_add or has_rem:
-        return '-edit'
-    return ''
 
 
 def footer_color_for_exit_code(exit_code: int | None) -> str:

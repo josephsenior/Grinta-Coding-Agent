@@ -31,8 +31,10 @@ from backend.execution.action_execution_server_helpers import (
 )
 from backend.execution.file_operations import (
     handle_file_read_errors,
+    read_docx_file,
     read_image_file,
-    read_pdf_file,
+    read_pdf_text_file,
+    read_pptx_file,
     read_text_file,
     read_video_file,
 )
@@ -44,6 +46,21 @@ from backend.ledger.observation import (
     ErrorObservation,
     FileReadObservation,
     Observation,
+)
+
+_STRUCTURED_READ_EXTENSIONS = (
+    '.bmp',
+    '.docx',
+    '.gif',
+    '.jpeg',
+    '.jpg',
+    '.mp4',
+    '.ogg',
+    '.pdf',
+    '.png',
+    '.pptx',
+    '.webm',
+    '.webp',
 )
 
 if TYPE_CHECKING:
@@ -67,9 +84,6 @@ class _AesIoFileMixin:
             return shell_err
         assert bash_session is not None
 
-        if os.path.isfile(action.path) and is_binary(action.path):
-            return ErrorObservation('ERROR_BINARY_FILE')
-
         impl_source = action.impl_source
         if impl_source == FileReadSource.FILE_EDITOR or str(impl_source).lower() in {
             'file_editor',
@@ -85,17 +99,27 @@ class _AesIoFileMixin:
                 f"You're not allowed to access this path: {action.path}. You can only access paths inside the workspace."
             )
 
+        lower_path = filepath.lower()
+        if not lower_path.endswith(_STRUCTURED_READ_EXTENSIONS):
+            if os.path.isfile(filepath) and is_binary(filepath):
+                return ErrorObservation('ERROR_BINARY_FILE')
+
         return self._read_file_by_type(filepath, action, working_dir)
 
     def _read_file_by_type(
         self, filepath: str, action: FileReadAction, working_dir: str
     ) -> Observation:
         try:
-            if filepath.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif')):
+            lower = filepath.lower()
+            if lower.endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.webp')):
                 return read_image_file(filepath)
-            if filepath.lower().endswith('.pdf'):
-                return read_pdf_file(filepath)
-            if filepath.lower().endswith(('.mp4', '.webm', '.ogg')):
+            if lower.endswith('.pdf'):
+                return read_pdf_text_file(filepath)
+            if lower.endswith('.docx'):
+                return read_docx_file(filepath)
+            if lower.endswith('.pptx'):
+                return read_pptx_file(filepath)
+            if lower.endswith(('.mp4', '.webm', '.ogg')):
                 return read_video_file(filepath)
             return read_text_file(filepath, action)
         except Exception:

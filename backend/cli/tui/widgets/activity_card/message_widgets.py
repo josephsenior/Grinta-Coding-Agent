@@ -39,11 +39,35 @@ class TurnCompletion(Static):
 class UserMessage(Static):
     """User message display in the transcript."""
 
-    def __init__(self, text: str, *, id: str | None = None) -> None:
+    def __init__(
+        self,
+        text: str,
+        *,
+        image_count: int = 0,
+        id: str | None = None,
+    ) -> None:
         from backend.cli.tui.renderer.prep import prep_markdown
 
         body = (text or '').rstrip()
-        renderable = prep_markdown(body) if body else Text('')
+        parts: list[Any] = []
+        if image_count > 0:
+            label = 'image' if image_count == 1 else 'images'
+            parts.append(
+                Text(
+                    f'{image_count} {label} attached',
+                    style='#91abec italic',
+                )
+            )
+        if body:
+            parts.append(prep_markdown(body))
+        if not parts:
+            renderable: Any = Text('')
+        elif len(parts) == 1:
+            renderable = parts[0]
+        else:
+            from rich.console import Group
+
+            renderable = Group(*parts)
         super().__init__(renderable, id=id)
 
 
