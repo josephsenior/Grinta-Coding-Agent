@@ -5,16 +5,12 @@ from __future__ import annotations
 from backend.cli.theme.navy import (
     NAVY_BG,
     NAVY_BORDER,
-    NAVY_BORDER_HIGHLIGHT,
     NAVY_BRAND,
     NAVY_ERROR,
     NAVY_READY,
     NAVY_SCROLLBAR_THUMB,
-    NAVY_SCROLLBAR_TRACK,
     NAVY_TEXT_DIM,
     NAVY_TEXT_MUTED,
-    NAVY_TEXT_PRIMARY,
-    NAVY_TEXT_SECONDARY,
 )
 
 # ── Unified diff palette ─────────────────────────────────────────────────────

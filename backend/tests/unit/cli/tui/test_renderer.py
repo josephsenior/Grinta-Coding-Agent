@@ -2186,7 +2186,7 @@ async def test_tui_file_edit_create_renders_compact_create_card(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_tui_file_edit_observation_uses_diff_preview_rows(mock_config):
+async def test_tui_file_edit_observation_uses_new_content_not_polluted_preview(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -2622,7 +2622,7 @@ async def test_tui_file_edit_observation_uses_explicit_diff_rows(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_tui_file_edit_observation_uses_diff_preview_rows(mock_config):
+async def test_tui_file_edit_observation_uses_diff_preview_rows_in_content(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -2672,7 +2672,7 @@ async def test_tui_file_edit_observation_uses_diff_preview_rows(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_tui_file_edit_observation_uses_diff_preview_rows(mock_config):
+async def test_tui_file_edit_observation_uses_diff_preview_rows_with_outcome(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)

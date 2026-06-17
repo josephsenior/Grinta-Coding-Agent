@@ -8,11 +8,11 @@ from textual.app import ComposeResult
 from textual.containers import Container, Vertical
 from textual.widgets import Static
 
+from backend.cli.theme import NAVY_TEXT_MUTED, NAVY_TEXT_PRIMARY, NAVY_TEXT_SECONDARY
 from backend.cli.theme.cards import (
     CARD_FILE_DELTA_PILL_BG,
     file_change_kind_class,
 )
-from backend.cli.theme import NAVY_TEXT_MUTED, NAVY_TEXT_PRIMARY, NAVY_TEXT_SECONDARY
 from backend.cli.tui.widgets.activity_card.diff_lines import _format_file_delta_outcome
 from backend.cli.tui.widgets.unified_diff_view import (
     UnifiedDiffView,

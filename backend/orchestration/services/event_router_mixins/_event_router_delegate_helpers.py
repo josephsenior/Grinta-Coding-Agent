@@ -61,7 +61,6 @@ def _summarize_delegate_file_action(
         )
         return 'running', f'Read {event.path}{loc}'
 
-    from backend.ledger.action import FileEditAction
 
     if isinstance(event, FileEditAction):
         command = getattr(event, 'command', '') or ''

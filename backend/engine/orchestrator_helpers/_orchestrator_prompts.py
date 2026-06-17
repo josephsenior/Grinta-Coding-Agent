@@ -39,8 +39,8 @@ def _set_prompt_tier_from_recent_history(orch: Orchestrator, state: State) -> No
     """Escalate to debug tier on recent errors or elevated-risk file operations."""
     with contextlib.suppress(Exception):
         from backend.core.enums import ActionSecurityRisk
-        from backend.ledger.observation import ErrorObservation
         from backend.ledger.action import FileEditAction
+        from backend.ledger.observation import ErrorObservation
 
         recent = state.history[-12:] if len(state.history) > 12 else state.history
         if any(isinstance(e, ErrorObservation) for e in recent):
