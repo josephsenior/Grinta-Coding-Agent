@@ -2,6 +2,8 @@
 
 BOOTSTRAP := python scripts/bootstrap_env.py
 
+.DEFAULT_GOAL := help
+
 .PHONY: pretest
 pretest:
 	@bash ./backend/scripts/dev/clean_pycache.sh
@@ -60,16 +62,12 @@ docker-up-no-db:
 		exit 1; \
 	fi
 
-# Makefile for App project
+# Makefile for the current Grinta CLI/TUI contributor workflow
 SHELL=/usr/bin/env bash
 
 # Variables
 BACKEND_HOST ?= "127.0.0.1"
 BACKEND_PORT ?= 3000
-BACKEND_HOST_PORT = "$(BACKEND_HOST):$(BACKEND_PORT)"
-DEFAULT_LOCAL_DATA_DIR = "./workspace"
-DEFAULT_MODEL = "gpt-4o"
-CONFIG_FILE = settings.json
 PRE_COMMIT_CONFIG_PATH = "./.pre-commit-config.yaml"
 PYTHON_VERSION = 3.12
 
@@ -208,40 +206,29 @@ start-backend:
 	@echo "$(YELLOW)Starting backend...$(RESET)"
 	@uv run uvicorn backend.execution.action_execution_server:app --host $(BACKEND_HOST) --port $(BACKEND_PORT) --reload --reload-exclude "./workspace"
 
-# Run the app
-run:
-	@echo "$(YELLOW)Running the app...$(RESET)"
-	@mkdir -p logs
-	@echo "$(YELLOW)Starting backend server...$(RESET)"
-	@uv run uvicorn backend.execution.action_execution_server:app --host $(BACKEND_HOST) --port $(BACKEND_PORT) &
-	@echo "$(YELLOW)Waiting for the backend to start...$(RESET)"
-	@until nc -z localhost $(BACKEND_PORT); do sleep 0.1; done
-	@echo "$(GREEN)Backend started successfully on $(BACKEND_HOST_PORT).$(RESET)"
-	@echo "$(GREEN)Launch TUI with: uv run app-tui$(RESET)"
+.PHONY: init-cli
+init-cli:
+	@echo "$(YELLOW)Launching interactive CLI setup...$(RESET)"
+	@uv run python -m backend.cli.entry init
 
-# Setup settings.json
-setup-config:
-	@echo "$(YELLOW)Setting up App configuration...$(RESET)"
-	@$(MAKE) setup-config-prompts
-	@mv $(CONFIG_FILE).tmp $(CONFIG_FILE)
-	@echo "$(GREEN)settings.json setup completed.$(RESET)"
+.PHONY: run-cli
+run-cli:
+	@echo "$(YELLOW)Launching Grinta from the source checkout...$(RESET)"
+	@uv run python -m backend.cli.entry
 
-setup-config-prompts:
-	@echo '{"local_data_root":"$(DEFAULT_LOCAL_DATA_DIR)","llm_model":"$(DEFAULT_MODEL)","llm_api_key":"","llm_base_url":""}' > $(CONFIG_FILE).tmp
-	@read -p "Enter local data root (LocalFileStore directory, absolute path) [default: $(DEFAULT_LOCAL_DATA_DIR)]: " data_root_dir; \
-	 data_root_dir=$${data_root_dir:-$(DEFAULT_LOCAL_DATA_DIR)}; \
-	 $(PYTHON) -c "import json; f='$(CONFIG_FILE).tmp'; d=json.load(open(f)); d['local_data_root']='$$data_root_dir'; json.dump(d, open(f,'w'), indent=2)"
-	@read -p "Enter your LLM model name [default: $(DEFAULT_MODEL)]: " llm_model; \
-	 llm_model=$${llm_model:-$(DEFAULT_MODEL)}; \
-	 $(PYTHON) -c "import json; f='$(CONFIG_FILE).tmp'; d=json.load(open(f)); d['llm_model']='$$llm_model'; json.dump(d, open(f,'w'), indent=2)"
-	@read -p "Enter your LLM API key: " llm_api_key; \
-	 $(PYTHON) -c "import json; f='$(CONFIG_FILE).tmp'; d=json.load(open(f)); d['llm_api_key']='$$llm_api_key'; json.dump(d, open(f,'w'), indent=2)"
-	@read -p "Enter your LLM base URL [mostly used for local LLMs, leave blank if not needed]: " llm_base_url; \
-	 $(PYTHON) -c "import json; f='$(CONFIG_FILE).tmp'; d=json.load(open(f)); d['llm_base_url']='$$llm_base_url'; json.dump(d, open(f,'w'), indent=2)"
+.PHONY: smoke-onboarding
+smoke-onboarding:
+	@echo "$(YELLOW)Running onboarding smoke checks (wheel + source)...$(RESET)"
+	@uv build --wheel
+	@WHEEL_DIR=./dist ./scripts/smoke_install.sh
+	@./scripts/smoke_source_onboarding.sh
+	@echo "$(GREEN)Onboarding smoke checks completed.$(RESET)"
 
-setup-config-basic:
-	@cp settings.template.json settings.json 2>/dev/null || (echo '{"local_data_root":"./workspace","max_budget_per_task":5.0,"llm_model":"$(DEFAULT_MODEL)","llm_api_key":"","llm_base_url":""}' > settings.json)
-	@echo "$(GREEN)settings.json created.$(RESET)"
+.PHONY: run
+run: run-cli
+
+.PHONY: setup-config
+setup-config: init-cli
 
 # Clean up all caches
 clean:
@@ -253,13 +240,20 @@ clean:
 help:
 	@echo "$(BLUE)Usage: make [target]$(RESET)"
 	@echo "Targets:"
-	@echo "  $(GREEN)build$(RESET)               - Build project, including environment setup and dependencies."
-	@echo "  $(GREEN)lint$(RESET)                - Run linters on the project."
-	@echo "  $(GREEN)setup-config$(RESET)        - Setup the configuration for App by providing LLM API key,"
-	@echo "                        LLM Model name, and local data root directory."
-	@echo "  $(GREEN)start-backend$(RESET)       - Start the backend server for the App project."
-	@echo "  $(GREEN)run$(RESET)                 - Start the backend, then launch the TUI with: uv run app-tui"
-	@echo "  $(GREEN)help$(RESET)                - Display this help message, providing information on available targets."
+	@echo "  $(GREEN)bootstrap-dev-test$(RESET)  - Sync the source-checkout dev + test dependency profile."
+	@echo "  $(GREEN)init-cli$(RESET)            - Run the interactive 'grinta init' flow from source."
+	@echo "  $(GREEN)run-cli$(RESET)             - Launch the Grinta CLI/TUI from source."
+	@echo "  $(GREEN)test-unit$(RESET)           - Run the unit test suite."
+	@echo "  $(GREEN)reliability-gate$(RESET)    - Run the full local reliability verification gate."
+	@echo "  $(GREEN)smoke-onboarding$(RESET)    - Build a wheel and run wheel + source onboarding smokes."
+	@echo "  $(GREEN)lint$(RESET)                - Run pre-commit across the repository."
+	@echo "  $(GREEN)build$(RESET)               - Bootstrap dependencies and install pre-commit hooks."
+	@echo "  $(GREEN)run$(RESET)                 - Compatibility alias for run-cli."
+	@echo "  $(GREEN)setup-config$(RESET)        - Compatibility alias for init-cli."
+	@echo "  $(GREEN)start-backend$(RESET)       - Legacy maintenance target for the action execution server."
+	@echo "  $(GREEN)compile-protos$(RESET)      - Rebuild protobuf-generated files."
+	@echo "  $(GREEN)update-openapi$(RESET)      - Refresh the generated OpenAPI schema."
+	@echo "  $(GREEN)help$(RESET)                - Show this target summary."
 
 # Phony targets
-.PHONY: build check-dependencies check-system check-python check-uv install-python-dependencies install-pre-commit-hooks lint start-backend run setup-config setup-config-prompts setup-config-basic clean help
+.PHONY: build check-dependencies check-system check-python check-uv install-python-dependencies install-pre-commit-hooks lint start-backend init-cli run-cli smoke-onboarding run setup-config clean help

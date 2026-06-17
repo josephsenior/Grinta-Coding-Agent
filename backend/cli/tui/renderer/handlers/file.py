@@ -25,13 +25,13 @@ from backend.cli.tui.renderer.helpers.file import (
     resolve_edit_mode_range,
     resolve_no_cmd_line_range,
 )
-from backend.ledger.observation.files import file_edit_observation_is_new_file
 from backend.ledger.action import FileEditAction, FileReadAction, FileWriteAction
 from backend.ledger.observation import (
     FileEditObservation,
     FileReadObservation,
     FileWriteObservation,
 )
+from backend.ledger.observation.files import file_edit_observation_is_new_file
 
 if TYPE_CHECKING:
     from backend.cli.tui.renderer.mixins.event_processor import (

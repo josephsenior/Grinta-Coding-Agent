@@ -375,7 +375,9 @@ def process_tool_calls(
             response_obj=response,
             total_calls_in_response=len(assistant_msg.tool_calls),
         )
-        _log_emitted_tool_action(action, tool_call, arguments, len(assistant_msg.tool_calls))
+        _log_emitted_tool_action(
+            action, tool_call, arguments, len(assistant_msg.tool_calls)
+        )
 
         actions.append(action)
 

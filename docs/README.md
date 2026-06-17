@@ -7,6 +7,7 @@ Choose a path:
 | Install and run the terminal app, configure models | [Quick Start](QUICK_START.md), [Install](INSTALL.md), [User Guide](USER_GUIDE.md) |
 | Debug failures and platform issues | [Troubleshooting](TROUBLESHOOTING.md), [Support Matrix](SUPPORT_MATRIX.md) |
 | Understand the system or contribute code | [Contributor Map](CONTRIBUTOR_MAP.md), [Architecture](ARCHITECTURE.md), [Developer Guide](DEVELOPER.md), [Vocabulary](VOCABULARY.md), [CI](CI.md), [Contributing](../CONTRIBUTING.md) |
+| Maintain releases and keep docs honest | [Release Checklist](RELEASE_CHECKLIST.md), [Fresh Machine Onboarding](FRESH_MACHINE_ONBOARDING.md), [Roadmap](../ROADMAP.md) |
 
 ## The Book of Grinta (narrative)
 
@@ -29,3 +30,5 @@ Long-form engineering memoir and technical chapters: **[journey/README.md](journ
 | ADRs | [ADR.md](ADR.md) |
 
 The repository root [README.md](../README.md) links here and to the rest of the project.
+
+Current-product rule of thumb: root docs and the top-level docs pages describe the supported surface; `docs/journey/` is historical narrative and may describe behavior that has since changed.

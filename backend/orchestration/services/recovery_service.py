@@ -645,9 +645,7 @@ class RecoveryService:
             return
 
         ids = ', '.join(getattr(s, 'id', '?') for s in in_progress_steps)
-        directive = (
-            f'Recoverable error during in_progress plan step(s): [{ids}].'
-        )
+        directive = f'Recoverable error during in_progress plan step(s): [{ids}].'
         state.set_planning_directive(
             directive,
             source=f'RecoveryService.task_reconciliation({type(exc).__name__})',

@@ -120,9 +120,7 @@ class FileEditorRollbackMixin:
             return
 
         if not file_path.exists() or not file_path.is_file():
-            raise ToolError(
-                'FILE_UNEXPECTEDLY_MODIFIED: file missing during rollback.'
-            )
+            raise ToolError('FILE_UNEXPECTEDLY_MODIFIED: file missing during rollback.')
         disk_now = self._read_file(file_path)
         if disk_now != expected_content:
             raise ToolError(

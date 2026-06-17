@@ -809,7 +809,6 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
         truncate_diff,
         truncate_large_text,
     )
-
     from backend.ledger.observation.files import resolve_file_edit_outcome
 
     command = action.command or ''

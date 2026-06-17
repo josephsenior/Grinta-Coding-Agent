@@ -138,7 +138,10 @@ def test_recent_causal_tail_keeps_latest_progress_after_chat_burst(
         lambda state=None: tmp_path / 'canonical_task_state.json',
     )
     command = _cmd('python -m pytest backend/tests/unit/context', 100)
-    events = [command, *[_user(f'continue {index}', 200 + index) for index in range(12)]]
+    events = [
+        command,
+        *[_user(f'continue {index}', 200 + index) for index in range(12)],
+    ]
 
     packet = build_context_packet(events, events, char_budget=1800)
 

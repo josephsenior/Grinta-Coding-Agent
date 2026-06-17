@@ -385,9 +385,7 @@ class PendingActionService:
             extra={'msg_type': 'PENDING_ACTION_TIMEOUT_CLEARED'},
         )
         timeout_observation: Observation = ErrorObservation(
-            content=(
-                f'Pending action timed out after {elapsed:.1f}s: {action_type}.'
-            ),
+            content=(f'Pending action timed out after {elapsed:.1f}s: {action_type}.'),
             error_id='PENDING_ACTION_TIMEOUT',
             timeout_kind='pending_action',
         )
