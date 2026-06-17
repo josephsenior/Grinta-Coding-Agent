@@ -206,7 +206,7 @@ def streaming_render_interval(text: str) -> float:
         return 0.08
     if '`' in text:
         return 0.12
-    return 0.2
+    return 0.1
 
 
 def prep_unified_diff_text(diff_text: str) -> str:

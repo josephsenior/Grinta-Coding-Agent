@@ -2910,6 +2910,33 @@ async def test_terminal_append_does_not_remount_all_children(mock_config):
 
 
 @pytest.mark.asyncio
+async def test_incremental_tail_highlights_partial_json(mock_config):
+    """Incremental non-terminal cards should syntax-highlight as content arrives."""
+    from rich.syntax import Syntax
+
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+        card = TUIActivityCard(
+            verb='Read',
+            detail='data.json',
+            badge_category='code',
+            collapsed=False,
+        )
+        card.enable_incremental_mode()
+        await pilot.app.mount(card)
+        card.append_content_incremental('{"name": "gr')
+        await pilot.pause()
+
+        tail = card.query_one('#incremental-tail', Static)
+        assert isinstance(tail.renderable, Syntax)
+        assert tail.renderable.lexer.name.lower() == 'json'
+
+
+@pytest.mark.asyncio
 async def test_tui_debugger_events_render_terminal_style_card(mock_config, monkeypatch):
     console = RichConsole()
     loop = asyncio.get_running_loop()
