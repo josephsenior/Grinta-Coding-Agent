@@ -152,7 +152,11 @@ def path_is_within_workspace(path: str | Path, workspace_root: str | Path) -> bo
 
 def _security_command_text(action: Any) -> str:
     """Return command text for command-like actions, else an empty string."""
-    from backend.ledger.action import CmdRunAction, TerminalInputAction, TerminalRunAction
+    from backend.ledger.action import (
+        CmdRunAction,
+        TerminalInputAction,
+        TerminalRunAction,
+    )
 
     if isinstance(action, CmdRunAction):
         return action.command or ''

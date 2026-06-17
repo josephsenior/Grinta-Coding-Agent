@@ -307,7 +307,9 @@ class ObservationService:
                 )
 
     @staticmethod
-    def _log_tool_observation_resolution(pending_action, observation: Observation) -> None:
+    def _log_tool_observation_resolution(
+        pending_action, observation: Observation
+    ) -> None:
         meta = getattr(pending_action, 'tool_call_metadata', None)
         if meta is None and getattr(observation, 'tool_call_metadata', None) is None:
             return

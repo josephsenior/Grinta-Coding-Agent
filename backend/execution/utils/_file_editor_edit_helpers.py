@@ -561,9 +561,7 @@ def handle_write_maybe_short_circuit_impl(
     if result is not None:
         return result
 
-    result = _check_write_dry_run(
-        self, dry_run, file_path, content, old_content
-    )
+    result = _check_write_dry_run(self, dry_run, file_path, content, old_content)
     if result is not None:
         return result
 
@@ -607,7 +605,9 @@ def _compose_write_commit_output(
     content: str,
     soft_warning: str,
 ) -> str:
-    output_msg = _compose_write_success_message(content=content, soft_warning=soft_warning)
+    output_msg = _compose_write_success_message(
+        content=content, soft_warning=soft_warning
+    )
     return output_msg
 
 

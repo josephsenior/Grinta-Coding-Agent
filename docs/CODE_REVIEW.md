@@ -1,8 +1,15 @@
-# Comprehensive Code Review - Grinta
+# Historical Code Review Snapshot - Grinta
+
+This document is a point-in-time engineering review, not a maintained release
+specification. For the current product surface and support stance, use
+[`README.md`](../README.md), [`USER_GUIDE.md`](USER_GUIDE.md),
+[`SUPPORT_MATRIX.md`](SUPPORT_MATRIX.md), and
+[`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md).
 
 ## Executive Summary
 
-**Grinta** is an impressive, production-grade autonomous coding agent. After thorough analysis of ~1,200+ files and 207K+ lines of Python code, here is my assessment:
+**Grinta** is an impressive, production-grade autonomous coding agent. After a
+large local analysis pass, here is the assessment captured in this snapshot:
 
 **Overall Rating: 8.5/10** - Excellent architecture, minor areas for improvement.
 
@@ -179,7 +186,8 @@ This codebase shows significant engineering investment and follows best practice
 - Middleware pipeline for cross-cutting concerns
 - Proper async/await patterns throughout
 
-**Would I Use This?** Yes, confidently. The architecture is solid, the security model is robust, and the performance characteristics (local-first, <1.5MB wheel) are impressive.
+**Would I Use This?** Yes, confidently. The architecture is solid, the security
+model is robust, and the local-first packaging approach is impressive.
 
 ---
 

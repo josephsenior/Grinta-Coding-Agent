@@ -25,7 +25,9 @@ def test_error_guidance_matches_auth_failure() -> None:
 
 
 def test_error_guidance_matches_range_edit_missing_lines() -> None:
-    guidance = error_guidance('edit requires start_line and end_line (missing: end_line).')
+    guidance = error_guidance(
+        'edit requires start_line and end_line (missing: end_line).'
+    )
     assert guidance is not None
     assert guidance.error_code == 'ERR-TE-001'
 

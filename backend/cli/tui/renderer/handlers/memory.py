@@ -52,9 +52,7 @@ def _render_checkpoint_card(
 def _handle_checkpoint_observation(
     orch: 'RendererEventProcessorMixin', event: CheckpointObservation
 ) -> None:
-    _render_checkpoint_card(
-        orch, event.content, source_tool='checkpoint'
-    )
+    _render_checkpoint_card(orch, event.content, source_tool='checkpoint')
 
 
 def _handle_working_memory_observation(

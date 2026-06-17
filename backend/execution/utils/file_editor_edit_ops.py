@@ -91,8 +91,7 @@ def apply_edit_logic(
             return _tool_result(
                 output='',
                 error=(
-                    f'edit requires start_line and end_line '
-                    f'(missing: {missing_str}).'
+                    f'edit requires start_line and end_line (missing: {missing_str}).'
                 ),
                 new_content=old_content_str,
             )

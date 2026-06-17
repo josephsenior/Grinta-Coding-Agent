@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core.errors import FunctionCallValidationError
 from backend.core.enums import ActionSecurityRisk
+from backend.core.errors import FunctionCallValidationError
 from backend.engine.tools.terminal_manager import handle_terminal_manager_tool
 from backend.ledger.action.terminal import (
     TerminalInputAction,

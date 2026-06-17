@@ -926,8 +926,7 @@ async def _execute_direct_tool(
             _build_mcp_error_payload(
                 action_name=action.name,
                 message=(
-                    f"MCP tool '{action.name}' unavailable: "
-                    f'{type(e).__name__}: {e}'
+                    f"MCP tool '{action.name}' unavailable: {type(e).__name__}: {e}"
                 ),
                 code='MCP_SERVER_UNAVAILABLE',
                 retryable=True,

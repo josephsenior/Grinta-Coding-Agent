@@ -128,7 +128,9 @@ class FileEditorEditOpsMixin:
             new_result.detail, new_content, file_path
         )
         enriched_msg = self._attach_content_context(enriched_msg, new_content)
-        return f'INTRODUCED_SYNTAX_ERROR: edit introduced syntax errors.\n{enriched_msg}'
+        return (
+            f'INTRODUCED_SYNTAX_ERROR: edit introduced syntax errors.\n{enriched_msg}'
+        )
 
     @staticmethod
     def _preflight_content_guard(file_path: Path, content: str) -> str | None:
