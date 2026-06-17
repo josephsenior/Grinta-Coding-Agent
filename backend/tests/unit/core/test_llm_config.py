@@ -63,6 +63,23 @@ class TestFieldValidation:
         assert cfg.temperature == 0.5
 
 
+class TestVisionActivation:
+    def test_vision_active_for_catalog_vision_model(self):
+        with suppress_llm_env_export():
+            cfg = LLMConfig(model='openai/gpt-5')
+        assert cfg.vision_is_active is True
+
+    def test_vision_inactive_when_disabled(self):
+        with suppress_llm_env_export():
+            cfg = LLMConfig(model='openai/gpt-5', disable_vision=True)
+        assert cfg.vision_is_active is False
+
+    def test_vision_inactive_for_non_vision_catalog_model(self):
+        with suppress_llm_env_export():
+            cfg = LLMConfig(model='deepseek/deepseek-chat')
+        assert cfg.vision_is_active is False
+
+
 # ---------------------------------------------------------------------------
 # URL validation
 # ---------------------------------------------------------------------------
