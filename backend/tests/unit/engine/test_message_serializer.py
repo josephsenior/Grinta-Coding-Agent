@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from backend.core.message import ImageContent, Message, TextContent
 from backend.engine.message_serializer import (
     MessageSerializationError,
     serialize_messages,
@@ -43,3 +44,20 @@ def test_serialize_messages_degraded_mode(monkeypatch):
         monkeypatch.delenv('APP_DEGRADED_MESSAGE_SERIALIZATION', raising=False)
     assert out[0]['role'] == 'user'
     assert out[0]['content'] == 'fallback text'
+
+
+def test_serialize_messages_preserves_image_blocks():
+    msg = Message(
+        role='user',
+        vision_enabled=True,
+        content=[
+            TextContent(text='see this'),
+            ImageContent(image_urls=['data:image/png;base64,QUJDRA==']),
+        ],
+    )
+    out = serialize_messages([msg])
+    assert isinstance(out[0]['content'], list)
+    assert any(
+        isinstance(part, dict) and part.get('type') == 'image_url'
+        for part in out[0]['content']
+    )

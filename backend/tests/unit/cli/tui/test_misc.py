@@ -540,10 +540,114 @@ async def test_tui_scroll_badge_shows_and_follows_tail(mock_config, monkeypatch)
         assert badge.has_class('-hidden')
 
 
-def test_unified_diff_view_does_not_create_nested_scroll() -> None:
-    """Diff bodies should scroll with the transcript, not trap the wheel."""
+def test_unified_diff_view_scrollable_after_ten_lines() -> None:
     from textual.containers import VerticalScroll
 
+    from backend.cli.tui.widgets.unified_diff_view import (
+        DIFF_VIEW_VISIBLE_LINES,
+        UnifiedDiffView,
+    )
+
+    assert issubclass(UnifiedDiffView, VerticalScroll)
+    assert DIFF_VIEW_VISIBLE_LINES == 10
+
+    compact = UnifiedDiffView(
+        old_content='',
+        new_content='\n'.join(f'line{i}' for i in range(1, 6)),
+    )
+    assert compact.has_class('-compact')
+    assert not compact.has_class('-scrollable')
+
+    scrollable = UnifiedDiffView(
+        old_content='',
+        new_content='\n'.join(f'line{i}' for i in range(1, 13)),
+    )
+    assert scrollable.has_class('-scrollable')
+    assert not scrollable.allow_vertical_scroll
+
+
+def test_unified_diff_view_compact_does_not_claim_vertical_scroll() -> None:
     from backend.cli.tui.widgets.unified_diff_view import UnifiedDiffView
 
-    assert not issubclass(UnifiedDiffView, VerticalScroll)
+    view = UnifiedDiffView(old_content='alpha', new_content='beta')
+    assert view.has_class('-compact')
+    assert not view.allow_vertical_scroll
+
+
+def test_diff_view_shows_two_context_lines_for_contents() -> None:
+    from backend.cli.tui.widgets.unified_diff_view import (
+        DIFF_VIEW_CONTEXT_LINES,
+        build_diff_view_rows,
+    )
+
+    old = '\n'.join(f'line{i}' for i in range(1, 11))
+    new = old.replace('line5', 'CHANGED')
+    rows = build_diff_view_rows(old_content=old, new_content=new)
+    ctx_texts = [row.text for row in rows if row.kind == 'ctx']
+
+    assert DIFF_VIEW_CONTEXT_LINES == 2
+    assert 'line3' in ctx_texts
+    assert 'line4' in ctx_texts
+    assert 'line6' in ctx_texts
+    assert 'line7' in ctx_texts
+    assert 'line1' not in ctx_texts
+    assert 'line10' not in ctx_texts
+
+
+def test_diff_view_trims_patch_context_to_two_lines() -> None:
+    from backend.cli.tui.widgets.unified_diff_view import build_diff_view_rows
+
+    patch = '\n'.join(
+        [
+            '--- a/demo.py',
+            '+++ b/demo.py',
+            '@@ -1,11 +1,11 @@',
+            ' ctx0',
+            ' ctx1',
+            ' ctx2',
+            ' ctx3',
+            ' ctx4',
+            '-old',
+            '+new',
+            ' ctx5',
+            ' ctx6',
+            ' ctx7',
+            ' ctx8',
+            ' ctx9',
+        ]
+    )
+    rows = build_diff_view_rows(patch=patch)
+    ctx_texts = [row.text for row in rows if row.kind == 'ctx']
+
+    assert 'ctx3' in ctx_texts
+    assert 'ctx4' in ctx_texts
+    assert 'ctx5' in ctx_texts
+    assert 'ctx6' in ctx_texts
+    assert 'ctx0' not in ctx_texts
+    assert 'ctx9' not in ctx_texts
+    assert any(row.text == '…' for row in rows if row.kind == 'hdr')
+
+
+def test_syntax_line_text_keeps_colors_without_background() -> None:
+    from rich.style import Style
+    from rich.text import Text
+
+    from backend.cli.tui.widgets.unified_diff_view import (
+        _strip_text_backgrounds,
+        _syntax_line_text,
+    )
+
+    tinted = Text('def foo():', style=Style(color='#7dcfff', bgcolor='#17233a'))
+    tinted.stylize(Style(color='#82aaff', bgcolor='#07101d'), 4, 7)
+    stripped = _strip_text_backgrounds(tinted)
+    assert stripped.plain == 'def foo():'
+    for span in stripped.spans:
+        style = span.style if isinstance(span.style, Style) else Style.parse(span.style)
+        assert style.bgcolor is None
+        assert style.color is not None
+
+    rendered = _syntax_line_text('def foo():', 'python')
+    assert 'foo' in rendered.plain
+    for span in rendered.spans:
+        style = span.style if isinstance(span.style, Style) else Style.parse(str(span.style))
+        assert style.bgcolor is None

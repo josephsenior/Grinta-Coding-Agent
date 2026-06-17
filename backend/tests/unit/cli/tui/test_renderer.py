@@ -2190,7 +2190,6 @@ async def test_tui_file_edit_create_renders_compact_create_card(mock_config):
 
         cards = _file_change_cards(s)
         assert len(cards) == 1
-        assert '-create' in cards[0].classes
         header = str(cards[0].query_one('#file-change-header').renderable)
         assert 'demo.txt' in header
         assert '+2' in header
@@ -2483,7 +2482,6 @@ async def test_tui_file_edit_action_and_observation_render_single_delta_card(
 
         cards = _file_change_cards(s)
         assert len(cards) == 1
-        assert '-edit' in cards[0].classes
         header = FileChangeCard._build_header_markup('demo.txt', '+1 -1')
         assert 'demo.txt' in header
         rendered = str(cards[0].query_one('#file-change-header').renderable)

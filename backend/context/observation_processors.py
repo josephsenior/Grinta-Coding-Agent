@@ -70,7 +70,7 @@ def convert_observation_to_message(
 
     handler = _OBSERVATION_DISPATCH.get(type(event))
     if handler is not None:
-        if isinstance(event, BrowserScreenshotObservation):
+        if isinstance(event, (BrowserScreenshotObservation, FileReadObservation)):
             return handler(event, max_message_chars, vision_is_active)
         return handler(event, max_message_chars)
 
@@ -79,10 +79,30 @@ def convert_observation_to_message(
 
 @_register_observation_handler(FileReadObservation)
 def _handle_file_read_observation(
-    obs: FileReadObservation, max_message_chars: int | None
+    obs: FileReadObservation,
+    max_message_chars: int | None,
+    vision_is_active: bool = False,
 ) -> Message:
     path = getattr(obs, 'path', 'unknown')
-    text = truncate_content(obs.content, max_message_chars, strategy='head_heavy')
+    content = obs.content or ''
+    if (
+        vision_is_active
+        and _is_valid_image_url(content)
+        and content.startswith('data:image/')
+    ):
+        cap = truncate_content(
+            f'[FILE_READ path={path}]\nImage attached below.',
+            max_message_chars,
+        )
+        return Message(
+            role='user',
+            vision_enabled=True,
+            content=[
+                TextContent(text=cap),
+                ImageContent(image_urls=[content]),
+            ],
+        )
+    text = truncate_content(content, max_message_chars, strategy='head_heavy')
     text = f'[FILE_READ path={path}]\n{text}'
     return Message(role='user', content=[TextContent(text=text)])
 

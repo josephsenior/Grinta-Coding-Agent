@@ -442,7 +442,17 @@ def _handle_message_action(
         vision_is_active=vision_is_active,
     )
     reasoning_content = getattr(action, 'thought', None) or None
-    return [Message(role=role, content=content, reasoning_content=reasoning_content)]
+    vision_enabled = vision_is_active and any(
+        isinstance(item, ImageContent) for item in content
+    )
+    return [
+        Message(
+            role=role,
+            content=content,
+            reasoning_content=reasoning_content,
+            vision_enabled=vision_enabled,
+        )
+    ]
 
 
 def _handle_user_cmd_action(action: CmdRunAction) -> list[Message]:

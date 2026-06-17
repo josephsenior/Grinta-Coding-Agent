@@ -769,7 +769,9 @@ class ScreenLifecycleMixin:
 
         return state
 
-    async def _dispatch_to_agent(self, text: str) -> None:
+    async def _dispatch_to_agent(
+        self, text: str, *, image_urls: list[str] | None = None
+    ) -> None:
         _tui_logger.debug('_dispatch_to_agent: ENTER')
         if self._controller is None or self._event_stream is None:
             _tui_logger.debug(
@@ -777,7 +779,10 @@ class ScreenLifecycleMixin:
             )
             return
 
-        action = MessageAction(content=text)
+        action = MessageAction(
+            content=text,
+            image_urls=image_urls or None,
+        )
         self._event_stream.add_event(action, EventSource.USER)
         _tui_logger.debug('_dispatch_to_agent: event added')
         try:

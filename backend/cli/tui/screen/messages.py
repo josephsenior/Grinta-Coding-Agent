@@ -43,7 +43,7 @@ class ScreenMessagesMixin:
         if self._renderer:
             self._renderer.add_to_history(renderable)
 
-    def add_user_message(self, text: str) -> None:
+    def add_user_message(self, text: str, *, image_count: int = 0) -> None:
         """User message."""
         self.finalize_thinking()
         if self._renderer:
@@ -54,7 +54,7 @@ class ScreenMessagesMixin:
             return
         from backend.cli.tui.widgets.activity_card import UserMessage
 
-        widget = UserMessage(text)
+        widget = UserMessage(text, image_count=image_count)
         display.append_widget(widget)
 
     def add_agent_message(self, text: str) -> None:

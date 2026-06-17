@@ -18,6 +18,14 @@ def _flatten_content_list(content_val: list[Any]) -> str:
     return '\n'.join(texts)
 
 
+def _content_list_has_images(content_val: list[Any]) -> bool:
+    return any(
+        isinstance(item, dict)
+        and (item.get('type') == 'image_url' or 'image_url' in item)
+        for item in content_val
+    )
+
+
 def _extract_text_chunks(msg: Message) -> list[str]:
     fallback_lines: list[str] = []
     for chunk in getattr(msg, 'content', []) or []:
@@ -62,8 +70,12 @@ def _serialize_message_with_fallback(msg: Message) -> dict:
 
 
 def _serialize_single_message(msg: Message) -> dict:
+    if getattr(msg, 'contains_image', False):
+        msg.vision_enabled = True
     raw = _serialize_message_with_fallback(msg)
     content_val = raw.get('content', '')
+    if isinstance(content_val, list) and _content_list_has_images(content_val):
+        return raw
     if isinstance(content_val, list):
         raw['content'] = _flatten_content_list(content_val)
     return raw
