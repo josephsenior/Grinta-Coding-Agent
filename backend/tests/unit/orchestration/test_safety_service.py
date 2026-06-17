@@ -15,7 +15,6 @@ from backend.ledger.action import (
     CmdRunAction,
     FileEditAction,
     FileReadAction,
-    FileWriteAction,
     TerminalInputAction,
     TerminalRunAction,
 )
@@ -55,7 +54,7 @@ class TestActionRequiresConfirmation:
     def test_mutating_and_external_actions_require_confirmation_flow(self):
         svc = SafetyService(_make_context())
         actions = [
-            FileWriteAction(path='/tmp/x.py', content='x'),
+            FileEditAction(path='/tmp/x.py', command='create_file', file_text='x'),
             TerminalRunAction(command='pytest -q'),
             TerminalInputAction(session_id='term-1', input='pytest -q'),
             MCPAction(name='tool_x', arguments={}),

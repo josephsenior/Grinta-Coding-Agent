@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from backend.core.logger import app_logger as logger
 from backend.ledger import EventSource
-from backend.ledger.action import CmdRunAction, FileReadAction, FileWriteAction
+from backend.ledger.action import CmdRunAction, FileEditAction, FileReadAction
 from backend.ledger.observation import (
     CmdOutputObservation,
     ErrorObservation,
@@ -41,7 +41,7 @@ class GitSetupMixin:
 
         def log(self, level: str, message: str) -> None: ...
         def read(self, action: FileReadAction) -> Any: ...
-        def write(self, action: FileWriteAction) -> Any: ...
+        def edit(self, action: FileEditAction) -> Any: ...
         def run(self, action: CmdRunAction) -> Any: ...
         def run_action(self, action: Any) -> Any: ...
         def set_runtime_status(
@@ -201,8 +201,12 @@ class GitSetupMixin:
 
         write_obs = cast(
             Any,
-            self.write(
-                FileWriteAction(path=pre_commit_hook, content=pre_commit_hook_content)
+            self.edit(
+                FileEditAction(
+                    path=pre_commit_hook,
+                    command='create_file',
+                    file_text=pre_commit_hook_content,
+                )
             ),
         )
         if isinstance(write_obs, ErrorObservation):

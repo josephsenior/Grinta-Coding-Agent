@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 
 from backend.core.enums import ActionSecurityRisk
-from backend.ledger.action import CmdRunAction, FileWriteAction
+from backend.ledger.action import CmdRunAction, FileEditAction
 from backend.security.analyzer import SecurityAnalyzer
 from backend.security.command_analyzer import CommandAnalyzer, RiskCategory
 
@@ -131,46 +131,58 @@ class TestWindowsPathTraversal:
 
     @pytest.mark.asyncio
     async def test_write_to_windows_dir(self, sec_analyzer: SecurityAnalyzer):
-        action = FileWriteAction(
-            path='C:\\Windows\\System32\\malicious.dll', content='bad'
+        action = FileEditAction(
+            path='C:\\Windows\\System32\\malicious.dll',
+            command='create_file',
+            file_text='bad',
         )
         risk = await sec_analyzer.security_risk(action)
         assert risk >= ActionSecurityRisk.MEDIUM
 
     @pytest.mark.asyncio
     async def test_write_to_program_files(self, sec_analyzer: SecurityAnalyzer):
-        action = FileWriteAction(
-            path='C:\\Program Files\\App\\payload.exe', content='bad'
+        action = FileEditAction(
+            path='C:\\Program Files\\App\\payload.exe',
+            command='create_file',
+            file_text='bad',
         )
         risk = await sec_analyzer.security_risk(action)
         assert risk >= ActionSecurityRisk.MEDIUM
 
     @pytest.mark.asyncio
     async def test_write_to_dotenv_windows(self, sec_analyzer: SecurityAnalyzer):
-        action = FileWriteAction(path='C:\\project\\.env', content='SECRET=abc')
+        action = FileEditAction(
+            path='C:\\project\\.env', command='create_file', file_text='SECRET=abc'
+        )
         risk = await sec_analyzer.security_risk(action)
         assert risk >= ActionSecurityRisk.MEDIUM
 
     @pytest.mark.asyncio
     async def test_write_to_aws_creds_windows(self, sec_analyzer: SecurityAnalyzer):
-        action = FileWriteAction(
-            path='C:\\Users\\me\\.aws\\credentials', content='leak'
+        action = FileEditAction(
+            path='C:\\Users\\me\\.aws\\credentials',
+            command='create_file',
+            file_text='leak',
         )
         risk = await sec_analyzer.security_risk(action)
         assert risk >= ActionSecurityRisk.MEDIUM
 
     @pytest.mark.asyncio
     async def test_write_to_ssh_windows(self, sec_analyzer: SecurityAnalyzer):
-        action = FileWriteAction(
-            path='C:\\Users\\me\\.ssh\\id_rsa', content='-----BEGIN RSA-----'
+        action = FileEditAction(
+            path='C:\\Users\\me\\.ssh\\id_rsa',
+            command='create_file',
+            file_text='-----BEGIN RSA-----',
         )
         risk = await sec_analyzer.security_risk(action)
         assert risk >= ActionSecurityRisk.MEDIUM
 
     @pytest.mark.asyncio
     async def test_safe_write_windows(self, sec_analyzer: SecurityAnalyzer):
-        action = FileWriteAction(
-            path='C:\\project\\src\\main.py', content="print('hello')\n"
+        action = FileEditAction(
+            path='C:\\project\\src\\main.py',
+            command='create_file',
+            file_text="print('hello')\n",
         )
         risk = await sec_analyzer.security_risk(action)
         assert risk == ActionSecurityRisk.LOW

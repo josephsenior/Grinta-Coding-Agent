@@ -40,21 +40,20 @@ def _collect_syntax_errors(node: Any, source: bytes, max_errors: int = 5) -> lis
 def _extract_syntax_check_payload(
     action: object, observation: Observation | None = None
 ) -> tuple[str, bytes | None] | None:
-    from backend.ledger.action import FileEditAction, FileWriteAction
+    from backend.ledger.action import FileEditAction
 
-    if isinstance(action, FileEditAction):
-        observed_new_content = getattr(observation, 'new_content', None)
-        if isinstance(observed_new_content, str):
-            raw: str | None = observed_new_content
-        elif action.command in {'create_file', 'write'}:
-            raw = action.file_text or action.new_str
-        else:
-            return None
-        return action.path, raw.encode('utf-8') if raw else None
-    if isinstance(action, FileWriteAction):
-        raw = action.content
-        return action.path, raw.encode('utf-8') if raw else None
-    return None
+    if not isinstance(action, FileEditAction):
+        return None
+
+    edit_action = action
+    observed_new_content = getattr(observation, 'new_content', None)
+    if isinstance(observed_new_content, str):
+        raw: str | None = observed_new_content
+    elif edit_action.command in {'create_file'}:
+        raw = edit_action.file_text or edit_action.new_str
+    else:
+        return None
+    return edit_action.path, raw.encode('utf-8') if raw else None
 
 
 def _append_syntax_check_result(

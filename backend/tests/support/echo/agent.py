@@ -9,16 +9,16 @@ from backend.ledger.action import (
     Action,
     AgentRejectAction,
     CmdRunAction,
+    FileEditAction,
     FileReadAction,
-    FileWriteAction,
     MessageAction,
 )
 from backend.ledger.observation import (
     AgentStateChangedObservation,
     CmdOutputMetadata,
     CmdOutputObservation,
+    FileEditObservation,
     FileReadObservation,
-    FileWriteObservation,
     Observation,
 )
 from backend.ledger.serialization.event import event_to_dict
@@ -26,7 +26,6 @@ from backend.orchestration.agent import Agent
 from backend.orchestration.state.state import State
 
 # FIXME: There are a few problems this surfaced
-# * FileWrites seem to add an unintended newline at the end of the file
 # * Browser not working
 
 
@@ -64,10 +63,19 @@ class Echo(Agent):
                 ],
             },
             {
-                'action': FileWriteAction(
-                    content='echo "Hello, World!"', path='hello.sh'
+                'action': FileEditAction(
+                    path='hello.sh',
+                    command='create_file',
+                    file_text='echo "Hello, World!"',
                 ),
-                'observations': [FileWriteObservation(content='', path='hello.sh')],
+                'observations': [
+                    FileEditObservation(
+                        content='',
+                        path='hello.sh',
+                        outcome='created',
+                        new_content='echo "Hello, World!"',
+                    )
+                ],
             },
             {
                 'action': FileReadAction(path='hello.sh'),

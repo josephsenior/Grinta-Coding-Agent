@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from backend.core.enums import ActionSecurityRisk
-from backend.ledger.action import CmdRunAction, FileWriteAction
+from backend.ledger.action import CmdRunAction, FileEditAction
 from backend.ledger.action.message import MessageAction
 from backend.security.analyzer import (
     _SENSITIVE_WRITE_PATHS,
@@ -69,30 +69,36 @@ class TestCommandRisk:
 
 
 # ---------------------------------------------------------------------------
-# FileWriteAction risk assessment
+# FileEditAction risk assessment
 # ---------------------------------------------------------------------------
 
 
-class TestFileWriteRisk:
+class TestFileEditCreateRisk:
     @pytest.mark.asyncio
     async def test_safe_write(self):
         sa = SecurityAnalyzer()
-        action = FileWriteAction(path='src/main.py', content="print('hello')\n")
+        action = FileEditAction(
+            path='src/main.py', command='create_file', file_text="print('hello')\n"
+        )
         risk = await sa.security_risk(action)
         assert risk == ActionSecurityRisk.LOW
 
     @pytest.mark.asyncio
     async def test_write_to_sensitive_path(self):
         sa = SecurityAnalyzer()
-        action = FileWriteAction(path='/etc/passwd', content='bad\n')
+        action = FileEditAction(
+            path='/etc/passwd', command='create_file', file_text='bad\n'
+        )
         risk = await sa.security_risk(action)
         assert risk >= ActionSecurityRisk.MEDIUM
 
     @pytest.mark.asyncio
     async def test_write_to_ssh_path(self):
         sa = SecurityAnalyzer()
-        action = FileWriteAction(
-            path='/home/user/.ssh/authorized_keys', content='ssh-rsa ...'
+        action = FileEditAction(
+            path='/home/user/.ssh/authorized_keys',
+            command='create_file',
+            file_text='ssh-rsa ...',
         )
         risk = await sa.security_risk(action)
         assert risk >= ActionSecurityRisk.MEDIUM
@@ -100,15 +106,19 @@ class TestFileWriteRisk:
     @pytest.mark.asyncio
     async def test_write_to_env_file(self):
         sa = SecurityAnalyzer()
-        action = FileWriteAction(path='.env', content='SECRET=leak\n')
+        action = FileEditAction(
+            path='.env', command='create_file', file_text='SECRET=leak\n'
+        )
         risk = await sa.security_risk(action)
         assert risk >= ActionSecurityRisk.MEDIUM
 
     @pytest.mark.asyncio
     async def test_write_windows_system_path(self):
         sa = SecurityAnalyzer()
-        action = FileWriteAction(
-            path='C:\\Windows\\System32\\evil.dll', content='binary'
+        action = FileEditAction(
+            path='C:\\Windows\\System32\\evil.dll',
+            command='create_file',
+            file_text='binary',
         )
         risk = await sa.security_risk(action)
         assert risk >= ActionSecurityRisk.MEDIUM
@@ -118,21 +128,27 @@ class TestFileWriteRisk:
         # The escalate-only analyzer no longer treats Python syntax errors as
         # a security risk — they are a code-quality concern handled by linters.
         sa = SecurityAnalyzer()
-        action = FileWriteAction(path='broken.py', content='def f(\n  x = \n')
+        action = FileEditAction(
+            path='broken.py', command='create_file', file_text='def f(\n  x = \n'
+        )
         risk = await sa.security_risk(action)
         assert risk == ActionSecurityRisk.LOW
 
     @pytest.mark.asyncio
     async def test_valid_python_no_extra_risk(self):
         sa = SecurityAnalyzer()
-        action = FileWriteAction(path='good.py', content='x = 1\n')
+        action = FileEditAction(
+            path='good.py', command='create_file', file_text='x = 1\n'
+        )
         risk = await sa.security_risk(action)
         assert risk == ActionSecurityRisk.LOW
 
     @pytest.mark.asyncio
     async def test_non_python_file_no_ast(self):
         sa = SecurityAnalyzer()
-        action = FileWriteAction(path='data.json', content='{"key": "val"}')
+        action = FileEditAction(
+            path='data.json', command='create_file', file_text='{"key": "val"}'
+        )
         risk = await sa.security_risk(action)
         assert risk == ActionSecurityRisk.LOW
 
@@ -180,7 +196,9 @@ class TestEscalateOnly:
     @pytest.mark.asyncio
     async def test_sensitive_path_write_is_high(self):
         sa = SecurityAnalyzer()
-        risk = await sa.security_risk(FileWriteAction(path='.env', content='X=1'))
+        risk = await sa.security_risk(
+            FileEditAction(path='.env', command='create_file', file_text='X=1')
+        )
         assert risk == ActionSecurityRisk.HIGH
 
 

@@ -19,7 +19,6 @@ from backend.core.enums import ActionSecurityRisk
 from backend.ledger.action import (
     CmdRunAction,
     FileEditAction,
-    FileWriteAction,
     MessageAction,
 )
 
@@ -95,10 +94,12 @@ class TestActionLabel:
         assert label.startswith('edit:')
         assert '/some/file.py' in label
 
-    def test_file_write(self) -> None:
-        action = FileWriteAction(path='/new/file.py', content='code')
+    def test_file_edit_create(self) -> None:
+        action = FileEditAction(
+            path='/new/file.py', command='create_file', file_text='code'
+        )
         label = _action_label(action)
-        assert label.startswith('write:')
+        assert label.startswith('edit:')
         assert '/new/file.py' in label
 
     def test_other_action(self) -> None:
@@ -117,8 +118,10 @@ class TestFileLabel:
         action = FileEditAction(path='/foo/bar.py', command='edit', new_str='x')
         assert _file_label(action) == '/foo/bar.py'
 
-    def test_file_write(self) -> None:
-        action = FileWriteAction(path='/foo/baz.py', content='x')
+    def test_file_edit_create(self) -> None:
+        action = FileEditAction(
+            path='/foo/baz.py', command='create_file', file_text='x'
+        )
         assert _file_label(action) == '/foo/baz.py'
 
     def test_cmd_run_returns_dash(self) -> None:
@@ -205,9 +208,11 @@ class TestRenderConfirmation:
             result = render_confirmation(console, action)
         assert result.approved is False
 
-    def test_file_write_action(self) -> None:
+    def test_file_edit_create_action(self) -> None:
         console = _quiet_console()
-        action = FileWriteAction(path='/tmp/test.txt', content='hello')
+        action = FileEditAction(
+            path='/tmp/test.txt', command='create_file', file_text='hello'
+        )
         with patch('rich.prompt.Prompt.ask', return_value='y'):
             result = render_confirmation(console, action)
         assert result.approved is True

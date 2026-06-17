@@ -116,21 +116,11 @@ class RendererTerminalMixin:
     ) -> None:
         if processing:
             self._activate_activity_card(widget)
-            self._tui.set_current_operation(
-                f'{verb} {detail}'.strip(),
-                meta=secondary or f'session {session_key}',
-                active=True,
-            )
             return
 
         widget.set_processing(False)
         if self._last_active_card is widget:
             self._last_active_card = None
-        self._tui.set_current_operation(
-            f'{verb} {detail}'.strip(),
-            meta=secondary or f'session {session_key}',
-            active=False,
-        )
 
     def _upsert_terminal_session_card(
         self,
@@ -238,11 +228,6 @@ class RendererTerminalMixin:
 
         widget.update_content(output_text)
         widget.set_processing(False)
-        self._tui.set_current_operation(
-            f'{card.verb} {card.detail}'.strip(),
-            meta=card.secondary or 'completed',
-            active=False,
-        )
 
     def _create_shell_command_card(self, command: str) -> Any:
         from backend.cli.tui.widgets.activity_card import (
@@ -269,11 +254,6 @@ class RendererTerminalMixin:
         widget.set_processing(True)
         self._activate_activity_card(widget)
         self._pending_shell_cards_by_command[command].append(widget)
-        self._tui.set_current_operation(
-            f'{card.verb} {card.detail}'.strip(),
-            meta='running',
-            active=True,
-        )
         display = self._tui._get_display()
         display.append_widget(widget)
         return widget

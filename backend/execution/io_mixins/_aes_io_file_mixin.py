@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING
 from binaryornot.check import is_binary
 
 from backend.core.enums import FileReadSource
-from backend.core.logger import app_logger as logger
 from backend.execution.action_execution_server_helpers import (
     edit_try_directory_view as _edit_try_directory_view_impl,
 )
@@ -31,23 +30,20 @@ from backend.execution.action_execution_server_helpers import (
     resolve_path as _resolve_path_impl,
 )
 from backend.execution.file_operations import (
-    ensure_directory_exists,
     handle_file_read_errors,
     read_image_file,
     read_pdf_file,
     read_text_file,
     read_video_file,
-    write_file_content,
 )
 from backend.ledger.action import (
     FileEditAction,
     FileReadAction,
-    FileWriteAction,
+    FileEditAction,
 )
 from backend.ledger.observation import (
     ErrorObservation,
     FileReadObservation,
-    FileWriteObservation,
     Observation,
 )
 
@@ -105,34 +101,6 @@ class _AesIoFileMixin:
             return read_text_file(filepath, action)
         except Exception:
             return handle_file_read_errors(filepath, working_dir)
-
-    async def write(self, action: FileWriteAction) -> Observation:
-        bash_session, shell_err = await asyncio.to_thread(
-            self._get_or_recreate_default_shell_session
-        )
-        if shell_err is not None:
-            return shell_err
-        assert bash_session is not None
-
-        working_dir = bash_session.cwd
-        try:
-            filepath = self._resolve_workspace_file_path(action.path, working_dir)
-        except PermissionError as exc:
-            return ErrorObservation(f'Permission error on {action.path}: {exc}')
-
-        try:
-            ensure_directory_exists(filepath)
-            file_exists = os.path.exists(filepath)
-            error_obs = write_file_content(filepath, action, file_exists)
-            if error_obs:
-                return error_obs
-            return FileWriteObservation(
-                content=f'Wrote file: {action.path}',
-                path=action.path,
-            )
-        except Exception as exc:
-            logger.error('Error writing file %s: %s', action.path, exc, exc_info=True)
-            return ErrorObservation(f'Failed to write file {action.path}: {exc}')
 
     def _edit_try_directory_view(
         self, filepath: str, path_for_obs: str, action: FileEditAction

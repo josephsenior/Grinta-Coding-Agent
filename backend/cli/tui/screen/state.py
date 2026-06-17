@@ -455,26 +455,6 @@ class ScreenStateMixin:
             self._phase_started_at = time.monotonic()
             self._render_hud_bar()
 
-    def set_current_operation(
-        self,
-        summary: str,
-        *,
-        meta: str = '',
-        active: bool = True,
-    ) -> None:
-        summary_text = re.sub(r'\s+', ' ', (summary or '').strip()) or 'Idle'
-        if len(summary_text) > 120:
-            summary_text = summary_text[:117] + '...'
-        meta_text = re.sub(r'\s+', ' ', (meta or '').strip())
-        if len(meta_text) > 140:
-            meta_text = meta_text[:137] + '...'
-        self._current_operation_summary = summary_text
-        self._current_operation_meta = meta_text or 'Waiting for activity'
-        self._current_operation_active = active
-
-    def clear_current_operation(self, meta: str = 'Waiting for activity') -> None:
-        self.set_current_operation('Idle', meta=meta, active=False)
-
     def set_retry_status(
         self,
         summary: str,

@@ -12,7 +12,6 @@ from backend.ledger.action import (
     CmdRunAction,
     FileEditAction,
     FileReadAction,
-    FileWriteAction,
     TerminalInputAction,
     TerminalRunAction,
 )
@@ -65,7 +64,7 @@ class TestSafetyService(unittest.IsolatedAsyncioTestCase):
     def test_action_requires_confirmation_mutating_and_external_actions(self):
         """Mutating and external-execution actions enter the confirmation flow."""
         actions = [
-            FileWriteAction(path='/test', content='x'),
+            FileEditAction(path='/test', command='create_file', file_text='x'),
             TerminalRunAction(command='pytest -q'),
             TerminalInputAction(session_id='term-1', input='pytest -q'),
             MCPAction(name='tool_x', arguments={}),

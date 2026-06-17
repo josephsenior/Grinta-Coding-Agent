@@ -101,7 +101,6 @@ def _deserialize_action(data: dict[str, Any]) -> ActionSchemaUnion:
         CmdRunActionSchema,
         FileEditActionSchema,
         FileReadActionSchema,
-        FileWriteActionSchema,
         MessageActionSchema,
         NullActionSchema,
         SystemMessageActionSchema,
@@ -113,7 +112,6 @@ def _deserialize_action(data: dict[str, Any]) -> ActionSchemaUnion:
 
     action_schemas: dict[str, type[BaseEventSchema]] = {
         'read': FileReadActionSchema,
-        'write': FileWriteActionSchema,
         'edit': FileEditActionSchema,
         'run': CmdRunActionSchema,
         'message': MessageActionSchema,

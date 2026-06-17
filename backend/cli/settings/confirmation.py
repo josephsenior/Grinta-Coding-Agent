@@ -32,7 +32,6 @@ from backend.ledger.action import (
     Action,
     CmdRunAction,
     FileEditAction,
-    FileWriteAction,
 )
 
 
@@ -76,13 +75,11 @@ def _action_label(action: Action) -> str:
         return f'shell: {shorten_middle(action.command)}'
     if isinstance(action, FileEditAction):
         return f'edit: {shorten_path(action.path or "—")}'
-    if isinstance(action, FileWriteAction):
-        return f'write: {shorten_path(action.path or "—")}'
     return type(action).__name__
 
 
 def _file_label(action: Action) -> str:
-    if isinstance(action, (FileEditAction, FileWriteAction)):
+    if isinstance(action, FileEditAction):
         return shorten_path(action.path or '—')
     if isinstance(action, CmdRunAction):
         return '—'

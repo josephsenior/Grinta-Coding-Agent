@@ -373,30 +373,42 @@ class TestAutoCheckMiddlewarePipeline(unittest.TestCase):
         self.assertIn('<SYNTAX_CHECK_FAILED>', obs.content)
         self.assertIn("'return' outside function", obs.content)
 
-    def test_file_write_valid_js(self):
-        """FileWriteAction with valid JS → SYNTAX_CHECK_PASSED."""
-        from backend.ledger.action.files import FileWriteAction
-        from backend.ledger.observation import FileWriteObservation
+    def test_file_edit_create_valid_js(self):
+        """FileEditAction create_file with valid JS → SYNTAX_CHECK_PASSED."""
+        from backend.ledger.action.files import FileEditAction
+        from backend.ledger.observation import FileEditObservation
 
-        action = FileWriteAction(
+        action = FileEditAction(
             path='/workspace/index.js',
-            content='function hello() { return 42; }\n',
+            command='create_file',
+            file_text='function hello() { return 42; }\n',
         )
-        obs = FileWriteObservation(content='File written', path='/workspace/index.js')
+        obs = FileEditObservation(
+            content='File written',
+            path='/workspace/index.js',
+            outcome='created',
+            new_content='function hello() { return 42; }\n',
+        )
         pipeline, ctx = self._make_pipeline_and_ctx(action)
         self._run(pipeline.run_observe(ctx, obs))
         self.assertIn('<SYNTAX_CHECK_PASSED />', obs.content)
 
-    def test_file_write_invalid_ts(self):
-        """FileWriteAction with invalid TS → SYNTAX_CHECK_FAILED."""
-        from backend.ledger.action.files import FileWriteAction
-        from backend.ledger.observation import FileWriteObservation
+    def test_file_edit_create_invalid_ts(self):
+        """FileEditAction create_file with invalid TS → SYNTAX_CHECK_FAILED."""
+        from backend.ledger.action.files import FileEditAction
+        from backend.ledger.observation import FileEditObservation
 
-        action = FileWriteAction(
+        action = FileEditAction(
             path='/workspace/app.ts',
-            content='const x: number = ;\n',
+            command='create_file',
+            file_text='const x: number = ;\n',
         )
-        obs = FileWriteObservation(content='File written', path='/workspace/app.ts')
+        obs = FileEditObservation(
+            content='File written',
+            path='/workspace/app.ts',
+            outcome='created',
+            new_content='const x: number = ;\n',
+        )
         pipeline, ctx = self._make_pipeline_and_ctx(action)
         self._run(pipeline.run_observe(ctx, obs))
         self.assertIn('<SYNTAX_CHECK_FAILED>', obs.content)

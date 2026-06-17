@@ -9,9 +9,8 @@ from backend.ledger.action import (
     FileEditAction,
     FileReadAction,
 )
-from backend.ledger.action.agent import AgentThinkAction
 from backend.ledger.action.mcp import MCPAction
-from backend.ledger.observation import AgentThinkObservation, Observation
+from backend.ledger.observation import FileEditObservation, Observation
 
 
 class _RuntimeStub(Runtime):
@@ -45,15 +44,35 @@ class _RuntimeStub(Runtime):
         raise NotImplementedError
 
 
-def test_run_action_preserves_tool_result_for_tool_backed_think_action() -> None:
+def _make_runtime(workspace: Path) -> _RuntimeStub:
     runtime = object.__new__(_RuntimeStub)
-    action = AgentThinkAction(
-        thought='[CHECKPOINT] Saved #1: phase 1', source_tool='checkpoint'
+    runtime.workspace_root = workspace
+    return runtime
+
+
+def test_enhance_observation_preserves_file_edit_fields(tmp_path: Path) -> None:
+    runtime = _make_runtime(tmp_path)
+    file_path = tmp_path / 'demo.md'
+    file_path.write_text('# Demo\nline two\n', encoding='utf-8')
+
+    observation = FileEditObservation(
+        content='File created successfully. Line endings: \\n. File preview:\n1\t# Demo',
+        path='demo.md',
+        outcome='created',
+        old_content=None,
+        new_content='# Demo\nline two',
     )
-    action.tool_result = {'tool': 'checkpoint', 'ok': True, 'status': 'saved'}
 
-    observation = runtime.run_action(action)
+    enhanced = runtime._enhance_observation_with_line_count(
+        observation,
+        'demo.md',
+        file_path,
+    )
 
-    assert isinstance(observation, AgentThinkObservation)
-    assert observation.suppress_cli is True
-    assert observation.tool_result == action.tool_result
+    assert enhanced is observation
+    assert isinstance(enhanced, FileEditObservation)
+    assert enhanced.new_content == '# Demo\nline two'
+    assert enhanced.old_content is None
+    assert enhanced.outcome == 'created'
+    assert 'File written: demo.md (2 lines)' in enhanced.content
+    assert enhanced.content.startswith('File created successfully.')

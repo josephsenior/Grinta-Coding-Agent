@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 from backend.core.enums import FileReadSource
 from backend.ledger.action import CmdRunAction
 from backend.ledger.observation import CmdOutputObservation
-from backend.ledger.observation.files import FileReadObservation, FileWriteObservation
+from backend.ledger.observation.files import FileEditObservation, FileReadObservation
 from backend.validation.task_validator import (
     CompositeValidator,
     DiffValidator,
@@ -228,7 +228,9 @@ class TestFileExistsValidator:
 
     async def test_expected_output_files_on_task_skips_prose_regex(self):
         v = FileExistsValidator()
-        ev = FileWriteObservation(path='out.txt', content='ok')
+        ev = FileEditObservation(
+            path='out.txt', content='ok', outcome='created', new_content='ok'
+        )
         state = self._make_state([ev])
         task = Task(
             description='Quoted "ghost.json" should not be required',

@@ -7,9 +7,9 @@ from typing import Any
 from backend.cli.tui.helpers import (
     _count_text_lines,
     _encode_diff_view_from_contents,
-    _extract_tagged_block,
+    _format_diff_summary,
 )
-from backend.ledger.observation import FileEditObservation, FileWriteObservation
+from backend.ledger.observation import FileEditObservation
 
 
 def file_read_range_from_view_range(view_range: Any) -> str | None:
@@ -44,6 +44,18 @@ def encode_create_file_diff(path: str, new_content: str) -> str | None:
     return _encode_diff_view_from_contents('', new_content, path=path)
 
 
+def file_change_outcome(
+    added: int,
+    removed: int,
+    *,
+    is_pure_create: bool,
+) -> str | None:
+    """Format collapsed header metrics for a file change card."""
+    if is_pure_create:
+        return f'+{added}' if added else None
+    return _format_diff_summary(added, removed)
+
+
 def resolve_edit_mode_range(
     event: Any,
     start_line: int | None,
@@ -65,14 +77,3 @@ def clean_file_edit_content(event: FileEditObservation) -> None:
         from backend.cli.display.transcript import strip_indentation_warnings
 
         event.content = strip_indentation_warnings(event.content)
-
-
-def file_write_observation_diff(event: FileWriteObservation) -> str | None:
-    explicit = getattr(event, 'diff', None)
-    if isinstance(explicit, str) and explicit.strip():
-        return explicit
-    return _extract_tagged_block(
-        str(getattr(event, 'content', '') or ''),
-        '<DIFF_PREVIEW>',
-        '</DIFF_PREVIEW>',
-    )
