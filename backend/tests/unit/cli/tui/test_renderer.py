@@ -226,6 +226,8 @@ async def test_tui_live_response_follows_tail_when_not_user_scrolled(
         renderer.update_live_response(
             'Starting response.\n' + '\n'.join(f'new line {idx}' for idx in range(20))
         )
+        if getattr(renderer, '_streaming_render_timer_armed', False):
+            renderer._flush_deferred_streaming_render()
         await pilot.pause()
         await _await_at_bottom(display, pilot)
 
