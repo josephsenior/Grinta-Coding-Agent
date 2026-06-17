@@ -26,7 +26,7 @@ concurrency:
   cancel-in-progress: true
 
 # CI tiers (see docs/CI.md):
-# - gates-on-linux-coverage-{a,b,d,f,i,h,g,e,c,report}: unit tests sharded for coverage on Linux.
+# - gates-on-linux-coverage-{a,b,d,f,h,g,e,c,report}: unit tests sharded for coverage on Linux.
 # - gates-on-linux-extended: integration/e2e/stress after coverage gate passes.
 # - gates-on-windows / gates-on-macos: unit-only PR gates for cross-platform smoke.
 # - heavy-tests: marker-filtered heavy | integration | benchmark (schedule, main, manual).
@@ -198,52 +198,6 @@ jobs:
           path: coverage-shard-f.dat
           if-no-files-found: error
 
-  gates-on-linux-coverage-i:
-    name: Python Gates on Linux (coverage I)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    strategy:
-      matrix:
-        python-version: ['3.12']
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-      - name: Install uv
-        uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f
-        with:
-          enable-cache: false
-      - name: Set up Python
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Lockfile validation
-        run: uv lock --check
-      - name: Install Python dependencies
-        run: python scripts/bootstrap_env.py dev-test
-      - name: Verify optional imports
-        run: python backend/scripts/verify/verify_optional_imports.py
-      - name: Compile backend (syntax gate)
-        run: uv run python -m compileall backend
-      - name: Run unit tests shard I with coverage
-        run: |
-          mapfile -t tests < <(find backend/tests/unit/execution -name 'test_*.py' | sort)
-          n=${#tests[@]}
-          half=$((n / 2))
-          q=$((n / 4))
-          fq=$((q / 2))
-          ffq=$((fq / 2))
-          start=$((half + ffq))
-          PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q \
-            --cov=backend --cov-fail-under=0 \
-            "${tests[@]:$start:$((fq - ffq))}"
-      - name: Stage coverage data
-        run: cp .coverage coverage-shard-i.dat
-      - name: Upload coverage data
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: coverage-linux-i
-          path: coverage-shard-i.dat
-          if-no-files-found: error
-
   gates-on-linux-coverage-h:
     name: Python Gates on Linux (coverage H)
     runs-on: ubuntu-24.04
@@ -276,10 +230,11 @@ jobs:
           half=$((n / 2))
           q=$((n / 4))
           fq=$((q / 2))
-          start=$((half + fq))
+          ffq=$((fq / 2))
+          start=$((half + ffq))
           PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q \
             --cov=backend --cov-fail-under=0 \
-            "${tests[@]:$start:$((q - fq))}"
+            "${tests[@]:$start:$((q - ffq))}"
       - name: Stage coverage data
         run: cp .coverage coverage-shard-h.dat
       - name: Upload coverage data
@@ -424,7 +379,6 @@ jobs:
       - gates-on-linux-coverage-c
       - gates-on-linux-coverage-d
       - gates-on-linux-coverage-f
-      - gates-on-linux-coverage-i
       - gates-on-linux-coverage-h
       - gates-on-linux-coverage-g
       - gates-on-linux-coverage-e
@@ -454,11 +408,10 @@ jobs:
           cp coverage-shards/coverage-linux-c/coverage-shard-c.dat .coverage.c
           cp coverage-shards/coverage-linux-d/coverage-shard-d.dat .coverage.d
           cp coverage-shards/coverage-linux-f/coverage-shard-f.dat .coverage.f
-          cp coverage-shards/coverage-linux-i/coverage-shard-i.dat .coverage.i
           cp coverage-shards/coverage-linux-h/coverage-shard-h.dat .coverage.h
           cp coverage-shards/coverage-linux-g/coverage-shard-g.dat .coverage.g
           cp coverage-shards/coverage-linux-e/coverage-shard-e.dat .coverage.e
-          uv run coverage combine .coverage.a .coverage.b .coverage.c .coverage.d .coverage.f .coverage.i .coverage.h .coverage.g .coverage.e
+          uv run coverage combine .coverage.a .coverage.b .coverage.c .coverage.d .coverage.f .coverage.h .coverage.g .coverage.e
           uv run coverage report --fail-under=75
           uv run coverage xml -o coverage.xml
       - name: Upload coverage to Codecov
