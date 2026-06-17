@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import struct
 import tempfile
 from pathlib import Path
 
@@ -12,6 +13,32 @@ from backend.cli.tui.image_attachments import (
     encode_image_path_as_data_url,
     is_supported_image_path,
 )
+
+
+def test_dib_to_bmp_wraps_header() -> None:
+    from backend.cli.tui.image_attachments import _dib_to_bmp
+
+    # Minimal 1x1 24-bit DIB header + pixel data.
+    dib = (
+        struct.pack(
+            '<IiiHHIIiiII',
+            40,
+            1,
+            1,
+            1,
+            24,
+            0,
+            4,
+            0,
+            0,
+            0,
+            0,
+        )
+        + b'\x00\x00\x00\x00'
+    )
+    bmp = _dib_to_bmp(dib)
+    assert bmp is not None
+    assert bmp.startswith(b'BM')
 
 
 def test_is_supported_image_path() -> None:

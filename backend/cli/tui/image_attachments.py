@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import mimetypes
 import platform
+import struct
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -72,13 +73,36 @@ def encode_image_path_as_data_url(path: str | Path, *, max_bytes: int) -> str:
     )
 
 
+def _dib_to_bmp(dib: bytes) -> bytes | None:
+    """Wrap a device-independent bitmap (DIB) in a BMP file header."""
+    if len(dib) < 40:
+        return None
+    header_size = struct.unpack('<I', dib[0:4])[0]
+    if header_size < 40 or header_size > len(dib):
+        return None
+    bit_count = struct.unpack('<H', dib[14:16])[0]
+    colors_used = struct.unpack('<I', dib[32:36])[0]
+    color_table_size = 0
+    if bit_count <= 8:
+        palette_entries = colors_used or (1 << bit_count)
+        color_table_size = palette_entries * 4
+    pixel_offset = 14 + header_size + color_table_size
+    file_size = 14 + len(dib)
+    return (
+        b'BM'
+        + struct.pack('<III', file_size, 0, pixel_offset)
+        + dib
+    )
+
+
 def _read_windows_clipboard_image() -> ClipboardImage | None:
     if sys.platform != 'win32':
         return None
-    image = _read_windows_clipboard_image_ctypes()
+    # Prefer PowerShell: handles CF_DIB / screenshots; ctypes only sees rare PNG formats.
+    image = _read_windows_clipboard_image_powershell()
     if image is not None:
         return image
-    return _read_windows_clipboard_image_powershell()
+    return _read_windows_clipboard_image_ctypes()
 
 
 def _read_windows_clipboard_image_ctypes() -> ClipboardImage | None:
@@ -112,6 +136,25 @@ def _read_windows_clipboard_image_ctypes() -> ClipboardImage | None:
                 kernel32.GlobalUnlock(handle)
             if data:
                 return ClipboardImage(data=data, mime_type=mime, label=label)
+
+        CF_DIB = 8
+        if user32.IsClipboardFormatAvailable(CF_DIB):
+            handle = user32.GetClipboardData(CF_DIB)
+            if handle:
+                ptr = kernel32.GlobalLock(handle)
+                if ptr:
+                    try:
+                        size = kernel32.GlobalSize(handle)
+                        dib = ctypes.string_at(ptr, size)
+                    finally:
+                        kernel32.GlobalUnlock(handle)
+                    bmp = _dib_to_bmp(dib)
+                    if bmp:
+                        return ClipboardImage(
+                            data=bmp,
+                            mime_type='image/bmp',
+                            label='clipboard.bmp',
+                        )
         return None
     finally:
         user32.CloseClipboard()

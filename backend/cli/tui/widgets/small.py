@@ -423,16 +423,27 @@ class InputBar(Horizontal):
 class PromptTextArea(TextArea):
     """Input area that routes arrow navigation to welcome suggestions when idle."""
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._previous_input_text = ''
+
+    def _paste_target_screen(self) -> Any | None:
+        app = getattr(self, 'app', None)
+        screen = getattr(app, 'screen', None) if app is not None else None
+        if screen is not None:
+            return screen
+        return getattr(self, 'screen', None)
+
     def watch_text(self, text: str) -> None:
-        if text.strip():
-            return
-        screen = getattr(self, 'screen', None)
+        previous = self._previous_input_text
+        self._previous_input_text = text
+        screen = self._paste_target_screen()
         if screen is None:
             return
-        pending = getattr(screen, '_pending_image_urls', None)
-        if not pending:
-            return
-        screen._pending_image_urls = []
+        if previous.strip() and not text.strip():
+            pending = getattr(screen, '_pending_image_urls', None)
+            if pending:
+                screen._pending_image_urls = []
         refresh = getattr(screen, '_refresh_input_attachment_hint', None)
         if callable(refresh):
             refresh()
@@ -445,14 +456,15 @@ class PromptTextArea(TextArea):
         if result := self._replace_via_keyboard(clipboard, *self.selection):
             self.move_cursor(result.end_location)
 
-    def _on_paste(self, event: events.Paste) -> None:
+    async def _on_paste(self, event: events.Paste) -> None:
         """Paste text or attach a clipboard image when available."""
         if self.read_only:
             return
-        screen = getattr(self, 'screen', None)
+        screen = self._paste_target_screen()
         if screen is not None and hasattr(screen, 'try_paste_clipboard_image'):
             if screen.try_paste_clipboard_image():
                 event.prevent_default()
+                event.stop()
                 return
         event.prevent_default()
         self._paste_text_from_clipboard(event)
@@ -461,7 +473,7 @@ class PromptTextArea(TextArea):
         """Paste from system clipboard directly."""
         if self.read_only:
             return
-        screen = getattr(self, 'screen', None)
+        screen = self._paste_target_screen()
         if screen is not None and hasattr(screen, 'try_paste_clipboard_image'):
             if screen.try_paste_clipboard_image():
                 return
