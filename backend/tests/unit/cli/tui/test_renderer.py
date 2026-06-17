@@ -323,15 +323,20 @@ async def test_tui_user_scroll_wins_over_active_follow_tail(mock_config, monkeyp
         # Simulate an in-flight programmatic follow-tail scroll.
         display._suppress_scroll_sync = True
 
-        display.user_scroll_page_up(animate=False)
-        for _ in range(12):
+        display.user_scroll_home(animate=False)
+        for _ in range(20):
             display._sync_scroll_state_from_position()
-            if not display._was_at_bottom():
+            if (
+                display._user_scrolled_away
+                and display.max_scroll_y > 0
+                and display.scroll_y < display.max_scroll_y - 1.0
+            ):
                 break
             await pilot.pause()
 
         assert display._user_scrolled_away is True
-        assert not display._was_at_bottom()
+        assert display.max_scroll_y > 0
+        assert display.scroll_y < display.max_scroll_y - 1.0
 
 
 @pytest.mark.asyncio
