@@ -117,6 +117,67 @@ class TestPendingActionDelegation:
         assert svc.get_pending_action_info() == info_val
 
 
+# ── _finalize_action: confirmation ordering ───────────────────────────
+
+
+class TestFinalizeActionConfirmationOrder:
+    @pytest.mark.asyncio
+    async def test_blocked_execute_skips_confirmation_gate(self):
+        ctx_mock = _make_context()
+        controller = ctx_mock.get_controller()
+        cs = _make_confirmation_service()
+        svc = ActionService(ctx_mock, _make_pending_service(), cs)
+
+        action = MagicMock(spec=Action)
+        action.runnable = True
+        action.source = None
+
+        inv_ctx = MagicMock()
+        inv_ctx.blocked = False
+
+        async def _block_on_execute(*_args):
+            inv_ctx.blocked = True
+
+        pipeline = MagicMock()
+        pipeline.run_execute = AsyncMock(side_effect=_block_on_execute)
+        controller.operation_pipeline = pipeline
+
+        await svc.run(action, inv_ctx)
+
+        controller.handle_blocked_invocation.assert_called_once_with(action, inv_ctx)
+        cs.handle_pending_confirmation.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_confirmation_gate_runs_after_execute_pipeline(self):
+        ctx_mock = _make_context()
+        controller = ctx_mock.get_controller()
+        cs = _make_confirmation_service()
+        call_order: list[str] = []
+
+        async def _track_execute(*_args):
+            call_order.append('execute')
+
+        async def _track_confirmation(*_args):
+            call_order.append('confirmation')
+
+        cs.handle_pending_confirmation = AsyncMock(side_effect=_track_confirmation)
+
+        pipeline = MagicMock()
+        pipeline.run_execute = AsyncMock(side_effect=_track_execute)
+        controller.operation_pipeline = pipeline
+
+        svc = ActionService(ctx_mock, _make_pending_service(), cs)
+        action = MagicMock(spec=Action)
+        action.runnable = True
+        action.source = None
+        inv_ctx = MagicMock()
+        inv_ctx.blocked = False
+
+        await svc.run(action, inv_ctx)
+
+        assert call_order == ['execute', 'confirmation']
+
+
 # ── _prepare_metrics_for_action ──────────────────────────────────────
 
 

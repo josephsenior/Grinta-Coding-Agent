@@ -143,16 +143,15 @@ def _extract_paths_from_tool_result(observation: Observation) -> list[str]:
 
 
 def _extract_paths_from_action(action: Any) -> list[str]:
-    from backend.ledger.action import FileEditAction, FileWriteAction
+    from backend.ledger.action import FileEditAction
+    if not isinstance(action, FileEditAction):
+        return []
 
-    if isinstance(action, FileEditAction):
-        command = str(action.command or '').strip().lower()
-        if command == 'read_file':
-            return []
-        return [action.path] if action.path else []
-    if isinstance(action, FileWriteAction):
-        return [action.path] if action.path else []
-    return []
+    edit_action = action
+    command = str(edit_action.command or '').strip().lower()
+    if command == 'read_file':
+        return []
+    return [edit_action.path] if edit_action.path else []
 
 
 def _resolve_for_diagnostics(raw_path: str, ctx: ToolInvocationContext) -> Path:

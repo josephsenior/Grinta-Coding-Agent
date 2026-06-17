@@ -28,6 +28,7 @@ from backend.cli.theme import (
     get_grinta_pygments_style,
 )
 from backend.cli.tool_display.renderers.badge import badge_for_tool_name
+from backend.ledger.observation.files import file_edit_observation_is_new_file
 
 
 def _preview_text_lines(
@@ -233,12 +234,12 @@ class DiffPanel:
     ) -> RenderResult:
         obs = self._obs
         path = getattr(obs, 'path', '?')
-        prev_exist = getattr(obs, 'prev_exist', True)
-        verb = self._resolve_verb(prev_exist)
+        is_new_file = file_edit_observation_is_new_file(obs)
+        verb = self._resolve_verb(is_new_file)
         parts: list[Any] = [format_activity_primary(verb, self._detail or path)]
         self._append_secondary(parts)
 
-        if not prev_exist:
+        if is_new_file:
             self._render_new_file_parts(parts, obs, path)
         else:
             self._render_existing_file_parts(parts, obs)
@@ -246,10 +247,10 @@ class DiffPanel:
         self._append_indentation_warnings(parts, obs)
         yield self._build_panel(parts)
 
-    def _resolve_verb(self, prev_exist: bool) -> str:
+    def _resolve_verb(self, is_new_file: bool) -> str:
         if self._verb:
             return self._verb
-        return 'Created' if not prev_exist else 'Edited'
+        return 'Created' if is_new_file else 'Edited'
 
     def _render_new_file_parts(self, parts: list[Any], obs: Any, path: str) -> None:
         self._append_new_file_delta(parts)

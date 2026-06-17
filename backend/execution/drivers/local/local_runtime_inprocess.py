@@ -42,7 +42,6 @@ from backend.ledger.action import (
     DebuggerAction,
     FileEditAction,
     FileReadAction,
-    FileWriteAction,
     MCPAction,
 )
 from backend.ledger.action.code_nav import LspQueryAction
@@ -362,14 +361,6 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             raise AgentRuntimeDisconnectedError('Runtime not initialized')
         return call_async_from_sync(
             self._executor.read, TOOL_BRIDGE_TIMEOUT_FILE_IO, action
-        )
-
-    def write(self, action: FileWriteAction) -> Observation:
-        """Write file via RuntimeExecutor."""
-        if self._executor is None:
-            raise AgentRuntimeDisconnectedError('Runtime not initialized')
-        return call_async_from_sync(
-            self._executor.write, TOOL_BRIDGE_TIMEOUT_FILE_IO, action
         )
 
     def edit(self, action: FileEditAction) -> Observation:

@@ -551,8 +551,6 @@ def _is_file_mutation_event(event: Event) -> bool:
     return _event_type_name(event) in (
         'FileEditAction',
         'FileEditObservation',
-        'FileWriteAction',
-        'FileWriteObservation',
     )
 
 

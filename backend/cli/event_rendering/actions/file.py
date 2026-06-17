@@ -25,7 +25,6 @@ from backend.cli.orient_tools import (
 from backend.ledger.action import (  # noqa: E402
     FileEditAction,
     FileReadAction,
-    FileWriteAction,
     RecallAction,
 )
 
@@ -61,21 +60,6 @@ class _ActionFileMixin(_ActionRenderersBase):
         )
         thought = getattr(action, 'thought', '') or ''
         _sync_reasoning_after_tool_line(self._reasoning, f'{verb} {detail}', thought)
-        self.refresh()
-
-    def _render_file_write_action(self, action: FileWriteAction) -> None:
-        self._flush_pending_tool_cards()
-        self._buffer_pending_activity(
-            title=ACTIVITY_CARD_TITLE_FILES,
-            verb='Created',
-            detail=action.path,
-            kind='file_write',
-            badge_label='files',
-        )
-        thought = getattr(action, 'thought', '') or ''
-        _sync_reasoning_after_tool_line(
-            self._reasoning, f'Created {action.path}', thought
-        )
         self.refresh()
 
     def _render_recall_action(self, action: RecallAction) -> None:

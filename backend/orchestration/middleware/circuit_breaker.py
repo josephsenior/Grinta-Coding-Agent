@@ -19,7 +19,6 @@ if TYPE_CHECKING:
 # stuck-detection pressure when observed successfully.
 _PROGRESS_OBSERVATION_TYPES: tuple[str, ...] = (
     'FileEditObservation',
-    'FileWriteObservation',
     'AgentDelegateObservation',
     'LspQueryObservation',
     'GrepObservation',

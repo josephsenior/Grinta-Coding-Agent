@@ -96,7 +96,6 @@ class TestActionType:
             'SYSTEM',
             'START',
             'READ',
-            'WRITE',
             'EDIT',
             'RUN',
             'BROWSE',
@@ -150,14 +149,14 @@ class TestAgentState:
 class TestObservationType:
     def test_has_key_values(self):
         assert ObservationType.READ.value == 'read'
-        assert ObservationType.WRITE.value == 'write'
+        assert ObservationType.EDIT.value == 'edit'
         assert ObservationType.RUN.value == 'run'
         assert ObservationType.ERROR.value == 'error'
         assert ObservationType.MCP.value == 'mcp'
         assert ObservationType.BROWSER_SCREENSHOT.value == 'browser_screenshot'
 
     def test_count(self):
-        assert len(ObservationType) == 37
+        assert len(ObservationType) == 36
 
 
 class TestExitReason:

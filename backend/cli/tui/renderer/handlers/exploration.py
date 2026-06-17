@@ -59,7 +59,6 @@ def _update_or_write_lsp_card(
             status=status,
             outcome=card.secondary or 'completed',
             extra_content=preview,
-            operation_label=f'Analyzed {symbol}'.strip(),
         )
         orch._pending_lsp_card = None
     else:
@@ -71,11 +70,6 @@ def _handle_grep_action(orch: 'RendererEventProcessorMixin', event: GrepAction) 
     orch._pending_search_card = model
     orch._pending_search_tool = 'grep'
     orch._pending_exploration_meta = None
-    orch._tui.set_current_operation(
-        f'{model.verb} {model.target}'.strip(),
-        meta='Searching',
-        active=True,
-    )
 
 
 def _handle_glob_action(orch: 'RendererEventProcessorMixin', event: GlobAction) -> None:
@@ -83,11 +77,6 @@ def _handle_glob_action(orch: 'RendererEventProcessorMixin', event: GlobAction) 
     orch._pending_search_card = model
     orch._pending_search_tool = 'glob'
     orch._pending_exploration_meta = None
-    orch._tui.set_current_operation(
-        f'{model.verb} {model.target}'.strip(),
-        meta='Listing',
-        active=True,
-    )
 
 
 def _handle_lsp_query_action(
@@ -95,11 +84,6 @@ def _handle_lsp_query_action(
 ) -> None:
     model = lsp_action_model(event)
     orch._pending_lsp_card = model
-    orch._tui.set_current_operation(
-        f'{model.verb} {model.target}'.strip(),
-        meta='Analyzing',
-        active=True,
-    )
 
 
 def _handle_grep_observation(
@@ -145,11 +129,6 @@ def _handle_find_symbols_action(
     model = find_symbols_action_model(event)
     orch._pending_find_symbols_card = model
     orch._pending_exploration_meta = None
-    orch._tui.set_current_operation(
-        f'{model.verb} {model.target}'.strip(),
-        meta='Searching',
-        active=True,
-    )
 
 
 def _handle_find_symbols_observation(
@@ -171,11 +150,6 @@ def _handle_read_symbols_action(
     model = read_symbols_action_model(event)
     orch._pending_read_symbols_card = model
     orch._pending_exploration_meta = None
-    orch._tui.set_current_operation(
-        f'{model.verb} {model.target}'.strip(),
-        meta='Reading',
-        active=True,
-    )
 
 
 def _handle_read_symbols_observation(
@@ -197,11 +171,6 @@ def _handle_analyze_project_structure_action(
     model = analyze_action_model(event)
     orch._pending_analyze_project_structure_card = model
     orch._pending_exploration_meta = None
-    orch._tui.set_current_operation(
-        f'{model.verb} {model.target}'.strip(),
-        meta='Analyzing',
-        active=True,
-    )
 
 
 def _handle_analyze_project_structure_observation(

@@ -90,10 +90,10 @@ class TestDeserializeAction:
         ev = deserialize_event(d)
         assert ev.__class__.__name__ == 'FileReadActionSchema'
 
-    def test_file_write_action(self):
-        d = _action_dict('write', path='/tmp/x.py', content='code')
+    def test_file_edit_create_action(self):
+        d = _action_dict('edit', path='/tmp/x.py', command='create_file', file_text='code')
         ev = deserialize_event(d)
-        assert ev.__class__.__name__ == 'FileWriteActionSchema'
+        assert ev.__class__.__name__ == 'FileEditActionSchema'
 
     def test_file_edit_action(self):
         d = _action_dict('edit', path='/tmp/x.py')

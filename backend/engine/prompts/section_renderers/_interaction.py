@@ -40,6 +40,7 @@ def _render_interaction_tail(
         response_style_body=response_style_body,
         communicate_tool_section=communicate_tool_section,
         interaction_guidance=(
-            'If a request is vague, inspect nearby docs/config first; see `<ASK_USER_TOOL>` only if you are still blocked or the scope is still ambiguous.'
+            'If a request is vague, inspect nearby docs/config first; see `<ASK_USER_TOOL>` only if you are still blocked or the scope is still ambiguous. '
+            'Flag problems you notice even outside the task scope.'
         ),
     )

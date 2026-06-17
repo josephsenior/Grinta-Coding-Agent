@@ -87,6 +87,9 @@ def convert_action_to_messages(
 
 def _is_tool_based_action(action: Action) -> bool:
     """Check if action is a tool-based action."""
+    if getattr(action, 'tool_call_metadata', None) is not None:
+        return True
+
     src = getattr(action, 'source', None)
     src_value: str
     if isinstance(src, EventSource):
@@ -146,12 +149,34 @@ def _handle_tool_based_action(
         return []
 
     tool_calls_payload = _convert_tool_calls(getattr(assistant_msg, 'tool_calls', None))
+    _log_replayed_tool_action(action, tool_metadata, response_id, tool_calls_payload)
     pending_tool_call_action_messages[str(response_id)] = Message(
         role=role,
         content=content_items,
         tool_calls=tool_calls_payload,
     )
     return []
+
+
+def _log_replayed_tool_action(
+    action: Action,
+    tool_metadata: Any,
+    response_id: object,
+    tool_calls_payload: list[ToolCall] | None,
+) -> None:
+    """Log tool-call replay so prompt-history pairing failures are diagnosable."""
+    try:
+        logger.info(
+            'Prompt history replayed tool action: action=%s tool=%s call_id=%s response_id=%s total_calls=%s replayed_calls=%s',
+            type(action).__name__,
+            getattr(tool_metadata, 'function_name', ''),
+            getattr(tool_metadata, 'tool_call_id', ''),
+            response_id,
+            getattr(tool_metadata, 'total_calls_in_response', None),
+            len(tool_calls_payload or []),
+        )
+    except Exception:
+        logger.debug('Failed to log replayed tool action', exc_info=True)
 
 
 def _should_emit_user_tool_request(action: Action) -> bool:

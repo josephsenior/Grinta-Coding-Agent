@@ -12,7 +12,11 @@ from backend.ledger.action import (
     CmdRunAction,
     FileEditAction,
     FileReadAction,
+    TerminalInputAction,
+    TerminalRunAction,
 )
+from backend.ledger.action.agent import BlackboardAction, DelegateTaskAction
+from backend.ledger.action.mcp import MCPAction
 from backend.orchestration.services.safety_service import SafetyService
 
 
@@ -56,6 +60,20 @@ class TestSafetyService(unittest.IsolatedAsyncioTestCase):
         result = self.service.action_requires_confirmation(action)
 
         self.assertTrue(result)
+
+    def test_action_requires_confirmation_mutating_and_external_actions(self):
+        """Mutating and external-execution actions enter the confirmation flow."""
+        actions = [
+            FileEditAction(path='/test', command='create_file', file_text='x'),
+            TerminalRunAction(command='pytest -q'),
+            TerminalInputAction(session_id='term-1', input='pytest -q'),
+            MCPAction(name='tool_x', arguments={}),
+            DelegateTaskAction(task_description='inspect module'),
+            BlackboardAction(command='set', key='status', value='ready'),
+        ]
+
+        for action in actions:
+            self.assertTrue(self.service.action_requires_confirmation(action))
 
     def test_action_requires_confirmation_skip_file_read(self):
         """FileReadAction no longer requires confirmation."""
@@ -125,16 +143,15 @@ class TestSafetyService(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(is_high_risk)
         self.assertTrue(ask_for_every)
 
-    async def test_analyze_security_no_analyzer(self):
-        """Test analyze_security sets UNKNOWN risk when no analyzer."""
+    async def test_analyze_security_no_analyzer_preserves_declared_risk(self):
+        """No analyzer should not erase the model/tool-declared risk."""
         action = MagicMock()
-        action.security_risk = None
+        action.security_risk = ActionSecurityRisk.HIGH
         self.mock_context.security_analyzer = None
 
         await self.service.analyze_security(action)
 
-        # Should set to UNKNOWN
-        self.assertEqual(action.security_risk, ActionSecurityRisk.UNKNOWN)
+        self.assertEqual(action.security_risk, ActionSecurityRisk.HIGH)
 
     async def test_analyze_security_with_analyzer(self):
         """Test analyze_security invokes analyzer."""
@@ -181,8 +198,8 @@ class TestSafetyService(unittest.IsolatedAsyncioTestCase):
         # Should not crash
         await self.service.analyze_security(action)
 
-    def test_apply_confirmation_state_no_autonomy(self):
-        """Test apply_confirmation_state when no autonomy controller."""
+    def test_apply_confirmation_state_high_risk_without_autonomy(self):
+        """High risk is enough to request confirmation even without autonomy."""
         action = CmdRunAction(command='test')
         self.mock_context.autonomy_controller = None
 
@@ -190,14 +207,12 @@ class TestSafetyService(unittest.IsolatedAsyncioTestCase):
             action, is_high_security_risk=True, is_ask_for_every_action=False
         )
 
-        # Should not set confirmation state
-        self.assertNotEqual(
-            getattr(action, 'confirmation_state', None),
-            ActionConfirmationStatus.AWAITING_CONFIRMATION,
+        self.assertEqual(
+            action.confirmation_state, ActionConfirmationStatus.AWAITING_CONFIRMATION
         )
 
-    def test_apply_confirmation_state_autonomy_no_request(self):
-        """Test apply_confirmation_state when autonomy doesn't request confirmation."""
+    def test_apply_confirmation_state_high_risk_overrides_autonomy_no_request(self):
+        """Declared/analyzed high risk still prompts in non-full autonomy."""
         action = CmdRunAction(command='test')
 
         mock_autonomy = MagicMock()
@@ -208,10 +223,8 @@ class TestSafetyService(unittest.IsolatedAsyncioTestCase):
             action, is_high_security_risk=True, is_ask_for_every_action=False
         )
 
-        # Should not set confirmation state
-        self.assertNotEqual(
-            getattr(action, 'confirmation_state', None),
-            ActionConfirmationStatus.AWAITING_CONFIRMATION,
+        self.assertEqual(
+            action.confirmation_state, ActionConfirmationStatus.AWAITING_CONFIRMATION
         )
 
     def test_apply_confirmation_state_cli_mode(self):

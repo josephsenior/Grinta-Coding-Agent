@@ -216,12 +216,37 @@ def show_current_autonomy(host: Any, valid_levels: tuple[str, ...]) -> None:
     )
 
 
+def _host_active_agent_name(host: Any) -> str:
+    from backend.core.constants import DEFAULT_AGENT_NAME
+
+    config = getattr(host, '_config', None)
+    if config is None:
+        return DEFAULT_AGENT_NAME
+    name = getattr(config, 'default_agent', None)
+    if isinstance(name, str) and name.strip():
+        return name.strip()
+    return DEFAULT_AGENT_NAME
+
+
 def apply_autonomy_level(host: Any, new_level: str) -> None:
+    from backend.cli.settings import get_persisted_autonomy_level, update_autonomy_level
+
+    agent_name = _host_active_agent_name(host)
+    if new_level == get_persisted_autonomy_level(agent_name):
+        controller = host._controller
+        if controller is not None:
+            ac = getattr(controller, 'autonomy_controller', None)
+            if ac is not None and getattr(ac, 'autonomy_level', None) == new_level:
+                return
+
     controller = host._controller
     if controller is not None:
         ac = getattr(controller, 'autonomy_controller', None)
         if ac is not None:
+            previous = getattr(ac, 'autonomy_level', None)
             ac.autonomy_level = new_level
+            if previous != new_level:
+                update_autonomy_level(new_level, agent_name)
             if host._renderer is not None:
                 host._renderer.add_system_message(
                     f'Autonomy set to: {new_level}', title='autonomy'

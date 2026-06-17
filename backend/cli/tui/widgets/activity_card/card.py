@@ -394,6 +394,7 @@ class ActivityCard(Container):
             cwd=self._terminal_cwd,
             session_id=self._terminal_session_id,
             footer=self._terminal_footer_text(),
+            exit_code=self._terminal_exit_code,
             running=self.processing,
             id='terminal-pane',
         )
@@ -408,6 +409,7 @@ class ActivityCard(Container):
         pane.set_command(self._terminal_command)
         pane.set_cwd(self._terminal_cwd)
         pane.set_session_id(self._terminal_session_id)
+        pane.set_exit_code(self._terminal_exit_code)
         pane.set_footer(self._terminal_footer_text())
         pane.set_running(self.processing)
         if self._extra_content:
@@ -483,17 +485,6 @@ class ActivityCard(Container):
 
         icon_part = f'[{color}]{icon}[/]'
 
-        if self._is_terminal_card() and self._badge_category != 'debugger':
-            command = self._terminal_command or self._command_from_detail(self._detail)
-            if self._shell_kind == 'pwsh':
-                prompt = f'[#7dd3fc]PS>[/] [#e2e8f0]{command}[/]'
-            else:
-                prompt = f'[#54efae]$[/] [#e2e8f0]{command}[/]'
-            detail_part = prompt
-        else:
-            verb_part = f'[{NAVY_BRAND}]{self._verb}[/]'
-            detail_part = f'{verb_part}  {self._detail}'
-
         outcome_part = ''
         if self._outcome:
             file_delta = (
@@ -512,6 +503,21 @@ class ActivityCard(Container):
                     else NAVY_TEXT_DIM
                 )
                 outcome_part = f'  [{outcome_color}]{self._outcome}[/]'
+
+        if self._is_terminal_card() and not self._collapsed:
+            pin_part = ' [#f6ff8f]📌[/]' if self._pinned else ''
+            return f'{pulse}{icon_part}{outcome_part}{pin_part}'
+
+        if self._is_terminal_card() and self._badge_category != 'debugger':
+            command = self._terminal_command or self._command_from_detail(self._detail)
+            if self._shell_kind == 'pwsh':
+                prompt = f'[#7dd3fc]PS>[/] [#e2e8f0]{command}[/]'
+            else:
+                prompt = f'[#54efae]$[/] [#e2e8f0]{command}[/]'
+            detail_part = prompt
+        else:
+            verb_part = f'[{NAVY_BRAND}]{self._verb}[/]'
+            detail_part = f'{verb_part}  {self._detail}'
 
         tail_part = ''
         if (

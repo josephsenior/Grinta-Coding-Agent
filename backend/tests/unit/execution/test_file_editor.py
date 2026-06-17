@@ -97,19 +97,21 @@ class TestFileEditorView:
 
 
 # ---------------------------------------------------------------------------
-# FileEditor — write / create
+# FileEditor — create_file
 # ---------------------------------------------------------------------------
 
 
-class TestFileEditorWrite:
-    """Tests for the FileEditor write/create commands."""
+class TestFileEditorCreate:
+    """Tests for the FileEditor create_file command."""
 
     def setup_method(self):
         self.tmpdir = tempfile.mkdtemp()
         self.editor = FileEditor(workspace_root=self.tmpdir)
 
-    def test_write_new_file(self):
-        result = self.editor(command='write', path='new.txt', file_text='hello world')
+    def test_create_file_new_file(self):
+        result = self.editor(
+            command='create_file', path='new.txt', file_text='hello world'
+        )
         assert result.error is None
         content = (Path(self.tmpdir) / 'new.txt').read_text()
         assert content == 'hello world'
@@ -120,21 +122,31 @@ class TestFileEditorWrite:
         )
         assert result.error is None
 
-    def test_write_overwrites(self):
+    def test_create_file_rejects_existing_without_overwrite(self):
         p = Path(self.tmpdir) / 'existing.txt'
         p.write_text('old')
-        result = self.editor(command='write', path='existing.txt', file_text='new')
-        assert result.error is None
-        assert p.read_text() == 'new'
-
-    def test_write_dry_run(self):
         result = self.editor(
-            command='write', path='dry.txt', file_text='content', dry_run=True
+            command='create_file', path='existing.txt', file_text='new'
+        )
+        assert result.error is not None
+        assert result.error_code == 'CREATE_FILE_ALREADY_EXISTS'
+        assert p.read_text() == 'old'
+
+    def test_create_file_dry_run(self):
+        result = self.editor(
+            command='create_file',
+            path='dry.txt',
+            file_text='content',
+            dry_run=True,
         )
         assert result.error is None
         assert 'preview' in result.output.lower() or 'Preview' in result.output
-        # File should not actually be created
         assert not (Path(self.tmpdir) / 'dry.txt').exists()
+
+    def test_write_command_is_not_supported(self):
+        result = self.editor(command='write', path='legacy.txt', file_text='data')
+        assert result.error is not None
+        assert 'Unknown command' in result.error
 
     def test_malformed_css_write_succeeds_with_warning(self, monkeypatch):
         # Default policy: post-write warning, never a pre-write veto. This is
@@ -189,8 +201,7 @@ class TestFileEditorWrite:
         )
         assert result.error is not None
         assert result.error_code == 'CREATE_FILE_ALREADY_EXISTS'
-        assert 'File already exists' in result.error
-        assert 'edit_symbol or replace_string' in result.error
+        assert result.error == 'File already exists.'
 
     def test_create_file_overwrites_existing_file_when_overwrite_existing_is_true(self):
         existing = Path(self.tmpdir) / 'big.py'
@@ -203,32 +214,6 @@ class TestFileEditorWrite:
         )
         assert result.error is None
         assert existing.read_text() == 'print("rewritten")\n'
-
-    def test_write_still_overwrites_existing_file(self):
-        existing = Path(self.tmpdir) / 'big.py'
-        existing.write_text('old\n')
-        result = self.editor(
-            command='write',
-            path='big.py',
-            file_text='print("rewritten")\n',
-        )
-        assert result.error is None
-        assert existing.read_text() == 'print("rewritten")\n'
-
-    def test_write_blocks_large_existing_code_file_overwrite(self):
-        existing = Path(self.tmpdir) / 'big.py'
-        original = ''.join(f'line_{i} = {i}\n' for i in range(220))
-        existing.write_text(original)
-
-        result = self.editor(
-            command='write',
-            path='big.py',
-            file_text='print("truncated")\n',
-        )
-
-        assert result.error is not None
-        assert result.error_code == 'LARGE_EXISTING_CODE_FILE_OVERWRITE_BLOCKED'
-        assert existing.read_text() == original
 
     def test_create_file_rejects_obvious_serialized_payload(self):
         result = self.editor(
@@ -431,13 +416,11 @@ class TestFileEditorReplaceString:
         assert result.error is not None
         assert result.error_code == 'OLD_STRING_NOT_FOUND'
         assert path.read_text() == 'alpha\n'
-        # Error message should always tell the model to re-read the file.
-        assert 'Re-read the file' in (result.error or '')
+        assert result.error == 'replace_string old_string was not found exactly.'
 
-    def test_old_string_not_found_hints_recent_write_on_same_path(self):
-        """A second ``replace_string`` on the same path within the same
-        session should get the more specific "stale working copy" hint,
-        because the first edit just changed the file.
+    def test_old_string_not_found_after_prior_edit_on_same_path(self):
+        """A second ``replace_string`` on the same path after a prior edit
+        should still report the same concise not-found error.
         """
         path = self._write('node.py', 'def foo():\n    return 1\n')
 
@@ -458,10 +441,7 @@ class TestFileEditorReplaceString:
             new_str='def foo():\n    return 3\n',
         )
         assert second.error_code == 'OLD_STRING_NOT_FOUND'
-        assert second.error is not None
-        assert 'Re-read the file' in second.error
-        # The same-path hint should be appended.
-        assert 'previous edit in this turn' in second.error
+        assert second.error == 'replace_string old_string was not found exactly.'
         assert path.read_text() == 'def foo():\n    return 2\n'
 
     def test_rejects_multiple_matches_without_replace_all(self):

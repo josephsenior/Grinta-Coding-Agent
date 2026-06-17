@@ -52,7 +52,6 @@ class RendererDisplayMixin:
         self._pending_terminal_card = None
         self._pending_shell_cards_by_command = defaultdict(deque)
         self._pending_file_read_cards_by_path = defaultdict(deque)
-        self._pending_file_create_cards_by_path = defaultdict(deque)
         self._orient_burst_lines = []
         self._orient_burst_widgets = []
         self._orient_burst_area = 'codebase'
@@ -500,9 +499,6 @@ class RendererDisplayMixin:
             except Exception:
                 pass
             self._last_active_card = None
-        clear_current_operation = getattr(self._tui, 'clear_current_operation', None)
-        if callable(clear_current_operation):
-            clear_current_operation()
 
     def _update_retry_strip(self, summary: str, meta: str) -> None:
         self._tui.set_retry_status(summary, meta=meta, active=True)
@@ -636,19 +632,8 @@ class RendererDisplayMixin:
         is_active = is_tool and card.secondary_kind == 'neutral'
         if is_active:
             self._activate_activity_card(widget)
-            self._tui.set_current_operation(
-                f'{card.verb} {card.detail}'.strip(),
-                meta=card.secondary or 'Running',
-                active=True,
-            )
-        else:
-            if self._last_active_card is widget:
-                self._last_active_card = None
-            self._tui.set_current_operation(
-                f'{card.verb} {card.detail}'.strip(),
-                meta=card.secondary or 'Completed',
-                active=False,
-            )
+        elif self._last_active_card is widget:
+            self._last_active_card = None
 
         display = self._tui._get_display()
         self._register_widget_event_id(widget)
@@ -668,6 +653,35 @@ class RendererDisplayMixin:
             display.append_widget(widget)
         self._sync_transcript_viewport()
 
+    def _mount_file_change_card(
+        self,
+        *,
+        display_path: str,
+        outcome: str | None,
+        encoded_diff: str | None,
+        diff_path: str = '',
+    ) -> Any:
+        """Append a static file-change diff card (observation-only, no animations)."""
+        from backend.cli.tui.widgets.file_change_card import FileChangeCard
+
+        self._flush_orient_burst()
+        self.commit_live_thinking()
+        self._clear_last_active_card_processing()
+        widget = FileChangeCard(
+            display_path=display_path,
+            outcome=outcome,
+            encoded_diff=encoded_diff,
+            diff_path=diff_path or display_path,
+        )
+        display = self._tui._get_display()
+        self._register_widget_event_id(widget)
+        if getattr(self, '_prepend_mode', False):
+            display.prepend_widget(widget)
+        else:
+            display.append_widget(widget, animate=False)
+        self._sync_transcript_viewport()
+        return widget
+
     def _write_orient_line(self, model: OrientLineModel) -> Any:
         from backend.cli.tui.widgets.activity_card import OrientLine
 
@@ -675,36 +689,13 @@ class RendererDisplayMixin:
         self._clear_last_active_card_processing()
         widget = OrientLine(model)
         self._append_transcript_widget(widget)
-        self._orient_burst_lines.append(model)
-        self._orient_burst_widgets.append(widget)
-        self._orient_burst_area = model.area or self._orient_burst_area
-        self._tui.set_current_operation(
-            f'{model.verb} {model.target}'.strip(),
-            meta=model.result,
-            active=False,
-        )
         return widget
 
     def _flush_orient_burst(self) -> None:
-        lines = list(getattr(self, '_orient_burst_lines', []) or [])
-        widgets = list(getattr(self, '_orient_burst_widgets', []) or [])
-        if not lines:
-            return
+        """No-op — orient lines stay as individual transcript rows."""
         self._orient_burst_lines = []
         self._orient_burst_widgets = []
-        area = getattr(self, '_orient_burst_area', 'codebase')
         self._orient_burst_area = 'codebase'
-        if len(lines) < 3:
-            return
-        for widget in widgets:
-            try:
-                widget.remove()
-            except Exception:
-                pass
-        from backend.cli.tui.widgets.activity_card import OrientBurst
-
-        burst = OrientBurst(area, lines, collapsed=True)
-        self._append_transcript_widget(burst)
 
     def _apply_card_final_state(
         self,
@@ -766,7 +757,6 @@ class RendererDisplayMixin:
         outcome: str | None = None,
         extra_content: str | None = None,
         collapse: bool = False,
-        operation_label: str | None = None,
         syntax_language: str | None = None,
         meta_lines: list[str] | None = None,
         diff_encoded: bool | None = None,
@@ -791,53 +781,6 @@ class RendererDisplayMixin:
             meta_lines=meta_lines,
             diff_encoded=diff_encoded,
         )
-        if operation_label is not None:
-            self._tui.set_current_operation(
-                operation_label,
-                meta=outcome or 'Completed',
-                active=False,
-            )
-
-    def _write_tui_file_card(
-        self,
-        verb: str,
-        detail: str,
-        *,
-        secondary: str | None = None,
-        secondary_kind: str = 'neutral',
-        extra_content: str | None = None,
-        collapsed: bool = True,
-    ) -> None:
-        from backend.cli.tui.widgets.activity_card import (
-            ActivityCard as TUIActivityCard,
-        )
-
-        self._flush_orient_burst()
-        self.commit_live_thinking()
-        self._clear_last_active_card_processing()
-        status_map = {'ok': 'ok', 'err': 'err', 'warn': 'warn', 'neutral': 'neutral'}
-        status = status_map.get(secondary_kind, 'neutral')
-        widget = TUIActivityCard(
-            verb=verb,
-            detail=detail,
-            badge_category='files',
-            status=status,
-            outcome=secondary,
-            extra_content=extra_content,
-            collapsed=collapsed,
-            collapsible=bool(extra_content),
-            diff_encoded=bool(extra_content),
-            syntax_language='diff' if extra_content else None,
-        )
-        self._tui.set_current_operation(
-            f'{verb} {detail}'.strip(),
-            meta=secondary or 'Completed',
-            active=False,
-        )
-        display = self._tui._get_display()
-        self._register_widget_event_id(widget)
-        display.append_widget(widget)
-        self._sync_transcript_viewport()
 
     def _sync_transcript_viewport(self) -> None:
         """Keep mounted transcript widgets within the viewport budget."""

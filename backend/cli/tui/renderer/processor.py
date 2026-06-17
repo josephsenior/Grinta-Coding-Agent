@@ -62,8 +62,6 @@ from backend.cli.tui.renderer.handlers.file import (
     _handle_file_edit_observation,
     _handle_file_read_action,
     _handle_file_read_observation,
-    _handle_file_write_action,
-    _handle_file_write_observation,
 )
 from backend.cli.tui.renderer.handlers.mcp import (
     _handle_mcp_action,
@@ -122,7 +120,6 @@ from backend.ledger.action import (
     EscalateToHumanAction,
     FileEditAction,
     FileReadAction,
-    FileWriteAction,
     FindSymbolsAction,
     GlobAction,
     GrepAction,
@@ -162,7 +159,6 @@ from backend.ledger.observation import (
     FileDownloadObservation,
     FileEditObservation,
     FileReadObservation,
-    FileWriteObservation,
     FindSymbolsObservation,
     GlobObservation,
     GrepObservation,
@@ -220,7 +216,6 @@ def _handle_message_action(
 _TOOL_EXECUTION_TYPES = (
     FileReadAction,
     FileEditAction,
-    FileWriteAction,
     CmdRunAction,
     MCPAction,
     BrowserToolAction,
@@ -397,10 +392,8 @@ _EVENT_HANDLERS: dict[type, Any] = {
     MessageAction: _handle_message_action,
     FileReadAction: _handle_file_read_action,
     FileEditAction: _handle_file_edit_action,
-    FileWriteAction: _handle_file_write_action,
     FileReadObservation: _handle_file_read_observation,
     FileEditObservation: _handle_file_edit_observation,
-    FileWriteObservation: _handle_file_write_observation,
     MCPAction: _handle_mcp_action,
     CmdRunAction: _handle_cmd_run_action,
     MCPObservation: _handle_mcp_observation,

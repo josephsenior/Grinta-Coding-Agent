@@ -43,7 +43,11 @@ class UserMessage(Static):
     """User message display in the transcript."""
 
     def __init__(self, text: str, *, id: str | None = None) -> None:
-        super().__init__(text, id=id)
+        from backend.cli.tui.renderer.prep import prep_markdown
+
+        body = (text or '').rstrip()
+        renderable = prep_markdown(body) if body else Text('')
+        super().__init__(renderable, id=id)
 
 
 class AgentMessage(Static):

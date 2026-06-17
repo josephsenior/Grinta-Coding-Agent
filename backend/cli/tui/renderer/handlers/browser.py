@@ -40,7 +40,6 @@ def _update_browser_screenshot_card(
         outcome=card.secondary or 'captured',
         extra_content=extra_content,
         meta_lines=card.meta_lines or None,
-        operation_label=f'Browser {last_cmd}'.strip(),
     )
     orch._last_browser_action_card = None
 

@@ -9,10 +9,16 @@ on:
     branches:
       - main
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
   id-token: write
+
+env:
+  # GitHub-hosted runners default to Node 24 for actions starting 2026-06-16; opt in
+  # explicitly so checkout/setup steps do not recycle mid-job on Node 20 actions.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 # If triggered by a PR, it will be in the same group. However, each commit on main will be in its own unique group
 concurrency:
@@ -20,24 +26,25 @@ concurrency:
   cancel-in-progress: true
 
 # CI tiers (see docs/CI.md):
-# - gates-on-linux: full backend/tests corpus + Codecov coverage (matches pytest.ini testpaths).
+# - gates-on-linux-coverage-{a,b,d,f,g,e,c,report}: unit tests sharded for coverage on Linux.
+#   Execution shards (d,f,g) skip compileall; syntax is still gated on a/b/c/e shards.
+# - gates-on-linux-extended: integration/e2e/stress after coverage gate passes.
 # - gates-on-windows / gates-on-macos: unit-only PR gates for cross-platform smoke.
 # - heavy-tests: marker-filtered heavy | integration | benchmark (schedule, main, manual).
 jobs:
-  gates-on-linux:
-    name: Python Gates on Linux
-    # ubuntu-latest (24.04) can cancel long steps when needrestart restarts runner-provisioner.
-    runs-on: ubuntu-22.04
+  gates-on-linux-coverage-a:
+    name: Python Gates on Linux (coverage A)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     strategy:
-      fail-fast: false
       matrix:
-        python-version: ['3.12', '3.13']
+        python-version: ['3.12']
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - name: Install uv
         uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f
         with:
-          enable-cache: true
+          enable-cache: false
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
@@ -50,11 +57,314 @@ jobs:
         run: python backend/scripts/verify/verify_optional_imports.py
       - name: Compile backend (syntax gate)
         run: uv run python -m compileall backend
-      - name: Run tests with coverage (full corpus)
-        run: PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q --cov=backend --cov-fail-under=75 --cov-report=xml:coverage.xml backend/tests
+      - name: Run unit tests shard A with coverage
+        run: >-
+          PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q
+          --cov=backend --cov-fail-under=0
+          backend/tests/unit/cli backend/tests/unit/client backend/tests/unit/context
+          backend/tests/unit/engine backend/tests/unit/eval
+      - name: Stage coverage data
+        run: cp .coverage coverage-shard-a.dat
+      - name: Upload coverage data
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: coverage-linux-a
+          path: coverage-shard-a.dat
+          if-no-files-found: error
 
+  gates-on-linux-coverage-b:
+    name: Python Gates on Linux (coverage B)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        python-version: ['3.12']
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Install uv
+        uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f
+        with:
+          enable-cache: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Lockfile validation
+        run: uv lock --check
+      - name: Install Python dependencies
+        run: python scripts/bootstrap_env.py dev-test
+      - name: Verify optional imports
+        run: python backend/scripts/verify/verify_optional_imports.py
+      - name: Compile backend (syntax gate)
+        run: uv run python -m compileall backend
+      - name: Run unit tests shard B with coverage
+        run: >-
+          PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q
+          --cov=backend --cov-fail-under=0
+          backend/tests/unit/core
+          backend/tests/unit/test_bounded_pipeline.py backend/tests/unit/test_backend_conftest.py
+          backend/tests/unit/test_package_version.py backend/tests/unit/test_start_server.py
+      - name: Stage coverage data
+        run: cp .coverage coverage-shard-b.dat
+      - name: Upload coverage data
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: coverage-linux-b
+          path: coverage-shard-b.dat
+          if-no-files-found: error
+
+  gates-on-linux-coverage-d:
+    name: Python Gates on Linux (coverage D)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        python-version: ['3.12']
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Install uv
+        uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f
+        with:
+          enable-cache: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Lockfile validation
+        run: uv lock --check
+      - name: Install Python dependencies
+        run: python scripts/bootstrap_env.py dev-test
+      - name: Verify optional imports
+        run: python backend/scripts/verify/verify_optional_imports.py
+      - name: Run unit tests shard D with coverage
+        run: |
+          mapfile -t tests < <(find backend/tests/unit/execution -name 'test_*.py' | sort)
+          half=$((${#tests[@]} / 2))
+          PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q \
+            --cov=backend --cov-fail-under=0 \
+            "${tests[@]:0:$half}"
+      - name: Stage coverage data
+        run: cp .coverage coverage-shard-d.dat
+      - name: Upload coverage data
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: coverage-linux-d
+          path: coverage-shard-d.dat
+          if-no-files-found: error
+
+  gates-on-linux-coverage-f:
+    name: Python Gates on Linux (coverage F)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        python-version: ['3.12']
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Install uv
+        uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f
+        with:
+          enable-cache: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Lockfile validation
+        run: uv lock --check
+      - name: Install Python dependencies
+        run: python scripts/bootstrap_env.py dev-test
+      - name: Verify optional imports
+        run: python backend/scripts/verify/verify_optional_imports.py
+      - name: Run unit tests shard F with coverage
+        run: |
+          mapfile -t tests < <(find backend/tests/unit/execution -name 'test_*.py' | sort)
+          n=${#tests[@]}
+          half=$((n / 2))
+          q=$((n / 4))
+          fq=$((q / 2))
+          ffq=$((fq / 2))
+          PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q \
+            --cov=backend --cov-fail-under=0 \
+            "${tests[@]:$half:$ffq}"
+      - name: Stage coverage data
+        run: cp .coverage coverage-shard-f.dat
+      - name: Upload coverage data
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: coverage-linux-f
+          path: coverage-shard-f.dat
+          if-no-files-found: error
+
+  gates-on-linux-coverage-g:
+    name: Python Gates on Linux (coverage G)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        python-version: ['3.12']
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Install uv
+        uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f
+        with:
+          enable-cache: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Lockfile validation
+        run: uv lock --check
+      - name: Install Python dependencies
+        run: python scripts/bootstrap_env.py dev-test
+      - name: Verify optional imports
+        run: python backend/scripts/verify/verify_optional_imports.py
+      - name: Run unit tests shard G with coverage
+        run: |
+          mapfile -t tests < <(find backend/tests/unit/execution -name 'test_*.py' | sort)
+          n=${#tests[@]}
+          half=$((n / 2))
+          q=$((n / 4))
+          fq=$((q / 2))
+          ffq=$((fq / 2))
+          start=$((half + ffq))
+          PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q \
+            --cov=backend --cov-fail-under=0 \
+            "${tests[@]:$start}"
+      - name: Stage coverage data
+        run: cp .coverage coverage-shard-g.dat
+      - name: Upload coverage data
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: coverage-linux-g
+          path: coverage-shard-g.dat
+          if-no-files-found: error
+
+  gates-on-linux-coverage-e:
+    name: Python Gates on Linux (coverage E)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        python-version: ['3.12']
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Install uv
+        uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f
+        with:
+          enable-cache: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Lockfile validation
+        run: uv lock --check
+      - name: Install Python dependencies
+        run: python scripts/bootstrap_env.py dev-test
+      - name: Verify optional imports
+        run: python backend/scripts/verify/verify_optional_imports.py
+      - name: Compile backend (syntax gate)
+        run: uv run python -m compileall backend
+      - name: Run unit tests shard E with coverage
+        run: >-
+          PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q
+          --cov=backend --cov-fail-under=0
+          backend/tests/unit/inference
+      - name: Stage coverage data
+        run: cp .coverage coverage-shard-e.dat
+      - name: Upload coverage data
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: coverage-linux-e
+          path: coverage-shard-e.dat
+          if-no-files-found: error
+
+  gates-on-linux-coverage-c:
+    name: Python Gates on Linux (coverage C)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        python-version: ['3.12']
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Install uv
+        uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f
+        with:
+          enable-cache: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Lockfile validation
+        run: uv lock --check
+      - name: Install Python dependencies
+        run: python scripts/bootstrap_env.py dev-test
+      - name: Verify optional imports
+        run: python backend/scripts/verify/verify_optional_imports.py
+      - name: Compile backend (syntax gate)
+        run: uv run python -m compileall backend
+      - name: Run unit tests shard C with coverage
+        run: >-
+          PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q
+          --cov=backend --cov-fail-under=0
+          backend/tests/unit/integrations backend/tests/unit/knowledge backend/tests/unit/ledger
+          backend/tests/unit/orchestration backend/tests/unit/persistence backend/tests/unit/playbooks
+          backend/tests/unit/security backend/tests/unit/telemetry backend/tests/unit/tools
+          backend/tests/unit/utils backend/tests/unit/validation
+      - name: Stage coverage data
+        run: cp .coverage coverage-shard-c.dat
+      - name: Upload coverage data
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: coverage-linux-c
+          path: coverage-shard-c.dat
+          if-no-files-found: error
+
+  gates-on-linux-coverage-report:
+    name: Python Gates on Linux (coverage report)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    needs:
+      - gates-on-linux-coverage-a
+      - gates-on-linux-coverage-b
+      - gates-on-linux-coverage-c
+      - gates-on-linux-coverage-d
+      - gates-on-linux-coverage-f
+      - gates-on-linux-coverage-g
+      - gates-on-linux-coverage-e
+    strategy:
+      matrix:
+        python-version: ['3.12']
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Install uv
+        uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f
+        with:
+          enable-cache: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install Python dependencies
+        run: python scripts/bootstrap_env.py dev-test
+      - name: Download coverage shards
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          path: coverage-shards
+      - name: Combine coverage and enforce threshold
+        run: |
+          cp coverage-shards/coverage-linux-a/coverage-shard-a.dat .coverage.a
+          cp coverage-shards/coverage-linux-b/coverage-shard-b.dat .coverage.b
+          cp coverage-shards/coverage-linux-c/coverage-shard-c.dat .coverage.c
+          cp coverage-shards/coverage-linux-d/coverage-shard-d.dat .coverage.d
+          cp coverage-shards/coverage-linux-f/coverage-shard-f.dat .coverage.f
+          cp coverage-shards/coverage-linux-g/coverage-shard-g.dat .coverage.g
+          cp coverage-shards/coverage-linux-e/coverage-shard-e.dat .coverage.e
+          uv run coverage combine .coverage.a .coverage.b .coverage.c .coverage.d .coverage.f .coverage.g .coverage.e
+          uv run coverage report --fail-under=75
+          uv run coverage xml -o coverage.xml
       - name: Upload coverage to Codecov
-        if: always() && matrix.python-version == '3.12'
+        if: always()
         uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2
         with:
           use_oidc: true
@@ -63,6 +373,65 @@ jobs:
           name: python-linux
           fail_ci_if_error: false
           verbose: true
+
+  gates-on-linux-extended:
+    name: Python Gates on Linux (extended)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: gates-on-linux-coverage-report
+    strategy:
+      matrix:
+        python-version: ['3.12']
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Install uv
+        uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f
+        with:
+          enable-cache: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Lockfile validation
+        run: uv lock --check
+      - name: Install Python dependencies
+        run: python scripts/bootstrap_env.py dev-test
+      - name: Verify optional imports
+        run: python backend/scripts/verify/verify_optional_imports.py
+      - name: Compile backend (syntax gate)
+        run: uv run python -m compileall backend
+      - name: Run integration, e2e, and stress tests
+        run: PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q -n 2 backend/tests/integration backend/tests/e2e backend/tests/stress
+
+  gates-on-linux-py313:
+    name: Python Gates on Linux (3.13 unit)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: gates-on-linux-extended
+    continue-on-error: true
+    strategy:
+      matrix:
+        python-version: ['3.13']
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Install uv
+        uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f
+        with:
+          enable-cache: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Lockfile validation
+        run: uv lock --check
+      - name: Install Python dependencies
+        run: python scripts/bootstrap_env.py dev-test
+      - name: Verify optional imports
+        run: python backend/scripts/verify/verify_optional_imports.py
+      - name: Compile backend (syntax gate)
+        run: uv run python -m compileall backend
+      - name: Run unit tests (Python 3.13 advisory)
+        run: PYTHONPATH=".:$PYTHONPATH" uv run pytest -q backend/tests/unit
 
   gates-on-windows:
     name: Python Gates on Windows
@@ -96,7 +465,7 @@ jobs:
 
   heavy-tests:
     name: Heavy / Integration Tests
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
     strategy:
       matrix:

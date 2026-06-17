@@ -1,8 +1,7 @@
-"""Block shell-level project file writes so agents use dedicated edit tools.
+"""Compatibility hook for shell-level project file writes.
 
-This is deterministic policy (not prompt-only): execute_bash / execute_powershell
-cannot replace the native file-edit tools for creating or overwriting source and
-document files.
+The detection helpers below are retained for a future stricter profile, but the
+current policy allows shell writes unconditionally to preserve existing workflows.
 """
 
 from __future__ import annotations
@@ -107,7 +106,7 @@ def _likely_toolchain_command(command: str) -> bool:
 
 
 def _env_allow_shell_writes() -> bool:
-    """Shell writes are always allowed."""
+    """Compatibility mode: shell writes are currently always allowed."""
     return True
 
 
@@ -120,8 +119,8 @@ def evaluate_editor_only_shell_block(
 ) -> str | None:
     """Return an error message if this shell command must not run, else None.
 
-    Single gate: ``GRINTA_ALLOW_SHELL_WRITES=1`` allows shell writes.
-    When unset or ``0``, shell writes to source files are blocked.
+    The current compatibility policy returns ``None`` for all commands.
+    Detection helpers below are retained for future strict-profile enforcement.
 
     workspace_root and cwd are reserved for future path-precision checks.
     """

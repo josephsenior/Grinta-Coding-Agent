@@ -133,7 +133,7 @@ class ScreenStateMixin:
         level = normalize_autonomy_level(value)
         return level if level in {'conservative', 'balanced', 'full'} else default
 
-    def _current_autonomy_level(self) -> str:
+    def _runtime_autonomy_level(self) -> str:
         controller = self._controller
         if controller is not None:
             ac = getattr(controller, 'autonomy_controller', None)
@@ -162,6 +162,19 @@ class ScreenStateMixin:
             getattr(self._hud.state, 'autonomy_level', None),
             default='balanced',
         )
+
+    def _current_autonomy_level(self) -> str:
+        runtime = self._runtime_autonomy_level()
+        if runtime:
+            return runtime
+
+        from backend.cli.settings import get_persisted_autonomy_level
+
+        configured = get_persisted_autonomy_level(self._active_agent_name())
+        if configured:
+            return configured
+
+        return 'balanced'
 
     def _mark_hud_select_sync(self, widget_id: str, *values: object) -> None:
         pending = getattr(self, '_hud_select_sync_values', None)
@@ -441,26 +454,6 @@ class ScreenStateMixin:
             self._phase_label = label
             self._phase_started_at = time.monotonic()
             self._render_hud_bar()
-
-    def set_current_operation(
-        self,
-        summary: str,
-        *,
-        meta: str = '',
-        active: bool = True,
-    ) -> None:
-        summary_text = re.sub(r'\s+', ' ', (summary or '').strip()) or 'Idle'
-        if len(summary_text) > 120:
-            summary_text = summary_text[:117] + '...'
-        meta_text = re.sub(r'\s+', ' ', (meta or '').strip())
-        if len(meta_text) > 140:
-            meta_text = meta_text[:137] + '...'
-        self._current_operation_summary = summary_text
-        self._current_operation_meta = meta_text or 'Waiting for activity'
-        self._current_operation_active = active
-
-    def clear_current_operation(self, meta: str = 'Waiting for activity') -> None:
-        self.set_current_operation('Idle', meta=meta, active=False)
 
     def set_retry_status(
         self,

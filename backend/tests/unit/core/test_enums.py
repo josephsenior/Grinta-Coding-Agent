@@ -127,7 +127,6 @@ class TestActionType:
         assert ActionType.MESSAGE.value == 'message'
         assert ActionType.START.value == 'start'
         assert ActionType.READ.value == 'read'
-        assert ActionType.WRITE.value == 'write'
         assert ActionType.EDIT.value == 'edit'
 
     def test_control_action_types(self):
@@ -153,7 +152,7 @@ class TestObservationType:
     def test_core_observation_types(self):
         """Test ObservationType has core observation values."""
         assert ObservationType.READ.value == 'read'
-        assert ObservationType.WRITE.value == 'write'
+        assert ObservationType.EDIT.value == 'edit'
         assert ObservationType.ERROR.value == 'error'
         assert ObservationType.NULL.value == 'null'
 

@@ -73,7 +73,7 @@ class TestRollbackMiddlewareInit:
 class TestRiskyActionTypes:
     @pytest.mark.parametrize(
         'action_type',
-        ['FileEditAction', 'FileWriteAction', 'CmdRunAction'],
+        ['FileEditAction', 'CmdRunAction'],
     )
     def test_risky(self, action_type):
         assert action_type in _RISKY_ACTION_TYPES

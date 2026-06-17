@@ -36,6 +36,16 @@ On Windows PowerShell you can use the convenience wrapper instead:
 That script syncs `dev-test` dependencies, checks local model servers, runs `init`
 when `settings.json` is missing, then launches the CLI.
 
+### Repo hygiene
+
+- Treat `dist/`, `logs/`, local cache directories, and one-off diagnostics as disposable output, not source.
+- Historical narrative docs under `docs/journey/` are intentionally not the current spec; use `README.md`, `docs/USER_GUIDE.md`, `docs/ARCHITECTURE.md`, and `docs/DEVELOPER.md` for current behavior.
+- Prefer the current helper surfaces for local work:
+  - `make help`
+  - `make run-cli`
+  - `make test-unit`
+  - `make reliability-gate`
+
 ### Local configuration (source checkout)
 
 - **`settings.json`** at the repository root holds non-secret defaults (`llm_model`,
@@ -174,7 +184,7 @@ across mixins under `backend/orchestration/session_orchestrator_mixins/`):
 | `ActionExecutionService` | Get & execute next agent action |
 | `ActionService` | Action intake, pending coordination |
 | `RecoveryService` | Exception classification, retry orchestration |
-| `TaskValidationService` | Finish-action validation pipeline |
+| `TaskValidationService` | Optional completion-quality warning pipeline |
 | `CircuitBreakerService` | Circuit breaker pattern |
 | `StuckDetectionService` | 6-strategy stuck/loop detection |
 | `IterationGuardService` | Iteration limit control flags |

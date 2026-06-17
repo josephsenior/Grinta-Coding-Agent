@@ -22,7 +22,8 @@ from backend.ledger.action.action import Action
 from backend.ledger.action.agent import AgentThinkAction
 from backend.ledger.action.commands import CmdRunAction
 from backend.ledger.action.empty import NullAction
-from backend.ledger.action.files import FileEditAction, FileReadAction, FileWriteAction
+from backend.ledger.action.files import FileEditAction, FileReadAction
+from backend.ledger.action import FileEditAction, FileReadAction
 from backend.ledger.action.message import MessageAction
 from backend.ledger.event import Event, EventSource
 from backend.ledger.observation import CmdOutputObservation
@@ -464,7 +465,7 @@ class StuckDetector:
         """
         if isinstance(action, CmdRunAction):
             return self._categorize_cmd_action(action.command)
-        if isinstance(action, (FileReadAction, FileWriteAction, FileEditAction)):
+        if isinstance(action, (FileReadAction, FileEditAction)):
             return f'file_op_{action.path}'
         return 'other_action'
 
@@ -746,7 +747,7 @@ class StuckDetector:
                 readonly_commands.append(e.command.strip())
             elif isinstance(e, FileReadAction):
                 readonly_commands.append(f'__read__{e.path}')
-            elif isinstance(e, (FileWriteAction, FileEditAction)):
+            elif isinstance(e, FileEditAction):
                 write_count += 1
 
         readonly_count = len(readonly_commands)

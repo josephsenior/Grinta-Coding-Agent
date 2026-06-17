@@ -92,6 +92,14 @@ def _json_safe_tool_message_content(message: Message) -> object:
     return str(message.content)
 
 
+def _compact_log_preview(value: object, *, limit: int = 300) -> str:
+    text = str(value or '').replace('\r', ' ').replace('\n', ' ')
+    text = ' '.join(text.split())
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3].rstrip() + '...'
+
+
 @dataclass
 class _ToolCallTracking:
     pending_action_messages: dict[str, Message] = field(default_factory=dict)
@@ -772,7 +780,7 @@ class ContextMemory:
                     system_prompt = (
                         '[DEGRADED_MODE_SYSTEM_PROMPT] PromptManager unavailable. '
                         'Critical tool and safety guidance may be missing. '
-                        'You are Grinta, an expert AI coding agent.'
+                        'You are Grinta, a careful senior software engineering agent.'
                     )
                 else:
                     raise RuntimeError(
@@ -979,9 +987,41 @@ class ContextMemory:
                 name=tool_name,
                 tool_ok=_tool_ok_for_observation(obs),
             )
+            self._log_tool_observation_for_prompt(obs, tool_call_metadata, tool_name)
             return []
 
         return [message]
+
+    def _log_tool_observation_for_prompt(
+        self,
+        obs: Observation,
+        tool_call_metadata,
+        tool_name: str,
+    ) -> None:
+        """Log compact tool observations to make prompt pairing auditable."""
+        try:
+            content = getattr(obs, 'content', '') or ''
+            tool_result = getattr(obs, 'tool_result', None)
+            tool_ok = _tool_ok_for_observation(obs)
+            logger.info(
+                'Prompt history recorded tool observation: observation=%s tool=%s call_id=%s ok=%s content_chars=%d preview=%r',
+                type(obs).__name__,
+                tool_name,
+                getattr(tool_call_metadata, 'tool_call_id', ''),
+                tool_ok,
+                len(str(content)),
+                _compact_log_preview(content),
+            )
+            if isinstance(tool_result, dict) and tool_result.get('error_code'):
+                logger.info(
+                    'Prompt history tool observation error metadata: tool=%s call_id=%s error_code=%s retryable=%s',
+                    tool_name,
+                    getattr(tool_call_metadata, 'tool_call_id', ''),
+                    tool_result.get('error_code'),
+                    tool_result.get('retryable'),
+                )
+        except Exception:
+            logger.debug('Failed to log tool observation for prompt', exc_info=True)
 
     def _get_message_for_observation(
         self,

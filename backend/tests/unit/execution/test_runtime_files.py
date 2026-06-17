@@ -174,9 +174,9 @@ class TestWriteFile:
         from backend.execution.utils.files import write_file
 
         obs = await write_file('new.txt', str(tmp_path), str(tmp_path), 'hello world')
-        from backend.ledger.observation import FileWriteObservation
+        from backend.ledger.observation import FileEditObservation
 
-        assert isinstance(obs, FileWriteObservation)
+        assert isinstance(obs, FileEditObservation)
         assert (tmp_path / 'new.txt').exists()
 
     async def test_write_creates_directories(self, tmp_path):
@@ -185,9 +185,9 @@ class TestWriteFile:
         obs = await write_file(
             'sub/dir/file.txt', str(tmp_path), str(tmp_path), 'content'
         )
-        from backend.ledger.observation import FileWriteObservation
+        from backend.ledger.observation import FileEditObservation
 
-        assert isinstance(obs, FileWriteObservation)
+        assert isinstance(obs, FileEditObservation)
         assert (tmp_path / 'sub' / 'dir' / 'file.txt').exists()
 
     async def test_write_outside_workspace(self, tmp_path):

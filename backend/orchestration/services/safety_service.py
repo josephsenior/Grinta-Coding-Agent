@@ -8,11 +8,17 @@ from backend.ledger.action import (
     Action,
     ActionConfirmationStatus,
     ActionSecurityRisk,
+    BlackboardAction,
     BrowseInteractiveAction,
     BrowserToolAction,
     CmdRunAction,
+    DelegateTaskAction,
     FileEditAction,
+    MCPAction,
+    TerminalInputAction,
+    TerminalRunAction,
 )
+from backend.ledger.action import FileEditAction
 
 if TYPE_CHECKING:
     from backend.orchestration.services.orchestration_context import (
@@ -36,6 +42,11 @@ class SafetyService:
         BrowseInteractiveAction,
         BrowserToolAction,
         FileEditAction,
+        TerminalRunAction,
+        TerminalInputAction,
+        MCPAction,
+        DelegateTaskAction,
+        BlackboardAction,
     )
 
     def __init__(self, context: OrchestrationContext) -> None:
@@ -57,8 +68,10 @@ class SafetyService:
     def evaluate_security_risk(self, action: Action) -> tuple[bool, bool]:
         """Return (is_high_risk, ask_for_every_action) tuple."""
         security_risk = getattr(action, 'security_risk', ActionSecurityRisk.UNKNOWN)
+        if not isinstance(security_risk, ActionSecurityRisk):
+            security_risk = ActionSecurityRisk.UNKNOWN
         analyzer = self._context.security_analyzer
-        is_high_security_risk = security_risk == ActionSecurityRisk.HIGH
+        is_high_security_risk = security_risk >= ActionSecurityRisk.HIGH
         is_ask_for_every_action = security_risk == ActionSecurityRisk.UNKNOWN and (
             analyzer is None
         )
@@ -68,19 +81,21 @@ class SafetyService:
         """Invoke configured security analyzer, falling back to UNKNOWN risk."""
         analyzer = self._context.security_analyzer
         if not analyzer:
-            if hasattr(action, 'security_risk'):
-                action.security_risk = ActionSecurityRisk.UNKNOWN
             return
 
         try:
+            declared = getattr(action, 'security_risk', ActionSecurityRisk.UNKNOWN)
+            if not isinstance(declared, ActionSecurityRisk):
+                declared = ActionSecurityRisk.UNKNOWN
             if hasattr(action, 'security_risk') and action.security_risk is not None:
                 logger.debug(
                     'Original security risk for %s: %s', action, action.security_risk
                 )
             if hasattr(action, 'security_risk'):
-                action.security_risk = await analyzer.security_risk(action)
+                analyzed = await analyzer.security_risk(action)
+                action.security_risk = max(declared, analyzed)
                 logger.debug(
-                    '[Security Analyzer: %s] Override security risk for action %s: %s',
+                    '[Security Analyzer: %s] Effective security risk for action %s: %s',
                     analyzer.__class__,
                     action,
                     action.security_risk,
@@ -112,7 +127,9 @@ class SafetyService:
             )
             return
 
-        if autonomy and autonomy.should_request_confirmation(action):
+        if is_high_security_risk:
+            action.confirmation_state = ActionConfirmationStatus.AWAITING_CONFIRMATION
+        elif autonomy and autonomy.should_request_confirmation(action):
             action.confirmation_state = ActionConfirmationStatus.AWAITING_CONFIRMATION
         else:
             logger.debug(

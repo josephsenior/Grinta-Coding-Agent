@@ -305,7 +305,6 @@ class ToolTelemetry:
             CmdRunActionSchema,
             FileEditActionSchema,
             FileReadActionSchema,
-            FileWriteActionSchema,
             MessageActionSchema,
             NullActionSchema,
             SystemMessageActionSchema,
@@ -313,7 +312,6 @@ class ToolTelemetry:
 
         return {
             'read': FileReadActionSchema,
-            'write': FileWriteActionSchema,
             'edit': FileEditActionSchema,
             'run': CmdRunActionSchema,
             'message': MessageActionSchema,

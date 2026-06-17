@@ -64,7 +64,7 @@ Console script
           -> execution layer runs action
             -> observation emitted
               -> orchestrator updates state
-                -> task validation gate controls completion
+                -> finish path applies step guards plus optional completion-quality validation
 ```
 
 ---
@@ -96,7 +96,7 @@ Current service files:
 - `step_guard_service.py`
 - `step_prerequisite_service.py`
 - `stuck_detection_service.py`
-- `task_validation_service.py`
+- `task_validation_service.py` (warning-only completion-quality checks when enabled)
 
 When adding new behavior, prefer extending an existing focused service first before creating new control-plane surfaces.
 

@@ -14,6 +14,7 @@ from backend.context.canonical_state import (
 )
 from backend.context.pre_condensation_snapshot import load_snapshot
 from backend.core.logger import app_logger as logger
+from backend.ledger.action import MessageAction
 from backend.ledger.observation.agent import AgentCondensationObservation
 
 if TYPE_CHECKING:
@@ -30,6 +31,9 @@ MAX_CONTEXT_PACKET_CHAR_BUDGET = 32_000
 class ContextPacket:
     content: str
     section_lengths: dict[str, int]
+
+
+_UserTurn = tuple[int | str | None, str, str]
 
 
 def build_context_packet_observation(
@@ -74,6 +78,23 @@ def build_context_packet(
     char_budget = _resolve_packet_char_budget(llm_config, char_budget)
     canonical = _canonical_for_packet(history, state=state)
     sections: list[tuple[str, str]] = []
+    snapshot = _load_snapshot_for_request_context(state=state)
+    user_context = _user_request_context(
+        history,
+        prompt_events=events,
+        snapshot=snapshot,
+    )
+    if user_context:
+        sections.append(
+            (
+                'recent_user_request_context',
+                _bounded_section(
+                    'Recent user request context',
+                    user_context,
+                    max(1400, int(char_budget * 0.16)),
+                ),
+            )
+        )
     checkpoint = _operational_checkpoint(canonical)
     if checkpoint:
         sections.append(
@@ -86,12 +107,16 @@ def build_context_packet(
                 ),
             )
         )
-    canonical_block = render_canonical_state_for_prompt(
-        canonical,
-        char_budget=max(4200, int(char_budget * 0.58)),
-    )
-    if canonical_block:
-        sections.append(('canonical_state', canonical_block))
+    if _canonical_has_packet_details(canonical):
+        canonical_block = render_canonical_state_for_prompt(
+            canonical,
+            char_budget=max(4200, int(char_budget * 0.58)),
+            include_objective=False,
+            include_latest_directive=False,
+            include_next_action=False,
+        )
+        if canonical_block:
+            sections.append(('canonical_state', canonical_block))
     active_status = _active_status(canonical)
     if active_status:
         sections.append(
@@ -128,7 +153,14 @@ def build_context_packet(
                 ),
             )
         )
-    restore_hints = _restore_hints(state=state) if just_compacted else ''
+    restore_hints = (
+        _restore_hints(
+            state=state,
+            include_latest_directive=not bool(user_context),
+        )
+        if just_compacted
+        else ''
+    )
     if restore_hints:
         sections.append(
             (
@@ -179,6 +211,26 @@ def _canonical_for_packet(
     return canonical
 
 
+def _canonical_has_packet_details(canonical: CanonicalTaskState) -> bool:
+    """True when canonical state adds facts not already covered by packet sections."""
+    return bool(
+        canonical.superseding_directive
+        or canonical.active_plan
+        or canonical.implementation_checkpoint
+        or canonical.task_plan
+        or canonical.active_files
+        or canonical.verification.command
+        or canonical.blockers
+        or canonical.failed_approaches
+        or canonical.background_tasks
+        or canonical.recent_work
+        or canonical.invalidated_assumptions
+        or canonical.decisions
+        or canonical.vcs_status
+        or canonical.narrative_summary
+    )
+
+
 def _latest_summary(history: list[Event]) -> str:
     from backend.ledger.observation.agent import AgentCondensationObservation
 
@@ -203,14 +255,141 @@ def _latest_summary(history: list[Event]) -> str:
     return ''
 
 
+def _load_snapshot_for_request_context(*, state: State | None) -> dict | None:
+    if state is None:
+        return None
+    try:
+        return load_snapshot(state=state)
+    except Exception:
+        logger.debug('Request-context snapshot load failed', exc_info=True)
+        return None
+
+
+def _user_request_context(
+    history: list[Event],
+    *,
+    prompt_events: list[Event],
+    snapshot: dict | None = None,
+) -> str:
+    user_turns = _dedupe_user_turns(
+        [*_user_turns_from_snapshot(snapshot), *_user_turns_from_events(history)]
+    )
+    prompt_turns = _user_turns_from_events(prompt_events)
+    missing_turns = [
+        turn for turn in user_turns if not _turn_is_present(turn, prompt_turns)
+    ]
+    if not missing_turns:
+        return ''
+
+    selected = missing_turns[-6:]
+    lines: list[str] = []
+    omitted = len(missing_turns) - len(selected)
+    if omitted:
+        lines.append(f'{omitted} older preserved user message(s) omitted.')
+    lines.append('Preserved user messages not otherwise in prompt:')
+    lines.extend('- ' + _format_user_turn(turn, 420) for turn in selected)
+    return '\n'.join(lines)
+
+
+def _user_turns_from_events(events: list[Event]) -> list[_UserTurn]:
+    turns: list[_UserTurn] = []
+    for event in events:
+        if not isinstance(event, MessageAction):
+            continue
+        event_source = getattr(event, 'source', None)
+        source_value = getattr(event_source, 'value', event_source)
+        if str(source_value).lower() != 'user':
+            continue
+        text = _clean_user_text(getattr(event, 'content', ''))
+        if not text:
+            continue
+        turns.append((_clean_event_id(getattr(event, 'id', None)), text, 'history'))
+    return turns
+
+
+def _user_turns_from_snapshot(snapshot: dict | None) -> list[_UserTurn]:
+    if not isinstance(snapshot, dict):
+        return []
+    raw_turns = snapshot.get('recent_user_messages')
+    turns: list[_UserTurn] = []
+    if isinstance(raw_turns, list):
+        for item in raw_turns:
+            if not isinstance(item, dict):
+                continue
+            text = _clean_user_text(item.get('text', ''))
+            if not text:
+                continue
+            turns.append((_clean_event_id(item.get('event_id')), text, 'snapshot'))
+    if turns:
+        return turns
+
+    latest = _clean_user_text(snapshot.get('latest_directive', ''))
+    if latest:
+        turns.append(('snapshot:latest', latest, 'snapshot'))
+    objective = _clean_user_text(snapshot.get('objective', ''))
+    if objective and objective != latest:
+        turns.insert(0, ('snapshot:objective', objective, 'snapshot'))
+    return turns
+
+
+def _dedupe_user_turns(turns: list[_UserTurn]) -> list[_UserTurn]:
+    merged: list[_UserTurn] = []
+    seen: set[tuple[str, str]] = set()
+    for turn in turns:
+        key = _turn_key(turn)
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(turn)
+    return merged
+
+
+def _clean_user_text(value: object) -> str:
+    return ' '.join(str(value or '').split())
+
+
+def _clean_event_id(value: object) -> int | str | None:
+    if isinstance(value, int | str):
+        return value
+    return None
+
+
+def _format_user_turn(turn: _UserTurn, limit: int) -> str:
+    event_id, text, source = turn
+    prefix = f'id={event_id}' if event_id is not None else source
+    return f'{prefix}: {_clip_inline(text, limit)}'
+
+
+def _turn_is_present(turn: _UserTurn, turns: list[_UserTurn]) -> bool:
+    key = _turn_key(turn)
+    return any(_turn_key(candidate) == key for candidate in turns)
+
+
+def _turn_key(turn: _UserTurn) -> tuple[str, str]:
+    event_id, text, _source = turn
+    return (str(event_id or ''), text)
+
+
+def _clip_inline(text: str, limit: int) -> str:
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3].rstrip() + '...'
+
+
 def _recent_tail_summary(events: list[Event]) -> str:
     lines: list[str] = []
-    for event in events[-10:]:
+    for event in reversed(events):
+        if isinstance(event, MessageAction):
+            continue
         event_id = getattr(event, 'id', '?')
         label = type(event).__name__
         detail = _event_detail(event)
+        if not detail:
+            continue
         lines.append(f'- {label} id={event_id}: {detail}')
-    return '\n'.join(line for line in lines if line.strip())
+        if len(lines) >= 10:
+            break
+    return '\n'.join(reversed(lines))
 
 
 def _operational_checkpoint(canonical: CanonicalTaskState) -> str:
@@ -249,13 +428,17 @@ def _active_status(canonical: CanonicalTaskState) -> str:
     return '\n'.join(lines)
 
 
-def _restore_hints(*, state: State | None) -> str:
+def _restore_hints(
+    *,
+    state: State | None,
+    include_latest_directive: bool = True,
+) -> str:
     snapshot = load_snapshot(state=state)
     if not snapshot:
         return ''
     lines: list[str] = []
     latest = str(snapshot.get('latest_directive', '')).strip()
-    if latest:
+    if latest and include_latest_directive:
         lines.append(f'Latest directive before compaction: {latest[:240]}')
     tests = snapshot.get('test_results')
     if isinstance(tests, list) and tests:

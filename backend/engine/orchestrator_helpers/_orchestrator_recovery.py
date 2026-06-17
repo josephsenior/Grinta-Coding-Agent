@@ -45,9 +45,7 @@ def _astep_handle_tool_execution_error(orch: Orchestrator, e: Exception) -> Acti
             removed,
         )
 
-    return AgentThinkAction(
-        thought=f'I encountered a tool error: {str(e)}. I will analyze the last tool call and retry.',
-    )
+    return AgentThinkAction(thought=str(e))
 
 
 def _astep_handle_recoverable_tool_call_shape_error(
@@ -87,8 +85,6 @@ def _astep_handle_recoverable_tool_call_shape_error(
         )
 
     return AgentThinkAction(
-        thought=(
-            f'{str(e)}\nPlease emit a corrected tool call with valid JSON arguments.'
-        ),
+        thought=str(e),
         kind=AgentThinkAction.KIND_RECOVERABLE_ERROR,
     )

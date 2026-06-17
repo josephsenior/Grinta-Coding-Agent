@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING, Any
 from backend.context.compactor.compactor import Compaction, RollingCompactor
 from backend.context.view import View
 from backend.ledger.action.agent import CondensationAction
-from backend.ledger.action.files import FileEditAction, FileWriteAction
+from backend.ledger.action import FileEditAction
+from backend.ledger.observation import FileEditObservation
 from backend.ledger.action.message import SystemMessageAction
 from backend.ledger.event import EventSource
 from backend.ledger.observation import Observation
@@ -22,7 +23,7 @@ class ConversationWindowCompactor(RollingCompactor):
     Strategy
     --------
     1. Always keep the most recent ``max_events`` events (recency window).
-    2. Outside that window, also keep every ``FileWriteAction`` / ``FileEditAction``
+    2. Outside that window, also keep every ``FileEditAction`` / ``FileEditObservation``
        and any ``Observation`` whose ``.cause`` refers to one of those file actions.
     3. System messages and user messages are always kept regardless of window.
     4. Everything else outside the window is pruned.
@@ -52,7 +53,7 @@ class ConversationWindowCompactor(RollingCompactor):
         return {
             event.id
             for event in events
-            if isinstance(event, (FileWriteAction, FileEditAction))
+            if isinstance(event, (FileEditAction, FileEditObservation))
         }
 
     @staticmethod
@@ -61,7 +62,7 @@ class ConversationWindowCompactor(RollingCompactor):
             return True
         if getattr(event, 'source', None) == EventSource.USER:
             return True
-        if isinstance(event, (FileWriteAction, FileEditAction)):
+        if isinstance(event, (FileEditAction, FileEditObservation)):
             return True
         return (
             isinstance(event, Observation)

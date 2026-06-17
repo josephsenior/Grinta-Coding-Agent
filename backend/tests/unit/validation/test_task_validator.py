@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from backend.ledger.action.files import FileWriteAction
+from backend.ledger.action.files import FileEditAction
 from backend.ledger.observation.files import FileReadObservation
 from backend.validation.task_validator import (
     CompositeValidator,
@@ -267,7 +267,11 @@ class TestFileExistsValidator:
     def test_check_file_exists_uses_typed_history_events(self):
         validator = FileExistsValidator(expected_files=['output.txt'])
         state = MagicMock()
-        state.history = [FileWriteAction(path='output.txt', content='done')]
+        state.history = [
+            FileEditAction(
+                path='output.txt', command='create_file', file_text='done'
+            )
+        ]
         assert validator._check_file_exists(state, 'output.txt') is True
 
     def test_check_file_exists_does_not_infer_from_shell_text(self):

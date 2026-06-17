@@ -182,6 +182,109 @@ def get_persisted_reasoning_effort() -> str:
     return str(raw).strip()
 
 
+def sync_persisted_autonomy_to_controller(
+    controller: Any,
+    agent_name: str | None = None,
+    *,
+    config: Any | None = None,
+) -> str:
+    """Apply settings.json autonomy to the live controller.
+
+    Returns the effective autonomy level on the controller after sync.
+    When no persisted value exists, returns the controller's current level.
+    """
+    from backend.core.constants import DEFAULT_AGENT_NAME
+    from backend.orchestration.autonomy import normalize_autonomy_level
+
+    level = get_persisted_autonomy_level(agent_name)
+    if not level:
+        ac = getattr(controller, 'autonomy_controller', None)
+        return normalize_autonomy_level(
+            getattr(ac, 'autonomy_level', 'balanced') if ac is not None else 'balanced'
+        )
+
+    target_agent = (agent_name or DEFAULT_AGENT_NAME).strip() or DEFAULT_AGENT_NAME
+    ac = getattr(controller, 'autonomy_controller', None)
+    if ac is not None:
+        ac.autonomy_level = level
+
+    if config is not None:
+        try:
+            setattr(config, 'autonomy_level', level)
+            getter = getattr(config, 'get_agent_config', None)
+            if callable(getter):
+                try:
+                    agent_config = getter(target_agent)
+                except TypeError:
+                    agent_config = getter()
+                if agent_config is not None:
+                    agent_config.autonomy_level = level
+        except Exception:
+            logger.debug(
+                'Could not mirror persisted autonomy onto config',
+                exc_info=True,
+            )
+
+    return level
+
+
+def get_persisted_autonomy_level(agent_name: str | None = None) -> str:
+    """Return the user-configured autonomy level from settings.json (empty = default)."""
+    from backend.core.constants import DEFAULT_AGENT_NAME
+    from backend.orchestration.autonomy import normalize_autonomy_level
+
+    agent_section = _load_raw_settings().get('agent')
+    if not isinstance(agent_section, dict):
+        return ''
+
+    candidate_names: list[str] = []
+    if agent_name and agent_name.strip():
+        candidate_names.append(agent_name.strip())
+    for fallback in (DEFAULT_AGENT_NAME, 'agent'):
+        if fallback not in candidate_names:
+            candidate_names.append(fallback)
+    for name, entry in agent_section.items():
+        if (
+            isinstance(name, str)
+            and isinstance(entry, dict)
+            and 'autonomy_level' in entry
+            and name not in candidate_names
+        ):
+            candidate_names.append(name)
+
+    for name in candidate_names:
+        entry = agent_section.get(name)
+        if not isinstance(entry, dict):
+            continue
+        level = normalize_autonomy_level(entry.get('autonomy_level'))
+        if level in {'conservative', 'balanced', 'full'}:
+            return level
+    return ''
+
+
+def update_autonomy_level(level: str, agent_name: str | None = None) -> None:
+    """Persist autonomy level without touching other agent fields."""
+    from backend.core.constants import DEFAULT_AGENT_NAME
+    from backend.orchestration.autonomy import normalize_autonomy_level
+
+    normalized = normalize_autonomy_level(level)
+    if normalized not in {'conservative', 'balanced', 'full'}:
+        return
+
+    target_agent = (agent_name or DEFAULT_AGENT_NAME).strip() or DEFAULT_AGENT_NAME
+    settings = _load_raw_settings()
+    agent_section = settings.get('agent')
+    if not isinstance(agent_section, dict):
+        agent_section = {}
+    agent_entry = agent_section.get(target_agent)
+    if not isinstance(agent_entry, dict):
+        agent_entry = {}
+    agent_entry['autonomy_level'] = normalized
+    agent_section[target_agent] = agent_entry
+    settings['agent'] = agent_section
+    _save_raw_settings(settings)
+
+
 def update_reasoning_effort(effort: str | None) -> None:
     """Persist reasoning effort without touching model or provider fields."""
     settings = _load_raw_settings()

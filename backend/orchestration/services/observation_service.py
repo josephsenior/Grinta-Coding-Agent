@@ -37,13 +37,25 @@ def _extract_tool_name_from_action(action: Any) -> str | None:
     """Extract tool name from an action's metadata or attributes."""
     meta = getattr(action, 'tool_call_metadata', None)
     if meta:
-        name = getattr(meta, 'tool_name', None) or getattr(meta, 'name', None)
+        name = (
+            getattr(meta, 'function_name', None)
+            or getattr(meta, 'tool_name', None)
+            or getattr(meta, 'name', None)
+        )
         if name:
             return str(name)
     tool_name = getattr(action, 'tool_name', None)
     if tool_name:
         return str(tool_name)
     return None
+
+
+def _compact_log_preview(value: object, *, limit: int = 300) -> str:
+    text = str(value or '').replace('\r', ' ').replace('\n', ' ')
+    text = ' '.join(text.split())
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3].rstrip() + '...'
 
 
 def _cleanup_stale_format_error_observations(
@@ -284,6 +296,8 @@ class ObservationService:
             return
         await transition_agent_state_logic(controller, ctx, observation)
 
+        self._log_tool_observation_resolution(pending_action, observation)
+
         if not isinstance(observation, ErrorObservation):
             tool_name = _extract_tool_name_from_action(pending_action)
             if tool_name:
@@ -291,6 +305,37 @@ class ObservationService:
                     controller.state.history,
                     tool_name,
                 )
+
+    @staticmethod
+    def _log_tool_observation_resolution(
+        pending_action, observation: Observation
+    ) -> None:
+        meta = getattr(pending_action, 'tool_call_metadata', None)
+        if meta is None and getattr(observation, 'tool_call_metadata', None) is None:
+            return
+        obs_meta = getattr(observation, 'tool_call_metadata', None)
+        tool_name = (
+            _extract_tool_name_from_action(pending_action)
+            or getattr(obs_meta, 'function_name', '')
+            or type(pending_action).__name__
+        )
+        try:
+            tool_result = getattr(observation, 'tool_result', None)
+            ok = tool_result.get('ok') if isinstance(tool_result, dict) else None
+            logger.info(
+                'Tool observation resolved: action=%s action_id=%s tool=%s call_id=%s observation=%s ok=%s content_chars=%d preview=%r',
+                type(pending_action).__name__,
+                getattr(pending_action, 'id', None),
+                tool_name,
+                getattr(meta, 'tool_call_id', '')
+                or getattr(obs_meta, 'tool_call_id', ''),
+                type(observation).__name__,
+                ok,
+                len(str(getattr(observation, 'content', '') or '')),
+                _compact_log_preview(getattr(observation, 'content', '') or ''),
+            )
+        except Exception:
+            logger.debug('Failed to log resolved tool observation', exc_info=True)
 
     @staticmethod
     def _cause_coerces_to_stream_id(cause: object) -> bool:
@@ -350,11 +395,8 @@ class ObservationService:
         pid = getattr(pending_action, 'id', None)
         oc = getattr(observation, 'cause', None)
         msg = (
-            'The environment reported an observation that does not match the action '
-            'the agent is waiting on. Pending action id was '
-            f'{pid!r}; observation referred to {oc!r}. '
-            'Treat any in-flight tool work as uncertain: verify the workspace before '
-            'continuing, then choose a new approach if needed.'
+            'Observation cause does not match pending action '
+            f'(pending={pid!r}, observation={oc!r}).'
         )
         err = ErrorObservation(
             content=msg,

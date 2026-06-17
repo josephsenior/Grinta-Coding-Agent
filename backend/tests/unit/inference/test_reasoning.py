@@ -225,6 +225,61 @@ class TestGatewayReasoningOptions:
             'enabled': True,
         }
 
+    def test_vercel_qwen37_plus_has_configurable_thinking(self):
+        from backend.inference.catalog_loader import (
+            apply_model_param_overrides,
+            sanitize_call_kwargs_for_provider,
+        )
+        from backend.inference.reasoning import reasoning_effort_options
+
+        entry = lookup('vercel/alibaba/qwen3.7-plus')
+        assert entry is not None
+        options = reasoning_effort_options(entry, include_disabled=True)
+        assert 'xhigh' in options
+
+        kwargs = {
+            'model': 'vercel/alibaba/qwen3.7-plus',
+            'temperature': 0.5,
+            'reasoning_effort': 'high',
+        }
+
+        out = apply_model_param_overrides(
+            'vercel/alibaba/qwen3.7-plus',
+            kwargs,
+            reasoning_effort='high',
+            provider='vercel',
+        )
+
+        assert out['reasoning'] == {'effort': 'high', 'enabled': True}
+        assert 'reasoning_effort' not in out
+
+        xhigh = apply_model_param_overrides(
+            'vercel/alibaba/qwen3.7-plus',
+            {'model': 'vercel/alibaba/qwen3.7-plus', 'temperature': 0.5},
+            reasoning_effort='xhigh',
+            provider='vercel',
+        )
+        sanitized = sanitize_call_kwargs_for_provider(
+            'vercel/alibaba/qwen3.7-plus', xhigh
+        )
+        assert 'reasoning' not in sanitized
+        assert sanitized['extra_body']['reasoning'] == {
+            'effort': 'xhigh',
+            'enabled': True,
+        }
+
+        disabled = apply_model_param_overrides(
+            'vercel/alibaba/qwen3.7-plus',
+            {'model': 'vercel/alibaba/qwen3.7-plus', 'reasoning_effort': 'none'},
+            reasoning_effort='none',
+            provider='vercel',
+        )
+
+        assert 'reasoning' not in disabled
+        assert 'thinking' not in disabled
+        assert 'enable_thinking' not in disabled
+        assert 'reasoning_effort' not in disabled
+
 
 class TestReasoningDisplayOptions:
     def test_opencode_claude_fable_display_labels_match_variants(self):

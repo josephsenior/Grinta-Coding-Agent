@@ -372,29 +372,10 @@ class FileEditTransactionCoordinator:
         restore_errors: list[str],
         skipped_tool_call_ids: dict[str, Any],
     ) -> None:
-        restored_lines = '\n'.join(f'- {path}' for path in sorted(restored))
-        skipped_lines = '\n'.join(
-            f'- {tool_id}' for tool_id in sorted(skipped_tool_call_ids)
-        )
-        error_lines = '\n'.join(f'- {err}' for err in restore_errors)
-        sections = [
-            '[FILE_EDIT_TRANSACTION_ROLLBACK]',
-            (
-                'A file edit from this assistant response failed. The runtime '
-                'restored files touched by the adjacent edit batch to their '
-                'pre-response contents. Re-read the affected files before retrying.'
-            ),
-        ]
-        if restored_lines:
-            sections.append('Restored files:\n' + restored_lines)
-        if skipped_lines:
-            sections.append('Skipped queued edit tool calls:\n' + skipped_lines)
-        if error_lines:
-            sections.append('Rollback warnings:\n' + error_lines)
-
-        suffix = '\n\n'.join(sections)
         observation.content = (
-            f'{observation.content}\n\n{suffix}' if observation.content else suffix
+            f'{observation.content}\n\n[FILE_EDIT_TRANSACTION_ROLLBACK]'
+            if observation.content
+            else '[FILE_EDIT_TRANSACTION_ROLLBACK]'
         )
 
         tool_result = dict(observation.tool_result or {})
@@ -417,12 +398,7 @@ class FileEditTransactionCoordinator:
             return
         for tool_call_id, action in skipped.items():
             obs = ErrorObservation(
-                content=(
-                    'FILE_EDIT_TRANSACTION_ABORTED: this queued edit was skipped '
-                    'because an earlier adjacent edit from the same assistant '
-                    'response failed. The runtime rolled back the batch; re-read '
-                    'the affected files and retry only the edits still needed.'
-                ),
+                content='FILE_EDIT_TRANSACTION_ABORTED: queued edit skipped.',
                 error_id='FILE_EDIT_TRANSACTION_ABORTED',
             )
             obs.tool_call_metadata = getattr(action, 'tool_call_metadata', None)

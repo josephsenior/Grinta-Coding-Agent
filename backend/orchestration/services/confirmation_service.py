@@ -141,16 +141,6 @@ class ConfirmationService:
         if not self._safety_service.action_requires_confirmation(action):
             return
 
-        confirmation_disabled = getattr(
-            self._safety_service,
-            'confirmation_disabled_by_autonomy',
-            None,
-        )
-        if callable(confirmation_disabled) and confirmation_disabled() is True:
-            if hasattr(action, 'confirmation_state'):
-                action.confirmation_state = ActionConfirmationStatus.CONFIRMED
-            return
-
         await self._safety_service.analyze_security(action)
         is_high_security_risk, is_ask_for_every_action = (
             self._safety_service.evaluate_security_risk(action)

@@ -56,14 +56,131 @@ def test_context_packet_contains_one_canonical_state_and_latest_verification(
         _output('pytest backend/tests/unit/context', '7 passed', 3, 0),
     ]
 
-    packet = build_context_packet(events, events, char_budget=1800)
+    packet = build_context_packet(
+        events,
+        events,
+        state=SimpleNamespace(),
+        char_budget=1800,
+    )
 
     assert packet is not None
     assert packet.content.count(CONTEXT_PACKET_MARKER) == 2
     assert packet.content.count('<CANONICAL_TASK_STATE>') == 2
-    assert 'Fix memory compaction' in packet.content
+    assert 'MessageAction id=1' not in packet.content
     assert 'Latest verification: PASSED' in packet.content
     assert len(packet.content) <= 1800
+
+
+def test_context_packet_omits_redundant_user_context_and_stale_objective(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setattr(
+        'backend.context.canonical_state.canonical_state_path',
+        lambda state=None: tmp_path / 'canonical_task_state.json',
+    )
+    events = [
+        _user('hey, are you powerful?', 1),
+        _user('make a deep analysis on this project', 2),
+        _user('continue', 3),
+    ]
+
+    packet = build_context_packet(events, events, char_budget=2200)
+
+    assert packet is not None
+    assert 'RECENT_USER_REQUEST_CONTEXT' not in packet.content
+    assert '- Objective: hey, are you powerful?' not in packet.content
+    assert '- Latest directive: continue' not in packet.content
+
+
+def test_context_packet_omits_request_context_when_latest_user_turn_is_raw_prompt(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setattr(
+        'backend.context.canonical_state.canonical_state_path',
+        lambda state=None: tmp_path / 'canonical_task_state.json',
+    )
+    events = [_user('Implement the exporter', 1)]
+
+    packet = build_context_packet(events, events, char_budget=1800)
+
+    assert packet is not None
+    assert 'RECENT_USER_REQUEST_CONTEXT' not in packet.content
+
+
+def test_recent_causal_tail_omits_chat_messages_already_in_prompt(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setattr(
+        'backend.context.canonical_state.canonical_state_path',
+        lambda state=None: tmp_path / 'canonical_task_state.json',
+    )
+    events = [
+        _user('continue', 929),
+        _cmd('python -m pytest backend/tests/unit/context', 930),
+    ]
+
+    packet = build_context_packet(events, events, char_budget=1800)
+
+    assert packet is not None
+    assert 'RECENT_CAUSAL_TAIL' in packet.content
+    assert 'MessageAction id=929' not in packet.content
+    assert 'continue' not in packet.content
+    assert 'CmdRunAction id=930: python -m pytest backend/tests/unit/context' in (
+        packet.content
+    )
+
+
+def test_recent_causal_tail_keeps_latest_progress_after_chat_burst(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setattr(
+        'backend.context.canonical_state.canonical_state_path',
+        lambda state=None: tmp_path / 'canonical_task_state.json',
+    )
+    command = _cmd('python -m pytest backend/tests/unit/context', 100)
+    events = [
+        command,
+        *[_user(f'continue {index}', 200 + index) for index in range(12)],
+    ]
+
+    packet = build_context_packet(events, events, char_budget=1800)
+
+    assert packet is not None
+    assert 'CmdRunAction id=100: python -m pytest backend/tests/unit/context' in (
+        packet.content
+    )
+    assert 'MessageAction id=211' not in packet.content
+
+
+def test_context_packet_uses_snapshot_user_turns_for_compacted_continue(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setattr(
+        'backend.context.canonical_state.canonical_state_path',
+        lambda state=None: tmp_path / 'canonical_task_state.json',
+    )
+    monkeypatch.setattr(
+        'backend.context.context_packet.load_snapshot',
+        lambda state=None: {
+            'recent_user_messages': [
+                {'event_id': 12, 'text': 'Audit the runtime loop'},
+                {'event_id': 13, 'text': 'continue'},
+            ]
+        },
+    )
+    events = [_user('continue', 13)]
+
+    packet = build_context_packet(
+        events,
+        events,
+        state=SimpleNamespace(),
+        char_budget=1800,
+    )
+
+    assert packet is not None
+    assert 'Preserved user messages not otherwise in prompt:' in packet.content
+    assert '- id=12: Audit the runtime loop' in packet.content
+    assert '- id=13: continue' not in packet.content
 
 
 def test_context_packet_prioritizes_task_checkpoint_after_compaction(
@@ -177,7 +294,7 @@ def test_repeated_compaction_replay_keeps_one_current_state(
     assert packet is not None
     assert packet.content.count('<CANONICAL_TASK_STATE>') == 2
     assert packet.content.count('Latest verification: PASSED') == 1
-    assert 'Finish the context packet hardening' in packet.content
+    assert 'MessageAction id=11' not in packet.content
     assert 'stale packet' not in packet.content
     assert 'old restore block' not in packet.content
     assert 'resuming task' not in packet.content
