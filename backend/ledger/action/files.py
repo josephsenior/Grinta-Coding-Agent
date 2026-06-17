@@ -35,37 +35,6 @@ class FileReadAction(Action):
 
 
 @dataclass
-class FileWriteAction(Action):
-    """Writes a file to a given path.
-
-    Can be set to write specific lines using start and end
-    Default lines 0:-1 (whole file).
-    """
-
-    path: str = ''
-    content: str = ''
-    start: int = 0
-    end: int = -1
-    thought: str = ''
-    action: ClassVar[str] = ActionType.WRITE
-    runnable: ClassVar[bool] = True
-    security_risk: ActionSecurityRisk = ActionSecurityRisk.UNKNOWN
-
-    @property
-    def message(self) -> str:
-        """Get file write message."""
-        return f'Writing file: {self.path}'
-
-    def __repr__(self) -> str:
-        """Return a readable summary of the write parameters."""
-        range_str = f'[L{self.start}:L{self.end}]'
-        return (
-            f'**FileWriteAction**\nPath: {self.path}\nRange: {range_str}'
-            f'\nThought: {self.thought}\nContent:\n```\n{self.content}\n```\n'
-        )
-
-
-@dataclass
 class FileEditAction(Action):
     """Edits a file using canonical internal file-editor commands.
 

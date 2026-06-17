@@ -61,7 +61,6 @@ def _update_or_write_delegate_card(
             status=status,
             outcome=outcome,
             extra_content=preview,
-            operation_label=f'Delegated {resolved_task}'.strip(),
         )
         orch._pending_delegate_card = None
     else:

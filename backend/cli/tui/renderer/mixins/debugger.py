@@ -145,21 +145,11 @@ class RendererDebuggerMixin:
     ) -> None:
         if processing:
             self._activate_activity_card(widget)
-            self._tui.set_current_operation(
-                f'{verb} {detail}'.strip(),
-                meta=secondary or f'session {session_key}',
-                active=True,
-            )
             return
 
         widget.set_processing(False)
         if self._last_active_card is widget:
             self._last_active_card = None
-        self._tui.set_current_operation(
-            f'{verb} {detail}'.strip(),
-            meta=secondary or f'session {session_key}',
-            active=False,
-        )
 
     def _upsert_debugger_session_card(
         self,

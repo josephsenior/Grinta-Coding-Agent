@@ -170,11 +170,13 @@ class TestObservationHandlerTimeout:
         # Minimal observation stub
         observation = MagicMock()
         observation.id = 'obs-1'
-        type(observation).__name__ = 'FileWriteObservation'
+        type(observation).__name__ = 'FileEditObservation'
 
-        from backend.ledger.observation import FileWriteObservation
+        from backend.ledger.observation import FileEditObservation
 
-        obs = FileWriteObservation(content='ok', path='/tmp/x')
+        obs = FileEditObservation(
+            content='ok', path='/tmp/x', outcome='created', new_content='ok'
+        )
 
         start = time.monotonic()
         await router._handle_observation(obs)
@@ -192,7 +194,7 @@ class TestObservationHandlerTimeout:
     @pytest.mark.asyncio
     async def test_normal_observation_handler_completes(self):
         """Non-hung observation handlers still complete — timeout is a ceiling."""
-        from backend.ledger.observation import FileWriteObservation
+        from backend.ledger.observation import FileEditObservation
         from backend.orchestration.services.event_router_mixins._event_router_delegate_mixin import (
             _EventRouterDelegateMixin,
         )
@@ -210,7 +212,9 @@ class TestObservationHandlerTimeout:
             side_effect=_normal_handler
         )
 
-        obs = FileWriteObservation(content='ok', path='/tmp/x')
+        obs = FileEditObservation(
+            content='ok', path='/tmp/x', outcome='created', new_content='ok'
+        )
         await router._handle_observation(obs)
 
         # Normal handler completed; no forced trigger needed.

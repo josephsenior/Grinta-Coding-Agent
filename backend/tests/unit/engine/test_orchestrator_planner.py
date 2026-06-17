@@ -10,7 +10,7 @@ from backend.core.enums import ActionSecurityRisk
 from backend.engine.orchestrator import Orchestrator
 from backend.engine.planner import OrchestratorPlanner, _maybe_log_prompt_metrics
 from backend.ledger.action.agent import AgentThinkAction, CondensationAction
-from backend.ledger.action.files import FileEditAction, FileWriteAction
+from backend.ledger.action.files import FileEditAction
 from backend.ledger.observation import ErrorObservation
 
 
@@ -127,14 +127,17 @@ class TestCondensationRecoveryHandling:
         orch._set_prompt_tier_from_recent_history(state)
         mock_pm.set_prompt_tier.assert_called_with('base')
 
-    def test_debug_when_file_write_high_security_risk(self):
+    def test_debug_when_file_edit_high_security_risk(self):
         orch = Orchestrator.__new__(Orchestrator)
         mock_pm = MagicMock()
         object.__setattr__(orch, '_prompt_manager', mock_pm)
         state = MagicMock()
         state.history = [
-            FileWriteAction(
-                path='x.sh', content='', security_risk=ActionSecurityRisk.HIGH
+            FileEditAction(
+                path='x.sh',
+                command='create_file',
+                file_text='',
+                security_risk=ActionSecurityRisk.HIGH,
             ),
         ]
         orch._set_prompt_tier_from_recent_history(state)

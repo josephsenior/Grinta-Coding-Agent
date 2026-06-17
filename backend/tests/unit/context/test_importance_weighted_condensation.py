@@ -9,7 +9,7 @@ from backend.context.compactor.strategies.conversation_window_compactor import (
     ConversationWindowCompactor,
 )
 from backend.context.view import View
-from backend.ledger.action.files import FileEditAction, FileWriteAction
+from backend.ledger.action.files import FileEditAction
 from backend.ledger.action.message import MessageAction, SystemMessageAction
 from backend.ledger.event import EventSource
 from backend.ledger.observation import Observation
@@ -46,12 +46,12 @@ def _view(events, unhandled=False):
 
 
 class TestImportanceWeightedCondensation(unittest.TestCase):
-    """Verify that FileWriteAction/FileEditAction events survive condensation."""
+    """Verify that FileEditAction events survive condensation."""
 
     def _build_events(self, n_total=30, file_indices=None, obs_for=None):
-        """Build event list with system msg, user msg, file writes, and chat.
+        """Build event list with system msg, user msg, file edits, and chat.
 
-        file_indices: dict of index -> path for FileWriteAction events
+        file_indices: dict of index -> path for FileEditAction events
         obs_for: dict of file_action_index -> obs_index for paired observations
         """
         file_indices = file_indices or {}
@@ -68,8 +68,9 @@ class TestImportanceWeightedCondensation(unittest.TestCase):
 
         for i in range(2, n_total):
             if i in file_indices:
-                fa = _ev(i, FileWriteAction, EventSource.AGENT)
+                fa = _ev(i, FileEditAction, EventSource.AGENT)
                 fa.path = file_indices[i]
+                fa.command = 'create_file'
                 events.append(fa)
             elif i in obs_for.values():
                 # Find the action this is an observation for
@@ -80,8 +81,8 @@ class TestImportanceWeightedCondensation(unittest.TestCase):
 
         return events
 
-    async def test_file_write_events_preserved(self):
-        """FileWriteAction events in the pruned region should be kept."""
+    async def test_file_edit_events_preserved(self):
+        """FileEditAction events in the pruned region should be kept."""
         # Create 30 events with a file write at index 5 (early, would normally be pruned).
         events = self._build_events(30, file_indices={5: 'src/page.tsx'})
 
@@ -102,10 +103,10 @@ class TestImportanceWeightedCondensation(unittest.TestCase):
                     action.pruned_events_end_id + 1,
                 )
             )
-        self.assertNotIn(5, pruned, 'FileWriteAction at id=5 should be preserved')
+        self.assertNotIn(5, pruned, 'FileEditAction at id=5 should be preserved')
 
-    async def test_file_edit_events_preserved(self):
-        """FileEditAction events should also be preserved."""
+    async def test_file_edit_range_events_preserved(self):
+        """FileEditAction range edits should also be preserved."""
         events = self._build_events(30)
         # Replace event at index 4 with a FileEditAction
         fa = _ev(4, FileEditAction, EventSource.AGENT)
@@ -154,7 +155,7 @@ class TestImportanceWeightedCondensation(unittest.TestCase):
                     action.pruned_events_end_id + 1,
                 )
             )
-        self.assertNotIn(5, pruned, 'FileWriteAction should be preserved')
+        self.assertNotIn(5, pruned, 'FileEditAction should be preserved')
         self.assertNotIn(6, pruned, 'Paired observation should be preserved')
 
     async def test_multiple_file_actions_preserved(self):
@@ -208,7 +209,7 @@ class TestImportanceWeightedCondensation(unittest.TestCase):
             e.id
             for e in events
             if e.id not in {0, 1, 5}
-            and not isinstance(e, (FileWriteAction, FileEditAction))
+            and not isinstance(e, FileEditAction)
         }
         self.assertTrue(
             pruned & non_essential_non_file,

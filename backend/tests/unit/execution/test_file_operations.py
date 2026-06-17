@@ -28,9 +28,8 @@ from backend.execution.file_operations import (
     set_file_permissions,
     truncate_cmd_output,
     truncate_large_text,
-    write_file_content,
 )
-from backend.ledger.action import FileReadAction, FileWriteAction
+from backend.ledger.action import FileReadAction
 from backend.ledger.observation import FileReadObservation
 
 
@@ -220,46 +219,6 @@ class TestHandleFileReadErrors:
             obs = handle_file_read_errors(f.name, os.path.dirname(f.name))
             assert 'Cannot read' in obs.content or 'permission' in obs.content.lower()
         os.unlink(f.name)
-
-
-# ---------------------------------------------------------------------------
-# write_file_content
-# ---------------------------------------------------------------------------
-class TestWriteFileContent:
-    def test_write_new_file(self):
-        with tempfile.TemporaryDirectory() as td:
-            fp = os.path.join(td, 'new.txt')
-            action = FileWriteAction(path=fp, content='hello world')
-            err = write_file_content(fp, action, file_exists=False)
-            assert err is None
-            assert open(fp, encoding='utf-8').read() == 'hello world'
-
-    def test_insert_existing_file_after_line_preserves_tail(self):
-        with tempfile.TemporaryDirectory() as td:
-            fp = os.path.join(td, 'existing.txt')
-            with open(fp, 'w', encoding='utf-8') as f:
-                f.write('line1\nline2\nline3\n')
-
-            action = FileWriteAction(
-                path=fp,
-                content='inserted',
-                start=2,
-                end=2,
-            )
-            err = write_file_content(fp, action, file_exists=True)
-            assert err is None
-
-            assert open(fp, encoding='utf-8').read() == (
-                'line1\nline2\ninserted\nline3\n'
-            )
-
-    def test_write_error_returns_observation(self):
-        # Try writing to a directory
-        with tempfile.TemporaryDirectory() as td:
-            action = FileWriteAction(path=td, content='test')
-            err = write_file_content(td, action, file_exists=False)
-            assert err is not None
-            assert 'Failed' in err.content
 
 
 # ---------------------------------------------------------------------------

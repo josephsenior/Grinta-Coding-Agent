@@ -11,7 +11,6 @@ from backend.ledger.action import (
     CmdRunAction,
     FileEditAction,
     FileReadAction,
-    FileWriteAction,
 )
 from backend.ledger.observation import CmdOutputObservation
 
@@ -59,14 +58,9 @@ class TestRuntimeExecutorProtocol:
         """Test protocol specifies read method for FileReadAction."""
         assert hasattr(RuntimeExecutorProtocol, 'read')
 
-    def test_protocol_has_write_method(self):
-        """Test protocol specifies write method for FileWriteAction."""
-        assert hasattr(RuntimeExecutorProtocol, 'write')
-
     def test_protocol_has_edit_method(self):
         """Test protocol specifies edit method for FileEditAction."""
         assert hasattr(RuntimeExecutorProtocol, 'edit')
-
 
 # ── Protocol Compliance ────────────────────────────────────────────────
 
@@ -138,20 +132,21 @@ class TestProtocolCompliance:
 
         cmd_action = CmdRunAction(command='echo test')
         file_read_action = FileReadAction(path='test.txt')
-        file_write_action = FileWriteAction(path='out.txt', content='data')
-        file_edit_action = FileEditAction(path='edit.txt')
+        file_edit_action = FileEditAction(
+            path='out.txt', command='create_file', file_text='data'
+        )
+        file_edit_range_action = FileEditAction(path='edit.txt')
 
         await executor.run_action(cmd_action)
         await executor.run(cmd_action)
         await executor.read(file_read_action)
-        await executor.write(file_write_action)
         await executor.edit(file_edit_action)
+        await executor.edit(file_edit_range_action)
 
         executor.run_action.assert_called_once()
         executor.run.assert_called_once_with(cmd_action)
         executor.read.assert_called_once_with(file_read_action)
-        executor.write.assert_called_once_with(file_write_action)
-        executor.edit.assert_called_once_with(file_edit_action)
+        assert executor.edit.call_count == 2
 
     def test_can_access_initial_cwd_property(self):
         """Test initial_cwd property can be accessed on compliant object."""

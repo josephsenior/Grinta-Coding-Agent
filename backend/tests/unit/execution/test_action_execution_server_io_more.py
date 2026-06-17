@@ -12,7 +12,6 @@ from backend.ledger.action import (
     CmdRunAction,
     FileEditAction,
     FileReadAction,
-    FileWriteAction,
 )
 from backend.ledger.observation import (
     CmdOutputObservation,
@@ -188,7 +187,7 @@ async def test_read_dispatches_by_extension(mock_executor) -> None:
 
 
 @pytest.mark.asyncio
-async def test_write_permission_error_path(mock_executor) -> None:
+async def test_edit_create_permission_error_path(mock_executor) -> None:
     session = MagicMock(spec=BaseShellSession)
     session.cwd = 'C:/ws'
     mock_executor.session_manager.get_session.return_value = session
@@ -197,30 +196,37 @@ async def test_write_permission_error_path(mock_executor) -> None:
         '_resolve_workspace_file_path',
         side_effect=PermissionError('nope'),
     ):
-        out = await mock_executor.write(FileWriteAction(path='../a.txt', content='x'))
+        out = await mock_executor.edit(
+            FileEditAction(path='../a.txt', command='create_file', file_text='x')
+        )
     assert isinstance(out, ErrorObservation)
-    assert 'Permission error' in out.content
+    assert 'not allowed to access this path' in out.content
 
 
 @pytest.mark.asyncio
-async def test_write_success_path(mock_executor) -> None:
+async def test_edit_create_success_path(mock_executor) -> None:
+    from backend.ledger.observation import FileEditObservation
+
     session = MagicMock(spec=BaseShellSession)
     session.cwd = 'C:/ws'
     mock_executor.session_manager.get_session.return_value = session
-    with (
-        patch.object(
-            mock_executor, '_resolve_workspace_file_path', return_value='C:/ws/a.txt'
-        ),
-        patch('backend.execution.io_mixins._aes_io_file_mixin.ensure_directory_exists'),
-        patch('os.path.exists', return_value=False),
-        patch(
-            'backend.execution.io_mixins._aes_io_file_mixin.write_file_content',
-            return_value=None,
-        ),
-    ):
-        out = await mock_executor.write(FileWriteAction(path='a.txt', content='x'))
-    assert out.__class__.__name__ == 'FileWriteObservation'
-    assert 'Wrote file' in out.content
+    expected = FileEditObservation(
+        content='File created successfully.',
+        path='a.txt',
+        outcome='created',
+        new_content='x',
+    )
+    with patch.object(
+        mock_executor, '_edit_via_file_editor', return_value=expected
+    ) as mock_edit:
+        out = await mock_executor.edit(
+            FileEditAction(path='a.txt', command='create_file', file_text='x')
+        )
+    assert isinstance(out, FileEditObservation)
+    mock_edit.assert_called_once()
+    edit_action = mock_edit.call_args[0][0]
+    assert edit_action.command == 'create_file'
+    assert edit_action.file_text == 'x'
 
 
 @pytest.mark.asyncio

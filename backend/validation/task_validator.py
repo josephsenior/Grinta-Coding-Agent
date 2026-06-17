@@ -17,11 +17,10 @@ if TYPE_CHECKING:
 
 from backend.core.logger import app_logger as logger
 from backend.ledger.action import CmdRunAction
-from backend.ledger.action.files import FileEditAction, FileWriteAction
+from backend.ledger.action.files import FileEditAction
 from backend.ledger.observation.files import (
     FileEditObservation,
     FileReadObservation,
-    FileWriteObservation,
 )
 from backend.validation.command_classification import (
     find_cmd_output_for_run,
@@ -358,9 +357,7 @@ class DiffValidator(TaskValidator):
                 event,
                 (
                     FileEditAction,
-                    FileWriteAction,
                     FileEditObservation,
-                    FileWriteObservation,
                 ),
             ):
                 continue
@@ -556,9 +553,7 @@ class FileExistsValidator(TaskValidator):
                 event,
                 (
                     FileEditAction,
-                    FileWriteAction,
                     FileEditObservation,
-                    FileWriteObservation,
                     FileReadObservation,
                 ),
             ):

@@ -17,7 +17,7 @@ from backend.execution.utils.files import (
 from backend.ledger.observation import (
     ErrorObservation,
     FileReadObservation,
-    FileWriteObservation,
+    FileEditObservation,
 )
 
 
@@ -409,7 +409,7 @@ class TestWriteFile:
                 content,
             )
 
-            assert isinstance(result, FileWriteObservation)
+            assert isinstance(result, FileEditObservation)
             assert result.path == file_path
 
             # Verify file was written
@@ -431,7 +431,7 @@ class TestWriteFile:
                 'New content',
             )
 
-            assert isinstance(result, FileWriteObservation)
+            assert isinstance(result, FileEditObservation)
             written = test_file.read_text()
             assert written == 'New content\n'
 
@@ -450,7 +450,7 @@ class TestWriteFile:
                 'New 1\nNew 2',
             )
 
-            assert isinstance(result, FileWriteObservation)
+            assert isinstance(result, FileEditObservation)
             assert test_file.read_bytes() == b'New 1\r\nNew 2\r\n'
 
     @pytest.mark.asyncio
@@ -470,7 +470,7 @@ class TestWriteFile:
                 end=2,
             )
 
-            assert isinstance(result, FileWriteObservation)
+            assert isinstance(result, FileEditObservation)
             written = test_file.read_text()
             assert 'Inserted' in written
             assert 'Line 1' in written
@@ -490,7 +490,7 @@ class TestWriteFile:
                 'Content',
             )
 
-            assert isinstance(result, FileWriteObservation)
+            assert isinstance(result, FileEditObservation)
             assert (workspace / 'sub' / 'dir' / 'file.txt').exists()
 
     @pytest.mark.asyncio
@@ -559,7 +559,7 @@ class TestWriteFile:
                 content,
             )
 
-            assert isinstance(result, FileWriteObservation)
+            assert isinstance(result, FileEditObservation)
             written = (workspace / 'test.txt').read_text()
             assert written == 'Line 1\nLine 2\nLine 3\n'
 
@@ -580,7 +580,7 @@ class TestWriteFile:
                 end=-1,
             )
 
-            assert isinstance(result, FileWriteObservation)
+            assert isinstance(result, FileEditObservation)
             written = test_file.read_text()
             # Should keep first 2 lines, then append
             assert 'Line 1' in written
@@ -602,7 +602,7 @@ class TestWriteFile:
                 'Short',
             )
 
-            assert isinstance(result, FileWriteObservation)
+            assert isinstance(result, FileEditObservation)
             written = test_file.read_text()
             assert written == 'Short\n'
             assert 'original content' not in written

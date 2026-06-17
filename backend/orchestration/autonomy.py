@@ -21,7 +21,6 @@ from backend.ledger.action import (
     CmdRunAction,
     DelegateTaskAction,
     FileEditAction,
-    FileWriteAction,
     TerminalInputAction,
     TerminalRunAction,
 )
@@ -104,9 +103,13 @@ class AutonomyController:
             return f'terminal-run:{action.cwd or ""}:{action.command}'
         if isinstance(action, TerminalInputAction):
             return f'terminal-input:{action.session_id}:{action.input}'
-        if isinstance(action, FileWriteAction | FileEditAction):
+        from backend.ledger.action import FileEditAction
+
+        if isinstance(action, FileEditAction):
             path = getattr(action, 'path', '') or ''
             command = getattr(action, 'command', '') or ''
+            if not command:
+                command = 'create_file'
             return f'{type(action).__name__}:{path}:{command}'
         if isinstance(action, BrowserToolAction):
             return f'browser:{action.command}:{action.params}'

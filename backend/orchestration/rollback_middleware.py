@@ -1,9 +1,8 @@
 """Rollback middleware — creates automatic checkpoints before risky actions.
 
 Integrates the existing (but previously orphaned) ``RollbackManager`` into the
-tool-invocation pipeline so that ``FileEditAction``, ``FileWriteAction``, and
-``CmdRunAction`` automatically get a filesystem checkpoint right before they
-execute.
+tool-invocation pipeline so that file mutation actions and ``CmdRunAction``
+automatically get a filesystem checkpoint right before they execute.
 
 The checkpoint ID is stored in ``ctx.metadata["rollback_checkpoint_id"]`` for
 downstream consumers (audit logger, debug endpoint, undo UI).
@@ -26,7 +25,6 @@ if TYPE_CHECKING:
 _RISKY_ACTION_TYPES = frozenset(
     {
         'FileEditAction',
-        'FileWriteAction',
         'CmdRunAction',
     }
 )

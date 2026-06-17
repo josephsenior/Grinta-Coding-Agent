@@ -5,10 +5,11 @@ from pathlib import Path
 
 from backend.ledger.observation import (
     ErrorObservation,
+    FileEditObservation,
     FileReadObservation,
-    FileWriteObservation,
     Observation,
 )
+from backend.ledger.observation.files import resolve_file_edit_outcome
 
 
 def resolve_path(
@@ -168,7 +169,7 @@ async def write_file(
         end: Ending line number for insertion (-1 for append)
 
     Returns:
-        FileWriteObservation on success or ErrorObservation on failure
+        FileEditObservation on success or ErrorObservation on failure
 
     """
     insert = split_content_lines(content)
@@ -176,7 +177,9 @@ async def write_file(
         whole_path = resolve_path(path, workdir, workspace_root)
         if not os.path.exists(os.path.dirname(whole_path)):
             os.makedirs(os.path.dirname(whole_path))
-        mode = 'r+' if os.path.exists(whole_path) else 'w'
+        file_existed = whole_path.exists()
+        old_content: str | None = None
+        mode = 'r+' if file_existed else 'w'
         try:
             # newline='' suppresses universal-newline translation so that
             # detect_line_ending can observe the file's actual \r\n endings
@@ -184,6 +187,7 @@ async def write_file(
             with open(whole_path, mode, encoding='utf-8', newline='') as file:  # noqa: ASYNC230
                 if mode != 'w':
                     all_lines = file.readlines()
+                    old_content = ''.join(all_lines)
                     new_file = insert_lines(
                         insert,
                         all_lines,
@@ -206,4 +210,15 @@ async def write_file(
             return ErrorObservation(f'File could not be decoded as utf-8: {path}')
     except PermissionError as e:
         return ErrorObservation(f'Permission error on {path}: {e}')
-    return FileWriteObservation(content='', path=path)
+    try:
+        new_content = whole_path.read_text(encoding='utf-8')
+    except OSError:
+        new_content = content
+    operation = 'create_file' if not file_existed else 'edit'
+    return FileEditObservation(
+        content=f'Wrote file: {path}',
+        path=path,
+        outcome=resolve_file_edit_outcome(operation, old_content),
+        old_content=old_content,
+        new_content=new_content,
+    )

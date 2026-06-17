@@ -31,7 +31,6 @@ from backend.ledger.observation.file_download import FileDownloadObservation
 from backend.ledger.observation.files import (
     FileEditObservation,
     FileReadObservation,
-    FileWriteObservation,
 )
 from backend.ledger.observation.mcp import MCPObservation
 from backend.ledger.observation.memory_tools import (
@@ -84,7 +83,6 @@ __all__ = [
     'FileDownloadObservation',
     'FileEditObservation',
     'FileReadObservation',
-    'FileWriteObservation',
     'MemoryPersistObservation',
     'MemoryRecallObservation',
     'MCPObservation',

@@ -14,11 +14,11 @@ from backend.ledger.action import (
     CmdRunAction,
     DelegateTaskAction,
     FileEditAction,
-    FileWriteAction,
     MCPAction,
     TerminalInputAction,
     TerminalRunAction,
 )
+from backend.ledger.action import FileEditAction
 
 if TYPE_CHECKING:
     from backend.orchestration.services.orchestration_context import (
@@ -42,7 +42,6 @@ class SafetyService:
         BrowseInteractiveAction,
         BrowserToolAction,
         FileEditAction,
-        FileWriteAction,
         TerminalRunAction,
         TerminalInputAction,
         MCPAction,

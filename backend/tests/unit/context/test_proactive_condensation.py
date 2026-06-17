@@ -10,7 +10,7 @@ from backend.context.compactor.strategies.conversation_window_compactor import (
     ConversationWindowCompactor,
 )
 from backend.context.view import View
-from backend.ledger.action.files import FileWriteAction
+from backend.ledger.action.files import FileEditAction
 from backend.ledger.action.message import MessageAction, SystemMessageAction
 from backend.ledger.event import EventSource
 
@@ -100,12 +100,12 @@ class TestFileEventsPreserved(unittest.TestCase):
 
         for i in range(2, n_total):
             if file_actions and i in file_actions:
-                fa = MagicMock(spec=FileWriteAction)
+                fa = MagicMock(spec=FileEditAction)
                 fa.id = i
                 fa.source = EventSource.AGENT
                 fa.path = file_actions[i]
-                fa.__class__ = cast(Any, FileWriteAction)
-                fa.content = f'content-{i}'
+                fa.__class__ = cast(Any, FileEditAction)
+                fa.command = 'create_file'
                 fa.cause = None
                 events.append(fa)
             else:

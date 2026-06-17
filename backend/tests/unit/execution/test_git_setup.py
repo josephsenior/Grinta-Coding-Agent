@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from backend.execution.git_setup import GitSetupMixin
-from backend.ledger.action import CmdRunAction, FileReadAction, FileWriteAction
+from backend.ledger.action import CmdRunAction, FileEditAction, FileReadAction
 from backend.ledger.observation import CmdOutputObservation, ErrorObservation
 
 # -----------------------------------------------------------
@@ -48,7 +48,7 @@ class _FakeGitRuntime(GitSetupMixin):
     def read(self, action: FileReadAction) -> Any:
         return self._read_results.get(action.path, ErrorObservation('Not found'))
 
-    def write(self, action: FileWriteAction) -> Any:
+    def edit(self, action: FileEditAction) -> Any:
         return self._write_results.get(action.path, MagicMock())
 
     def run(self, action: CmdRunAction) -> Any:
@@ -61,8 +61,8 @@ class _FakeGitRuntime(GitSetupMixin):
             return self.run(action)
         if isinstance(action, FileReadAction):
             return self.read(action)
-        if isinstance(action, FileWriteAction):
-            return self.write(action)
+        if isinstance(action, FileEditAction):
+            return self.edit(action)
         return MagicMock()
 
     def set_runtime_status(

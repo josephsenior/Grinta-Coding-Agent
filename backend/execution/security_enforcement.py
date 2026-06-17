@@ -568,12 +568,7 @@ class SecurityEnforcementMixin:
 
     def _enforce_hardened_local_policy(self, action: Action) -> Observation | None:
         """Apply deterministic local policy gates before heuristic risk handling."""
-        from backend.ledger.action import (
-            CmdRunAction,
-            FileEditAction,
-            FileReadAction,
-            FileWriteAction,
-        )
+        from backend.ledger.action import CmdRunAction, FileEditAction, FileReadAction
         from backend.ledger.observation import ErrorObservation
 
         sec_cfg = self.config.security  # type: ignore[attr-defined]
@@ -591,7 +586,7 @@ class SecurityEnforcementMixin:
             if block_message is not None:
                 return ErrorObservation(content=block_message)
 
-        if isinstance(action, (FileReadAction, FileWriteAction, FileEditAction)):
+        if isinstance(action, (FileReadAction, FileEditAction)):
             block_message = evaluate_hardened_local_file_policy(
                 path=getattr(action, 'path', ''),
                 security_config=sec_cfg,

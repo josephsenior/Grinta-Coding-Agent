@@ -254,23 +254,6 @@ def _extract_read_file_info(event: Event, files: dict) -> None:
             _update_file_record(files, path, action='read', record_type='read')
 
 
-def _extract_write_file_info(event: Event, files: dict) -> None:
-    """Extract file path and hash from FileWrite* events."""
-    path = getattr(event, 'path', '')
-    content = getattr(event, 'content', None)
-    if isinstance(content, str):
-        _update_file_record(
-            files,
-            path,
-            action='write',
-            record_type='write',
-            content=content,
-            hash_source='write_content',
-        )
-    elif path:
-        _update_file_record(files, path, action='write', record_type='write')
-
-
 def _extract_cmd_run_file_paths(event: Event, files: dict) -> None:
     """Extract file paths from simple cat/head/tail command reads."""
     cmd = getattr(event, 'command', '')
@@ -291,8 +274,6 @@ def _extract_file_info(event: Event, snapshot: dict) -> None:
 
     if cls_name in ('FileEditAction', 'FileEditObservation'):
         _extract_edit_file_info(event, files)
-    elif cls_name in ('FileWriteAction', 'FileWriteObservation'):
-        _extract_write_file_info(event, files)
     elif cls_name in ('FileReadAction', 'FileReadObservation'):
         _extract_read_file_info(event, files)
     elif cls_name == 'CmdRunAction':

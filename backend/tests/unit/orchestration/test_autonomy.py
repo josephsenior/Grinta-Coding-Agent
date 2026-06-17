@@ -15,7 +15,6 @@ from backend.ledger.action import (
     CmdRunAction,
     FileEditAction,
     FileReadAction,
-    FileWriteAction,
     TerminalInputAction,
     TerminalRunAction,
 )
@@ -315,13 +314,15 @@ class TestHighRiskDetection:
         for action in safe_commands:
             assert controller._is_high_risk_action(action) is False
 
-    def test_file_write_not_high_risk(self):
-        """FileWriteAction should not be flagged as high-risk."""
+    def test_file_edit_create_not_high_risk(self):
+        """FileEditAction create_file should not be flagged as high-risk."""
         config = MagicMock()
         config.autonomy_level = 'balanced'
         controller = AutonomyController(config)
 
-        action = FileWriteAction(path='/tmp/test.txt', content='test')
+        action = FileEditAction(
+            path='/tmp/test.txt', command='create_file', file_text='test'
+        )
         assert controller._is_high_risk_action(action) is False
 
     def test_file_edit_is_high_risk(self):

@@ -69,23 +69,6 @@ class FileReadObservation(Observation):
 
 
 @dataclass
-class FileWriteObservation(Observation):
-    """This data class represents a file write operation."""
-
-    path: str
-    observation: ClassVar[str] = ObservationType.WRITE
-
-    @property
-    def message(self) -> str:
-        """Get a human-readable message describing the file write operation."""
-        return f'I wrote to the file {self.path}.'
-
-    def __str__(self) -> str:
-        """Get a string representation of the file write observation."""
-        return f'[Write to {self.path} is successful.]\n{self.content}'
-
-
-@dataclass
 class FileEditObservation(Observation):
     """This data class represents a file edit operation.
 

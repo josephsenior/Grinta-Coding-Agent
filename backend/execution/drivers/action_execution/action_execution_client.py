@@ -53,7 +53,6 @@ class ActionExecutionClient(Runtime):
             'terminal_read',
             'debugger',
             'read',
-            'write',
             'edit',
             'think',
             'null',
@@ -147,9 +146,6 @@ class ActionExecutionClient(Runtime):
         return self._execute_action_on_server(action)
 
     def read(self, action: Any) -> Any:
-        return self._execute_action_on_server(action)
-
-    def write(self, action: Any) -> Any:
         return self._execute_action_on_server(action)
 
     def edit(self, action: Any) -> Any:

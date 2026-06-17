@@ -22,7 +22,8 @@ import logging
 from typing import Any
 
 from backend.core.enums import ActionSecurityRisk
-from backend.ledger.action import Action, CmdRunAction, FileWriteAction
+from backend.ledger.action import Action, CmdRunAction
+from backend.ledger.action import FileEditAction
 from backend.security.command_analyzer import CommandAnalyzer, RiskCategory
 
 logger = logging.getLogger(__name__)
@@ -76,8 +77,8 @@ class SecurityAnalyzer:
         Safe to call from any thread, including the event-loop thread.
         The async :meth:`security_risk` delegates here.
         """
-        if isinstance(action, FileWriteAction):
-            return self._assess_file_write(action)
+        if isinstance(action, FileEditAction):
+            return self._assess_sensitive_path_write(action)
 
         if isinstance(action, CmdRunAction):
             return self._assess_command(action)
@@ -96,13 +97,14 @@ class SecurityAnalyzer:
     # File-write assessment
     # ------------------------------------------------------------------
 
-    def _assess_file_write(self, action: FileWriteAction) -> ActionSecurityRisk:
+    def _assess_sensitive_path_write(self, action: Action) -> ActionSecurityRisk:
         """Escalate writes to sensitive system / credential paths to HIGH."""
-        path_lower = (action.path or '').lower().replace('\\', '/')
+        path_lower = (getattr(action, 'path', '') or '').lower().replace('\\', '/')
         for sensitive in _SENSITIVE_WRITE_PATHS:
             if sensitive.lower().replace('\\', '/') in path_lower:
                 logger.warning(
-                    'Security: write to sensitive path %s -> HIGH', action.path
+                    'Security: write to sensitive path %s -> HIGH',
+                    getattr(action, 'path', ''),
                 )
                 return ActionSecurityRisk.HIGH
         return ActionSecurityRisk.LOW

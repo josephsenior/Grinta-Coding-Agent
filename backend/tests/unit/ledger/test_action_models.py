@@ -25,7 +25,7 @@ from backend.ledger.action.agent import (
 )
 from backend.ledger.action.commands import CmdRunAction
 from backend.ledger.action.empty import NullAction
-from backend.ledger.action.files import FileEditAction, FileReadAction, FileWriteAction
+from backend.ledger.action.files import FileEditAction, FileReadAction
 from backend.ledger.action.mcp import MCPAction
 from backend.ledger.action.message import (
     MessageAction,
@@ -221,28 +221,6 @@ class TestFileReadAction(unittest.TestCase):
 
     def test_impl_source_default(self):
         self.assertEqual(FileReadAction().impl_source, FileReadSource.DEFAULT)
-
-
-# ---------------------------------------------------------------------------
-# FileWriteAction
-# ---------------------------------------------------------------------------
-class TestFileWriteAction(unittest.TestCase):
-    def test_action_type(self):
-        self.assertEqual(FileWriteAction.action, ActionType.WRITE)
-
-    def test_runnable(self):
-        self.assertTrue(FileWriteAction.runnable)
-
-    def test_message_property(self):
-        f = FileWriteAction(path='out.txt')
-        self.assertIn('out.txt', f.message)
-
-    def test_repr(self):
-        f = FileWriteAction(path='a.py', content='x=1', start=1, end=5, thought='fix')
-        r = repr(f)
-        self.assertIn('FileWriteAction', r)
-        self.assertIn('a.py', r)
-        self.assertIn('x=1', r)
 
 
 # ---------------------------------------------------------------------------

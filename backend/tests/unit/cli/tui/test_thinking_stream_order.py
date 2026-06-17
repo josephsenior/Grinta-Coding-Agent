@@ -15,7 +15,7 @@ from backend.cli.tui.widgets.activity_card import (
     ActivityCard as TUIActivityCard,
 )
 from backend.cli.tui.widgets.activity_card import ThinkingIndicator
-from backend.ledger.action import FileWriteAction, StreamingChunkAction
+from backend.ledger.action import FileEditAction, StreamingChunkAction
 
 
 @pytest.fixture
@@ -68,8 +68,10 @@ async def test_thinking_stream_freezes_before_later_activity(
         )
         await pilot.pause()
         renderer._process_event(
-            FileWriteAction(
-                path='tests/test_order.py', content='def test_ok():\n    pass\n'
+            FileEditAction(
+                path='tests/test_order.py',
+                command='create_file',
+                file_text='def test_ok():\n    pass\n',
             )
         )
         await pilot.pause()

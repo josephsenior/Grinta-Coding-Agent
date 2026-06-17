@@ -23,7 +23,7 @@ from backend.execution.utils.files import (
     split_content_lines,
 )
 from backend.execution.utils.test_output_summary import extract_test_summary
-from backend.ledger.action import FileReadAction, FileWriteAction
+from backend.ledger.action import FileReadAction
 from backend.ledger.observation import (
     ErrorObservation,
     FileReadObservation,
@@ -572,51 +572,6 @@ def ensure_directory_exists(filepath: str) -> None:
     parent = os.path.dirname(filepath)
     if parent:
         os.makedirs(parent, exist_ok=True)
-
-
-def write_file_content(
-    filepath: str,
-    action: FileWriteAction,
-    file_exists: bool,
-) -> ErrorObservation | None:
-    """Write content to file, handling both new and existing files.
-
-    Returns:
-        ErrorObservation if write failed, None on success.
-    """
-    try:
-        if not file_exists:
-            with open(filepath, 'w', encoding='utf-8') as f:
-                f.write(action.content)
-        else:
-            with open(filepath, encoding='utf-8') as f:
-                all_lines = f.readlines()
-
-            # Preserve existing file newline style while normalizing inserted text.
-            to_insert = split_content_lines(action.content)
-
-            # ``insert_lines`` already treats ``start`` as the insertion index
-            # in the 0-based line list. ``action.start`` is the caller-facing
-            # line number after which to insert, so pass it through directly.
-            # This keeps "insert after line N" aligned with the documented tool
-            # contract and preserves the untouched tail of the file.
-            start = action.start if action.start is not None else 0
-            end = action.end if action.end is not None else -1
-
-            new_lines = insert_lines(
-                to_insert,
-                all_lines,
-                start,
-                end,
-                newline=detect_line_ending(all_lines),
-            )
-
-            with open(filepath, 'w', encoding='utf-8') as f:
-                f.writelines(new_lines)
-
-        return None
-    except Exception as e:
-        return ErrorObservation(f'Failed to write file {filepath}: {e}')
 
 
 def set_file_permissions(

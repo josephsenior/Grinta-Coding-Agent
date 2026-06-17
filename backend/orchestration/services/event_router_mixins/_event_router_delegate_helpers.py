@@ -16,7 +16,6 @@ from backend.ledger.action import (
     CmdRunAction,
     FileEditAction,
     FileReadAction,
-    FileWriteAction,
     MCPAction,
     MessageAction,
     TaskTrackingAction,
@@ -62,20 +61,21 @@ def _summarize_delegate_file_action(
         )
         return 'running', f'Read {event.path}{loc}'
 
-    if isinstance(event, FileWriteAction):
-        return 'running', f'Created {event.path}'
+    from backend.ledger.action import FileEditAction
 
-    if not isinstance(event, FileEditAction):
-        return None
+    if isinstance(event, FileEditAction):
+        command = getattr(event, 'command', '') or ''
+        if command == 'create_file':
+            return 'running', f'Created {event.path}'
+        if command == 'read_file':
+            region = ''
+            vr = getattr(event, 'view_range', None)
+            if vr and len(vr) == 2:
+                region = f' L{vr[0]}:L{vr[1]}'
+            return 'running', f'Read {event.path}{region}'
+        return 'running', f'Edited {event.path}'
 
-    command = getattr(event, 'command', '') or ''
-    if command == 'read_file':
-        region = ''
-        vr = getattr(event, 'view_range', None)
-        if vr and len(vr) == 2:
-            region = f' L{vr[0]}:L{vr[1]}'
-        return 'running', f'Read {event.path}{region}'
-    return 'running', f'Edited {event.path}'
+    return None
 
 
 def _summarize_delegate_command_action(

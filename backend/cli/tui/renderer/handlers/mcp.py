@@ -26,11 +26,6 @@ def _handle_mcp_action(orch: 'RendererEventProcessorMixin', event: MCPAction) ->
     if orient is not None:
         orch._pending_mcp_card = orient
         orch._pending_exploration_meta = None
-        orch._tui.set_current_operation(
-            f'{orient.verb} {orient.target}'.strip(),
-            meta='Running',
-            active=True,
-        )
         return
     card = ActivityRenderer.mcp_activity_card(event.name, event.arguments)
     widget = orch._write_card(card)
@@ -72,7 +67,6 @@ def _handle_mcp_observation(
         card,
         content=content,
         pending_attr='_pending_mcp_card',
-        operation_label=card.detail,
         force_err=is_error,
     )
     orch._pending_mcp_card = None

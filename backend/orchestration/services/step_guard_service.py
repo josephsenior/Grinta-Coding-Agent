@@ -10,10 +10,6 @@ from backend.core.interaction_modes import normalize_interaction_mode
 from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
-from backend.ledger.action import (
-    FileEditAction,
-    FileWriteAction,
-)
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation_cause import attach_observation_cause
 from backend.orchestration.services.guard_bus import (
@@ -452,10 +448,12 @@ class StepGuardService:
         )
 
     def _collect_created_files(self, history: list[Any]) -> set[str]:
-        """Collect normalized paths of files created via FileWrite/FileEdit."""
+        """Collect normalized paths of files created via file mutation actions."""
+        from backend.ledger.action import FileEditAction
+
         created: set[str] = set()
         for e in history:
-            if isinstance(e, (FileWriteAction, FileEditAction)):
+            if isinstance(e, FileEditAction):
                 p = getattr(e, 'path', '') or ''
                 if p:
                     created.add(self._normalize_path(p))
