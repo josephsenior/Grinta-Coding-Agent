@@ -9,6 +9,18 @@ from textual.app import ComposeResult
 from textual.containers import Container, Vertical
 from textual.widgets import Static
 
+from backend.cli.theme.cards import (
+    TERM_COMMAND_FG,
+    TERM_DEBUGGER_PROMPT,
+    TERM_FOOTER_NEUTRAL,
+    TERM_HIDDEN_LINES_FG,
+    TERM_PTY_PROMPT,
+    TERM_PWSH_PROMPT,
+    TERM_RUNNING_CURSOR,
+    TERM_SHELL_PROMPT,
+    TERM_TITLEBAR_FG,
+    footer_color_for_exit_code,
+)
 from backend.cli.tui.constants import _TUI_TERMINAL_DISPLAY_LINE_CAP
 from backend.cli.tui.helpers import _format_terminal_output_for_display
 
@@ -20,7 +32,6 @@ class TerminalPane(Vertical):
     TerminalPane {
         width: 100%;
         height: auto;
-        background: #0a0e14;
         border: none;
         padding: 0;
         margin: 0;
@@ -28,8 +39,6 @@ class TerminalPane(Vertical):
     TerminalPane .terminal-titlebar {
         width: 100%;
         height: 1;
-        background: #141c2e;
-        color: #8f9fc1;
         padding: 0 1;
     }
     TerminalPane .terminal-prompt {
@@ -37,29 +46,21 @@ class TerminalPane(Vertical):
         height: auto;
         min-height: 1;
         padding: 0 1;
-        background: #0a0e14;
     }
     TerminalPane .terminal-output-wrap {
         width: 100%;
         height: auto;
-        max-height: 20;
         overflow-y: auto;
-        background: #080c12;
         padding: 0 1;
         scrollbar-size-vertical: 1;
-        scrollbar-color: #334155 #080c12;
     }
     TerminalPane .terminal-output {
         width: 100%;
         height: auto;
-        background: #080c12;
-        color: #cbd5e1;
     }
     TerminalPane .terminal-footer {
         width: 100%;
         height: 1;
-        background: #0d1219;
-        color: #54597b;
         padding: 0 1;
     }
     """
@@ -72,6 +73,7 @@ class TerminalPane(Vertical):
         cwd: str | None = None,
         session_id: str = '',
         footer: str = '',
+        exit_code: int | None = None,
         running: bool = False,
         id: str | None = None,
     ) -> None:
@@ -81,6 +83,7 @@ class TerminalPane(Vertical):
         self._cwd = cwd
         self._session_id = session_id
         self._footer = footer
+        self._exit_code = exit_code
         self._running = running
         self._output_text = ''
         self._hidden_lines = 0
@@ -110,9 +113,14 @@ class TerminalPane(Vertical):
         self._footer = footer
         self._refresh_footer()
 
+    def set_exit_code(self, exit_code: int | None) -> None:
+        self._exit_code = exit_code
+        self._refresh_footer()
+
     def set_running(self, running: bool) -> None:
         self._running = running
         self._refresh_output()
+        self._refresh_footer()
 
     def set_output(self, content: str) -> None:
         self._output_text = content or ''
@@ -142,33 +150,56 @@ class TerminalPane(Vertical):
     def _title_markup(self) -> str:
         if self._shell_kind == 'debugger':
             label = self._session_id[:12] if self._session_id else 'session'
-            return f'[#8f9fc1]debugger · {label}[/]'
+            return f'[{TERM_TITLEBAR_FG}]debugger · {label} │[/]'
         if self._shell_kind == 'terminal':
             label = self._session_id[:12] if self._session_id else 'session'
-            return f'[#8f9fc1]terminal · {label}[/]'
+            return f'[{TERM_TITLEBAR_FG}]terminal · {label} │[/]'
         label = 'pwsh' if self._shell_kind == 'pwsh' else 'bash'
-        return f'[#8f9fc1]{label}[/]'
+        return f'[{TERM_TITLEBAR_FG}]{label} │[/]'
 
     def _prompt_markup(self) -> str:
         command = self._command or '…'
         if self._shell_kind == 'debugger':
-            return f'[#5eead4]DAP>[/] [#e2e8f0]{command}[/]'
+            return f'[{TERM_DEBUGGER_PROMPT}]DAP>[/] [{TERM_COMMAND_FG}]{command}[/]'
         if self._shell_kind == 'pwsh':
             path = self._cwd or '~'
-            return f'[#7dd3fc]PS {path}>[/] [#e2e8f0]{command}[/]'
+            return f'[{TERM_PWSH_PROMPT}]PS {path}>[/] [{TERM_COMMAND_FG}]{command}[/]'
         if self._shell_kind == 'terminal':
-            return f'[#5eead4]$[/] [#e2e8f0]{command}[/]'
-        return f'[#54efae]$[/] [#e2e8f0]{command}[/]'
+            return f'[{TERM_PTY_PROMPT}]$[/] [{TERM_COMMAND_FG}]{command}[/]'
+        return f'[{TERM_SHELL_PROMPT}]$[/] [{TERM_COMMAND_FG}]{command}[/]'
+
+    def _format_footer_text(self, text: str) -> str:
+        if not text:
+            return ''
+        parts = text.split(' · ')
+        markup_parts: list[str] = []
+        for part in parts:
+            if part.startswith('exit '):
+                try:
+                    code = int(part.split()[1])
+                except (IndexError, ValueError):
+                    color = TERM_FOOTER_NEUTRAL
+                else:
+                    color = footer_color_for_exit_code(code)
+                markup_parts.append(f'[{color}]{part}[/]')
+            elif part == 'running':
+                markup_parts.append(f'[{TERM_PTY_PROMPT}]{part}[/]')
+            else:
+                markup_parts.append(f'[{TERM_FOOTER_NEUTRAL}]{part}[/]')
+        sep = f' [{TERM_FOOTER_NEUTRAL}]·[/] '
+        return sep.join(markup_parts)
 
     def _footer_markup(self) -> str:
         if self._footer:
-            return f'[#54597b]{self._footer}[/]'
+            return self._format_footer_text(self._footer)
         parts: list[str] = []
         if self._cwd:
             parts.append(f'cwd: {self._cwd}')
-        if self._running:
+        if self._exit_code is not None:
+            parts.append(f'exit {self._exit_code}')
+        elif self._running:
             parts.append('running')
-        return f'[#54597b]{" · ".join(parts)}[/]' if parts else ''
+        return self._format_footer_text(' · '.join(parts)) if parts else ''
 
     def _output_renderable(self) -> Any:
         if not self._output_text and not self._running:
@@ -177,11 +208,11 @@ class TerminalPane(Vertical):
         if self._running:
             if self._output_text:
                 renderable.append('\n')
-            renderable.append('█', style='blink #5eead4')
+            renderable.append('█', style=f'blink {TERM_RUNNING_CURSOR}')
         if self._hidden_lines:
             prefix = Text(
                 f'…{self._hidden_lines} earlier line(s) hidden…\n',
-                style='#54597b',
+                style=TERM_HIDDEN_LINES_FG,
             )
             if isinstance(renderable, Text):
                 renderable = prefix + renderable

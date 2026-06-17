@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+from pathlib import PurePath
+
 from textual.app import ComposeResult
 from textual.containers import Container, Vertical
 from textual.widgets import Static
 
-from backend.cli.theme import NAVY_TEXT_PRIMARY
+from backend.cli.theme.cards import (
+    CARD_FILE_DELTA_PILL_BG,
+    file_change_kind_class,
+)
+from backend.cli.theme import NAVY_TEXT_MUTED, NAVY_TEXT_PRIMARY, NAVY_TEXT_SECONDARY
 from backend.cli.tui.widgets.activity_card.diff_lines import _format_file_delta_outcome
 from backend.cli.tui.widgets.unified_diff_view import (
     UnifiedDiffView,
@@ -22,8 +28,6 @@ class FileChangeCard(Container):
         width: 100%;
         height: auto;
         margin: 0 0 1 0;
-        border: round #1b233a;
-        background: #08101d;
         padding: 0 0 1 0;
     }
     FileChangeCard .file-change-header {
@@ -49,18 +53,50 @@ class FileChangeCard(Container):
         id: str | None = None,
     ) -> None:
         super().__init__(id=id, classes='file-change-card')
+        kind_class = file_change_kind_class(outcome)
+        if kind_class:
+            self.add_class(kind_class)
         self._display_path = display_path
         self._outcome = outcome
         self._encoded_diff = encoded_diff
         self._diff_path = diff_path or display_path
 
     @staticmethod
+    def _split_path(display_path: str) -> tuple[str, str, str]:
+        normalized = display_path.replace('\\', '/')
+        if '/' in normalized:
+            split_at = normalized.rfind('/')
+            dirname = normalized[: split_at + 1]
+            filename = normalized[split_at + 1 :]
+        else:
+            dirname = ''
+            filename = normalized
+        ext = PurePath(filename).suffix.lstrip('.').lower()
+        return dirname, filename, ext
+
+    @staticmethod
+    def _build_path_markup(display_path: str) -> str:
+        dirname, filename, ext = FileChangeCard._split_path(display_path)
+        if not dirname:
+            return f'[{NAVY_TEXT_SECONDARY}]{display_path}[/]'
+        parts = [
+            f'[{NAVY_TEXT_MUTED}]{dirname}[/]',
+            f'[{NAVY_TEXT_PRIMARY} bold]{filename}[/]',
+        ]
+        if ext:
+            parts.append(f' [{NAVY_TEXT_MUTED}]{ext}[/]')
+        return ''.join(parts)
+
+    @staticmethod
     def _build_header_markup(display_path: str, outcome: str | None) -> str:
-        path_part = f'[{NAVY_TEXT_PRIMARY}]{display_path}[/]'
+        path_part = FileChangeCard._build_path_markup(display_path)
         if not outcome:
             return path_part
         delta = _format_file_delta_outcome(outcome)
-        return f'{path_part}  {delta}' if delta else path_part
+        if not delta:
+            return path_part
+        pill = f'[on {CARD_FILE_DELTA_PILL_BG}] {delta} [/]'
+        return f'{path_part}  {pill}'
 
     def compose(self) -> ComposeResult:
         yield Static(

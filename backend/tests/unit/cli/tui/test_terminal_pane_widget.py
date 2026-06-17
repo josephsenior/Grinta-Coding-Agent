@@ -41,6 +41,19 @@ def test_terminal_pane_footer_and_output_renderable() -> None:
     renderable_running = pane._output_renderable()
     assert renderable_running is not None
 
+    pane.set_footer('cwd: /work · exit 0')
+    footer_ok = pane._footer_markup()
+    assert '[#54efae]exit 0[/]' in footer_ok
+
+    pane.set_footer('cwd: /work · exit 1')
+    footer_err = pane._footer_markup()
+    assert '[#fd8383]exit 1[/]' in footer_err
+
+
+def test_terminal_pane_title_includes_separator() -> None:
+    pane = TerminalPane(shell_kind='terminal', session_id='sess-12345')
+    assert '│' in pane._title_markup()
+
 
 def test_terminal_pane_trims_long_output() -> None:
     pane = TerminalPane()

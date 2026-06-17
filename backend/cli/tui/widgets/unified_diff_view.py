@@ -15,26 +15,18 @@ from textual.containers import Horizontal, VerticalScroll
 from textual.widgets import Static
 
 from backend.cli.syntax_theme import get_grinta_rich_syntax_theme
+from backend.cli.theme.cards import (
+    DIFF_HDR,
+    DIFF_INLINE_ADD,
+    DIFF_INLINE_REM,
+    DIFF_LINE_CTX,
+)
 
 DIFF_VIEW_PREFIX = '\x1fgrinta-diff-view\x1f'
 
 DiffKind = Literal['ctx', 'add', 'rem', 'hdr']
 
 _HUNK_RE = re.compile(r'^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@')
-
-# Grinta-aligned diff palette (inspired by textual-diff-view unified layout).
-_CLR_GUTTER = '#5a6478'
-_CLR_GUTTER_ADD = '#6f9f82'
-_CLR_GUTTER_REM = '#b87a7a'
-_CLR_LINE_CTX = '#c8ceda'
-_CLR_LINE_ADD = '#b8f0c8'
-_CLR_LINE_REM = '#ffc0c0'
-_CLR_BG_CTX = 'transparent'
-_CLR_BG_ADD = '#0f2f22'
-_CLR_BG_REM = '#351818'
-_CLR_INLINE_ADD = '#54efae'
-_CLR_INLINE_REM = '#fd8383'
-_CLR_HDR = '#91abec'
 
 
 @dataclass(frozen=True)
@@ -106,7 +98,7 @@ def _guess_language(path: str) -> str:
 
 def _syntax_line_text(line: str, language: str) -> Text:
     if not line.strip() or language == 'text':
-        return Text(line or ' ', style=_CLR_LINE_CTX)
+        return Text(line or ' ', style=DIFF_LINE_CTX)
     try:
         from rich.syntax import Syntax
 
@@ -123,10 +115,10 @@ def _syntax_line_text(line: str, language: str) -> Text:
         for segment, style, _ in console.render(
             syntax, console.options.update_width(4096)
         ):
-            rendered.append(segment, style or _CLR_LINE_CTX)
-        return rendered or Text(line or ' ', style=_CLR_LINE_CTX)
+            rendered.append(segment, style or DIFF_LINE_CTX)
+        return rendered or Text(line or ' ', style=DIFF_LINE_CTX)
     except Exception:
-        return Text(line or ' ', style=_CLR_LINE_CTX)
+        return Text(line or ' ', style=DIFF_LINE_CTX)
 
 
 def _word_diff_overlay(base: Text, other: str, *, side: str) -> Text:
@@ -138,7 +130,7 @@ def _word_diff_overlay(base: Text, other: str, *, side: str) -> Text:
         base.plain,
         other,
     )
-    highlight = _CLR_INLINE_REM if side == 'rem' else _CLR_INLINE_ADD
+    highlight = DIFF_INLINE_REM if side == 'rem' else DIFF_INLINE_ADD
     for tag, i1, i2, j1, j2 in matcher.get_opcodes():
         if side == 'rem' and tag in {'delete', 'replace'}:
             base.stylize(highlight, i1, i2)
@@ -342,47 +334,16 @@ class UnifiedDiffRow(Horizontal):
         height: 1;
         content-align: right middle;
         padding: 0 1 0 0;
-        color: #5a6478;
-    }
-    UnifiedDiffRow .diff-gutter.add {
-        color: #6f9f82;
-        background: #0f2f22;
-    }
-    UnifiedDiffRow .diff-gutter.rem {
-        color: #b87a7a;
-        background: #351818;
     }
     UnifiedDiffRow .diff-code {
         width: 1fr;
         height: 1;
         padding: 0 1;
     }
-    UnifiedDiffRow .diff-code.ctx {
-        color: #c8ceda;
-    }
-    UnifiedDiffRow .diff-code.add {
-        background: #0f2f22;
-    }
-    UnifiedDiffRow .diff-code.rem {
-        background: #351818;
-    }
-    UnifiedDiffRow .diff-code.hdr {
-        color: #91abec;
-        background: #0a1224;
-    }
     UnifiedDiffRow .diff-sign {
         width: 2;
         height: 1;
         content-align: center middle;
-        color: #5a6478;
-    }
-    UnifiedDiffRow .diff-sign.add {
-        color: #54efae;
-        background: #0f2f22;
-    }
-    UnifiedDiffRow .diff-sign.rem {
-        color: #fd8383;
-        background: #351818;
     }
     """
 
@@ -407,7 +368,7 @@ class UnifiedDiffRow(Horizontal):
     def _render_code(self) -> Text:
         row = self._row
         if row.kind == 'hdr':
-            return Text(row.text, style=_CLR_HDR)
+            return Text(row.text, style=DIFF_HDR)
         base = _syntax_line_text(row.text, self._language)
         if row.kind == 'rem' and row.pair_text is not None:
             return _word_diff_overlay(base, row.pair_text, side='rem')
@@ -433,17 +394,12 @@ class UnifiedDiffView(VerticalScroll):
     UnifiedDiffView {
         width: 100%;
         height: auto;
-        max-height: 24;
-        border: solid #26324f;
-        background: #060a14;
         padding: 0;
     }
     UnifiedDiffView .diff-truncated {
         width: 100%;
         height: 1;
         padding: 0 1;
-        color: #969aad;
-        background: #0a1224;
     }
     """
 
