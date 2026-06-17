@@ -85,10 +85,20 @@ class _SessionOrchestratorStateMixin:
         """
         pending = self.services.pending_action.get()
         if pending is None:
-            logger.warning(
-                'apply_user_decision: no pending action (state=%s); ignoring.',
-                self.get_agent_state(),
-            )
+            current_state = self.get_agent_state()
+            if current_state == AgentState.AWAITING_USER_CONFIRMATION:
+                logger.warning(
+                    'apply_user_decision: no pending action; releasing stale confirmation gate'
+                )
+                new_state = (
+                    AgentState.RUNNING if approved else AgentState.AWAITING_USER_INPUT
+                )
+                await self.set_agent_state_to(new_state)
+            else:
+                logger.warning(
+                    'apply_user_decision: no pending action (state=%s); ignoring.',
+                    current_state,
+                )
             return
 
         if hasattr(pending, 'thought'):

@@ -53,14 +53,10 @@ def _compose_create_file_success_message(content: str) -> str:
 
 def _compose_write_success_message(
     *,
-    is_create: bool,
     content: str,
     soft_warning: str,
 ) -> str:
-    if is_create:
-        output_msg = _compose_create_file_success_message(content)
-    else:
-        output_msg = 'File written successfully'
+    output_msg = _compose_create_file_success_message(content)
     if soft_warning:
         output_msg = f'{output_msg}\n{soft_warning}'
     return output_msg
@@ -86,7 +82,6 @@ def _encode_disk_payload(content: str, meta: _FileReadMeta) -> bytes:
     return content.encode('utf-8')
 
 
-_LARGE_EXISTING_CODE_FILE_LINES = 200
 _CODE_FILE_SUFFIXES: frozenset[str] = frozenset(
     {
         '.py',
@@ -111,9 +106,3 @@ _CODE_FILE_SUFFIXES: frozenset[str] = frozenset(
         '.scala',
     }
 )
-
-
-def _is_large_existing_code_file(file_path: Path, content: str | None) -> bool:
-    if content is None or file_path.suffix.lower() not in _CODE_FILE_SUFFIXES:
-        return False
-    return len(content.splitlines()) >= _LARGE_EXISTING_CODE_FILE_LINES

@@ -226,6 +226,17 @@ class TestGatewayReasoningOptions:
         }
 
     def test_vercel_qwen37_plus_has_configurable_thinking(self):
+        from backend.inference.catalog_loader import (
+            apply_model_param_overrides,
+            sanitize_call_kwargs_for_provider,
+        )
+        from backend.inference.reasoning import reasoning_effort_options
+
+        entry = lookup('vercel/alibaba/qwen3.7-plus')
+        assert entry is not None
+        options = reasoning_effort_options(entry, include_disabled=True)
+        assert 'xhigh' in options
+
         kwargs = {
             'model': 'vercel/alibaba/qwen3.7-plus',
             'temperature': 0.5,
@@ -239,9 +250,23 @@ class TestGatewayReasoningOptions:
             provider='vercel',
         )
 
-        assert out['thinking'] == {'type': 'enabled'}
-        assert out['enable_thinking'] is True
+        assert out['reasoning'] == {'effort': 'high', 'enabled': True}
         assert 'reasoning_effort' not in out
+
+        xhigh = apply_model_param_overrides(
+            'vercel/alibaba/qwen3.7-plus',
+            {'model': 'vercel/alibaba/qwen3.7-plus', 'temperature': 0.5},
+            reasoning_effort='xhigh',
+            provider='vercel',
+        )
+        sanitized = sanitize_call_kwargs_for_provider(
+            'vercel/alibaba/qwen3.7-plus', xhigh
+        )
+        assert 'reasoning' not in sanitized
+        assert sanitized['extra_body']['reasoning'] == {
+            'effort': 'xhigh',
+            'enabled': True,
+        }
 
         disabled = apply_model_param_overrides(
             'vercel/alibaba/qwen3.7-plus',
@@ -250,8 +275,9 @@ class TestGatewayReasoningOptions:
             provider='vercel',
         )
 
-        assert disabled['enable_thinking'] is False
+        assert 'reasoning' not in disabled
         assert 'thinking' not in disabled
+        assert 'enable_thinking' not in disabled
         assert 'reasoning_effort' not in disabled
 
 

@@ -825,8 +825,6 @@ async def _execute_direct_tool(
     action: MCPAction, matching_client: MCPClient
 ) -> MCPObservation:
     """Execute a direct MCP tool call and return observation."""
-    from backend.utils.terminal_contract import get_terminal_tool_name as _terminal_tool
-
     try:
         if cached := get_cached(action.name, action.arguments):
             logger.debug('Cache hit for MCP tool %s', action.name)
@@ -888,9 +886,7 @@ async def _execute_direct_tool(
                 _build_mcp_error_payload(
                     action_name=action.name,
                     message=(
-                        f"MCP tool '{action.name}' rejected arguments with validation error ({code}).\n"
-                        'Attempted schema-aware repair and single retry where possible.\n'
-                        'Next step: call the same tool with arguments matching its input schema exactly.'
+                        f"MCP tool '{action.name}' argument validation failed ({code})."
                     ),
                     code='MCP_TOOL_VALIDATION_ERROR',
                     retryable=True,
@@ -902,12 +898,7 @@ async def _execute_direct_tool(
             action,
             _build_mcp_error_payload(
                 action_name=action.name,
-                message=(
-                    f"MCP tool '{action.name}' returned an error: {e}\n"
-                    'You can try:\n'
-                    '  1. Re-call the tool with corrected arguments\n'
-                    f'  2. Use {_terminal_tool()} as a fallback to accomplish the same task'
-                ),
+                message=f"MCP tool '{action.name}' failed: {err_text}",
                 code='MCP_TOOL_ERROR',
                 retryable=False,
                 category='tool_bug',
@@ -919,12 +910,7 @@ async def _execute_direct_tool(
             action,
             _build_mcp_error_payload(
                 action_name=action.name,
-                message=(
-                    f"MCP tool '{action.name}' timed out (server did not respond in time).\n"
-                    'The tool may be waiting on a slow network call or the MCP server may be stuck.\n'
-                    'Try: a narrower query, or fall back to a non-MCP tool.\n'
-                    'Tune limits: APP_MCP_CALL_TOTAL_BUDGET_SEC, APP_MCP_RECONNECT_SESSION_TIMEOUT_SEC.'
-                ),
+                message=f"MCP tool '{action.name}' timed out.",
                 code='MCP_TOOL_TIMEOUT',
                 retryable=True,
                 category='timeout',
@@ -940,12 +926,8 @@ async def _execute_direct_tool(
             _build_mcp_error_payload(
                 action_name=action.name,
                 message=(
-                    f"MCP server for tool '{action.name}' is unavailable (reason: "
-                    f'{type(e).__name__}: {e}).\n'
-                    'The MCP server may be disconnected or experiencing issues.\n'
-                    'Fallback options:\n'
-                    f'  1. Use {_terminal_tool()} to accomplish the same task\n'
-                    '  2. Continue with non-MCP tools'
+                    f"MCP tool '{action.name}' unavailable: "
+                    f'{type(e).__name__}: {e}'
                 ),
                 code='MCP_SERVER_UNAVAILABLE',
                 retryable=True,
@@ -977,18 +959,12 @@ async def call_tool_mcp(
     if action.name in WRAPPER_TOOL_REGISTRY:
         return await _execute_wrapper_tool(action, mcps)
 
-    from backend.utils.terminal_contract import get_terminal_tool_name as _terminal_tool
-
     if not mcps:
         return _make_mcp_observation(
             action,
             _build_mcp_error_payload(
                 action_name=action.name,
-                message=(
-                    'No MCP clients are currently connected for this session. '
-                    f'Use {_terminal_tool()} or another non-MCP tool instead; '
-                    'only the tools listed in your active tool schema are available.'
-                ),
+                message='No MCP clients are connected for this session.',
                 code='MCP_NO_CLIENTS',
                 retryable=True,
                 category='env',
@@ -1003,13 +979,7 @@ async def call_tool_mcp(
             action,
             _build_mcp_error_payload(
                 action_name=action.name,
-                message=(
-                    f"MCP tool '{action.name}' is not available in this session.\n"
-                    'Only the tool names listed in your active tool schema are valid — '
-                    'pass them verbatim to `call_mcp_tool(tool_name=...)` with no '
-                    '`server:` / `server/` / `server__` prefix.\n'
-                    f'If none fit, use {_terminal_tool()} or another non-MCP tool.'
-                ),
+                message=f"MCP tool '{action.name}' is not available in this session.",
                 code='MCP_TOOL_UNAVAILABLE',
                 retryable=False,
                 category='not_found',

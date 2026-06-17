@@ -4,11 +4,50 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from difflib import SequenceMatcher
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 from backend.core.enums import FileEditSource, FileReadSource
 from backend.core.schemas import ObservationType
 from backend.ledger.observation.observation import Observation
+
+FileEditOutcome = Literal['created', 'edited']
+
+# Internal editor operations that always modify an existing file.
+_FILE_EDIT_OPERATIONS = frozenset(
+    {
+        'replace_string',
+        'edit',
+        'insert_text',
+        'multi_edit',
+        'symbol_body_replacement',
+        'edit_symbol_deferred',
+        'edit_noop',
+        'edit_preview',
+        'edit_validate',
+        'write_guard',
+        'create_file_preview',
+        'create_file_noop',
+    }
+)
+
+_FILE_CREATE_OPERATIONS = frozenset({'create_file'})
+
+
+def resolve_file_edit_outcome(
+    operation: str | None,
+    old_content: str | None,
+) -> FileEditOutcome:
+    """Map an editor operation to a UI/agent outcome label."""
+    if operation in _FILE_EDIT_OPERATIONS:
+        return 'edited'
+    if operation in _FILE_CREATE_OPERATIONS:
+        return 'created' if old_content is None else 'edited'
+    return 'edited'
+
+
+def file_edit_observation_is_new_file(obs: 'FileEditObservation') -> bool:
+    """Return True when the observation represents a newly created file."""
+    return obs.outcome == 'created'
 
 
 @dataclass
@@ -59,7 +98,7 @@ class FileEditObservation(Observation):
     """
 
     path: str = ''
-    prev_exist: bool = True
+    outcome: FileEditOutcome | None = None
     old_content: str | None = None
     new_content: str | None = None
     impl_source: FileEditSource = FileEditSource.FILE_EDITOR
@@ -70,6 +109,11 @@ class FileEditObservation(Observation):
     #: SHA-256 hash of new_content for edit verification. Included in __str__ output
     #: so the LLM can self-correct if the observed diff looks truncated or corrupted.
     new_content_hash: str | None = None
+
+    @property
+    def is_new_file(self) -> bool:
+        """True when this observation created a new file rather than editing one."""
+        return file_edit_observation_is_new_file(self)
 
     @property
     def message(self) -> str:
@@ -261,14 +305,7 @@ class FileEditObservation(Observation):
 
     def __str__(self) -> str:
         """Get a string representation of the file edit observation."""
-        if self.impl_source == FileEditSource.FILE_EDITOR:
-            return self.content
-        if not self.prev_exist:  # type: ignore[unreachable]
-            assert self.old_content == '', (
-                'old_content should be empty if the file is new (prev_exist=False).'
-            )
-            return f'[New file {self.path} is created with the provided content.]\n'
-        return self.visualize_diff().rstrip() + '\n'
+        return self.content
 
     def content_with_hash(self) -> str:
         """Return the observation content with the new_content_hash prepended.

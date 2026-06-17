@@ -405,18 +405,12 @@ class ActionExecutionService:
             exc,
             (FunctionCallValidationError, CommonFunctionCallValidationError),
         ):
-            return (
-                f'Tool validation failed: {exc}\n'
-                'Please correct the tool arguments and try again.'
-            )
+            return f'Tool validation failed: {exc}'
         if isinstance(
             exc,
             (FunctionCallNotExistsError, CommonFunctionCallNotExistsError),
         ):
-            return (
-                f'Tool not found: {exc}\n'
-                'Please use an existing tool from the provided list.'
-            )
+            return f'Tool not found: {exc}'
         if isinstance(exc, LLMNoActionError):
             return 'No tool call or final text was detected.'
         return str(exc)

@@ -83,7 +83,9 @@ def test_append_group_lines() -> None:
 def test_diff_panel_validation_secondary_uses_callout() -> None:
     obs = SimpleNamespace(
         path='main.py',
-        prev_exist=True,
+        tool_result={'operation': 'replace_string', 'ok': True},
+        outcome='edited',
+        old_content='before',
         get_edit_groups=lambda **kwargs: [],
         content='',
         diff=None,
@@ -102,7 +104,9 @@ def test_diff_panel_hides_diff_when_env_disabled(monkeypatch) -> None:
     monkeypatch.setenv('GRINTA_SHOW_DIFF', '0')
     obs = SimpleNamespace(
         path='main.py',
-        prev_exist=True,
+        tool_result={'operation': 'replace_string', 'ok': True},
+        outcome='edited',
+        old_content='before',
         get_edit_groups=lambda **kwargs: [],
         content='',
         diff=None,
@@ -116,7 +120,6 @@ def test_diff_panel_hides_diff_when_env_disabled(monkeypatch) -> None:
 def test_diff_panel_appends_indentation_warnings() -> None:
     obs = SimpleNamespace(
         path='main.py',
-        prev_exist=True,
         content=(
             'edit ok\n\n[INDENTATION WARNINGS]\n'
             '[INDENTATION MISMATCH] line 2\nexpected 4 spaces\n'

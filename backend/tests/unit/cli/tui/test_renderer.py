@@ -2197,14 +2197,13 @@ async def test_tui_file_edit_create_action_renders_non_expandable_card(mock_conf
         assert not list(card.query('#caret').results())
         assert card.query_one('#expanded-body').display is False
 
-        renderer._process_event(
-            FileEditObservation(
-                path='created.txt',
-                content='created',
-                prev_exist=False,
-                new_content='alpha\nbeta',
-            )
+        obs = FileEditObservation(
+            path='created.txt',
+            content='created',
+            outcome='created',
+            new_content='alpha\nbeta',
         )
+        renderer._process_event(obs)
         await pilot.pause()
 
         file_cards = [
@@ -2351,7 +2350,6 @@ async def test_tui_file_edit_observation_uses_unified_diff_rows(mock_config):
             FileEditObservation(
                 content='edited',
                 path='demo.txt',
-                prev_exist=True,
                 old_content='alpha\nbeta\n',
                 new_content='alpha\ngamma\nbeta\n',
             )
@@ -2396,7 +2394,6 @@ async def test_tui_file_edit_action_and_observation_render_single_delta_card(
             FileEditObservation(
                 content='edited',
                 path='demo.txt',
-                prev_exist=True,
                 old_content='alpha\nbeta\n',
                 new_content='alpha\ngamma\n',
             )
@@ -2413,6 +2410,108 @@ async def test_tui_file_edit_action_and_observation_render_single_delta_card(
         assert 'demo.txt' in collapsed_markup
         assert '[#54efae]+1[/]' in collapsed_markup
         assert '[#fd8383]-1[/]' in collapsed_markup
+
+
+@pytest.mark.asyncio
+async def test_tui_replace_string_observation_renders_edited_not_created(
+    mock_config,
+):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+
+        renderer._process_event(
+            FileEditAction(
+                path='demo.txt',
+                command='replace_string',
+                old_string='alpha',
+                new_str='gamma',
+            )
+        )
+        obs = FileEditObservation(
+            content='replaced',
+            path='demo.txt',
+            outcome='edited',
+            old_content=None,
+            new_content='gamma',
+        )
+        renderer._process_event(obs)
+        await pilot.pause()
+
+        file_cards = [
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-files' in card.classes
+        ]
+        assert len(file_cards) == 1
+        collapsed = file_cards[0].query_one('#collapsed-row')
+        assert 'Edited' in str(collapsed.renderable)
+        assert 'Created' not in str(collapsed.renderable)
+
+
+@pytest.mark.asyncio
+async def test_tui_file_edit_observation_discards_pending_create_for_overwrite(
+    mock_config,
+):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+
+        renderer._process_event(
+            FileEditAction(
+                path='demo.txt',
+                command='create_file',
+                file_text='gamma',
+                overwrite_existing=True,
+            )
+        )
+        obs = FileEditObservation(
+            content='overwritten',
+            path='demo.txt',
+            outcome='edited',
+            old_content='alpha',
+            new_content='gamma',
+        )
+        renderer._process_event(obs)
+        await pilot.pause()
+
+        file_cards = [
+            card
+            for card in s.query(TUIActivityCard).results()
+            if 'category-files' in card.classes
+        ]
+        assert len(file_cards) == 1
+        collapsed = file_cards[0].query_one('#collapsed-row')
+        assert 'Edited' in str(collapsed.renderable)
+        assert 'Created' not in str(collapsed.renderable)
 
 
 @pytest.mark.asyncio
@@ -2439,7 +2538,6 @@ async def test_tui_file_edit_observation_uses_explicit_diff_rows(mock_config):
             FileEditObservation(
                 content='edited',
                 path='.',
-                prev_exist=True,
                 diff='--- demo.txt\n+++ demo.txt\n@@ -1 +1 @@\n-old\n+new\n',
             )
         )
@@ -2495,7 +2593,6 @@ async def test_tui_file_edit_observation_uses_diff_preview_rows(mock_config):
                     '</DIFF_PREVIEW>'
                 ),
                 path='demo.txt',
-                prev_exist=True,
             )
         )
         await pilot.pause()

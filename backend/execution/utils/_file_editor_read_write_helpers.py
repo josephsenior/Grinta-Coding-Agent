@@ -14,7 +14,6 @@ keep that module focused on the ops mixin class.
 from __future__ import annotations
 
 import hashlib
-import time
 from pathlib import Path
 from typing import Literal
 
@@ -65,48 +64,6 @@ def read_file_impl(self, file_path: Path) -> str:
     text, meta = self._read_file_with_meta(file_path)
     self._remember_io_meta(file_path, meta)
     return text
-
-
-def recent_write_key_impl(file_path: Path) -> str:
-    try:
-        return str(file_path.resolve())
-    except OSError:
-        return str(file_path)
-
-
-def record_recent_write_impl(self, file_path: Path) -> None:
-    """Stamp the path in ``_recent_writes`` after a successful write.
-
-    Used by :meth:`_handle_replace_string` to detect the "stale
-    old_string" case where the model has chained several
-    ``replace_string`` calls on the same file in one turn. Entries are
-    bounded so a long-lived editor instance does not grow unboundedly.
-    """
-    recent = getattr(self, '_recent_writes', None)
-    if recent is None:
-        return
-    key = self._recent_write_key(file_path)
-    recent[key] = time.monotonic()
-    if len(recent) > 256:
-        oldest_key = min(recent, key=recent.get)
-        recent.pop(oldest_key, None)
-
-
-def was_recently_written_impl(
-    self, file_path: Path, *, window_seconds: float = 30.0
-) -> bool:
-    """True if the path was written to within ``window_seconds``.
-
-    Only meaningful on instances that have actually performed writes;
-    older instances without the attribute simply return ``False``.
-    """
-    recent = getattr(self, '_recent_writes', None)
-    if not recent:
-        return False
-    last = recent.get(self._recent_write_key(file_path))
-    if last is None:
-        return False
-    return (time.monotonic() - last) <= window_seconds
 
 
 def write_file_impl(self, file_path: Path, content: str) -> str:
@@ -223,10 +180,7 @@ def replace_range_impl(
     if expected_hash and content_hash != expected_hash:
         return ToolResult(
             output='',
-            error=(
-                'FILE_UNEXPECTEDLY_MODIFIED: file changed since it was read. '
-                'Re-read the file and retry the edit.'
-            ),
+            error='FILE_UNEXPECTEDLY_MODIFIED: file changed since it was read.',
             old_content=content,
             new_content=content,
         )

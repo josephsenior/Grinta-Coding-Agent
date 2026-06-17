@@ -120,9 +120,13 @@ class ActionService:
     ) -> None:
         controller = self._context.get_controller()
 
-        await self._confirmation_service.handle_pending_confirmation(action)
+        # Run pre-dispatch middleware before entering the user confirmation
+        # gate. A blocked action must not leave AWAITING_USER_CONFIRMATION
+        # without a pending action to confirm.
         if await _run_execute_pipeline_if_present(controller, action, ctx):
             return
+
+        await self._confirmation_service.handle_pending_confirmation(action)
 
         self._prepare_metrics_for_action(action)
 

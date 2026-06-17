@@ -2081,15 +2081,29 @@ class TestApplyUserDecision(unittest.IsolatedAsyncioTestCase):
         )
         self.ctrl.step.assert_called_once()
 
-    async def test_no_pending_action_is_a_noop(self):
-        """If there's no pending action, ``apply_user_decision`` is a no-op."""
+    async def test_no_pending_action_is_a_noop_when_not_awaiting_confirmation(self):
+        """No pending action outside the confirmation gate is a no-op."""
         self.ctrl.services.pending_action.get.return_value = None
+        self.ctrl.get_agent_state = MagicMock(return_value=AgentState.RUNNING)
 
         await self.ctrl.apply_user_decision(approved=True)
 
         self.ctrl.services.pending_action.clear_for_action.assert_not_called()
         self.ctrl.services.context.emit_event.assert_not_called()
         self.ctrl.set_agent_state_to.assert_not_awaited()
+        self.ctrl.step.assert_not_called()
+
+    async def test_stale_confirmation_gate_released_without_pending(self):
+        """Orphan AWAITING_USER_CONFIRMATION without pending recovers to RUNNING."""
+        self.ctrl.services.pending_action.get.return_value = None
+        self.ctrl.get_agent_state = MagicMock(
+            return_value=AgentState.AWAITING_USER_CONFIRMATION
+        )
+
+        await self.ctrl.apply_user_decision(approved=True)
+
+        self.ctrl.set_agent_state_to.assert_awaited_once_with(AgentState.RUNNING)
+        self.ctrl.services.context.emit_event.assert_not_called()
         self.ctrl.step.assert_not_called()
 
     async def test_clear_for_action_runs_before_id_is_wiped(self):

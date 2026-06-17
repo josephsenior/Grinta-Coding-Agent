@@ -602,11 +602,13 @@ def terminal_input_preflight_error(
         return None
 
     if _COPIED_BASH_PROMPT_RE.match(text):
+        from backend.utils.terminal_contract import get_terminal_tool_name
+
+        terminal_tool = get_terminal_tool_name()
         return ErrorObservation(
             content=(
                 'TERMINAL_INPUT_REJECTED: input appears to include a copied shell '
-                'prompt prefix (`$ `). Send only the command text, without the prompt. '
-                'Use `execute_powershell` / `execute_bash` for ordinary one-shot commands.'
+                f'prompt prefix (`$ `). Send only the command text. Use `{terminal_tool}`.'
             )
         )
 
@@ -808,7 +810,9 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
         truncate_large_text,
     )
 
-    command = action.command or 'write'
+    from backend.ledger.observation.files import resolve_file_edit_outcome
+
+    command = action.command or ''
     edit_mode = getattr(action, 'edit_mode', None) or ''
     is_range_edit = edit_mode.strip().lower() == 'range'
 
@@ -831,7 +835,7 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
         expected_hash=getattr(action, 'expected_hash', None),
         overwrite_existing=getattr(action, 'overwrite_existing', False),
     )
-    if result_str.startswith('ERROR:'):
+    if tool_result.get('ok') is False:
         obs: ErrorObservation | FileEditObservation = ErrorObservation(result_str)
         obs.tool_result = tool_result
         return obs
@@ -857,10 +861,15 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
         except Exception:
             pass
 
+    operation = (
+        tool_result.get('operation')
+        if isinstance(tool_result, dict)
+        else command or None
+    )
     obs = FileEditObservation(
         content=result_str,
         path=action.path,
-        prev_exist=old_content is not None,
+        outcome=resolve_file_edit_outcome(operation, old_content),
         old_content=old_content,
         new_content=new_content,
         impl_source=FileEditSource.FILE_EDITOR,
@@ -1050,7 +1059,7 @@ def _build_edit_result_obs(
     final_obs = FileEditObservation(
         content=content,
         path=action.path,
-        prev_exist=True,
+        outcome='edited',
         old_content=None,
         new_content=None,
         diff=diff,

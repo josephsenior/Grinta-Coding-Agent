@@ -634,9 +634,10 @@
         "reasoning_efforts": [
           "low",
           "medium",
-          "high"
+          "high",
+          "xhigh"
         ],
-        "reasoning_wire": "openai_thinking_enabled",
+        "reasoning_wire": "vercel_gateway_reasoning",
         "supports_stop_words": true
       },
       "metadata": {

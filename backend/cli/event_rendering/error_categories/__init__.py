@@ -104,7 +104,7 @@ NOTICE_TITLE_RULES: tuple = (
         lambda lower: 'default shell session not initialized' in lower,
         'Shell session issue',
     ),
-    (lambda lower: 'stuck loop' in lower, 'Stuck pattern'),
+    (lambda lower: 'stuck_loop' in lower or 'stuck loop' in lower, 'Stuck pattern'),
     (
         lambda lower: any(
             s in lower for s in ('timeout', 'timed out', 'did not answer')

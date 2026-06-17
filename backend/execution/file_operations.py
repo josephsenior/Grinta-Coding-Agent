@@ -13,8 +13,7 @@ import os
 import re
 from typing import TYPE_CHECKING, Any
 
-from backend.core.editor_recovery import append_editor_recovery_guidance
-from backend.core.enums import FileEditSource
+from backend.core.enums import FileReadSource
 from backend.core.logger import app_logger as logger
 from backend.core.os_capabilities import OS_CAPS
 from backend.execution.utils.files import (
@@ -27,7 +26,6 @@ from backend.execution.utils.test_output_summary import extract_test_summary
 from backend.ledger.action import FileReadAction, FileWriteAction
 from backend.ledger.observation import (
     ErrorObservation,
-    FileEditObservation,
     FileReadObservation,
 )
 
@@ -101,11 +99,8 @@ def _make_error_response(
 def _make_editor_error_response(
     result: Any, path: str, file_text: str | None, new_str: str | None, command: str
 ) -> tuple[str, tuple[None, None], dict[str, Any]]:
-    enriched_error = append_editor_recovery_guidance(
-        result.error, path=path, tool_name='file_edit', content=file_text or new_str
-    )
     return (
-        f'ERROR:\n{enriched_error}',
+        result.error,
         (None, None),
         {
             'tool': 'file_edit',
@@ -169,7 +164,7 @@ def _parse_insert_line(insert_line: int | str | None) -> tuple[int | None, str |
         except ValueError:
             return (
                 None,
-                f"ERROR:\nInvalid insert_line value: '{insert_line}'. Expected an integer.",
+                f"Invalid insert_line value: '{insert_line}'. Expected an integer.",
             )
     return insert_line, None
 
@@ -647,20 +642,17 @@ def set_file_permissions(
             logger.debug('Could not set default permissions for %s', filepath)
 
 
-def handle_directory_view(full_path: str, display_path: str) -> FileEditObservation:
+def handle_directory_view(full_path: str, display_path: str) -> FileReadObservation:
     """Handle viewing a directory by listing files up to 2 levels deep."""
     # List files up to 2 levels deep
     file_list, hidden_count = _list_directory_recursive(full_path, max_depth=2)
 
     content = _format_directory_listing(display_path, file_list, hidden_count)
 
-    return FileEditObservation(
+    return FileReadObservation(
         content=content,
         path=display_path,
-        old_content=None,
-        new_content=None,
-        impl_source=FileEditSource.FILE_EDITOR,
-        diff='',
+        impl_source=FileReadSource.FILE_EDITOR,
     )
 
 

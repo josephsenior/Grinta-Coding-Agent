@@ -93,7 +93,6 @@ class TestConvertObservation:
             path='/tmp/x.py',
             old_content='original',
             new_content='edited',
-            prev_exist=True,
         )
         msg = convert_observation_to_message(obs, max_message_chars=None)
         assert msg.role == 'user'
