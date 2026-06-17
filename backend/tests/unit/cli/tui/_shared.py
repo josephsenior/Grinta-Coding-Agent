@@ -95,14 +95,24 @@ def _get_screen(app: GrintaTUIApp) -> GrintaScreen:
     return app.screen  # type: ignore[return-value]
 
 
-async def _await_at_bottom(display, pilot, *, attempts: int = 30) -> None:
+async def _await_at_bottom(display, pilot, *, attempts: int = 40) -> None:
     """Wait for programmatic follow-tail / force_scroll_end to settle."""
     for _ in range(attempts):
+        if getattr(display, '_suppress_scroll_sync', False):
+            await pilot.pause()
+            continue
         display._sync_scroll_state_from_position()
         if display._was_at_bottom():
             return
         await pilot.pause()
+    if getattr(display, '_suppress_scroll_sync', False):
+        display._release_programmatic_scroll()
+        await pilot.pause()
     display._sync_scroll_state_from_position()
+    if not display._was_at_bottom():
+        display.force_scroll_end()
+        await pilot.pause()
+        display._sync_scroll_state_from_position()
     assert display._was_at_bottom()
 
 

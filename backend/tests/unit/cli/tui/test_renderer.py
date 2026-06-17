@@ -296,7 +296,7 @@ async def test_tui_content_growth_does_not_mark_user_scrolled_away(
 
         display.append_widget(Static('new tail content'))
         await pilot.pause()
-        display._sync_scroll_state_from_position()
+        await _await_at_bottom(display, pilot)
         assert display._user_scrolled_away is False
 
 
