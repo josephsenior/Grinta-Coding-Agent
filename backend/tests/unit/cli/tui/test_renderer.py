@@ -60,6 +60,47 @@ async def test_tui_activity_card_processing_and_mount(mock_config):
         found = s.query_one(TUIActivityCard)
         assert found is not None
 
+        from backend.cli.tui.widgets.terminal_pane import TerminalPane
+
+        pane = found.query_one('#terminal-pane', TerminalPane)
+        assert 'git status' in pane._prompt_markup()
+        assert pane._running is True
+        body = found.query_one('#expanded-body', Container)
+        assert body.display is True
+
+
+@pytest.mark.asyncio
+async def test_tui_shell_card_terminal_pane_before_output(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.widgets.terminal_pane import TerminalPane
+
+        mounted = TUIActivityCard(
+            verb='Ran',
+            detail='$ pytest -q',
+            badge_category='shell',
+            status='running',
+            terminal_command='pytest -q',
+            shell_kind='bash',
+            extra_content=None,
+            collapsed=True,
+        )
+        mounted.set_processing(True)
+        s.query_one('#main-display').mount(mounted)
+        await pilot.pause()
+
+        pane = mounted.query_one('#terminal-pane', TerminalPane)
+        assert 'pytest -q' in pane._prompt_markup()
+        assert pane._running is True
+        body = mounted.query_one('#expanded-body', Container)
+        assert body.display is True
+
 
 @pytest.mark.asyncio
 async def test_tui_activity_card_expanded_output_wraps_in_extra_frame(mock_config):

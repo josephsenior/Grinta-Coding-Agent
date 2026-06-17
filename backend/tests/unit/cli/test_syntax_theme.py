@@ -193,6 +193,6 @@ def test_tui_sources_do_not_request_bold_text():
 
 
 def test_streaming_render_interval_shortens_in_code_fence():
-    assert streaming_render_interval('plain prose') == 0.1
+    assert streaming_render_interval('plain prose') == 0.25
     assert streaming_render_interval('`x`') == 0.12
     assert streaming_render_interval('```python\nx') == 0.08

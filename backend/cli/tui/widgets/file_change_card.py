@@ -1,4 +1,4 @@
-"""Static scrollable file-change card for create/edit observations."""
+"""Static file-change card for create/edit observations."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from backend.cli.tui.widgets.unified_diff_view import (
 
 
 class FileChangeCard(Container):
-    """Path + delta header with an always-visible scrollable unified diff body."""
+    """Path + delta header with a unified diff body scrolled by the transcript."""
 
     DEFAULT_CSS = """
     FileChangeCard {

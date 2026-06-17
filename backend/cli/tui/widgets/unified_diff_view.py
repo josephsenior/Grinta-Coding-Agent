@@ -11,7 +11,7 @@ from typing import Any, Literal
 
 from rich.console import Console
 from rich.text import Text
-from textual.containers import Horizontal, VerticalScroll
+from textual.containers import Horizontal, Vertical
 from textual.widgets import Static
 
 from backend.cli.syntax_theme import get_grinta_rich_syntax_theme
@@ -387,8 +387,12 @@ class UnifiedDiffRow(Horizontal):
         yield Static(self._render_code(), classes=f'diff-code {row.kind}')
 
 
-class UnifiedDiffView(VerticalScroll):
-    """Scrollable unified diff preview with gutters, syntax, and word highlights."""
+class UnifiedDiffView(Vertical):
+    """Unified diff preview with gutters, syntax, and word highlights.
+
+    Intentionally not a nested scroll container: file-change cards live inside
+    the transcript scroll view, and an inner scrollbar traps manual wheel input.
+    """
 
     DEFAULT_CSS = """
     UnifiedDiffView {
