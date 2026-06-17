@@ -4,7 +4,7 @@ This repository currently follows a **main-branch promotion model**.
 
 There is no separate long-lived beta or staging branch documented in the current tree. In practice, promotion means: stabilize a feature branch through PR review, merge to `main`, run the quality gates that already exist in CI, then cut a versioned release when `main` is in a publishable state.
 
-This document describes the workflow that is actually supported by the repo today.
+This document describes the workflow that is actually supported by the repo today. The step-by-step release and GA checklist lives in [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
 
 ---
 
@@ -19,7 +19,7 @@ For Grinta, that usually means all of the following are true:
 - local reliability checks have been run for the release candidate
 - the version and changelog are updated
 - a git tag is created for the release
-- container and package publishing steps are either triggered or intentionally deferred
+- package publishing is triggered manually; container images are published only when a maintainer dispatches the Docker workflow
 
 ---
 
@@ -29,16 +29,20 @@ These are the concrete gates already present in the repository.
 
 | Gate | File | Purpose |
 | --- | --- | --- |
-| Python tests | `.github/workflows/py-tests.yml` | Syntax checks, lockfile validation, minimal pytest coverage on PRs and `main` |
+| Python tests | `.github/workflows/py-tests.yml` | Lockfile validation, sharded unit coverage (75%), integration/e2e/stress on Linux, unit smoke on Windows |
 | Lint + type checks | `.github/workflows/lint.yml` | Pre-commit, version consistency, mypy |
-| End-to-end tests | `.github/workflows/e2e-tests.yml` | Agent loop E2E coverage on Linux and Windows |
-| Container build | `.github/workflows/ghcr-build.yml` | Build/test/push container images for PRs, `main`, and tags |
-| Package release | `.github/workflows/pypi-release.yml` | Manual publish flow with pre-release tests |
+| CodeQL | `.github/workflows/codeql.yml` | Static security analysis for Python |
+| Bandit | `.github/workflows/bandit.yml` | Python SAST |
+| Dependency review | `.github/workflows/dependency-review.yml` | Blocks high-severity dependency risk on PRs |
+| End-to-end tests | `.github/workflows/e2e-tests.yml` | CLI/orchestration regression when paths match |
+| Smoke install | `.github/workflows/smoke-install.yml` | Wheel + source onboarding smoke on Linux and Windows |
+| Container build | `.github/workflows/ghcr-build.yml` | **Manual dispatch only** — Docker assets may be absent; do not assume images publish with a tag |
+| Package release | `.github/workflows/pypi-release.yml` | **Manual** publish flow with pre-release tests (mypy + unit tests, wheel smoke) |
 | Evaluation runs | `.github/workflows/run-eval.yml` | Label-driven, release-driven, or manual evaluation passes |
 | Local reliability gate | `backend/scripts/verify/reliability_gate.py` | Phase-based release gate runnable from the Makefile |
 | Stress suite | `make test-stress` | Parallel pending, backpressure, and event-stream load tests (`pytest -m stress`) |
 
-Two local commands matter most before promotion:
+Two local commands matter most before RC and GA promotion:
 
 ```bash
 make reliability-gate
@@ -47,19 +51,20 @@ make reliability-gate-integration
 
 The first runs the full reliability gate. The second adds integration coverage, the reliability integration bundle, and the stress suite — the stronger pre-release check for RC and GA.
 
+CI's `gates-on-linux-extended` already runs integration, e2e, and stress on every PR; the Makefile targets above are additional local confidence for release cuts.
+
 ---
 
 ## Promotion Checklist
 
-Before cutting a release from `main`, verify all of the following:
+Before cutting a release from `main`, work through [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md). At minimum:
 
 - PR review is complete and the final branch has already merged cleanly into `main`
-- CI is green on `main`
-- `make reliability-gate` passes locally
-- `make reliability-gate-integration` passes for releases that touch runtime, orchestration, or evaluation-critical code (includes integration + stress)
-- `make test-stress` passes for RC and GA promotion
+- all **required** CI jobs are green on `main` (see checklist table)
+- `make reliability-gate` passes locally for RC/GA releases
+- `make reliability-gate-integration` passes for releases that touch runtime, orchestration, or evaluation-critical code
 - `CHANGELOG.md` is updated
-- `pyproject.toml` version is updated
+- `pyproject.toml` version and `_DEFAULT_VERSION` in `backend/__init__.py` are updated together
 - release notes are clear enough that a user can understand what changed and what risk exists
 
 If a change affects evaluation, autonomy, prompt behavior, or safety, promotion should also include a deliberate evaluation run rather than relying only on unit and E2E tests.
@@ -89,7 +94,8 @@ If the second command is too expensive for a tiny docs-only or packaging-only ch
 
 Update these files together:
 
-- `pyproject.toml`
+- `pyproject.toml` (`version = "x.y.z"`)
+- `backend/__init__.py` (`_DEFAULT_VERSION` fallback)
 - `CHANGELOG.md`
 
 The current package version lives in `pyproject.toml`, and the changelog should reflect the exact user-visible contents of the release.
@@ -105,17 +111,17 @@ git tag vX.Y.Z
 git push origin main --tags
 ```
 
-Tagging is the clean boundary between "merged" and "released."
+Tagging is the clean boundary between "merged" and "released." It does **not** automatically publish to PyPI or GHCR.
 
-### 5. Let the automated workflows do their work
+### 5. Publish artifacts (operator actions)
 
-After merge/tag:
+After the tag is on `main`:
 
-- container build and push happen through `.github/workflows/ghcr-build.yml`
-- evaluation can run through `.github/workflows/run-eval.yml`
-- package publishing is available through the manual PyPI workflow
-
-The PyPI publish flow is not fully automatic. Treat it as an explicit operator action, not an assumed side effect.
+1. **PyPI** — trigger the manual [pypi-release workflow](../.github/workflows/pypi-release.yml). It runs mypy + unit tests, builds the wheel, smoke-tests `grinta --help` / `--version`, then publishes via OIDC to the `pypi` environment.
+2. **Scoop / Homebrew** — update manifests with the **published** sdist URL and checksums from PyPI **after** upload (see [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md)).
+3. **Container images** — trigger [ghcr-build](../.github/workflows/ghcr-build.yml) manually if Docker assets are present and an image is needed. This workflow is **not** tied to tag push.
+4. **Evaluation** — run [run-eval](../.github/workflows/run-eval.yml) manually or via release trigger when the release touches autonomy, prompts, safety, or orchestration.
+5. **Release notes** — publish via GitHub Releases / [release-drafter](../.github/release-drafter.yml), aligned with [Support Matrix](SUPPORT_MATRIX.md) claims.
 
 ### 6. Run evaluation when the release deserves it
 
