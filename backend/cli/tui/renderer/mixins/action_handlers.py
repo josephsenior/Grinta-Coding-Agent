@@ -71,7 +71,7 @@ class RendererActionHandlersMixin:
         pending_attr: str | None = None,
         force_err: bool = False,
     ) -> None:
-        """Render or finalize an exploration activity card in-place."""
+        """Render or finalize a record-tier card in-place."""
         if pending_attr is not None:
             pending = getattr(self, pending_attr, None)
             if pending is not None:
@@ -85,7 +85,7 @@ class RendererActionHandlersMixin:
                 extra_content = ActivityRenderer.format_extra_lines(card.extra_lines)
                 if extra_content is None and content:
                     extra_content = content[:200]
-                self._update_activity_card_outcome(
+                self._update_record_panel_outcome(
                     pending,
                     status=status,
                     outcome=card.secondary or 'completed',
@@ -94,7 +94,7 @@ class RendererActionHandlersMixin:
                 )
                 setattr(self, pending_attr, None)
                 return
-        self._write_card(card)
+        self._write_record_card(card)
 
     def _render_search_card(
         self,

@@ -24,6 +24,7 @@ from backend.ledger.action import (
     FindSymbolsAction,
     ReadSymbolsAction,
 )
+from backend.ledger.observation import ErrorObservation
 
 
 def _use_tmp_workspace(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
@@ -38,11 +39,20 @@ def _use_tmp_workspace(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
 
 
 def _payload(event: object) -> dict:
+    content = getattr(event, 'content', '')
+    if content:
+        return json.loads(str(content))
     tool_result = getattr(event, 'tool_result', None)
     if isinstance(tool_result, dict):
         return dict(tool_result)
-    content = getattr(event, 'content', '')
-    return json.loads(str(content))
+    return {}
+
+
+def _read_symbols_result(action: ReadSymbolsAction) -> dict | ErrorObservation:
+    obs = execute_read_symbols(action)
+    if isinstance(obs, ErrorObservation):
+        return obs
+    return _payload(obs)
 
 
 def test_read_file_and_range_return_file_read_actions(monkeypatch, tmp_path):
@@ -160,7 +170,7 @@ def test_find_symbols_discovers_candidates_and_read_symbols_reports_ambiguity(
         }
     )
     assert isinstance(read_action, ReadSymbolsAction)
-    ambiguous = _payload(execute_read_symbols(read_action))
+    ambiguous = _read_symbols_result(read_action)
 
     assert candidates['type'] == 'symbols'
     assert len(candidates['candidates']) == 2
@@ -170,9 +180,10 @@ def test_find_symbols_discovers_candidates_and_read_symbols_reports_ambiguity(
     }
     assert {item['symbol_kind'] for item in candidates['candidates']} == {'method'}
     assert all('content' not in item for item in candidates['candidates'])
-    assert ambiguous['results'][0]['status'] == 'ambiguous'
-    assert len(ambiguous['results'][0]['candidates']) == 2
-    assert 'content' not in ambiguous['results'][0]
+    assert isinstance(ambiguous, ErrorObservation)
+    assert 'ambiguous' in ambiguous.content
+    assert ambiguous.tool_result['error_code'] == 'SYMBOL_AMBIGUOUS'
+    assert len(ambiguous.tool_result.get('candidates') or []) == 2
 
 
 def test_read_symbols_resolves_each_requested_symbol_independently(
@@ -198,19 +209,14 @@ def test_read_symbols_resolves_each_requested_symbol_independently(
         }
     )
     assert isinstance(action, ReadSymbolsAction)
-    payload = _payload(execute_read_symbols(action))
+    result = _read_symbols_result(action)
 
-    assert [item['status'] for item in payload['results']] == [
-        'resolved',
-        'ambiguous',
-        'not_found',
-    ]
-    assert (
-        payload['results'][0]['content']
-        == 'def authenticate_user():\n    return True\n'
-    )
-    assert len(payload['results'][1]['candidates']) == 2
-    assert "Symbol 'MissingService' was not found." == payload['results'][2]['message']
+    assert isinstance(result, ErrorObservation)
+    assert '2 of 3 targets could not be resolved' in result.content
+    assert result.tool_result['failed_count'] == 2
+    assert result.tool_result['resolved_count'] == 1
+    assert 'validate' in result.content
+    assert 'MissingService' in result.content
 
 
 def test_read_symbols_accepts_qualified_names_without_path(monkeypatch, tmp_path):
@@ -403,7 +409,7 @@ def test_edit_symbol_rejects_ambiguous_write_target(monkeypatch, tmp_path):
         encoding='utf-8',
     )
 
-    with pytest.raises(FunctionCallValidationError, match='ambiguous'):
+    with pytest.raises(ToolExecutionError, match='ambiguous'):
         _handle_multi_edit_command(
             '.',
             {
@@ -566,7 +572,7 @@ def test_multiedit_commits_no_changes_when_one_operation_fails(monkeypatch, tmp_
     (tmp_path / 'a.py').write_text('A = 1\n', encoding='utf-8')
     (tmp_path / 'b.py').write_text('B = 1\n', encoding='utf-8')
 
-    with pytest.raises(ToolExecutionError):
+    with pytest.raises(ToolExecutionError) as exc_info:
         _handle_multi_edit_command(
             '.',
             {
@@ -586,6 +592,13 @@ def test_multiedit_commits_no_changes_when_one_operation_fails(monkeypatch, tmp_
                 ]
             },
         )
+
+    exc = exc_info.value
+    assert 'replace_string failed: old_string not found exactly.' in str(exc)
+    assert 'File: b.py' in str(exc)
+    assert 'Op index: 1 (2/2)' in str(exc)
+    assert exc.context['error_code'] == 'OLD_STRING_NOT_FOUND'
+    assert 'missing' not in str(exc)
 
     assert (tmp_path / 'a.py').read_text(encoding='utf-8') == 'A = 1\n'
     assert (tmp_path / 'b.py').read_text(encoding='utf-8') == 'B = 1\n'

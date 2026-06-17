@@ -374,6 +374,7 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
             'nvidia': ['nvidia/'],
             'ollama': ['ollama/'],
             'deepseek': ['deepseek/'],
+            'moonshot': ['moonshot/'],
         }
 
         for provider, prefixes in prefix_patterns.items():

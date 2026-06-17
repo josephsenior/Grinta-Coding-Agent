@@ -3,6 +3,7 @@ from __future__ import annotations
 import shutil
 
 from backend.engine.tools.grep import build_grep_action, execute_grep
+from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.search import GrepObservation
 
 
@@ -92,9 +93,9 @@ class TestExecuteGrep:
         action = build_grep_action(pattern='(unclosed', path=str(tmp_path))
         obs = execute_grep(action)
 
+        assert isinstance(obs, ErrorObservation)
         assert 'Invalid regex' in obs.content
-        assert obs.error
-        assert 'glob' in obs.content
+        assert obs.tool_result['error_code'] == 'INVALID_PATTERN'
 
     def test_missing_path_returns_error(self, tmp_path, monkeypatch) -> None:
         monkeypatch.setattr(shutil, 'which', lambda x: None)
@@ -102,8 +103,9 @@ class TestExecuteGrep:
         action = build_grep_action(pattern='hello', path=str(tmp_path / 'nope'))
         obs = execute_grep(action)
 
+        assert isinstance(obs, ErrorObservation)
         assert 'Path does not exist' in obs.content
-        assert obs.error
+        assert obs.tool_result['error_code'] == 'PATH_NOT_FOUND'
 
     def test_empty_pattern_rejected(self, tmp_path, monkeypatch) -> None:
         monkeypatch.setattr(shutil, 'which', lambda x: None)
@@ -111,6 +113,6 @@ class TestExecuteGrep:
         action = build_grep_action(pattern='', path=str(tmp_path))
         obs = execute_grep(action)
 
+        assert isinstance(obs, ErrorObservation)
         assert 'non-empty' in obs.content
-        assert obs.error
-        assert 'glob' in obs.content
+        assert obs.tool_result['error_code'] == 'VALIDATION_ERROR'

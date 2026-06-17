@@ -108,6 +108,7 @@ def _strip_provider_prefix(model: str) -> str:
         'groq',
         'xai',
         'deepseek',
+        'moonshot',
         'opencode',
         'opencode-go',
         'vercel',

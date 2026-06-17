@@ -62,8 +62,11 @@ Transcript > UserMessage,
 Transcript > AgentMessage,
 Transcript > LiveResponse,
 Transcript > ThinkingIndicator,
+Transcript > ErrorBlock,
 Transcript > TranscriptNotice,
 Transcript > OrientLine,
+Transcript > SessionPanel,
+Transcript > RecordPanel,
 Transcript > TurnCompletion,
 Transcript > CollapsibleSection {
     margin-bottom: 2;
@@ -1107,6 +1110,13 @@ ThinkingIndicator {
     height: auto;
     margin: 0 0 2 0;
     padding: 1 1 1 2;
+}
+
+ErrorBlock {
+    width: 100%;
+    height: auto;
+    margin: 0 0 2 0;
+    padding: 0 1 0 2;
 }
 
 TranscriptNotice {

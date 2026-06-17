@@ -554,3 +554,78 @@ def _fetch_target(args: dict[str, Any]) -> str:
     if len(urls) == 1 and path and path != '/':
         label = f'{host}{path}'
     return shorten_middle(label, max_len=52, head_min=18)
+
+
+_CHECKPOINT_VERBS: dict[str, str] = {
+    'save': 'Saved',
+    'view': 'Listed',
+    'revert': 'Reverted',
+    'clear': 'Cleared',
+}
+
+
+def checkpoint_target(action: Any) -> str:
+    label = str(getattr(action, 'label', '') or '').strip()
+    if label:
+        return label
+    command = str(getattr(action, 'command', '') or 'save').strip().lower()
+    checkpoint_id = str(getattr(action, 'checkpoint_id', '') or '').strip()
+    if command == 'revert' and checkpoint_id:
+        return checkpoint_id[:12]
+    return command or 'checkpoint'
+
+
+def checkpoint_action_model(action: Any) -> OrientLineModel:
+    command = str(getattr(action, 'command', '') or 'save').strip().lower()
+    verb = _CHECKPOINT_VERBS.get(command, 'Checkpoint')
+    return OrientLineModel(
+        tool='checkpoint',
+        icon='',
+        verb=verb,
+        target=checkpoint_target(action),
+        result='…',
+        area='workspace',
+    )
+
+
+def checkpoint_result(obs: Any) -> str:
+    if not getattr(obs, 'ok', True):
+        reason = str(getattr(obs, 'reason', '') or getattr(obs, 'status', '') or '')
+        return 'failed' if not reason else reason[:40]
+    content = str(getattr(obs, 'content', '') or '').strip()
+    if content:
+        first = content.split('\n', 1)[0].strip()
+        return first[:44] if len(first) > 44 else first
+    if getattr(obs, 'changed_state', False):
+        return 'saved'
+    return 'completed'
+
+
+def checkpoint_observation_model(
+    obs: Any, pending: OrientLineModel | None = None
+) -> OrientLineModel:
+    base = pending or checkpoint_action_model(obs)
+    return base.with_result(checkpoint_result(obs))
+
+
+def checkpoint_think_orient_model(
+    *, detail: str = '', text: str = '', source_tool: str = ''
+) -> OrientLineModel:
+    del source_tool
+    payload = (detail or text or '').strip()
+    lowered = payload.lower()
+    if 'revert' in lowered or 'rollback' in lowered:
+        verb = 'Reverted'
+    elif 'save' in lowered or 'saved' in lowered:
+        verb = 'Saved'
+    else:
+        verb = 'Checkpoint'
+    target = payload[:52] + ('...' if len(payload) > 52 else '') if payload else 'checkpoint'
+    return OrientLineModel(
+        tool='checkpoint',
+        icon='',
+        verb=verb,
+        target=target,
+        result='completed',
+        area='workspace',
+    )

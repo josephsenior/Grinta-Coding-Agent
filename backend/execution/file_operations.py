@@ -96,21 +96,15 @@ def _make_error_response(
 def _make_editor_error_response(
     result: Any, path: str, file_text: str | None, new_str: str | None, command: str
 ) -> tuple[str, tuple[None, None], dict[str, Any]]:
-    return (
-        result.error,
-        (None, None),
-        {
-            'tool': 'file_edit',
-            'ok': False,
-            'error_code': result.error_code or 'EDITOR_ERROR',
-            'retryable': result.retryable,
-            'operation': result.operation or command,
-            'payload': result.metadata or {},
-            'verification_passed': bool(
-                (result.metadata or {}).get('verification_passed', False)
-            ),
-        },
+    from backend.execution.structured_edit_errors import normalize_editor_error_response
+
+    _ = (file_text, new_str)
+    message, tool_result = normalize_editor_error_response(
+        result,
+        path=path,
+        command=command,
     )
+    return message, (None, None), tool_result
 
 
 def _make_empty_response(

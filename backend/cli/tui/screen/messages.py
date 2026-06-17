@@ -109,11 +109,32 @@ class ScreenMessagesMixin:
             return
         self._write_log(widget)
 
+    def _emit_error_block(self, renderable: Any) -> None:
+        """Render an inline error block matching thinking/exploration chrome."""
+        from backend.cli.tui.widgets.error_block import ErrorBlock
+
+        widget = ErrorBlock(renderable)
+        try:
+            display = self._get_display()
+        except Exception:
+            self._write_log(widget)
+            return
+        if type(display).__name__ == 'MagicMock':
+            display.write(renderable)
+            return
+        self._write_log(widget)
+
     def add_error(self, text: str) -> None:
-        self._emit_transcript_notice(text)
+        from backend.cli.event_rendering.text_utils import sanitize_visible_transcript_text
+        from backend.cli.tui.widgets.error_block import ErrorBlock
+
+        content = sanitize_visible_transcript_text(text)
+        if not content:
+            return
+        self._emit_error_block(ErrorBlock.simple_message(content))
 
     def add_warning(self, text: str) -> None:
-        """Recoverable issue — same soft notice styling as ``add_error``."""
+        """Recoverable issue — same soft notice styling as before."""
         self._emit_transcript_notice(text)
 
     def add_error_panel(
@@ -122,12 +143,12 @@ class ScreenMessagesMixin:
         *,
         error_category: str | None = None,
     ) -> None:
-        """Render a persistent structured error card for context-bearing failures."""
-        from backend.cli.event_rendering.error_panel import build_error_panel
+        """Render a persistent structured error block for context-bearing failures."""
+        from backend.cli.event_rendering.error_panel import build_error_tui_renderable
 
         width = getattr(getattr(self, 'size', None), 'width', None)
-        self._write_log(
-            build_error_panel(
+        self._emit_error_block(
+            build_error_tui_renderable(
                 text,
                 title='Error',
                 error_category=error_category,

@@ -28,7 +28,7 @@ def _handle_mcp_action(orch: 'RendererEventProcessorMixin', event: MCPAction) ->
         orch._pending_exploration_meta = None
         return
     card = ActivityRenderer.mcp_activity_card(event.name, event.arguments)
-    widget = orch._write_card(card)
+    widget = orch._write_record_card(card, processing=True)
     orch._pending_mcp_card = widget
     orch._pending_exploration_meta = card.meta_lines or None
 

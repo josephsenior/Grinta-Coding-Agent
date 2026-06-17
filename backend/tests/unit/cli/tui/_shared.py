@@ -94,6 +94,16 @@ def _get_screen(app: GrintaTUIApp) -> GrintaScreen:
     return app.screen  # type: ignore[return-value]
 
 
+def _static_render_plain(static: Static) -> str:
+    rendered = static.renderable
+    if hasattr(rendered, 'plain'):
+        return str(rendered.plain)
+    console = RichConsole()
+    with console.capture() as capture:
+        console.print(rendered)
+    return capture.get()
+
+
 def _file_change_cards(screen: GrintaScreen) -> list[FileChangeCard]:
     return list(screen.query(FileChangeCard).results())
 

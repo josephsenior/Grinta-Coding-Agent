@@ -841,6 +841,8 @@ async def test_tui_terminal_session_reuses_single_card(mock_config):
             loop=loop,
         )
 
+        from backend.cli.tui.widgets.session_panel import SessionPanel
+
         renderer._process_event(TerminalRunAction(command='npm run dev'))
         renderer._process_event(TerminalReadAction(session_id='term-1'))
         renderer._process_event(
@@ -851,11 +853,13 @@ async def test_tui_terminal_session_reuses_single_card(mock_config):
         )
         await pilot.pause()
 
-        cards = s.query(TUIActivityCard).results()
-        terminal_cards = [card for card in cards if 'category-terminal' in card.classes]
-        assert len(terminal_cards) == 1
+        panels = s.query(SessionPanel).results()
+        terminal_panels = [
+            panel for panel in panels if 'category-terminal' in panel.classes
+        ]
+        assert len(terminal_panels) == 1
 
-        prompt = terminal_cards[0].query_one('#terminal-prompt')
+        prompt = terminal_panels[0].query_one('#terminal-prompt')
         assert 'status' in str(prompt.renderable)
 
 
@@ -879,29 +883,28 @@ async def test_tui_terminal_observation_strips_control_traffic(mock_config):
             loop=loop,
         )
 
-        renderer._process_event(TerminalRunAction(command='powershell'))
+        from backend.cli.tui.widgets.session_panel import SessionPanel
+
+        from backend.cli.tui.widgets.terminal_pane import TerminalPane
+
+        renderer._process_event(CmdRunAction(command='powershell'))
         renderer._process_event(
-            TerminalObservation(
-                session_id='term-1',
+            CmdOutputObservation(
                 content='PS> \x1b[32mok\x1b[0m [444444;32;15Mdone',
+                command='powershell',
+                exit_code=0,
             )
         )
         await pilot.pause()
 
-        card = next(
-            card
-            for card in s.query(TUIActivityCard).results()
-            if 'category-terminal' in card.classes
+        panel = next(
+            panel
+            for panel in s.query(SessionPanel).results()
+            if 'category-shell' in panel.classes
         )
-        extra = card.query_one('#terminal-output')
-        rendered = (
-            str(extra.renderable.plain)
-            if hasattr(extra.renderable, 'plain')
-            else str(extra.renderable)
-        )
-        assert '\x1b' not in rendered
-        assert '[444444;32;15M' not in rendered
-        assert 'ok' in rendered
+        assert not panel.processing
+        assert '[444444;32;15M' not in panel._output_buffer
+        assert 'ok' in panel._output_buffer
 
 
 @pytest.mark.asyncio
@@ -924,19 +927,21 @@ async def test_tui_shell_command_reuses_single_card(mock_config):
             loop=loop,
         )
 
+        from backend.cli.tui.widgets.session_panel import SessionPanel
+
         renderer._process_event(CmdRunAction(command='pytest -q'))
         renderer._process_event(
             CmdOutputObservation('2 passed', command='pytest -q', exit_code=0)
         )
         await pilot.pause()
 
-        cards = s.query(TUIActivityCard).results()
-        shell_cards = [card for card in cards if 'category-shell' in card.classes]
-        assert len(shell_cards) == 1
-        prompt = shell_cards[0].query_one('#terminal-prompt')
+        panels = s.query(SessionPanel).results()
+        shell_panels = [panel for panel in panels if 'category-shell' in panel.classes]
+        assert len(shell_panels) == 1
+        prompt = shell_panels[0].query_one('#terminal-prompt')
         assert 'pytest -q' in str(prompt.renderable)
-        collapsed = shell_cards[0].query_one('#collapsed-row')
-        assert 'exit 0' in str(collapsed.renderable)
+        header = shell_panels[0].query_one('.session-header')
+        assert 'exit 0' in str(header.renderable)
 
 
 @pytest.mark.asyncio
@@ -1008,6 +1013,8 @@ async def test_tui_mcp_call_merges_action_and_observation_into_single_card(
             loop=loop,
         )
 
+        from backend.cli.tui.widgets.record_panel import RecordPanel
+
         renderer._process_event(
             MCPAction(name='search_docs', arguments={'q': 'ranking'})
         )
@@ -1020,15 +1027,16 @@ async def test_tui_mcp_call_merges_action_and_observation_into_single_card(
         )
         await pilot.pause()
 
-        mcp_cards = [
-            card
-            for card in s.query(TUIActivityCard).results()
-            if 'category-mcp' in card.classes
+        mcp_panels = [
+            panel
+            for panel in s.query(RecordPanel).results()
+            if 'category-mcp' in panel.classes
         ]
-        assert len(mcp_cards) == 1
-        assert 'processing' not in mcp_cards[0].classes
-        collapsed = mcp_cards[0].query_one('#collapsed-row')
-        rendered = str(collapsed.renderable)
+        assert len(mcp_panels) == 1
+        assert '-running' not in mcp_panels[0].classes
+        assert '-collapsed' in mcp_panels[0].classes
+        header = mcp_panels[0].query_one('.record-header-text')
+        rendered = _static_render_plain(header)
         assert 'Called' in rendered
         assert 'search_docs' in rendered
         assert 'ranking' in rendered.lower()
@@ -1149,6 +1157,8 @@ async def test_tui_delegate_task_merges_action_and_observation_into_single_card(
             loop=loop,
         )
 
+        from backend.cli.tui.widgets.record_panel import RecordPanel
+
         renderer._process_event(
             DelegateTaskAction(
                 task_description='Investigate flaky test',
@@ -1162,15 +1172,15 @@ async def test_tui_delegate_task_merges_action_and_observation_into_single_card(
         )
         await pilot.pause()
 
-        worker_cards = [
-            card
-            for card in s.query(TUIActivityCard).results()
-            if 'category-workers' in card.classes
+        worker_panels = [
+            panel
+            for panel in s.query(RecordPanel).results()
+            if 'category-workers' in panel.classes
         ]
-        assert len(worker_cards) == 1
-        assert 'processing' not in worker_cards[0].classes
-        collapsed = worker_cards[0].query_one('#collapsed-row')
-        rendered = str(collapsed.renderable)
+        assert len(worker_panels) == 1
+        assert '-running' not in worker_panels[0].classes
+        header = worker_panels[0].query_one('.record-header-text')
+        rendered = _static_render_plain(header)
         assert 'Delegated' in rendered
         assert 'completed' in rendered
 
@@ -1195,6 +1205,8 @@ async def test_tui_browser_screenshot_merges_with_action_card(mock_config):
             loop=loop,
         )
 
+        from backend.cli.tui.widgets.record_panel import RecordPanel
+
         renderer._process_event(
             BrowserToolAction(
                 command='navigate',
@@ -1209,15 +1221,15 @@ async def test_tui_browser_screenshot_merges_with_action_card(mock_config):
         )
         await pilot.pause()
 
-        browser_cards = [
-            card
-            for card in s.query(TUIActivityCard).results()
-            if 'category-browser' in card.classes
+        browser_panels = [
+            panel
+            for panel in s.query(RecordPanel).results()
+            if 'category-browser' in panel.classes
         ]
-        assert len(browser_cards) == 1
-        assert 'processing' not in browser_cards[0].classes
-        collapsed = browser_cards[0].query_one('#collapsed-row')
-        rendered = str(collapsed.renderable)
+        assert len(browser_panels) == 1
+        assert '-running' not in browser_panels[0].classes
+        header = browser_panels[0].query_one('.record-header-text')
+        rendered = _static_render_plain(header)
         assert 'Navigate' in rendered
         assert 'captured' in rendered
 
@@ -1465,8 +1477,8 @@ async def test_tui_duplicate_thinking_payload_renders_once(mock_config, monkeypa
 
         thinking_blocks = list(s.query(ThinkingIndicator).results())
         assert len(thinking_blocks) == 1
-        rendered = str(
-            thinking_blocks[0].query_one('#thinking-content', Static).renderable
+        rendered = _static_render_plain(
+            thinking_blocks[0].query_one('#thinking-content', Static)
         )
         assert rendered.count(thought) == 1
 
@@ -1513,7 +1525,7 @@ async def test_tui_thinking_indicator_shows_content_without_collapse(
         block = blocks[0]
 
         content = block.query_one('#thinking-content', Static)
-        rendered = str(content.renderable)
+        rendered = _static_render_plain(content)
         assert thought in rendered
         assert 'Thinking:' in rendered
 
@@ -1941,13 +1953,14 @@ async def test_tui_internal_thinking_payloads_render_as_activity_cards(mock_conf
         await pilot.pause()
 
         assert list(s.query(ThinkingIndicator).results()) == []
-        cards = list(s.query(TUIActivityCard).results())
-        memory_cards = [card for card in cards if 'category-memory' in card.classes]
-        tool_cards = [card for card in cards if 'category-tool' in card.classes]
+        from backend.cli.tui.widgets.activity_card import OrientLine
 
-        assert len(memory_cards) == 0
-        assert len(tool_cards) == 1
-        assert 'Checkpoint' in str(tool_cards[0].query_one('#collapsed-row').renderable)
+        orient_lines = list(s.query(OrientLine).results())
+        checkpoint_lines = [
+            line for line in orient_lines if line.model.tool == 'checkpoint'
+        ]
+        assert len(checkpoint_lines) == 1
+        assert 'Saved' in str(checkpoint_lines[0].query_one('#orient-content').renderable)
 
 
 @pytest.mark.asyncio
@@ -1983,17 +1996,17 @@ async def test_tui_recoverable_error_renders_as_plain_error_message(mock_config)
         await asyncio.sleep(0.3)
 
         assert list(s.query(ThinkingIndicator).results()) == []
-        # Recoverable errors render as a soft TranscriptNotice — not ActivityCards.
+        # Recoverable errors render as inline ErrorBlock rows — not ActivityCards.
         cards = list(s.query(TUIActivityCard).results())
         error_cards = [card for card in cards if 'category-error' in card.classes]
         assert error_cards == []
 
         # The error must be in the renderer's history (the source of truth).
-        from backend.cli.tui.widgets.transcript_notice import TranscriptNotice
+        from backend.cli.tui.widgets.error_block import ErrorBlock
 
         def _history_plain(item: object) -> str:
-            if isinstance(item, TranscriptNotice):
-                renderable = getattr(item, 'renderable', item)
+            if isinstance(item, ErrorBlock):
+                renderable = getattr(item, '_renderable', item)
                 return str(getattr(renderable, 'plain', renderable))
             return str(getattr(item, 'plain', item))
 
@@ -2736,14 +2749,16 @@ async def test_tui_shell_command_empty_output_still_completes(mock_config):
             loop=loop,
         )
 
+        from backend.cli.tui.widgets.session_panel import SessionPanel
+
         renderer._process_event(CmdRunAction(command='true'))
         renderer._process_event(CmdOutputObservation('', command='true', exit_code=0))
         await pilot.pause()
 
-        cards = s.query(TUIActivityCard).results()
-        shell_cards = [card for card in cards if 'category-shell' in card.classes]
-        assert len(shell_cards) == 1
-        assert 'processing' not in shell_cards[0].classes
+        panels = s.query(SessionPanel).results()
+        shell_panels = [panel for panel in panels if 'category-shell' in panel.classes]
+        assert len(shell_panels) == 1
+        assert '-running' not in shell_panels[0].classes
 
 
 def test_activity_renderer_keeps_error_heavy_success_output_expanded() -> None:
@@ -2826,6 +2841,7 @@ async def test_tui_add_error_and_warning_omit_hardcoded_wrap(mock_config):
     from backend.cli.tui.screen.messages import (
         ScreenMessagesMixin,
     )
+    from backend.cli.tui.widgets.error_block import ErrorBlock
     from backend.cli.tui.widgets.transcript_notice import TranscriptNotice
 
     long_text = 'recoverable ' + ('x' * 200)
@@ -2837,14 +2853,17 @@ async def test_tui_add_error_and_warning_omit_hardcoded_wrap(mock_config):
     stub.add_error('boom')
     stub.add_warning(long_text)
 
-    def _notice_plain(item: object) -> str:
-        if isinstance(item, TranscriptNotice):
-            renderable = getattr(item, 'renderable', item)
+    def _widget_plain(item: object) -> str:
+        if isinstance(item, (ErrorBlock, TranscriptNotice)):
+            renderable = getattr(item, '_renderable', None) or getattr(
+                item, 'renderable', item
+            )
             return str(getattr(renderable, 'plain', renderable))
         return str(getattr(item, 'plain', item))
 
-    plain = '\n'.join(_notice_plain(item) for item in captured)
-    assert all(isinstance(item, TranscriptNotice) for item in captured)
+    plain = '\n'.join(_widget_plain(item) for item in captured)
+    assert isinstance(captured[0], ErrorBlock)
+    assert isinstance(captured[1], TranscriptNotice)
     # The 200-char run must remain on a single line — no width=80 pre-wrap.
     assert 'x' * 200 in plain
 
@@ -2988,6 +3007,7 @@ async def test_tui_debugger_events_render_terminal_style_card(mock_config, monke
         await pilot.pause()
         s = _get_screen(app)
         from backend.cli.tui.app import TUIRenderer
+        from backend.cli.tui.widgets.session_panel import SessionPanel
         from backend.cli.tui.widgets.terminal_pane import TerminalPane
         from backend.ledger.action.debugger import DebuggerAction
         from backend.ledger.observation.debugger import DebuggerObservation
@@ -3021,16 +3041,16 @@ async def test_tui_debugger_events_render_terminal_style_card(mock_config, monke
         )
         await pilot.pause()
 
-        debugger_cards = [
-            card
-            for card in s.query(TUIActivityCard).results()
-            if 'category-debugger' in card.classes
+        debugger_panels = [
+            panel
+            for panel in s.query(SessionPanel).results()
+            if 'category-debugger' in panel.classes
         ]
-        assert len(debugger_cards) == 1
-        card = debugger_cards[0]
-        assert 'processing' not in card.classes
-        assert card._shell_kind == 'debugger'
-        pane = card.query_one('#terminal-pane', TerminalPane)
+        assert len(debugger_panels) == 1
+        panel = debugger_panels[0]
+        assert '-running' not in panel.classes
+        assert panel._shell_kind == 'debugger'
+        pane = panel.query_one('#terminal-pane', TerminalPane)
         assert pane is not None
         assert 'DAP>' in pane._prompt_markup()
         assert 'dbg-session-1'[:12] in pane._title_markup()

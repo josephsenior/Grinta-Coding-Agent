@@ -859,11 +859,19 @@ class Runtime(
     def _make_verification_failure_observation(
         self, file_path: str, observation: Observation
     ) -> ErrorObservation:
+        from backend.execution.structured_edit_errors import (
+            build_verification_failure_tool_result,
+            format_verification_failure_message,
+        )
+
         logger.error(
             'VERIFICATION FAILURE: File %s missing after file operation', file_path
         )
-        error_msg = f'❌ CRITICAL VERIFICATION FAILURE:\nFile {file_path} does NOT exist after file operation execution.\nThis indicates an execution failure or stale workspace base.\n\nOriginal observation: {observation.content[:200]}\n\nPlease retry the file creation.'
-        return ErrorObservation(content=error_msg)
+        _ = observation
+        error_msg = format_verification_failure_message(file_path)
+        err = ErrorObservation(content=error_msg)
+        err.tool_result = build_verification_failure_tool_result(file_path)
+        return err
 
     def _enhance_observation_with_line_count(
         self, observation: Observation, file_path: str, file_on_disk: Path

@@ -14,6 +14,7 @@ from backend.ledger.observation import (
 )
 from backend.ledger.observation.error import (
     ERROR_CATEGORY_AUTH,
+    ERROR_CATEGORY_BAD_REQUEST,
     ERROR_CATEGORY_CONTENT_POLICY,
     ERROR_CATEGORY_CONTEXT_WINDOW,
     ERROR_CATEGORY_MODEL_NOT_FOUND,
@@ -28,6 +29,7 @@ if TYPE_CHECKING:
 _ACTION_REQUIRED_CATEGORIES = frozenset(
     {
         ERROR_CATEGORY_AUTH,
+        ERROR_CATEGORY_BAD_REQUEST,
         ERROR_CATEGORY_CONTENT_POLICY,
         ERROR_CATEGORY_CONTEXT_WINDOW,
         ERROR_CATEGORY_MODEL_NOT_FOUND,
@@ -37,6 +39,7 @@ _ACTION_REQUIRED_CATEGORIES = frozenset(
 
 _ACTION_REQUIRED_TITLES = {
     ERROR_CATEGORY_AUTH: 'Authentication failed',
+    ERROR_CATEGORY_BAD_REQUEST: 'Invalid request',
     ERROR_CATEGORY_CONTENT_POLICY: 'Content blocked',
     ERROR_CATEGORY_CONTEXT_WINDOW: 'Context window full',
     ERROR_CATEGORY_MODEL_NOT_FOUND: 'Model unavailable',
@@ -87,7 +90,12 @@ def _notify_ui_only_error(
 def _handle_error_observation(
     orch: 'RendererEventProcessorMixin', event: ErrorObservation
 ) -> None:
+    from backend.cli.tui.renderer.handlers.exploration import (
+        clear_pending_exploration_cards,
+    )
+
     orch._compaction_transcript_active = False
+    clear_pending_exploration_cards(orch)
     content = event.content or 'An unknown error occurred'
     if getattr(event, 'agent_only', False):
         return

@@ -11,11 +11,10 @@ from backend.cli.display.hud import HUDBar
 from backend.cli.display.reasoning_display import ReasoningDisplay
 from backend.cli.tui.app import GrintaScreen, TUIRenderer
 from backend.cli.tui.main import GrintaTUIApp
-from backend.cli.tui.widgets.activity_card import (
-    ActivityCard as TUIActivityCard,
-)
 from backend.cli.tui.widgets.activity_card import ThinkingIndicator
-from backend.ledger.action import FileEditAction, StreamingChunkAction
+from backend.cli.tui.widgets.session_panel import SessionPanel
+from backend.ledger.action import CmdRunAction, StreamingChunkAction
+from backend.ledger.observation import CmdOutputObservation
 
 
 @pytest.fixture
@@ -33,7 +32,13 @@ def mock_config():
 
 def _plain_text(widget: ThinkingIndicator) -> str:
     body = widget.query_one('#thinking-content', Static)
-    return str(body.renderable)
+    rendered = body.renderable
+    if hasattr(rendered, 'plain'):
+        return str(rendered.plain)
+    console = RichConsole()
+    with console.capture() as capture:
+        console.print(rendered)
+    return capture.get()
 
 
 @pytest.mark.asyncio
@@ -67,12 +72,9 @@ async def test_thinking_stream_freezes_before_later_activity(
             StreamingChunkAction(thinking_accumulated='First thought.\nStill thinking.')
         )
         await pilot.pause()
+        renderer._process_event(CmdRunAction(command='pytest -q'))
         renderer._process_event(
-            FileEditAction(
-                path='tests/test_order.py',
-                command='create_file',
-                file_text='def test_ok():\n    pass\n',
-            )
+            CmdOutputObservation('2 passed', command='pytest -q', exit_code=0)
         )
         await pilot.pause()
         renderer._process_event(
@@ -84,16 +86,14 @@ async def test_thinking_stream_freezes_before_later_activity(
         visible = [
             child
             for child in display.children
-            if isinstance(child, (ThinkingIndicator, TUIActivityCard))
+            if isinstance(child, (ThinkingIndicator, SessionPanel))
         ]
 
         assert [type(child) for child in visible] == [
             ThinkingIndicator,
-            TUIActivityCard,
+            SessionPanel,
             ThinkingIndicator,
         ]
         assert 'Still thinking.' in _plain_text(visible[0])
-        assert 'tests/test_order.py' in str(
-            visible[1].query_one('#collapsed-row').renderable
-        )
+        assert 'pytest -q' in str(visible[1].query_one('#terminal-prompt').renderable)
         assert 'Second thought.' in _plain_text(visible[2])

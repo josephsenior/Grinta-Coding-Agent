@@ -1021,17 +1021,12 @@ def _record_undo_snapshots(executor: Any, snapshots: dict) -> None:
 
 
 def _make_edit_error_obs(exc: Exception, payload: dict, command: str) -> Any:
+    from backend.execution.structured_edit_errors import normalize_edit_exception
     from backend.ledger.observation import ErrorObservation
 
-    obs: ErrorObservation = ErrorObservation(str(exc))
-    obs.tool_result = {
-        'tool': 'file_edit',
-        'ok': False,
-        'error_code': 'STRUCTURED_EDIT_ERROR',
-        'retryable': False,
-        'operation': command,
-        'payload': payload,
-    }
+    message, tool_result = normalize_edit_exception(exc, payload, command=command)
+    obs: ErrorObservation = ErrorObservation(message)
+    obs.tool_result = tool_result
     return obs
 
 
