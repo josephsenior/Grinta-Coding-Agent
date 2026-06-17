@@ -119,10 +119,28 @@ class RenderArtifact:
     measured_height: int = 1
 
 
+def _loosen_markdown_spacing(text: str) -> str:
+    """Add a little air between markdown paragraphs (not inside code fences)."""
+    if not text.strip():
+        return text
+
+    def _expand_paragraph_gaps(segment: str) -> str:
+        return re.sub(r'\n{2,}', '\n\n\n', segment)
+
+    parts: list[str] = []
+    last = 0
+    for match in _COMPLETE_FENCE_RE.finditer(text):
+        parts.append(_expand_paragraph_gaps(text[last : match.start()]))
+        parts.append(match.group(0))
+        last = match.end()
+    parts.append(_expand_paragraph_gaps(text[last:]))
+    return ''.join(parts)
+
+
 def prep_markdown(text: str) -> Markdown:
     theme = get_grinta_rich_syntax_theme()
     return GrintaMarkdown(
-        text,
+        _loosen_markdown_spacing(text),
         code_theme=theme,
         inline_code_theme=theme,
     )
