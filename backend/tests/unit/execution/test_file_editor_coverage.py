@@ -88,7 +88,12 @@ class TestFileEditorCoverageGaps:
         """Covers lines 546-547 (Transaction success pop)."""
         self._write('file1.txt', 'orig1')
         with self.editor.transaction() as trans:
-            trans(command='write', path='file1.txt', file_text='new1')
+            trans(
+                command='create_file',
+                path='file1.txt',
+                file_text='new1',
+                overwrite_existing=True,
+            )
             assert self.editor._transaction_stack
         # Success pop
         assert not self.editor._transaction_stack
@@ -101,7 +106,12 @@ class TestFileEditorCoverageGaps:
         self._write('file1.txt', 'orig1')
         try:
             with self.editor.transaction() as trans:
-                trans(command='write', path='file1.txt', file_text='new1')
+                trans(
+                    command='create_file',
+                    path='file1.txt',
+                    file_text='new1',
+                    overwrite_existing=True,
+                )
                 raise RuntimeError('Fail')
         except RuntimeError:
             pass

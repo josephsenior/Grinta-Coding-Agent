@@ -14,7 +14,6 @@ from contextlib import ExitStack
 from pathlib import Path
 from typing import Any, NoReturn, cast
 
-from backend.core.editor_recovery import append_editor_recovery_guidance
 from backend.core.enums import FileEditSource, FileReadSource
 from backend.core.errors import FunctionCallValidationError
 from backend.engine.function_calling_helpers import (
@@ -873,13 +872,7 @@ def _resolve_multi_edit_path(raw_path: str, item_index: int) -> tuple[str, str]:
 def _multi_edit_raise(message: str, *, path: str | None = None) -> NoReturn:
     from backend.core.errors import ToolExecutionError
 
-    raise ToolExecutionError(
-        append_editor_recovery_guidance(
-            message,
-            path=path,
-            tool_name='multi_edit',
-        )
-    )
+    raise ToolExecutionError(message)
 
 
 def _multi_edit_relative_path(item_path: str, workspace_root: str | Path) -> str:

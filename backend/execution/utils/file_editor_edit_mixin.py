@@ -128,12 +128,7 @@ class FileEditorEditOpsMixin:
             new_result.detail, new_content, file_path
         )
         enriched_msg = self._attach_content_context(enriched_msg, new_content)
-        return (
-            'INTRODUCED_SYNTAX_ERROR: the previous file parsed successfully, '
-            'but this edit introduces syntax errors. Re-read the affected '
-            'region and repair with one smaller targeted edit.\n'
-            f'{enriched_msg}'
-        )
+        return f'INTRODUCED_SYNTAX_ERROR: edit introduced syntax errors.\n{enriched_msg}'
 
     @staticmethod
     def _preflight_content_guard(file_path: Path, content: str) -> str | None:
@@ -158,19 +153,15 @@ class FileEditorEditOpsMixin:
             line.strip().lower() for line in content.splitlines() if line.strip()
         }
         if normalized_lines and normalized_lines.issubset(placeholder_lines):
-            return (
-                'Placeholder example content detected. The file_editor XML examples '
-                'must be replaced with the real file contents before writing.'
-            )
+            return 'Placeholder example content detected.'
 
         suffix = file_path.suffix.lower()
         if suffix == '.py':
             for idx, line in enumerate(content.splitlines(), start=1):
                 if re.match(r'^\s*//', line):
                     return (
-                        f'Line {idx}: invalid Python comment prefix `//` detected. '
-                        'Python comments use `#`. Repair the affected lines with a '
-                        'targeted range edit instead of retrying the same full write.'
+                        f'Line {idx}: invalid Python comment prefix `//` '
+                        '(Python uses `#`).'
                     )
         return None
 
@@ -216,11 +207,8 @@ class FileEditorEditOpsMixin:
 
             if has_literal_escape_residue(content, file_path):
                 return (
-                    msg + '\n\n[HINT] The content contains literal backslash-escape '
-                    'sequences (e.g. \\n, \\") that appear to be double-escaped. '
-                    'In your next tool call, use a single backslash for newlines '
-                    '(a real newline character, not the characters "\\" + "n") '
-                    'and unescaped double quotes inside strings.'
+                    msg
+                    + '\n[HINT] Content contains literal \\n or \\" escape sequences.'
                 )
         except Exception:
             pass

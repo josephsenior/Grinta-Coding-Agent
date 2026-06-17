@@ -19,7 +19,9 @@ def test_diff_panel_new_file() -> None:
     """DiffPanel should show creation info for new files."""
     obs = MagicMock()
     obs.path = 'src/main.py'
-    obs.prev_exist = False
+    obs.tool_result = {'operation': 'create_file', 'ok': True}
+    obs.outcome = 'created'
+    obs.old_content = None
     obs.new_content = "print('hello')\nprint('world')\n"
     obs.content = 'File created'
 
@@ -38,7 +40,9 @@ def test_diff_panel_new_xml_file_shows_plain_preview() -> None:
     """DiffPanel should render new XML file content as plain text preview."""
     obs = MagicMock()
     obs.path = 'src/config.xml'
-    obs.prev_exist = False
+    obs.tool_result = {'operation': 'create_file', 'ok': True}
+    obs.outcome = 'created'
+    obs.old_content = None
     obs.new_content = '<root>\n  <item>value</item>\n</root>\n'
     obs.content = 'File created'
 
@@ -55,7 +59,9 @@ def test_diff_panel_existing_file_with_groups() -> None:
     """DiffPanel should render edit groups for existing file edits."""
     obs = MagicMock()
     obs.path = 'README.md'
-    obs.prev_exist = True
+    obs.tool_result = {'operation': 'replace_string', 'ok': True}
+    obs.outcome = 'edited'
+    obs.old_content = 'old'
     obs.get_edit_groups.return_value = [
         {
             'before_edits': ['- old line 1'],
@@ -76,7 +82,9 @@ def test_diff_panel_existing_file_with_groups() -> None:
 def test_diff_panel_shows_files_badge_title_when_requested() -> None:
     obs = MagicMock()
     obs.path = 'src/main.py'
-    obs.prev_exist = True
+    obs.tool_result = {'operation': 'replace_string', 'ok': True}
+    obs.outcome = 'edited'
+    obs.old_content = 'old'
     obs.get_edit_groups.return_value = [
         {
             'before_edits': ['-print("old")'],
@@ -95,7 +103,9 @@ def test_diff_panel_shows_files_badge_title_when_requested() -> None:
 def test_diff_panel_extracts_diff_preview_block() -> None:
     obs = MagicMock()
     obs.path = 'README.md'
-    obs.prev_exist = True
+    obs.tool_result = {'operation': 'replace_string', 'ok': True}
+    obs.outcome = 'edited'
+    obs.old_content = 'old'
     obs.diff = None
     obs.get_edit_groups.return_value = []
     obs.visualize_diff.side_effect = RuntimeError('no old/new content')

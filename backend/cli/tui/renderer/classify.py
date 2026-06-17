@@ -46,8 +46,5 @@ def _is_full_autonomy(orch: 'RendererEventProcessorMixin') -> bool:
     controller = getattr(orch._tui, '_controller', None)
     ac = getattr(controller, 'autonomy_controller', None)
     if ac is not None:
-        raw_level = getattr(ac, 'autonomy_level', '')
-        return normalize_autonomy_level(raw_level) == 'full'
-    hud = getattr(orch._tui, '_hud', None)
-    state = getattr(hud, 'state', None)
-    return normalize_autonomy_level(getattr(state, 'autonomy_level', '')) == 'full'
+        return normalize_autonomy_level(getattr(ac, 'autonomy_level', '')) == 'full'
+    return False

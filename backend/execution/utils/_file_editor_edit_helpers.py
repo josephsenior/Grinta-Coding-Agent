@@ -22,7 +22,6 @@ from backend.execution.utils._file_editor_diff_helpers import (
 )
 from backend.execution.utils._file_editor_io_helpers import (
     _compose_write_success_message,
-    _is_large_existing_code_file,
 )
 from backend.execution.utils._file_editor_types import ToolResult
 
@@ -131,20 +130,9 @@ def _normalize_replace_strings(
 def _build_old_string_not_found_result(
     self, file_path: Path, old_content: str
 ) -> ToolResult:
-    base_error = (
-        'replace_string old_string was not found exactly. '
-        'Re-read the file and retry the edit with a verified '
-        'old_string.'
-    )
-    if self._was_recently_written(file_path):
-        base_error += (
-            ' (The file was modified by a previous edit in this '
-            "turn — re-read it before retrying, the model's "
-            'working copy is now stale.)'
-        )
     return ToolResult(
         output='',
-        error=base_error,
+        error='replace_string old_string was not found exactly.',
         old_content=old_content,
         new_content=old_content,
         error_code='OLD_STRING_NOT_FOUND',
@@ -195,10 +183,7 @@ def handle_replace_string_impl(
         if match_count > 1 and not replace_all:
             return ToolResult(
                 output='',
-                error=(
-                    'replace_string old_string matched multiple occurrences. '
-                    'Make old_string more specific or set replace_all=true.'
-                ),
+                error='replace_string old_string matched multiple occurrences.',
                 old_content=old_content,
                 new_content=old_content,
                 error_code='OLD_STRING_NOT_UNIQUE',
@@ -284,10 +269,7 @@ def verify_post_write_impl(
     )
     return ToolResult(
         output='',
-        error=(
-            'EDIT_VERIFICATION_FAILED: file contents on disk did not match the intended write. '
-            'Re-read the file and retry with a smaller verified edit.'
-        ),
+        error='EDIT_VERIFICATION_FAILED: file contents on disk did not match the intended write.',
         old_content=old_content,
         new_content=actual_content,
         error_code='EDIT_VERIFICATION_FAILED',
@@ -392,10 +374,7 @@ def _validate_edit_before_write(
         if disk_now != old_content:
             return ToolResult(
                 output='',
-                error=(
-                    'FILE_UNEXPECTEDLY_MODIFIED: file changed on disk since it was read. '
-                    'Re-read the file and retry the edit.'
-                ),
+                error='FILE_UNEXPECTEDLY_MODIFIED: file changed on disk since it was read.',
                 old_content=old_content,
                 new_content=new_content,
             ), ''
@@ -485,8 +464,6 @@ def write_edit_result_impl(
     if verification_error is not None:
         return verification_error
 
-    self._record_recent_write(file_path)
-
     output = _format_edit_success_output(
         self, old_content, new_content, written_content, msg
     )
@@ -509,19 +486,15 @@ def write_edit_result_impl(
 
 
 def _check_write_create_exists(
-    is_create: bool,
     file_existed: bool,
     overwrite_existing: bool,
     old_content: str | None,
     content: str,
 ) -> ToolResult | None:
-    if is_create and file_existed and not overwrite_existing:
+    if file_existed and not overwrite_existing:
         return ToolResult(
             output='',
-            error=(
-                'File already exists. Use edit_symbol or replace_string '
-                'for modifications.'
-            ),
+            error='File already exists.',
             old_content=old_content,
             new_content=content,
             error_code='CREATE_FILE_ALREADY_EXISTS',
@@ -537,21 +510,19 @@ def _check_write_dry_run(
     file_path: Path,
     content: str,
     old_content: str | None,
-    is_create: bool,
 ) -> ToolResult | None:
     if not dry_run:
         return None
-    op = 'create_file_preview' if is_create else 'write_preview'
     return ToolResult(
         output='Preview generated (no changes applied)',
         old_content=old_content,
         new_content=content,
-        operation=op,
+        operation='create_file_preview',
         metadata=self._build_receipt(
             file_path=file_path,
             old_content=old_content,
             new_content=content,
-            operation=op,
+            operation='create_file_preview',
             target_kind='full_file',
             verification_passed=False,
         ),
@@ -568,39 +539,7 @@ def _check_write_noop(
             output='No changes applied (content unchanged).',
             old_content=old_content,
             new_content=content,
-            operation='write_noop',
-        )
-    return None
-
-
-def _check_large_existing_file_guard(
-    self,
-    file_path: Path,
-    file_existed: bool,
-    is_create: bool,
-    overwrite_existing: bool,
-    old_content: str | None,
-    content: str,
-) -> ToolResult | None:
-    if (
-        file_existed
-        and not is_create
-        and not overwrite_existing
-        and _is_large_existing_code_file(file_path, old_content)
-    ):
-        return ToolResult(
-            output='',
-            error=(
-                'LARGE_EXISTING_CODE_FILE_OVERWRITE_BLOCKED: refusing a full-file '
-                f'overwrite of {file_path.name} ({len((old_content or "").splitlines())} lines). '
-                'Use edit_symbol or replace_string for targeted changes, or set '
-                'overwrite_existing=true when a deliberate full rewrite is required.'
-            ),
-            old_content=old_content,
-            new_content=content,
-            error_code='LARGE_EXISTING_CODE_FILE_OVERWRITE_BLOCKED',
-            retryable=False,
-            operation='write_guard',
+            operation='create_file_noop',
         )
     return None
 
@@ -612,36 +551,23 @@ def handle_write_maybe_short_circuit_impl(
     content: str,
     old_content: str | None,
     file_existed: bool,
-    is_create: bool,
     dry_run: bool,
     overwrite_existing: bool,
 ) -> ToolResult | None:
     """Early exits before validation / disk write."""
     result = _check_write_create_exists(
-        is_create, file_existed, overwrite_existing, old_content, content
+        file_existed, overwrite_existing, old_content, content
     )
     if result is not None:
         return result
 
     result = _check_write_dry_run(
-        self, dry_run, file_path, content, old_content, is_create
+        self, dry_run, file_path, content, old_content
     )
     if result is not None:
         return result
 
-    result = _check_write_noop(file_existed, old_content, content)
-    if result is not None:
-        return result
-
-    return _check_large_existing_file_guard(
-        self,
-        file_path,
-        file_existed,
-        is_create,
-        overwrite_existing,
-        old_content,
-        content,
-    )
+    return _check_write_noop(file_existed, old_content, content)
 
 
 def _validate_write_commit(
@@ -678,22 +604,10 @@ def _validate_write_commit(
 
 def _compose_write_commit_output(
     self,
-    is_create: bool,
     content: str,
-    old_content: str | None,
     soft_warning: str,
 ) -> str:
-    output_msg = _compose_write_success_message(
-        is_create=is_create,
-        content=content,
-        soft_warning=soft_warning,
-    )
-
-    if not is_create and old_content is not None:
-        context_window = _format_context_window(old_content, content)
-        if context_window:
-            output_msg += '\n\n' + context_window
-
+    output_msg = _compose_write_success_message(content=content, soft_warning=soft_warning)
     return output_msg
 
 
@@ -704,7 +618,6 @@ def handle_write_commit_impl(
     content: str,
     old_content: str | None,
     file_existed: bool,
-    is_create: bool,
 ) -> ToolResult:
     """Validate, detect stale disk, backup, undo snapshot, atomic write."""
     validation_err, soft_warning = _validate_write_commit(
@@ -732,27 +645,24 @@ def handle_write_commit_impl(
         file_path=file_path,
         expected_content=written_content,
         old_content=old_content,
-        operation='create_file' if is_create else 'write',
+        operation='create_file',
         target_kind='full_file',
     )
     if verification_error is not None:
         return verification_error
 
-    operation = 'create_file' if is_create else 'write'
-    output_msg = _compose_write_commit_output(
-        self, is_create, content, old_content, soft_warning
-    )
+    output_msg = _compose_write_commit_output(self, content, soft_warning)
 
     return ToolResult(
         output=output_msg,
         old_content=old_content,
         new_content=written_content,
-        operation=operation,
+        operation='create_file',
         metadata=self._build_receipt(
             file_path=file_path,
             old_content=old_content,
             new_content=written_content,
-            operation=operation,
+            operation='create_file',
             target_kind='full_file',
             verification_passed=True,
         ),
@@ -774,10 +684,7 @@ def detect_stale_disk_on_write_impl(
         return None
     return ToolResult(
         output='',
-        error=(
-            'FILE_UNEXPECTEDLY_MODIFIED: file changed on disk since it was read. '
-            'Re-read the file and retry the write.'
-        ),
+        error='FILE_UNEXPECTEDLY_MODIFIED: file changed on disk since it was read.',
         old_content=old_content,
         new_content=new_content,
         error_code='FILE_UNEXPECTEDLY_MODIFIED',
@@ -790,21 +697,11 @@ def handle_write_impl(
     self,
     file_path: Path,
     content: str,
-    is_create: bool = False,
     *,
     dry_run: bool = False,
     overwrite_existing: bool = False,
 ) -> ToolResult:
-    """Handle write command - write new file content.
-
-    Args:
-        self: FileEditor instance (mixin dispatch).
-        file_path: Path to the file to write
-        content: Content to write to the file
-        is_create: If True, use "created" message instead of "written"
-        dry_run: If True, return preview without writing changes
-        overwrite_existing: If True, allow guarded full-file overwrites
-    """
+    """Handle create_file command - write new or overwritten file content."""
     try:
         old_content = None
         file_existed = file_path.exists()
@@ -816,7 +713,6 @@ def handle_write_impl(
             content=content,
             old_content=old_content,
             file_existed=file_existed,
-            is_create=is_create,
             dry_run=dry_run,
             overwrite_existing=overwrite_existing,
         )
@@ -828,7 +724,6 @@ def handle_write_impl(
             content=content,
             old_content=old_content,
             file_existed=file_existed,
-            is_create=is_create,
         )
 
     except Exception as e:

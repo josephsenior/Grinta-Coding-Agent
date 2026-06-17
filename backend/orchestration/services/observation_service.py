@@ -393,11 +393,8 @@ class ObservationService:
         pid = getattr(pending_action, 'id', None)
         oc = getattr(observation, 'cause', None)
         msg = (
-            'The environment reported an observation that does not match the action '
-            'the agent is waiting on. Pending action id was '
-            f'{pid!r}; observation referred to {oc!r}. '
-            'Treat any in-flight tool work as uncertain: verify the workspace before '
-            'continuing, then choose a new approach if needed.'
+            'Observation cause does not match pending action '
+            f'(pending={pid!r}, observation={oc!r}).'
         )
         err = ErrorObservation(
             content=msg,

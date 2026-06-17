@@ -446,7 +446,6 @@ class TestLongSessionCompactionInvariants:
             path='src/main.py',
             old_content='old',
             new_content='new',
-            prev_exist=True,
         )
         file_edit_result.id = 3
         file_edit_result.source = EventSource.ENVIRONMENT

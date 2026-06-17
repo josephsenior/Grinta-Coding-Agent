@@ -24,6 +24,18 @@ def test_error_guidance_matches_auth_failure() -> None:
     assert guidance.steps
 
 
+def test_error_guidance_matches_range_edit_missing_lines() -> None:
+    guidance = error_guidance('edit requires start_line and end_line (missing: end_line).')
+    assert guidance is not None
+    assert guidance.error_code == 'ERR-TE-001'
+
+
+def test_error_guidance_matches_stuck_loop() -> None:
+    guidance = error_guidance('STUCK_LOOP: repeating actions without progress.')
+    assert guidance is not None
+    assert guidance.error_code == 'ERR-SYS-013'
+
+
 def test_notice_panel_title_uses_rule_table() -> None:
     assert notice_panel_title('rate limit exceeded') == 'Rate or quota limit'
     assert notice_panel_title('connection reset by peer') == 'Connection issue'

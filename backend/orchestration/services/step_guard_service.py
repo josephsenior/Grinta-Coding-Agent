@@ -308,9 +308,7 @@ class StepGuardService:
             )
             error_obs = ErrorObservation(
                 content=(
-                    'NO STEP PROGRESS WATCHDOG: The agent loop has been stuck in '
-                    'RUNNING state for too long with no scheduled step().  '
-                    'This indicates the _step_pending race condition.  '
+                    'NO_STEP_PROGRESS: agent loop stalled in RUNNING state. '
                     f'Reason: {getattr(result, "reason", "unknown")}'
                 ),
                 error_id='NO_STEP_PROGRESS_WATCHDOG',
@@ -479,13 +477,8 @@ class StepGuardService:
             return created_files_message
 
         return (
-            'STUCK LOOP DETECTED — You are repeating actions without progress.\n'
-            'MANDATORY RECOVERY:\n'
-            '1. Stop repeating the same read-only or no-op action.\n'
-            '2. Verify the current state using a concrete tool result.\n'
-            '3. Execute one specific unfinished step.\n'
-            'YOUR VERY NEXT ACTION MUST BE a real progress-making action.',
-            'STUCK RECOVERY: verify state, then make one concrete next-step action.',
+            'STUCK_LOOP: repeating actions without progress.',
+            'STUCK_LOOP: make one concrete progress action.',
         )
 
     @staticmethod
@@ -510,14 +503,8 @@ class StepGuardService:
         )
         if symbol_hits >= 2:
             return (
-                'STUCK LOOP DETECTED — repeated symbol/code-edit failures were detected.\n'
-                'MANDATORY NEXT ACTIONS:\n'
-                '1. If the error mentions a symbol, call `find_symbols` before editing again.\n'
-                '2. Re-read the affected file or symbol with `read` to confirm the live code shape.\n'
-                '3. Retry exactly one targeted edit with `edit_symbol` or `replace_string`.\n'
-                '4. Use `multiedit` only when the scope requires atomic multi-file changes.\n'
-                'Do NOT emit another near-identical edit without new evidence.',
-                'STUCK RECOVERY: find_symbols or read the file region, then one targeted edit retry max.',
+                'STUCK_LOOP: repeated symbol/code-edit failures.',
+                'STUCK_LOOP: refresh symbol context, then one targeted edit.',
             )
 
         file_edit_hits = sum(
@@ -530,14 +517,8 @@ class StepGuardService:
         if file_edit_hits < 2:
             return None
         return (
-            'STUCK LOOP DETECTED — repeated file-edit failures were detected.\n'
-            'MANDATORY NEXT ACTIONS:\n'
-            '1. Read the target file again with `read` to refresh exact context.\n'
-            '2. Use `edit_symbol` for source symbols or `replace_string` for exact text.\n'
-            '3. Retry once with corrected live context.\n'
-            '4. If it fails again, switch tools instead of retrying the same edit shape.\n'
-            'Do NOT emit another near-identical edit without new file evidence.',
-            'STUCK RECOVERY: refresh the file, then one targeted edit retry max.',
+            'STUCK_LOOP: repeated file-edit failures.',
+            'STUCK_LOOP: refresh file context, then one targeted edit.',
         )
 
     @staticmethod
@@ -548,10 +529,7 @@ class StepGuardService:
             return None
         created_str = ', '.join(sorted(created_files))
         return (
-            'STUCK LOOP DETECTED — You are repeating actions without progress.\n'
-            f'Files already touched in this session: {created_str}.\n'
-            'Do NOT assume the task is complete based on file names alone.\n'
-            'YOUR VERY NEXT ACTION MUST BE: perform one concrete unfinished task step, '
-            'or verify the current state before changing course.',
-            'STUCK RECOVERY: stop repeating, verify current state, then do the next unfinished step.',
+            f'STUCK_LOOP: repeating actions without progress. '
+            f'Files already touched: {created_str}.',
+            'STUCK_LOOP: verify state, then one concrete next step.',
         )

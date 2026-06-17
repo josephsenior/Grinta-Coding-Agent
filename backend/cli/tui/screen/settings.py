@@ -49,8 +49,18 @@ class ScreenSettingsMixin:
         level = self._visible_autonomy_level(new_level)
         if level not in {'conservative', 'balanced', 'full'}:
             return
-        previous = self._current_autonomy_level()
-        if previous == level and self._hud.state.autonomy_level == level:
+        from backend.cli.settings import (
+            get_persisted_autonomy_level,
+            update_autonomy_level,
+        )
+
+        agent_name = self._active_agent_name()
+        previous = self._runtime_autonomy_level()
+        if (
+            previous == level
+            and self._hud.state.autonomy_level == level
+            and level == get_persisted_autonomy_level(agent_name)
+        ):
             return
         controller = self._controller
         if controller is not None:
@@ -70,6 +80,7 @@ class ScreenSettingsMixin:
         self._hud.update_autonomy(level)
         self._render_hud_bar()
         if previous != level:
+            update_autonomy_level(level, agent_name)
             self.notify(f'Autonomy: {level}', severity='information', timeout=2.0)
 
     def _apply_hud_reasoning_effort(self, effort_value: str) -> None:

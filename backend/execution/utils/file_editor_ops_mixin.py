@@ -66,16 +66,7 @@ from backend.execution.utils._file_editor_read_write_helpers import (
     read_file_with_meta_impl as _read_file_with_meta_impl,
 )
 from backend.execution.utils._file_editor_read_write_helpers import (
-    recent_write_key_impl as _recent_write_key_impl,
-)
-from backend.execution.utils._file_editor_read_write_helpers import (
-    record_recent_write_impl as _record_recent_write_impl,
-)
-from backend.execution.utils._file_editor_read_write_helpers import (
     replace_range_impl as _replace_range_impl,
-)
-from backend.execution.utils._file_editor_read_write_helpers import (
-    was_recently_written_impl as _was_recently_written_impl,
 )
 from backend.execution.utils._file_editor_read_write_helpers import (
     write_file_impl as _write_file_impl,
@@ -247,7 +238,6 @@ class FileEditorOpsMixin:
         content: str,
         old_content: str | None,
         file_existed: bool,
-        is_create: bool,
         dry_run: bool,
         overwrite_existing: bool,
     ) -> ToolResult | None:
@@ -257,7 +247,6 @@ class FileEditorOpsMixin:
             content=content,
             old_content=old_content,
             file_existed=file_existed,
-            is_create=is_create,
             dry_run=dry_run,
             overwrite_existing=overwrite_existing,
         )
@@ -269,7 +258,6 @@ class FileEditorOpsMixin:
         content: str,
         old_content: str | None,
         file_existed: bool,
-        is_create: bool,
     ) -> ToolResult:
         return _handle_write_commit_impl(
             self,
@@ -277,7 +265,6 @@ class FileEditorOpsMixin:
             content=content,
             old_content=old_content,
             file_existed=file_existed,
-            is_create=is_create,
         )
 
     def _detect_stale_disk_on_write(
@@ -300,7 +287,6 @@ class FileEditorOpsMixin:
         self,
         file_path: Path,
         content: str,
-        is_create: bool = False,
         *,
         dry_run: bool = False,
         overwrite_existing: bool = False,
@@ -309,7 +295,6 @@ class FileEditorOpsMixin:
             self,
             file_path,
             content,
-            is_create,
             dry_run=dry_run,
             overwrite_existing=overwrite_existing,
         )
@@ -319,20 +304,6 @@ class FileEditorOpsMixin:
 
     def _read_file(self, file_path: Path) -> str:
         return _read_file_impl(self, file_path)
-
-    @staticmethod
-    def _recent_write_key(file_path: Path) -> str:
-        return _recent_write_key_impl(file_path)
-
-    def _record_recent_write(self, file_path: Path) -> None:
-        return _record_recent_write_impl(self, file_path)
-
-    def _was_recently_written(
-        self, file_path: Path, *, window_seconds: float = 30.0
-    ) -> bool:
-        return _was_recently_written_impl(
-            self, file_path, window_seconds=window_seconds
-        )
 
     def _write_file(self, file_path: Path, content: str) -> str:
         return _write_file_impl(self, file_path, content)

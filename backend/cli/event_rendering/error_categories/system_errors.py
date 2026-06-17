@@ -20,39 +20,15 @@ SYSTEM_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
         ),
     ),
     _GuidanceRule(
-        _has('edit_mode=range requires'),
+        _has('edit requires start_line and end_line'),
         ErrorGuidance(
             summary='A range edit is missing start_line or end_line.',
             steps=(
-                'Use the public file API instead: `replace_string` for exact text or `edit_symbol` for code symbols.',
-                'Re-read the target context if you need a more specific exact anchor.',
+                'Use `replace_string` for exact text or `edit_symbol` for code symbols.',
+                'Re-read the target context if you need a more specific anchor.',
             ),
             omit_summary_in_recovery=False,
             error_code='ERR-TE-001',
-        ),
-    ),
-    _GuidanceRule(
-        _has("command 'edit' requires 'edit_mode'"),
-        ErrorGuidance(
-            summary='A legacy edit command is missing its edit_mode.',
-            steps=(
-                'The legacy range-edit format is no longer model-facing.',
-                'Use `create`, `replace_string`, `edit_symbol`, or `multiedit`.',
-            ),
-            omit_summary_in_recovery=False,
-            error_code='ERR-TE-002',
-        ),
-    ),
-    _GuidanceRule(
-        _has('deterministic edit failed'),
-        ErrorGuidance(
-            summary='The edit arguments did not match a valid file-edit path.',
-            steps=(
-                'Check that the operation and required metadata are present.',
-                'Re-read the file first, then retry with the correct parameter set.',
-            ),
-            omit_summary_in_recovery=False,
-            error_code='ERR-TE-003',
         ),
     ),
     _GuidanceRule(
@@ -198,7 +174,7 @@ SYSTEM_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
         ),
     ),
     _GuidanceRule(
-        _any('stuck loop detected', 'stuck recovery:', 'mandatory recovery:'),
+        _any('stuck_loop:', 'stuck loop detected'),
         ErrorGuidance(
             summary='The model repeated the same action without new output.',
             steps=(

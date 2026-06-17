@@ -391,7 +391,7 @@ HUD,
 }
 
 #hud-reasoning {
-    width: 16;
+    width: 20;
     margin-right: 1;
     background: transparent;
     border: none;
@@ -431,6 +431,7 @@ HUD,
 #hud-reasoning SelectOverlay {
     background: #0d1a30;
     border: solid #6a5020;
+    min-width: 20;
 }
 
 #hud-reasoning SelectOverlay .option-list--option {

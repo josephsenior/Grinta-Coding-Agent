@@ -133,7 +133,7 @@ class ScreenStateMixin:
         level = normalize_autonomy_level(value)
         return level if level in {'conservative', 'balanced', 'full'} else default
 
-    def _current_autonomy_level(self) -> str:
+    def _runtime_autonomy_level(self) -> str:
         controller = self._controller
         if controller is not None:
             ac = getattr(controller, 'autonomy_controller', None)
@@ -162,6 +162,19 @@ class ScreenStateMixin:
             getattr(self._hud.state, 'autonomy_level', None),
             default='balanced',
         )
+
+    def _current_autonomy_level(self) -> str:
+        runtime = self._runtime_autonomy_level()
+        if runtime:
+            return runtime
+
+        from backend.cli.settings import get_persisted_autonomy_level
+
+        configured = get_persisted_autonomy_level(self._active_agent_name())
+        if configured:
+            return configured
+
+        return 'balanced'
 
     def _mark_hud_select_sync(self, widget_id: str, *values: object) -> None:
         pending = getattr(self, '_hud_select_sync_values', None)

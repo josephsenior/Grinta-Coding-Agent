@@ -88,12 +88,11 @@ def build_recoverable_tool_call_error_action(exc: Exception) -> Action:
             '`todo`, `in_progress`, `done`, `skipped`, `blocked`.\n'
         )
 
+    thought = detail
+    if extra_hint:
+        thought = f'{detail}\n{extra_hint.strip()}'
     return AgentThinkAction(
-        thought=(
-            f'{detail}\n'
-            f'{extra_hint}'
-            'Recover by emitting one corrected tool call with strict JSON arguments.'
-        ),
+        thought=thought,
         kind=AgentThinkAction.KIND_RECOVERABLE_ERROR,
     )
 

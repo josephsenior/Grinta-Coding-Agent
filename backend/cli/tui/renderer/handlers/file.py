@@ -25,6 +25,7 @@ from backend.cli.tui.renderer.helpers.file import (
     resolve_edit_mode_range,
     resolve_no_cmd_line_range,
 )
+from backend.ledger.observation.files import file_edit_observation_is_new_file
 from backend.ledger.action import FileEditAction, FileReadAction, FileWriteAction
 from backend.ledger.observation import (
     FileEditObservation,
@@ -36,6 +37,14 @@ if TYPE_CHECKING:
     from backend.cli.tui.renderer.mixins.event_processor import (
         RendererEventProcessorMixin,
     )
+
+
+def _discard_pending_file_card_widget(widget: Any) -> None:
+    """Drop a stale pending file card when the observation type does not match."""
+    try:
+        widget.remove()
+    except Exception:
+        pass
 
 
 def _write_create_file_diff_card(
@@ -232,6 +241,9 @@ def _resolve_file_edit_pending_create(
     )
     if pending_create is None:
         return False
+    if not file_edit_observation_is_new_file(event):
+        _discard_pending_file_card_widget(pending_create)
+        return False
     new_content = getattr(event, 'new_content', '') or ''
     _finalize_pending_create_file_card(
         orch,
@@ -375,7 +387,7 @@ def _route_file_edit_observation(
     added: int,
     removed: int,
 ) -> None:
-    if not getattr(event, 'prev_exist', True):
+    if file_edit_observation_is_new_file(event):
         _handle_file_edit_new_file(orch, event, path, added)
     elif not path or path == '.':
         _handle_file_edit_multi_file(orch, event, path)

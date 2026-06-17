@@ -305,8 +305,7 @@ class TestTaskReconciliationDirective:
 
         state_with_in_progress_step.set_planning_directive.assert_called_once()
         directive = state_with_in_progress_step.set_planning_directive.call_args[0][0]
-        assert 'task_tracker' in directive
-        assert 'in_progress' in directive
+        assert 'Recoverable error during in_progress plan step(s): [2].' == directive
 
     @pytest.mark.asyncio
     async def test_survivable_error_without_in_progress_step_no_directive(

@@ -31,6 +31,7 @@ from backend.execution.file_operations import (
     write_file_content,
 )
 from backend.ledger.action import FileReadAction, FileWriteAction
+from backend.ledger.observation import FileReadObservation
 
 
 # ---------------------------------------------------------------------------
@@ -308,7 +309,7 @@ class TestExecuteFileEditor:
         output, (old, new), tool_result = execute_file_editor(
             editor, 'edit', '/test.py'
         )
-        assert 'ERROR' in output
+        assert output == 'Something went wrong'
         assert old is None and new is None
         assert tool_result['ok'] is False
 
@@ -365,4 +366,5 @@ class TestDirectoryViewing:
             with open(os.path.join(td, 'readme.md'), 'w', encoding='utf-8') as f:
                 f.write('test')
             obs = handle_directory_view(td, '/workspace')
+            assert isinstance(obs, FileReadObservation)
             assert 'readme.md' in obs.content

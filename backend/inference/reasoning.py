@@ -291,7 +291,7 @@ def _allowed_efforts(entry: ModelEntry, wire: str, family: str) -> tuple[str, ..
 
 
 _EFFORT_DISPLAY_LABELS: dict[str, str] = {
-    'none': 'Off (omit)',
+    'none': 'None',
     'minimal': 'Minimal',
     'low': 'Low',
     'medium': 'Medium',

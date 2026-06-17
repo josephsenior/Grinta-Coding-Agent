@@ -96,13 +96,6 @@ class FileEditor(
         # Last transaction rollback results, shaped like normal editor results
         # so callers/tests can inspect the emitted before/after payloads.
         self._last_rollback_results: list[ToolResult] = []
-        # Per-path timestamp (monotonic) of the most recent successful write.
-        # Used by ``_handle_replace_string`` to detect "stale old_string" cases
-        # where the model has chained several ``replace_string`` calls on the
-        # same file in a single turn and the file no longer matches the
-        # previously-read content. Bounded to avoid unbounded growth in long
-        # sessions.
-        self._recent_writes: dict[str, float] = {}
         # When True, skip per-edit syntax validation (multi_edit validates once per file).
         self._defer_syntax_validation: bool = False
 
@@ -147,7 +140,7 @@ class FileEditor(
         """Execute a file editor command.
 
         Args:
-            command: Command to execute ("read_file", "replace_string", "insert_text", "create_file", "undo_last_edit", "edit", "write").
+            command: Command to execute ("read_file", "replace_string", "insert_text", "create_file", "undo_last_edit", "edit").
             path: File path (relative to workspace_root or absolute)
             file_text: Optional file content for write/edit operations (use MISSING if not provided)
             view_range: Optional [start_line, end_line] for view command (1-indexed)
@@ -260,13 +253,11 @@ class FileEditor(
                 )
             if command == 'undo_last_edit':
                 return self._handle_undo_last_edit(file_path, path)
-            if command in ('write', 'create_file'):
-                # Handle sentinels for write/create_file command
+            if command == 'create_file':
                 content = self._extract_content(file_text, new_str)
                 return self._handle_write(
                     file_path,
                     content,
-                    is_create=(command == 'create_file'),
                     dry_run=dry_run,
                     overwrite_existing=overwrite_existing,
                 )
@@ -340,12 +331,10 @@ from backend.execution.utils._file_editor_diff_helpers import (  # noqa: E402, F
 )
 from backend.execution.utils._file_editor_io_helpers import (  # noqa: E402, F401
     _CODE_FILE_SUFFIXES,
-    _LARGE_EXISTING_CODE_FILE_LINES,
     _QUOTE_TRANSLATE,
     _compose_create_file_success_message,
     _compose_write_success_message,
     _encode_disk_payload,
-    _is_large_existing_code_file,
     _normalize_newlines_for_metadata,
     normalize_quotes,
 )

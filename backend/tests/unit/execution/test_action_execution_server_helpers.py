@@ -340,3 +340,35 @@ def test_build_edit_result_obs_accepts_message_action_outcome() -> None:
         )
     assert isinstance(obs, FileEditObservation)
     assert 'multi_edit committed' in obs.content
+
+
+def test_edit_via_file_editor_marks_replace_string_as_existing_file() -> None:
+    ex = _executor()
+    ex.file_editor = object()
+    action = SimpleNamespace(
+        path='demo.txt',
+        command='replace_string',
+        file_text=None,
+        view_range=None,
+        new_str='gamma',
+        old_string='alpha',
+        replace_all=False,
+        insert_line=None,
+        start_line=None,
+        end_line=None,
+        edit_mode=None,
+        expected_hash=None,
+        overwrite_existing=False,
+    )
+    with patch(
+        'backend.execution.file_operations.execute_file_editor',
+        return_value=(
+            'replaced',
+            (None, 'gamma'),
+            {'operation': 'replace_string', 'ok': True},
+        ),
+    ):
+        obs = h.edit_via_file_editor(ex, action)
+    assert isinstance(obs, FileEditObservation)
+    assert obs.outcome == 'edited'
+    assert obs.tool_result['operation'] == 'replace_string'
