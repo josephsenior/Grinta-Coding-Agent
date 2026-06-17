@@ -814,8 +814,8 @@ async def test_tui_terminal_session_reuses_single_card(mock_config):
         terminal_cards = [card for card in cards if 'category-terminal' in card.classes]
         assert len(terminal_cards) == 1
 
-        collapsed = terminal_cards[0].query_one('#collapsed-row')
-        assert 'status' in str(collapsed.renderable)
+        prompt = terminal_cards[0].query_one('#terminal-prompt')
+        assert 'status' in str(prompt.renderable)
 
 
 @pytest.mark.asyncio
@@ -892,8 +892,9 @@ async def test_tui_shell_command_reuses_single_card(mock_config):
         cards = s.query(TUIActivityCard).results()
         shell_cards = [card for card in cards if 'category-shell' in card.classes]
         assert len(shell_cards) == 1
+        prompt = shell_cards[0].query_one('#terminal-prompt')
+        assert 'pytest -q' in str(prompt.renderable)
         collapsed = shell_cards[0].query_one('#collapsed-row')
-        assert 'pytest -q' in str(collapsed.renderable)
         assert 'exit 0' in str(collapsed.renderable)
 
 
@@ -2135,6 +2136,7 @@ async def test_tui_file_edit_create_renders_compact_create_card(mock_config):
 
         cards = _file_change_cards(s)
         assert len(cards) == 1
+        assert '-create' in cards[0].classes
         header = str(cards[0].query_one('#file-change-header').renderable)
         assert 'demo.txt' in header
         assert '+2' in header
@@ -2427,6 +2429,7 @@ async def test_tui_file_edit_action_and_observation_render_single_delta_card(
 
         cards = _file_change_cards(s)
         assert len(cards) == 1
+        assert '-edit' in cards[0].classes
         header = FileChangeCard._build_header_markup('demo.txt', '+1 -1')
         assert 'demo.txt' in header
         rendered = str(cards[0].query_one('#file-change-header').renderable)

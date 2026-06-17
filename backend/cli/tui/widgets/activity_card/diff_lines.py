@@ -9,6 +9,10 @@ from textual.app import ComposeResult
 from textual.containers import Container
 from textual.widgets import Static
 
+from backend.cli.theme.cards import (
+    DIFF_LINE_ADD_TEXT,
+    DIFF_LINE_REM_TEXT,
+)
 from backend.cli.theme import NAVY_ERROR, NAVY_READY, NAVY_TEXT_DIM, NAVY_TEXT_MUTED
 from backend.cli.tui.widgets.activity_card.constants import (
     DIFF_ADD_PREFIX,
@@ -27,23 +31,11 @@ class DiffLine(Static):
         height: 1;
         padding: 0 1;
     }
-    DiffLine.add {
-        background: #0f2f22;
-        color: #7de6a1;
-    }
-    DiffLine.rem {
-        background: #351818;
-        color: #ff9a9a;
-    }
-    DiffLine.ctx {
-        background: transparent;
-        color: #969aad;
-    }
     """
 
     _STYLE_BY_KIND = {
-        'add': '#7de6a1',
-        'rem': '#ff9a9a',
+        'add': DIFF_LINE_ADD_TEXT,
+        'rem': DIFF_LINE_REM_TEXT,
         'ctx': NAVY_TEXT_MUTED,
     }
 
@@ -68,21 +60,6 @@ class SplitDiffLine(Container):
         width: 1fr;
         height: 1;
         padding: 0 1;
-    }
-    SplitDiffLine .split-pane.left {
-        border-right: solid #26324f;
-    }
-    SplitDiffLine .split-pane.add {
-        background: #0f2f22;
-        color: #7de6a1;
-    }
-    SplitDiffLine .split-pane.rem {
-        background: #351818;
-        color: #ff9a9a;
-    }
-    SplitDiffLine .split-pane.ctx {
-        background: transparent;
-        color: #969aad;
     }
     """
 
