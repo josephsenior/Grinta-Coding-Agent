@@ -96,7 +96,6 @@ class TestActionType:
             'SYSTEM',
             'START',
             'READ',
-            'WRITE',
             'EDIT',
             'RUN',
             'BROWSE',
