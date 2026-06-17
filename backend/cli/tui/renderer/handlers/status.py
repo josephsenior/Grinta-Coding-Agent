@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from backend.cli.event_rendering.error_panel import notice_panel_title
 from backend.cli.tui.renderer.handlers.compaction import show_compaction_started_card
@@ -65,26 +65,35 @@ def _notification_message(content: str, error_category: str | None) -> str:
     return f'{title}: {first_line}'
 
 
+def notify_ui_only_error(
+    tui: Any,
+    content: str,
+    error_category: str | None,
+) -> None:
+    """Toast + runtime strip for user-facing errors that must not hit the transcript."""
+    message = _notification_message(content, error_category)
+    severity = 'error' if error_category in _ACTION_REQUIRED_CATEGORIES else 'warning'
+    if severity == 'error' and hasattr(tui, 'notify_error'):
+        tui.notify_error(message)
+    elif hasattr(tui, 'notify_warning'):
+        tui.notify_warning(message)
+    else:
+        tui.notify(message, severity=severity, timeout=4.0)
+
+    if error_category and error_category not in TRANSIENT_HUD_ONLY_CATEGORIES:
+        tui.set_runtime_status(
+            _notification_title(content, error_category),
+            _first_error_line(content),
+            active=True,
+        )
+
+
 def _notify_ui_only_error(
     orch: 'RendererEventProcessorMixin',
     content: str,
     error_category: str | None,
 ) -> None:
-    message = _notification_message(content, error_category)
-    severity = 'error' if error_category in _ACTION_REQUIRED_CATEGORIES else 'warning'
-    if severity == 'error' and hasattr(orch._tui, 'notify_error'):
-        orch._tui.notify_error(message)
-    elif hasattr(orch._tui, 'notify_warning'):
-        orch._tui.notify_warning(message)
-    else:
-        orch._tui.notify(message, severity=severity, timeout=4.0)
-
-    if error_category and error_category not in TRANSIENT_HUD_ONLY_CATEGORIES:
-        orch._update_runtime_strip(
-            _notification_title(content, error_category),
-            _first_error_line(content),
-            active=True,
-        )
+    notify_ui_only_error(orch._tui, content, error_category)
 
 
 def _handle_error_observation(

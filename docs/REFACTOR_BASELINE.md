@@ -9,15 +9,16 @@ Re-run these commands after major refactors to track progress.
 
 | File | LOC (approx) |
 |------|-----|
-| `backend/cli/tui/screen/lifecycle.py` | ~801 |
-| `backend/cli/repl/session.py` | ~699 |
-| `backend/cli/tui/renderer/mixins/display.py` | ~693 |
-| `backend/cli/tui/widgets/activity_card/card.py` | ~684 |
-| `backend/cli/tui/renderer/drain.py` | ~656 |
-| `backend/cli/tui/screen/input.py` | ~647 |
+| `backend/cli/tui/widgets/activity_card/card.py` | ~991 |
+| `backend/cli/tui/renderer/mixins/display.py` | ~881 |
+| `backend/cli/tui/screen/lifecycle.py` | ~827 |
+| `backend/cli/tui/screen/input.py` | ~760 |
+| `backend/cli/session/session_manager.py` | ~697 |
+| `backend/cli/repl/session.py` | ~688 |
+| `backend/cli/tui/renderer/drain.py` | ~654 |
 | `backend/cli/main.py` | ~635 |
-| `backend/cli/session/session_manager.py` | ~629 |
-| `backend/cli/tool_display/preview.py` | ~615 |
+| `backend/cli/tui/widgets/unified_diff_view.py` | ~634 |
+| `backend/cli/orient_tools.py` | ~631 |
 
 **Split complete (no longer monoliths):**
 
@@ -32,6 +33,21 @@ Re-run these commands after major refactors to track progress.
 | `theme.py` (~795) | `theme/` package |
 | `activity_card.py` (~1,362) | `widgets/activity_card/` package |
 | Top-level display/session/settings | `display/`, `session/`, `settings/`, `onboarding/` |
+
+## Largest non-CLI backend files (current)
+
+| File | LOC (approx) |
+|------|-----|
+| `backend/engine/tools/_file_edits.py` | ~1,560 |
+| `backend/context/context_pipeline.py` | ~1,350 |
+| `backend/context/canonical_state.py` | ~1,230 |
+| `backend/inference/llm.py` | ~1,220 |
+| `backend/inference/direct_clients.py` | ~1,180 |
+| `backend/context/conversation_memory.py` | ~1,180 |
+| `backend/ledger/stream.py` | ~1,160 |
+| `backend/context/prompt_window.py` | ~1,130 |
+
+Post-v1.0 split candidates — use `docs/internals/import-manifest.json` before decomposing.
 
 ## Commands to refresh
 
@@ -77,6 +93,7 @@ uv run python backend/scripts/verify/check_file_size.py
 
 - [x] `backend/tests/unit/cli/tui/`
 - [x] `backend/tests/unit/cli/frontend/`
+- [x] Orchestration service tests consolidated under `backend/tests/unit/orchestration/services/`
 
 ### Phase 3 — top-level CLI packages
 

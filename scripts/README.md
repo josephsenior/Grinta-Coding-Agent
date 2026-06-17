@@ -35,7 +35,7 @@ For CI gates and layer-boundary checks, see [`backend/scripts/`](../backend/scri
 | --- | --- |
 | [`discover_public_imports.py`](discover_public_imports.py) | AST-only import manifest for refactor planning; output defaults to `docs/internals/import-manifest.json`. |
 | [`strip_session_log.py`](strip_session_log.py) | Strip noisy session log lines and write an audit summary via `backend.core.session_log_audit`. |
-| [`test_provider_connection.py`](test_provider_connection.py) | Manual cloud-provider ping (`vercel`, `nvidia`). Replaces the old per-provider test scripts. |
+| [`provider_connection_check.py`](../backend/tests/manual/provider_connection_check.py) | Manual cloud-provider ping (`vercel`, `nvidia`). Lives under `backend/tests/manual/`. |
 | [`probe_llm_settings.py`](probe_llm_settings.py) | Manual ping using your configured `settings.json` profile (model, provider, API key). |
 
 ## Manual tests (not in this folder)

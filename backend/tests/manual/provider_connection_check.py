@@ -2,11 +2,11 @@
 
 Run from the repo root with the matching API key in the environment or ``.env``::
 
-    python scripts/test_provider_connection.py vercel
-    python scripts/test_provider_connection.py nvidia
+    uv run python backend/tests/manual/provider_connection_check.py vercel
+    uv run python backend/tests/manual/provider_connection_check.py nvidia
 
     # Windows PowerShell:
-    $env:VERCEL_API_KEY = "vck_..."; python scripts/test_provider_connection.py vercel
+    $env:VERCEL_API_KEY = "vck_..."; uv run python backend/tests/manual/provider_connection_check.py vercel
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-_REPO_ROOT = Path(__file__).resolve().parents[1]
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 

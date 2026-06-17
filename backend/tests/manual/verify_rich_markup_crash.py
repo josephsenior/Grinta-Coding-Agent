@@ -1,3 +1,5 @@
+"""Ad-hoc probe for Rich markup parsing edge cases (middle-dot character)."""
+
 from rich.text import Text
 
 m = '\n[dim #969aad]  (1 tool executed · 2.1s)[/dim]\n'

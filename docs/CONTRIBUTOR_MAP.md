@@ -21,7 +21,7 @@ Install path for end users: `pipx install grinta-ai`. Contributors should use
 | --- | --- | --- |
 | CLI commands, startup, slash commands | `launch/entry.py` → `backend/cli/entry.py` → `backend/cli/main.py`; REPL under `backend/cli/repl/`, settings under `backend/cli/settings/` | `backend/tests/unit/cli/` |
 | TUI screens and rendering | `backend/cli/tui/app.py`, mixins under `backend/cli/tui/` | `backend/tests/unit/cli/tui/` |
-| Agent step loop (core control plane) | `backend/orchestration/session_orchestrator.py` + mixins in `session_orchestrator_mixins/` | `backend/tests/unit/orchestration/` |
+| Agent step loop (core control plane) | `backend/orchestration/session_orchestrator.py` + mixins in `session_orchestrator_mixins/` | `backend/tests/unit/orchestration/services/` |
 | Middleware (safety, cost, rollback) | `backend/orchestration/session_orchestrator.py` (pipeline list), files under `backend/orchestration/middleware/` | `backend/tests/unit/orchestration/test_*middleware*` |
 | Tool execution (bash, edit, grep, browser) | `backend/execution/action_execution_server.py`, `backend/engine/tools/` | `backend/tests/unit/execution/`, `backend/tests/unit/engine/` |
 | LLM provider routing and API calls | `backend/inference/registry.py`, `backend/inference/llm.py`, `backend/inference/direct_clients.py` | `backend/tests/unit/inference/` |
@@ -58,12 +58,16 @@ mixins over growing them further. Split work belongs in focused follow-up PRs.
 
 | Module | ~LOC | Role |
 | --- | ---: | --- |
-| `backend/cli/tui/_app_renderer_event_processor.py` | 1,700+ | TUI event rendering |
+| `backend/cli/tui/widgets/activity_card/card.py` | 990 | Activity card rendering |
+| `backend/cli/tui/renderer/mixins/display.py` | 880 | TUI history + card display |
+| `backend/cli/tui/screen/lifecycle.py` | 830 | TUI screen lifecycle |
+| `backend/engine/tools/_file_edits.py` | 1,560 | File edit tools |
 | `backend/context/context_pipeline.py` | 1,350 | Compaction orchestration |
-| `backend/inference/llm.py` | 1,215 | LLM call surface |
-| `backend/engine/tools/_file_edits.py` | 1,175 | File edit tools |
+| `backend/inference/llm.py` | 1,220 | LLM call surface |
 | `backend/ledger/stream.py` | 1,160 | Durable event stream |
-| `backend/context/prompt_window.py` | 1,100 | Prompt assembly / windowing |
+| `backend/context/prompt_window.py` | 1,130 | Prompt assembly / windowing |
+
+Orchestration service tests live in `backend/tests/unit/orchestration/services/` (mirrors `backend/orchestration/services/`). The split `_app_renderer_event_processor.py` monolith now lives under `backend/cli/tui/renderer/handlers/`.
 
 ## Inference vs integrations
 

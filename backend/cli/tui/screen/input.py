@@ -24,6 +24,7 @@ from backend.cli.tui.image_attachments import (
     read_clipboard_image_blocking,
 )
 from backend.cli.tui.image_input_gate import image_input_blocked_reason
+from backend.cli.tui.renderer.handlers.status import notify_ui_only_error
 from backend.ledger.observation.error import ERROR_CATEGORY_BAD_REQUEST
 from backend.cli.tui.widgets.small import (
     InputBar,
@@ -167,7 +168,7 @@ class ScreenInputMixin:
         return image_input_blocked_reason(self._llm_config_for_image_input())
 
     def _reject_image_input(self, message: str) -> None:
-        self.add_error_panel(message, error_category=ERROR_CATEGORY_BAD_REQUEST)
+        notify_ui_only_error(self, message, ERROR_CATEGORY_BAD_REQUEST)
 
     def _refresh_input_attachment_hint(self) -> None:
         try:
