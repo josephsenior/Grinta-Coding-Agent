@@ -46,10 +46,24 @@ Transcript {
     scrollbar-color: #334155 #060a14;
     scrollbar-color-hover: #475569 #060a14;
     scrollbar-color-active: #64748b #060a14;
-    padding: 1 2 2 2;
+    padding: 2 2 3 2;
     height: 1fr;
     layout: vertical;
     overflow-x: hidden;
+}
+
+/* Extra breathing room between transcript blocks */
+Transcript > ActivityCard,
+Transcript > FileChangeCard,
+Transcript > UserMessage,
+Transcript > AgentMessage,
+Transcript > LiveResponse,
+Transcript > ThinkingIndicator,
+Transcript > TranscriptNotice,
+Transcript > OrientLine,
+Transcript > TurnCompletion,
+Transcript > CollapsibleSection {
+    margin-bottom: 2;
 }
 
 #main-display {
@@ -70,7 +84,7 @@ ActivityCard {
 FileChangeCard {
     width: 100%;
     height: auto;
-    margin: 0 0 1 0;
+    margin: 0 0 2 0;
     border: round #1b233a;
     background: #08101d;
     padding: 0 0 1 0;
@@ -913,8 +927,8 @@ Toast.-error { border-left: wide #f05757; }
 UserMessage {
     width: 100%;
     height: auto;
-    margin: 1 0;
-    padding: 1 2;
+    margin: 1 0 2 0;
+    padding: 1 2 2 2;
     background: #111b29;
     border: round #384673;
     border-right: solid #91abec;
@@ -924,8 +938,8 @@ UserMessage {
 AgentMessage {
     width: 100%;
     height: auto;
-    margin: 1 0;
-    padding: 1 2;
+    margin: 1 0 2 0;
+    padding: 1 2 2 2;
     background: #080c16;
     border: none;
     color: #cbd5e1;
@@ -934,8 +948,8 @@ AgentMessage {
 LiveResponse {
     width: 100%;
     height: auto;
-    margin: 0 0 1 0;
-    padding: 0 1 0 2;
+    margin: 0 0 2 0;
+    padding: 1 1 1 2;
     background: #070b14;
     border-left: solid #3d5a80;
     color: #b8c4d8;
@@ -946,10 +960,17 @@ LiveResponse.-streaming {
     border-left: solid #5eead4;
 }
 
+ThinkingIndicator {
+    width: 100%;
+    height: auto;
+    margin: 0 0 2 0;
+    padding: 1 1 1 2;
+}
+
 TranscriptNotice {
     width: 100%;
     height: auto;
-    margin: 0 0 1 0;
+    margin: 0 0 2 0;
     padding: 0 1;
     background: #12161f;
     border: none;

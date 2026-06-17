@@ -74,7 +74,11 @@ TERM_SCROLLBAR_THUMB = NAVY_SCROLLBAR_THUMB
 TERM_SCROLLBAR_TRACK = NAVY_BG
 TERM_HIDDEN_LINES_FG = '#54597b'
 
-# ── Helpers ────────────────────────────────────────────────────────────────────
+# ── Transcript vertical rhythm ─────────────────────────────────────────────────
+
+TRANSCRIPT_BLOCK_MARGIN = 2
+TRANSCRIPT_PADDING_VERTICAL = 2
+
 
 
 def file_change_kind_class(outcome: str | None) -> str:
