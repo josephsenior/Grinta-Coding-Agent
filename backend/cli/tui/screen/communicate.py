@@ -345,9 +345,13 @@ class ScreenCommunicateMixin:
                 return
             self._update_suggestions_list(text)
             self._update_command_hint(text)
-            try:
-                hint = self.query_one('#input-hint', Label)
-                hint.display = not bool(text.strip())
-            except Exception:
-                pass
+            refresh = getattr(self, '_refresh_input_attachment_hint', None)
+            if callable(refresh):
+                refresh()
+            else:
+                try:
+                    hint = self.query_one('#input-hint', Label)
+                    hint.display = not bool(text.strip())
+                except Exception:
+                    pass
             self._resize_input_bar()
