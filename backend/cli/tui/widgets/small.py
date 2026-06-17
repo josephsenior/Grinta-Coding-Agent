@@ -172,9 +172,6 @@ class Transcript(VerticalScroll):
         if max_y > last_max_y:
             return
 
-        if not self._was_at_bottom():
-            self._set_user_scrolled_away(True)
-
     def set_backpressure(self, active: bool) -> None:
         """Mark whether the renderer is draining a backlog.
 
