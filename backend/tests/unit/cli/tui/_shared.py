@@ -31,7 +31,6 @@ from backend.cli.tui.main import GrintaTUIApp
 from backend.cli.tui.widgets.activity_card import (
     ActivityCard as TUIActivityCard,
 )
-from backend.cli.tui.widgets.file_change_card import FileChangeCard
 from backend.cli.tui.widgets.activity_card import (
     AgentMessage,
     LiveResponse,
@@ -40,6 +39,7 @@ from backend.cli.tui.widgets.activity_card import (
     ThinkingIndicator,
     TurnCompletion,
 )
+from backend.cli.tui.widgets.file_change_card import FileChangeCard
 from backend.cli.tui.widgets.small import ScrollTailBadge
 from backend.cli.tui.widgets.unified_diff_view import UnifiedDiffRow, UnifiedDiffView
 from backend.core.enums import AgentState, EventSource

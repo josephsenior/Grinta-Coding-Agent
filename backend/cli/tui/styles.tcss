@@ -930,7 +930,9 @@ UserMessage {
     margin: 1 0 2 0;
     padding: 1 2 2 2;
     background: #111b29;
-    border: round #384673;
+    border-top: none;
+    border-left: none;
+    border-bottom: none;
     border-right: solid #91abec;
     color: #e9e9e9;
 }

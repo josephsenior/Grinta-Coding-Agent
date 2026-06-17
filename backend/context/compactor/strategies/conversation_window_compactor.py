@@ -6,12 +6,11 @@ from typing import TYPE_CHECKING, Any
 
 from backend.context.compactor.compactor import Compaction, RollingCompactor
 from backend.context.view import View
-from backend.ledger.action.agent import CondensationAction
 from backend.ledger.action import FileEditAction
-from backend.ledger.observation import FileEditObservation
+from backend.ledger.action.agent import CondensationAction
 from backend.ledger.action.message import SystemMessageAction
 from backend.ledger.event import EventSource
-from backend.ledger.observation import Observation
+from backend.ledger.observation import FileEditObservation, Observation
 
 if TYPE_CHECKING:
     from backend.inference.llm_registry import LLMRegistry

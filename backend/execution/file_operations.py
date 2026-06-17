@@ -17,10 +17,7 @@ from backend.core.enums import FileReadSource
 from backend.core.logger import app_logger as logger
 from backend.core.os_capabilities import OS_CAPS
 from backend.execution.utils.files import (
-    detect_line_ending,
-    insert_lines,
     read_lines,
-    split_content_lines,
 )
 from backend.execution.utils.test_output_summary import extract_test_summary
 from backend.ledger.action import FileReadAction
