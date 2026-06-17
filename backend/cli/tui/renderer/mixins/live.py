@@ -22,7 +22,7 @@ from backend.ledger import (
 )
 
 _LIVE_SCROLL_PAINT_INTERVAL = 0.1
-_LIVE_STREAMING_RENDER_INTERVAL = 0.2
+_LIVE_STREAMING_RENDER_INTERVAL = 0.1
 
 
 def _streaming_render_interval(text: str) -> float:

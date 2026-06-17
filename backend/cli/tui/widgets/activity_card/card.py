@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from rich.console import Group
 from rich.syntax import Syntax
+from rich.text import Text
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
@@ -580,12 +582,23 @@ class ActivityCard(Container):
         styled_lines = [f'[{NAVY_TEXT_MUTED}]{line}[/]' for line in lines]
         return '\n'.join(styled_lines)
 
+    @staticmethod
+    def _looks_like_json_buffer(content: str) -> bool:
+        stripped = content.strip()
+        return stripped.startswith('{') or stripped.startswith('[')
+
     def _auto_detect_format(self, content: str) -> Any:
         if self._is_diff_like_content(content):
             return self._build_syntax_renderable(content, 'diff', line_numbers=True)
+        if self._looks_like_json_buffer(content):
+            return self._build_syntax_renderable(content, 'json')
         json_result = self._try_json_syntax(content)
         if json_result is not None:
             return json_result
+        if '```' in content or '`' in content:
+            from backend.cli.tui.renderer.prep import prep_streaming_renderable
+
+            return prep_streaming_renderable(content, base_text_style=NAVY_TEXT_MUTED)
         return self._format_plain_content(content)
 
     def _get_formatted_extra_content(self) -> Any:
@@ -807,32 +820,41 @@ class ActivityCard(Container):
         self._incremental_hidden_lines += hidden
         self._extra_content = '\n'.join(lines[-line_cap:])
 
-    def _incremental_tail_markup(self) -> str:
+    def _incremental_tail_renderable(self) -> Any:
         from backend.cli.tui.constants import _TUI_TERMINAL_DISPLAY_LINE_CAP
 
         lines = (self._extra_content or '').splitlines()
         if len(lines) > _TUI_TERMINAL_DISPLAY_LINE_CAP:
             self._trim_incremental_lines(_TUI_TERMINAL_DISPLAY_LINE_CAP)
-            lines = (self._extra_content or '').splitlines()
-        parts: list[str] = []
+
+        parts: list[Any] = []
         if self._incremental_hidden_lines:
             parts.append(
-                f'[{NAVY_TEXT_DIM}]…{self._incremental_hidden_lines} earlier '
-                f'line(s) hidden in card…[/]'
+                Text(
+                    f'…{self._incremental_hidden_lines} earlier '
+                    f'line(s) hidden in card…',
+                    style=NAVY_TEXT_DIM,
+                )
             )
-        parts.extend(
-            f'[{NAVY_TEXT_MUTED}]{line}[/]' for line in lines if line or lines == ['']
-        )
-        return '\n'.join(parts) if parts else ''
+
+        body = self._get_formatted_extra_content()
+        if body or not parts:
+            parts.append(body if body is not None else Text(''))
+
+        if not parts:
+            return Text('')
+        if len(parts) == 1:
+            return parts[0]
+        return Group(*parts)
 
     def _mount_incremental_tail(self, body: Container) -> None:
-        markup = self._incremental_tail_markup()
+        renderable = self._incremental_tail_renderable()
         try:
             tail = body.query_one('#incremental-tail', Static)
-            tail.update(markup)
+            tail.update(renderable)
         except Exception:
             body.remove_children()
-            body.mount(Static(markup, id='incremental-tail'))
+            body.mount(Static(renderable, id='incremental-tail'))
         body.display = not self._collapsed
 
     def append_content_incremental(self, text: str) -> None:
@@ -921,6 +943,9 @@ class ActivityCard(Container):
             return
         try:
             body = self.query_one('#expanded-body', Container)
+            if self._incremental_mode and not self._diff_encoded:
+                self._mount_incremental_tail(body)
+                return
             body.remove_children()
             for renderable in self._extra_renderables():
                 body.mount(renderable)
