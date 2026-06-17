@@ -865,6 +865,146 @@ GrintaSessionsDialog #sessions-panel {
     margin-bottom: 0;
 }
 
+/* Dialog selects + dropdown lists — match command suggestions chrome */
+GrintaSettingsDialog Select,
+GrintaSessionsDialog Select {
+    background: #0a1323;
+    border: none;
+    color: #c8d4e8;
+    height: 1;
+    min-height: 1;
+    padding: 0;
+}
+
+GrintaSettingsDialog Select:focus,
+GrintaSessionsDialog Select:focus {
+    border-left: solid #91abec;
+}
+
+GrintaSettingsDialog SelectCurrent,
+GrintaSessionsDialog SelectCurrent {
+    background: #0a1323;
+    color: #c8d4e8;
+    border: none;
+    padding: 0 1;
+    height: 1;
+    min-height: 1;
+}
+
+GrintaSettingsDialog SelectCurrent:focus,
+GrintaSessionsDialog SelectCurrent:focus {
+    background: #12223a;
+    border-left: solid #91abec;
+}
+
+GrintaSettingsDialog SelectCurrent #label,
+GrintaSessionsDialog SelectCurrent #label {
+    color: #c8d4e8;
+    padding: 0;
+    margin: 0;
+    height: 1;
+}
+
+GrintaSettingsDialog SelectCurrent .arrow,
+GrintaSessionsDialog SelectCurrent .arrow {
+    height: 1;
+    padding: 0;
+    margin: 0;
+    color: #8f9fc1;
+}
+
+GrintaSettingsDialog SelectOverlay,
+GrintaSessionsDialog SelectOverlay {
+    background: #07101d;
+    border-top: solid #26324f;
+    border-bottom: solid #26324f;
+    border-left: heavy #5eead4;
+    border-right: none;
+    padding: 0;
+    scrollbar-size-vertical: 1;
+    scrollbar-color: #64748b #0f172a;
+    scrollbar-color-hover: #94a3b8 #0f172a;
+    scrollbar-color-active: #cbd5e1 #0f172a;
+}
+
+GrintaSettingsDialog SelectOverlay .option-list--option,
+GrintaSessionsDialog SelectOverlay .option-list--option {
+    background: transparent;
+    color: #c8d4e8;
+    padding: 0 1;
+    margin: 0 1;
+    height: auto;
+    min-height: 1;
+}
+
+GrintaSettingsDialog SelectOverlay .option-list--option:hover,
+GrintaSessionsDialog SelectOverlay .option-list--option:hover,
+GrintaSettingsDialog SelectOverlay .option-list--option-highlighted,
+GrintaSessionsDialog SelectOverlay .option-list--option-highlighted {
+    background: #101c36;
+    color: #e9e9e9;
+    border-left: solid #5eead4;
+}
+
+GrintaSettingsDialog Input,
+GrintaSessionsDialog Input {
+    height: 1;
+    min-height: 1;
+    border: none;
+    background: #0a1323;
+    color: #c8d4e8;
+    padding: 0 1;
+}
+
+GrintaSettingsDialog Input:focus,
+GrintaSessionsDialog Input:focus {
+    background: #12223a;
+    border-left: solid #91abec;
+}
+
+GrintaSessionsDialog #sessions-table {
+    background: #07101d;
+    color: #c8d4e8;
+    border: none;
+    scrollbar-color: #64748b #0f172a;
+    scrollbar-color-hover: #94a3b8 #0f172a;
+    scrollbar-color-active: #cbd5e1 #0f172a;
+}
+
+GrintaSessionsDialog #sessions-table > .datatable--header {
+    background: #08101d;
+    color: #8f9fc1;
+    text-style: bold;
+    border-bottom: solid #26324f;
+}
+
+GrintaSessionsDialog #sessions-table > .datatable--cursor {
+    background: #101c36;
+    color: #e9e9e9;
+}
+
+GrintaSessionsDialog #sessions-table > .datatable--row-even,
+GrintaSessionsDialog #sessions-table > .datatable--row-odd {
+    background: transparent;
+}
+
+GrintaSessionsDialog #sessions-table > .datatable--row-hover {
+    background: #101c36;
+    color: #e9e9e9;
+}
+
+GrintaSessionsDialog #sessions-table > .datatable--row-selected {
+    background: #101c36;
+    color: #e9e9e9;
+    border-left: solid #5eead4;
+}
+
+GrintaSessionsDialog #sessions-preview {
+    background: #07101d;
+    border-top: solid #26324f;
+    color: #c8d4e8;
+}
+
 #settings-current-key {
     color: #8f9fc1;
 }

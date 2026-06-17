@@ -61,55 +61,7 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
     GrintaSettingsDialog #settings-reasoning,
     GrintaSettingsDialog #settings-custom-model,
     GrintaSettingsDialog #settings-api-key {
-        height: 1;
-        min-height: 1;
         margin-bottom: 1;
-        border: none;
-        background: #0a1323;
-        color: #c8d4e8;
-        padding: 0 1;
-    }
-    GrintaSettingsDialog #settings-provider SelectCurrent,
-    GrintaSettingsDialog #settings-model SelectCurrent,
-    GrintaSettingsDialog #settings-reasoning SelectCurrent {
-        border: none;
-        background: #0a1323;
-        color: #c8d4e8;
-        padding: 0 1;
-        height: 1;
-        min-height: 1;
-    }
-    GrintaSettingsDialog #settings-provider SelectCurrent:focus,
-    GrintaSettingsDialog #settings-model SelectCurrent:focus,
-    GrintaSettingsDialog #settings-reasoning SelectCurrent:focus {
-        background: #12223a;
-    }
-    GrintaSettingsDialog #settings-provider SelectCurrent #label,
-    GrintaSettingsDialog #settings-model SelectCurrent #label,
-    GrintaSettingsDialog #settings-reasoning SelectCurrent #label {
-        color: #c8d4e8;
-        padding: 0;
-        margin: 0;
-        height: 1;
-    }
-    GrintaSettingsDialog #settings-provider SelectCurrent .arrow,
-    GrintaSettingsDialog #settings-model SelectCurrent .arrow,
-    GrintaSettingsDialog #settings-reasoning SelectCurrent .arrow {
-        height: 1;
-        padding: 0;
-        margin: 0;
-        color: #8f9fc1;
-    }
-    GrintaSettingsDialog #settings-provider:focus,
-    GrintaSettingsDialog #settings-model:focus,
-    GrintaSettingsDialog #settings-reasoning:focus,
-    GrintaSettingsDialog #settings-custom-model:focus,
-    GrintaSettingsDialog #settings-api-key:focus {
-        border: none;
-    }
-    GrintaSettingsDialog #settings-custom-model:focus,
-    GrintaSettingsDialog #settings-api-key:focus {
-        background: #12223a;
     }
     GrintaSettingsDialog #settings-model-meta {
         height: auto;

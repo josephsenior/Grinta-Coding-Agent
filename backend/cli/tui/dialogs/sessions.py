@@ -42,21 +42,15 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
     }
     GrintaSessionsDialog #sessions-search,
     GrintaSessionsDialog #sessions-limit {
-        height: 1;
-        border: none;
-        background: #0a1323;
-        color: #c8d4e8;
-        padding: 0 1;
+        width: auto;
+        margin-left: 0;
     }
     GrintaSessionsDialog #sessions-search {
         width: 1fr;
     }
     GrintaSessionsDialog #sessions-sort {
         width: 14;
-        height: 1;
         margin-left: 1;
-        border: none;
-        background: #0a1323;
     }
     GrintaSessionsDialog #sessions-limit {
         width: 5;
@@ -84,11 +78,8 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
     GrintaSessionsDialog #sessions-preview {
         height: auto;
         max-height: 7;
-        margin-top: 1;
-        padding: 0 1;
-        border: none;
-        background: #0a1323;
-        color: #cbd5e1;
+        margin-top: 0;
+        padding: 1;
     }
     GrintaSessionsDialog #dialog-feedback {
         margin-top: 0;
@@ -159,7 +150,7 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
                 )
                 yield Button('Refresh', id='sessions-refresh', variant='default')
             with Vertical(id='sessions-panel'):
-                yield DataTable(id='sessions-table', zebra_stripes=True)
+                yield DataTable(id='sessions-table', zebra_stripes=False)
             yield Static('', id='sessions-preview')
             yield Label('', id='dialog-feedback')
             with Horizontal(id='dialog-buttons'):

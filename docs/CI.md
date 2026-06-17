@@ -1,21 +1,38 @@
 # Continuous integration
 
-This document describes what runs in GitHub Actions and how it relates to local `pytest` ([`pytest.ini`](../pytest.ini)). **Linux PR gates** run the full **`backend/tests`** tree with coverage (unit + integration + e2e + stress). **Windows** gates still run **`backend/tests/unit`** only for cross-platform smoke.
+This document describes what runs in GitHub Actions and how it relates to local `pytest` ([`pytest.ini`](../pytest.ini)).
+
+**Linux PR gates** shard the full **unit** corpus (`backend/tests/unit`) across seven coverage jobs, enforce **75%** in `gates-on-linux-coverage-report`, then run integration, e2e, and stress in `gates-on-linux-extended`. **Windows** gates run the same unit corpus on 3.12 and 3.13 for cross-platform smoke.
+
+For release tagging and GA promotion, see [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
 
 ## Required checks on pull requests
 
 | Workflow | Job | What runs |
 |----------|-----|-----------|
-| **Run Python Tests** | `gates-on-linux-coverage-{a,b,d,f,g,e,c,report}` + `gates-on-linux-extended` | Unit tests with coverage sharded across seven Linux jobs (execution split into D+F+G; G includes former H/I slices), combined in report; execution shards skip `compileall` (syntax gated on other shards). Then integration/e2e/stress. |
-| **Run Python Tests** | `gates-on-windows` | Same unit corpus as `gates-on-linux` on `windows-latest`. |
-| **Run Python Tests** | `gates-on-macos` | Same unit corpus as `gates-on-linux` on `macos-latest` — **advisory only** (`continue-on-error: true`) until the matrix is promoted to required. |
+| **Run Python Tests** | `gates-on-linux-coverage-{a,b,c,d,f,g,e}` + `report` | Full unit corpus on Linux with sharded coverage; combined report enforces **75%** (`--fail-under=75`). Execution shards (D/F/G) skip `compileall`; syntax is gated on other shards. |
+| **Run Python Tests** | `gates-on-linux-extended` | Integration, e2e, and stress suites on Linux (runs after the coverage report job passes). |
+| **Run Python Tests** | `gates-on-windows` (3.12 + 3.13) | Full unit corpus cross-platform smoke. |
 | **Lint** | pre-commit, mypy, version check | See [`.github/workflows/lint.yml`](../.github/workflows/lint.yml). |
-| **Dependency Review** | `dependency-review` | Blocks high-severity dependency risk on pull requests. |
 | **CodeQL** | `analyze` | Static security analysis for Python on PRs and main. |
+| **Security Scan (Bandit)** | Bandit | Python SAST; fails on medium/high findings. See [`.github/workflows/bandit.yml`](../.github/workflows/bandit.yml). |
+| **Dependency Review** | `dependency-review` | Blocks high-severity dependency risk on pull requests. |
 | **CLI Regression Tests** | (when paths match) | CLI integration smoke and selected orchestration tests; see [`.github/workflows/e2e-tests.yml`](../.github/workflows/e2e-tests.yml). |
 | **Smoke Install** | `smoke-install` | Clean venv wheel install + source onboarding smoke (`scripts/smoke_install.*`, `scripts/smoke_source_onboarding.*`) on Linux and Windows; see [`.github/workflows/smoke-install.yml`](../.github/workflows/smoke-install.yml). |
 
-Codecov upload is enforced (`fail_ci_if_error: true`) and coverage uses the same `fail_under` policy as the project configuration. The coverage gate runs against the full `backend/tests` tree (not unit-only), so integration, e2e, and stress tests contribute to the reported percentage.
+### Advisory (not release-blocking today)
+
+| Job | Notes |
+| --- | --- |
+| `gates-on-macos` | Same unit corpus as Linux; `continue-on-error: true` until promoted to required. |
+| `gates-on-linux-py313` | Full unit corpus on Python 3.13; `continue-on-error: true`. |
+| **Heavy / Integration Tests** | Marker-filtered `heavy \| integration \| benchmark` slice; runs on `main`, schedule, and manual dispatch only. |
+
+### Coverage
+
+The **75%** gate applies to the **unit** corpus only, measured across sharded Linux jobs and combined in `gates-on-linux-coverage-report`. Integration, e2e, and stress suites run in `gates-on-linux-extended` but do **not** contribute to the coverage percentage.
+
+Codecov upload runs from the coverage report job with `fail_ci_if_error: false` (upload failure does not block the merge). The enforced threshold is the local `coverage report --fail-under=75` step in CI, matching [`pyproject.toml`](../pyproject.toml).
 
 ## Heavy / integration / benchmark tier
 
@@ -28,6 +45,15 @@ The **Heavy / Integration Tests** job in `py-tests.yml` runs only when:
 It executes: `pytest backend/tests -m "heavy or integration or benchmark"`.
 
 Markers are defined in `pytest.ini`. That job is marker-filtered over the full tree. A bare local `pytest` (no path arguments) still collects all of `backend/tests` per `testpaths`; narrow with `pytest backend/tests/unit` or add `-m` when you want a smaller slice.
+
+## Local equivalents
+
+| CI job | Local command |
+| --- | --- |
+| Linux unit + coverage | `PYTHONPATH=. uv run pytest --cov=backend --cov-fail-under=75 backend/tests/unit` |
+| Windows unit smoke | `PYTHONPATH=. uv run pytest backend/tests/unit` |
+| Integration / e2e / stress | `PYTHONPATH=. uv run pytest backend/tests/integration backend/tests/e2e backend/tests/stress` |
+| Lint | `pre-commit run --all-files` and `uv run mypy --config-file mypy.ini` |
 
 ## What to run before opening a PR
 
