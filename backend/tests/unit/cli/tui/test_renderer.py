@@ -1442,10 +1442,13 @@ async def test_tui_thinking_indicator_shows_content_without_collapse(
 
         thought = 'Plotting the next move.'
         renderer._process_event(StreamingChunkAction(thinking_accumulated=thought))
+        if getattr(renderer, '_deferred_stream_chunk', None) is not None:
+            renderer._flush_deferred_stream_chunk()
+        await pilot.pause()
         renderer._process_event(
             FileWriteAction(path='demo.txt', content='finalize thinking')
         )
-        await asyncio.sleep(0.2)
+        await pilot.pause()
 
         blocks = list(s.query(ThinkingIndicator).results())
         assert len(blocks) == 1
