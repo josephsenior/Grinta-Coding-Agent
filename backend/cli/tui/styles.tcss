@@ -53,7 +53,10 @@ Transcript {
 }
 
 /* Extra breathing room between transcript blocks */
-Transcript > ActivityCard,
+Transcript > ActivityCard {
+    margin-bottom: 1;
+}
+
 Transcript > FileChangeCard,
 Transcript > UserMessage,
 Transcript > AgentMessage,
@@ -102,11 +105,8 @@ FileChangeCard.-edit {
 UnifiedDiffView {
     width: 100%;
     height: auto;
-    max-height: 24;
     border-top: solid #1b233a;
     background: #060a14;
-    scrollbar-size-vertical: 1;
-    scrollbar-color: #33405d #060a14;
 }
 
 UnifiedDiffView .diff-truncated {

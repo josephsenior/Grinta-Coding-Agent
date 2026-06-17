@@ -50,7 +50,7 @@ class ActivityCard(Container):
     ActivityCard {
         width: 100%;
         height: auto;
-        margin: 0 0 1 0;
+        margin: 0;
         border: round #1b233a;
         background: #08101d;
         padding: 0 0 0 1;
@@ -656,7 +656,7 @@ class ActivityCard(Container):
             if self._collapsible:
                 yield Static(self._caret_char(), id='caret', classes='card-caret')
 
-        if self._extra_content:
+        if self._extra_content or self._is_terminal_card():
             with Container(classes='card-expanded-body', id='expanded-body'):
                 if self._is_terminal_card():
                     yield TerminalPane(
@@ -665,6 +665,7 @@ class ActivityCard(Container):
                         cwd=self._terminal_cwd,
                         session_id=self._terminal_session_id,
                         footer=self._terminal_footer_text(),
+                        exit_code=self._terminal_exit_code,
                         running=self.processing,
                         id='terminal-pane',
                     )
@@ -717,7 +718,10 @@ class ActivityCard(Container):
             self.remove_class('-collapsed')
             self.add_class('-expanded')
             if body is not None:
+                body.remove_class('-hidden')
                 body.display = True
+                if self._is_terminal_card():
+                    self._ensure_terminal_pane(body)
             if meta is not None:
                 meta.display = True
 

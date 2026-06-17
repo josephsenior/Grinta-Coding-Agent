@@ -538,3 +538,12 @@ async def test_tui_scroll_badge_shows_and_follows_tail(mock_config, monkeypatch)
         await pilot.pause()
         assert display._user_scrolled_away is False
         assert badge.has_class('-hidden')
+
+
+def test_unified_diff_view_does_not_create_nested_scroll() -> None:
+    """Diff bodies should scroll with the transcript, not trap the wheel."""
+    from textual.containers import VerticalScroll
+
+    from backend.cli.tui.widgets.unified_diff_view import UnifiedDiffView
+
+    assert not issubclass(UnifiedDiffView, VerticalScroll)
