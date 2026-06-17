@@ -405,6 +405,13 @@ class ScreenStateMixin:
         else:
             bar.border_title = ' Agent task '
             hint.update('Describe a task for Grinta to execute...')
+        pending = len(getattr(self, '_pending_image_urls', []) or [])
+        if pending > 0:
+            refresh = getattr(self, '_refresh_input_attachment_hint', None)
+            if callable(refresh):
+                refresh()
+            return
+        hint.remove_class('-image-attached')
         hint.display = not bool(ta.text.strip())
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:

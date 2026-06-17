@@ -7,6 +7,8 @@ import tempfile
 from pathlib import Path
 
 from backend.cli.tui.image_attachments import (
+    ClipboardImage,
+    encode_image_bytes_as_data_url,
     encode_image_path_as_data_url,
     is_supported_image_path,
 )
@@ -15,6 +17,16 @@ from backend.cli.tui.image_attachments import (
 def test_is_supported_image_path() -> None:
     assert is_supported_image_path('photo.PNG')
     assert not is_supported_image_path('notes.pdf')
+
+
+def test_image_attachment_status_text() -> None:
+    from backend.cli.tui.image_attachments import image_attachment_status_text
+
+    assert image_attachment_status_text(1) == '1 image attached'
+    assert image_attachment_status_text(2) == '2 images attached'
+    assert '[bold #5eead4]1 image attached[/]' == image_attachment_status_text(
+        1, rich=True
+    )
 
 
 def test_encode_image_path_as_data_url() -> None:
@@ -28,3 +40,42 @@ def test_encode_image_path_as_data_url() -> None:
         assert base64.b64decode(payload).startswith(b'\x89PNG')
     finally:
         Path(path).unlink(missing_ok=True)
+
+
+def test_encode_image_bytes_as_data_url() -> None:
+    payload = b'\x89PNG\r\n\x1a\n'
+    url = encode_image_bytes_as_data_url(payload, 'image/png', max_bytes=1024)
+    assert url.startswith('data:image/png;base64,')
+
+
+def test_read_clipboard_image_returns_none_when_unavailable(monkeypatch) -> None:
+    monkeypatch.setattr(
+        'backend.cli.tui.image_attachments._read_windows_clipboard_image',
+        lambda: None,
+    )
+    monkeypatch.setattr(
+        'backend.cli.tui.image_attachments._read_macos_clipboard_image',
+        lambda: None,
+    )
+    monkeypatch.setattr(
+        'backend.cli.tui.image_attachments._read_linux_clipboard_image',
+        lambda: None,
+    )
+    from backend.cli.tui.image_attachments import read_clipboard_image_blocking
+
+    assert read_clipboard_image_blocking() is None
+
+
+def test_read_clipboard_image_prefers_first_available_reader(monkeypatch) -> None:
+    sample = ClipboardImage(
+        data=b'\x89PNG\r\n',
+        mime_type='image/png',
+        label='clipboard.png',
+    )
+    monkeypatch.setattr(
+        'backend.cli.tui.image_attachments._read_windows_clipboard_image',
+        lambda: sample,
+    )
+    from backend.cli.tui.image_attachments import read_clipboard_image_blocking
+
+    assert read_clipboard_image_blocking() == sample

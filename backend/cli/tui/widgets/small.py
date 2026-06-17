@@ -423,41 +423,53 @@ class InputBar(Horizontal):
 class PromptTextArea(TextArea):
     """Input area that routes arrow navigation to welcome suggestions when idle."""
 
-    def _on_paste(self, event: events.Paste) -> None:
-        """Handle paste events by reading the system clipboard directly.
-
-        In most terminals (Windows Terminal, etc.), Ctrl+V is intercepted and
-        forwarded as a bracketed paste event. For large clipboard content, the
-        terminal/PTY can silently truncate the data mid-stream — the paste event
-        arrives with incomplete or empty text, so the user sees nothing.
-
-        Bypass this by reading the system clipboard directly via pyperclip.
-        Falls back to the paste-event text when pyperclip is unavailable.
-        """
-        if self.read_only:
+    def watch_text(self, text: str) -> None:
+        if text.strip():
             return
+        screen = getattr(self, 'screen', None)
+        if screen is None:
+            return
+        pending = getattr(screen, '_pending_image_urls', None)
+        if not pending:
+            return
+        screen._pending_image_urls = []
+        refresh = getattr(screen, '_refresh_input_attachment_hint', None)
+        if callable(refresh):
+            refresh()
+
+    def _paste_text_from_clipboard(self, event: events.Paste | None = None) -> None:
         try:
             clipboard = pyperclip.paste()
         except Exception:
-            clipboard = event.text
-        event.prevent_default()
+            clipboard = event.text if event is not None else ''
         if result := self._replace_via_keyboard(clipboard, *self.selection):
             self.move_cursor(result.end_location)
+
+    def _on_paste(self, event: events.Paste) -> None:
+        """Paste text or attach a clipboard image when available."""
+        if self.read_only:
+            return
+        screen = getattr(self, 'screen', None)
+        if screen is not None and hasattr(screen, 'try_paste_clipboard_image'):
+            if screen.try_paste_clipboard_image():
+                event.prevent_default()
+                return
+        event.prevent_default()
+        self._paste_text_from_clipboard(event)
 
     def action_paste(self) -> None:
-        """Paste from system clipboard directly.
-
-        This handles the case where Ctrl+V is NOT intercepted by the terminal
-        and reaches the app as a key binding.
-        """
+        """Paste from system clipboard directly."""
         if self.read_only:
             return
+        screen = getattr(self, 'screen', None)
+        if screen is not None and hasattr(screen, 'try_paste_clipboard_image'):
+            if screen.try_paste_clipboard_image():
+                return
         try:
-            clipboard = pyperclip.paste()
+            pyperclip.paste()
         except Exception:
             return super().action_paste()
-        if result := self._replace_via_keyboard(clipboard, *self.selection):
-            self.move_cursor(result.end_location)
+        self._paste_text_from_clipboard()
 
     def on_key(self, event: events.Key) -> None:
         screen = getattr(self, 'screen', None)

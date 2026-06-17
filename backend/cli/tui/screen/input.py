@@ -4,7 +4,6 @@ import asyncio
 import contextlib
 import shlex
 import time
-from pathlib import Path
 from typing import Any
 
 from textual.widgets import (
@@ -20,10 +19,12 @@ from backend.cli.tui.helpers import (
     _strip_terminal_control_literals,
 )
 from backend.cli.tui.image_attachments import (
-    encode_image_path_as_data_url,
-    is_supported_image_path,
-    pick_image_files_blocking,
+    encode_image_bytes_as_data_url,
+    image_attachment_status_text,
+    read_clipboard_image_blocking,
 )
+from backend.cli.tui.image_input_gate import image_input_blocked_reason
+from backend.ledger.observation.error import ERROR_CATEGORY_BAD_REQUEST
 from backend.cli.tui.widgets.small import (
     InputBar,
 )
@@ -156,6 +157,18 @@ class ScreenInputMixin:
         max_mb = getattr(uploads, 'max_file_size_mb', 100) if uploads else 100
         return int(max_mb) * 1024 * 1024
 
+    def _llm_config_for_image_input(self) -> object | None:
+        try:
+            return self._config.get_llm_config()
+        except Exception:
+            return None
+
+    def _image_input_blocked_reason(self) -> str | None:
+        return image_input_blocked_reason(self._llm_config_for_image_input())
+
+    def _reject_image_input(self, message: str) -> None:
+        self.add_error_panel(message, error_category=ERROR_CATEGORY_BAD_REQUEST)
+
     def _refresh_input_attachment_hint(self) -> None:
         try:
             hint = self.query_one('#input-hint', Label)
@@ -164,66 +177,48 @@ class ScreenInputMixin:
             return
         pending = len(getattr(self, '_pending_image_urls', []) or [])
         if pending > 0:
-            label = 'image' if pending == 1 else 'images'
-            hint.update(
-                f'{pending} {label} attached · '
-                'Ctrl+Shift+X clear · Ctrl+Shift+I add more'
-            )
+            hint.update(image_attachment_status_text(pending, rich=True))
+            hint.add_class('-image-attached')
             hint.display = True
             return
+        hint.remove_class('-image-attached')
         if ta.text.strip():
             hint.display = False
             return
         self._update_input_identity()
 
-    def action_clear_image_attachments(self) -> None:
-        self._pending_image_urls = []
-        self._pending_image_names = []
+    def _add_pending_image_data_url(self, data_url: str) -> bool:
+        self._pending_image_urls.append(data_url)
         self._refresh_input_attachment_hint()
-        self.notify('Image attachments cleared.', severity='information', timeout=2.0)
+        return True
 
-    def action_attach_images(self) -> None:
+    def try_paste_clipboard_image(self) -> bool:
+        """Attach an image from the OS clipboard when one is available."""
         if getattr(self, '_turn_in_flight', False):
             self.notify_warning('Wait for the current turn to finish.')
-            return
-        self.run_worker(self._attach_images_worker(), exclusive=True)
-
-    async def _attach_images_worker(self) -> None:
+            return True
         try:
-            selected = await asyncio.to_thread(pick_image_files_blocking)
+            image = read_clipboard_image_blocking()
         except Exception as exc:
-            self.notify_error(f'Could not open file picker: {type(exc).__name__}: {exc}')
-            return
-        if not selected:
-            return
-
-        max_bytes = self._max_image_attachment_bytes()
-        added = 0
-        for path in selected:
-            if not is_supported_image_path(path):
-                self.notify_warning(f'Unsupported image type: {path}')
-                continue
-            try:
-                data_url = encode_image_path_as_data_url(path, max_bytes=max_bytes)
-            except ValueError as exc:
-                self.notify_warning(str(exc))
-                continue
-            except OSError as exc:
-                self.notify_warning(f'Could not read {path}: {exc}')
-                continue
-            self._pending_image_urls.append(data_url)
-            self._pending_image_names.append(Path(path).name)
-            added += 1
-
-        if added:
-            self._refresh_input_attachment_hint()
-            self.notify(
-                f'Attached {added} image(s).',
-                severity='information',
-                timeout=2.0,
+            self.notify_error(
+                f'Could not read clipboard image: {type(exc).__name__}: {exc}'
             )
-        else:
-            self.notify_warning('No images were attached.')
+            return True
+        if image is None:
+            return False
+        if blocked := self._image_input_blocked_reason():
+            self._reject_image_input(blocked)
+            return True
+        try:
+            data_url = encode_image_bytes_as_data_url(
+                image.data,
+                image.mime_type,
+                max_bytes=self._max_image_attachment_bytes(),
+            )
+        except ValueError as exc:
+            self.notify_warning(str(exc))
+            return True
+        return self._add_pending_image_data_url(data_url)
 
     def action_history_prev(self) -> None:
         """Navigate backward through command history."""
@@ -402,6 +397,9 @@ class ScreenInputMixin:
         if not text and not pending_images:
             self._submit_handle_empty_text()
             return
+        if pending_images and (blocked := self._image_input_blocked_reason()):
+            self._reject_image_input(blocked)
+            return
         if text.startswith('/'):
             self._submit_spawn_input_task(text)
             return
@@ -520,9 +518,8 @@ class ScreenInputMixin:
         agent_text: str | None = None
         image_urls: list[str] | None = None
         async with self._input_lock:
-            await self._handle_input_prepare_ui()
-
             if text.startswith('/'):
+                await self._handle_input_prepare_ui()
                 await self._handle_slash_command(text)
                 return
 
@@ -531,9 +528,14 @@ class ScreenInputMixin:
                 return
 
             image_urls = list(getattr(self, '_pending_image_urls', []) or [])
+            if image_urls and (blocked := self._image_input_blocked_reason()):
+                self._reject_image_input(blocked)
+                return
+
+            await self._handle_input_prepare_ui()
+
             self.add_user_message(text, image_count=len(image_urls))
             self._pending_image_urls = []
-            self._pending_image_names = []
             self._refresh_input_attachment_hint()
             self._render_hud_bar()
             self.query_one('#input-bar', InputBar).add_class('processing')

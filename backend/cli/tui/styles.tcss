@@ -460,6 +460,11 @@ InputBar.-blurred {
     text-style: italic;
 }
 
+#input-hint.-image-attached {
+    color: #5eead4;
+    text-style: bold;
+}
+
 #input-row {
     layout: horizontal;
     height: 1fr;

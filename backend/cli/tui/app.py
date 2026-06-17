@@ -105,8 +105,6 @@ class GrintaScreen(
         Binding('ctrl+shift+[', 'expand_activity_cards', 'Expand Cards', show=False),
         Binding('ctrl+p', 'history_prev', 'History Prev', show=False),
         Binding('ctrl+n', 'history_next', 'History Next', show=False),
-        Binding('ctrl+shift+i', 'attach_images', 'Attach Image', show=True),
-        Binding('ctrl+shift+x', 'clear_image_attachments', 'Clear Images', show=False),
     ]
     _STATE_LABELS = {
         'starting': 'Starting…',
@@ -226,7 +224,6 @@ class GrintaScreen(
         self._hud_controls_ready = False
         self._hud_select_sync_values: dict[str, tuple[set[str], float]] = {}
         self._pending_image_urls: list[str] = []
-        self._pending_image_names: list[str] = []
 
 
 class TUIRenderer(
