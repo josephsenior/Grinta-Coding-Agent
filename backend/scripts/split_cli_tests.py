@@ -51,81 +51,6 @@ def _is_fixture(node: ast.stmt) -> bool:
     return False
 
 
-def _headless_bucket(name: str) -> str:
-    if name == 'test_grinta_rich_theme_overrides_inline_markdown_code':
-        return 'theme'
-    if name.startswith('test_tui_strips_') or name.startswith('test_tui_input_removes'):
-        return 'input_sanitize'
-    if 'communicate' in name:
-        return 'communicate'
-    if any(token in name for token in ('welcome', 'typing', 'w_empty')):
-        return 'welcome'
-    if 'hud' in name:
-        return 'hud'
-    if any(
-        token in name
-        for token in (
-            'settings',
-            'sessions',
-            'resume',
-            'help',
-            'clear_command',
-            'unknown_command',
-            'inline_command',
-            'command_autocomplete',
-            'slash',
-        )
-    ):
-        return 'commands'
-    if any(
-        token in name
-        for token in (
-            'activity_card',
-            'renderer_writes',
-            'transcript',
-            'live_response',
-            'content_growth',
-            'user_scroll',
-            'page_keys',
-            'backpressure',
-            'terminal_append',
-            'grep',
-            'glob',
-            'lsp',
-            'find_symbols',
-            'read_symbols',
-            'file_',
-            'shell',
-            'cmd',
-            'mcp',
-            'browser',
-            'terminal',
-            'delegate',
-            'orient',
-            'thinking',
-            'checkpoint',
-            'condensation',
-            'status',
-            'task_sidebar',
-            'tasks_sidebar',
-            'stream',
-            'replay',
-            'metrics',
-            'mode_switch',
-            'autonomy',
-            'reasoning',
-            'compaction',
-            'error',
-            'success',
-            'worker',
-        )
-    ):
-        return 'renderer'
-    if name.startswith('test_tui_mount') or name.startswith('test_tui_input_and'):
-        return 'mount'
-    return 'misc'
-
-
 def _frontend_bucket(name: str) -> str:
     if name.startswith('test_hud_'):
         return 'hud'
@@ -215,16 +140,7 @@ def _split_file(
 
 
 def main() -> None:
-    headless_src = REPO / 'backend' / 'cli' / 'tui' / 'tests' / 'test_headless.py'
     frontend_src = REPO / 'backend' / 'tests' / 'unit' / 'cli' / 'test_cli_frontend.py'
-
-    print('Splitting test_headless.py')
-    _split_file(
-        headless_src,
-        REPO / 'backend' / 'tests' / 'unit' / 'cli' / 'tui',
-        _headless_bucket,
-        module_doc='Headless TUI',
-    )
 
     print('Splitting test_cli_frontend.py')
     _split_file(
