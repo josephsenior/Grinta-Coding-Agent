@@ -496,3 +496,13 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             entry = lookup(self.model)
             if entry and entry.default_temperature is not None:
                 object.__setattr__(self, 'temperature', entry.default_temperature)
+
+    @property
+    def vision_is_active(self) -> bool:
+        """True when catalog vision support is enabled and not explicitly disabled."""
+        from backend.inference.catalog_loader import vision_is_active_for_model
+
+        return vision_is_active_for_model(
+            self.model,
+            disable_vision=self.disable_vision,
+        )

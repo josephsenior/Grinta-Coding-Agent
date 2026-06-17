@@ -1172,7 +1172,7 @@ class LLM(RetryMixin, DebugMixin):
         return normalized_messages
 
     def vision_is_active(self) -> bool:
-        return not self.config.disable_vision
+        return bool(self.config.vision_is_active)
 
     def is_caching_prompt_active(self) -> bool:
         return self.config.caching_prompt

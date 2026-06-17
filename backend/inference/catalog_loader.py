@@ -424,6 +424,47 @@ def _resolve_prompt_cache_mode(
     )
 
 
+def _capabilities_indicate_vision(metadata: dict[str, Any] | None) -> bool:
+    """Infer vision support from catalog metadata capabilities."""
+    if not metadata:
+        return False
+    capabilities = metadata.get('capabilities')
+    if not isinstance(capabilities, dict):
+        return False
+    input_modalities = capabilities.get('input')
+    if isinstance(input_modalities, dict) and bool(input_modalities.get('image')):
+        return True
+    return capabilities.get('attachment') is True
+
+
+def _resolve_supports_vision(
+    runtime: dict[str, Any],
+    metadata: dict[str, Any] | None,
+) -> bool:
+    if 'supports_vision' in runtime:
+        return bool(runtime.get('supports_vision'))
+    return _capabilities_indicate_vision(metadata)
+
+
+def model_supports_vision(model: str | None) -> bool:
+    """Return True when the catalog marks the model as vision-capable."""
+    entry = lookup(model or '')
+    if entry is None:
+        return False
+    return bool(entry.supports_vision)
+
+
+def vision_is_active_for_model(
+    model: str | None,
+    *,
+    disable_vision: bool | None,
+) -> bool:
+    """Whether image content should be included for this model/config pair."""
+    if disable_vision is True:
+        return False
+    return model_supports_vision(model)
+
+
 def _entry_from_catalog(
     *,
     provider: str,
@@ -475,7 +516,7 @@ def _entry_from_catalog(
         prompt_cache_mode=prompt_cache_mode,
         supports_stop_words=runtime.get('supports_stop_words', True),
         supports_response_schema=runtime.get('supports_response_schema', False),
-        supports_vision=runtime.get('supports_vision', False),
+        supports_vision=_resolve_supports_vision(runtime, metadata),
         strip_reasoning_effort=runtime.get('strip_reasoning_effort', False),
         thinking_mode=runtime.get('thinking_mode'),
         strip_temperature=runtime.get('strip_temperature', False),

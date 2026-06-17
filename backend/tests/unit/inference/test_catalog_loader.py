@@ -18,6 +18,7 @@ from backend.inference.catalog_loader import (
     get_verified_models,
     lookup,
     lookup_provider_model,
+    model_supports_vision,
     prefers_short_tool_descriptions,
     sanitize_call_kwargs_for_provider,
     supports_function_calling,
@@ -540,3 +541,14 @@ class TestTransportSanitizationAndValidation:
         from backend.inference.catalog_loader import validate_model_transport
 
         validate_model_transport('opencode/gemini-3-flash')
+
+
+class TestModelSupportsVision:
+    def test_known_vision_model(self):
+        assert model_supports_vision('openai/gpt-5') is True
+
+    def test_known_non_vision_model(self):
+        assert model_supports_vision('deepseek/deepseek-chat') is False
+
+    def test_unknown_model(self):
+        assert model_supports_vision('unknown/not-a-real-model') is False
