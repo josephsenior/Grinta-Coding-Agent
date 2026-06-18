@@ -6,12 +6,12 @@ from typing import Any
 import httpx
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
-from backend.utils.http.http_session import HttpSession
 from backend.utils.async_helpers.tenacity_metrics import (
     tenacity_after_factory,
     tenacity_before_sleep_factory,
 )
 from backend.utils.async_helpers.tenacity_stop import stop_if_should_exit
+from backend.utils.http.http_session import HttpSession
 
 
 class RequestHTTPError(httpx.HTTPStatusError):

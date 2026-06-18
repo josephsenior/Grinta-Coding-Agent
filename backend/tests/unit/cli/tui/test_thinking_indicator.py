@@ -18,13 +18,17 @@ class _ThinkingHost(App):
 
 
 @pytest.mark.asyncio
-async def test_thinking_indicator_finalized_inline_code_uses_lightweight_highlight() -> None:
+async def test_thinking_indicator_finalized_inline_code_uses_lightweight_highlight() -> (
+    None
+):
     app = _ThinkingHost()
 
     async with app.run_test():
         widget = app.query_one('#thinking', ThinkingIndicator)
         widget.start()
-        widget.set_thoughts('Inspect `backend/main.py` before editing.', streaming=False)
+        widget.set_thoughts(
+            'Inspect `backend/main.py` before editing.', streaming=False
+        )
 
         content = widget.query_one('#thinking-content', Static)
         renderable = content.renderable

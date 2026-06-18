@@ -32,11 +32,11 @@ from backend.core.os_capabilities import OS_CAPS
 from backend.execution.action_execution_server_io import (
     RuntimeExecutorIOAndTerminalMixin,
 )
-from backend.execution.debugger import DAPDebugManager
 from backend.execution.aes.file_operations import (
     get_max_edit_observation_chars,
     truncate_large_text,
 )
+from backend.execution.debugger import DAPDebugManager
 from backend.execution.mcp.proxy import MCPProxyManager
 from backend.execution.plugin_loader import init_plugins
 from backend.execution.plugins import Plugin
@@ -160,7 +160,9 @@ class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
         self.session_manager.security_config = security_config
 
         if self.session_manager.tool_registry is not None:
-            from backend.utils.terminal.terminal_contract import set_active_tool_registry
+            from backend.utils.terminal.terminal_contract import (
+                set_active_tool_registry,
+            )
 
             set_active_tool_registry(self.session_manager.tool_registry)
 

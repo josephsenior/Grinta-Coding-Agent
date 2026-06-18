@@ -74,7 +74,6 @@ TRANSCRIPT_BLOCK_MARGIN = 2
 TRANSCRIPT_PADDING_VERTICAL = 2
 
 
-
 def footer_color_for_exit_code(exit_code: int | None) -> str:
     if exit_code == 0:
         return TERM_FOOTER_OK

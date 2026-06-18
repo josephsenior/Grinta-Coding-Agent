@@ -301,28 +301,32 @@ def test_terminal_helpers_fall_back_to_bash_when_powershell_unavailable_on_windo
 
 def test_python_shell_command_prefers_python3_in_bash_mode():
     with patch(
-        'backend.utils.terminal.terminal_contract.uses_powershell_terminal', return_value=False
+        'backend.utils.terminal.terminal_contract.uses_powershell_terminal',
+        return_value=False,
     ):
         assert get_python_shell_command() == 'python3'
 
 
 def test_python_shell_command_prefers_python_on_windows():
     with patch(
-        'backend.utils.terminal.terminal_contract.uses_powershell_terminal', return_value=False
+        'backend.utils.terminal.terminal_contract.uses_powershell_terminal',
+        return_value=False,
     ):
         assert get_python_shell_command() == 'python3'
 
 
 def test_python_shell_command_prefers_python_in_powershell_mode():
     with patch(
-        'backend.utils.terminal.terminal_contract.uses_powershell_terminal', return_value=True
+        'backend.utils.terminal.terminal_contract.uses_powershell_terminal',
+        return_value=True,
     ):
         assert get_python_shell_command() == 'python'
 
 
 def test_build_python_exec_command_base64_encodes_script():
     with patch(
-        'backend.utils.terminal.terminal_contract.uses_powershell_terminal', return_value=False
+        'backend.utils.terminal.terminal_contract.uses_powershell_terminal',
+        return_value=False,
     ):
         command = build_python_exec_command('print("hello")')
 
@@ -333,7 +337,8 @@ def test_build_python_exec_command_base64_encodes_script():
 
 def test_build_python_exec_command_includes_shell_fallbacks_for_bash():
     with patch(
-        'backend.utils.terminal.terminal_contract.uses_powershell_terminal', return_value=False
+        'backend.utils.terminal.terminal_contract.uses_powershell_terminal',
+        return_value=False,
     ):
         command = build_python_exec_command('print("hello")')
 
@@ -345,7 +350,8 @@ def test_build_python_exec_command_includes_shell_fallbacks_for_bash():
 
 def test_build_python_exec_command_includes_shell_fallbacks_for_powershell():
     with patch(
-        'backend.utils.terminal.terminal_contract.uses_powershell_terminal', return_value=True
+        'backend.utils.terminal.terminal_contract.uses_powershell_terminal',
+        return_value=True,
     ):
         command = build_python_exec_command('print("hello")')
 

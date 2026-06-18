@@ -649,5 +649,9 @@ def test_syntax_line_text_keeps_colors_without_background() -> None:
     rendered = _syntax_line_text('def foo():', 'python')
     assert 'foo' in rendered.plain
     for span in rendered.spans:
-        style = span.style if isinstance(span.style, Style) else Style.parse(str(span.style))
+        style = (
+            span.style
+            if isinstance(span.style, Style)
+            else Style.parse(str(span.style))
+        )
         assert style.bgcolor is None

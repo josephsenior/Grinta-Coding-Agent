@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from backend.inference.catalog_loader import lookup
 from backend.inference.capabilities.param_profiles import (
     resolve_effective_model_entry,
     resolve_model_entry_for_capabilities,
     resolve_param_profile_id,
     synthetic_entry_from_profile,
 )
+from backend.inference.catalog_loader import lookup
 from backend.inference.reasoning import reasoning_effort_options
 from backend.inference.runtime_profile import resolve_runtime_profile
 

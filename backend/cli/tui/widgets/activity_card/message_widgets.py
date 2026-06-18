@@ -212,9 +212,7 @@ class ThinkingIndicator(Container):
         from backend.cli.tui.renderer.prep import prep_streaming_renderable
 
         content.remove_class('-hidden')
-        body = prep_streaming_renderable(
-            full_text, base_text_style=CLR_REASONING_SNAP
-        )
+        body = prep_streaming_renderable(full_text, base_text_style=CLR_REASONING_SNAP)
         content.update(Group(self._thinking_prefix_renderable(), body))
 
     def _update_display(self, *, streaming: bool = False) -> None:

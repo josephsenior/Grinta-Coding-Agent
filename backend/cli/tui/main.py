@@ -19,8 +19,8 @@ from textual.reactive import Reactive
 
 from backend.cli.display.hud import HUDBar
 from backend.cli.display.reasoning_display import ReasoningDisplay
-from backend.cli.theme.syntax_theme import GRINTA_TERMINAL_THEME
 from backend.cli.theme import grinta_rich_theme_styles
+from backend.cli.theme.syntax_theme import GRINTA_TERMINAL_THEME
 
 # ── Rich theme for consistent markup in RichLog/Static widgets ─────────────
 _RICH_THEME = RichTheme(grinta_rich_theme_styles())

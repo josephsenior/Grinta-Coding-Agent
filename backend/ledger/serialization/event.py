@@ -12,10 +12,10 @@ from pydantic import BaseModel
 from backend.core.pydantic_compat import model_dump_with_options
 from backend.inference.metrics import Cost, Metrics, ResponseLatency, TokenUsage
 from backend.ledger.event import Event, EventSource
+from backend.ledger.infra.tool import ToolCallMetadata
 from backend.ledger.serialization.action import action_from_dict
 from backend.ledger.serialization.observation import observation_from_dict
 from backend.ledger.serialization.serialization_utils import remove_fields
-from backend.ledger.infra.tool import ToolCallMetadata
 
 TOP_KEYS = [
     'id',

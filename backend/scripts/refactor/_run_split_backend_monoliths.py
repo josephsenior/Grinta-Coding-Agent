@@ -42,7 +42,13 @@ def split_module(
         if cross_imports and suffix in cross_imports:
             extra = cross_imports[suffix]
             if extra:
-                content = content.rstrip() + '\n\n' + '\n'.join(extra) + '\n\n' + body.lstrip('\n')
+                content = (
+                    content.rstrip()
+                    + '\n\n'
+                    + '\n'.join(extra)
+                    + '\n\n'
+                    + body.lstrip('\n')
+                )
                 # rebuild properly
                 content = f'"""{doc}"""\n\n' + header
                 content += '\n'.join(extra) + '\n\n'

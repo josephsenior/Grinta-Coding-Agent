@@ -57,7 +57,10 @@ def parse_docx(file_path: str) -> None:
         file_path: str: The path to the file to open.
 
     """
-    output_lines = [f'[Reading DOCX file from {file_path}]', extract_docx_text(file_path)]
+    output_lines = [
+        f'[Reading DOCX file from {file_path}]',
+        extract_docx_text(file_path),
+    ]
     print('\n'.join(output_lines) + '\n')
 
 

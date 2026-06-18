@@ -19,6 +19,7 @@ from rich.syntax import Syntax
 from rich.text import Text
 
 from backend.cli._typing import ObservationRenderersHost
+from backend.cli.display.layout_tokens import ACTIVITY_BLOCK_BOTTOM_PAD
 from backend.cli.display.transcript import (
     strip_tool_result_validation_annotations,
 )
@@ -28,7 +29,6 @@ from backend.cli.event_rendering.observations.shell_helpers import (
 from backend.cli.event_rendering.text_utils import (
     strip_pty_echo as _strip_pty_echo,
 )
-from backend.cli.display.layout_tokens import ACTIVITY_BLOCK_BOTTOM_PAD
 from backend.cli.theme import (
     CLR_OUTPUT_PANEL_BORDER,
     CLR_OUTPUT_PANEL_TITLE,

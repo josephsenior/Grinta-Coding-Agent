@@ -14,8 +14,8 @@ from collections.abc import Callable
 from typing import Any
 
 from backend.core.logger import app_logger as logger
-from backend.ledger.infra.config import get_event_runtime_defaults
 from backend.ledger.event import Event
+from backend.ledger.infra.config import get_event_runtime_defaults
 
 
 class BackpressureManager:

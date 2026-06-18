@@ -30,8 +30,8 @@ if TYPE_CHECKING:
     from backend.ledger.stream import EventStream
     from backend.orchestration import SessionOrchestrator
     from backend.orchestration.agent import Agent
-    from backend.orchestration.telemetry.conversation_stats import ConversationStats
     from backend.orchestration.state.state import State
+    from backend.orchestration.telemetry.conversation_stats import ConversationStats
 
 
 from backend.core.bootstrap.agent_control_loop import run_agent_until_done
@@ -271,7 +271,9 @@ def _create_early_status_callback(
                     run_or_schedule(controller.set_agent_state_to(AgentState.ERROR))
                 except Exception:
                     try:
-                        from backend.utils.async_helpers.async_utils import create_tracked_task
+                        from backend.utils.async_helpers.async_utils import (
+                            create_tracked_task,
+                        )
 
                         create_tracked_task(
                             controller.set_agent_state_to(AgentState.ERROR),

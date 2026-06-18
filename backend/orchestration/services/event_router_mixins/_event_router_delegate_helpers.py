@@ -61,7 +61,6 @@ def _summarize_delegate_file_action(
         )
         return 'running', f'Read {event.path}{loc}'
 
-
     if isinstance(event, FileEditAction):
         command = getattr(event, 'command', '') or ''
         if command == 'create_file':

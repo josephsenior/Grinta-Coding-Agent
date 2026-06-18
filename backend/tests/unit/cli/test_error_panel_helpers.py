@@ -85,8 +85,9 @@ def test_build_error_panel_regular_error_is_panel() -> None:
 
 
 def test_build_error_tui_renderable_is_group() -> None:
-    from backend.cli.event_rendering.error_panel import build_error_tui_renderable
     from rich.console import Group
+
+    from backend.cli.event_rendering.error_panel import build_error_tui_renderable
 
     renderable = build_error_tui_renderable(
         'ERROR:\nSomething broke badly\nmore detail',

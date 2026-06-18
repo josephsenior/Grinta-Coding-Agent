@@ -5,13 +5,14 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Self
 
-from backend.context.context_budget import ContextBudget
+import backend.context.context_pipeline as _cp
+from backend.context.compaction.compact_boundary import project_after_compact_boundary
 from backend.context.compaction.microcompact import apply_microcompact
 from backend.context.compaction.pre_condensation_snapshot import (
     extract_snapshot,
     save_snapshot,
 )
-from backend.context.compaction.compact_boundary import project_after_compact_boundary
+from backend.context.context_budget import ContextBudget
 from backend.context.memory.session_context import bind_session_context
 from backend.context.tool_result_storage import (
     apply_frozen_tool_replacements,
@@ -25,8 +26,6 @@ from backend.core.constants import (
 from backend.core.logger import app_logger as logger
 from backend.inference.capabilities.context_limits import limits_from_config
 from backend.ledger.event import Event
-
-import backend.context.context_pipeline as _cp
 
 if TYPE_CHECKING:
     from backend.core.config.compactor_config import ContextPipelineConfig
@@ -163,7 +162,9 @@ class ContextPipelineBaseMixin:
             return False
         llm_config = self._llm_config(state)
         events = self._project_layers_1_to_3(history, state, apply_tool_budget=False)
-        budget = _cp.ContextBudget.from_events(events, llm_config=llm_config, state=state)
+        budget = _cp.ContextBudget.from_events(
+            events, llm_config=llm_config, state=state
+        )
         view = getattr(state, 'view', None)
         explicit = bool(getattr(view, 'unhandled_condensation_request', False))
         turn_signals = getattr(state, 'turn_signals', None)

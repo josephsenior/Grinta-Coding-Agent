@@ -251,7 +251,9 @@ def _toml_check(path: str, language: str, code: str) -> SyntaxCheckResult:
 
 def _render_python_syntax_error(exc: SyntaxError, code: str, path: str) -> str:
     try:
-        from backend.utils.treesitter.treesitter_editor import _render_python_syntax_error
+        from backend.utils.treesitter.treesitter_editor import (
+            _render_python_syntax_error,
+        )
 
         return _render_python_syntax_error(exc, code, path)
     except Exception:

@@ -2,23 +2,10 @@
 
 from __future__ import annotations
 
-import json
 import time
-from dataclasses import asdict, dataclass, field
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from backend.core.logger import app_logger as logger
-
-
 from backend.context.canonical_state.types import (
-    BackgroundTaskState,
-    CanonicalTaskState,
-    FailedApproach,
-    FieldFreshness,
-    RecentWorkItem,
-    TaskPlanItem,
-    VerificationState,
     _MAX_BACKGROUND_TASKS,
     _MAX_BLOCKERS,
     _MAX_FAILED_APPROACHES,
@@ -27,13 +14,18 @@ from backend.context.canonical_state.types import (
     _MAX_TASK_PLAN_ITEMS,
     _MAX_VERIFICATION_OUTPUT_CHARS,
     _PIVOT_MARKERS,
+    BackgroundTaskState,
+    CanonicalTaskState,
+    FailedApproach,
+    FieldFreshness,
+    RecentWorkItem,
+    TaskPlanItem,
+    VerificationState,
     clip_with_marker,
 )
 
 if TYPE_CHECKING:
     from backend.ledger.event import Event
-    from backend.orchestration.state.state import State
-
 
 
 def _set_field(
@@ -625,23 +617,3 @@ def _is_control_noise(text: str) -> bool:
             'restored context',
         )
     )
-
-
-__all__ = [
-    'CANONICAL_STATE_MARKER',
-    'BackgroundTaskState',
-    'CanonicalTaskState',
-    'CanonicalValidationResult',
-    'FailedApproach',
-    'FieldFreshness',
-    'RecentWorkItem',
-    'VerificationState',
-    'apply_canonical_patch',
-    'canonical_state_path',
-    'load_canonical_state',
-    'reduce_events_into_state',
-    'reduce_snapshot_into_state',
-    'render_canonical_state_for_prompt',
-    'save_canonical_state',
-    'validate_canonical_state_for_compaction',
-]

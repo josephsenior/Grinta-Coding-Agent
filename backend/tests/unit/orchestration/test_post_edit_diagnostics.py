@@ -148,7 +148,8 @@ async def test_post_edit_diagnostics_offloads_lsp_from_loop(tmp_path) -> None:
         patch(
             'backend.orchestration.middleware.post_edit_diagnostics.call_sync_from_async',
             wraps=__import__(
-                'backend.utils.async_helpers.async_utils', fromlist=['call_sync_from_async']
+                'backend.utils.async_helpers.async_utils',
+                fromlist=['call_sync_from_async'],
             ).call_sync_from_async,
         ) as offload,
     ):

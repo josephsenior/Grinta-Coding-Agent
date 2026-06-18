@@ -6,7 +6,6 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from backend.inference.catalog_loader import lookup
 from backend.inference.capabilities.context_limits import (
     DEFAULT_UNKNOWN_CONTEXT_WINDOW_TOKENS,
     ModelContextLimits,
@@ -14,6 +13,7 @@ from backend.inference.capabilities.context_limits import (
     limits_from_catalog,
 )
 from backend.inference.capabilities.param_profiles import resolve_param_profile_id
+from backend.inference.catalog_loader import lookup
 from backend.inference.registry import normalize_provider_name
 
 _RUNTIME_PROFILE_KEY = '_grinta_runtime_profile'

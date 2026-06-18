@@ -14,11 +14,11 @@ else:
 from rich.padding import Padding
 
 from backend.cli._typing import ActionRenderersHost
-from backend.cli.display.transcript import (  # noqa: E402
-    format_orient_line,
-)
 from backend.cli.display.layout_tokens import (
     ACTIVITY_BLOCK_BOTTOM_PAD,
+)
+from backend.cli.display.transcript import (  # noqa: E402
+    format_orient_line,
 )
 from backend.cli.tool_display.orient_tools import (
     ORIENT_MCP_TOOL_NAMES,

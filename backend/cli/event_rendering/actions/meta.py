@@ -15,15 +15,15 @@ from rich.console import Group
 from rich.text import Text
 
 from backend.cli._typing import ActionRenderersHost
+from backend.cli.display.layout_tokens import (
+    ACTIVITY_CARD_TITLE_DELEGATION,
+    DECISION_PANEL_ACCENT_STYLE,
+)
 from backend.cli.display.transcript import (  # noqa: E402
     format_callout_panel,
 )
 from backend.cli.event_rendering.delegate import (
     summarize_delegate_action as _summarize_delegate_action,
-)
-from backend.cli.display.layout_tokens import (
-    ACTIVITY_CARD_TITLE_DELEGATION,
-    DECISION_PANEL_ACCENT_STYLE,
 )
 from backend.cli.theme import (
     CLR_OPTION_RECOMMENDED,

@@ -15,8 +15,8 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from backend.core.io_adapters import json
 from backend.core.logger import app_logger as logger
-from backend.ledger.stream.durable_writer import DurableEventWriter, PersistedEvent
 from backend.ledger.infra.integrity import embed_checksum
+from backend.ledger.stream.durable_writer import DurableEventWriter, PersistedEvent
 from backend.persistence.locations import get_conversation_events_dir
 
 if TYPE_CHECKING:

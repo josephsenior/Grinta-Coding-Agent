@@ -25,12 +25,12 @@ from backend.cli.tui.image_attachments import (
 )
 from backend.cli.tui.image_input_gate import image_input_blocked_reason
 from backend.cli.tui.renderer.handlers.status import notify_ui_only_error
-from backend.ledger.observation.error import ERROR_CATEGORY_BAD_REQUEST
 from backend.cli.tui.widgets.small import (
     InputBar,
 )
 from backend.core.logger import app_logger as logger
 from backend.ledger import EventStreamSubscriber
+from backend.ledger.observation.error import ERROR_CATEGORY_BAD_REQUEST
 
 
 def _parse_sessions_tui_args(args: list[str]) -> dict[str, Any]:

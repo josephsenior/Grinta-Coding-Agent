@@ -175,7 +175,9 @@ class RecoveryService:
             Timeout,
         )
 
-        if isinstance(exc, (BadRequestError, RateLimitError, APIConnectionError, Timeout)):
+        if isinstance(
+            exc, (BadRequestError, RateLimitError, APIConnectionError, Timeout)
+        ):
             return
 
         try:

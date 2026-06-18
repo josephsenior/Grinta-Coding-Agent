@@ -24,7 +24,9 @@ _MAX_CURRENT_STATE_FILES = 12
 def _sync_findings_block(
     memory: dict[str, Any], snapshot: dict[str, Any]
 ) -> str | None:
-    from backend.context.compaction.pre_condensation_snapshot import format_snapshot_for_injection
+    from backend.context.compaction.pre_condensation_snapshot import (
+        format_snapshot_for_injection,
+    )
 
     block = format_snapshot_for_injection(snapshot)
     if block and block.strip():
@@ -464,7 +466,9 @@ def build_working_set_observation(
     not inject this — it is rendered through the condensation observation path
     and would falsely tell the model that context was already condensed.
     """
-    from backend.context.compaction.compact_boundary import find_last_condensation_action
+    from backend.context.compaction.compact_boundary import (
+        find_last_condensation_action,
+    )
 
     has_compacted = find_last_condensation_action(events) is not None
     if not has_compacted and not _session_has_durable_artifacts(state=state):

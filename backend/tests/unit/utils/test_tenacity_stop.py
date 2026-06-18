@@ -31,16 +31,22 @@ class TestStopIfShouldExit:
         def mock_should_exit():
             return True
 
-        original = getattr(backend.utils.async_helpers.tenacity_stop, 'should_exit', None)
+        original = getattr(
+            backend.utils.async_helpers.tenacity_stop, 'should_exit', None
+        )
         try:
-            cast(Any, backend.utils.async_helpers.tenacity_stop).should_exit = mock_should_exit
+            cast(
+                Any, backend.utils.async_helpers.tenacity_stop
+            ).should_exit = mock_should_exit
             result = stop_condition(retry_state)
             assert result is True
         finally:
             if original is None:
                 delattr(backend.utils.async_helpers.tenacity_stop, 'should_exit')
             else:
-                cast(Any, backend.utils.async_helpers.tenacity_stop).should_exit = original
+                cast(
+                    Any, backend.utils.async_helpers.tenacity_stop
+                ).should_exit = original
 
     def test_returns_false_when_should_continue(self):
         """Test returns False when no shutdown requested."""
@@ -75,16 +81,22 @@ class TestStopIfShouldExit:
         def mock_should_exit():
             return True
 
-        original = getattr(backend.utils.async_helpers.tenacity_stop, 'should_exit', None)
+        original = getattr(
+            backend.utils.async_helpers.tenacity_stop, 'should_exit', None
+        )
         try:
-            cast(Any, backend.utils.async_helpers.tenacity_stop).should_exit = mock_should_exit
+            cast(
+                Any, backend.utils.async_helpers.tenacity_stop
+            ).should_exit = mock_should_exit
             result = stop_condition(retry_state)
             assert result is True
         finally:
             if original is None:
                 delattr(backend.utils.async_helpers.tenacity_stop, 'should_exit')
             else:
-                cast(Any, backend.utils.async_helpers.tenacity_stop).should_exit = original
+                cast(
+                    Any, backend.utils.async_helpers.tenacity_stop
+                ).should_exit = original
 
     def test_callable_local_fallback(self):
         """Test falls back to local callable if available."""

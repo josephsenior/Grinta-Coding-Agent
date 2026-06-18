@@ -14,6 +14,15 @@ from typing import TYPE_CHECKING
 from binaryornot.check import is_binary
 
 from backend.core.enums import FileReadSource
+from backend.execution.aes.file_operations import (
+    handle_file_read_errors,
+    read_docx_file,
+    read_image_file,
+    read_pdf_text_file,
+    read_pptx_file,
+    read_text_file,
+    read_video_file,
+)
 from backend.execution.aes.helpers import (
     edit_try_directory_view as _edit_try_directory_view_impl,
 )
@@ -28,15 +37,6 @@ from backend.execution.aes.helpers import (
 )
 from backend.execution.aes.helpers import (
     resolve_path as _resolve_path_impl,
-)
-from backend.execution.aes.file_operations import (
-    handle_file_read_errors,
-    read_docx_file,
-    read_image_file,
-    read_pdf_text_file,
-    read_pptx_file,
-    read_text_file,
-    read_video_file,
 )
 from backend.ledger.action import (
     FileEditAction,

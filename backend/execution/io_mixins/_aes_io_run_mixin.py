@@ -14,6 +14,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from backend.core.logger import app_logger as logger
+from backend.execution.aes.file_operations import (
+    truncate_cmd_output,
+)
 from backend.execution.aes.helpers import (
     apply_grep_filter as _apply_grep_filter_impl,
 )
@@ -22,9 +25,6 @@ from backend.execution.aes.helpers import (
 )
 from backend.execution.aes.helpers import (
     attach_detected_server as _attach_detected_server_impl,
-)
-from backend.execution.aes.file_operations import (
-    truncate_cmd_output,
 )
 from backend.execution.utils.shell.unified_shell import BaseShellSession
 from backend.ledger.action import (

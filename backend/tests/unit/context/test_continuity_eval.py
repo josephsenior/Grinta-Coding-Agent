@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
+from backend.context.compaction.pre_condensation_snapshot import (
+    extract_snapshot,
+    format_snapshot_for_injection,
+)
 from backend.context.continuity_eval import (
     build_continuity_facts,
     compaction_passes_continuity_gate,
     evaluate_restored_context,
-)
-from backend.context.compaction.pre_condensation_snapshot import (
-    extract_snapshot,
-    format_snapshot_for_injection,
 )
 from backend.ledger.action.agent import AgentThinkAction
 from backend.ledger.action.commands import CmdRunAction

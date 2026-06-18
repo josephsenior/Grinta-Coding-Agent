@@ -2,29 +2,11 @@
 
 from __future__ import annotations
 
-from backend.context.compaction.compaction_finalizer import finalize_compaction_artifacts
-from backend.context.context_budget import ContextBudget, record_post_compact_baseline
+from backend.context.compaction.compaction_finalizer import (
+    finalize_compaction_artifacts,
+)
 from backend.context.compaction.pre_condensation_snapshot import delete_staging_snapshot
-from backend.context.memory.session_memory import (
-    build_compaction_summary,
-    maybe_update,
-    session_memory_exists,
-)
-from backend.context.context_pipeline.types import (
-    PipelineStepResult,
-    _COMPACTION_TARGET_RATIO,
-    _CONSECUTIVE_CONDENSATION_KEY,
-    _CONTINUITY_REJECTION_FP_KEY,
-    _CONTINUITY_REJECTION_STREAK_KEY,
-    _ContinuityGateDecision,
-    _DETERMINISTIC_FALLBACK_THRESHOLD,
-    _INEFFECTIVE_COMPACT_STREAK_KEY,
-    _INEFFECTIVE_COMPACT_UNTIL_KEY,
-    _JUST_COMPACTED_KEY,
-    _LAST_BOUNDARY_COMPACT_KEY,
-    _LAST_LLM_COMPACT_KEY,
-    _SKIP_COMPACTION_UNTIL_KEY,
-)
+from backend.context.context_budget import ContextBudget, record_post_compact_baseline
 from backend.context.context_pipeline.core import ContextPipeline
 from backend.context.context_pipeline.helpers import (
     _drop_stale_prompt_state_artifacts,
@@ -35,6 +17,26 @@ from backend.context.context_pipeline.helpers import (
     _shrink_tail_for_token_reduction,
     _synthetic_history_after_action,
     apply_ineffective_compaction_backoff,
+)
+from backend.context.context_pipeline.types import (
+    _COMPACTION_TARGET_RATIO,
+    _CONSECUTIVE_CONDENSATION_KEY,
+    _CONTINUITY_REJECTION_FP_KEY,
+    _CONTINUITY_REJECTION_STREAK_KEY,
+    _DETERMINISTIC_FALLBACK_THRESHOLD,
+    _INEFFECTIVE_COMPACT_STREAK_KEY,
+    _INEFFECTIVE_COMPACT_UNTIL_KEY,
+    _JUST_COMPACTED_KEY,
+    _LAST_BOUNDARY_COMPACT_KEY,
+    _LAST_LLM_COMPACT_KEY,
+    _SKIP_COMPACTION_UNTIL_KEY,
+    PipelineStepResult,
+    _ContinuityGateDecision,
+)
+from backend.context.memory.session_memory import (
+    build_compaction_summary,
+    maybe_update,
+    session_memory_exists,
 )
 
 __all__ = [

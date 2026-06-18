@@ -11,9 +11,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-SUPPORTED_IMAGE_SUFFIXES = frozenset(
-    {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'}
-)
+SUPPORTED_IMAGE_SUFFIXES = frozenset({'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'})
 
 _IMAGE_ATTACHMENT_STYLE = 'bold #5eead4'
 
@@ -88,11 +86,7 @@ def _dib_to_bmp(dib: bytes) -> bytes | None:
         color_table_size = palette_entries * 4
     pixel_offset = 14 + header_size + color_table_size
     file_size = 14 + len(dib)
-    return (
-        b'BM'
-        + struct.pack('<III', file_size, 0, pixel_offset)
-        + dib
-    )
+    return b'BM' + struct.pack('<III', file_size, 0, pixel_offset) + dib
 
 
 def _read_windows_clipboard_image() -> ClipboardImage | None:

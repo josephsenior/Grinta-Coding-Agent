@@ -10,12 +10,18 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, cast
 
-from backend.context.processors.action_processors import convert_action_to_messages
+from backend.context.compaction.pre_condensation_snapshot import (
+    is_durable_decision_text,
+)
 from backend.context.context_tracking import ContextTracker
 from backend.context.memory.types import (
     ContextAnchor,
     Decision,
     DecisionType,
+)
+from backend.context.processors.action_processors import convert_action_to_messages
+from backend.context.processors.observation_processors import (
+    convert_observation_to_message,
 )
 from backend.context.prompt.message_formatting import (
     apply_user_message_formatting,
@@ -26,8 +32,6 @@ from backend.context.prompt.message_formatting import (
     message_with_text,
     remove_duplicate_system_prompt_user,
 )
-from backend.context.processors.observation_processors import convert_observation_to_message
-from backend.context.compaction.pre_condensation_snapshot import is_durable_decision_text
 from backend.context.prompt.prompt_assembly import process_recall_observation
 from backend.context.prompt.prompt_window import event_fingerprint
 from backend.context.tool_call_tracker import (

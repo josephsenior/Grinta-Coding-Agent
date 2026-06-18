@@ -10,8 +10,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from backend.execution.utils.shell.bash import BashSession
     from backend.execution.utils.server_detector import DetectedServer
+    from backend.execution.utils.shell.bash import BashSession
 
 
 def _detect_server_startup(orch: BashSession, output: str) -> None:

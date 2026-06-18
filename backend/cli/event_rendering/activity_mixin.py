@@ -18,6 +18,11 @@ from rich.padding import Padding
 from rich.style import Style
 from rich.text import Text
 
+from backend.cli.display.layout_tokens import (
+    ACTIVITY_BLOCK_BOTTOM_PAD,
+    ACTIVITY_CARD_TITLE_SHELL,
+)
+from backend.cli.display.path_links import file_uri_for_path, linkify_plain
 from backend.cli.display.transcript import (
     format_activity_block,
     format_activity_shell_block,
@@ -27,11 +32,6 @@ from backend.cli.display.transcript import (
 from backend.cli.event_rendering.panels import (
     PendingActivityCard,
 )
-from backend.cli.display.layout_tokens import (
-    ACTIVITY_BLOCK_BOTTOM_PAD,
-    ACTIVITY_CARD_TITLE_SHELL,
-)
-from backend.cli.display.path_links import file_uri_for_path, linkify_plain
 
 if TYPE_CHECKING:
     from backend.cli.event_renderer import CLIEventRenderer

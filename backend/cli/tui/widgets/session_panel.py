@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Container, Vertical
@@ -127,7 +125,9 @@ class SessionPanel(Container):
         ]
         if result:
             parts.append((' · ', _SESSION_DIM))
-            parts.append((result, _STATUS_RESULT_COLOR.get(status_key, CLR_REASONING_SNAP)))
+            parts.append(
+                (result, _STATUS_RESULT_COLOR.get(status_key, CLR_REASONING_SNAP))
+            )
         return Text.assemble(*parts)
 
     def _footer_text(self) -> str:

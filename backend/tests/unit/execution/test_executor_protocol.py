@@ -62,6 +62,7 @@ class TestRuntimeExecutorProtocol:
         """Test protocol specifies edit method for FileEditAction."""
         assert hasattr(RuntimeExecutorProtocol, 'edit')
 
+
 # ── Protocol Compliance ────────────────────────────────────────────────
 
 

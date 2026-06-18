@@ -20,12 +20,12 @@ from backend.ledger.observation import (
     Observation,
 )
 from backend.ledger.observation.terminal import TerminalObservation
-from backend.orchestration.tool_pipeline import ToolInvocationContext
 from backend.orchestration.middleware.tool_result_validator import (
     ToolResultValidator,
     ValidationResult,
     ValidationRule,
 )
+from backend.orchestration.tool_pipeline import ToolInvocationContext
 
 
 class TestValidationRule:

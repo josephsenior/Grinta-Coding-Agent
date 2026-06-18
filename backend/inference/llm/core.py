@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import copy
 import time
 from collections.abc import AsyncIterator, Callable
 from typing import (
@@ -14,26 +13,16 @@ from backend.core import json_compat as json
 from backend.core.errors import LLMNoResponseError
 from backend.core.logger import app_logger as logger
 from backend.core.message import Message
+from backend.inference.capabilities.model_features import ModelFeatures
 from backend.inference.debug_mixin import DebugMixin
 from backend.inference.exceptions import (
     APIConnectionError,
-    APIError,
     AuthenticationError,
-    BadRequestError,
-    ContentPolicyViolationError,
-    ContextWindowExceededError,
-    InternalServerError,
-    LLMError,
     RateLimitError,
     ServiceUnavailableError,
-    Timeout,
-    format_html_api_error_response,
-    is_context_window_error,
-    is_html_api_body,
 )
-from backend.inference.llm.utils import create_pretrained_tokenizer, get_token_count
+from backend.inference.llm.utils import get_token_count
 from backend.inference.metrics import Metrics
-from backend.inference.capabilities.model_features import ModelFeatures
 from backend.inference.retry_mixin import RetryMixin
 
 if TYPE_CHECKING:
@@ -43,19 +32,20 @@ from backend.inference.llm.config import (
     _apply_base_url_discovery,
     _apply_custom_tokenizer,
     _get_provider_resolver,
-    _load_cached_features,
     _llm_model_metadata_for_log,
+    _load_cached_features,
     _resolve_function_calling_config,
     _safe_call_kwargs_for_log,
     _validate_api_key_or_local,
 )
 from backend.inference.llm.exceptions import _map_provider_exception
 from backend.inference.llm.stream import (
-    LLM_RETRY_EXCEPTIONS,
     _INBAND_DISCONNECT_PHRASES,
     _INBAND_PREFIX_LIMIT,
+    LLM_RETRY_EXCEPTIONS,
     _stream_with_chunk_timeout,
 )
+
 
 class LLM(RetryMixin, DebugMixin):
     """Language Model abstraction layer with direct SDK client support.

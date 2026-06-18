@@ -73,7 +73,7 @@ if '_extract_pre_condensation_snapshot' not in base:
     base = base.rstrip() + '\n\n' + snapshot
     base_path.write_text(base, encoding='utf-8')
 
-facade = f'''"""ContextPipeline class — composes mixin submodules."""
+facade = '''"""ContextPipeline class — composes mixin submodules."""
 
 from __future__ import annotations
 

@@ -21,6 +21,12 @@ from rich.padding import Padding
 from rich.panel import Panel
 from rich.text import Text
 
+from backend.cli.display.layout_tokens import (
+    CALLOUT_PANEL_PADDING,
+    frame_live_body,
+    frame_transcript_body,
+    gap_below_live_section,
+)
 from backend.cli.display.status_chrome import (
     rich_fake_prompt_group,
     status_fields_from_hud,
@@ -36,12 +42,6 @@ from backend.cli.event_rendering.panels import (
 )
 from backend.cli.event_rendering.panels import (
     normalize_system_title as _normalize_system_title,
-)
-from backend.cli.display.layout_tokens import (
-    CALLOUT_PANEL_PADDING,
-    frame_live_body,
-    frame_transcript_body,
-    gap_below_live_section,
 )
 from backend.cli.theme import (
     CLR_USER_BG,

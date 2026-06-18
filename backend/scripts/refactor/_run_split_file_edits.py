@@ -11,8 +11,10 @@ lines = source.splitlines(keepends=True)
 
 HEADER = ''.join(lines[0:57])
 
+
 def slice_(start: int, end: int) -> str:
     return HEADER + ''.join(lines[start - 1 : end - 1])
+
 
 splits = {
     '_file_edits_symbols.py': (59, 542),

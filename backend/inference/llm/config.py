@@ -2,43 +2,21 @@
 
 from __future__ import annotations
 
-import copy
-import time
-from collections.abc import AsyncIterator, Callable
 from typing import (
     TYPE_CHECKING,
     Any,
 )
 
-from backend.core import json_compat as json
-from backend.core.errors import LLMNoResponseError
 from backend.core.logger import app_logger as logger
-from backend.core.message import Message
-from backend.inference.debug_mixin import DebugMixin
-from backend.inference.direct_clients import get_direct_client
-from backend.inference.exceptions import (
-    APIConnectionError,
-    APIError,
-    AuthenticationError,
-    BadRequestError,
-    ContentPolicyViolationError,
-    ContextWindowExceededError,
-    InternalServerError,
-    LLMError,
-    RateLimitError,
-    ServiceUnavailableError,
-    Timeout,
-    format_html_api_error_response,
-    is_context_window_error,
-    is_html_api_body,
-)
-from backend.inference.llm.utils import create_pretrained_tokenizer, get_token_count
-from backend.inference.metrics import Metrics
 from backend.inference.capabilities.model_features import ModelFeatures
-from backend.inference.retry_mixin import RetryMixin
+from backend.inference.exceptions import (
+    AuthenticationError,
+)
+from backend.inference.llm.utils import create_pretrained_tokenizer
 
 if TYPE_CHECKING:
-    from backend.core.config import LLMConfig
+    pass
+
 
 def _get_provider_resolver() -> Any:
     """Return the provider resolver instance."""
@@ -182,13 +160,13 @@ def _safe_call_kwargs_for_log(call_kwargs: dict[str, Any]) -> dict[str, Any]:
 
 def _llm_model_metadata_for_log(config: Any, resolver: Any) -> dict[str, Any]:
     """Return visible active model metadata for run logs."""
+    from backend.inference.capabilities.context_limits import limits_from_config
     from backend.inference.catalog_loader import (
         compact_metadata_for_log,
         lookup,
         runtime_model_id,
         runtime_parameter_mode,
     )
-    from backend.inference.capabilities.context_limits import limits_from_config
     from backend.inference.reasoning import reasoning_effort_options
 
     model = str(getattr(config, 'model', '') or '').strip()
@@ -280,4 +258,3 @@ def _llm_model_metadata_for_log(config: Any, resolver: Any) -> dict[str, Any]:
             },
         }
     return metadata
-

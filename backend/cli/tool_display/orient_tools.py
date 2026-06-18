@@ -620,7 +620,9 @@ def checkpoint_think_orient_model(
         verb = 'Saved'
     else:
         verb = 'Checkpoint'
-    target = payload[:52] + ('...' if len(payload) > 52 else '') if payload else 'checkpoint'
+    target = (
+        payload[:52] + ('...' if len(payload) > 52 else '') if payload else 'checkpoint'
+    )
     return OrientLineModel(
         tool='checkpoint',
         icon='',

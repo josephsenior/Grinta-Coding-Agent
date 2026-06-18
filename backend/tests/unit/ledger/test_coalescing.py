@@ -5,8 +5,12 @@ from __future__ import annotations
 import time
 from unittest.mock import MagicMock
 
-from backend.ledger.stream.coalescing import _COALESCE_TYPES, CoalescedBatch, EventCoalescer
 from backend.ledger.event import Event, EventSource
+from backend.ledger.stream.coalescing import (
+    _COALESCE_TYPES,
+    CoalescedBatch,
+    EventCoalescer,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers

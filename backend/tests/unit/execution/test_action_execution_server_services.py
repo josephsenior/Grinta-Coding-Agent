@@ -129,7 +129,10 @@ def test_close_cleans_resources(mock_executor) -> None:
     mock_executor._native_browser = native
     mock_executor.browser = MagicMock()
 
-    with patch('backend.utils.async_helpers.async_utils.call_async_from_sync', return_value=None):
+    with patch(
+        'backend.utils.async_helpers.async_utils.call_async_from_sync',
+        return_value=None,
+    ):
         mock_executor.close()
 
     mock_executor.debug_manager.close_all.assert_called_once()

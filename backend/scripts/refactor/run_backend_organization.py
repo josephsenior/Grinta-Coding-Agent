@@ -47,14 +47,38 @@ CONTEXT_PIPELINE_MOVES: dict[str, str] = {
 }
 
 CONTEXT_PIPELINE_IMPORTS: list[tuple[str, str]] = [
-    ('backend.context.context_pipeline_types', 'backend.context.context_pipeline.types'),
-    ('backend.context.context_pipeline_helpers', 'backend.context.context_pipeline.helpers'),
-    ('backend.context.context_pipeline_core_base', 'backend.context.context_pipeline.core_base'),
-    ('backend.context.context_pipeline_core_prepare', 'backend.context.context_pipeline.core_prepare'),
-    ('backend.context.context_pipeline_core_prompt', 'backend.context.context_pipeline.core_prompt'),
-    ('backend.context.context_pipeline_core_compact', 'backend.context.context_pipeline.core_compact'),
-    ('backend.context.context_pipeline_core_state', 'backend.context.context_pipeline.core_state'),
-    ('backend.context.context_pipeline_core_gates', 'backend.context.context_pipeline.core_gates'),
+    (
+        'backend.context.context_pipeline_types',
+        'backend.context.context_pipeline.types',
+    ),
+    (
+        'backend.context.context_pipeline_helpers',
+        'backend.context.context_pipeline.helpers',
+    ),
+    (
+        'backend.context.context_pipeline_core_base',
+        'backend.context.context_pipeline.core_base',
+    ),
+    (
+        'backend.context.context_pipeline_core_prepare',
+        'backend.context.context_pipeline.core_prepare',
+    ),
+    (
+        'backend.context.context_pipeline_core_prompt',
+        'backend.context.context_pipeline.core_prompt',
+    ),
+    (
+        'backend.context.context_pipeline_core_compact',
+        'backend.context.context_pipeline.core_compact',
+    ),
+    (
+        'backend.context.context_pipeline_core_state',
+        'backend.context.context_pipeline.core_state',
+    ),
+    (
+        'backend.context.context_pipeline_core_gates',
+        'backend.context.context_pipeline.core_gates',
+    ),
     ('backend.context.context_pipeline_core', 'backend.context.context_pipeline.core'),
 ]
 
@@ -70,7 +94,10 @@ CANONICAL_STATE_MOVES: dict[str, str] = {
 CANONICAL_STATE_IMPORTS: list[tuple[str, str]] = [
     ('backend.context.canonical_state_types', 'backend.context.canonical_state.types'),
     ('backend.context.canonical_state_ops', 'backend.context.canonical_state.ops'),
-    ('backend.context.canonical_state_private', 'backend.context.canonical_state.private'),
+    (
+        'backend.context.canonical_state_private',
+        'backend.context.canonical_state.private',
+    ),
 ]
 
 # --- inference/llm package (split siblings) ---
@@ -138,7 +165,10 @@ MEMORY_MOVES: dict[str, str] = {
 
 MEMORY_IMPORTS: list[tuple[str, str]] = [
     ('backend.context.agent_memory', 'backend.context.memory.agent_memory'),
-    ('backend.context.conversation_memory', 'backend.context.memory.conversation_memory'),
+    (
+        'backend.context.conversation_memory',
+        'backend.context.memory.conversation_memory',
+    ),
     ('backend.context.session_memory', 'backend.context.memory.session_memory'),
     ('backend.context.memory_types', 'backend.context.memory.types'),
     ('backend.context.working_set', 'backend.context.memory.working_set'),
@@ -153,8 +183,14 @@ PROCESSORS_MOVES: dict[str, str] = {
 }
 
 PROCESSORS_IMPORTS: list[tuple[str, str]] = [
-    ('backend.context.action_processors', 'backend.context.processors.action_processors'),
-    ('backend.context.observation_processors', 'backend.context.processors.observation_processors'),
+    (
+        'backend.context.action_processors',
+        'backend.context.processors.action_processors',
+    ),
+    (
+        'backend.context.observation_processors',
+        'backend.context.processors.observation_processors',
+    ),
 ]
 
 # --- context/compaction (distinct from compactor/ strategies) ---
@@ -170,9 +206,18 @@ COMPACTION_MOVES: dict[str, str] = {
 COMPACTION_IMPORTS: list[tuple[str, str]] = [
     ('backend.context.compact_boundary', 'backend.context.compaction.compact_boundary'),
     ('backend.context.microcompact', 'backend.context.compaction.microcompact'),
-    ('backend.context.compaction_finalizer', 'backend.context.compaction.compaction_finalizer'),
-    ('backend.context.condensed_history', 'backend.context.compaction.condensed_history'),
-    ('backend.context.pre_condensation_snapshot', 'backend.context.compaction.pre_condensation_snapshot'),
+    (
+        'backend.context.compaction_finalizer',
+        'backend.context.compaction.compaction_finalizer',
+    ),
+    (
+        'backend.context.condensed_history',
+        'backend.context.compaction.condensed_history',
+    ),
+    (
+        'backend.context.pre_condensation_snapshot',
+        'backend.context.compaction.pre_condensation_snapshot',
+    ),
 ]
 
 # --- context/prompt ---
@@ -250,9 +295,18 @@ CAPABILITIES_IMPORTS: list[tuple[str, str]] = [
         'backend.inference.provider_capabilities',
         'backend.inference.capabilities.provider_capabilities',
     ),
-    ('backend.inference.model_features', 'backend.inference.capabilities.model_features'),
-    ('backend.inference.param_profiles', 'backend.inference.capabilities.param_profiles'),
-    ('backend.inference.context_limits', 'backend.inference.capabilities.context_limits'),
+    (
+        'backend.inference.model_features',
+        'backend.inference.capabilities.model_features',
+    ),
+    (
+        'backend.inference.param_profiles',
+        'backend.inference.capabilities.param_profiles',
+    ),
+    (
+        'backend.inference.context_limits',
+        'backend.inference.capabilities.context_limits',
+    ),
 ]
 
 # --- inference/caching (replace prompt_caching before prompt_cache) ---
@@ -366,7 +420,10 @@ UTILS_ASYNC_HELPERS_MOVES: dict[str, str] = {
 
 UTILS_ASYNC_HELPERS_IMPORTS: list[tuple[str, str]] = [
     ('backend.utils.async_utils', 'backend.utils.async_helpers.async_utils'),
-    ('backend.utils.subprocess_bridge', 'backend.utils.async_helpers.subprocess_bridge'),
+    (
+        'backend.utils.subprocess_bridge',
+        'backend.utils.async_helpers.subprocess_bridge',
+    ),
     ('backend.utils.circuit_breaker', 'backend.utils.async_helpers.circuit_breaker'),
     ('backend.utils.tenacity_metrics', 'backend.utils.async_helpers.tenacity_metrics'),
     ('backend.utils.tenacity_stop', 'backend.utils.async_helpers.tenacity_stop'),
@@ -755,7 +812,10 @@ def _rewrite_imports() -> None:
 
 def main() -> None:
     _move_group(BACKEND / 'cli', CLI_MOVES)
-    _write_init(BACKEND / 'inference' / 'providers' / '__init__.py', 'Direct LLM provider client implementations.')
+    _write_init(
+        BACKEND / 'inference' / 'providers' / '__init__.py',
+        'Direct LLM provider client implementations.',
+    )
     _move_group(BACKEND / 'context', CONTEXT_PIPELINE_MOVES)
     _move_group(BACKEND / 'context', CANONICAL_STATE_MOVES)
     _move_group(BACKEND / 'inference', LLM_MOVES)

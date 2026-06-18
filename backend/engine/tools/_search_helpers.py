@@ -193,7 +193,9 @@ def attach_search_error_tool_result(
     path: str,
     output_mode: str | None = None,
 ) -> None:
-    from backend.execution.aes.structured_edit_errors import build_search_error_tool_result
+    from backend.execution.aes.structured_edit_errors import (
+        build_search_error_tool_result,
+    )
 
     message = str(getattr(observation, 'error', '') or observation.content or '')
     observation.tool_result = build_search_error_tool_result(

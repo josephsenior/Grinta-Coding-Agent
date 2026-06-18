@@ -20,7 +20,10 @@ from backend.ledger.observation import (
     FileReadObservation,
 )
 from backend.playbooks.engine import BasePlaybook, load_playbooks_from_dir
-from backend.utils.async_helpers.async_utils import GENERAL_TIMEOUT, call_async_from_sync
+from backend.utils.async_helpers.async_utils import (
+    GENERAL_TIMEOUT,
+    call_async_from_sync,
+)
 
 if TYPE_CHECKING:
     pass

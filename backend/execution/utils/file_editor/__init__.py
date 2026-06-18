@@ -30,13 +30,17 @@ from backend.core.type_safety.path_validation import (
 from backend.core.type_safety.sentinels import MISSING, Sentinel, is_missing
 from backend.execution.utils.file_editor._file_editor_io_helpers import _FileReadMeta
 from backend.execution.utils.file_editor._file_editor_types import ToolResult
-from backend.execution.utils.file_editor.file_editor_edit_mixin import FileEditorEditOpsMixin
+from backend.execution.utils.file_editor.file_editor_edit_mixin import (
+    FileEditorEditOpsMixin,
+)
 from backend.execution.utils.file_editor.file_editor_ops_mixin import FileEditorOpsMixin
 from backend.execution.utils.file_editor.file_editor_rollback_mixin import (
     FileEditorRollbackMixin,
     ToolError,
 )
-from backend.execution.utils.file_editor.file_editor_view_mixin import FileEditorViewMixin
+from backend.execution.utils.file_editor.file_editor_view_mixin import (
+    FileEditorViewMixin,
+)
 
 _GLOBAL_UNDO_HISTORY: dict[str, deque[str | None]] = defaultdict(
     lambda: deque(maxlen=32)

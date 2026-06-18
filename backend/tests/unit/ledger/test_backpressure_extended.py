@@ -12,8 +12,8 @@ import unittest
 from typing import Any
 from unittest.mock import MagicMock
 
-from backend.ledger.stream.backpressure import BackpressureManager
 from backend.ledger.event import Event
+from backend.ledger.stream.backpressure import BackpressureManager
 
 
 def _make_event() -> MagicMock:

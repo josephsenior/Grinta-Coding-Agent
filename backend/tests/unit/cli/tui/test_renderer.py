@@ -885,8 +885,6 @@ async def test_tui_terminal_observation_strips_control_traffic(mock_config):
 
         from backend.cli.tui.widgets.session_panel import SessionPanel
 
-        from backend.cli.tui.widgets.terminal_pane import TerminalPane
-
         renderer._process_event(CmdRunAction(command='powershell'))
         renderer._process_event(
             CmdOutputObservation(
@@ -1960,7 +1958,9 @@ async def test_tui_internal_thinking_payloads_render_as_activity_cards(mock_conf
             line for line in orient_lines if line.model.tool == 'checkpoint'
         ]
         assert len(checkpoint_lines) == 1
-        assert 'Saved' in str(checkpoint_lines[0].query_one('#orient-content').renderable)
+        assert 'Saved' in str(
+            checkpoint_lines[0].query_one('#orient-content').renderable
+        )
 
 
 @pytest.mark.asyncio
@@ -2198,7 +2198,9 @@ async def test_tui_file_edit_create_renders_compact_create_card(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_tui_file_edit_observation_uses_new_content_not_polluted_preview(mock_config):
+async def test_tui_file_edit_observation_uses_new_content_not_polluted_preview(
+    mock_config,
+):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -2235,9 +2237,7 @@ async def test_tui_file_edit_observation_uses_new_content_not_polluted_preview(m
         await pilot.pause()
 
         add_rows = [
-            row
-            for row in s.query(UnifiedDiffRow).results()
-            if row._row.kind == 'add'
+            row for row in s.query(UnifiedDiffRow).results() if row._row.kind == 'add'
         ]
         rendered = '\n'.join(row._row.text for row in add_rows)
         assert 'Real body' in rendered
@@ -2683,7 +2683,9 @@ async def test_tui_file_edit_observation_uses_diff_preview_rows_in_content(mock_
 
 
 @pytest.mark.asyncio
-async def test_tui_file_edit_observation_uses_diff_preview_rows_with_outcome(mock_config):
+async def test_tui_file_edit_observation_uses_diff_preview_rows_with_outcome(
+    mock_config,
+):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)

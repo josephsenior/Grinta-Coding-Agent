@@ -7,9 +7,9 @@ from types import SimpleNamespace
 import pytest
 
 from backend.ledger.event import Event
+from backend.ledger.infra.tool import ToolCallMetadata
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation_cause import attach_observation_cause
-from backend.ledger.infra.tool import ToolCallMetadata
 
 
 @pytest.fixture()

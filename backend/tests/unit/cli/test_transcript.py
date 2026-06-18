@@ -8,6 +8,7 @@ import pytest
 from rich.console import Console
 from rich.text import Text
 
+from backend.cli.display.layout_tokens import CALLOUT_PANEL_PADDING
 from backend.cli.display.transcript import (
     format_activity_block,
     format_activity_delta_secondary,
@@ -28,7 +29,6 @@ from backend.cli.display.transcript import (
     strip_pseudo_xml_function_calls,
     strip_tool_result_validation_annotations,
 )
-from backend.cli.display.layout_tokens import CALLOUT_PANEL_PADDING
 
 
 def test_format_ground_truth_tool_line_uses_ascii_prefix() -> None:
