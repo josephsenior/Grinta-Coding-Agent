@@ -1,4 +1,4 @@
-"""Tests for backend.context.memory_types — Decision, ContextAnchor, enums."""
+"""Tests for backend.context.memory.types — Decision, ContextAnchor, enums."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from datetime import datetime
 
 import pytest
 
-from backend.context.memory_types import (
+from backend.context.memory.types import (
     ContextAnchor,
     Decision,
     DecisionType,

@@ -73,7 +73,7 @@ def get_current_session_id() -> str | None:
 
 
 def _memory_path() -> Path:
-    from backend.context.session_context import scoped_agent_path
+    from backend.context.memory.session_context import scoped_agent_path
 
     return scoped_agent_path('working_memory', '.json')
 

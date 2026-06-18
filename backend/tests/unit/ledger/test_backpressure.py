@@ -1,4 +1,4 @@
-"""Unit tests for backend.ledger.backpressure — queue policy & stats."""
+"""Unit tests for backend.ledger.stream.backpressure — queue policy & stats."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import time
 
 import pytest
 
-from backend.ledger.backpressure import BackpressureManager
+from backend.ledger.stream.backpressure import BackpressureManager
 from backend.ledger.event import Event, EventSource
 
 # ---------------------------------------------------------------------------

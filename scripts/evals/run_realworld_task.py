@@ -3,7 +3,7 @@
 Loads repo ``settings.json`` first, then merges ``settings.bench.json`` overrides.
 After the run, writes a manifest with measured turn count, latency, and cost so
 you can fill qualitative scores into the results template and score with
-``scripts/score_agent_eval_pack.py``.
+``scripts/evals/score_agent_eval_pack.py``.
 """
 
 from __future__ import annotations

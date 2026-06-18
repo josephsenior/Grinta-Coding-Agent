@@ -1,4 +1,4 @@
-"""Unit tests for backend.context.conversation_memory — event→message conversion."""
+"""Unit tests for backend.context.memory.conversation_memory — event→message conversion."""
 
 from __future__ import annotations
 
@@ -9,9 +9,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.context.conversation_memory import ContextMemory
-from backend.context.memory_types import DecisionType
-from backend.context.message_formatting import (
+from backend.context.memory.conversation_memory import ContextMemory
+from backend.context.memory.types import DecisionType
+from backend.context.prompt.message_formatting import (
     apply_user_message_formatting,
     class_name_in_mro,
     extract_first_text,
@@ -32,7 +32,7 @@ from backend.ledger.observation.commands import CmdOutputObservation
 from backend.ledger.observation.files import FileEditObservation
 from backend.ledger.observation.mcp import MCPObservation
 from backend.ledger.observation.search import GlobObservation
-from backend.ledger.tool import ToolCallMetadata, build_tool_call_metadata
+from backend.ledger.infra.tool import ToolCallMetadata, build_tool_call_metadata
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -510,7 +510,7 @@ class TestVectorMemoryInit:
         from unittest.mock import MagicMock
 
         # Patch EnhancedVectorStore constructor to avoid optional deps.
-        import backend.context.conversation_memory as cm
+        import backend.context.memory.conversation_memory as cm
 
         fake_store = MagicMock(name='vector_store')
         monkeypatch.setattr(

@@ -29,7 +29,7 @@ from backend.cli.event_rendering.observations.shell_helpers import (
 from backend.cli.event_rendering.text_utils import (
     summarize_cmd_failure as _summarize_cmd_failure,
 )
-from backend.cli.layout_tokens import ACTIVITY_BLOCK_BOTTOM_PAD
+from backend.cli.display.layout_tokens import ACTIVITY_BLOCK_BOTTOM_PAD
 from backend.ledger.observation import (
     CmdOutputObservation,
 )

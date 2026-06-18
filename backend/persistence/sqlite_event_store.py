@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any
 
 from backend.core import json_compat as json
-from backend.ledger.integrity import (
+from backend.ledger.infra.integrity import (
     embed_checksum,
     repair_payload_checksum,
     verify_event_integrity,

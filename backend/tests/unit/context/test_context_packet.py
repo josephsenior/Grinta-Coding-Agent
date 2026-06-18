@@ -5,7 +5,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from backend.context.canonical_state import CanonicalTaskState, save_canonical_state
-from backend.context.context_packet import (
+from backend.context.prompt.context_packet import (
     CONTEXT_PACKET_MARKER,
     build_context_packet,
     build_context_packet_observation,
@@ -160,7 +160,7 @@ def test_context_packet_uses_snapshot_user_turns_for_compacted_continue(
         lambda state=None: tmp_path / 'canonical_task_state.json',
     )
     monkeypatch.setattr(
-        'backend.context.context_packet.load_snapshot',
+        'backend.context.prompt.context_packet.load_snapshot',
         lambda state=None: {
             'recent_user_messages': [
                 {'event_id': 12, 'text': 'Audit the runtime loop'},

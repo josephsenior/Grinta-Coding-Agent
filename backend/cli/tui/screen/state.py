@@ -246,7 +246,7 @@ class ScreenStateMixin:
 
     def _resolve_hud_model_entry(self) -> Any | None:
         from backend.cli.settings import get_current_model
-        from backend.inference.param_profiles import (
+        from backend.inference.capabilities.param_profiles import (
             resolve_model_entry_for_capabilities,
         )
         from backend.inference.registry import build_model_entries_by_provider

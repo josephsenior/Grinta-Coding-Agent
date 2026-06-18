@@ -1,4 +1,4 @@
-"""Tests for backend.execution.file_viewer_server module.
+"""Tests for backend.execution.server.file_viewer_server module.
 
 Targets 20.5% coverage (44 statements) by testing the FastAPI app routes.
 """
@@ -11,7 +11,7 @@ import tempfile
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.execution.file_viewer_server import create_app
+from backend.execution.server.file_viewer_server import create_app
 
 
 @pytest.fixture()

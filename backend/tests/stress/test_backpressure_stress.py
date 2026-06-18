@@ -17,8 +17,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.ledger.backpressure import BackpressureManager
-from backend.ledger.durable_writer import DurableEventWriter, PersistedEvent
+from backend.ledger.stream.backpressure import BackpressureManager
+from backend.ledger.stream.durable_writer import DurableEventWriter, PersistedEvent
 from backend.ledger.observation import NullObservation
 from backend.utils.circuit_breaker import CircuitBreaker, CircuitBreakerManager
 
@@ -146,7 +146,7 @@ class TestBackpressureCriticalEvents:
     async def test_runnable_and_cause_linked_events_are_critical(self):
         from backend.ledger.action import CmdRunAction
         from backend.ledger.observation import CmdOutputObservation
-        from backend.ledger.persistence import EventPersistence
+        from backend.ledger.stream.persistence import EventPersistence
 
         runnable = CmdRunAction(command='echo hi')
         runnable.id = 1

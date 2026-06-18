@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.ledger.secret_masker import SecretMasker
+from backend.ledger.infra.secret_masker import SecretMasker
 
 
 def test_masks_configured_secret_in_string() -> None:

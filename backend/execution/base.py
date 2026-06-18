@@ -35,7 +35,7 @@ from backend.execution.env_manager import EnvManagerMixin
 from backend.execution.git_setup import GitSetupMixin
 from backend.execution.playbook_loader import PlaybookLoaderMixin
 from backend.execution.plugins import PluginRequirement
-from backend.execution.security_enforcement import SecurityEnforcementMixin
+from backend.execution.aes.security_enforcement import SecurityEnforcementMixin
 from backend.execution.task_tracking import TaskTrackingMixin
 from backend.execution.utils.git_handler import CommandResult, GitHandler
 from backend.ledger import EventSource, EventStream, EventStreamSubscriber
@@ -859,7 +859,7 @@ class Runtime(
     def _make_verification_failure_observation(
         self, file_path: str, observation: Observation
     ) -> ErrorObservation:
-        from backend.execution.structured_edit_errors import (
+        from backend.execution.aes.structured_edit_errors import (
             build_verification_failure_tool_result,
             format_verification_failure_message,
         )

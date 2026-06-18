@@ -37,7 +37,7 @@ from backend.cli.event_rendering.panels import (
 from backend.cli.event_rendering.panels import (
     normalize_system_title as _normalize_system_title,
 )
-from backend.cli.layout_tokens import (
+from backend.cli.display.layout_tokens import (
     CALLOUT_PANEL_PADDING,
     frame_live_body,
     frame_transcript_body,

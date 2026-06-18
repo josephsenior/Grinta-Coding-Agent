@@ -12,7 +12,7 @@ from rich.text import Text
 
 import backend
 from backend.cli.event_rendering.panels import task_panel_signature
-from backend.cli.layout_tokens import (
+from backend.cli.display.layout_tokens import (
     SIDEBAR_VISIBLE_MIN_WIDTH,
     SIDEBAR_WIDTH_RATIO,
 )

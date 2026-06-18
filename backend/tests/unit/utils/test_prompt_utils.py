@@ -401,7 +401,7 @@ class TestOrchestratorPromptManager:
         )
 
         with patch(
-            'backend.inference.model_features.get_features',
+            'backend.inference.capabilities.model_features.get_features',
             return_value=SimpleNamespace(supports_function_calling=True),
         ):
             result = opm.get_system_message()

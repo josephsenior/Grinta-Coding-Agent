@@ -190,7 +190,7 @@ cleaned = provider_config_manager.validate_and_clean_params(
 Automatic feature detection:
 
 ```python
-from backend.inference.model_features import get_features
+from backend.inference.capabilities.model_features import get_features
 
 features = get_features("claude-haiku-4-5-20251001")
 
@@ -606,7 +606,7 @@ LLM_MODEL=gpt-4o-mini
 
 ```python
 # Check if model supports function calling
-from backend.inference.model_features import get_features
+from backend.inference.capabilities.model_features import get_features
 
 features = get_features(your_model)
 print(f"Function calling: {features.supports_function_calling}")

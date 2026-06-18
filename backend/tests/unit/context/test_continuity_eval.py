@@ -7,7 +7,7 @@ from backend.context.continuity_eval import (
     compaction_passes_continuity_gate,
     evaluate_restored_context,
 )
-from backend.context.pre_condensation_snapshot import (
+from backend.context.compaction.pre_condensation_snapshot import (
     extract_snapshot,
     format_snapshot_for_injection,
 )

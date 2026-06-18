@@ -66,15 +66,15 @@ def pipeline() -> ContextPipeline:
 @pytest.fixture(autouse=True)
 def _isolate_snapshot_paths(tmp_path, monkeypatch):
     monkeypatch.setattr(
-        'backend.context.pre_condensation_snapshot._snapshot_path',
+        'backend.context.compaction.pre_condensation_snapshot._snapshot_path',
         lambda state=None: tmp_path / 'pre_condensation_snapshot.json',
     )
     monkeypatch.setattr(
-        'backend.context.pre_condensation_snapshot._snapshot_staging_path',
+        'backend.context.compaction.pre_condensation_snapshot._snapshot_staging_path',
         lambda state=None: tmp_path / '.pre_condensation_snapshot.staging.json',
     )
     monkeypatch.setattr(
-        'backend.context.session_memory._session_memory_path',
+        'backend.context.memory.session_memory._session_memory_path',
         lambda state=None: tmp_path / 'session_memory.md',
     )
     monkeypatch.setattr(

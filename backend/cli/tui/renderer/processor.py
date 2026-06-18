@@ -14,7 +14,7 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Any
 
-from backend.cli.orient_tools import ORIENT_MCP_TOOL_NAMES
+from backend.cli.tool_display.orient_tools import ORIENT_MCP_TOOL_NAMES
 from backend.cli.tui.renderer.handlers.browser import (
     _handle_browse_interactive_action,
     _handle_browser_screenshot_observation,

@@ -1,4 +1,4 @@
-"""Unit tests for backend.ledger.durable_writer — threaded event persistence."""
+"""Unit tests for backend.ledger.stream.durable_writer — threaded event persistence."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.ledger.durable_writer import DurableEventWriter, PersistedEvent
+from backend.ledger.stream.durable_writer import DurableEventWriter, PersistedEvent
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -401,7 +401,7 @@ class TestBatchFlush:
 
     def test_batch_does_not_exceed_batch_size(self):
         """Even with many queued events the batch drains ≤ _DEFAULT_BATCH_SIZE at a time."""
-        from backend.ledger.durable_writer import _DEFAULT_BATCH_SIZE
+        from backend.ledger.stream.durable_writer import _DEFAULT_BATCH_SIZE
 
         store = _make_file_store()
         flush_sizes: list[int] = []

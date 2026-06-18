@@ -23,7 +23,7 @@ from backend.cli.event_rendering.unified_renderer import (
     ActivityCard,
     ActivityRenderer,
 )
-from backend.cli.orient_tools import OrientLineModel
+from backend.cli.tool_display.orient_tools import OrientLineModel
 
 
 class RendererDisplayMixin:

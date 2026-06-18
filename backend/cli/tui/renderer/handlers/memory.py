@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from backend.cli.orient_tools import (
+from backend.cli.tool_display.orient_tools import (
     OrientLineModel,
     checkpoint_action_model,
     checkpoint_observation_model,

@@ -3,7 +3,7 @@
 import asyncio
 from collections.abc import Callable
 
-from backend.context.agent_memory import Memory
+from backend.context.memory.agent_memory import Memory
 from backend.core.enums import RuntimeStatus
 from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
@@ -138,7 +138,7 @@ async def run_agent_until_done(
     # Set session ID for working memory scoping — isolates working memory
     # across concurrent/sequential sessions on the same workspace.
     try:
-        from backend.context.session_context import bind_session_context
+        from backend.context.memory.session_context import bind_session_context
 
         session_id = getattr(controller, 'id', None)
         bind_session_context(session_id=session_id)

@@ -11,7 +11,7 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from backend.context.pre_condensation_snapshot import extract_snapshot
+from backend.context.compaction.pre_condensation_snapshot import extract_snapshot
 from backend.core.constants import DEFAULT_CONTINUITY_GATE_MIN_SCORE
 
 if TYPE_CHECKING:

@@ -1,4 +1,4 @@
-"""Comprehensive tests for backend.ledger.secret_masker module.
+"""Comprehensive tests for backend.ledger.infra.secret_masker module.
 
 Tests SecretMasker string/bytes masking, nested structure handling,
 top-level field protection, and pattern cache rebuilding.
@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import unittest
 
-from backend.ledger.secret_masker import SecretMasker
+from backend.ledger.infra.secret_masker import SecretMasker
 
 
 class TestSecretMaskerBasics(unittest.TestCase):

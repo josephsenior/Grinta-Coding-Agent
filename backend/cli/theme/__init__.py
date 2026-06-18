@@ -233,7 +233,7 @@ def mark_prompt() -> str:
 
 def get_grinta_pygments_style() -> type:
     """Get or create the Grinta Pygments style for syntax highlighting."""
-    from backend.cli.syntax_theme import build_grinta_pygments_style
+    from backend.cli.theme.syntax_theme import build_grinta_pygments_style
 
     return build_grinta_pygments_style()
 

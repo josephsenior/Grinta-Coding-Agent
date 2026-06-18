@@ -1,8 +1,8 @@
-"""Tests for backend.context.action_processors – stateless conversion helpers."""
+"""Tests for backend.context.processors.action_processors – stateless conversion helpers."""
 
 from __future__ import annotations
 
-from backend.context.action_processors import (
+from backend.context.processors.action_processors import (
     _handle_message_action,
     _handle_system_message_action,
     _handle_user_cmd_action,
@@ -18,7 +18,7 @@ from backend.ledger.action import (
 from backend.ledger.action.message import SystemMessageAction
 from backend.ledger.action.search import GlobAction
 from backend.ledger.event import EventSource
-from backend.ledger.tool import ToolCallMetadata
+from backend.ledger.infra.tool import ToolCallMetadata
 
 # ── _is_tool_based_action ───────────────────────────────────────────
 

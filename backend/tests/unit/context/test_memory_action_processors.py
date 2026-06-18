@@ -1,11 +1,11 @@
-"""Tests for backend.context.action_processors — action-to-message conversion."""
+"""Tests for backend.context.processors.action_processors — action-to-message conversion."""
 
 from __future__ import annotations
 
 from typing import Any
 from unittest.mock import MagicMock
 
-from backend.context.action_processors import (
+from backend.context.processors.action_processors import (
     _build_think_action_message,
     _content_from_assistant_message,
     _convert_tool_calls,

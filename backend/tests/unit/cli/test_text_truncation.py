@@ -1,8 +1,8 @@
-"""Unit tests for backend.cli.text_truncation."""
+"""Unit tests for backend.cli.display.text_truncation."""
 
 from __future__ import annotations
 
-from backend.cli.text_truncation import shorten_middle, shorten_path, truncate_line
+from backend.cli.display.text_truncation import shorten_middle, shorten_path, truncate_line
 
 
 def test_shorten_middle_preserves_head_and_tail() -> None:

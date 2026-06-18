@@ -13,7 +13,7 @@ else:
 
 
 from backend.cli._typing import ActionRenderersHost
-from backend.cli.orient_tools import (
+from backend.cli.tool_display.orient_tools import (
     analyze_action_model,
     find_symbols_action_model,
     glob_action_model,

@@ -45,7 +45,7 @@ def _apply_system_cache_control(
     format Anthropic requires and adds the ``prompt-caching-2024-07-31`` beta
     header.  Otherwise returns ``system_content`` unchanged.
     """
-    from backend.inference.prompt_caching import model_supports_prompt_cache_hints
+    from backend.inference.caching.prompt_caching import model_supports_prompt_cache_hints
 
     if system_content is None:
         return None
@@ -418,7 +418,7 @@ def _apply_tools_cache_control(kwargs: dict[str, Any]) -> None:
     tool definitions block is cached, saving significant input tokens on
     subsequent calls within the same session.
     """
-    from backend.inference.prompt_caching import model_supports_prompt_cache_hints
+    from backend.inference.caching.prompt_caching import model_supports_prompt_cache_hints
 
     tools = kwargs.get('tools')
     if not tools or not isinstance(tools, list):

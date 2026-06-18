@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Protocol, cast
 from backend.utils.async_utils import run_or_schedule
 
 if TYPE_CHECKING:
-    from backend.context.agent_memory import Memory
+    from backend.context.memory.agent_memory import Memory
     from backend.core.provider_types import ProviderTokenType
     from backend.execution.base import Runtime
     from backend.inference.llm_registry import LLMRegistry

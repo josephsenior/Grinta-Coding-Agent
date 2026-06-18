@@ -7,7 +7,7 @@ from textual.app import ComposeResult
 from textual.containers import Container
 from textual.widgets import Static
 
-from backend.cli.orient_tools import OrientLineModel
+from backend.cli.tool_display.orient_tools import OrientLineModel
 from backend.cli.theme import CLR_REASONING_SNAP
 
 # Left pipe colors — aligned with exploration activity-card accents.

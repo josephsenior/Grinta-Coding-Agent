@@ -16,7 +16,7 @@ from backend.context.context_pipeline import (
     ContextPipeline,
     _ContinuityGateDecision,
 )
-from backend.context.pre_condensation_snapshot import extract_snapshot
+from backend.context.compaction.pre_condensation_snapshot import extract_snapshot
 from backend.core.config.compactor_config import ContextPipelineConfig
 from backend.core.constants import DEFAULT_EMERGENCY_PROMPT_MIN_EVENTS
 from backend.ledger.action.agent import AgentThinkAction

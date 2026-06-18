@@ -1,9 +1,9 @@
-"""Tests for backend.ledger.compaction — event compaction utilities."""
+"""Tests for backend.ledger.stream.compaction — event compaction utilities."""
 
 from typing import Any, cast
 from unittest.mock import MagicMock
 
-from backend.ledger.compaction import (
+from backend.ledger.stream.compaction import (
     EventCompactor,
     _edit_path,
     _is_file_edit,

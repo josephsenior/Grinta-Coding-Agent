@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from backend.cli.orient_tools import (
+from backend.cli.tool_display.orient_tools import (
     OrientLineModel,
     _command_from_target,
     _display_path,

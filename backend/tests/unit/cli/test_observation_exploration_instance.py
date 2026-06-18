@@ -5,7 +5,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from backend.cli.event_rendering.observations.exploration import _ObsExplorationMixin
-from backend.cli.orient_tools import OrientLineModel
+from backend.cli.tool_display.orient_tools import OrientLineModel
 
 
 class TestCompleteOrAppendOrient:

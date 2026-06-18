@@ -507,7 +507,7 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
 
     async def run(self) -> None:
         """Boot the engine, subscribe to events, and loop on user input."""
-        from backend.cli.repl_debug import debug as diag
+        from backend.cli.repl.debug import debug as diag
 
         diag('run() ENTER')
         loop = asyncio.get_running_loop()

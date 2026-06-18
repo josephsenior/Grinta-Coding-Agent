@@ -6,11 +6,11 @@ from unittest.mock import MagicMock, patch
 from pydantic import SecretStr
 
 from backend.core.provider_types import ProviderToken, ProviderType
-from backend.execution.orchestrator import (
+from backend.execution.runtime.orchestrator import (
     RuntimeAcquireResult,
     RuntimeOrchestrator,
 )
-from backend.execution.runtime_pool import PooledRuntime, WarmPoolPolicy
+from backend.execution.runtime.pool import PooledRuntime, WarmPoolPolicy
 
 
 class TestRuntimeAcquireResult(unittest.TestCase):
@@ -53,7 +53,7 @@ class TestRuntimeOrchestrator(unittest.TestCase):
             pool=self.mock_pool, telemetry=self.mock_telemetry
         )
 
-    @patch('backend.execution.orchestrator.runtime_watchdog')
+    @patch('backend.execution.runtime.orchestrator.runtime_watchdog')
     def test_init_default_pool(self, mock_watchdog):
         """Test RuntimeOrchestrator initializes with default pool."""
         orchestrator = RuntimeOrchestrator()
@@ -62,7 +62,7 @@ class TestRuntimeOrchestrator(unittest.TestCase):
         self.assertIsNotNone(orchestrator._pool)
         mock_watchdog.set_idle_cleanup.assert_called()
 
-    @patch('backend.execution.orchestrator.runtime_watchdog')
+    @patch('backend.execution.runtime.orchestrator.runtime_watchdog')
     def test_acquire_from_pool(self, mock_watchdog):
         """Test acquire returns runtime from pool when available."""
         mock_runtime = MagicMock()
@@ -98,7 +98,7 @@ class TestRuntimeOrchestrator(unittest.TestCase):
         # Should watch runtime
         mock_watchdog.watch_runtime.assert_called_once()
 
-    @patch('backend.execution.orchestrator.runtime_watchdog')
+    @patch('backend.execution.runtime.orchestrator.runtime_watchdog')
     @patch('backend.core.bootstrap.setup.create_runtime')
     def test_acquire_creates_new_runtime(self, mock_create, mock_watchdog):
         """Test acquire creates new runtime when pool is empty."""
@@ -136,7 +136,7 @@ class TestRuntimeOrchestrator(unittest.TestCase):
             'local', reused=False
         )
 
-    @patch('backend.execution.orchestrator.runtime_watchdog')
+    @patch('backend.execution.runtime.orchestrator.runtime_watchdog')
     @patch('backend.core.bootstrap.setup.create_runtime')
     def test_acquire_with_repo_initializer(self, mock_create, mock_watchdog):
         """Test acquire runs repo initializer when provided."""
@@ -167,7 +167,7 @@ class TestRuntimeOrchestrator(unittest.TestCase):
         mock_repo_init.assert_called_once_with(mock_runtime)
         self.assertEqual(result.repo_directory, '/initialized/repo')
 
-    @patch('backend.execution.orchestrator.runtime_watchdog')
+    @patch('backend.execution.runtime.orchestrator.runtime_watchdog')
     def test_release(self, mock_watchdog):
         """Test release returns runtime to pool."""
         mock_runtime = MagicMock()
@@ -187,7 +187,7 @@ class TestRuntimeOrchestrator(unittest.TestCase):
         # Should unwatch runtime
         mock_watchdog.unwatch_runtime.assert_called_once_with(mock_runtime)
 
-    @patch('backend.execution.orchestrator.runtime_watchdog')
+    @patch('backend.execution.runtime.orchestrator.runtime_watchdog')
     def test_release_infers_key(self, mock_watchdog):
         """Test release infers key from runtime config."""
         mock_runtime = MagicMock()
@@ -243,9 +243,9 @@ class TestRuntimeOrchestrator(unittest.TestCase):
 
         self.assertEqual(stats, {})
 
-    @patch('backend.execution.orchestrator.runtime_watchdog')
-    @patch('backend.execution.orchestrator.IDLE_RECLAIM_SPIKE_THRESHOLD', 5)
-    @patch('backend.execution.orchestrator.logger')
+    @patch('backend.execution.runtime.orchestrator.runtime_watchdog')
+    @patch('backend.execution.runtime.orchestrator.IDLE_RECLAIM_SPIKE_THRESHOLD', 5)
+    @patch('backend.execution.runtime.orchestrator.logger')
     def test_handle_idle_reclaim_spike(self, mock_logger, mock_watchdog):
         """Test _maybe_record_idle_reclaim_spike detects spikes."""
         self.orchestrator._last_idle_reclaim_totals = {'docker': 0}
@@ -260,7 +260,7 @@ class TestRuntimeOrchestrator(unittest.TestCase):
         # Should log
         mock_logger.info.assert_called_once()
 
-    @patch('backend.execution.orchestrator.IDLE_RECLAIM_SPIKE_THRESHOLD', 10)
+    @patch('backend.execution.runtime.orchestrator.IDLE_RECLAIM_SPIKE_THRESHOLD', 10)
     def test_handle_idle_reclaim_no_spike(self):
         """Test _maybe_record_idle_reclaim_spike ignores small changes."""
         self.orchestrator._last_idle_reclaim_totals = {'docker': 5}
@@ -270,9 +270,9 @@ class TestRuntimeOrchestrator(unittest.TestCase):
         # Should not record signal (delta is 5, threshold is 10)
         self.mock_telemetry.record_scaling_signal.assert_not_called()
 
-    @patch('backend.execution.orchestrator.runtime_watchdog')
-    @patch('backend.execution.orchestrator.EVICTION_SPIKE_THRESHOLD', 3)
-    @patch('backend.execution.orchestrator.logger')
+    @patch('backend.execution.runtime.orchestrator.runtime_watchdog')
+    @patch('backend.execution.runtime.orchestrator.EVICTION_SPIKE_THRESHOLD', 3)
+    @patch('backend.execution.runtime.orchestrator.logger')
     def test_handle_eviction_spike(self, mock_logger, mock_watchdog):
         """Test _maybe_record_eviction_spike detects spikes."""
         self.orchestrator._last_eviction_totals = {'local': 0}
@@ -327,8 +327,8 @@ class TestRuntimeOrchestrator(unittest.TestCase):
 
         self.assertIsNone(result)
 
-    @patch('backend.execution.orchestrator.runtime_watchdog')
-    @patch('backend.execution.orchestrator.logger')
+    @patch('backend.execution.runtime.orchestrator.runtime_watchdog')
+    @patch('backend.execution.runtime.orchestrator.logger')
     def test_handle_watchdog_saturation(self, mock_logger, mock_watchdog):
         """Test _handle_watchdog_saturation detects saturation."""
         policy = WarmPoolPolicy(max_size=5, ttl_seconds=600.0)

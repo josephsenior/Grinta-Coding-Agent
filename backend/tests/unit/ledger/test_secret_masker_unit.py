@@ -1,6 +1,6 @@
-"""Tests for backend.ledger.secret_masker — SecretMasker."""
+"""Tests for backend.ledger.infra.secret_masker — SecretMasker."""
 
-from backend.ledger.secret_masker import SecretMasker
+from backend.ledger.infra.secret_masker import SecretMasker
 
 
 class TestSecretMaskerInit:

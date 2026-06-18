@@ -79,7 +79,7 @@ may be present in the user's working directory. The resolved path runs
 `backend.cli.main` then selects the runtime surface:
 
 - TTY stdin -> `backend.cli.tui.main`, the Textual application with transcript cards, HUD, dialogs, and keyboard shortcuts.
-- Non-TTY stdin -> `backend.cli.repl_noninteractive`, for scripted/piped one-shot runs.
+- Non-TTY stdin -> `backend.cli.repl.noninteractive`, for scripted/piped one-shot runs.
 
 The legacy prompt-toolkit REPL still exists as support code and fallback logic,
 but the current interactive product surface is the Textual TUI.

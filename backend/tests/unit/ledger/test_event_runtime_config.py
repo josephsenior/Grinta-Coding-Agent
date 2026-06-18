@@ -1,4 +1,4 @@
-"""Tests for backend.ledger.config — EventRuntimeDefaults and get_event_runtime_defaults."""
+"""Tests for backend.ledger.infra.config — EventRuntimeDefaults and get_event_runtime_defaults."""
 
 import os
 from typing import Any, cast
@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from backend.ledger.config import EventRuntimeDefaults, get_event_runtime_defaults
+from backend.ledger.infra.config import EventRuntimeDefaults, get_event_runtime_defaults
 
 
 def _assert_event_runtime_attrs(

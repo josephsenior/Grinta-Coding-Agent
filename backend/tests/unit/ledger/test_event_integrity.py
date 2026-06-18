@@ -1,4 +1,4 @@
-"""Unit tests for backend.ledger.integrity — corrupt event recovery."""
+"""Unit tests for backend.ledger.infra.integrity — corrupt event recovery."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from unittest.mock import MagicMock, PropertyMock
 
 from backend.core import json_compat as json
-from backend.ledger.integrity import (
+from backend.ledger.infra.integrity import (
     embed_checksum,
     iter_events_until_corrupt,
     verify_event_integrity,

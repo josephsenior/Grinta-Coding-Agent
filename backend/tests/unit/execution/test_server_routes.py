@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from backend.execution.server_routes import (
+from backend.execution.server.routes import (
     _ensure_path_in_workspace,
     register_exception_handlers,
     register_routes,
@@ -180,9 +180,9 @@ def test_get_server_info_includes_uptime(
         last_execution_time=1005.0,
     )
 
-    monkeypatch.setattr('backend.execution.server_routes.time.time', lambda: 1010.0)
+    monkeypatch.setattr('backend.execution.server.routes.time.time', lambda: 1010.0)
     monkeypatch.setattr(
-        'backend.execution.server_routes.get_system_stats',
+        'backend.execution.server.routes.get_system_stats',
         lambda: {'ok': True},
     )
 
@@ -268,7 +268,7 @@ def test_upload_file_recursive_requires_zip(tmp_path: Path) -> None:
     assert 'zip' in r.json()['detail'].lower()
 
 
-@patch('backend.execution.server_routes.OS_CAPS')
+@patch('backend.execution.server.routes.OS_CAPS')
 def test_update_mcp_server_skipped_on_windows(mock_caps, tmp_path: Path) -> None:
     mock_caps.is_windows = True
     workspace = tmp_path / 'workspace'

@@ -27,8 +27,8 @@ def normalize_provider_name(provider: str | None) -> str | None:
 
 
 if TYPE_CHECKING:
-    from backend.inference.model_features import ModelFeatures
-    from backend.inference.provider_capabilities import ProviderCapabilities
+    from backend.inference.capabilities.model_features import ModelFeatures
+    from backend.inference.capabilities.provider_capabilities import ProviderCapabilities
 
 PROVIDER_DEFAULT_URLS: dict[str, str] = {
     'groq': 'https://api.groq.com/openai/v1',
@@ -231,7 +231,7 @@ def _picker_entry_for_model_id(
 ) -> ModelEntry:
     """Build a picker row: catalog + param profile overlay when available."""
     from backend.inference.catalog_loader import lookup_provider_model
-    from backend.inference.param_profiles import resolve_effective_model_entry
+    from backend.inference.capabilities.param_profiles import resolve_effective_model_entry
 
     bare = model_id.split('/')[-1] if '/' in model_id else model_id
     for candidate in (model_id, bare):
@@ -259,7 +259,7 @@ def _catalog_picker_entries(
     catalog_entries: list[ModelEntry],
 ) -> list[ModelEntry]:
     """Build picker rows from static catalog entries."""
-    from backend.inference.param_profiles import resolve_effective_model_entry
+    from backend.inference.capabilities.param_profiles import resolve_effective_model_entry
 
     enriched: list[ModelEntry] = []
     for scoped in catalog_entries:
@@ -367,14 +367,14 @@ def resolve_api_key_for_provider(config: Any, provider: str | None) -> str | Non
 
 def get_model_capabilities(model: str) -> ModelFeatures:
     """Per-model capabilities (catalog first, glob fallbacks)."""
-    from backend.inference.model_features import get_features
+    from backend.inference.capabilities.model_features import get_features
 
     return get_features(model)
 
 
 def get_provider_capability_profile(provider: str | None) -> ProviderCapabilities:
     """Per-provider behavioural flags (native tools, cache, replay, etc.)."""
-    from backend.inference.provider_capabilities import get_provider_capabilities
+    from backend.inference.capabilities.provider_capabilities import get_provider_capabilities
 
     return get_provider_capabilities(provider)
 

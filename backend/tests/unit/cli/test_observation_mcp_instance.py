@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from backend.cli.event_rendering.observations.mcp import _ObsMcpMixin
-from backend.cli.orient_tools import OrientLineModel
+from backend.cli.tool_display.orient_tools import OrientLineModel
 
 
 class _Host(_ObsMcpMixin):

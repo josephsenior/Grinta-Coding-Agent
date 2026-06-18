@@ -31,7 +31,7 @@ backend/cli/
 │   ├── session.py                 # Repl class (public: from backend.cli.repl import Repl)
 │   ├── slash_command_registry.py
 │   └── …                          # mixins, slash_command_*, run_helpers_*
-├── tool_display/                  # Rich tool renderers
+├── tool_display/                  # Rich tool renderers + orient_tools.py
 ├── event_rendering/
 │   ├── unified_renderer/          # ActivityCard + ActivityRenderer
 │   ├── observations/              # CLI observation handlers (domain mixins)
@@ -48,11 +48,14 @@ backend/cli/
 ## Import conventions
 
 - **Theme:** `from backend.cli.theme import …` (package root only)
-- **Display:** `from backend.cli.display.hud import HUDBar`, etc.
+- **Display:** `from backend.cli.display.hud import HUDBar`, `layout_tokens`, `path_links`, `text_truncation`, etc.
+- **Orient tools:** `from backend.cli.tool_display.orient_tools import …`
+- **Syntax theme:** `from backend.cli.theme.syntax_theme import …`
 - **Sessions:** `from backend.cli.session import session_manager`
 - **Settings:** `from backend.cli.settings import get_current_model`, etc.
 - **Settings UI:** `from backend.cli.settings.settings_tui import …`
-- **REPL:** `from backend.cli.repl import Repl`
+- **REPL:** `from backend.cli.repl import Repl`; helpers in `repl/noninteractive.py`, `repl/debug.py`
+- **Session maintenance:** `from backend.cli.session.storage_cleanup import …`
 - **Activity cards:** `from backend.cli.event_rendering.unified_renderer import ActivityRenderer`
 - **Event renderer mixins:** `from backend.cli.event_rendering.observations import ObservationRenderersMixin`
 - **Slash commands:** `from backend.cli.repl.slash_command_registry import …`

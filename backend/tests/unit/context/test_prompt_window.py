@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from backend.context.prompt_window import (
+from backend.context.prompt.prompt_window import (
     estimate_events_tokens,
     estimate_prompt_events_tokens,
     select_prompt_events,
@@ -21,7 +21,7 @@ from backend.ledger.observation.agent import AgentCondensationObservation
 @pytest.fixture(autouse=True)
 def _isolate_durable_context(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        'backend.context.pre_condensation_snapshot.load_snapshot',
+        'backend.context.compaction.pre_condensation_snapshot.load_snapshot',
         lambda: None,
     )
     monkeypatch.setattr(

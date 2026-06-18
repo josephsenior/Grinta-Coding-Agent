@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from backend.context.prompt_window import select_prompt_events
+from backend.context.prompt.prompt_window import select_prompt_events
 from backend.ledger.action import CmdRunAction, MessageAction
 from backend.ledger.event import EventSource
 from backend.ledger.observation import CmdOutputObservation

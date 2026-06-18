@@ -243,7 +243,7 @@ class ScreenLifecycleMixin:
             )
             sid = session_id.strip() if session_id else generate_sid(config)
             try:
-                from backend.context.session_context import bind_session_context
+                from backend.context.memory.session_context import bind_session_context
 
                 bind_session_context(session_id=sid)
             except Exception:

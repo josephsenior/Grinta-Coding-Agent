@@ -448,7 +448,7 @@ async def _async_main(
                 verbose=verbose,
             )
         else:
-            from backend.cli.repl_noninteractive import run_noninteractive
+            from backend.cli.repl.noninteractive import run_noninteractive
 
             await run_noninteractive(
                 config=config,
@@ -560,7 +560,7 @@ def main(
     _setup_logging()
     _configure_redirected_streams()
     if cleanup_storage:
-        from backend.cli.storage_cleanup import run_storage_cleanup_command
+        from backend.cli.session.storage_cleanup import run_storage_cleanup_command
 
         run_storage_cleanup_command(project)
         return
@@ -570,7 +570,7 @@ def main(
         no_splash=no_splash,
     )
     if handled:
-        from backend.cli.storage_cleanup import run_storage_cleanup_command
+        from backend.cli.session.storage_cleanup import run_storage_cleanup_command
 
         run_storage_cleanup_command(project)
         return
@@ -585,7 +585,7 @@ def main(
 
     configure_file_logging()
 
-    from backend.cli.repl_debug import debug as diag
+    from backend.cli.repl.debug import debug as diag
 
     try:
         async_kwargs = {

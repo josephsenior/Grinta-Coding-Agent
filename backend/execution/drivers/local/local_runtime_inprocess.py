@@ -574,7 +574,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             SafePath,
         )
         from backend.core.workspace_resolution import workspace_grinta_root
-        from backend.execution.security_enforcement import path_is_within_workspace
+        from backend.execution.aes.security_enforcement import path_is_within_workspace
 
         workspace = Path(self._executor.initial_cwd).resolve()
         app_workspace_root = workspace_grinta_root(workspace).resolve()

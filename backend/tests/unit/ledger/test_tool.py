@@ -1,10 +1,10 @@
-"""Tests for backend.ledger.tool — tool call metadata utilities."""
+"""Tests for backend.ledger.infra.tool — tool call metadata utilities."""
 
 from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from backend.ledger.tool import ToolCallMetadata, build_tool_call_metadata
+from backend.ledger.infra.tool import ToolCallMetadata, build_tool_call_metadata
 
 
 def create_mock_response(response_id='chatcmpl-123', model='gpt-4'):

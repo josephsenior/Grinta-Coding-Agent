@@ -24,7 +24,7 @@ def _orient_path(path: str | None, max_len: int = 36) -> str:
     """Format a path for orient tool target: left-ellipsis, no empty fallback."""
     if not path:
         return ''
-    from backend.cli.text_truncation import shorten_path
+    from backend.cli.display.text_truncation import shorten_path
 
     display = shorten_path(path, max_len=max_len)
     if not display.startswith('…') or len(display) <= 1:

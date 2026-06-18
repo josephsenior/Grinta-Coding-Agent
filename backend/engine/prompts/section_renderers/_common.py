@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.inference.provider_capabilities import (
+from backend.inference.capabilities.provider_capabilities import (
     model_token_correction as _model_token_correction,
 )
 

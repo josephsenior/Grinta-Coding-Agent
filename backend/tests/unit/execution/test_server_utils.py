@@ -1,11 +1,11 @@
-"""Tests for backend.execution.server_utils — list path resolution and directory sorting."""
+"""Tests for backend.execution.server.utils — list path resolution and directory sorting."""
 
 from __future__ import annotations
 
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
-from backend.execution.server_utils import (
+from backend.execution.server.utils import (
     _get_sorted_directory_entries,
     _resolve_list_path,
 )

@@ -14,16 +14,16 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from backend.core.logger import app_logger as logger
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     apply_grep_filter as _apply_grep_filter_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     apply_terminal_resize_if_requested as _apply_terminal_resize_if_requested_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     attach_detected_server as _attach_detected_server_impl,
 )
-from backend.execution.file_operations import (
+from backend.execution.aes.file_operations import (
     truncate_cmd_output,
 )
 from backend.execution.utils.unified_shell import BaseShellSession

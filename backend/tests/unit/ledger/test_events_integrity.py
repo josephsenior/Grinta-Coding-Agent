@@ -1,11 +1,11 @@
-"""Tests for backend.ledger.integrity — iter_events_until_corrupt."""
+"""Tests for backend.ledger.infra.integrity — iter_events_until_corrupt."""
 
 from __future__ import annotations
 
 import json
 from unittest.mock import MagicMock
 
-from backend.ledger.integrity import iter_events_until_corrupt
+from backend.ledger.infra.integrity import iter_events_until_corrupt
 
 
 def _make_store(events: list, cur_id: int | None = None):

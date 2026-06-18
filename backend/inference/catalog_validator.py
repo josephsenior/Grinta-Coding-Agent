@@ -16,7 +16,7 @@ from backend.inference.catalog_loader import (
     runtime_model_id,
     validate_model_transport,
 )
-from backend.inference.prompt_caching import VALID_PROMPT_CACHE_MODES
+from backend.inference.caching.prompt_caching import VALID_PROMPT_CACHE_MODES
 from backend.inference.reasoning import (
     WIRE_ANTHROPIC_ADAPTIVE,
     WIRE_ANTHROPIC_EXTENDED,

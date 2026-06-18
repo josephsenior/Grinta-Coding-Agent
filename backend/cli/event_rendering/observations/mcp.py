@@ -22,7 +22,7 @@ from backend.cli.display.tool_call_display import (
 from backend.cli.display.transcript import (
     format_activity_result_secondary,
 )
-from backend.cli.orient_tools import (
+from backend.cli.tool_display.orient_tools import (
     ORIENT_MCP_TOOL_NAMES,
     OrientLineModel,
     mcp_observation_model,

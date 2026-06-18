@@ -1,4 +1,4 @@
-"""Unit tests for backend.execution.runtime_manager — RuntimeManager."""
+"""Unit tests for backend.execution.runtime.manager — RuntimeManager."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import threading
 from typing import Any
 from unittest.mock import MagicMock
 
-from backend.execution.runtime_manager import (
+from backend.execution.runtime.manager import (
     RuntimeManager,
     RuntimeServerInfo,
     _ManagedServer,

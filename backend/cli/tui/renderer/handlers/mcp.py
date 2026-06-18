@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from backend.cli.event_rendering.unified_renderer import ActivityRenderer
-from backend.cli.orient_tools import (
+from backend.cli.tool_display.orient_tools import (
     ORIENT_MCP_TOOL_NAMES,
     OrientLineModel,
     mcp_action_model,

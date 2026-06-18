@@ -1,16 +1,16 @@
-"""Tests for backend.context.observation_processors."""
+"""Tests for backend.context.processors.observation_processors."""
 
 from __future__ import annotations
 
 from types import SimpleNamespace
 
-from backend.context.message_formatting import extract_first_text
-from backend.context.observation_processors import (
+from backend.context.prompt.message_formatting import extract_first_text
+from backend.context.processors.observation_processors import (
     _get_observation_content,
     _handle_simple_observation,
     convert_observation_to_message,
 )
-from backend.context.pre_condensation_snapshot import save_snapshot
+from backend.context.compaction.pre_condensation_snapshot import save_snapshot
 from backend.core.message import ImageContent, TextContent
 from backend.ledger.observation import (
     BrowserScreenshotObservation,
@@ -166,7 +166,7 @@ class TestConvertObservation:
 
     def test_condensation_observation_restores_working_memory(self, monkeypatch):
         monkeypatch.setattr(
-            'backend.context.observation_processors._load_working_memory_snapshot',
+            'backend.context.processors.observation_processors._load_working_memory_snapshot',
             lambda: '\nWORKING_MEMORY\n',
         )
         obs = AgentCondensationObservation(content='summary', is_working_set=False)

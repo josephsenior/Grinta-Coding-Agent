@@ -239,7 +239,7 @@ class OrchestratorPromptManager(PromptManager):
         if not model_id:
             return 'unknown'
 
-        from backend.inference.model_features import get_features
+        from backend.inference.capabilities.model_features import get_features
 
         features = get_features(model_id)
         return 'native' if features.supports_function_calling else 'string'

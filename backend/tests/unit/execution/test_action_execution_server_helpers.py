@@ -4,7 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from backend.execution import action_execution_server_helpers as h
+from backend.execution.aes import helpers as h
 from backend.ledger.action import MessageAction
 from backend.ledger.observation import (
     ErrorObservation,
@@ -53,7 +53,7 @@ def test_build_shell_git_and_env_commands() -> None:
 
 def test_uses_powershell_shell_contract_windows_and_session_fallback() -> None:
     ex = _executor()
-    with patch('backend.execution.action_execution_server_helpers.OS_CAPS') as caps:
+    with patch('backend.execution.aes.helpers.OS_CAPS') as caps:
         caps.is_windows = False
         assert h.uses_powershell_shell_contract(ex) is False
 
@@ -61,7 +61,7 @@ def test_uses_powershell_shell_contract_windows_and_session_fallback() -> None:
         pass
 
     ex.session_manager.get_session = lambda _sid: PowerShellSession()
-    with patch('backend.execution.action_execution_server_helpers.OS_CAPS') as caps:
+    with patch('backend.execution.aes.helpers.OS_CAPS') as caps:
         caps.is_windows = True
         assert h.uses_powershell_shell_contract(ex) is True
 
@@ -132,7 +132,7 @@ def test_workspace_resolution_and_path_validation() -> None:
     assert h.resolve_effective_cwd(ex, None) == Path('C:/ws').resolve()
     assert h.resolve_effective_cwd(ex, 'src') == Path('C:/ws/src').resolve()
     with patch(
-        'backend.execution.action_execution_server_helpers.path_is_within_workspace',
+        'backend.execution.aes.helpers.path_is_within_workspace',
         return_value=False,
     ):
         err = h.validate_workspace_scoped_cwd(ex, 'cmd', '../outside')
@@ -143,7 +143,7 @@ def test_validate_interactive_session_scope_closes_escaped_session() -> None:
     ex = _executor()
     s = SimpleNamespace(cwd='C:/outside')
     with patch(
-        'backend.execution.action_execution_server_helpers.path_is_within_workspace',
+        'backend.execution.aes.helpers.path_is_within_workspace',
         return_value=False,
     ):
         err = h.validate_interactive_session_scope(ex, 't1', s)
@@ -155,7 +155,7 @@ def test_validate_interactive_session_scope_closes_escaped_session() -> None:
 def test_predict_and_evaluate_interactive_terminal_command() -> None:
     ex = _executor()
     with patch(
-        'backend.execution.action_execution_server_helpers.path_is_within_workspace',
+        'backend.execution.aes.helpers.path_is_within_workspace',
         return_value=True,
     ):
         cwd, err = h.predict_interactive_cwd_change(
@@ -164,7 +164,7 @@ def test_predict_and_evaluate_interactive_terminal_command() -> None:
     assert err is None and cwd is not None
 
     with patch(
-        'backend.execution.action_execution_server_helpers.path_is_within_workspace',
+        'backend.execution.aes.helpers.path_is_within_workspace',
         return_value=False,
     ):
         cwd2, err2 = h.predict_interactive_cwd_change(
@@ -310,7 +310,7 @@ def test_file_read_edit_helpers() -> None:
     with (
         patch('os.path.isdir', return_value=True),
         patch(
-            'backend.execution.file_operations.handle_directory_view',
+            'backend.execution.aes.file_operations.handle_directory_view',
             return_value=FileReadObservation(path='d', content='dir'),
         ),
     ):
@@ -361,7 +361,7 @@ def test_edit_via_file_editor_marks_replace_string_as_existing_file() -> None:
         overwrite_existing=False,
     )
     with patch(
-        'backend.execution.file_operations.execute_file_editor',
+        'backend.execution.aes.file_operations.execute_file_editor',
         return_value=(
             'replaced',
             (None, 'gamma'),

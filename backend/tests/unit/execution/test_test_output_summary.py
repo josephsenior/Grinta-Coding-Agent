@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.execution.file_operations import truncate_cmd_output
+from backend.execution.aes.file_operations import truncate_cmd_output
 from backend.execution.utils.test_output_summary import (
     extract_test_summary,
     parse_pytest_pass_fail_counts,

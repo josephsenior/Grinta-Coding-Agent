@@ -1,11 +1,11 @@
-"""Tests for backend.context.memory_types — Decision/ContextAnchor data models."""
+"""Tests for backend.context.memory.types — Decision/ContextAnchor data models."""
 
 from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
 
-from backend.context.memory_types import (
+from backend.context.memory.types import (
     ContextAnchor,
     Decision,
     DecisionType,

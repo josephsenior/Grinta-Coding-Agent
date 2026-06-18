@@ -12,20 +12,28 @@ For CI gates and layer-boundary checks, see [`backend/scripts/`](../backend/scri
 | [`bootstrap_env.py`](bootstrap_env.py) | Canonical `uv sync` wrapper for dependency profiles (`base`, `browser`, `dev`, `dev-test`, `dev-test-browser`). Used by CI, `START_HERE`, and `CONTRIBUTING.md`. |
 | [`check_contributor_bootstrap.sh`](check_contributor_bootstrap.sh) | Quick sanity check that `bootstrap_env.py dev-test` succeeds on Linux/macOS. |
 
+## Launch / Docker
+
+| Script | Purpose |
+| --- | --- |
+| [`launch/start_here.ps1`](launch/start_here.ps1) / [`launch/start_here.sh`](launch/start_here.sh) | First-run onboarding: sync deps, optional init wizard, launch CLI. Root `START_HERE.ps1` / `start_here.sh` are thin stubs. |
+| [`docker/docker_start.ps1`](docker/docker_start.ps1) / [`docker/docker_start.sh`](docker/docker_start.sh) | Docker Compose quick start. Root `DOCKER_START.ps1` / `docker_start.sh` are thin stubs. |
+| [`build.sh`](build.sh) | `uv build -v` wrapper. Root `build.sh` is a thin stub. |
+
 ## Release / onboarding smoke
 
 | Script | Purpose |
 | --- | --- |
-| [`smoke_install.sh`](smoke_install.sh) / [`.ps1`](smoke_install.ps1) | Install the built wheel into a clean venv and verify `grinta --help`, optional extras, and `grinta init` non-TTY guard. |
-| [`smoke_source_onboarding.sh`](smoke_source_onboarding.sh) / [`.ps1`](smoke_source_onboarding.ps1) | Source-checkout smoke: sync `base` profile and run `grinta --help`. |
-| [`Dockerfile.smoke`](Dockerfile.smoke) | Minimal image for wheel-install smoke in containerized CI. |
+| [`smoke/smoke_install.sh`](smoke/smoke_install.sh) / [`.ps1`](smoke/smoke_install.ps1) | Install the built wheel into a clean venv and verify `grinta --help`, optional extras, and `grinta init` non-TTY guard. Root `scripts/smoke_install.*` are thin stubs. |
+| [`smoke/smoke_source_onboarding.sh`](smoke/smoke_source_onboarding.sh) / [`.ps1`](smoke/smoke_source_onboarding.ps1) | Source-checkout smoke: sync `base` profile and run `grinta --help`. Root stubs preserved. |
+| [`smoke/Dockerfile.smoke`](smoke/Dockerfile.smoke) | Minimal image for wheel-install smoke in containerized CI. |
 
 ## Evals
 
 | Script | Purpose |
 | --- | --- |
 | [`evals/run_realworld_task.py`](evals/run_realworld_task.py) | Run one task from the agent comparison pack headlessly with `settings.bench.json` overrides. |
-| [`score_agent_eval_pack.py`](score_agent_eval_pack.py) | Score or template-fill results from [`evals/agent_comparison_pack.json`](evals/agent_comparison_pack.json). |
+| [`evals/score_agent_eval_pack.py`](evals/score_agent_eval_pack.py) | Score or template-fill results from [`evals/agent_comparison_pack.json`](evals/agent_comparison_pack.json). |
 | [`evals/agent_comparison_pack.json`](evals/agent_comparison_pack.json) | Vendor-neutral eval task definitions. |
 | [`evals/grinta_results.template.json`](evals/grinta_results.template.json) | Blank results template for manual scoring. |
 

@@ -7,8 +7,8 @@ from types import SimpleNamespace
 import pytest
 
 from backend.core.errors import FunctionCallValidationError, ToolExecutionError
-from backend.execution import action_execution_server_helpers as h
-from backend.execution.structured_edit_errors import (
+from backend.execution.aes import helpers as h
+from backend.execution.aes.structured_edit_errors import (
     compact_symbol_candidates,
     compact_syntax_detail,
     format_agent_edit_error_message,
@@ -177,7 +177,7 @@ def test_symbol_ambiguity_summary_is_compact() -> None:
 
 
 def test_format_verification_failure_message() -> None:
-    from backend.execution.structured_edit_errors import (
+    from backend.execution.aes.structured_edit_errors import (
         build_verification_failure_tool_result,
         format_verification_failure_message,
     )
@@ -212,7 +212,7 @@ def test_normalize_editor_error_response_compact() -> None:
 
 
 def test_build_search_error_tool_result() -> None:
-    from backend.execution.structured_edit_errors import build_search_error_tool_result
+    from backend.execution.aes.structured_edit_errors import build_search_error_tool_result
 
     tool_result = build_search_error_tool_result(
         tool='grep',
@@ -227,7 +227,7 @@ def test_build_search_error_tool_result() -> None:
 
 
 def test_build_search_error_observation() -> None:
-    from backend.execution.structured_edit_errors import build_search_error_observation
+    from backend.execution.aes.structured_edit_errors import build_search_error_observation
     from backend.ledger.observation import ErrorObservation
 
     obs = build_search_error_observation(
@@ -243,7 +243,7 @@ def test_build_search_error_observation() -> None:
 
 
 def test_build_read_symbols_error_observation_single_not_found() -> None:
-    from backend.execution.structured_edit_errors import (
+    from backend.execution.aes.structured_edit_errors import (
         build_read_symbols_error_observation,
     )
     from backend.ledger.observation import ErrorObservation

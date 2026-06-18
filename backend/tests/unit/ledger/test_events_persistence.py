@@ -1,11 +1,11 @@
-"""Tests for backend.ledger.persistence — EventPersistence with file-store mocks."""
+"""Tests for backend.ledger.stream.persistence — EventPersistence with file-store mocks."""
 
 from __future__ import annotations
 
 from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
-from backend.ledger.persistence import EventPersistence, _truncate_payload
+from backend.ledger.stream.persistence import EventPersistence, _truncate_payload
 
 # ── Helper to build a persistence instance with file-store mock ───────
 

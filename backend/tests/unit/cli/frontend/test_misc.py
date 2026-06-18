@@ -572,7 +572,7 @@ def test_grinta_main_runs_cleanup_storage_without_asyncio() -> None:
     with patch.object(sys, 'argv', ['grinta', '--cleanup-storage']):
         with patch('backend.cli.main.asyncio.run') as mock_asyncio_run:
             with patch(
-                'backend.cli.storage_cleanup.run_storage_cleanup_command',
+                'backend.cli.session.storage_cleanup.run_storage_cleanup_command',
                 return_value=0,
             ) as mock_cleanup:
                 from backend.cli.main import main
@@ -637,7 +637,7 @@ async def test_async_main_queues_piped_input(tmp_path: Path) -> None:
         with patch('backend.core.config.load_app_config', return_value=config):
             with patch('backend.cli.main.Console', return_value=_make_console()):
                 with patch(
-                    'backend.cli.repl_noninteractive.run_noninteractive',
+                    'backend.cli.repl.noninteractive.run_noninteractive',
                     return_value=None,
                 ):
                     with patch(

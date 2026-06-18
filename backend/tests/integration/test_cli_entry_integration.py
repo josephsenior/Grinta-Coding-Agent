@@ -54,7 +54,7 @@ def test_entry_main_launches_cli_repl_with_project_and_piped_input(
                                 'backend.cli.main.Console', return_value=_make_console()
                             ):
                                 with patch(
-                                    'backend.cli.repl_noninteractive.run_noninteractive',
+                                    'backend.cli.repl.noninteractive.run_noninteractive',
                                     return_value=None,
                                 ):
                                     with patch(

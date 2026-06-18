@@ -6,26 +6,26 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from backend.context.compact_boundary import (
+from backend.context.compaction.compact_boundary import (
     boundary_info,
     project_after_compact_boundary,
 )
-from backend.context.compaction_finalizer import finalize_compaction_artifacts
+from backend.context.compaction.compaction_finalizer import finalize_compaction_artifacts
 from backend.context.compactor import Compactor
-from backend.context.condensed_history import CondensedHistory
-from backend.context.conversation_memory import ContextMemory
-from backend.context.pre_condensation_snapshot import (
+from backend.context.compaction.condensed_history import CondensedHistory
+from backend.context.memory.conversation_memory import ContextMemory
+from backend.context.compaction.pre_condensation_snapshot import (
     delete_staging_snapshot,
     extract_snapshot,
     format_snapshot_for_injection,
     load_snapshot,
     save_snapshot,
 )
-from backend.context.prompt_window import event_fingerprint, select_prompt_events
+from backend.context.prompt.prompt_window import event_fingerprint, select_prompt_events
 from backend.context.view import View
 from backend.core.logger import app_logger as logger
 from backend.core.message import Message, TextContent
-from backend.inference.prompt_caching import should_mark_messages_for_prompt_cache
+from backend.inference.caching.prompt_caching import should_mark_messages_for_prompt_cache
 from backend.ledger.action import MessageAction
 from backend.ledger.action.agent import CondensationAction
 
@@ -275,7 +275,7 @@ class ContextMemoryManager:
         if self._pipeline is not None:
             return await self._pipeline.prepare_step(state)
 
-        from backend.context.session_context import bind_session_context
+        from backend.context.memory.session_context import bind_session_context
 
         bind_session_context(state=state)
         started = time.perf_counter()
@@ -481,7 +481,7 @@ class ContextMemoryManager:
 
         Returns an empty string if no snapshot is available.
         """
-        from backend.context.session_context import bind_session_context
+        from backend.context.memory.session_context import bind_session_context
 
         bind_session_context(state=state)
         snapshot = load_snapshot(state=state)
@@ -639,7 +639,7 @@ class ContextMemoryManager:
                 llm_config=llm_config,
                 full_history=full_history,
             )
-            from backend.context.prompt_window import (
+            from backend.context.prompt.prompt_window import (
                 PromptWindowResult,
                 estimate_prompt_events_tokens,
             )

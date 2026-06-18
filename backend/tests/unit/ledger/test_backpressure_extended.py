@@ -1,4 +1,4 @@
-"""Comprehensive tests for backend.ledger.backpressure module.
+"""Comprehensive tests for backend.ledger.stream.backpressure module.
 
 Tests BackpressureManager queue policies, stats tracking, rate windows,
 snapshot generation, and critical event handling.
@@ -12,7 +12,7 @@ import unittest
 from typing import Any
 from unittest.mock import MagicMock
 
-from backend.ledger.backpressure import BackpressureManager
+from backend.ledger.stream.backpressure import BackpressureManager
 from backend.ledger.event import Event
 
 

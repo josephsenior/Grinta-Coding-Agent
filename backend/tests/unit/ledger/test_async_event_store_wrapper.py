@@ -1,4 +1,4 @@
-"""Tests for backend.ledger.async_event_store_wrapper — AsyncEventStoreWrapper."""
+"""Tests for backend.ledger.stream.async_event_store_wrapper — AsyncEventStoreWrapper."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.ledger.async_event_store_wrapper import AsyncEventStoreWrapper
+from backend.ledger.stream.async_event_store_wrapper import AsyncEventStoreWrapper
 from backend.ledger.event import Event
 
 

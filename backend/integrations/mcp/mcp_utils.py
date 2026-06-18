@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
 if TYPE_CHECKING:
-    from backend.context.agent_memory import Memory
+    from backend.context.memory.agent_memory import Memory
     from backend.execution.base import Runtime
     from backend.ledger.action.mcp import MCPAction
     from backend.ledger.observation.observation import Observation

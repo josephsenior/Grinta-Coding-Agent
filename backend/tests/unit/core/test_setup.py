@@ -78,7 +78,7 @@ def test_ensure_agent_class_available_success(mock_get_cls):
 
 @patch('backend.core.bootstrap.setup.get_file_store')
 @patch('backend.core.bootstrap.setup.EventStream')
-@patch('backend.execution.runtime_factory.get_runtime_cls')
+@patch('backend.execution.runtime.factory.get_runtime_cls')
 def test_create_runtime_sid_from_stream(
     mock_get_runtime_cls, mock_event_stream_cls, mock_get_file_store
 ):
@@ -109,7 +109,7 @@ def test_create_runtime_sid_from_stream(
 
 @patch('backend.core.bootstrap.setup.get_file_store')
 @patch('backend.core.bootstrap.setup.EventStream')
-@patch('backend.execution.runtime_factory.get_runtime_cls')
+@patch('backend.execution.runtime.factory.get_runtime_cls')
 def test_create_runtime(
     mock_get_runtime_cls, mock_event_stream_cls, mock_get_file_store
 ):
@@ -145,7 +145,7 @@ def test_create_runtime(
 
 @patch('backend.core.bootstrap.setup.get_file_store')
 @patch('backend.core.bootstrap.setup.EventStream')
-@patch('backend.execution.runtime_factory.get_runtime_cls')
+@patch('backend.execution.runtime.factory.get_runtime_cls')
 def test_create_runtime_closes_owned_event_stream_on_init_error(
     mock_get_runtime_cls, mock_event_stream_cls, mock_get_file_store
 ):

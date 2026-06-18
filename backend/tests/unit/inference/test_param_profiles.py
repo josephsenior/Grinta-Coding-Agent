@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from backend.inference.catalog_loader import lookup
-from backend.inference.param_profiles import (
+from backend.inference.capabilities.param_profiles import (
     resolve_effective_model_entry,
     resolve_model_entry_for_capabilities,
     resolve_param_profile_id,

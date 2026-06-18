@@ -40,7 +40,7 @@ from backend.cli.event_rendering.text_utils import (
 from backend.cli.event_rendering.text_utils import (
     show_reasoning_text as _show_reasoning_text,
 )
-from backend.cli.layout_tokens import (
+from backend.cli.display.layout_tokens import (
     LIVE_PANEL_ACCENT_STYLE,
 )
 from backend.cli.theme import (

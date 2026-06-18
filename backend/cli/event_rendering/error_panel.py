@@ -37,7 +37,7 @@ from backend.cli.event_rendering.text_utils import (
     error_panel_text_wrap_width,
     wrap_panel_text_block,
 )
-from backend.cli.layout_tokens import (
+from backend.cli.display.layout_tokens import (
     CALLOUT_PANEL_PADDING,
     LIVE_PANEL_ACCENT_STYLE,
 )
@@ -183,7 +183,7 @@ def build_recovery_text(
     wrap_width: int | None = None,
 ) -> Text:
     """Render a guidance block for the error / notice panel."""
-    from backend.cli.path_links import linkify_plain
+    from backend.cli.display.path_links import linkify_plain
 
     recovery = Text()
     if for_tui:
@@ -435,7 +435,7 @@ def _build_error_body(
     detail_style: str | None = None,
     recovery_for_tui: bool = False,
 ) -> list[Any]:
-    from backend.cli.path_links import linkify_plain
+    from backend.cli.display.path_links import linkify_plain
 
     if headline_style is None:
         headline_style = (

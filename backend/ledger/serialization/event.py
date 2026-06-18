@@ -15,7 +15,7 @@ from backend.ledger.event import Event, EventSource
 from backend.ledger.serialization.action import action_from_dict
 from backend.ledger.serialization.observation import observation_from_dict
 from backend.ledger.serialization.serialization_utils import remove_fields
-from backend.ledger.tool import ToolCallMetadata
+from backend.ledger.infra.tool import ToolCallMetadata
 
 TOP_KEYS = [
     'id',

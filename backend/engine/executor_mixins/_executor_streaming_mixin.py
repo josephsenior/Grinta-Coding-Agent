@@ -973,7 +973,7 @@ class _ExecutorStreamingMixin:
         if streamed_usage:
             return streamed_usage
 
-        from backend.inference.llm_utils import get_token_count
+        from backend.inference.llm.utils import get_token_count
 
         estimated_prompt = get_token_count(call_params.get('messages') or [])
         estimated_completion = get_token_count(

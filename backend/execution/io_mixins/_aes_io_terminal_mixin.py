@@ -20,55 +20,55 @@ from backend.core.constants import (
     TERMINAL_RUN_EXECUTION_TIMEOUT_SECONDS,
 )
 from backend.core.logger import app_logger as logger
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     advance_terminal_read_cursor as _advance_terminal_read_cursor_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     bump_terminal_empty_read_streak as _bump_terminal_empty_read_streak_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     clear_terminal_read_cursor as _clear_terminal_read_cursor_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     get_terminal_read_cursor as _get_terminal_read_cursor_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     mark_terminal_session_interaction as _mark_terminal_session_interaction_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     missing_terminal_session_error as _missing_terminal_session_error_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     next_terminal_session_id as _next_terminal_session_id_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     normalize_terminal_command as _normalize_terminal_command_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     read_terminal_with_mode as _read_terminal_with_mode_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     reset_terminal_empty_read_streak as _reset_terminal_empty_read_streak_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     should_poll_terminal_input_delta as _should_poll_terminal_input_delta_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     terminal_input_preflight_error as _terminal_input_preflight_error_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     terminal_mode as _terminal_mode_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     terminal_open_guardrail_error as _terminal_open_guardrail_error_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     terminal_output_state as _terminal_output_state_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     terminal_read_empty_hints as _terminal_read_empty_hints_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     terminal_shell_kind as _terminal_shell_kind_impl,
 )
 from backend.execution.utils.unified_shell import BaseShellSession

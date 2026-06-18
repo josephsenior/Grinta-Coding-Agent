@@ -1,4 +1,3 @@
 #!/usr/bin/env bash
-set -e
-
-uv build -v
+# Backward-compatible entrypoint — implementation lives in scripts/
+exec "$(cd "$(dirname "$0")" && pwd)/scripts/build.sh" "$@"

@@ -1,11 +1,11 @@
-"""Tests for backend.ledger.persistence — EventPersistence."""
+"""Tests for backend.ledger.stream.persistence — EventPersistence."""
 
 from __future__ import annotations
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from backend.ledger.persistence import EventPersistence
+from backend.ledger.stream.persistence import EventPersistence
 
 # ===================================================================
 # is_critical_event class method

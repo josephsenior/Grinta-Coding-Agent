@@ -1,10 +1,10 @@
-"""Tests for backend.ledger.stream_stats — aggregated event stream statistics."""
+"""Tests for backend.ledger.stream.stream_stats — aggregated event stream statistics."""
 
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from backend.ledger.stream_stats import get_aggregated_event_stream_stats
+from backend.ledger.stream.stream_stats import get_aggregated_event_stream_stats
 
 
 def _assert_stats_subset(stats: dict[str, int], expected: dict[str, int]) -> None:
@@ -18,7 +18,7 @@ class TestGetAggregatedEventStreamStats:
     def test_no_streams_returns_zero_totals(self):
         """Test returns zero totals when no streams exist."""
         with patch(
-            'backend.ledger.stream_stats.EventStream.iter_global_streams',
+            'backend.ledger.stream.stream_stats.EventStream.iter_global_streams',
             return_value=[],
         ):
             stats = get_aggregated_event_stream_stats()
@@ -54,7 +54,7 @@ class TestGetAggregatedEventStreamStats:
         mock_stream.get_backpressure_snapshot.return_value = snapshot
 
         with patch(
-            'backend.ledger.stream_stats.EventStream.iter_global_streams',
+            'backend.ledger.stream.stream_stats.EventStream.iter_global_streams',
             return_value=[mock_stream],
         ):
             stats = get_aggregated_event_stream_stats()
@@ -95,7 +95,7 @@ class TestGetAggregatedEventStreamStats:
         }
 
         with patch(
-            'backend.ledger.stream_stats.EventStream.iter_global_streams',
+            'backend.ledger.stream.stream_stats.EventStream.iter_global_streams',
             return_value=[mock_stream1, mock_stream2],
         ):
             stats = get_aggregated_event_stream_stats()
@@ -127,7 +127,7 @@ class TestGetAggregatedEventStreamStats:
         }
 
         with patch(
-            'backend.ledger.stream_stats.EventStream.iter_global_streams',
+            'backend.ledger.stream.stream_stats.EventStream.iter_global_streams',
             return_value=[mock_stream1, mock_stream2, mock_stream3],
         ):
             stats = get_aggregated_event_stream_stats()
@@ -145,7 +145,7 @@ class TestGetAggregatedEventStreamStats:
         }
 
         with patch(
-            'backend.ledger.stream_stats.EventStream.iter_global_streams',
+            'backend.ledger.stream.stream_stats.EventStream.iter_global_streams',
             return_value=[mock_stream],
         ):
             stats = get_aggregated_event_stream_stats()
@@ -169,7 +169,7 @@ class TestGetAggregatedEventStreamStats:
         }
 
         with patch(
-            'backend.ledger.stream_stats.EventStream.iter_global_streams',
+            'backend.ledger.stream.stream_stats.EventStream.iter_global_streams',
             return_value=[mock_stream1, mock_stream2],
         ):
             stats = get_aggregated_event_stream_stats()
@@ -185,7 +185,7 @@ class TestGetAggregatedEventStreamStats:
         mock_stream.get_backpressure_snapshot.return_value = {}
 
         with patch(
-            'backend.ledger.stream_stats.EventStream.iter_global_streams',
+            'backend.ledger.stream.stream_stats.EventStream.iter_global_streams',
             return_value=[mock_stream],
         ):
             stats = get_aggregated_event_stream_stats()
@@ -212,7 +212,7 @@ class TestGetAggregatedEventStreamStats:
         }
 
         with patch(
-            'backend.ledger.stream_stats.EventStream.iter_global_streams',
+            'backend.ledger.stream.stream_stats.EventStream.iter_global_streams',
             return_value=[mock_stream1, mock_stream2],
         ):
             stats = get_aggregated_event_stream_stats()
@@ -232,7 +232,7 @@ class TestGetAggregatedEventStreamStats:
         }
 
         with patch(
-            'backend.ledger.stream_stats.EventStream.iter_global_streams',
+            'backend.ledger.stream.stream_stats.EventStream.iter_global_streams',
             return_value=[mock_stream],
         ):
             stats = get_aggregated_event_stream_stats()
@@ -259,7 +259,7 @@ class TestGetAggregatedEventStreamStats:
         }
 
         with patch(
-            'backend.ledger.stream_stats.EventStream.iter_global_streams',
+            'backend.ledger.stream.stream_stats.EventStream.iter_global_streams',
             return_value=[mock_stream1, mock_stream2],
         ):
             stats = get_aggregated_event_stream_stats()
