@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from backend.execution.action_execution_server import RuntimeExecutor
-from backend.execution.utils.unified_shell import BaseShellSession
+from backend.execution.utils.shell.unified_shell import BaseShellSession
 from backend.ledger.action import (
     CmdRunAction,
     FileEditAction,

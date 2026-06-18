@@ -1,10 +1,10 @@
-"""Tests for backend.execution.utils.bash — bash command parsing and execution utils."""
+"""Tests for backend.execution.utils.shell.bash — bash command parsing and execution utils."""
 
 from __future__ import annotations
 
 from unittest.mock import patch
 
-from backend.execution.utils.bash import escape_bash_special_chars, split_bash_commands
+from backend.execution.utils.shell.bash import escape_bash_special_chars, split_bash_commands
 
 
 # ---------------------------------------------------------------------------
@@ -63,7 +63,7 @@ class TestSplitBashCommands:
         # Mock bashlex.parse to raise NotImplementedError
         cmd = 'some command'
         with patch(
-            'backend.execution.utils.bash_support.bashlex.parse',
+            'backend.execution.utils.shell.bash_support.bashlex.parse',
             side_effect=NotImplementedError,
         ):
             result = split_bash_commands(cmd)
@@ -72,7 +72,7 @@ class TestSplitBashCommands:
     def test_parsing_type_error_returns_original(self):
         cmd = 'some command'
         with patch(
-            'backend.execution.utils.bash_support.bashlex.parse', side_effect=TypeError
+            'backend.execution.utils.shell.bash_support.bashlex.parse', side_effect=TypeError
         ):
             result = split_bash_commands(cmd)
             assert result == [cmd]
@@ -80,7 +80,7 @@ class TestSplitBashCommands:
     def test_parsing_attribute_error_returns_original(self):
         cmd = 'some command'
         with patch(
-            'backend.execution.utils.bash_support.bashlex.parse',
+            'backend.execution.utils.shell.bash_support.bashlex.parse',
             side_effect=AttributeError,
         ):
             result = split_bash_commands(cmd)

@@ -37,7 +37,7 @@ from backend.execution.playbook_loader import PlaybookLoaderMixin
 from backend.execution.plugins import PluginRequirement
 from backend.execution.aes.security_enforcement import SecurityEnforcementMixin
 from backend.execution.task_tracking import TaskTrackingMixin
-from backend.execution.utils.git_handler import CommandResult, GitHandler
+from backend.execution.utils.git.git_handler import CommandResult, GitHandler
 from backend.ledger import EventSource, EventStream, EventStreamSubscriber
 from backend.ledger.action import (
     Action,
@@ -58,7 +58,7 @@ from backend.ledger.observation import (
 from backend.ledger.observation_cause import attach_observation_cause
 from backend.ledger.serialization.action import ACTION_TYPE_TO_CLASS
 from backend.security import SecurityAnalyzer, options
-from backend.utils.async_utils import (
+from backend.utils.async_helpers.async_utils import (
     DEBUGGER_SYNC_EXECUTOR,
     GENERAL_TIMEOUT,
     call_async_from_sync,
@@ -370,7 +370,7 @@ class Runtime(
     def _cleanup_processes(self) -> None:
         loop, created = self._resolve_event_loop()
         if loop and loop.is_running():
-            from backend.utils.async_utils import create_tracked_task
+            from backend.utils.async_helpers.async_utils import create_tracked_task
 
             create_tracked_task(
                 self.process_manager.cleanup_all(runtime=self),

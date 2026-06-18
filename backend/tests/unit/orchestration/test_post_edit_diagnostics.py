@@ -11,7 +11,7 @@ from backend.orchestration.middleware.post_edit_diagnostics import (
     PostEditDiagnosticsMiddleware,
 )
 from backend.orchestration.tool_pipeline import ToolInvocationContext
-from backend.utils.lsp_client import LspLocation, LspResult
+from backend.utils.lsp.lsp_client import LspLocation, LspResult
 
 
 def _ctx(action: object) -> ToolInvocationContext:
@@ -36,7 +36,7 @@ async def test_post_edit_diagnostics_appends_passed_receipt(tmp_path) -> None:
             'backend.utils.runtime_detect.lsp_command_for_extension',
             return_value=('pylsp',),
         ),
-        patch('backend.utils.lsp_client.get_lsp_client', return_value=lsp),
+        patch('backend.utils.lsp.lsp_client.get_lsp_client', return_value=lsp),
     ):
         await PostEditDiagnosticsMiddleware(timeout_seconds=0.25).observe(
             _ctx(action), obs
@@ -73,7 +73,7 @@ async def test_post_edit_diagnostics_reports_lsp_failures(tmp_path) -> None:
             return_value=('pyright-langserver', '--stdio'),
         ),
         patch(
-            'backend.utils.lsp_client.get_lsp_client',
+            'backend.utils.lsp.lsp_client.get_lsp_client',
             return_value=MagicMock(query=MagicMock(return_value=result)),
         ),
     ):
@@ -119,7 +119,7 @@ async def test_post_edit_diagnostics_uses_structured_edit_file_receipts(
             return_value=('pylsp',),
         ),
         patch(
-            'backend.utils.lsp_client.get_lsp_client',
+            'backend.utils.lsp.lsp_client.get_lsp_client',
             return_value=MagicMock(
                 query=MagicMock(return_value=LspResult(available=True))
             ),
@@ -144,11 +144,11 @@ async def test_post_edit_diagnostics_offloads_lsp_from_loop(tmp_path) -> None:
             'backend.utils.runtime_detect.lsp_command_for_extension',
             return_value=('pylsp',),
         ),
-        patch('backend.utils.lsp_client.get_lsp_client', return_value=lsp),
+        patch('backend.utils.lsp.lsp_client.get_lsp_client', return_value=lsp),
         patch(
             'backend.orchestration.middleware.post_edit_diagnostics.call_sync_from_async',
             wraps=__import__(
-                'backend.utils.async_utils', fromlist=['call_sync_from_async']
+                'backend.utils.async_helpers.async_utils', fromlist=['call_sync_from_async']
             ).call_sync_from_async,
         ) as offload,
     ):

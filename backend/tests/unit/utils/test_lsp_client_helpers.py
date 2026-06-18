@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
-from backend.utils import lsp_client as lc
+from backend.utils.lsp import lsp_client as lc
 
 
 def test_detect_any_lsp_server_true() -> None:

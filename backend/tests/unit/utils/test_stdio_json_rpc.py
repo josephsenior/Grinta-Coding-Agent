@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.utils.stdio_json_rpc import parse_content_length_json_messages
+from backend.utils.http.stdio_json_rpc import parse_content_length_json_messages
 
 
 def test_parse_single_message() -> None:

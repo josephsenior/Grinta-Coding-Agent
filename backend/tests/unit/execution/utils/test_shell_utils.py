@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.execution.utils.shell_utils import format_shell_output
+from backend.execution.utils.shell.shell_utils import format_shell_output
 
 
 class TestFormatShellOutput:

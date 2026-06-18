@@ -9,7 +9,7 @@ from backend.core.os_capabilities import OS_CAPS
 from backend.execution.base import Runtime
 from backend.execution.utils.request import send_request
 from backend.execution.utils.system_stats import update_last_execution_time
-from backend.utils.http_session import HttpSession
+from backend.utils.http.http_session import HttpSession
 
 if TYPE_CHECKING:
     from backend.core.config import AppConfig

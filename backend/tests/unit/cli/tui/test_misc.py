@@ -80,7 +80,7 @@ async def test_tui_renderer_receives_queued_agent_message_events(mock_config):
         from backend.cli.tui.app import TUIRenderer
         from backend.ledger import EventStream
         from backend.persistence.in_memory_file_store import InMemoryFileStore
-        from backend.utils.async_utils import set_main_event_loop
+        from backend.utils.async_helpers.async_utils import set_main_event_loop
 
         set_main_event_loop(loop)
         stream = EventStream('tui-render-test', InMemoryFileStore(), user_id='tui-test')

@@ -393,7 +393,7 @@ class PendingActionService:
             timeout_observation, action, context='pending_action_service.timeout'
         )
         try:
-            from backend.orchestration.file_edit_transaction import (
+            from backend.orchestration.file_edits.file_edit_transaction import (
                 get_file_edit_transaction_coordinator,
             )
 
@@ -522,7 +522,7 @@ class PendingActionService:
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
-            from backend.utils.async_utils import get_main_event_loop
+            from backend.utils.async_helpers.async_utils import get_main_event_loop
 
             main_loop = get_main_event_loop()
             if main_loop is None or not main_loop.is_running():

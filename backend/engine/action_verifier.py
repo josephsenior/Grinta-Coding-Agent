@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from backend.core.logger import app_logger as logger
 from backend.ledger.action import CmdRunAction, FileEditAction
 from backend.ledger.observation import CmdOutputObservation, ErrorObservation
-from backend.utils.terminal_contract import build_python_exec_command
+from backend.utils.terminal.terminal_contract import build_python_exec_command
 
 if TYPE_CHECKING:
     from backend.execution.base import Runtime

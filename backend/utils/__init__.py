@@ -1,5 +1,5 @@
 """Grinta common utilities."""
 
-from .retry import RetryError, retry
+from .async_helpers.retry import RetryError, retry
 
 __all__ = ['retry', 'RetryError']

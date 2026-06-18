@@ -1,4 +1,4 @@
-"""Tests for backend.utils.tenacity_metrics — retry hook factories."""
+"""Tests for backend.utils.async_helpers.tenacity_metrics — retry hook factories."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
-from backend.utils.tenacity_metrics import (
+from backend.utils.async_helpers.tenacity_metrics import (
     call_tenacity_hooks,
     tenacity_after_factory,
     tenacity_before_sleep_factory,
@@ -61,7 +61,7 @@ class TestTenacityBeforeSleepFactory:
         hook = tenacity_before_sleep_factory('my_op')
         assert callable(hook)
 
-    @patch('backend.utils.tenacity_metrics._record_metrics_event_runtime')
+    @patch('backend.utils.async_helpers.tenacity_metrics._record_metrics_event_runtime')
     def test_hook_records_attempt_event(self, mock_record):
         hook = tenacity_before_sleep_factory('my_op')
         rs = _make_retry_state(attempt_number=2, max_attempts=5)
@@ -73,7 +73,7 @@ class TestTenacityBeforeSleepFactory:
         assert event['attempt_index'] == 2
         assert event['max_attempts'] == 5
 
-    @patch('backend.utils.tenacity_metrics._record_metrics_event_runtime')
+    @patch('backend.utils.async_helpers.tenacity_metrics._record_metrics_event_runtime')
     def test_hook_with_no_stop_attribute(self, mock_record):
         hook = tenacity_before_sleep_factory('test_op')
         rs = SimpleNamespace(attempt_number=1)  # no 'stop'
@@ -96,7 +96,7 @@ class TestTenacityAfterFactory:
         hook = tenacity_after_factory('my_op')
         assert callable(hook)
 
-    @patch('backend.utils.tenacity_metrics._record_metrics_event_runtime')
+    @patch('backend.utils.async_helpers.tenacity_metrics._record_metrics_event_runtime')
     def test_successful_outcome(self, mock_record):
         hook = tenacity_after_factory('my_op')
         outcome = MagicMock()
@@ -108,7 +108,7 @@ class TestTenacityAfterFactory:
         assert event['status'] == 'retry_success'
         assert event['operation'] == 'my_op'
 
-    @patch('backend.utils.tenacity_metrics._record_metrics_event_runtime')
+    @patch('backend.utils.async_helpers.tenacity_metrics._record_metrics_event_runtime')
     def test_failure_at_max_attempts(self, mock_record):
         hook = tenacity_after_factory('my_op')
         outcome = MagicMock()
@@ -122,7 +122,7 @@ class TestTenacityAfterFactory:
         assert event['attempt_index'] == 3
         assert event['max_attempts'] == 3
 
-    @patch('backend.utils.tenacity_metrics._record_metrics_event_runtime')
+    @patch('backend.utils.async_helpers.tenacity_metrics._record_metrics_event_runtime')
     def test_no_event_when_not_at_max(self, mock_record):
         hook = tenacity_after_factory('my_op')
         outcome = MagicMock()
@@ -141,7 +141,7 @@ class TestTenacityAfterFactory:
         # Should not raise
         hook(rs)
 
-    @patch('backend.utils.tenacity_metrics._record_metrics_event_runtime')
+    @patch('backend.utils.async_helpers.tenacity_metrics._record_metrics_event_runtime')
     def test_no_outcome_attribute(self, mock_record):
         hook = tenacity_after_factory('op')
         rs = SimpleNamespace(attempt_number=3)  # no 'outcome', no 'stop'
@@ -154,7 +154,7 @@ class TestTenacityAfterFactory:
         """Test that the outer try-except in _after suppresses errors."""
         # Force sanitize_operation_label to fail
         with patch(
-            'backend.utils.tenacity_metrics.sanitize_operation_label',
+            'backend.utils.async_helpers.tenacity_metrics.sanitize_operation_label',
             side_effect=ValueError('label error'),
         ):
             hook = tenacity_after_factory('fail_op')

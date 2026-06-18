@@ -1,4 +1,4 @@
-"""Unit tests for backend.utils.circuit_breaker."""
+"""Unit tests for backend.utils.async_helpers.circuit_breaker."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from backend.utils.circuit_breaker import (
+from backend.utils.async_helpers.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerManager,
     _BreakerMetrics,

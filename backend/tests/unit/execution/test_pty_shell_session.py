@@ -11,11 +11,11 @@ from unittest.mock import MagicMock
 import pytest
 
 from backend.core.constants import CMD_OUTPUT_PS1_BEGIN, CMD_OUTPUT_PS1_END
-from backend.execution.utils.pty_session import (
+from backend.execution.utils.shell.pty_session import (
     InteractiveSessionError,
     PtyUnavailableError,
 )
-from backend.execution.utils.pty_shell_session import (
+from backend.execution.utils.shell.pty_shell_session import (
     _CONTROL_ALIASES,
     PtyInteractiveShellSession,
     _argv_looks_like_bash,
@@ -232,11 +232,11 @@ class TestNonPs1Execute:
         read_output_since = MagicMock(side_effect=[('', 41, 0), (delta, 59, 0)])
         monkeypatch.setattr(session, 'read_output_since', read_output_since)
         monkeypatch.setattr(
-            'backend.execution.utils.pty_shell_session.IS_WINDOWS',
+            'backend.execution.utils.shell.pty_shell_session.IS_WINDOWS',
             True,
         )
         monkeypatch.setattr(
-            'backend.execution.utils.pty_shell_session.time.sleep',
+            'backend.execution.utils.shell.pty_shell_session.time.sleep',
             lambda _: None,
         )
 
@@ -274,7 +274,7 @@ class TestFactoryWiring:
         return tools
 
     def test_interactive_true_returns_pty_session(self, tmp_path) -> None:
-        from backend.execution.utils.unified_shell import create_shell_session
+        from backend.execution.utils.shell.unified_shell import create_shell_session
 
         session = create_shell_session(
             work_dir=str(tmp_path),
@@ -284,7 +284,7 @@ class TestFactoryWiring:
         assert isinstance(session, PtyInteractiveShellSession)
 
     def test_interactive_false_preserves_legacy_selection(self, tmp_path) -> None:
-        from backend.execution.utils.unified_shell import create_shell_session
+        from backend.execution.utils.shell.unified_shell import create_shell_session
 
         session = create_shell_session(
             work_dir=str(tmp_path),
@@ -296,14 +296,14 @@ class TestFactoryWiring:
     def test_interactive_falls_back_when_pty_unavailable(
         self, tmp_path, monkeypatch
     ) -> None:
-        from backend.execution.utils import unified_shell
+        from backend.execution.utils.shell import unified_shell
 
         class _FakeRaisingPty:
             def __init__(self, *args, **kwargs):
                 raise PtyUnavailableError('forced for test')
 
         monkeypatch.setattr(
-            'backend.execution.utils.pty_shell_session.PtyInteractiveShellSession',
+            'backend.execution.utils.shell.pty_shell_session.PtyInteractiveShellSession',
             _FakeRaisingPty,
         )
 
@@ -319,7 +319,7 @@ class TestSessionManagerInteractiveFlag:
     def test_session_manager_passes_interactive_flag(
         self, tmp_path, monkeypatch
     ) -> None:
-        from backend.execution.utils import session_manager as sm_mod
+        from backend.execution.utils.shell import session_manager as sm_mod
 
         captured: dict[str, object] = {}
 
@@ -342,7 +342,7 @@ class TestSessionManagerInteractiveFlag:
     def test_session_manager_defaults_interactive_false(
         self, tmp_path, monkeypatch
     ) -> None:
-        from backend.execution.utils import session_manager as sm_mod
+        from backend.execution.utils.shell import session_manager as sm_mod
 
         captured: dict[str, object] = {}
 

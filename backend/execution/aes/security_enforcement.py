@@ -336,7 +336,7 @@ def _invoke_security_analyzer(analyzer: Any, action: Action) -> Any:
 
     import asyncio
 
-    from backend.utils.async_utils import call_async_from_sync
+    from backend.utils.async_helpers.async_utils import call_async_from_sync
 
     corofn = getattr(analyzer, 'security_risk', None)
     if not callable(corofn):

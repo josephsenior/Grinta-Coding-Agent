@@ -18,7 +18,7 @@ class TestAutonomyService(unittest.TestCase):
         self.mock_controller.PENDING_ACTION_TIMEOUT = 123.0
         self.service = AutonomyService(self.mock_controller)
 
-    @patch('backend.orchestration.autonomy.AutonomyController')
+    @patch('backend.orchestration.agent.autonomy.AutonomyController')
     def test_initialize_no_agent_config(self, mock_autonomy_controller_class):
         """Test initialize() with no agent config sets defaults."""
         mock_agent = MagicMock()
@@ -42,7 +42,7 @@ class TestAutonomyService(unittest.TestCase):
         # Should NOT create AutonomyController
         mock_autonomy_controller_class.assert_not_called()
 
-    @patch('backend.orchestration.autonomy.AutonomyController')
+    @patch('backend.orchestration.agent.autonomy.AutonomyController')
     def test_initialize_invalid_agent_config(self, mock_autonomy_controller_class):
         """Test initialize() with invalid agent config type sets defaults."""
         mock_agent = MagicMock()
@@ -55,7 +55,7 @@ class TestAutonomyService(unittest.TestCase):
         self.assertIsNone(self.mock_controller.task_validator)
 
     @patch('backend.core.config.agent_config.AgentConfig')
-    @patch('backend.orchestration.autonomy.AutonomyController')
+    @patch('backend.orchestration.agent.autonomy.AutonomyController')
     def test_initialize_with_valid_agent_config(
         self, mock_autonomy_controller_class, mock_agent_config_class
     ):
@@ -197,7 +197,7 @@ class TestAutonomyService(unittest.TestCase):
 
         self.assertIsNone(self.mock_controller.task_validator)
 
-    @patch('backend.orchestration.autonomy.AutonomyController')
+    @patch('backend.orchestration.agent.autonomy.AutonomyController')
     def test_initialize_calls_add_system_message(self, mock_autonomy_controller_class):
         """Test initialize() calls _add_system_message after task validator setup."""
         from backend.core.config.agent_config import AgentConfig
@@ -217,7 +217,7 @@ class TestAutonomyService(unittest.TestCase):
         # Check it was called
         self.mock_controller._add_system_message.assert_called_once()
 
-    @patch('backend.orchestration.autonomy.AutonomyController')
+    @patch('backend.orchestration.agent.autonomy.AutonomyController')
     @patch('backend.orchestration.services.autonomy_service.logger')
     def test_initialize_logs_safety_validator_enabled(
         self, mock_logger, mock_autonomy_controller_class
@@ -238,7 +238,7 @@ class TestAutonomyService(unittest.TestCase):
         debug_calls = [call[0][0] for call in mock_logger.debug.call_args_list]
         self.assertTrue(any('SafetyValidator enabled' in msg for msg in debug_calls))
 
-    @patch('backend.orchestration.autonomy.AutonomyController')
+    @patch('backend.orchestration.agent.autonomy.AutonomyController')
     @patch('backend.orchestration.services.autonomy_service.logger')
     def test_initialize_logs_task_validator_enabled(
         self, mock_logger, mock_autonomy_controller_class
@@ -261,7 +261,7 @@ class TestAutonomyService(unittest.TestCase):
         debug_calls = [call[0][0] for call in mock_logger.debug.call_args_list]
         self.assertTrue(any('TaskValidator enabled' in msg for msg in debug_calls))
 
-    @patch('backend.orchestration.autonomy.AutonomyController')
+    @patch('backend.orchestration.agent.autonomy.AutonomyController')
     def test_initialize_full_workflow(self, mock_autonomy_controller_class):
         """Test complete initialize() workflow with all components enabled."""
         from backend.core.config.agent_config import AgentConfig

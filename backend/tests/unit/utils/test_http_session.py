@@ -1,4 +1,4 @@
-"""Tests for backend.utils.http_session — HttpSession wrapper with close guard."""
+"""Tests for backend.utils.http.http_session — HttpSession wrapper with close guard."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.utils.http_session import HttpSession, SessionClosedError
+from backend.utils.http.http_session import HttpSession, SessionClosedError
 
 
 def _raise_session_closed(message: str) -> None:
@@ -73,7 +73,7 @@ class TestHttpSession:
         """Test request merges default headers with request headers."""
         session = HttpSession(headers={'X-Default': 'value1'})
 
-        with patch('backend.utils.http_session.CLIENT') as mock_client:
+        with patch('backend.utils.http.http_session.CLIENT') as mock_client:
             mock_client.request.return_value = MagicMock()
             session.request('GET', 'http://example.com', headers={'X-Custom': 'value2'})
 
@@ -86,7 +86,7 @@ class TestHttpSession:
         """Test request headers override default headers."""
         session = HttpSession(headers={'X-Header': 'default'})
 
-        with patch('backend.utils.http_session.CLIENT') as mock_client:
+        with patch('backend.utils.http.http_session.CLIENT') as mock_client:
             mock_client.request.return_value = MagicMock()
             session.request(
                 'GET', 'http://example.com', headers={'X-Header': 'override'}
@@ -99,7 +99,7 @@ class TestHttpSession:
         """Test GET method delegates to request."""
         session = HttpSession()
 
-        with patch('backend.utils.http_session.CLIENT') as mock_client:
+        with patch('backend.utils.http.http_session.CLIENT') as mock_client:
             mock_client.request.return_value = MagicMock()
             session.get('http://example.com')
 
@@ -111,7 +111,7 @@ class TestHttpSession:
         """Test POST method delegates to request."""
         session = HttpSession()
 
-        with patch('backend.utils.http_session.CLIENT') as mock_client:
+        with patch('backend.utils.http.http_session.CLIENT') as mock_client:
             mock_client.request.return_value = MagicMock()
             session.post('http://example.com', data={'key': 'value'})
 
@@ -123,7 +123,7 @@ class TestHttpSession:
         """Test PATCH method delegates to request."""
         session = HttpSession()
 
-        with patch('backend.utils.http_session.CLIENT') as mock_client:
+        with patch('backend.utils.http.http_session.CLIENT') as mock_client:
             mock_client.request.return_value = MagicMock()
             session.patch('http://example.com', data={'update': 'field'})
 
@@ -135,7 +135,7 @@ class TestHttpSession:
         """Test PUT method delegates to request."""
         session = HttpSession()
 
-        with patch('backend.utils.http_session.CLIENT') as mock_client:
+        with patch('backend.utils.http.http_session.CLIENT') as mock_client:
             mock_client.request.return_value = MagicMock()
             session.put('http://example.com', data={'replace': 'all'})
 
@@ -147,7 +147,7 @@ class TestHttpSession:
         """Test DELETE method delegates to request."""
         session = HttpSession()
 
-        with patch('backend.utils.http_session.CLIENT') as mock_client:
+        with patch('backend.utils.http.http_session.CLIENT') as mock_client:
             mock_client.request.return_value = MagicMock()
             session.delete('http://example.com')
 
@@ -159,7 +159,7 @@ class TestHttpSession:
         """Test OPTIONS method delegates to request."""
         session = HttpSession()
 
-        with patch('backend.utils.http_session.CLIENT') as mock_client:
+        with patch('backend.utils.http.http_session.CLIENT') as mock_client:
             mock_client.request.return_value = MagicMock()
             session.options('http://example.com')
 
@@ -171,7 +171,7 @@ class TestHttpSession:
         """Test stream merges default headers."""
         session = HttpSession(headers={'X-Stream': 'header'})
 
-        with patch('backend.utils.http_session.CLIENT') as mock_client:
+        with patch('backend.utils.http.http_session.CLIENT') as mock_client:
             mock_client.stream.return_value = MagicMock()
             session.stream('GET', 'http://example.com')
 
@@ -182,7 +182,7 @@ class TestHttpSession:
         """Test request works when no headers provided."""
         session = HttpSession()
 
-        with patch('backend.utils.http_session.CLIENT') as mock_client:
+        with patch('backend.utils.http.http_session.CLIENT') as mock_client:
             mock_client.request.return_value = MagicMock()
             session.request('GET', 'http://example.com')
 
@@ -192,7 +192,7 @@ class TestHttpSession:
         """Test multiple requests work before closing."""
         session = HttpSession()
 
-        with patch('backend.utils.http_session.CLIENT') as mock_client:
+        with patch('backend.utils.http.http_session.CLIENT') as mock_client:
             mock_client.request.return_value = MagicMock()
 
             session.get('http://example.com/1')

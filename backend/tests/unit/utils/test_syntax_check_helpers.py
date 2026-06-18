@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from backend.utils.syntax_check import (
+from backend.utils.treesitter.syntax_check import (
     SyntaxCheckResult,
     _first_line_column,
     _json_check,

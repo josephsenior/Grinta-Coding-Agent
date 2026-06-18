@@ -93,7 +93,7 @@ class TestGetCircuitBreakerStats:
         mock_manager.breakers = {}
 
         with patch(
-            'backend.utils.circuit_breaker.get_circuit_breaker_manager',
+            'backend.utils.async_helpers.circuit_breaker.get_circuit_breaker_manager',
             return_value=mock_manager,
         ):
             result = await get_circuit_breaker_stats()
@@ -114,7 +114,7 @@ class TestGetCircuitBreakerStats:
         mock_manager.breakers = {'api_breaker': mock_breaker}
 
         with patch(
-            'backend.utils.circuit_breaker.get_circuit_breaker_manager',
+            'backend.utils.async_helpers.circuit_breaker.get_circuit_breaker_manager',
             return_value=mock_manager,
         ):
             result = await get_circuit_breaker_stats()
@@ -127,7 +127,7 @@ class TestGetCircuitBreakerStats:
     async def test_handles_import_error(self):
         """Test returns empty list on ImportError."""
         with patch(
-            'backend.utils.circuit_breaker.get_circuit_breaker_manager',
+            'backend.utils.async_helpers.circuit_breaker.get_circuit_breaker_manager',
             side_effect=ImportError,
         ):
             result = await get_circuit_breaker_stats()
@@ -145,7 +145,7 @@ class TestGetCircuitBreakerStats:
         mock_manager.breakers = {'incomplete_breaker': mock_breaker}
 
         with patch(
-            'backend.utils.circuit_breaker.get_circuit_breaker_manager',
+            'backend.utils.async_helpers.circuit_breaker.get_circuit_breaker_manager',
             return_value=mock_manager,
         ):
             result = await get_circuit_breaker_stats()
@@ -246,7 +246,7 @@ class TestCheckCircuitBreakerHealth:
         mock_manager.breakers = {'test_breaker': mock_breaker}
 
         with patch(
-            'backend.utils.circuit_breaker.get_circuit_breaker_manager',
+            'backend.utils.async_helpers.circuit_breaker.get_circuit_breaker_manager',
             return_value=mock_manager,
         ):
             result = await check_circuit_breaker_health('test_breaker')
@@ -261,7 +261,7 @@ class TestCheckCircuitBreakerHealth:
         mock_manager.breakers = {}
 
         with patch(
-            'backend.utils.circuit_breaker.get_circuit_breaker_manager',
+            'backend.utils.async_helpers.circuit_breaker.get_circuit_breaker_manager',
             return_value=mock_manager,
         ):
             result = await check_circuit_breaker_health('missing_breaker')
@@ -272,7 +272,7 @@ class TestCheckCircuitBreakerHealth:
     async def test_handles_exception(self):
         """Test handles exceptions and returns UNKNOWN."""
         with patch(
-            'backend.utils.circuit_breaker.get_circuit_breaker_manager',
+            'backend.utils.async_helpers.circuit_breaker.get_circuit_breaker_manager',
             side_effect=Exception('test error'),
         ):
             result = await check_circuit_breaker_health('any_breaker')
@@ -296,7 +296,7 @@ class TestCheckCircuitBreakerHealth:
         mock_manager.breakers = {'failing_breaker': mock_breaker}
 
         with patch(
-            'backend.utils.circuit_breaker.get_circuit_breaker_manager',
+            'backend.utils.async_helpers.circuit_breaker.get_circuit_breaker_manager',
             return_value=mock_manager,
         ):
             result = await check_circuit_breaker_health('failing_breaker')

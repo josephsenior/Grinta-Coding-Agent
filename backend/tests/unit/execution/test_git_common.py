@@ -1,4 +1,4 @@
-"""Tests for backend.execution.utils.git_common — low-level git helpers."""
+"""Tests for backend.execution.utils.git.git_common — low-level git helpers."""
 
 from __future__ import annotations
 
@@ -6,12 +6,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.execution.utils.git_common import run_git_cmd
+from backend.execution.utils.git.git_common import run_git_cmd
 
 
 class TestRunGitCmd:
     def test_successful_command(self):
-        with patch('backend.execution.utils.git_common.subprocess.run') as mock_run:
+        with patch('backend.execution.utils.git.git_common.subprocess.run') as mock_run:
             mock_run.return_value = MagicMock(
                 returncode=0,
                 stdout=b'main\n',
@@ -21,7 +21,7 @@ class TestRunGitCmd:
             assert result == 'main'
 
     def test_failed_command_raises(self):
-        with patch('backend.execution.utils.git_common.subprocess.run') as mock_run:
+        with patch('backend.execution.utils.git.git_common.subprocess.run') as mock_run:
             mock_run.return_value = MagicMock(
                 returncode=128,
                 stdout=b'',
@@ -31,7 +31,7 @@ class TestRunGitCmd:
                 run_git_cmd('git status', '/repo')
 
     def test_stderr_preferred_over_stdout(self):
-        with patch('backend.execution.utils.git_common.subprocess.run') as mock_run:
+        with patch('backend.execution.utils.git.git_common.subprocess.run') as mock_run:
             mock_run.return_value = MagicMock(
                 returncode=0,
                 stdout=b'stdout output',
@@ -41,7 +41,7 @@ class TestRunGitCmd:
             assert result == 'stderr output'
 
     def test_strips_output(self):
-        with patch('backend.execution.utils.git_common.subprocess.run') as mock_run:
+        with patch('backend.execution.utils.git.git_common.subprocess.run') as mock_run:
             mock_run.return_value = MagicMock(
                 returncode=0,
                 stdout=b'  trimmed  \n',

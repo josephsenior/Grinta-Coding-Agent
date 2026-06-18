@@ -545,7 +545,7 @@ class TestPendingActionWatchdog(unittest.IsolatedAsyncioTestCase):
     @patch(
         'backend.orchestration.services.pending_action_service.asyncio.get_running_loop'
     )
-    @patch('backend.utils.async_utils.get_main_event_loop')
+    @patch('backend.utils.async_helpers.async_utils.get_main_event_loop')
     async def test_schedule_watchdog_skips_when_no_active_loop_exists(
         self, mock_get_main_event_loop, mock_get_running_loop
     ):

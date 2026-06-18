@@ -26,7 +26,7 @@ from backend.ledger.observation import (
     LspQueryObservation,
     MCPObservation,
 )
-from backend.utils.lsp_client import LspClient, LspLocation, LspResult, LspSymbol
+from backend.utils.lsp.lsp_client import LspClient, LspLocation, LspResult, LspSymbol
 
 
 @pytest.fixture(autouse=True)
@@ -132,7 +132,7 @@ async def test_runtime_executor_lsp_query_observation_shape(tmp_path) -> None:
         error='',
     )
 
-    with patch('backend.utils.lsp_client.LspClient') as LC:
+    with patch('backend.utils.lsp.lsp_client.LspClient') as LC:
         LC.return_value.query.return_value = result
         obs = await ex.lsp_query(action)
 
@@ -269,7 +269,7 @@ async def test_runtime_executor_lsp_list_symbols_observation(tmp_path: Path) -> 
         available=True,
         symbols=[LspSymbol(name='Box', kind='Class', line=1)],
     )
-    with patch('backend.utils.lsp_client.LspClient') as LC:
+    with patch('backend.utils.lsp.lsp_client.LspClient') as LC:
         LC.return_value.query.return_value = result
         obs = await ex.lsp_query(action)
     assert isinstance(obs, LspQueryObservation)

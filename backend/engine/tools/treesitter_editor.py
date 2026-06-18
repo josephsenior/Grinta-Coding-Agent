@@ -1,6 +1,6 @@
 """Compatibility wrapper for Tree-sitter editor utilities.
 
-The canonical implementation lives in `backend.utils.treesitter_editor`.
+The canonical implementation lives in `backend.utils.treesitter.treesitter_editor`.
 Historically, orchestrator tools and tests import it from
 `backend.engine.tools.treesitter_editor`, so we re-export the
 public API here.
@@ -15,7 +15,7 @@ from __future__ import annotations
 from backend.engine.tools.structure_editor import (  # noqa: F401
     StructureEditor,
 )
-from backend.utils.treesitter_editor import (  # noqa: F401
+from backend.utils.treesitter.treesitter_editor import (  # noqa: F401
     LANGUAGE_EXTENSIONS,
     TREE_SITTER_AVAILABLE,
     EditResult,

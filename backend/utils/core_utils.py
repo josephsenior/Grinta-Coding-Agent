@@ -6,7 +6,7 @@ from copy import deepcopy
 from typing import TYPE_CHECKING
 
 from backend.inference.llm_registry import LLMRegistry
-from backend.orchestration.conversation_stats import ConversationStats
+from backend.orchestration.telemetry.conversation_stats import ConversationStats
 from backend.persistence import get_file_store
 from backend.persistence.locations import get_local_data_root
 

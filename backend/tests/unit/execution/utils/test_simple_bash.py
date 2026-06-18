@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.execution.utils.simple_bash import SimpleBashSession
+from backend.execution.utils.shell.simple_bash import SimpleBashSession
 from backend.ledger.action import CmdRunAction
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.commands import CmdOutputObservation
@@ -66,7 +66,7 @@ class TestSimpleBashSession:
         assert isinstance(result, ErrorObservation)
         assert 'Interactive input not supported' in result.content
 
-    @patch('backend.execution.utils.simple_bash.bounded_communicate')
+    @patch('backend.execution.utils.shell.simple_bash.bounded_communicate')
     @patch('subprocess.Popen')
     def test_execute_command_success(
         self, mock_popen: MagicMock, mock_bc: MagicMock, session: SimpleBashSession
@@ -89,7 +89,7 @@ class TestSimpleBashSession:
         assert isinstance(result, CmdOutputObservation)
         assert result.content == 'stdout_val'
 
-    @patch('backend.execution.utils.simple_bash.bounded_communicate')
+    @patch('backend.execution.utils.shell.simple_bash.bounded_communicate')
     @patch('subprocess.Popen')
     def test_execute_command_with_cd(
         self, mock_popen: MagicMock, mock_bc: MagicMock, session: SimpleBashSession
@@ -114,7 +114,7 @@ class TestSimpleBashSession:
         # original command.
         assert mock_popen.call_count >= 1
 
-    @patch('backend.execution.utils.simple_bash.bounded_communicate')
+    @patch('backend.execution.utils.shell.simple_bash.bounded_communicate')
     @patch('subprocess.Popen')
     def test_execute_background_failure_fallback(
         self, mock_popen: MagicMock, mock_bc: MagicMock, session: SimpleBashSession
@@ -147,7 +147,7 @@ class TestSimpleBashSession:
         assert isinstance(result, CmdOutputObservation)
         assert result.content == 'stdout'
 
-    @patch('backend.execution.utils.simple_bash.bounded_communicate')
+    @patch('backend.execution.utils.shell.simple_bash.bounded_communicate')
     @patch('subprocess.Popen')
     def test_execute_background_registration_exception(
         self, mock_popen: MagicMock, mock_bc: MagicMock, session: SimpleBashSession
@@ -182,7 +182,7 @@ class TestSimpleBashSession:
         with pytest.raises(RuntimeError, match='closed'):
             session._run_command('ls')
 
-    @patch('backend.execution.utils.simple_bash.bounded_communicate')
+    @patch('backend.execution.utils.shell.simple_bash.bounded_communicate')
     @patch('subprocess.Popen')
     def test_handle_subprocess_timeout(
         self, mock_popen: MagicMock, mock_bc: MagicMock, session: SimpleBashSession

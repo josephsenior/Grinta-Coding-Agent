@@ -33,7 +33,7 @@ from backend.ledger.observation.agent import (
 )
 from backend.ledger.observation_cause import attach_observation_cause
 from backend.ledger.stream import EventStream, EventStreamSubscriber
-from backend.utils.async_utils import run_or_schedule
+from backend.utils.async_helpers.async_utils import run_or_schedule
 from backend.utils.prompt import ConversationInstructions, RepositoryInfo, RuntimeInfo
 
 if TYPE_CHECKING:
@@ -670,7 +670,7 @@ class Memory:
                             'MEMORY.set_runtime_status: status_callback returned'
                         )
                     except Exception:
-                        from backend.utils.async_utils import create_tracked_task
+                        from backend.utils.async_helpers.async_utils import create_tracked_task
 
                         create_tracked_task(
                             self._set_runtime_status('error', status, message),

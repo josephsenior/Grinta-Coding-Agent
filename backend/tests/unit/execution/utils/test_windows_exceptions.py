@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.execution.utils.windows_exceptions import DotNetMissingError
+from backend.execution.utils.shell.windows_exceptions import DotNetMissingError
 
 
 def _raise_dotnet_missing(message: str, *, details: str | None = None) -> None:

@@ -7,8 +7,8 @@ import unittest
 from backend.orchestration.middleware.auto_check import (
     _treesitter_syntax_check,
 )
-from backend.utils.syntax_check import check_syntax
-from backend.utils.treesitter_editor import TREE_SITTER_AVAILABLE
+from backend.utils.treesitter.syntax_check import check_syntax
+from backend.utils.treesitter.treesitter_editor import TREE_SITTER_AVAILABLE
 
 
 class TestSharedSyntaxCheckService(unittest.TestCase):

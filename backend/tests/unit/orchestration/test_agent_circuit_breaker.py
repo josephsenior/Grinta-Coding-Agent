@@ -1,4 +1,4 @@
-"""Unit tests for backend.orchestration.agent_circuit_breaker module.
+"""Unit tests for backend.orchestration.agent.circuit_breaker module.
 
 Tests cover:
 - CircuitBreakerConfig dataclass
@@ -14,7 +14,7 @@ Tests cover:
 from unittest.mock import MagicMock
 
 from backend.ledger.action import ActionSecurityRisk
-from backend.orchestration.agent_circuit_breaker import (
+from backend.orchestration.agent.circuit_breaker import (
     FILE_EDIT_BUCKET,
     FILE_EDIT_SYNTAX_BUCKET,
     CircuitBreaker,

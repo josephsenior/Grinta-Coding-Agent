@@ -10,7 +10,7 @@ from backend.core.schemas import AgentState
 from backend.core.suspend_aware_deadline import SuspendAwareDeadline
 from backend.execution.base import Runtime
 from backend.orchestration import SessionOrchestrator
-from backend.utils.async_utils import run_or_schedule
+from backend.utils.async_helpers.async_utils import run_or_schedule
 
 
 def _handle_error_status(
@@ -53,7 +53,7 @@ def _handle_error_status(
                     exc_info=True,
                 )
                 try:
-                    from backend.utils.async_utils import create_tracked_task
+                    from backend.utils.async_helpers.async_utils import create_tracked_task
 
                     create_tracked_task(
                         controller.set_agent_state_to(AgentState.ERROR),

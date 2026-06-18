@@ -131,7 +131,7 @@ class ActionService:
         self._prepare_metrics_for_action(action)
 
         try:
-            from backend.orchestration.file_edit_transaction import (
+            from backend.orchestration.file_edits.file_edit_transaction import (
                 get_file_edit_transaction_coordinator,
             )
 

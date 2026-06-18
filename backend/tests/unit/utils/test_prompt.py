@@ -11,7 +11,7 @@ from backend.utils.prompt import (
     PromptManager,
     _UninitializedPromptManager,
 )
-from backend.utils.terminal_contract import (
+from backend.utils.terminal.terminal_contract import (
     build_python_exec_command,
     get_python_shell_command,
     get_shell_name,
@@ -260,14 +260,14 @@ def test_sentinels():
 
 
 def test_terminal_helpers_prefer_powershell_when_available_on_windows():
-    from backend.utils import terminal_contract as prompt_mod
+    from backend.utils.terminal import terminal_contract as prompt_mod
 
     prompt_mod.set_active_tool_registry(None)
     prompt_mod._get_global_tool_registry.cache_clear()
     with (
-        patch('backend.utils.terminal_contract.OS_CAPS') as mock_caps,
+        patch('backend.utils.terminal.terminal_contract.OS_CAPS') as mock_caps,
         patch(
-            'backend.utils.terminal_contract._runtime_prefers_powershell',
+            'backend.utils.terminal.terminal_contract._runtime_prefers_powershell',
             return_value=True,
         ),
     ):
@@ -280,14 +280,14 @@ def test_terminal_helpers_prefer_powershell_when_available_on_windows():
 
 
 def test_terminal_helpers_fall_back_to_bash_when_powershell_unavailable_on_windows():
-    from backend.utils import terminal_contract as prompt_mod
+    from backend.utils.terminal import terminal_contract as prompt_mod
 
     prompt_mod.set_active_tool_registry(None)
     prompt_mod._get_global_tool_registry.cache_clear()
     with (
-        patch('backend.utils.terminal_contract.OS_CAPS') as mock_caps,
+        patch('backend.utils.terminal.terminal_contract.OS_CAPS') as mock_caps,
         patch(
-            'backend.utils.terminal_contract._runtime_prefers_powershell',
+            'backend.utils.terminal.terminal_contract._runtime_prefers_powershell',
             return_value=False,
         ),
     ):
@@ -301,28 +301,28 @@ def test_terminal_helpers_fall_back_to_bash_when_powershell_unavailable_on_windo
 
 def test_python_shell_command_prefers_python3_in_bash_mode():
     with patch(
-        'backend.utils.terminal_contract.uses_powershell_terminal', return_value=False
+        'backend.utils.terminal.terminal_contract.uses_powershell_terminal', return_value=False
     ):
         assert get_python_shell_command() == 'python3'
 
 
 def test_python_shell_command_prefers_python_on_windows():
     with patch(
-        'backend.utils.terminal_contract.uses_powershell_terminal', return_value=False
+        'backend.utils.terminal.terminal_contract.uses_powershell_terminal', return_value=False
     ):
         assert get_python_shell_command() == 'python3'
 
 
 def test_python_shell_command_prefers_python_in_powershell_mode():
     with patch(
-        'backend.utils.terminal_contract.uses_powershell_terminal', return_value=True
+        'backend.utils.terminal.terminal_contract.uses_powershell_terminal', return_value=True
     ):
         assert get_python_shell_command() == 'python'
 
 
 def test_build_python_exec_command_base64_encodes_script():
     with patch(
-        'backend.utils.terminal_contract.uses_powershell_terminal', return_value=False
+        'backend.utils.terminal.terminal_contract.uses_powershell_terminal', return_value=False
     ):
         command = build_python_exec_command('print("hello")')
 
@@ -333,7 +333,7 @@ def test_build_python_exec_command_base64_encodes_script():
 
 def test_build_python_exec_command_includes_shell_fallbacks_for_bash():
     with patch(
-        'backend.utils.terminal_contract.uses_powershell_terminal', return_value=False
+        'backend.utils.terminal.terminal_contract.uses_powershell_terminal', return_value=False
     ):
         command = build_python_exec_command('print("hello")')
 
@@ -345,7 +345,7 @@ def test_build_python_exec_command_includes_shell_fallbacks_for_bash():
 
 def test_build_python_exec_command_includes_shell_fallbacks_for_powershell():
     with patch(
-        'backend.utils.terminal_contract.uses_powershell_terminal', return_value=True
+        'backend.utils.terminal.terminal_contract.uses_powershell_terminal', return_value=True
     ):
         command = build_python_exec_command('print("hello")')
 
@@ -359,7 +359,7 @@ def test_active_tool_registry_visible_from_worker_thread():
     from unittest.mock import MagicMock
 
     from backend.core.os_capabilities import OS_CAPS, override_os_capabilities
-    from backend.utils import terminal_contract as prompt_mod
+    from backend.utils.terminal import terminal_contract as prompt_mod
 
     prompt_mod.set_active_tool_registry(None)
     prompt_mod._get_global_tool_registry.cache_clear()
@@ -384,7 +384,7 @@ def test_build_python_exec_command_matches_active_registry_git_bash_on_windows()
     """Regression: Git Bash-only Windows contract must emit POSIX shell."""
     from unittest.mock import MagicMock
 
-    from backend.utils import terminal_contract as prompt_mod
+    from backend.utils.terminal import terminal_contract as prompt_mod
 
     prompt_mod.set_active_tool_registry(None)
     prompt_mod._get_global_tool_registry.cache_clear()
@@ -393,7 +393,7 @@ def test_build_python_exec_command_matches_active_registry_git_bash_on_windows()
     mock_reg.has_powershell = False
     prompt_mod.set_active_tool_registry(mock_reg)
     try:
-        with patch('backend.utils.terminal_contract.OS_CAPS') as mock_caps:
+        with patch('backend.utils.terminal.terminal_contract.OS_CAPS') as mock_caps:
             mock_caps.is_windows = True
             command = build_python_exec_command('print("hello")')
         assert 'command -v python3' in command

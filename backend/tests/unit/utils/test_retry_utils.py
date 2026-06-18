@@ -1,11 +1,11 @@
-"""Tests for backend.utils.retry — Retry with backoff utilities."""
+"""Tests for backend.utils.async_helpers.retry — Retry with backoff utilities."""
 
 from __future__ import annotations
 
 import pytest
 
 from backend.core.schemas import RetryConfig, RetryStrategy
-from backend.utils.retry import (
+from backend.utils.async_helpers.retry import (
     RetryError,
     RetryExhaustedError,
     calculate_backoff,

@@ -18,7 +18,7 @@ class AutonomyService:
     def initialize(self, agent: Agent) -> None:
         """Configure autonomy controller and related validators."""
         from backend.core.config.agent_config import AgentConfig as _AgentConfig
-        from backend.orchestration.autonomy import AutonomyController
+        from backend.orchestration.agent.autonomy import AutonomyController
 
         controller = self._controller
         agent_config = getattr(agent, 'config', None)

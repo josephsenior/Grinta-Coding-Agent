@@ -1,4 +1,4 @@
-"""Comprehensive tests for backend.utils.treesitter_editor."""
+"""Comprehensive tests for backend.utils.treesitter.treesitter_editor."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from backend.utils.treesitter_editor import (
+from backend.utils.treesitter.treesitter_editor import (
     LANGUAGE_EXTENSIONS,
     TREE_SITTER_AVAILABLE,
     EditResult,
@@ -637,7 +637,7 @@ class TestCoverageGaps:
 
     def test_get_parser_none_pack(self, editor: TreeSitterEditor) -> None:
         """Test get_parser when language pack is missing."""
-        import backend.utils.treesitter_editor as tse
+        import backend.utils.treesitter.treesitter_editor as tse
 
         with pytest.MonkeyPatch.context() as mp:
             mp.setattr(tse, '_get_language', None)

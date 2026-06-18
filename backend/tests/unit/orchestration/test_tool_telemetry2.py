@@ -1,4 +1,4 @@
-"""Tests for backend.orchestration.tool_telemetry — tool invocation telemetry tracking."""
+"""Tests for backend.orchestration.telemetry.tool_telemetry — tool invocation telemetry tracking."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 from backend.ledger.action.commands import CmdRunAction
 from backend.ledger.observation.commands import CmdOutputObservation
 from backend.ledger.observation.error import ErrorObservation
-from backend.orchestration.tool_telemetry import ToolTelemetry
+from backend.orchestration.telemetry.tool_telemetry import ToolTelemetry
 
 
 # ---------------------------------------------------------------------------
@@ -71,7 +71,7 @@ class TestToolTelemetryInit:
         ToolTelemetry._shared_latency = None
         try:
             with patch(
-                'backend.orchestration.tool_telemetry.importlib.import_module',
+                'backend.orchestration.telemetry.tool_telemetry.importlib.import_module',
                 return_value=fake_prometheus,
             ):
                 ToolTelemetry()

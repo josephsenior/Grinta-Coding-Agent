@@ -602,7 +602,7 @@ def terminal_input_preflight_error(
         return None
 
     if _COPIED_BASH_PROMPT_RE.match(text):
-        from backend.utils.terminal_contract import get_terminal_tool_name
+        from backend.utils.terminal.terminal_contract import get_terminal_tool_name
 
         terminal_tool = get_terminal_tool_name()
         return ErrorObservation(
@@ -920,7 +920,7 @@ def _structured_edit_verification_receipt(
     snapshots: dict[Path, tuple[str | None, str]],
 ) -> tuple[str, list[dict[str, Any]], bool]:
     """Verify structured edits after commit and return an agent-visible receipt."""
-    from backend.utils.syntax_check import check_syntax
+    from backend.utils.treesitter.syntax_check import check_syntax
 
     file_receipts: list[dict[str, Any]] = []
     lines = ['[EDIT_VERIFICATION]']

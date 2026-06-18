@@ -1,6 +1,6 @@
 """Tests for terminal color utilities."""
 
-from backend.utils.term_color import TermColor, colorize
+from backend.utils.terminal.term_color import TermColor, colorize
 
 
 class TestTermColor:

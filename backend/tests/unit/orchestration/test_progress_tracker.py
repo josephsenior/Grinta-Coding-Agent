@@ -1,11 +1,11 @@
-"""Tests for backend.orchestration.progress_tracker module."""
+"""Tests for backend.orchestration.telemetry.progress_tracker module."""
 
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock
 
 from backend.ledger.action import CmdRunAction, FileEditAction
 from backend.ledger.observation import CmdOutputObservation
-from backend.orchestration.progress_tracker import (
+from backend.orchestration.telemetry.progress_tracker import (
     Milestone,
     ProgressMetrics,
     ProgressTracker,

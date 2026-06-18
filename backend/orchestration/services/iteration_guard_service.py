@@ -76,7 +76,7 @@ class IterationGuardService:
         return graceful_env not in ('0', 'false', 'no')
 
     def _schedule_graceful_shutdown(self, reason: str) -> None:
-        from backend.utils.async_utils import create_tracked_task
+        from backend.utils.async_helpers.async_utils import create_tracked_task
 
         create_tracked_task(
             self._graceful_shutdown(reason=reason),

@@ -80,10 +80,10 @@ class _EventRouterDelegateMixin:
         )
         from backend.orchestration.agent import Agent
         from backend.orchestration.blackboard import Blackboard
-        from backend.orchestration.conversation_stats import ConversationStats
+        from backend.orchestration.telemetry.conversation_stats import ConversationStats
         from backend.orchestration.orchestration_config import OrchestrationConfig
         from backend.orchestration.session_orchestrator import SessionOrchestrator
-        from backend.utils.async_utils import run_or_schedule
+        from backend.utils.async_helpers.async_utils import run_or_schedule
 
         # Check delegation depth limit
         current_depth = getattr(action, 'depth', 0)
@@ -352,7 +352,7 @@ class _EventRouterDelegateMixin:
                 # stream.
                 parent_runtime = getattr(self._ctrl, 'runtime', None)
                 if parent_runtime is not None:
-                    from backend.utils.async_utils import run_or_schedule
+                    from backend.utils.async_helpers.async_utils import run_or_schedule
 
                     _worker_stream_ref = worker_stream  # capture for closure
 
@@ -453,7 +453,7 @@ class _EventRouterDelegateMixin:
                 # drain those tasks so that state.history contains the
                 # initial message before the first _step_inner() call, and
                 # so the AgentStateChangedObservation is processed.
-                from backend.utils.async_utils import _background_tasks
+                from backend.utils.async_helpers.async_utils import _background_tasks
 
                 worker_task_baseline = set(_background_tasks)
 

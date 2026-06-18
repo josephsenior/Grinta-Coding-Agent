@@ -10,7 +10,7 @@ import logging
 import time
 
 from backend.core.schemas import AgentState
-from backend.utils.async_utils import (
+from backend.utils.async_helpers.async_utils import (
     create_tracked_task,
     get_main_event_loop,
 )

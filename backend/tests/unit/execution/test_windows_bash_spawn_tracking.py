@@ -28,7 +28,7 @@ if sys.platform != 'win32':
     )
 
 
-from backend.execution.utils.windows_bash import (  # noqa: E402
+from backend.execution.utils.shell.windows_bash import (  # noqa: E402
     _SPAWNED_PID_MARKER_RE,
     _START_PROCESS_RE,
     _extract_spawned_pids,

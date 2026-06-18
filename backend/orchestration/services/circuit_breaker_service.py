@@ -8,7 +8,7 @@ from backend.core.constants import (
     DEFAULT_AGENT_MAX_STUCK_DETECTIONS,
 )
 from backend.core.logger import app_logger as logger
-from backend.orchestration.agent_circuit_breaker import (
+from backend.orchestration.agent.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerConfig,
     CircuitBreakerResult,

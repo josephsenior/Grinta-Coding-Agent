@@ -229,7 +229,7 @@ class _SessionOrchestratorParallelMixin(SessionOrchestratorAccessorsMixin):
 
     async def _drain_step_barrier(self, *, timeout: float = 2.0) -> bool:  # noqa: ASYNC109
         """Drain background tasks and wait for outstanding pending actions."""
-        from backend.utils.async_utils import drain_step_barrier
+        from backend.utils.async_helpers.async_utils import drain_step_barrier
 
         pending_service = getattr(
             getattr(self, 'services', None), 'pending_action', None

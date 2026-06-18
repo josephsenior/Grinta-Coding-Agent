@@ -7,7 +7,7 @@ from backend.ledger import EventSource
 from backend.ledger.action import FileEditAction
 from backend.ledger.observation import ErrorObservation, FileEditObservation
 from backend.ledger.infra.tool import ToolCallMetadata
-from backend.orchestration.file_edit_transaction import (
+from backend.orchestration.file_edits.file_edit_transaction import (
     FileEditTransactionCoordinator,
 )
 

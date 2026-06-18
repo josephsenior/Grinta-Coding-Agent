@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from backend.ledger.observation import ErrorObservation
-from backend.orchestration.agent_circuit_breaker import CircuitBreakerResult
+from backend.orchestration.agent.circuit_breaker import CircuitBreakerResult
 from backend.orchestration.services.step_guard_service import StepGuardService
 from backend.orchestration.session_orchestrator import SessionOrchestrator
 

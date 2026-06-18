@@ -25,14 +25,14 @@ def _treesitter_syntax_check(
     Returns:
         (is_valid, error_detail) or None if language not supported.
     """
-    from backend.utils.syntax_check import check_syntax
+    from backend.utils.treesitter.syntax_check import check_syntax
 
     return check_syntax(path, content).as_legacy_tuple()
 
 
 def _collect_syntax_errors(node: Any, source: bytes, max_errors: int = 5) -> list[str]:
     """Walk tree-sitter AST and collect ERROR/MISSING node descriptions."""
-    from backend.utils.syntax_check import collect_tree_sitter_syntax_errors
+    from backend.utils.treesitter.syntax_check import collect_tree_sitter_syntax_errors
 
     return collect_tree_sitter_syntax_errors(node, source, max_errors=max_errors)
 

@@ -22,7 +22,7 @@ from backend.engine.tools.ignore_filter import (
     prune_ignored_dirs,
 )
 from backend.execution.utils.bounded_io import BoundedResult
-from backend.utils.subprocess_bridge import run_bounded_subprocess_sync
+from backend.utils.async_helpers.subprocess_bridge import run_bounded_subprocess_sync
 
 
 def _run_command(

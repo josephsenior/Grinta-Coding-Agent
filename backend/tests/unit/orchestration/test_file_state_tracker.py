@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.orchestration.file_state_tracker import (
+from backend.orchestration.file_edits.file_state_tracker import (
     FileStateMiddleware,
     FileStateTracker,
     _extract_removed_symbols,

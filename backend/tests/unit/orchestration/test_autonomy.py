@@ -1,4 +1,4 @@
-"""Unit tests for backend.orchestration.autonomy module.
+"""Unit tests for backend.orchestration.agent.autonomy module.
 
 Tests cover:
 - AutonomyLevel enum values
@@ -19,7 +19,7 @@ from backend.ledger.action import (
     TerminalRunAction,
 )
 from backend.ledger.action.agent import BlackboardAction, DelegateTaskAction
-from backend.orchestration.autonomy import AutonomyController, AutonomyLevel
+from backend.orchestration.agent.autonomy import AutonomyController, AutonomyLevel
 
 
 class TestAutonomyLevel:

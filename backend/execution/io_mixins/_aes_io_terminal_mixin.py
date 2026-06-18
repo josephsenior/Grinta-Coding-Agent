@@ -71,7 +71,7 @@ from backend.execution.aes.helpers import (
 from backend.execution.aes.helpers import (
     terminal_shell_kind as _terminal_shell_kind_impl,
 )
-from backend.execution.utils.unified_shell import BaseShellSession
+from backend.execution.utils.shell.unified_shell import BaseShellSession
 from backend.ledger.action.terminal import (
     TerminalInputAction,
     TerminalReadAction,

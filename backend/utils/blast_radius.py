@@ -14,8 +14,8 @@ import subprocess
 from pathlib import Path
 
 from backend.core.logger import app_logger as logger
-from backend.utils.lsp_client import get_lsp_client
-from backend.utils.treesitter_editor import TreeSitterEditor
+from backend.utils.lsp.lsp_client import get_lsp_client
+from backend.utils.treesitter.treesitter_editor import TreeSitterEditor
 
 # Directories excluded from the grep fallback to avoid noise.
 _GREP_EXCLUDED_DIRS = (

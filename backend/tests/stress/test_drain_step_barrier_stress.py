@@ -9,7 +9,7 @@ from typing import Any, cast
 import pytest
 
 from backend.orchestration.services.pending_action_service import PendingActionService
-from backend.utils.async_utils import drain_step_barrier, run_or_schedule
+from backend.utils.async_helpers.async_utils import drain_step_barrier, run_or_schedule
 
 pytestmark = pytest.mark.stress
 

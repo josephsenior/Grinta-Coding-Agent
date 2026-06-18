@@ -1,4 +1,4 @@
-"""Tests for backend.execution.utils.git_handler — GitHandler."""
+"""Tests for backend.execution.utils.git.git_handler — GitHandler."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from backend.execution.utils.git_handler import CommandResult, GitHandler
+from backend.execution.utils.git.git_handler import CommandResult, GitHandler
 
 # ---------------------------------------------------------------------------
 # Helpers

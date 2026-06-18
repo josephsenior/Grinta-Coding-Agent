@@ -329,6 +329,356 @@ LEDGER_INFRA_IMPORTS: list[tuple[str, str]] = [
     ('backend.ledger.tool', 'backend.ledger.infra.tool'),
 ]
 
+# --- utils/treesitter ---
+
+UTILS_TREESITTER_MOVES: dict[str, str] = {
+    '_tse_errors.py': 'treesitter/_tse_errors.py',
+    '_tse_languages.py': 'treesitter/_tse_languages.py',
+    '_tse_query.py': 'treesitter/_tse_query.py',
+    '_tse_runtime.py': 'treesitter/_tse_runtime.py',
+    '_tse_types.py': 'treesitter/_tse_types.py',
+    'treesitter_editor.py': 'treesitter/treesitter_editor.py',
+    'syntax_check.py': 'treesitter/syntax_check.py',
+    'chunk_localizer.py': 'treesitter/chunk_localizer.py',
+}
+
+UTILS_TREESITTER_IMPORTS: list[tuple[str, str]] = [
+    ('backend.utils._tse_errors', 'backend.utils.treesitter._tse_errors'),
+    ('backend.utils._tse_languages', 'backend.utils.treesitter._tse_languages'),
+    ('backend.utils._tse_query', 'backend.utils.treesitter._tse_query'),
+    ('backend.utils._tse_runtime', 'backend.utils.treesitter._tse_runtime'),
+    ('backend.utils._tse_types', 'backend.utils.treesitter._tse_types'),
+    ('backend.utils.treesitter_editor', 'backend.utils.treesitter.treesitter_editor'),
+    ('backend.utils.syntax_check', 'backend.utils.treesitter.syntax_check'),
+    ('backend.utils.chunk_localizer', 'backend.utils.treesitter.chunk_localizer'),
+]
+
+# --- utils/async_helpers (async is a reserved keyword — cannot use utils/async/) ---
+
+UTILS_ASYNC_HELPERS_MOVES: dict[str, str] = {
+    'async_utils.py': 'async_helpers/async_utils.py',
+    'retry.py': 'async_helpers/retry.py',
+    'circuit_breaker.py': 'async_helpers/circuit_breaker.py',
+    'tenacity_metrics.py': 'async_helpers/tenacity_metrics.py',
+    'tenacity_stop.py': 'async_helpers/tenacity_stop.py',
+    'subprocess_bridge.py': 'async_helpers/subprocess_bridge.py',
+}
+
+UTILS_ASYNC_HELPERS_IMPORTS: list[tuple[str, str]] = [
+    ('backend.utils.async_utils', 'backend.utils.async_helpers.async_utils'),
+    ('backend.utils.subprocess_bridge', 'backend.utils.async_helpers.subprocess_bridge'),
+    ('backend.utils.circuit_breaker', 'backend.utils.async_helpers.circuit_breaker'),
+    ('backend.utils.tenacity_metrics', 'backend.utils.async_helpers.tenacity_metrics'),
+    ('backend.utils.tenacity_stop', 'backend.utils.async_helpers.tenacity_stop'),
+    ('backend.utils.retry', 'backend.utils.async_helpers.retry'),
+]
+
+# --- utils/lsp ---
+
+UTILS_LSP_MOVES: dict[str, str] = {
+    'lsp_client.py': 'lsp/lsp_client.py',
+    'language_tool_aliases.py': 'lsp/language_tool_aliases.py',
+}
+
+UTILS_LSP_IMPORTS: list[tuple[str, str]] = [
+    ('backend.utils.lsp_client', 'backend.utils.lsp.lsp_client'),
+    ('backend.utils.language_tool_aliases', 'backend.utils.lsp.language_tool_aliases'),
+]
+
+# --- utils/http ---
+
+UTILS_HTTP_MOVES: dict[str, str] = {
+    'http_session.py': 'http/http_session.py',
+    'stdio_json_rpc.py': 'http/stdio_json_rpc.py',
+}
+
+UTILS_HTTP_IMPORTS: list[tuple[str, str]] = [
+    ('backend.utils.http_session', 'backend.utils.http.http_session'),
+    ('backend.utils.stdio_json_rpc', 'backend.utils.http.stdio_json_rpc'),
+]
+
+# --- utils/terminal ---
+
+UTILS_TERMINAL_MOVES: dict[str, str] = {
+    'term_color.py': 'terminal/term_color.py',
+    'terminal_contract.py': 'terminal/terminal_contract.py',
+}
+
+UTILS_TERMINAL_IMPORTS: list[tuple[str, str]] = [
+    ('backend.utils.term_color', 'backend.utils.terminal.term_color'),
+    ('backend.utils.terminal_contract', 'backend.utils.terminal.terminal_contract'),
+]
+
+# --- orchestration/stuck ---
+
+ORCHESTRATION_STUCK_MOVES: dict[str, str] = {
+    'stuck.py': 'stuck/__init__.py',
+    'stuck_patterns.py': 'stuck/patterns.py',
+}
+
+ORCHESTRATION_STUCK_IMPORTS: list[tuple[str, str]] = [
+    ('backend.orchestration.stuck_patterns', 'backend.orchestration.stuck.patterns'),
+]
+
+# --- orchestration/agent ---
+
+ORCHESTRATION_AGENT_MOVES: dict[str, str] = {
+    'agent.py': 'agent/__init__.py',
+    'agent_tools.py': 'agent/tools.py',
+    'agent_circuit_breaker.py': 'agent/circuit_breaker.py',
+    'autonomy.py': 'agent/autonomy.py',
+}
+
+ORCHESTRATION_AGENT_IMPORTS: list[tuple[str, str]] = [
+    (
+        'backend.orchestration.agent_circuit_breaker',
+        'backend.orchestration.agent.circuit_breaker',
+    ),
+    ('backend.orchestration.agent_tools', 'backend.orchestration.agent.tools'),
+    ('backend.orchestration.autonomy', 'backend.orchestration.agent.autonomy'),
+]
+
+# --- orchestration/file_edits ---
+
+ORCHESTRATION_FILE_EDITS_MOVES: dict[str, str] = {
+    'file_edit_transaction.py': 'file_edits/file_edit_transaction.py',
+    'file_state_tracker.py': 'file_edits/file_state_tracker.py',
+    'pre_exec_diff.py': 'file_edits/pre_exec_diff.py',
+}
+
+ORCHESTRATION_FILE_EDITS_IMPORTS: list[tuple[str, str]] = [
+    (
+        'backend.orchestration.file_edit_transaction',
+        'backend.orchestration.file_edits.file_edit_transaction',
+    ),
+    (
+        'backend.orchestration.file_state_tracker',
+        'backend.orchestration.file_edits.file_state_tracker',
+    ),
+    (
+        'backend.orchestration.pre_exec_diff',
+        'backend.orchestration.file_edits.pre_exec_diff',
+    ),
+]
+
+# --- orchestration/telemetry ---
+
+ORCHESTRATION_TELEMETRY_MOVES: dict[str, str] = {
+    'tool_telemetry.py': 'telemetry/tool_telemetry.py',
+    'conversation_stats.py': 'telemetry/conversation_stats.py',
+    'progress_tracker.py': 'telemetry/progress_tracker.py',
+}
+
+ORCHESTRATION_TELEMETRY_IMPORTS: list[tuple[str, str]] = [
+    (
+        'backend.orchestration.tool_telemetry',
+        'backend.orchestration.telemetry.tool_telemetry',
+    ),
+    (
+        'backend.orchestration.conversation_stats',
+        'backend.orchestration.telemetry.conversation_stats',
+    ),
+    (
+        'backend.orchestration.progress_tracker',
+        'backend.orchestration.telemetry.progress_tracker',
+    ),
+]
+
+# --- orchestration/middleware (root orphans → middleware/) ---
+
+ORCHESTRATION_MIDDLEWARE_MOVES: dict[str, str] = {
+    'rollback_middleware.py': 'middleware/rollback_middleware.py',
+    'tool_result_validator.py': 'middleware/tool_result_validator.py',
+}
+
+ORCHESTRATION_MIDDLEWARE_IMPORTS: list[tuple[str, str]] = [
+    (
+        'backend.orchestration.rollback_middleware',
+        'backend.orchestration.middleware.rollback_middleware',
+    ),
+    (
+        'backend.orchestration.tool_result_validator',
+        'backend.orchestration.middleware.tool_result_validator',
+    ),
+]
+
+# --- execution/utils/git ---
+
+EXECUTION_UTILS_GIT_MOVES: dict[str, str] = {
+    'git_common.py': 'git/git_common.py',
+    'git_changes.py': 'git/git_changes.py',
+    'git_diff.py': 'git/git_diff.py',
+    'git_handler.py': 'git/git_handler.py',
+}
+
+EXECUTION_UTILS_GIT_IMPORTS: list[tuple[str, str]] = [
+    ('backend.execution.utils.git_handler', 'backend.execution.utils.git.git_handler'),
+    ('backend.execution.utils.git_changes', 'backend.execution.utils.git.git_changes'),
+    ('backend.execution.utils.git_common', 'backend.execution.utils.git.git_common'),
+    ('backend.execution.utils.git_diff', 'backend.execution.utils.git.git_diff'),
+]
+
+# --- execution/utils/file_editor ---
+
+EXECUTION_UTILS_FILE_EDITOR_MOVES: dict[str, str] = {
+    'file_editor.py': 'file_editor/__init__.py',
+    '_file_editor_types.py': 'file_editor/_file_editor_types.py',
+    '_file_editor_diff_helpers.py': 'file_editor/_file_editor_diff_helpers.py',
+    '_file_editor_io_helpers.py': 'file_editor/_file_editor_io_helpers.py',
+    '_file_editor_read_write_helpers.py': 'file_editor/_file_editor_read_write_helpers.py',
+    '_file_editor_edit_helpers.py': 'file_editor/_file_editor_edit_helpers.py',
+    'file_editor_edit_ops.py': 'file_editor/file_editor_edit_ops.py',
+    'file_editor_edit_mixin.py': 'file_editor/file_editor_edit_mixin.py',
+    'file_editor_ops_mixin.py': 'file_editor/file_editor_ops_mixin.py',
+    'file_editor_rollback_mixin.py': 'file_editor/file_editor_rollback_mixin.py',
+    'file_editor_view_mixin.py': 'file_editor/file_editor_view_mixin.py',
+}
+
+EXECUTION_UTILS_FILE_EDITOR_IMPORTS: list[tuple[str, str]] = [
+    (
+        'backend.execution.utils._file_editor_read_write_helpers',
+        'backend.execution.utils.file_editor._file_editor_read_write_helpers',
+    ),
+    (
+        'backend.execution.utils._file_editor_edit_helpers',
+        'backend.execution.utils.file_editor._file_editor_edit_helpers',
+    ),
+    (
+        'backend.execution.utils._file_editor_diff_helpers',
+        'backend.execution.utils.file_editor._file_editor_diff_helpers',
+    ),
+    (
+        'backend.execution.utils._file_editor_io_helpers',
+        'backend.execution.utils.file_editor._file_editor_io_helpers',
+    ),
+    (
+        'backend.execution.utils._file_editor_types',
+        'backend.execution.utils.file_editor._file_editor_types',
+    ),
+    (
+        'backend.execution.utils.file_editor_rollback_mixin',
+        'backend.execution.utils.file_editor.file_editor_rollback_mixin',
+    ),
+    (
+        'backend.execution.utils.file_editor_edit_mixin',
+        'backend.execution.utils.file_editor.file_editor_edit_mixin',
+    ),
+    (
+        'backend.execution.utils.file_editor_ops_mixin',
+        'backend.execution.utils.file_editor.file_editor_ops_mixin',
+    ),
+    (
+        'backend.execution.utils.file_editor_view_mixin',
+        'backend.execution.utils.file_editor.file_editor_view_mixin',
+    ),
+    (
+        'backend.execution.utils.file_editor_edit_ops',
+        'backend.execution.utils.file_editor.file_editor_edit_ops',
+    ),
+]
+
+# --- execution/utils/shell ---
+
+EXECUTION_UTILS_SHELL_MOVES: dict[str, str] = {
+    'bash.py': 'shell/bash.py',
+    'bash_support.py': 'shell/bash_support.py',
+    'bash_constants.py': 'shell/bash_constants.py',
+    'simple_bash.py': 'shell/simple_bash.py',
+    'windows_bash.py': 'shell/windows_bash.py',
+    'windows_exceptions.py': 'shell/windows_exceptions.py',
+    'unified_shell.py': 'shell/unified_shell.py',
+    'pty_session.py': 'shell/pty_session.py',
+    'pty_shell_session.py': 'shell/pty_shell_session.py',
+    'shell_utils.py': 'shell/shell_utils.py',
+    'prompt_detector.py': 'shell/prompt_detector.py',
+    'command.py': 'shell/command.py',
+    '_bash_command.py': 'shell/_bash_command.py',
+    '_bash_detached.py': 'shell/_bash_detached.py',
+    '_bash_pane.py': 'shell/_bash_pane.py',
+    '_bash_server.py': 'shell/_bash_server.py',
+    '_bash_timeouts.py': 'shell/_bash_timeouts.py',
+    'session_manager.py': 'shell/session_manager.py',
+    'blocking_heuristics.py': 'shell/blocking_heuristics.py',
+    'subprocess_background.py': 'shell/subprocess_background.py',
+}
+
+EXECUTION_UTILS_SHELL_IMPORTS: list[tuple[str, str]] = [
+    (
+        'backend.execution.utils.subprocess_background',
+        'backend.execution.utils.shell.subprocess_background',
+    ),
+    (
+        'backend.execution.utils.blocking_heuristics',
+        'backend.execution.utils.shell.blocking_heuristics',
+    ),
+    (
+        'backend.execution.utils.pty_shell_session',
+        'backend.execution.utils.shell.pty_shell_session',
+    ),
+    (
+        'backend.execution.utils.windows_exceptions',
+        'backend.execution.utils.shell.windows_exceptions',
+    ),
+    (
+        'backend.execution.utils._bash_timeouts',
+        'backend.execution.utils.shell._bash_timeouts',
+    ),
+    (
+        'backend.execution.utils._bash_detached',
+        'backend.execution.utils.shell._bash_detached',
+    ),
+    (
+        'backend.execution.utils._bash_command',
+        'backend.execution.utils.shell._bash_command',
+    ),
+    (
+        'backend.execution.utils._bash_server',
+        'backend.execution.utils.shell._bash_server',
+    ),
+    (
+        'backend.execution.utils.prompt_detector',
+        'backend.execution.utils.shell.prompt_detector',
+    ),
+    (
+        'backend.execution.utils.session_manager',
+        'backend.execution.utils.shell.session_manager',
+    ),
+    (
+        'backend.execution.utils.unified_shell',
+        'backend.execution.utils.shell.unified_shell',
+    ),
+    (
+        'backend.execution.utils.windows_bash',
+        'backend.execution.utils.shell.windows_bash',
+    ),
+    (
+        'backend.execution.utils._bash_pane',
+        'backend.execution.utils.shell._bash_pane',
+    ),
+    (
+        'backend.execution.utils.bash_constants',
+        'backend.execution.utils.shell.bash_constants',
+    ),
+    (
+        'backend.execution.utils.bash_support',
+        'backend.execution.utils.shell.bash_support',
+    ),
+    (
+        'backend.execution.utils.simple_bash',
+        'backend.execution.utils.shell.simple_bash',
+    ),
+    (
+        'backend.execution.utils.shell_utils',
+        'backend.execution.utils.shell.shell_utils',
+    ),
+    (
+        'backend.execution.utils.pty_session',
+        'backend.execution.utils.shell.pty_session',
+    ),
+    ('backend.execution.utils.bash', 'backend.execution.utils.shell.bash'),
+    ('backend.execution.utils.command', 'backend.execution.utils.shell.command'),
+]
+
 ALL_IMPORTS = (
     CLI_IMPORTS
     + CONTEXT_PIPELINE_IMPORTS
@@ -346,6 +696,19 @@ ALL_IMPORTS = (
     + CACHING_IMPORTS
     + EXECUTION_AES_IMPORTS
     + EXECUTION_SERVER_IMPORTS
+    + UTILS_TREESITTER_IMPORTS
+    + UTILS_ASYNC_HELPERS_IMPORTS
+    + UTILS_LSP_IMPORTS
+    + UTILS_HTTP_IMPORTS
+    + UTILS_TERMINAL_IMPORTS
+    + ORCHESTRATION_STUCK_IMPORTS
+    + ORCHESTRATION_AGENT_IMPORTS
+    + ORCHESTRATION_FILE_EDITS_IMPORTS
+    + ORCHESTRATION_TELEMETRY_IMPORTS
+    + ORCHESTRATION_MIDDLEWARE_IMPORTS
+    + EXECUTION_UTILS_GIT_IMPORTS
+    + EXECUTION_UTILS_FILE_EDITOR_IMPORTS
+    + EXECUTION_UTILS_SHELL_IMPORTS
 )
 
 SKIP_NAMES = {'run_backend_organization.py', 'reorganize_cli_top_level.py'}
@@ -444,6 +807,55 @@ def main() -> None:
         'Action execution server HTTP routes and file viewer.',
     )
     _move_group(BACKEND / 'execution', EXECUTION_SERVER_MOVES)
+    _write_init(
+        BACKEND / 'utils' / 'treesitter' / '__init__.py',
+        'Tree-sitter editor, syntax checking, and chunk localization.',
+    )
+    _move_group(BACKEND / 'utils', UTILS_TREESITTER_MOVES)
+    _write_init(
+        BACKEND / 'utils' / 'async_helpers' / '__init__.py',
+        'Async/sync bridging, retries, circuit breakers, and subprocess helpers.',
+    )
+    _move_group(BACKEND / 'utils', UTILS_ASYNC_HELPERS_MOVES)
+    _write_init(
+        BACKEND / 'utils' / 'lsp' / '__init__.py',
+        'LSP client wrapper and language-server name aliases.',
+    )
+    _move_group(BACKEND / 'utils', UTILS_LSP_MOVES)
+    _write_init(
+        BACKEND / 'utils' / 'http' / '__init__.py',
+        'HTTP session wrapper and stdio JSON-RPC framing helpers.',
+    )
+    _move_group(BACKEND / 'utils', UTILS_HTTP_MOVES)
+    _write_init(
+        BACKEND / 'utils' / 'terminal' / '__init__.py',
+        'Terminal color helpers and shell/tool-registry contract adapters.',
+    )
+    _move_group(BACKEND / 'utils', UTILS_TERMINAL_MOVES)
+    _move_group(BACKEND / 'orchestration', ORCHESTRATION_STUCK_MOVES)
+    _move_group(BACKEND / 'orchestration', ORCHESTRATION_AGENT_MOVES)
+    _write_init(
+        BACKEND / 'orchestration' / 'file_edits' / '__init__.py',
+        'File edit transactions, state tracking, and pre-exec diff middleware.',
+    )
+    _move_group(BACKEND / 'orchestration', ORCHESTRATION_FILE_EDITS_MOVES)
+    _write_init(
+        BACKEND / 'orchestration' / 'telemetry' / '__init__.py',
+        'Tool telemetry, conversation stats, and progress tracking.',
+    )
+    _move_group(BACKEND / 'orchestration', ORCHESTRATION_TELEMETRY_MOVES)
+    _move_group(BACKEND / 'orchestration', ORCHESTRATION_MIDDLEWARE_MOVES)
+    _write_init(
+        BACKEND / 'execution' / 'utils' / 'git' / '__init__.py',
+        'Git diff, change parsing, and command helpers for the runtime.',
+    )
+    _move_group(BACKEND / 'execution' / 'utils', EXECUTION_UTILS_GIT_MOVES)
+    _move_group(BACKEND / 'execution' / 'utils', EXECUTION_UTILS_FILE_EDITOR_MOVES)
+    _write_init(
+        BACKEND / 'execution' / 'utils' / 'shell' / '__init__.py',
+        'Shell sessions — bash, PTY, Windows PowerShell, and session management.',
+    )
+    _move_group(BACKEND / 'execution' / 'utils', EXECUTION_UTILS_SHELL_MOVES)
     _rewrite_imports()
     print('backend organization complete')
 

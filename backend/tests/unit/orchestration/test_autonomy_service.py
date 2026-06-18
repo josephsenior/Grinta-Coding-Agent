@@ -82,7 +82,7 @@ class TestAutonomyServiceInitialize:
         agent = _make_agent(agent_config=agent_config)
 
         with (
-            patch('backend.orchestration.autonomy.AutonomyController') as mock_ac,
+            patch('backend.orchestration.agent.autonomy.AutonomyController') as mock_ac,
             patch(
                 'backend.orchestration.services.autonomy_service.SafetyValidator',
                 create=True,

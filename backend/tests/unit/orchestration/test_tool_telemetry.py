@@ -1,4 +1,4 @@
-"""Unit tests for backend.orchestration.tool_telemetry — metrics recording."""
+"""Unit tests for backend.orchestration.telemetry.tool_telemetry — metrics recording."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import time
 from unittest.mock import MagicMock
 
 from backend.orchestration.tool_pipeline import ToolInvocationContext
-from backend.orchestration.tool_telemetry import ToolTelemetry
+from backend.orchestration.telemetry.tool_telemetry import ToolTelemetry
 
 # ---------------------------------------------------------------------------
 # Helpers

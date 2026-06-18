@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.execution.utils.pty_session import (
+from backend.execution.utils.shell.pty_session import (
     CONTROL_SEQUENCES,
     InteractiveSession,
     InteractiveSessionConfig,
@@ -212,7 +212,7 @@ class TestPtyUnavailableHandling:
     """Simulate missing backend libraries to verify the error path."""
 
     def test_backend_missing_raises_pty_unavailable(self, monkeypatch) -> None:
-        import backend.execution.utils.pty_session as mod
+        import backend.execution.utils.shell.pty_session as mod
 
         def _raise(*_args, **_kwargs):
             raise PtyUnavailableError('forced for test')

@@ -46,7 +46,7 @@ from backend.execution.server.routes import (
 )
 from backend.execution.utils.file_editor import FileEditor
 from backend.execution.utils.memory_monitor import MemoryMonitor
-from backend.execution.utils.session_manager import SessionManager
+from backend.execution.utils.shell.session_manager import SessionManager
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.code_nav import LspQueryAction
 from backend.ledger.action.mcp import MCPAction
@@ -160,7 +160,7 @@ class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
         self.session_manager.security_config = security_config
 
         if self.session_manager.tool_registry is not None:
-            from backend.utils.terminal_contract import set_active_tool_registry
+            from backend.utils.terminal.terminal_contract import set_active_tool_registry
 
             set_active_tool_registry(self.session_manager.tool_registry)
 
@@ -325,7 +325,7 @@ class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
 
     async def lsp_query(self, action: LspQueryAction) -> Observation:
         """Execute an LSP query using the lsp_client."""
-        from backend.utils.lsp_client import LspClient
+        from backend.utils.lsp.lsp_client import LspClient
 
         start = time.perf_counter()
         try:
@@ -479,7 +479,7 @@ class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
 
             try:
                 from backend.core.constants import GENERAL_TIMEOUT
-                from backend.utils.async_utils import call_async_from_sync
+                from backend.utils.async_helpers.async_utils import call_async_from_sync
 
                 call_async_from_sync(_disconnect_mcp, GENERAL_TIMEOUT)
             except Exception as exc:
@@ -508,7 +508,7 @@ class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
         if self._native_browser is not None:
             try:
                 from backend.core.constants import GENERAL_TIMEOUT
-                from backend.utils.async_utils import call_async_from_sync
+                from backend.utils.async_helpers.async_utils import call_async_from_sync
 
                 call_async_from_sync(self._native_browser.shutdown, GENERAL_TIMEOUT)
             except Exception:

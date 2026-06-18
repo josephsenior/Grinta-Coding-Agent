@@ -1,4 +1,4 @@
-"""Unit tests for backend.utils.retry — backoff calculation & retry decorator."""
+"""Unit tests for backend.utils.async_helpers.retry — backoff calculation & retry decorator."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import pytest
 
 from backend.core.enums import RetryStrategy
 from backend.core.schemas import RetryConfig
-from backend.utils.retry import (
+from backend.utils.async_helpers.retry import (
     RetryError,
     RetryExhaustedError,
     calculate_backoff,

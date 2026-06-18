@@ -35,7 +35,7 @@ from backend.ledger.stream.persistence import EventPersistence
 from backend.ledger.infra.secret_masker import SecretMasker
 from backend.ledger.serialization.event import event_from_dict, event_to_dict
 from backend.persistence.locations import get_conversation_dir
-from backend.utils.async_utils import (
+from backend.utils.async_helpers.async_utils import (
     call_sync_from_async,
     get_main_event_loop,
     run_or_schedule,

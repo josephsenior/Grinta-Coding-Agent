@@ -18,7 +18,7 @@ from backend.core.schemas import AgentState
 from backend.ledger.action import (
     Action,
 )
-from backend.utils.async_utils import (
+from backend.utils.async_helpers.async_utils import (
     run_or_schedule,
 )
 
@@ -50,7 +50,7 @@ def _invoke_zero_arg_callback(callback: Callable[[], object]) -> object:
 if TYPE_CHECKING:
     from backend.core.enums import AgentState
     from backend.ledger.event import Event
-    from backend.utils.async_utils import (
+    from backend.utils.async_helpers.async_utils import (
         run_or_schedule,
     )
 
@@ -77,7 +77,7 @@ class _SessionOrchestratorStepMixin:
         ``_step_task`` is None or done before calling.  This method just
         resets the request event and creates a fresh task.
         """
-        from backend.utils.async_utils import create_tracked_task
+        from backend.utils.async_helpers.async_utils import create_tracked_task
 
         self._step_request_count = 0
         self._step_task = create_tracked_task(

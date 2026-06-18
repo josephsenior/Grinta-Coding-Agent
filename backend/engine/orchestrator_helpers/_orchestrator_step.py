@@ -252,7 +252,7 @@ def _step_sync(orch: Orchestrator, state: State) -> Action:
     """
     import threading
 
-    from backend.utils.async_utils import get_main_event_loop
+    from backend.utils.async_helpers.async_utils import get_main_event_loop
 
     try:
         current_loop = asyncio.get_running_loop()

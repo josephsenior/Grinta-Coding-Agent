@@ -4,7 +4,7 @@ from collections import deque
 from backend.ledger.action import Action
 from backend.ledger.action.commands import CmdRunAction
 from backend.ledger.action.files import FileReadAction
-from backend.utils.terminal_contract import uses_powershell_terminal
+from backend.utils.terminal.terminal_contract import uses_powershell_terminal
 
 
 def _escape_ps_path(path: str) -> str:

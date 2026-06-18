@@ -26,7 +26,7 @@ from backend.execution.aes.helpers import (
 from backend.execution.aes.file_operations import (
     truncate_cmd_output,
 )
-from backend.execution.utils.unified_shell import BaseShellSession
+from backend.execution.utils.shell.unified_shell import BaseShellSession
 from backend.ledger.action import (
     CmdRunAction,
     DebuggerAction,
@@ -37,7 +37,7 @@ from backend.ledger.observation import (
     Observation,
 )
 from backend.ledger.observation.terminal import TerminalObservation
-from backend.utils.async_utils import call_sync_from_async
+from backend.utils.async_helpers.async_utils import call_sync_from_async
 
 if TYPE_CHECKING:
     pass
@@ -134,7 +134,7 @@ class _AesIoRunMixin:
 
     def _maybe_promote_blocking_action(self, action: CmdRunAction) -> None:
         try:
-            from backend.execution.utils.blocking_heuristics import (
+            from backend.execution.utils.shell.blocking_heuristics import (
                 is_known_slow_command,
             )
 
@@ -170,7 +170,7 @@ class _AesIoRunMixin:
         if detached_pane is None or detached_window is None or registered_bg_id is None:
             return detached_pane
 
-        from backend.execution.utils.bash import BackgroundPaneSession
+        from backend.execution.utils.shell.bash import BackgroundPaneSession
 
         bg_pane_session = BackgroundPaneSession(
             pane=detached_pane,
@@ -204,7 +204,7 @@ class _AesIoRunMixin:
         ):
             return
 
-        from backend.execution.utils.subprocess_background import (
+        from backend.execution.utils.shell.subprocess_background import (
             SubprocessBackgroundSession,
         )
 

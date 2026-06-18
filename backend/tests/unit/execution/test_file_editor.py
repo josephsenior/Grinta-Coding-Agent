@@ -276,7 +276,7 @@ class TestFileEditorEdit:
         assert 'y = 42' in content
 
     def test_range_edit_blocks_syntax_regression(self):
-        from backend.utils import treesitter_editor
+        from backend.utils.treesitter import treesitter_editor
 
         if not treesitter_editor.TREE_SITTER_AVAILABLE:
             pytest.skip('tree-sitter not installed')

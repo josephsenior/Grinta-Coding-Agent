@@ -81,7 +81,7 @@ class ConversationResumer:
     async def list_sessions(self) -> list[str]:
         """Return known session IDs from the file store."""
         from backend.core.constants import CONVERSATION_BASE_DIR
-        from backend.utils.async_utils import call_sync_from_async
+        from backend.utils.async_helpers.async_utils import call_sync_from_async
 
         try:
             entries = await call_sync_from_async(self._fs.list, CONVERSATION_BASE_DIR)
@@ -95,7 +95,7 @@ class ConversationResumer:
     async def _load_metadata(self, sid: str) -> dict[str, Any]:
         import json
 
-        from backend.utils.async_utils import call_sync_from_async
+        from backend.utils.async_helpers.async_utils import call_sync_from_async
 
         path = get_conversation_metadata_filename(sid, self._user_id)
         raw = await call_sync_from_async(self._fs.read, path)
@@ -105,7 +105,7 @@ class ConversationResumer:
         """Read and deserialize all events in order."""
         import json
 
-        from backend.utils.async_utils import call_sync_from_async
+        from backend.utils.async_helpers.async_utils import call_sync_from_async
 
         events_dir = get_conversation_events_dir(sid, self._user_id)
         try:

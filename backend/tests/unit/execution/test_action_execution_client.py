@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 from backend.execution.drivers.action_execution.action_execution_client import (
     ActionExecutionClient,
 )
-from backend.utils.http_session import HttpSession
+from backend.utils.http.http_session import HttpSession
 
 
 def test_send_action_server_request_uses_http_session() -> None:

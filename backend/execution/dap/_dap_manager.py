@@ -27,7 +27,7 @@ from backend.execution.dap._dap_session import DAPDebugSession
 from backend.ledger.action.debugger import DebuggerAction
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.debugger import DebuggerObservation
-from backend.utils.language_tool_aliases import normalize_debug_adapter_name
+from backend.utils.lsp.language_tool_aliases import normalize_debug_adapter_name
 
 
 class DAPDebugManager:

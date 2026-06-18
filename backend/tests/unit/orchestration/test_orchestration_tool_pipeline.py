@@ -196,7 +196,7 @@ class TestCircuitBreakerMiddlewarePipeline:
     @pytest.mark.asyncio
     async def test_observe_str_replace_syntax_uses_syntax_bucket(self):
         from backend.ledger.observation import ErrorObservation
-        from backend.orchestration.agent_circuit_breaker import (
+        from backend.orchestration.agent.circuit_breaker import (
             FILE_EDIT_SYNTAX_BUCKET,
         )
 
@@ -220,7 +220,7 @@ class TestCircuitBreakerMiddlewarePipeline:
     @pytest.mark.asyncio
     async def test_observe_str_replace_non_syntax_uses_hard_bucket(self):
         from backend.ledger.observation import ErrorObservation
-        from backend.orchestration.agent_circuit_breaker import (
+        from backend.orchestration.agent.circuit_breaker import (
             FILE_EDIT_BUCKET,
         )
 

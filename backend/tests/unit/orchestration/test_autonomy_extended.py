@@ -1,4 +1,4 @@
-"""Extended tests for backend.orchestration.autonomy — AutonomyController & AutonomyLevel."""
+"""Extended tests for backend.orchestration.agent.autonomy — AutonomyController & AutonomyLevel."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from backend.ledger.action import CmdRunAction, FileEditAction
-from backend.orchestration.autonomy import AutonomyController, AutonomyLevel
+from backend.orchestration.agent.autonomy import AutonomyController, AutonomyLevel
 
 
 # ---------------------------------------------------------------------------

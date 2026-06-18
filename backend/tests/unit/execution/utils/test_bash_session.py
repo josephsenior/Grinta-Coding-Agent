@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from backend.core.constants import CMD_OUTPUT_PS1_BEGIN, CMD_OUTPUT_PS1_END
-from backend.execution.utils.bash import BashCommandStatus, BashSession
+from backend.execution.utils.shell.bash import BashCommandStatus, BashSession
 from backend.ledger.action import CmdRunAction
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.commands import CmdOutputObservation
@@ -110,7 +110,7 @@ class TestBashSession:
         assert isinstance(result, ErrorObservation)
         assert 'Cannot execute multiple commands at once' in result.content
 
-    @patch('backend.execution.utils.bash.should_continue')
+    @patch('backend.execution.utils.shell.bash.should_continue')
     def test_execute_command_success(self, mock_should_continue, session, mock_tmux):
         mock_should_continue.return_value = True
         ps1_full = _fake_ps1_json_block(working_dir=session.work_dir, exit_code=0)
@@ -135,7 +135,7 @@ class TestBashSession:
         assert 'hello world' in result.content
         assert result.metadata.exit_code == 0
 
-    @patch('backend.execution.utils.bash.should_continue')
+    @patch('backend.execution.utils.shell.bash.should_continue')
     @patch('time.time')
     def test_execute_no_change_timeout(
         self, mock_time, mock_should_continue, session, mock_tmux
@@ -167,7 +167,7 @@ class TestBashSession:
         assert 'no new output' in result.metadata.suffix
         assert session.prev_status == BashCommandStatus.NO_CHANGE_TIMEOUT
 
-    @patch('backend.execution.utils.bash.should_continue')
+    @patch('backend.execution.utils.shell.bash.should_continue')
     @patch('time.time')
     def test_execute_hard_timeout(
         self, mock_time, mock_should_continue, session, mock_tmux
@@ -201,7 +201,7 @@ class TestBashSession:
 
     def test_handle_interactive_prompts(self, session, mock_tmux):
         with patch(
-            'backend.execution.utils.bash.detect_interactive_prompt',
+            'backend.execution.utils.shell.bash.detect_interactive_prompt',
             return_value=(True, 'y'),
         ):
             # Trigger it

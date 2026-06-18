@@ -29,7 +29,7 @@ MAX_HISTORY_BYTES: int = 200 * 1024 * 1024  # 200 MB
 if TYPE_CHECKING:
     from backend.ledger.event import Event
     from backend.ledger.stream import EventStream
-    from backend.orchestration.conversation_stats import ConversationStats
+    from backend.orchestration.telemetry.conversation_stats import ConversationStats
     from backend.persistence.files import FileStore
 
 

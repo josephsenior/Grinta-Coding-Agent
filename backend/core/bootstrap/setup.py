@@ -31,7 +31,7 @@ from backend.orchestration.state.state import State
 from backend.persistence import get_file_store
 from backend.persistence.data_models.user_secrets import UserSecrets
 from backend.persistence.locations import get_local_data_root
-from backend.utils.async_utils import call_async_from_sync
+from backend.utils.async_helpers.async_utils import call_async_from_sync
 
 if TYPE_CHECKING:
     from backend.core.config import AgentConfig, AppConfig
@@ -42,7 +42,7 @@ if TYPE_CHECKING:
     )
     from backend.execution.base import Runtime
     from backend.ledger.event import Event
-    from backend.orchestration.conversation_stats import ConversationStats
+    from backend.orchestration.telemetry.conversation_stats import ConversationStats
     from backend.playbooks.engine.playbook import BasePlaybook
 
 

@@ -15,11 +15,11 @@ from tenacity.stop import stop_base
 from backend.core.errors import LLMNoResponseError
 from backend.core.logger import app_logger as logger
 from backend.inference.exceptions import RateLimitError, RateLimitKind
-from backend.utils.tenacity_metrics import (
+from backend.utils.async_helpers.tenacity_metrics import (
     tenacity_after_factory,
     tenacity_before_sleep_factory,
 )
-from backend.utils.tenacity_stop import stop_if_should_exit
+from backend.utils.async_helpers.tenacity_stop import stop_if_should_exit
 
 try:
     from backend.core.constants import DEFAULT_LLM_NUM_RETRIES_BONUS_FOR_HINTED

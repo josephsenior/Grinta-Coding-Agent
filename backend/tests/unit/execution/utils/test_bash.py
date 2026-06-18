@@ -1,8 +1,8 @@
-"""Comprehensive tests for backend.execution.utils.bash - Bash command parsing and execution."""
+"""Comprehensive tests for backend.execution.utils.shell.bash - Bash command parsing and execution."""
 
 from unittest.mock import patch
 
-from backend.execution.utils.bash import (
+from backend.execution.utils.shell.bash import (
     escape_bash_special_chars,
     split_bash_commands,
 )

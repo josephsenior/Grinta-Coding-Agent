@@ -2,7 +2,7 @@ import json
 
 from backend.engine.tools.lsp_query import create_lsp_query_tool
 from backend.ledger.action.code_nav import LspQueryAction
-from backend.utils.lsp_client import (
+from backend.utils.lsp.lsp_client import (
     LspClient,
 )
 
@@ -61,7 +61,7 @@ def test_lsp_client_graceful_degradation(monkeypatch):
         raise FileNotFoundError('pylsp not found')
 
     monkeypatch.setattr('subprocess.run', mock_run)
-    monkeypatch.setattr('backend.utils.lsp_client._PYLSP_AVAILABLE', None)
+    monkeypatch.setattr('backend.utils.lsp.lsp_client._PYLSP_AVAILABLE', None)
 
     client = LspClient()
 
