@@ -116,9 +116,9 @@ Google-native client paths, plus local runtimes.
 
 The current project state is broader. The catalog directory now carries provider
 files for Anthropic, Cerebras, DeepInfra, DeepSeek, DigitalOcean, Fireworks,
-Google, Groq, Lightning, Mistral, NVIDIA, OpenAI, OpenCode routes, OpenRouter,
-Perplexity, Together, Vercel, and xAI. Local discovery lives under
-`backend.inference.discover_models`, not in an older `backend.llm` namespace.
+Google, Groq, Lightning, Mistral, Moonshot, NVIDIA, OpenAI, OpenCode routes,
+OpenRouter, Perplexity, Together, Vercel, xAI, and Z.ai. Local discovery lives
+under `backend.inference.discover_models`, not in an older `backend.llm` namespace.
 
 That does not mean every provider is equally strong for autonomous coding. It
 means the system has moved from "we can point at a few APIs" to "provider
@@ -171,7 +171,7 @@ It made the remaining imperfections harder to hide.
 
 There are still rough edges:
 
-- contributor docs and startup scripts can drift from the canonical module paths
+- some backend modules remain above the soft size budget (`direct_clients.py`, `conversation_memory.py`, and others — see [46 · The Decomposition Wave](46-the-decomposition-wave.md))
 - UI code is now powerful enough to need its own discipline, not just enthusiasm
 - release notes can preserve true historical facts while still confusing readers about current APIs
 - counts in narrative docs age quickly when the codebase is actively decomposed
@@ -208,4 +208,4 @@ And Grinta, finally, is starting to cross that line.
 
 ---
 
-← [The Empty Folder Trials](44-the-empty-folder-trials.md) | [The Book of Grinta](README.md) | [The Road Ahead](07-the-road-ahead.md) →
+← [The Empty Folder Trials](44-the-empty-folder-trials.md) | [The Book of Grinta](README.md) | [The Decomposition Wave](46-the-decomposition-wave.md) →
