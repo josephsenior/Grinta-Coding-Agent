@@ -70,23 +70,6 @@ def _build_read_file_action(
     )
 
 
-def _build_symbol_insert_action(path: str, arguments: Mapping[str, Any]) -> Action:
-    """Build the internal insertion action used by create(type="symbol")."""
-    new_str = cast(str | None, arguments.get('new_str'))
-    insert_line = arguments.get('insert_line')
-    if new_str is None or insert_line is None:
-        raise FunctionCallValidationError(
-            'create type=symbol requires resolved insertion text and insertion line.'
-        )
-    return FileEditAction(
-        path=path,
-        command='insert_text',
-        insert_line=int(insert_line),
-        new_str=new_str,
-        impl_source=FileEditSource.FILE_EDITOR,
-    )
-
-
 def _handle_read_range_public(arguments: Mapping[str, Any]) -> Action:
     path = require_tool_argument(arguments, 'path', READ_TOOL_NAME)
     start_line = require_tool_argument(arguments, 'start_line', READ_TOOL_NAME)

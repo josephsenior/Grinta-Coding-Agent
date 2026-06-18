@@ -238,44 +238,75 @@ class RendererDebuggerMixin:
         return '\n'.join(lines[:28])
 
     def _handle_debugger_action_card(self, action: Any) -> None:
-        debug_action = str(getattr(action, 'debug_action', '') or '').strip().lower()
-        session_id = getattr(action, 'session_id', '') or ''
-        verb = _ACTION_VERBS.get(debug_action, 'Debugging')
+        # Debugger action: append a new DebuggerCard
         detail = self._debugger_card_detail_from_action(action)
-        self._upsert_debugger_session_card(
-            session_id=session_id,
-            verb=verb,
-            detail=detail,
-            secondary=_join_secondary_parts(
-                self._debugger_session_label(session_id),
-                'running request',
-            ),
-            secondary_kind='neutral',
-            processing=True,
+        location = detail  # the detail already encodes file/target
+        self._create_and_append_debugger_scan_card(
+            location=location,
+            function='',
         )
 
     def _handle_debugger_observation_card(self, observation: Any) -> None:
         payload = dict(getattr(observation, 'payload', None) or {})
-        session_id = str(
-            getattr(observation, 'session_id', None) or payload.get('session_id') or ''
-        )
-        state = str(getattr(observation, 'state', None) or payload.get('state') or '')
-        verb = _STATE_VERBS.get(state, 'Debugger')
         detail = self._debugger_card_detail_from_payload(payload)
-        output = self._debugger_payload_output(payload)
-        content = str(getattr(observation, 'content', '') or '').strip()
-        if content and content not in output:
-            output = f'{output}\n{content}'.strip()
-        secondary = _join_secondary_parts(
-            self._debugger_session_label(session_id),
-            state or 'updated',
+        target = payload.get('target') or payload.get('state') or ''
+        self._create_and_append_debugger_scan_card(
+            location=detail,
+            function=target,
+            payload=payload,
         )
-        self._upsert_debugger_session_card(
-            session_id=session_id,
-            verb=verb,
-            detail=detail,
-            secondary=secondary,
-            secondary_kind='ok',
-            extra_content=output or None,
-            processing=False,
+
+    # ── scan-line debugger card (new 1-line feed) ───────────────────
+
+    @staticmethod
+    def _extract_debugger_stack(payload: dict[str, Any]) -> list[str]:
+        frames = payload.get('stackFrames')
+        if not isinstance(frames, list):
+            return []
+        result: list[str] = []
+        for f in frames[:16]:
+            if isinstance(f, dict):
+                name = f.get('name', '?')
+                source = f.get('source', {})
+                if isinstance(source, dict):
+                    sname = source.get('name', '?')
+                    line = source.get('line', '')
+                    result.append(f'{name}()  {sname}:{line}' if line else f'{name}()  {sname}')
+                else:
+                    result.append(f'{name}()')
+        return result
+
+    @staticmethod
+    def _extract_debugger_variables(payload: dict[str, Any]) -> list[tuple[str, str]]:
+        variables = payload.get('variables')
+        if not isinstance(variables, list):
+            return []
+        result: list[tuple[str, str]] = []
+        for v in variables[:20]:
+            if isinstance(v, dict):
+                result.append((str(v.get('name', '?')), str(v.get('value', '?'))))
+        return result
+
+    def _create_and_append_debugger_scan_card(
+        self,
+        location: str,
+        function: str,
+        *,
+        payload: dict[str, Any] | None = None,
+    ) -> Any:
+        from backend.cli.tui.widgets.scan_line import DebuggerCard
+
+        p = payload or {}
+        stack = self._extract_debugger_stack(p)
+        variables = self._extract_debugger_variables(p)
+
+        self.commit_live_thinking()
+        card = DebuggerCard(
+            location=location,
+            function=function,
+            stack=stack or None,
+            variables=variables or None,
         )
+        card.set_state('done')
+        self._append_scan_line_card(card)
+        return card

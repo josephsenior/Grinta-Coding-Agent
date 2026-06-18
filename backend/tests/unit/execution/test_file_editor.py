@@ -89,6 +89,54 @@ class TestFileEditorView:
             'not found' in result.error.lower() or 'validation' in result.error.lower()
         )
 
+    def test_view_grinta_data_root_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from backend.core import workspace_resolution
+
+        workspace = tmp_path / 'workspace'
+        workspace.mkdir()
+        data_root = tmp_path / 'grinta-data'
+        tool_results = data_root / 'agent' / 'tool-results'
+        tool_results.mkdir(parents=True)
+        persisted = tool_results / 'event_42.txt'
+        persisted.write_text('persisted tool output', encoding='utf-8')
+
+        monkeypatch.setattr(
+            workspace_resolution,
+            'workspace_grinta_root',
+            lambda _root: data_root,
+        )
+        editor = FileEditor(workspace_root=str(workspace))
+        result = editor(command='read_file', path=str(persisted))
+        assert result.error is None
+        assert 'persisted tool output' in result.output
+
+    def test_create_rejects_grinta_data_root_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from backend.core import workspace_resolution
+
+        workspace = tmp_path / 'workspace'
+        workspace.mkdir()
+        data_root = tmp_path / 'grinta-data'
+        target = data_root / 'agent' / 'tool-results' / 'event_99.txt'
+        target.parent.mkdir(parents=True)
+
+        monkeypatch.setattr(
+            workspace_resolution,
+            'workspace_grinta_root',
+            lambda _root: data_root,
+        )
+        editor = FileEditor(workspace_root=str(workspace))
+        result = editor(
+            command='create_file',
+            path=str(target),
+            file_text='should not write here',
+        )
+        assert result.error is not None
+        assert 'outside workspace boundary' in result.error.lower()
+
     def test_view_directory_is_error(self):
         (Path(self.tmpdir) / 'subdir').mkdir()
         result = self.editor(command='read_file', path='subdir')

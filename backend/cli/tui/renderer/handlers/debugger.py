@@ -1,4 +1,4 @@
-"""Debugger event handlers for the TUI renderer."""
+"""Debugger event handlers — now append DebuggerCard (scan-line) per state change."""
 
 from __future__ import annotations
 

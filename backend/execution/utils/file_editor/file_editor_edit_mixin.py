@@ -129,7 +129,7 @@ class FileEditorEditOpsMixin:
         )
         enriched_msg = self._attach_content_context(enriched_msg, new_content)
         return (
-            f'INTRODUCED_SYNTAX_ERROR: edit introduced syntax errors.\n{enriched_msg}'
+            f'File has syntax errors.\n{enriched_msg}'
         )
 
     @staticmethod

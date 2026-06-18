@@ -50,9 +50,6 @@ from backend.execution.utils.file_editor._file_editor_edit_helpers import (
     handle_write_maybe_short_circuit_impl as _handle_write_maybe_short_circuit_impl,
 )
 from backend.execution.utils.file_editor._file_editor_edit_helpers import (
-    verify_post_write_impl as _verify_post_write_impl,
-)
-from backend.execution.utils.file_editor._file_editor_edit_helpers import (
     write_edit_result_impl as _write_edit_result_impl,
 )
 from backend.execution.utils.file_editor._file_editor_io_helpers import _FileReadMeta
@@ -143,28 +140,6 @@ class FileEditorOpsMixin:
             requested_start_line=requested_start_line,
             requested_end_line=requested_end_line,
             rollback_available=rollback_available,
-        )
-
-    def _verify_post_write(
-        self,
-        *,
-        file_path: Path,
-        expected_content: str,
-        old_content: str | None,
-        operation: str,
-        target_kind: str,
-        requested_start_line: int | None = None,
-        requested_end_line: int | None = None,
-    ) -> ToolResult | None:
-        return _verify_post_write_impl(
-            self,
-            file_path=file_path,
-            expected_content=expected_content,
-            old_content=old_content,
-            operation=operation,
-            target_kind=target_kind,
-            requested_start_line=requested_start_line,
-            requested_end_line=requested_end_line,
         )
 
     def _finalize_edit_result(

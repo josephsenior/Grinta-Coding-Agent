@@ -1,4 +1,9 @@
-"""Terminal session event handlers (run, input, read, observation)."""
+"""Terminal session event handlers (run, input, read, observation).
+
+Now appends one :class:`TerminalCard` per agent command instead of
+upserting a single :class:`SessionPanel` per session.  A session
+scrollback buffer tracks full output for detail screens.
+"""
 
 from __future__ import annotations
 
@@ -41,17 +46,13 @@ def _handle_terminal_run_action(
 ) -> None:
     cmd = getattr(event, 'command', '') or ''
     session_id = getattr(event, 'session_id', '') or ''
-    detail = orch._terminal_card_detail(session_id, cmd)
-    orch._upsert_terminal_session_card(
+    cwd = getattr(event, 'cwd', '') or ''
+    label = orch._terminal_session_label(session_id) or session_id
+    orch._create_terminal_scan_card(
         session_id=session_id,
-        verb='Started',
-        detail=detail,
-        secondary=_join_secondary_parts(
-            orch._terminal_session_label(session_id),
-            'starting session',
-        ),
-        secondary_kind='neutral',
-        processing=True,
+        session_label=label,
+        cwd=cwd,
+        command=cmd,
     )
 
 
@@ -60,36 +61,22 @@ def _handle_terminal_input_action(
 ) -> None:
     session_id = getattr(event, 'session_id', '') or ''
     submitted = _sanitize_terminal_display_text(getattr(event, 'input', '') or '')
-    detail = orch._terminal_card_detail(session_id, submitted)
-    orch._upsert_terminal_session_card(
+    label = orch._terminal_session_label(session_id) or session_id
+    orch._create_terminal_scan_card(
         session_id=session_id,
-        verb='Sent',
-        detail=detail,
-        secondary=_join_secondary_parts(
-            orch._terminal_session_label(session_id),
-            'awaiting output',
-        ),
-        secondary_kind='neutral',
-        extra_content=f'$ {submitted.rstrip()}' if submitted.strip() else None,
-        processing=True,
+        session_label=label,
+        cwd='',
+        command=submitted,
     )
 
 
 def _handle_terminal_read_action(
     orch: 'RendererEventProcessorMixin', event: TerminalReadAction
 ) -> None:
-    session_id = getattr(event, 'session_id', '') or ''
-    orch._upsert_terminal_session_card(
-        session_id=session_id,
-        verb='Reading',
-        detail=orch._terminal_card_detail(session_id),
-        secondary=_join_secondary_parts(
-            orch._terminal_session_label(session_id),
-            'streaming output',
-        ),
-        secondary_kind='neutral',
-        processing=True,
-    )
+    # TerminalReadAction is a streaming trigger — keep the most recent
+    # TerminalCard as the active one for output accumulation but don't
+    # create a new card for every read pulse.
+    pass
 
 
 def _handle_terminal_observation(
@@ -99,15 +86,6 @@ def _handle_terminal_observation(
     session_id = getattr(event, 'session_id', '') or ''
     exit_code = getattr(event, 'exit_code', None)
     state = getattr(event, 'state', None)
-    secondary = _terminal_secondary_text(orch, session_id, exit_code, state)
-    secondary_kind = terminal_secondary_kind(exit_code)
     content = sanitize_terminal_observation_content(content)
-    orch._upsert_terminal_session_card(
-        session_id=session_id,
-        verb='Output',
-        detail=orch._terminal_card_detail(session_id),
-        secondary=secondary,
-        secondary_kind=secondary_kind,
-        extra_content=content or None,
-        processing=exit_code is None,
-    )
+
+    orch._accumulate_terminal_scrollback(session_id, content)

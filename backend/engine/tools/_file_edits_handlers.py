@@ -129,8 +129,10 @@ def _handle_create_symbol_public(arguments: Mapping[str, Any]) -> Action:
 def _handle_create_tool(arguments: Mapping[str, Any]) -> Action:
     validate_security_risk(arguments, CREATE_TOOL_NAME)
     create_type = (
-        str(require_tool_argument(arguments, 'type', CREATE_TOOL_NAME)).strip().lower()
+        str(arguments.get('type', '') or '').strip().lower()
     )
+    if not create_type:
+        create_type = 'symbol' if arguments.get('target_symbol') else 'file'
     normalized_args = dict(arguments)
     _guard_content_arguments(normalized_args)
     if create_type == 'file':

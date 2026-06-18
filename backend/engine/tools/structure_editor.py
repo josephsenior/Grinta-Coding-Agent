@@ -429,11 +429,7 @@ class StructureEditor:
             )
             return EditResult(
                 success=False,
-                message=(
-                    f"Symbol Editor doesn't support {ext} files. "
-                    f'It requires source code files with tree-sitter parsers. '
-                    f'Supported: {supported}'
-                ),
+                message=f'Unsupported file type: {ext}',
             )
 
         # Read old content before edit for context window

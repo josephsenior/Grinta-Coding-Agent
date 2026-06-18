@@ -77,10 +77,16 @@ async def _stream_with_chunk_timeout(
         except StopAsyncIteration:
             return
         except _asyncio.TimeoutError:
+            from backend.core.logger import app_logger as logger
             from backend.inference.exceptions import Timeout as LLMTimeout
 
+            logger.warning(
+                'LLM chunk timeout after %.1fs',
+                timeout_sec,
+                extra={'msg_type': 'LLM_CHUNK_TIMEOUT'},
+            )
             raise LLMTimeout(
-                message=f'No chunk received within {timeout_sec}s — provider may be hanging.',
+                message=f'LLM chunk timeout after {timeout_sec}s',
                 model='',
                 llm_provider='',
             )

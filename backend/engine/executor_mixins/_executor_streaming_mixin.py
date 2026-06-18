@@ -296,11 +296,12 @@ class _ExecutorStreamingMixin:
                 return
             except asyncio.TimeoutError:
                 logger.warning(
-                    'LLM stream chunk timed out mid-generation after %.1fs. Streaming stalled.',
+                    'LLM chunk timeout after %.1fs',
                     stream_chunk_timeout,
+                    extra={'msg_type': 'LLM_CHUNK_TIMEOUT'},
                 )
                 raise LLMTimeout(
-                    f'LLM stream chunk timed out mid-generation after {stream_chunk_timeout} seconds',
+                    f'LLM chunk timeout after {stream_chunk_timeout}s',
                     model=self._llm_model_name(self._llm),
                 ) from None
 

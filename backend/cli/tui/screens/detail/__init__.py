@@ -1,0 +1,30 @@
+"""Detail screen base and concrete implementations for scan-line cards.
+
+The six concrete detail screens correspond to:
+* ``AgentMessageCard`` → ``MessageDetailScreen``
+* ``EditCard`` → ``EditDetailScreen``
+* ``ShellCard`` → ``ShellDetailScreen``
+* ``TerminalCard`` → ``TerminalDetailScreen``
+* ``BrowserCard`` → ``BrowserDetailScreen``
+* ``DebuggerCard`` → ``DebuggerDetailScreen``
+"""
+
+from __future__ import annotations
+
+from backend.cli.tui.screens.detail.base import DetailScreen
+from backend.cli.tui.screens.detail.message import MessageDetailScreen
+from backend.cli.tui.screens.detail.edit import EditDetailScreen
+from backend.cli.tui.screens.detail.shell import ShellDetailScreen
+from backend.cli.tui.screens.detail.terminal import TerminalDetailScreen
+from backend.cli.tui.screens.detail.browser import BrowserDetailScreen
+from backend.cli.tui.screens.detail.debugger import DebuggerDetailScreen
+
+__all__ = [
+    'DetailScreen',
+    'MessageDetailScreen',
+    'EditDetailScreen',
+    'ShellDetailScreen',
+    'TerminalDetailScreen',
+    'BrowserDetailScreen',
+    'DebuggerDetailScreen',
+]

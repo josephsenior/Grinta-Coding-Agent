@@ -68,7 +68,8 @@ Transcript > OrientLine,
 Transcript > SessionPanel,
 Transcript > RecordPanel,
 Transcript > TurnCompletion,
-Transcript > CollapsibleSection {
+Transcript > CollapsibleSection,
+Transcript > ScanLineCard {
     margin-bottom: 2;
 }
 

@@ -138,8 +138,7 @@ async def native_web_fetch_wrapper(
         'ok': False,
         'isError': True,
         'error': (
-            'web_fetch failed via Exa and fetch MCP fallbacks. '
-            'Check MCP connectivity or try browser for interactive pages.'
+            'web_fetch failed. Check MCP connectivity or try browser.'
         ),
         'category': 'env',
         'retryable': True,

@@ -7,7 +7,7 @@ from typing import Any, NoReturn
 
 from backend.core.errors import FunctionCallValidationError, ToolExecutionError
 
-_FILES_UNMODIFIED = 'No files were modified.'
+_FILES_UNMODIFIED = 'No files were modified. Re-read the file and retry.'
 
 _SYMBOL_AMBIGUITY_HINT = (
     'Retry with path + qualified_name + symbol_kind, or use symbol_id.'
@@ -55,7 +55,7 @@ def compact_syntax_detail(message: str) -> str:
         return ''
     if 'Content context:' in text:
         text = text.split('Content context:', 1)[0].strip()
-    text = text.replace('INTRODUCED_SYNTAX_ERROR: edit introduced syntax errors.', '')
+    text = text.replace('File has syntax errors.', '')
     text = text.replace('INTRODUCED_SYNTAX_ERROR:', '').strip()
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     return lines[0] if lines else text[:240]
@@ -77,13 +77,12 @@ def summarize_editor_error(result: Any) -> tuple[str, str, bool, dict[str, Any]]
             'replace_string failed: old_string matched multiple occurrences.'
         ),
         'FILE_NOT_FOUND': 'file not found.',
-        'INTRODUCED_SYNTAX_ERROR': 'introduced syntax error.',
+        'INTRODUCED_SYNTAX_ERROR': 'File has syntax errors.',
         'CONTENT_APPEARS_SERIALIZED': (
             'content appears serialized (literal escape sequences).'
         ),
         'CREATE_FILE_ALREADY_EXISTS': 'create failed: file already exists.',
         'EMPTY_OLD_STRING': 'replace_string failed: old_string must not be empty.',
-        'INVALID_INSERT_LINE': 'edit failed: invalid insert_line.',
         'REPLACE_STRING_ERROR': 'replace_string failed.',
     }
     summary = summaries.get(error_code)

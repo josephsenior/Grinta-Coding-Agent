@@ -59,6 +59,21 @@ class TestNoStepProgressWatchdog:
         assert cb._last_step_call_ts == now
         assert cb._auto_recover_attempts == 0
 
+    def test_watchdog_suppressed_while_runtime_work_active(self, cb):
+        """In-flight runtime tools count as progress for no-step recovery."""
+        now = 10.0
+        cb.record_step_call(ts=now - 0.5)
+
+        result = cb.check_no_step_progress(
+            agent_state=AgentState.RUNNING,
+            now=now,
+            runtime_work_active=True,
+        )
+
+        assert result is None
+        assert cb._last_step_call_ts == now
+        assert cb._auto_recover_attempts == 0
+
     def test_watchdog_second_stall_within_cooldown_is_fatal(self, cb):
         """Second stall inside the cooldown window forces ERROR (action=stop)."""
         now = 10.0

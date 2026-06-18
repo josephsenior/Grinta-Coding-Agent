@@ -24,6 +24,7 @@ from backend.cli.event_rendering.unified_renderer import (
     ActivityRenderer,
 )
 from backend.cli.tool_display.orient_tools import OrientLineModel
+from backend.cli.tui.renderer.mixins.terminal import RendererTerminalMixin
 
 
 class RendererDisplayMixin:
@@ -76,6 +77,8 @@ class RendererDisplayMixin:
         self._mounted_event_ids = set()
         self._event_order = []
         self._last_task_sidebar_signature = None
+        self._file_edit_actions_by_id: dict[int, Any] = {}
+        RendererTerminalMixin._init_terminal_state(self)
         try:
             self._tui._get_display().clear()
         except (AttributeError, NoMatches):
@@ -682,6 +685,17 @@ class RendererDisplayMixin:
             display.append_widget(widget, animate=False)
         self._sync_transcript_viewport()
         return widget
+
+    def _append_scan_line_card(self, card: Any) -> Any:
+        """Append a 1-line :class:`ScanLineCard` to the transcript feed."""
+        self._flush_orient_burst()
+        self.commit_live_thinking()
+        self._clear_last_active_card_processing()
+        self._register_widget_event_id(card)
+        display = self._tui._get_display()
+        display.append_widget(card)
+        self._sync_transcript_viewport()
+        return card
 
     def _write_orient_line(self, model: OrientLineModel) -> Any:
         from backend.cli.tui.widgets.activity_card import OrientLine

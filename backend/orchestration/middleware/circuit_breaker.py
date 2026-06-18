@@ -19,10 +19,16 @@ if TYPE_CHECKING:
 # stuck-detection pressure when observed successfully.
 _PROGRESS_OBSERVATION_TYPES: tuple[str, ...] = (
     'FileEditObservation',
+    'FileReadObservation',
     'AgentDelegateObservation',
     'LspQueryObservation',
     'GrepObservation',
     'GlobObservation',
+    'CmdOutputObservation',
+    'TerminalObservation',
+    'BrowserScreenshotObservation',
+    'MCPObservation',
+    'DebuggerObservation',
     # Updating the structured task plan counts as real progress so long
     # multi-step tasks do not trip stuck detection while they are still
     # advancing through tracked work.

@@ -170,7 +170,8 @@ class FileEditor(
         self._current_command = command
         try:
             # Validate and resolve file path with security checks
-            safe_path = self._resolve_path_safe(path)
+            read_only = command == 'read_file'
+            safe_path = self._resolve_path_safe(path, read_only=read_only)
             file_path = safe_path.path
 
             with _file_lock_for_path(file_path):
@@ -273,11 +274,13 @@ class FileEditor(
         except Exception as e:
             return ToolResult(output='', error=str(e))
 
-    def _resolve_path_safe(self, path: str) -> SafePath:
+    def _resolve_path_safe(self, path: str, *, read_only: bool = False) -> SafePath:
         """Resolve and validate file path with security checks.
 
         Args:
             path: File path to resolve
+            read_only: When True, also allow Grinta workspace data paths
+                (e.g. persisted tool outputs) for read-only access.
 
         Returns:
             SafePath instance with validated path
@@ -285,6 +288,11 @@ class FileEditor(
         Raises:
             PathValidationError: If path validation fails
         """
+        from backend.core.type_safety.path_validation import validate_readable_path
+
+        if read_only:
+            validated = validate_readable_path(path, self.workspace_root)
+            return SafePath(validated, Path(self.workspace_root).resolve())
         return SafePath.validate(
             path,
             workspace_root=str(self.workspace_root),

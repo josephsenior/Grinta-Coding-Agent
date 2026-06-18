@@ -82,6 +82,23 @@ class _SessionOrchestratorWatchdogMixin:
 
         return getattr(executor, '_active_stream_iter', None) is not None
 
+    def _is_runtime_work_active(self) -> bool:
+        """Return True while a tool action is awaiting its observation."""
+        pending_svc = getattr(getattr(self, 'services', None), 'pending_action', None)
+        if pending_svc is None:
+            return False
+        has_outstanding = getattr(pending_svc, 'has_outstanding', None)
+        if not callable(has_outstanding):
+            return False
+        try:
+            return bool(has_outstanding())
+        except Exception:
+            return False
+
+    def _is_agent_work_in_flight(self) -> bool:
+        """True during LLM streaming or in-flight runtime tool execution."""
+        return self._is_llm_stream_active() or self._is_runtime_work_active()
+
     async def _watchdog_loop(self) -> None:
         """Background loop that checks for step() progress at regular intervals."""
         from backend.core.constants import (
@@ -127,12 +144,14 @@ class _SessionOrchestratorWatchdogMixin:
                     auto_recover_attempted = False
                     continue
 
-                if self._is_llm_stream_active():
+                if self._is_agent_work_in_flight():
                     self._watchdog_last_step_ts = time.monotonic()
                     auto_recover_attempted = False
                     logger.debug(
                         'INDEPENDENT WATCHDOG: suppressed no-step recovery; '
-                        'LLM stream is active'
+                        'agent work is in flight (llm_stream=%s runtime_work=%s)',
+                        self._is_llm_stream_active(),
+                        self._is_runtime_work_active(),
                     )
                     continue
 
@@ -143,9 +162,9 @@ class _SessionOrchestratorWatchdogMixin:
                 now = time.monotonic()
                 if not auto_recover_attempted or (now - auto_recover_ts) > cooldown:
                     logger.warning(
-                        'INDEPENDENT WATCHDOG: no step() call for %.1fs in RUNNING; '
-                        'issuing schedule_step_soon() to recover',
+                        'No step progress for %.1fs; scheduling recovery',
                         elapsed,
+                        extra={'msg_type': 'NO_STEP_PROGRESS_WATCHDOG'},
                     )
                     self._watchdog_last_step_ts = now
                     auto_recover_attempted = True
@@ -156,9 +175,9 @@ class _SessionOrchestratorWatchdogMixin:
                         pass
                 else:
                     logger.error(
-                        'INDEPENDENT WATCHDOG: auto-recover did not help after %.1fs; '
-                        'forcing ERROR state to break the stall',
+                        'No step progress for %.1fs after auto-recover',
                         elapsed,
+                        extra={'msg_type': 'NO_STEP_PROGRESS_WATCHDOG'},
                     )
                     try:
                         await self.set_agent_state_to(AgentState.ERROR)

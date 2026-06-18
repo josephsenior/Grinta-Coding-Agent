@@ -49,6 +49,25 @@ def _controller_llm_stream_active(controller: 'SessionOrchestrator') -> bool:
         return False
 
 
+def _controller_runtime_work_active(controller: 'SessionOrchestrator') -> bool:
+    checker = getattr(controller, '_is_runtime_work_active', None)
+    if callable(checker):
+        try:
+            return bool(checker())
+        except Exception:
+            return False
+    pending_svc = getattr(getattr(controller, 'services', None), 'pending_action', None)
+    if pending_svc is None:
+        return False
+    has_outstanding = getattr(pending_svc, 'has_outstanding', None)
+    if not callable(has_outstanding):
+        return False
+    try:
+        return bool(has_outstanding())
+    except Exception:
+        return False
+
+
 def _clear_agent_queued_actions(controller: 'SessionOrchestrator', reason: str) -> None:
     """Clear queued agent actions when recovery requires a hard strategy reset."""
     agent = getattr(controller, 'agent', None)
@@ -276,6 +295,7 @@ class StepGuardService:
             result = watchdog_fn(
                 agent_state=agent_state,
                 llm_stream_active=_controller_llm_stream_active(controller),
+                runtime_work_active=_controller_runtime_work_active(controller),
             )
         except Exception as exc:
             logger.debug('No-step-progress watchdog raised: %s', exc, exc_info=True)
@@ -287,9 +307,8 @@ class StepGuardService:
         action = getattr(result, 'action', '')
         if action == 'auto_recover_once':
             logger.warning(
-                'NO_STEP_PROGRESS_WATCHDOG: %.0fs stall detected in RUNNING; '
-                'issuing one schedule_step_soon() to recover',
-                getattr(result, 'reason', ''),
+                'No step progress stall; scheduling recovery',
+                extra={'msg_type': 'NO_STEP_PROGRESS_WATCHDOG'},
             )
             try:
                 controller.schedule_step_soon()
@@ -299,8 +318,8 @@ class StepGuardService:
 
         if action == 'stop':
             logger.error(
-                'NO_STEP_PROGRESS_WATCHDOG: stall persisted after auto-recover; '
-                'forcing ERROR state'
+                'No step progress stall after auto-recover',
+                extra={'msg_type': 'NO_STEP_PROGRESS_WATCHDOG'},
             )
             error_obs = ErrorObservation(
                 content=(

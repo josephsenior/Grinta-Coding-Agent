@@ -499,3 +499,65 @@ class TestPathValidationInternals:
                     PathValidationError, match='outside workspace boundary'
                 ):
                     _resolve_path('outside.py', workspace, True)
+
+
+# ---------------------------------------------------------------------------
+# validate_readable_path
+# ---------------------------------------------------------------------------
+
+
+class TestValidateReadablePath:
+    def test_allows_workspace_relative_file(self, tmp_path: Path) -> None:
+        from backend.core.type_safety.path_validation import validate_readable_path
+
+        workspace = tmp_path / 'workspace'
+        workspace.mkdir()
+        target = workspace / 'src' / 'main.py'
+        target.parent.mkdir()
+        target.write_text('print("hi")', encoding='utf-8')
+
+        assert validate_readable_path('src/main.py', workspace) == target.resolve()
+
+    def test_allows_grinta_data_root_absolute_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from backend.core import workspace_resolution
+        from backend.core.type_safety.path_validation import validate_readable_path
+
+        workspace = tmp_path / 'workspace'
+        workspace.mkdir()
+        data_root = tmp_path / 'grinta-data'
+        tool_results = data_root / 'agent' / 'tool-results'
+        tool_results.mkdir(parents=True)
+        persisted = tool_results / 'event_42.txt'
+        persisted.write_text('big output', encoding='utf-8')
+
+        monkeypatch.setattr(
+            workspace_resolution,
+            'workspace_grinta_root',
+            lambda _root: data_root,
+        )
+
+        assert validate_readable_path(str(persisted), workspace) == persisted.resolve()
+
+    def test_rejects_path_outside_both_roots(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from backend.core import workspace_resolution
+        from backend.core.type_safety.path_validation import validate_readable_path
+
+        workspace = tmp_path / 'workspace'
+        workspace.mkdir()
+        outside = tmp_path / 'outside.txt'
+        outside.write_text('nope', encoding='utf-8')
+        data_root = tmp_path / 'grinta-data'
+        data_root.mkdir()
+
+        monkeypatch.setattr(
+            workspace_resolution,
+            'workspace_grinta_root',
+            lambda _root: data_root,
+        )
+
+        with pytest.raises(PathValidationError, match='outside workspace boundary'):
+            validate_readable_path(str(outside), workspace)

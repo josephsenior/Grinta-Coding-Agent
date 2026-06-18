@@ -12,7 +12,7 @@ from backend.cli.display.reasoning_display import ReasoningDisplay
 from backend.cli.tui.app import GrintaScreen, TUIRenderer
 from backend.cli.tui.main import GrintaTUIApp
 from backend.cli.tui.widgets.activity_card import ThinkingIndicator
-from backend.cli.tui.widgets.session_panel import SessionPanel
+from backend.cli.tui.widgets.scan_line import ShellCard
 from backend.ledger.action import CmdRunAction, StreamingChunkAction
 from backend.ledger.observation import CmdOutputObservation
 
@@ -86,14 +86,14 @@ async def test_thinking_stream_freezes_before_later_activity(
         visible = [
             child
             for child in display.children
-            if isinstance(child, (ThinkingIndicator, SessionPanel))
+            if isinstance(child, (ThinkingIndicator, ShellCard))
         ]
 
         assert [type(child) for child in visible] == [
             ThinkingIndicator,
-            SessionPanel,
+            ShellCard,
             ThinkingIndicator,
         ]
         assert 'Still thinking.' in _plain_text(visible[0])
-        assert 'pytest -q' in str(visible[1].query_one('#terminal-prompt').renderable)
+        assert 'pytest -q' in getattr(visible[1], 'command', '')
         assert 'Second thought.' in _plain_text(visible[2])

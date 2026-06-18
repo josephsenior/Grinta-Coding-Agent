@@ -147,7 +147,7 @@ def create_create_tool() -> ChatCompletionToolParam:
             },
             'security_risk': get_security_risk_param(),
         },
-        required=['type', 'path', 'content', 'security_risk'],
+        required=['path', 'content', 'security_risk'],
     )
 
 

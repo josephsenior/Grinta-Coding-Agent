@@ -121,6 +121,7 @@ class ScreenLifecycleMixin:
         self.call_after_refresh(self._mark_hud_controls_ready)
         self._update_input_identity()
         self._hud_tick = self.set_interval(1.0, self._refresh_runtime_feedback)
+        self._scanline_refresh_tick = self.set_interval(0.25, self._refresh_scanline_cards)
         ta = self.query_one('#input', TextArea)
         ta.text = ''
         ta.focus()

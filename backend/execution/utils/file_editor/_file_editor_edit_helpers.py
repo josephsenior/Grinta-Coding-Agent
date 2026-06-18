@@ -92,7 +92,7 @@ def _validate_replace_string_old_string(old_string: str | None) -> ToolResult | 
             output='',
             error='replace_string old_string must not be empty.',
             error_code='EMPTY_OLD_STRING',
-            retryable=False,
+            retryable=True,
             operation='replace_string',
         )
     return None
@@ -109,7 +109,7 @@ def _check_replace_string_preflight(
             error_code='CONTENT_APPEARS_SERIALIZED'
             if 'CONTENT_APPEARS_SERIALIZED' in preflight
             else 'CONTENT_PREFLIGHT_FAILED',
-            retryable=False,
+            retryable=True,
             operation='replace_string',
         )
     return None
@@ -168,7 +168,7 @@ def handle_replace_string_impl(
                 output='',
                 error=f'File not found: {file_path}',
                 error_code='FILE_NOT_FOUND',
-                retryable=False,
+                retryable=True,
                 operation='replace_string',
             )
 
@@ -241,42 +241,6 @@ def build_receipt_impl(
         'requested_start_line': requested_start_line,
         'requested_end_line': requested_end_line,
     }
-
-
-def verify_post_write_impl(
-    self,
-    *,
-    file_path: Path,
-    expected_content: str,
-    old_content: str | None,
-    operation: str,
-    target_kind: str,
-    requested_start_line: int | None = None,
-    requested_end_line: int | None = None,
-) -> ToolResult | None:
-    actual_content = self._read_file(file_path)
-    if actual_content == expected_content:
-        return None
-    receipt = self._build_receipt(
-        file_path=file_path,
-        old_content=old_content,
-        new_content=actual_content,
-        operation=operation,
-        target_kind=target_kind,
-        verification_passed=False,
-        requested_start_line=requested_start_line,
-        requested_end_line=requested_end_line,
-    )
-    return ToolResult(
-        output='',
-        error='EDIT_VERIFICATION_FAILED: file contents on disk did not match the intended write.',
-        old_content=old_content,
-        new_content=actual_content,
-        error_code='EDIT_VERIFICATION_FAILED',
-        retryable=True,
-        operation=operation,
-        metadata=receipt,
-    )
 
 
 def finalize_edit_result_impl(
@@ -374,7 +338,7 @@ def _validate_edit_before_write(
         if disk_now != old_content:
             return ToolResult(
                 output='',
-                error='FILE_UNEXPECTEDLY_MODIFIED: file changed on disk since it was read.',
+                error='File was modified by another process. Re-read and retry.',
                 old_content=old_content,
                 new_content=new_content,
             ), ''
@@ -383,27 +347,11 @@ def _validate_edit_before_write(
         file_path, old_content, new_content
     )
     if regression_error is not None:
-        return ToolResult(
-            output='',
-            error=regression_error,
-            old_content=old_content,
-            new_content=new_content,
-            error_code='INTRODUCED_SYNTAX_ERROR',
-            retryable=True,
-            operation='edit_validate',
-        ), ''
+        return None, f'WARNING: {regression_error}'
 
     is_valid, msg = self._maybe_validate_syntax_for_file(file_path, new_content)
     if not is_valid:
-        return ToolResult(
-            output='',
-            error=f'Syntax validation failed: {msg}',
-            old_content=old_content,
-            new_content=new_content,
-            error_code='SYNTAX_VALIDATION_FAILED',
-            retryable=True,
-            operation='edit_validate',
-        ), ''
+        return None, f'WARNING: {msg}'
     return None, msg if msg else ''
 
 
@@ -452,17 +400,6 @@ def write_edit_result_impl(
     self._push_undo_snapshot(file_path, old_content)
 
     written_content = self._write_file(file_path, new_content)
-    verification_error = self._verify_post_write(
-        file_path=file_path,
-        expected_content=written_content,
-        old_content=old_content,
-        operation='edit',
-        target_kind=target_kind,
-        requested_start_line=requested_start_line,
-        requested_end_line=requested_end_line,
-    )
-    if verification_error is not None:
-        return verification_error
 
     output = _format_edit_success_output(
         self, old_content, new_content, written_content, msg
@@ -498,7 +435,7 @@ def _check_write_create_exists(
             old_content=old_content,
             new_content=content,
             error_code='CREATE_FILE_ALREADY_EXISTS',
-            retryable=False,
+            retryable=True,
             operation='create_file',
         )
     return None
@@ -575,27 +512,11 @@ def _validate_write_commit(
         file_path, old_content, content
     )
     if regression_error is not None:
-        return ToolResult(
-            output='',
-            error=regression_error,
-            old_content=old_content,
-            new_content=content,
-            error_code='INTRODUCED_SYNTAX_ERROR',
-            retryable=True,
-            operation='write_validate',
-        ), ''
+        return None, f'WARNING: {regression_error}'
 
     is_valid, msg = self._maybe_validate_syntax_for_file(file_path, content)
     if not is_valid:
-        return ToolResult(
-            output='',
-            error=f'Syntax validation failed: {msg}',
-            old_content=old_content,
-            new_content=content,
-            error_code='SYNTAX_VALIDATION_FAILED',
-            retryable=True,
-            operation='write_validate',
-        ), ''
+        return None, f'WARNING: {msg}'
     soft_warning = msg if msg and msg.startswith('WARNING:') else ''
     return None, soft_warning
 
@@ -641,15 +562,6 @@ def handle_write_commit_impl(
     self._push_undo_snapshot(file_path, old_content)
 
     written_content = self._write_file(file_path, content)
-    verification_error = self._verify_post_write(
-        file_path=file_path,
-        expected_content=written_content,
-        old_content=old_content,
-        operation='create_file',
-        target_kind='full_file',
-    )
-    if verification_error is not None:
-        return verification_error
 
     output_msg = _compose_write_commit_output(self, content, soft_warning)
 
@@ -684,7 +596,7 @@ def detect_stale_disk_on_write_impl(
         return None
     return ToolResult(
         output='',
-        error='FILE_UNEXPECTEDLY_MODIFIED: file changed on disk since it was read.',
+        error='File was modified by another process. Re-read and retry.',
         old_content=old_content,
         new_content=new_content,
         error_code='FILE_UNEXPECTEDLY_MODIFIED',
