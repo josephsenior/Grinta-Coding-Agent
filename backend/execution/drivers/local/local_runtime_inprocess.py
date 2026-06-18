@@ -260,38 +260,6 @@ class LocalRuntimeInProcess(ActionExecutionClient):
 
         elapsed = time.time() - start_time
         logger.info('🚀 In-process runtime ready in %.2fs', elapsed)
-        self._maybe_warm_debugpy()
-
-    def _maybe_warm_debugpy(self) -> None:
-        """Pre-import ``debugpy`` in a background thread.
-
-        The first ``debugger`` tool call would otherwise eat the full
-        cold-start latency on Windows. No-op when ``GRINTA_DEBUGPY_WARMUP=0``
-        or when ``debugpy`` is unavailable.
-        """
-        from backend.core.constants import DEBUGPY_WARMUP_ENABLED
-
-        if not DEBUGPY_WARMUP_ENABLED:
-            return
-
-        def _warm() -> None:
-            import time as _time
-
-            warm_start = _time.time()
-            try:
-                import importlib
-
-                importlib.import_module('debugpy.adapter')
-                logger.info(
-                    'debugpy adapter pre-imported in %.2fs',
-                    _time.time() - warm_start,
-                )
-            except Exception as exc:
-                logger.debug('debugpy warmup skipped: %s', exc)
-
-        threading.Thread(
-            target=_warm, name='grinta-debugpy-warmup', daemon=True
-        ).start()
 
     def _setup_workspace_directory(self) -> None:
         """Create temporary workspace directory."""

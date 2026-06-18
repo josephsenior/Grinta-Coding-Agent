@@ -288,7 +288,7 @@ def detect_debug_adapters() -> list[dict[str, Any]]:
             'command': [sys.executable, '-m', 'debugpy.adapter']
             if debugpy_ok
             else None,
-            'source': 'bundled',
+            'source': 'installed',
         }
     ]
     for label, recipe in _DAP_ADAPTER_RECIPES.items():

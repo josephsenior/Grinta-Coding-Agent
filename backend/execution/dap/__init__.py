@@ -3,7 +3,7 @@
 Modules:
 
 - :mod:`backend.execution.dap._dap_adapters` — debug-adapter auto-detection
-  (looks for ``lldb-vscode``, ``debugpy``, etc. on ``$PATH``).
+  (looks for ``debugpy`` when installed, ``lldb-vscode``, etc. on ``$PATH``).
 - :mod:`backend.execution.dap._dap_client` — async DAP client (request/
   response framing, ``reverse-requests``).
 - :mod:`backend.execution.dap._dap_errors` — ``DAPError`` and the

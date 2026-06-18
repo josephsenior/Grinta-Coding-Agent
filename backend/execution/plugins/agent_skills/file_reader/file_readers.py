@@ -33,9 +33,9 @@ from backend.execution.plugins.agent_skills.utils.config import (
     _get_openai_model,
 )
 
-_DOCUMENTS_EXTRA_HINT = (
-    'Document parsing requires the optional [documents] extra. '
-    "Install with: pip install 'grinta-ai[documents]'"
+_MISSING_PARSER_HINT = (
+    'Document parser dependency missing. '
+    'Reinstall grinta-ai or run: pip install pypdf python-docx python-pptx pylatexenc'
 )
 
 
@@ -73,7 +73,7 @@ def parse_latex(file_path: str) -> None:
             LatexNodes2Text,  # type: ignore[import-untyped]
         )
     except ImportError as exc:
-        raise RuntimeError(_DOCUMENTS_EXTRA_HINT) from exc
+        raise RuntimeError(_MISSING_PARSER_HINT) from exc
     with open(file_path, encoding='utf-8') as f:
         data = f.read()
     text = LatexNodes2Text().latex_to_text(data).strip()

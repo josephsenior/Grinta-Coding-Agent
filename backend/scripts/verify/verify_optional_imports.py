@@ -16,11 +16,6 @@ OPTIONAL_TOP_LEVEL_MODULES = {
     'redis',
     # memory / RAG (extras: rag)
     'chromadb',
-    # documents (extras: documents)
-    'docx',
-    'pptx',
-    'pylatexenc',
-    'pypdf',
     # browser (extras: browser)
     'browser_use',
     # telemetry

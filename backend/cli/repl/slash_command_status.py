@@ -156,8 +156,7 @@ def cmd_cost(host: Any, parsed: Any) -> bool:
 def cmd_health(host: Any, parsed: Any) -> bool:
     """Run a fast self-check.
 
-    Verifies provider reachable, debugpy importable, ripgrep + git
-    available.
+    Verifies debugpy (when installed), ripgrep, git, and model setup.
     """
     if host._reject_extra_args(parsed):
         return True
@@ -171,7 +170,13 @@ def cmd_health(host: Any, parsed: Any) -> bool:
         importlib.import_module('debugpy.adapter')
         checks.append(('debugpy', True, 'importable'))
     except Exception as exc:
-        checks.append(('debugpy', False, f'import failed: {exc}'))
+        checks.append(
+            (
+                'debugpy',
+                False,
+                f'not installed (pip install debugpy): {exc}',
+            )
+        )
 
     for binary in ('rg', 'git'):
         path = shutil.which(binary)

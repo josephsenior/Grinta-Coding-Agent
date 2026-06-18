@@ -232,7 +232,7 @@ _SLASH_COMMANDS = (
     ),
     SlashCommandSpec(
         '/health',
-        'Run a fast self-check (debugpy, ripgrep, git, model)',
+        'Run a fast self-check (debug adapters, ripgrep, git, model)',
         '/health',
         help_section='control',
     ),

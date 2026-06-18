@@ -474,9 +474,10 @@ def has_any_lsp_server() -> bool:
 def has_any_debug_adapter() -> bool:
     """True when at least one DAP adapter is usable by this runtime.
 
-    Python (debugpy) is bundled, so this should effectively return True in a
-    working install. PATH probes may also find non-DAP debug servers; those are
-    reported for diagnostics but do not make the ``debugger`` tool available.
+    Python (debugpy) is auto-detected when installed in the active environment
+    (``pip install debugpy``). PATH probes may also find non-DAP debug servers;
+    those are reported for diagnostics but do not make the ``debugger`` tool
+    available unless they use a supported transport.
     """
     if os.getenv('GRINTA_DISABLE_DEBUGGER_DETECTION') == '1':
         return False

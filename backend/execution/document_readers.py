@@ -1,14 +1,14 @@
 """Text extraction from PDF, DOCX, and PPTX files.
 
-Requires the optional ``[documents]`` extra:
-``pip install 'grinta-ai[documents]'``
+Parser libraries ship with the base ``grinta-ai`` install (``pypdf``, ``python-docx``,
+``python-pptx``, ``pylatexenc``).
 """
 
 from __future__ import annotations
 
-_DOCUMENTS_EXTRA_HINT = (
-    'Document parsing requires the optional [documents] extra. '
-    "Install with: pip install 'grinta-ai[documents]'"
+_MISSING_PARSER_HINT = (
+    'Document parser dependency missing. '
+    'Reinstall grinta-ai or run: pip install pypdf python-docx python-pptx pylatexenc'
 )
 
 
@@ -16,7 +16,7 @@ def _read_pdf_reader():
     try:
         from pypdf import PdfReader
     except ImportError as exc:
-        raise RuntimeError(_DOCUMENTS_EXTRA_HINT) from exc
+        raise RuntimeError(_MISSING_PARSER_HINT) from exc
     return PdfReader
 
 
@@ -36,7 +36,7 @@ def extract_docx_text(file_path: str) -> str:
     try:
         import docx  # type: ignore[import-untyped, import-not-found]
     except ImportError as exc:
-        raise RuntimeError(_DOCUMENTS_EXTRA_HINT) from exc
+        raise RuntimeError(_MISSING_PARSER_HINT) from exc
     document = docx.Document(file_path)
     parts: list[str] = []
     for para in document.paragraphs:
@@ -51,7 +51,7 @@ def extract_pptx_text(file_path: str) -> str:
     try:
         from pptx import Presentation  # type: ignore[import-untyped, import-not-found]
     except ImportError as exc:
-        raise RuntimeError(_DOCUMENTS_EXTRA_HINT) from exc
+        raise RuntimeError(_MISSING_PARSER_HINT) from exc
     presentation = Presentation(file_path)
     parts: list[str] = []
     for slide_idx, slide in enumerate(presentation.slides, start=1):

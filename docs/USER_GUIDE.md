@@ -73,7 +73,7 @@ uv run python -m backend.cli.entry init
 Grinta has two runtime surfaces:
 
 - **Interactive TTY:** `grinta` or `uv run python -m backend.cli.entry` opens the Textual terminal app with transcript cards, HUD, dialogs, and slash commands.
-- **Non-interactive stdin:** piped input runs through `backend.cli.repl_noninteractive` and prints results without the Textual app.
+- **Non-interactive stdin:** piped input runs through `backend.cli.repl.noninteractive` and prints results without the Textual app.
 
 The same orchestrator, safety checks, provider routing, and event stream back both surfaces.
 
@@ -281,7 +281,7 @@ Common slash commands:
 | `/model [provider/model]` | Show or switch the active model |
 | `/autonomy [conservative|balanced|full]` | View or set confirmation behavior |
 | `/status [verbose]` | Show HUD state and optional diagnostics |
-| `/health` | Check debugpy, ripgrep, git, and model setup |
+| `/health` | Check debug adapters (e.g. debugpy), ripgrep, git, and model setup |
 | `/diff [--stat|--name-only|--patch] [path]` | Show workspace git changes |
 | `/checkpoint [label]` | Save a manual workspace checkpoint |
 | `/compact` / `/retry` | Compact context or resend the last message |

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Packaging:** PDF/DOCX/PPTX/LaTeX parsers (`pypdf`, `python-docx`,
+  `python-pptx`, `pylatexenc`) are included in the base install; the
+  `[documents]` extra is removed. Optional extras are now `[rag]`, `[browser]`,
+  and `[all]`.
+- **Packaging:** `debugpy` is no longer bundled in the base wheel. Python
+  debugging is auto-detected when `debugpy` is installed in the active
+  environment (`pip install debugpy`), consistent with other DAP adapters and
+  LSP servers. Contributor dev deps still include `debugpy`.
 - **Model-facing file API:** public editing tools are consolidated to
   `read`, `find_symbols`, `create`, `edit_symbol`, `replace_string`, and
   `multiedit`. Legacy public editor factories and compatibility handlers were
