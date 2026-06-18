@@ -10,6 +10,7 @@ from rich.markdown import Markdown
 from rich.syntax import PygmentsSyntaxTheme, Syntax
 from rich.theme import Theme
 
+from backend.cli.theme import CLR_REASONING_SNAP, grinta_rich_theme_styles
 from backend.cli.theme.syntax_theme import (
     GRINTA_SYNTAX_COLORS,
     get_grinta_pygments_style,
@@ -17,7 +18,6 @@ from backend.cli.theme.syntax_theme import (
     invalidate_grinta_syntax_theme_cache,
     resolve_syntax_colors,
 )
-from backend.cli.theme import CLR_REASONING_SNAP, grinta_rich_theme_styles
 from backend.cli.tui.renderer.prep import (
     prep_markdown,
     prep_streaming_renderable,

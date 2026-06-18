@@ -78,7 +78,9 @@ def strip_prompt_cache_hints_from_messages(
     prompt caching. Pure OpenAI models use implicit server-side caching instead
     and keep hints stripped.
     """
-    from backend.inference.caching.prompt_caching import model_supports_prompt_cache_hints
+    from backend.inference.caching.prompt_caching import (
+        model_supports_prompt_cache_hints,
+    )
 
     cleaned = copy.deepcopy(messages)
     if model_supports_prompt_cache_hints(model or '', provider=provider):

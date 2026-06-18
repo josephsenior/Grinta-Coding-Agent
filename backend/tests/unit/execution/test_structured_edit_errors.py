@@ -108,8 +108,18 @@ def test_normalize_edit_exception_from_tool_execution_error() -> None:
     )
     payload = {
         'file_edits': [
-            {'path': 'src/a.py', 'operation': 'replace_string', 'old_string': 'x', 'new_string': 'y'},
-            {'path': 'src/b.py', 'operation': 'replace_string', 'old_string': 'missing', 'new_string': 'z'},
+            {
+                'path': 'src/a.py',
+                'operation': 'replace_string',
+                'old_string': 'x',
+                'new_string': 'y',
+            },
+            {
+                'path': 'src/b.py',
+                'operation': 'replace_string',
+                'old_string': 'missing',
+                'new_string': 'z',
+            },
         ]
     }
     message, tool_result = normalize_edit_exception(exc, payload, command='multi_edit')
@@ -126,8 +136,18 @@ def test_normalize_edit_exception_from_validation_error() -> None:
     )
     payload = {
         'file_edits': [
-            {'path': 'a.py', 'operation': 'replace_string', 'old_string': 'a', 'new_string': 'b'},
-            {'path': 'b.py', 'operation': 'replace_string', 'old_string': 'a', 'new_string': 'b'},
+            {
+                'path': 'a.py',
+                'operation': 'replace_string',
+                'old_string': 'a',
+                'new_string': 'b',
+            },
+            {
+                'path': 'b.py',
+                'operation': 'replace_string',
+                'old_string': 'a',
+                'new_string': 'b',
+            },
             {'operation': 'replace_string', 'old_string': 'a', 'new_string': 'b'},
         ]
     }
@@ -212,7 +232,9 @@ def test_normalize_editor_error_response_compact() -> None:
 
 
 def test_build_search_error_tool_result() -> None:
-    from backend.execution.aes.structured_edit_errors import build_search_error_tool_result
+    from backend.execution.aes.structured_edit_errors import (
+        build_search_error_tool_result,
+    )
 
     tool_result = build_search_error_tool_result(
         tool='grep',
@@ -227,7 +249,9 @@ def test_build_search_error_tool_result() -> None:
 
 
 def test_build_search_error_observation() -> None:
-    from backend.execution.aes.structured_edit_errors import build_search_error_observation
+    from backend.execution.aes.structured_edit_errors import (
+        build_search_error_observation,
+    )
     from backend.ledger.observation import ErrorObservation
 
     obs = build_search_error_observation(

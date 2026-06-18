@@ -10,7 +10,11 @@ from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, Vertical
 from textual.widgets import Static
 
-from backend.cli.theme import CLR_REASONING_SNAP, NAVY_ERROR, NAVY_READY, NAVY_TEXT_MUTED
+from backend.cli.theme import (
+    CLR_REASONING_SNAP,
+    NAVY_ERROR,
+    NAVY_READY,
+)
 
 if TYPE_CHECKING:
     from backend.cli.event_rendering.unified_renderer.types import ActivityCard

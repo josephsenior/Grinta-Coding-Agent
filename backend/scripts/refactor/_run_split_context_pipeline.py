@@ -27,7 +27,7 @@ parent = path.parent
     f'"""{doc}"""\n\n' + header + helpers_body, encoding='utf-8'
 )
 
-core_extra = '''
+core_extra = """
 from backend.context.context_pipeline.helpers import (
     _drop_stale_prompt_state_artifacts,
     _latest_event_id,
@@ -42,17 +42,17 @@ from backend.context.context_pipeline.types import (
     PipelineStepResult,
     _ContinuityGateDecision,
 )
-'''
+"""
 core_path = parent / 'context_pipeline_core.py'
 core = core_path.read_text(encoding='utf-8').replace(
     'if TYPE_CHECKING:', core_extra + '\nif TYPE_CHECKING:', 1
 )
 core_path.write_text(core, encoding='utf-8')
 
-helpers_extra = '''
+helpers_extra = """
 from backend.context.prompt.context_packet import CONTEXT_PACKET_MARKER
 from backend.ledger.event import Event
-'''
+"""
 helpers_path = parent / 'context_pipeline_helpers.py'
 helpers = helpers_path.read_text(encoding='utf-8')
 if 'CONTEXT_PACKET_MARKER' not in helpers.split('def _drop_stale')[0]:
@@ -60,6 +60,7 @@ if 'CONTEXT_PACKET_MARKER' not in helpers.split('def _drop_stale')[0]:
         'if TYPE_CHECKING:', helpers_extra + '\nif TYPE_CHECKING:', 1
     )
     helpers_path.write_text(helpers, encoding='utf-8')
+
 
 def names_in(mod_path: Path) -> list[str]:
     mod = ast.parse(mod_path.read_text(encoding='utf-8'))
@@ -72,6 +73,7 @@ def names_in(mod_path: Path) -> list[str]:
                 if isinstance(t, ast.Name):
                     out.append(t.id)
     return sorted(set(out))
+
 
 all_names: list[str] = []
 blocks: list[str] = []

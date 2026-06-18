@@ -222,7 +222,9 @@ def test_build_working_set_skips_fresh_session_without_artifacts() -> None:
 
 
 def test_working_set_observation_skips_condensation_boilerplate() -> None:
-    from backend.context.processors.observation_processors import convert_observation_to_message
+    from backend.context.processors.observation_processors import (
+        convert_observation_to_message,
+    )
     from backend.ledger.observation.agent import AgentCondensationObservation
 
     obs = AgentCondensationObservation(

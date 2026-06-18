@@ -27,7 +27,7 @@ parent = path.parent
     f'"""{doc}"""\n\n' + header + private_body, encoding='utf-8'
 )
 
-ops_extra = '''
+ops_extra = """
 from backend.context.canonical_state.private import (
     _can_update,
     _clean,
@@ -57,14 +57,14 @@ from backend.context.canonical_state.types import (
     CanonicalTaskState,
     CanonicalValidationResult,
 )
-'''
+"""
 ops_path = parent / 'canonical_state_ops.py'
 ops = ops_path.read_text(encoding='utf-8').replace(
     'if TYPE_CHECKING:', ops_extra + '\nif TYPE_CHECKING:', 1
 )
 ops_path.write_text(ops, encoding='utf-8')
 
-priv_extra = '''
+priv_extra = """
 from backend.context.canonical_state.types import (
     BackgroundTaskState,
     CanonicalTaskState,
@@ -75,12 +75,13 @@ from backend.context.canonical_state.types import (
     VerificationState,
     clip_with_marker,
 )
-'''
+"""
 priv_path = parent / 'canonical_state_private.py'
 priv = priv_path.read_text(encoding='utf-8').replace(
     'if TYPE_CHECKING:', priv_extra + '\nif TYPE_CHECKING:', 1
 )
 priv_path.write_text(priv, encoding='utf-8')
+
 
 def names_in(path: Path) -> list[str]:
     mod = ast.parse(path.read_text(encoding='utf-8'))
@@ -93,6 +94,7 @@ def names_in(path: Path) -> list[str]:
                 if isinstance(t, ast.Name):
                     out.append(t.id)
     return sorted(set(out))
+
 
 all_names: list[str] = []
 blocks: list[str] = []
@@ -115,5 +117,12 @@ facade = (
     + '\n'
 )
 path.write_text(facade, encoding='utf-8')
-print('types', len(types_body.splitlines()), 'ops', len(ops_body.splitlines()), 'private', len(private_body.splitlines()))
+print(
+    'types',
+    len(types_body.splitlines()),
+    'ops',
+    len(ops_body.splitlines()),
+    'private',
+    len(private_body.splitlines()),
+)
 print('facade', len(set(all_names)), 'names')

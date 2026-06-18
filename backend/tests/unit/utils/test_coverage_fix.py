@@ -11,9 +11,9 @@ import pytest
 
 import backend.utils.async_helpers.async_utils as async_utils
 import backend.utils.async_helpers.circuit_breaker as circuit_breaker
-import backend.utils.import_utils as import_utils
 import backend.utils.async_helpers.tenacity_metrics as tenacity_metrics
 import backend.utils.async_helpers.tenacity_stop as tenacity_stop
+import backend.utils.import_utils as import_utils
 
 
 class TestImportUtilsFinal:

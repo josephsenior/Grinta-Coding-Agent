@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from backend.context.prompt.message_formatting import extract_first_text
+from backend.context.compaction.pre_condensation_snapshot import save_snapshot
 from backend.context.processors.observation_processors import (
     _get_observation_content,
     _handle_simple_observation,
     convert_observation_to_message,
 )
-from backend.context.compaction.pre_condensation_snapshot import save_snapshot
+from backend.context.prompt.message_formatting import extract_first_text
 from backend.core.message import ImageContent, TextContent
 from backend.ledger.observation import (
     BrowserScreenshotObservation,

@@ -19,6 +19,9 @@ from rich.markdown import Markdown
 from rich.padding import Padding
 from rich.text import Text
 
+from backend.cli.display.layout_tokens import (
+    LIVE_PANEL_ACCENT_STYLE,
+)
 from backend.cli.display.tool_call_display import (
     looks_like_streaming_tool_arguments,
     streaming_args_hint,
@@ -39,9 +42,6 @@ from backend.cli.event_rendering.text_utils import (
 )
 from backend.cli.event_rendering.text_utils import (
     show_reasoning_text as _show_reasoning_text,
-)
-from backend.cli.display.layout_tokens import (
-    LIVE_PANEL_ACCENT_STYLE,
 )
 from backend.cli.theme import (
     get_grinta_pygments_style,

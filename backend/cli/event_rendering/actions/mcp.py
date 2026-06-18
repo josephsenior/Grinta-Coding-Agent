@@ -13,13 +13,13 @@ else:
 
 
 from backend.cli._typing import ActionRenderersHost
+from backend.cli.display.layout_tokens import (
+    ACTIVITY_CARD_TITLE_MCP,
+)
 from backend.cli.display.tool_call_display import friendly_verb_for_tool
 from backend.cli.event_rendering.actions.dispatch import _ORIENT_MCP_NAMES
 from backend.cli.event_rendering.text_utils import (
     sync_reasoning_after_tool_line as _sync_reasoning_after_tool_line,
-)
-from backend.cli.display.layout_tokens import (
-    ACTIVITY_CARD_TITLE_MCP,
 )
 from backend.cli.tool_display.orient_tools import (
     mcp_action_model,

@@ -15,7 +15,6 @@ from rich.text import Text
 from textual.containers import Horizontal, VerticalScroll
 from textual.widgets import Static
 
-from backend.cli.theme.syntax_theme import get_grinta_rich_syntax_theme
 from backend.cli.theme.cards import (
     DIFF_HDR,
     DIFF_INLINE_ADD,
@@ -24,6 +23,7 @@ from backend.cli.theme.cards import (
     DIFF_LINE_CTX,
     DIFF_LINE_REM_TEXT,
 )
+from backend.cli.theme.syntax_theme import get_grinta_rich_syntax_theme
 
 DIFF_VIEW_PREFIX = '\x1fgrinta-diff-view\x1f'
 DIFF_VIEW_CONTEXT_LINES = 2

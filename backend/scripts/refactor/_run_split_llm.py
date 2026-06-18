@@ -14,9 +14,15 @@ import_end = 0
 for node in tree.body:
     if isinstance(node, (ast.Import, ast.ImportFrom)):
         import_end = max(import_end, node.end_lineno or 0)
-    elif isinstance(node, ast.If) and isinstance(node.test, ast.Name) and node.test.id == 'TYPE_CHECKING':
+    elif (
+        isinstance(node, ast.If)
+        and isinstance(node.test, ast.Name)
+        and node.test.id == 'TYPE_CHECKING'
+    ):
         import_end = max(import_end, node.end_lineno or 0)
-    elif isinstance(node, ast.Expr) and isinstance(getattr(node, 'value', None), ast.Constant):
+    elif isinstance(node, ast.Expr) and isinstance(
+        getattr(node, 'value', None), ast.Constant
+    ):
         import_end = max(import_end, node.end_lineno or 0)
     else:
         break
@@ -61,7 +67,7 @@ for suffix, (start, end) in slices.items():
 # Fix cross-imports in core
 core_path = parent / 'llm_core.py'
 core = core_path.read_text(encoding='utf-8')
-extra = '''
+extra = """
 from backend.inference.llm.config import (
     _apply_base_url_discovery,
     _apply_custom_tokenizer,
@@ -79,7 +85,7 @@ from backend.inference.llm.stream import (
     _INBAND_PREFIX_LIMIT,
     _stream_with_chunk_timeout,
 )
-'''
+"""
 # insert after header block in core - after TYPE_CHECKING block
 marker = 'if TYPE_CHECKING:\n    from backend.core.config import LLMConfig\n'
 if marker in core:

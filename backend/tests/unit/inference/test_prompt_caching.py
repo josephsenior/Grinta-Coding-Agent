@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from backend.inference.catalog_loader import apply_model_param_overrides, lookup
-from backend.inference.mappers.openai import strip_prompt_cache_hints_from_messages
 from backend.inference.caching.prompt_caching import (
     model_supports_explicit_resource_cache,
     model_supports_prompt_cache_hints,
     model_uses_implicit_prompt_cache,
     prompt_cache_mode_for_model,
 )
+from backend.inference.catalog_loader import apply_model_param_overrides, lookup
+from backend.inference.mappers.openai import strip_prompt_cache_hints_from_messages
 
 _CACHE_MESSAGE = [
     {

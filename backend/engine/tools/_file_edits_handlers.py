@@ -6,40 +6,39 @@ that module under the 40 KB file-size cap. No logic changes.
 
 from __future__ import annotations
 
-import json
-import shutil
-import tempfile
 from collections.abc import Mapping
-from contextlib import ExitStack
 from pathlib import Path
-from typing import Any, NoReturn, cast
+from typing import Any, cast
 
-from backend.core.enums import FileEditSource, FileReadSource
-from backend.core.errors import FunctionCallValidationError, ToolExecutionError
+from backend.core.enums import FileEditSource
+from backend.core.errors import FunctionCallValidationError
 from backend.engine.function_calling_helpers import (
     parse_bool_argument,
     require_tool_argument,
     set_security_risk,
     validate_security_risk,
 )
+from backend.engine.tools._file_edits_common import _multi_edit_raise
+from backend.engine.tools._file_edits_symbols import (
+    _build_create_file_action,
+    _build_read_file_action,
+    _handle_read_range_public,
+    _handle_read_symbols_public,
+)
 from backend.engine.tools._file_ops import (
     _coerce_optional_int,
     _filter_symbol_candidates,
     _find_symbol_candidates,
-    _find_symbol_candidates_in_file,
     _guard_content_arguments,
     _parse_symbol_id,
-    _read_text_for_tool,
     _relative_display_path,
     _resolve_symbol_candidates,
     _safe_workspace_path,
-    _sha256_text,
     _single_symbol_candidate,
 )
 from backend.inference.tool_names import (
     CREATE_TOOL_NAME,
     EDIT_SYMBOL_TOOL_NAME,
-    FIND_SYMBOLS_TOOL_NAME,
     MULTIEDIT_TOOL_NAME,
     READ_TOOL_NAME,
     REPLACE_STRING_TOOL_NAME,
@@ -48,19 +47,6 @@ from backend.ledger.action import (
     Action,
     AgentThinkAction,
     FileEditAction,
-    FileReadAction,
-    FindSymbolsAction,
-    MessageAction,
-    ReadSymbolsAction,
-)
-from backend.ledger.observation import FindSymbolsObservation, ReadSymbolsObservation
-
-from backend.engine.tools._file_edits_common import _multi_edit_raise
-from backend.engine.tools._file_edits_symbols import (
-    _build_create_file_action,
-    _build_read_file_action,
-    _handle_read_range_public,
-    _handle_read_symbols_public,
 )
 
 
@@ -274,7 +260,9 @@ def _select_and_validate_symbol(
             retryable=True,
         )
     if len(candidates) > 1:
-        from backend.execution.aes.structured_edit_errors import symbol_ambiguity_summary
+        from backend.execution.aes.structured_edit_errors import (
+            symbol_ambiguity_summary,
+        )
 
         _multi_edit_raise(
             symbol_ambiguity_summary(symbol_name, candidates).split('\n')[0],
@@ -461,4 +449,3 @@ def _handle_multiedit_tool(arguments: Mapping[str, Any]) -> Action:
     )
     set_security_risk(action, arguments)
     return action
-

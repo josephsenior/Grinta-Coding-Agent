@@ -22,6 +22,10 @@ from rich.console import Group
 from rich.panel import Panel
 from rich.text import Text
 
+from backend.cli.display.layout_tokens import (
+    CALLOUT_PANEL_PADDING,
+    LIVE_PANEL_ACCENT_STYLE,
+)
 from backend.cli.event_rendering.constants import (
     CRITICAL_ERROR_FRAGMENTS,
     RECOVERABLE_NOTICE_FRAGMENTS,
@@ -36,10 +40,6 @@ from backend.cli.event_rendering.text_utils import (
     error_panel_outer_width,
     error_panel_text_wrap_width,
     wrap_panel_text_block,
-)
-from backend.cli.display.layout_tokens import (
-    CALLOUT_PANEL_PADDING,
-    LIVE_PANEL_ACCENT_STYLE,
 )
 from backend.cli.theme import (
     CLR_ERROR_BODY,
@@ -399,9 +399,7 @@ def build_error_tui_renderable(
 
     wrap_w = error_panel_text_wrap_width(content_width)
     summary, detail = split_error_text(error_text)
-    use_notice = use_recoverable_notice_style(
-        error_text, error_category=error_category
-    )
+    use_notice = use_recoverable_notice_style(error_text, error_category=error_category)
     body_parts = _build_error_body(
         error_text=error_text,
         summary=summary,

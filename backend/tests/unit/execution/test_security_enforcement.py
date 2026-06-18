@@ -205,7 +205,9 @@ class TestEnforceSecurity:
 
         rt = _FakeRuntime(analyzer=SecurityAnalyzer(), enforce=True)
         action = CmdRunAction(command='echo hello')
-        with patch('backend.utils.async_helpers.async_utils.call_async_from_sync') as bridge:
+        with patch(
+            'backend.utils.async_helpers.async_utils.call_async_from_sync'
+        ) as bridge:
             result = rt._enforce_security(action)
         bridge.assert_not_called()
         assert result is None

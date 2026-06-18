@@ -2,20 +2,10 @@
 
 from __future__ import annotations
 
-import copy
-import time
-from collections.abc import AsyncIterator, Callable
 from typing import (
     TYPE_CHECKING,
-    Any,
 )
 
-from backend.core import json_compat as json
-from backend.core.errors import LLMNoResponseError
-from backend.core.logger import app_logger as logger
-from backend.core.message import Message
-from backend.inference.debug_mixin import DebugMixin
-from backend.inference.direct_clients import get_direct_client
 from backend.inference.exceptions import (
     APIConnectionError,
     APIError,
@@ -32,13 +22,10 @@ from backend.inference.exceptions import (
     is_context_window_error,
     is_html_api_body,
 )
-from backend.inference.llm.utils import create_pretrained_tokenizer, get_token_count
-from backend.inference.metrics import Metrics
-from backend.inference.capabilities.model_features import ModelFeatures, get_features
-from backend.inference.retry_mixin import RetryMixin
 
 if TYPE_CHECKING:
-    from backend.core.config import LLMConfig
+    pass
+
 
 def _safe_exception_text(exc: Exception) -> str:
     """Return a robust exception message even if ``__str__`` is broken."""

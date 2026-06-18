@@ -6,13 +6,13 @@ from types import SimpleNamespace
 
 import pytest
 
+from backend.ledger.infra.tool import ToolCallMetadata, build_tool_call_metadata
 from backend.ledger.model_response_lite import (
     AssistantMessageLite,
     AssistantToolCallLite,
     ChoiceLite,
     ModelResponseLite,
 )
-from backend.ledger.infra.tool import ToolCallMetadata, build_tool_call_metadata
 
 # ---------------------------------------------------------------------------
 # Helpers

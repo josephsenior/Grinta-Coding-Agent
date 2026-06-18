@@ -18,8 +18,8 @@ from backend.inference.direct_clients import (
     get_shared_async_http_client,
     get_shared_http_client,
 )
-from backend.inference.providers.openai_ops import completion as openai_completion
 from backend.inference.exceptions import BadRequestError
+from backend.inference.providers.openai_ops import completion as openai_completion
 
 
 # ---------------------------------------------------------------------------

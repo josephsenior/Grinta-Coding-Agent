@@ -125,7 +125,9 @@ class ScreenMessagesMixin:
         self._write_log(widget)
 
     def add_error(self, text: str) -> None:
-        from backend.cli.event_rendering.text_utils import sanitize_visible_transcript_text
+        from backend.cli.event_rendering.text_utils import (
+            sanitize_visible_transcript_text,
+        )
         from backend.cli.tui.widgets.error_block import ErrorBlock
 
         content = sanitize_visible_transcript_text(text)

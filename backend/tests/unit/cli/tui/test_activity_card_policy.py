@@ -17,7 +17,9 @@ from backend.tests.unit.cli.tui._shared import _get_screen
 
 
 @pytest.mark.asyncio
-async def test_shell_session_panels_stay_open_when_next_shell_starts(mock_config) -> None:
+async def test_shell_session_panels_stay_open_when_next_shell_starts(
+    mock_config,
+) -> None:
     console = RichConsole()
     loop = __import__('asyncio').get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -53,7 +55,9 @@ async def test_shell_session_panels_stay_open_when_next_shell_starts(mock_config
 
 
 @pytest.mark.asyncio
-async def test_shell_session_panel_keeps_body_visible_after_completion(mock_config) -> None:
+async def test_shell_session_panel_keeps_body_visible_after_completion(
+    mock_config,
+) -> None:
     console = RichConsole()
     loop = __import__('asyncio').get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -76,7 +80,9 @@ async def test_shell_session_panel_keeps_body_visible_after_completion(mock_conf
         await pilot.pause()
 
         panel = next(
-            p for p in screen.query(SessionPanel).results() if 'category-shell' in p.classes
+            p
+            for p in screen.query(SessionPanel).results()
+            if 'category-shell' in p.classes
         )
         assert '-running' not in panel.classes
         assert panel.query_one('#terminal-output-wrap')
@@ -110,7 +116,9 @@ async def test_record_panel_stays_collapsed_until_user_expands(mock_config) -> N
         await pilot.pause()
 
         panel = next(
-            p for p in screen.query(RecordPanel).results() if 'category-mcp' in p.classes
+            p
+            for p in screen.query(RecordPanel).results()
+            if 'category-mcp' in p.classes
         )
         assert '-collapsed' in panel.classes
         panel.expand()

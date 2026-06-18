@@ -6,9 +6,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
 parent = REPO / 'backend/inference'
-doc = (
-    'Split from ``llm.py`` — see ``backend.inference.llm`` facade.'
-)
+doc = 'Split from ``llm.py`` — see ``backend.inference.llm`` facade.'
 
 for name in ('llm_exceptions.py', 'llm_stream.py', 'llm_config.py', 'llm_core.py'):
     path = parent / name
@@ -24,7 +22,7 @@ for name in ('llm_exceptions.py', 'llm_stream.py', 'llm_config.py', 'llm_core.py
 # Re-apply core cross-imports
 core_path = parent / 'llm_core.py'
 core = core_path.read_text(encoding='utf-8')
-extra = '''
+extra = """
 from backend.inference.llm.config import (
     _apply_base_url_discovery,
     _apply_custom_tokenizer,
@@ -42,7 +40,7 @@ from backend.inference.llm.stream import (
     _INBAND_PREFIX_LIMIT,
     _stream_with_chunk_timeout,
 )
-'''
+"""
 marker = 'if TYPE_CHECKING:\n    from backend.core.config import LLMConfig\n'
 if marker in core and 'from backend.inference.llm.config import' not in core:
     core = core.replace(marker, marker + extra)

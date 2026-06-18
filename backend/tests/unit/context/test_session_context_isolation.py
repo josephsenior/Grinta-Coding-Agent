@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import json
 
-from backend.context.compaction.pre_condensation_snapshot import _snapshot_path, load_snapshot
+from backend.context.compaction.pre_condensation_snapshot import (
+    _snapshot_path,
+    load_snapshot,
+)
 from backend.context.memory.session_context import scoped_agent_path
 from backend.context.memory.session_memory import (
     _session_memory_path,

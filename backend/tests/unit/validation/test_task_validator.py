@@ -268,9 +268,7 @@ class TestFileExistsValidator:
         validator = FileExistsValidator(expected_files=['output.txt'])
         state = MagicMock()
         state.history = [
-            FileEditAction(
-                path='output.txt', command='create_file', file_text='done'
-            )
+            FileEditAction(path='output.txt', command='create_file', file_text='done')
         ]
         assert validator._check_file_exists(state, 'output.txt') is True
 

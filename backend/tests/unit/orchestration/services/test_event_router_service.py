@@ -753,7 +753,10 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
             async def close(self, set_stop_state=False):
                 return None
 
-        with patch('backend.utils.async_helpers.async_utils.run_or_schedule', side_effect=_capture):
+        with patch(
+            'backend.utils.async_helpers.async_utils.run_or_schedule',
+            side_effect=_capture,
+        ):
             with patch(
                 'backend.orchestration.services.event_router_mixins._event_router_delegate_mixin.EventStream'
             ) as mock_event_stream:

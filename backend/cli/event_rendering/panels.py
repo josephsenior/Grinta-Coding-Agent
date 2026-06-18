@@ -13,13 +13,13 @@ from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
 
-from backend.cli.display.transcript import format_live_panel
 from backend.cli.display.layout_tokens import (
     LIVE_PANEL_ACCENT_STYLE,
     WORKER_LABEL_WIDTH,
     WORKER_PANEL_ACCENT_STYLE,
     WORKER_TIMER_WIDTH,
 )
+from backend.cli.display.transcript import format_live_panel
 from backend.cli.theme import (
     CLR_INFO_BODY,
     CLR_INFO_ICON,

@@ -14,7 +14,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from backend.core.os_capabilities import OSCapabilities, override_os_capabilities
-from backend.execution.utils.shell.unified_shell import BaseShellSession, create_shell_session
+from backend.execution.utils.shell.unified_shell import (
+    BaseShellSession,
+    create_shell_session,
+)
 
 
 def _force_os(request, *, windows: bool) -> None:

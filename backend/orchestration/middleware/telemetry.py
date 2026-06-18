@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from backend.orchestration.tool_pipeline import ToolInvocationMiddleware
 from backend.orchestration.telemetry.tool_telemetry import ToolTelemetry
+from backend.orchestration.tool_pipeline import ToolInvocationMiddleware
 
 if TYPE_CHECKING:
     from backend.ledger.observation import Observation

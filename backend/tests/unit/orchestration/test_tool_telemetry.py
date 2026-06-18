@@ -5,8 +5,8 @@ from __future__ import annotations
 import time
 from unittest.mock import MagicMock
 
-from backend.orchestration.tool_pipeline import ToolInvocationContext
 from backend.orchestration.telemetry.tool_telemetry import ToolTelemetry
+from backend.orchestration.tool_pipeline import ToolInvocationContext
 
 # ---------------------------------------------------------------------------
 # Helpers

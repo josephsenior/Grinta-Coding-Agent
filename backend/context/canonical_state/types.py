@@ -2,17 +2,11 @@
 
 from __future__ import annotations
 
-import json
-import time
 from dataclasses import asdict, dataclass, field
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from backend.core.logger import app_logger as logger
-
 if TYPE_CHECKING:
-    from backend.ledger.event import Event
-    from backend.orchestration.state.state import State
+    pass
 
 
 SCHEMA_VERSION = 2
@@ -280,9 +274,9 @@ class CanonicalValidationResult:
     ok: bool
     missing: tuple[str, ...] = ()
 
+
 def _known_dataclass_fields(cls: type, data: dict[str, Any]) -> dict[str, Any]:
     from dataclasses import fields
 
     field_names = {field.name for field in fields(cls)}
     return {key: value for key, value in data.items() if key in field_names}
-

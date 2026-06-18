@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import re
 from typing import Any, NoReturn
 
@@ -107,7 +106,11 @@ def format_agent_edit_error_message(
     *,
     fallback: str,
 ) -> str:
-    lines = [fallback.rstrip('.') + '.' if fallback and not fallback.endswith('.') else fallback]
+    lines = [
+        fallback.rstrip('.') + '.'
+        if fallback and not fallback.endswith('.')
+        else fallback
+    ]
     path = context.get('failed_path') or context.get('path')
     if path:
         lines.append(f'File: {path}')
@@ -207,12 +210,16 @@ def parse_validation_error(
     if 'symbol' in lowered and 'ambiguous' in lowered:
         context['error_code'] = 'SYMBOL_AMBIGUOUS'
         context['hint'] = _SYMBOL_AMBIGUITY_HINT
-    elif 'could not find symbol' in lowered or 'symbol' in lowered and 'not found' in lowered:
+    elif (
+        'could not find symbol' in lowered
+        or 'symbol' in lowered
+        and 'not found' in lowered
+    ):
         context['error_code'] = 'SYMBOL_NOT_FOUND'
         context['hint'] = _SYMBOL_AMBIGUITY_HINT
-        symbol_match = re.search(r"symbol\s+([^.\n]+)", text, flags=re.IGNORECASE)
+        symbol_match = re.search(r'symbol\s+([^.\n]+)', text, flags=re.IGNORECASE)
         if symbol_match:
-            context['symbol'] = symbol_match.group(1).strip("'\"")
+            context['symbol'] = symbol_match.group(1).strip('\'"')
     elif 'missing required' in lowered or 'requires' in lowered:
         context['error_code'] = 'VALIDATION_ERROR'
     return context

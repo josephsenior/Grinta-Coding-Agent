@@ -141,8 +141,8 @@ def get_features(model: str) -> ModelFeatures:
     Catalog entries are the source of truth. Uncataloged models receive
     conservative defaults suitable for local/manual ids.
     """
-    from backend.inference.catalog_loader import lookup
     from backend.inference.capabilities.context_limits import derive_usable_input_tokens
+    from backend.inference.catalog_loader import lookup
 
     if entry := lookup(model):
         usable_input = derive_usable_input_tokens(

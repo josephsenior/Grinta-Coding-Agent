@@ -7,8 +7,8 @@ import time
 
 import pytest
 
-from backend.ledger.stream.backpressure import BackpressureManager
 from backend.ledger.event import Event, EventSource
+from backend.ledger.stream.backpressure import BackpressureManager
 
 # ---------------------------------------------------------------------------
 # Helpers

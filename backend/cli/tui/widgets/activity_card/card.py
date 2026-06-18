@@ -20,7 +20,9 @@ from backend.cli.theme import (
 )
 from backend.cli.tui.widgets.activity_card.card_content import ActivityCardContentMixin
 from backend.cli.tui.widgets.activity_card.card_styles import ACTIVITY_CARD_DEFAULT_CSS
-from backend.cli.tui.widgets.activity_card.card_terminal import ActivityCardTerminalMixin
+from backend.cli.tui.widgets.activity_card.card_terminal import (
+    ActivityCardTerminalMixin,
+)
 from backend.cli.tui.widgets.activity_card.diff_lines import _format_file_delta_outcome
 from backend.cli.tui.widgets.terminal_pane import TerminalPane
 

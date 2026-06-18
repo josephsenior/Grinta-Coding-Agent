@@ -3,18 +3,12 @@
 from __future__ import annotations
 
 import json
-import time
-from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-
-from backend.core.logger import app_logger as logger
-
 
 from backend.context.canonical_state.private import (
     _append,
     _append_list,
-    _can_update,
     _clean,
     _coerce_string_list,
     _extract_next_action,
@@ -40,17 +34,18 @@ from backend.context.canonical_state.private import (
     _update_verification,
 )
 from backend.context.canonical_state.types import (
-    CANONICAL_STATE_MARKER,
-    CanonicalTaskState,
-    CanonicalValidationResult,
     _MAX_ACTIVE_FILES,
     _MAX_BLOCKERS,
     _MAX_DECISIONS,
     _MAX_INVALIDATED,
     _MAX_OUTPUT_CHARS,
     _RENDER_VERIFICATION_OUTPUT_CHARS,
+    CANONICAL_STATE_MARKER,
+    CanonicalTaskState,
+    CanonicalValidationResult,
     clip_with_marker,
 )
+from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from backend.ledger.event import Event
@@ -392,4 +387,3 @@ def _import_legacy_state(*, state: State | None = None) -> CanonicalTaskState:
     except Exception:
         logger.debug('Legacy session memory import failed', exc_info=True)
     return canonical
-

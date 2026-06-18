@@ -144,6 +144,7 @@ def _extract_paths_from_tool_result(observation: Observation) -> list[str]:
 
 def _extract_paths_from_action(action: Any) -> list[str]:
     from backend.ledger.action import FileEditAction
+
     if not isinstance(action, FileEditAction):
         return []
 

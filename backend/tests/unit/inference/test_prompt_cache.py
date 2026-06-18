@@ -59,7 +59,9 @@ def test_register_default_backends_with_gemini_adapter() -> None:
     old = dict(prompt_cache._REGISTRY)
     try:
         prompt_cache._REGISTRY.clear()
-        with patch('backend.inference.caching.gemini_cache.gemini_cache_manager', fake_manager):
+        with patch(
+            'backend.inference.caching.gemini_cache.gemini_cache_manager', fake_manager
+        ):
             prompt_cache._register_default_backends()
         backend = prompt_cache.get_prompt_cache('google')
         out = backend.get_or_create_cache_handle(
@@ -79,7 +81,9 @@ def test_register_default_backends_fallback_when_module_missing() -> None:
     old = dict(prompt_cache._REGISTRY)
     try:
         prompt_cache._REGISTRY.clear()
-        with patch.dict('sys.modules', {'backend.inference.caching.gemini_cache': None}):
+        with patch.dict(
+            'sys.modules', {'backend.inference.caching.gemini_cache': None}
+        ):
             prompt_cache._register_default_backends()
         assert (
             prompt_cache.get_prompt_cache('google').get_or_create_cache_handle(

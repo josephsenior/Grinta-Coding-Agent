@@ -96,7 +96,9 @@ def _make_error_response(
 def _make_editor_error_response(
     result: Any, path: str, file_text: str | None, new_str: str | None, command: str
 ) -> tuple[str, tuple[None, None], dict[str, Any]]:
-    from backend.execution.aes.structured_edit_errors import normalize_editor_error_response
+    from backend.execution.aes.structured_edit_errors import (
+        normalize_editor_error_response,
+    )
 
     _ = (file_text, new_str)
     message, tool_result = normalize_editor_error_response(

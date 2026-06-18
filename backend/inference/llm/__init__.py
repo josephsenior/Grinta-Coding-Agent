@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import copy
 
+from backend.inference.capabilities.model_features import get_features
 from backend.inference.direct_clients import get_direct_client
 from backend.inference.llm.config import (
     _apply_base_url_discovery,
@@ -38,7 +39,6 @@ from backend.inference.llm.stream import (
     _INBAND_PREFIX_LIMIT,
     _stream_with_chunk_timeout,
 )
-from backend.inference.capabilities.model_features import get_features
 
 __all__ = [
     'LLM',

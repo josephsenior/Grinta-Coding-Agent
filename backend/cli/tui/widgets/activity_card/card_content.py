@@ -8,8 +8,8 @@ from typing import Any
 from rich.syntax import Syntax
 from textual.widgets import Static
 
-from backend.cli.theme.syntax_theme import get_grinta_rich_syntax_theme
 from backend.cli.theme import NAVY_BG, NAVY_TEXT_MUTED
+from backend.cli.theme.syntax_theme import get_grinta_rich_syntax_theme
 from backend.cli.tui.widgets.activity_card.diff_lines import (
     DiffLine,
     SplitDiffLine,

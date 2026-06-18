@@ -6,6 +6,11 @@ import os
 import textwrap
 from typing import Any
 
+from backend.cli.display.layout_tokens import (
+    ACTIVITY_CARD_TITLE_TERMINAL,
+    TRANSCRIPT_LEFT_INSET,
+    TRANSCRIPT_RIGHT_INSET,
+)
 from backend.cli.display.tool_call_display import (
     redact_internal_result_markers,
     redact_streamed_tool_call_markers,
@@ -19,11 +24,6 @@ from backend.cli.event_rendering.constants import (
     VISIBLE_INTERNAL_BLOCK_TAG_RE,
     VISIBLE_INTERNAL_SECTION_RE,
     VISIBLE_SUPPRESSED_LINE_RE,
-)
-from backend.cli.display.layout_tokens import (
-    ACTIVITY_CARD_TITLE_TERMINAL,
-    TRANSCRIPT_LEFT_INSET,
-    TRANSCRIPT_RIGHT_INSET,
 )
 from backend.engine import prompt_role_debug as _prompt_role_debug
 

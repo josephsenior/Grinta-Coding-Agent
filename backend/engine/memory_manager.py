@@ -10,10 +10,10 @@ from backend.context.compaction.compact_boundary import (
     boundary_info,
     project_after_compact_boundary,
 )
-from backend.context.compaction.compaction_finalizer import finalize_compaction_artifacts
-from backend.context.compactor import Compactor
+from backend.context.compaction.compaction_finalizer import (
+    finalize_compaction_artifacts,
+)
 from backend.context.compaction.condensed_history import CondensedHistory
-from backend.context.memory.conversation_memory import ContextMemory
 from backend.context.compaction.pre_condensation_snapshot import (
     delete_staging_snapshot,
     extract_snapshot,
@@ -21,11 +21,15 @@ from backend.context.compaction.pre_condensation_snapshot import (
     load_snapshot,
     save_snapshot,
 )
+from backend.context.compactor import Compactor
+from backend.context.memory.conversation_memory import ContextMemory
 from backend.context.prompt.prompt_window import event_fingerprint, select_prompt_events
 from backend.context.view import View
 from backend.core.logger import app_logger as logger
 from backend.core.message import Message, TextContent
-from backend.inference.caching.prompt_caching import should_mark_messages_for_prompt_cache
+from backend.inference.caching.prompt_caching import (
+    should_mark_messages_for_prompt_cache,
+)
 from backend.ledger.action import MessageAction
 from backend.ledger.action.agent import CondensationAction
 

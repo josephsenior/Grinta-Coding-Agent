@@ -15,6 +15,11 @@ from rich.padding import Padding
 from rich.text import Text
 
 from backend.cli._typing import ActionRenderersHost
+from backend.cli.display.layout_tokens import (
+    ACTIVITY_BLOCK_BOTTOM_PAD,
+    ACTIVITY_CARD_TITLE_CHECKPOINT,
+    ACTIVITY_CARD_TITLE_TOOL,
+)
 from backend.cli.display.transcript import (  # noqa: E402
     format_activity_block,
     format_activity_secondary,
@@ -30,11 +35,6 @@ from backend.cli.event_rendering.constants import (
 )
 from backend.cli.event_rendering.text_utils import (
     sanitize_visible_transcript_text as _sanitize_visible_transcript_text,
-)
-from backend.cli.display.layout_tokens import (
-    ACTIVITY_BLOCK_BOTTOM_PAD,
-    ACTIVITY_CARD_TITLE_CHECKPOINT,
-    ACTIVITY_CARD_TITLE_TOOL,
 )
 from backend.cli.tool_display.renderers.think import render_message, render_think
 from backend.ledger.action import (  # noqa: E402

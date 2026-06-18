@@ -208,8 +208,7 @@ class TestImportanceWeightedCondensation(unittest.TestCase):
         non_essential_non_file = {
             e.id
             for e in events
-            if e.id not in {0, 1, 5}
-            and not isinstance(e, FileEditAction)
+            if e.id not in {0, 1, 5} and not isinstance(e, FileEditAction)
         }
         self.assertTrue(
             pruned & non_essential_non_file,

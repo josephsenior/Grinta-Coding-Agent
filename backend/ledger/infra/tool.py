@@ -5,7 +5,6 @@ from typing import Any
 from pydantic import PrivateAttr
 
 from backend.core.schemas.metadata import ToolCallMetadataSchema
-
 from backend.ledger.model_response_lite import ModelResponseLite
 
 

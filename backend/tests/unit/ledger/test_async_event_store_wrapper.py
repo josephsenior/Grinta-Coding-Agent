@@ -6,8 +6,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.ledger.stream.async_event_store_wrapper import AsyncEventStoreWrapper
 from backend.ledger.event import Event
+from backend.ledger.stream.async_event_store_wrapper import AsyncEventStoreWrapper
 
 
 class TestAsyncEventStoreWrapper:

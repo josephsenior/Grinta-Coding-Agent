@@ -11,12 +11,12 @@ from backend.context.canonical_state import (
     reduce_events_into_state,
     render_canonical_state_for_prompt,
 )
+from backend.context.compaction.pre_condensation_snapshot import extract_snapshot
 from backend.context.context_budget import ContextBudget
 from backend.context.context_pipeline import (
     ContextPipeline,
     _ContinuityGateDecision,
 )
-from backend.context.compaction.pre_condensation_snapshot import extract_snapshot
 from backend.core.config.compactor_config import ContextPipelineConfig
 from backend.core.constants import DEFAULT_EMERGENCY_PROMPT_MIN_EVENTS
 from backend.ledger.action.agent import AgentThinkAction

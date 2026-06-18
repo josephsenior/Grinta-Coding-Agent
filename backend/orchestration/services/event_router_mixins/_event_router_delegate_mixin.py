@@ -80,9 +80,9 @@ class _EventRouterDelegateMixin:
         )
         from backend.orchestration.agent import Agent
         from backend.orchestration.blackboard import Blackboard
-        from backend.orchestration.telemetry.conversation_stats import ConversationStats
         from backend.orchestration.orchestration_config import OrchestrationConfig
         from backend.orchestration.session_orchestrator import SessionOrchestrator
+        from backend.orchestration.telemetry.conversation_stats import ConversationStats
         from backend.utils.async_helpers.async_utils import run_or_schedule
 
         # Check delegation depth limit

@@ -305,7 +305,9 @@ class RendererThinkingMixin:
 
         if intent.kind == 'checkpoint':
             if self._should_render_thinking_artifact(intent):
-                from backend.cli.tool_display.orient_tools import checkpoint_think_orient_model
+                from backend.cli.tool_display.orient_tools import (
+                    checkpoint_think_orient_model,
+                )
 
                 self._write_orient_line(
                     checkpoint_think_orient_model(

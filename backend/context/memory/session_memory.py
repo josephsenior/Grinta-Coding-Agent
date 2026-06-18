@@ -233,7 +233,9 @@ def build_compaction_summary(
         parts.append(memory)
     if include_snapshot:
         try:
-            from backend.context.compaction.pre_condensation_snapshot import load_snapshot
+            from backend.context.compaction.pre_condensation_snapshot import (
+                load_snapshot,
+            )
 
             snapshot = load_snapshot(state=state)
             if snapshot:

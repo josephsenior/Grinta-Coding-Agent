@@ -57,8 +57,8 @@ if TYPE_CHECKING:
     from backend.ledger.action import MessageAction
     from backend.ledger.event import Event, EventSource
     from backend.ledger.observation import AgentStateChangedObservation
-    from backend.orchestration.telemetry.conversation_stats import ConversationStats
     from backend.orchestration.state.state import State
+    from backend.orchestration.telemetry.conversation_stats import ConversationStats
 
 
 class _SessionOrchestratorStateMixin:

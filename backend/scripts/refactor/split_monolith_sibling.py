@@ -54,7 +54,9 @@ def split_file(
     for suffix, start, end, doc in slices:
         target = parent / f'{stem}_{suffix}.py'
         body = _extract_slice(source, start, end).strip('\n') + '\n'
-        header = _module_header(doc or f'Split from ``{source_path.name}``.', future=True)
+        header = _module_header(
+            doc or f'Split from ``{source_path.name}``.', future=True
+        )
         target.write_text(header + body, encoding='utf-8')
         names = _top_level_names(body)
         written.append((f'{stem}_{suffix}', names))
@@ -69,17 +71,22 @@ def split_file(
         for mod, _ in written
     )
     facade = textwrap.dedent(
-        f'''\
-        {module_doc or facade_docstring or f"Facade re-exporting ``{stem}_*`` submodules."}
+        f"""\
+        {module_doc or facade_docstring or f'Facade re-exporting ``{stem}_*`` submodules.'}
 
         {imports}
 
         __all__ = {sorted(all_names)!r}
-        '''
+        """
     )
     if not facade.startswith('"""'):
-        facade = f'"""{module_doc or facade_docstring or f"Facade for {stem}."}"""\n\n' + facade
-    source_path.write_text('from __future__ import annotations\n\n' + facade, encoding='utf-8')
+        facade = (
+            f'"""{module_doc or facade_docstring or f"Facade for {stem}."}"""\n\n'
+            + facade
+        )
+    source_path.write_text(
+        'from __future__ import annotations\n\n' + facade, encoding='utf-8'
+    )
     print(f'wrote facade {source_path.name}')
 
 

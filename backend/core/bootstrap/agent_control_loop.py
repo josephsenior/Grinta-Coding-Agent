@@ -53,7 +53,9 @@ def _handle_error_status(
                     exc_info=True,
                 )
                 try:
-                    from backend.utils.async_helpers.async_utils import create_tracked_task
+                    from backend.utils.async_helpers.async_utils import (
+                        create_tracked_task,
+                    )
 
                     create_tracked_task(
                         controller.set_agent_state_to(AgentState.ERROR),

@@ -23,7 +23,9 @@ from backend.execution.utils.file_editor._file_editor_io_helpers import (
     _normalize_newlines_for_metadata,
 )
 from backend.execution.utils.file_editor._file_editor_types import ToolResult
-from backend.execution.utils.file_editor.file_editor_view_mixin import _detect_indentation_mismatch
+from backend.execution.utils.file_editor.file_editor_view_mixin import (
+    _detect_indentation_mismatch,
+)
 
 
 def read_file_with_meta_impl(self, file_path: Path) -> tuple[str, _FileReadMeta]:

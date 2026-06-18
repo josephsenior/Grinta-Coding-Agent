@@ -352,9 +352,8 @@ def _symbol_action_ambiguity_error(
     )
 
     compact = compact_symbol_candidates(candidates)
-    return (
-        f'{symbol_ambiguity_summary(symbol_name, candidates)}\n'
-        + json.dumps({'candidates': compact}, separators=(',', ':'))
+    return f'{symbol_ambiguity_summary(symbol_name, candidates)}\n' + json.dumps(
+        {'candidates': compact}, separators=(',', ':')
     )
 
 
@@ -375,7 +374,7 @@ def _single_symbol_candidate(
     )
     if not candidates:
         raise FunctionCallValidationError(
-            f"edit_symbol failed: symbol not found.\nFile: {path}\nSymbol: {symbol_name}"
+            f'edit_symbol failed: symbol not found.\nFile: {path}\nSymbol: {symbol_name}'
         )
     if len(candidates) > 1:
         raise FunctionCallValidationError(

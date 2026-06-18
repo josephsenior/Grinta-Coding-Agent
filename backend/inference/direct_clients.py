@@ -578,7 +578,9 @@ def _resolve_transport_profile(
         base_url: The endpoint URL being used. ``None`` means the SDK
             default.
     """
-    from backend.inference.capabilities.provider_capabilities import get_provider_capabilities
+    from backend.inference.capabilities.provider_capabilities import (
+        get_provider_capabilities,
+    )
 
     # Metadata: only the real OpenAI API accepts the `metadata` request field.
     is_native_openai = model_family == 'openai' and (
@@ -946,13 +948,13 @@ def _model_metadata_for_log(
     resolved_base_url: str | None,
 ) -> dict[str, Any]:
     """Return deterministic, non-secret model metadata for run logs."""
+    from backend.inference.capabilities.context_limits import derive_usable_input_tokens
     from backend.inference.catalog_loader import (
         compact_metadata_for_log,
         lookup_provider_model,
         runtime_model_id,
         runtime_parameter_mode,
     )
-    from backend.inference.capabilities.context_limits import derive_usable_input_tokens
     from backend.inference.reasoning import reasoning_effort_options
 
     entry = lookup_provider_model(
@@ -1059,10 +1061,10 @@ def _try_opencode_gemini_client(
 ) -> DirectLLMClient | None:
     if provider != 'opencode':
         return None
+    from backend.inference.provider_resolver import opencode_required_endpoint
     from backend.inference.providers.opencode_gemini_ops import (
         OpenCodeGeminiClient,
     )
-    from backend.inference.provider_resolver import opencode_required_endpoint
 
     endpoint = opencode_required_endpoint(stripped_model)
     if not endpoint.startswith('/models/'):

@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from backend.utils.lsp.lsp_client import LspCodeAction, LspLocation, LspResult, LspSymbol
+from backend.utils.lsp.lsp_client import (
+    LspCodeAction,
+    LspLocation,
+    LspResult,
+    LspSymbol,
+)
 
 
 @pytest.mark.integration
