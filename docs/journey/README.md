@@ -4,7 +4,7 @@
 
 By Youssef Mejdi, AI Engineering Student, 4th Year
 
-**Inventory note:** Chapter-specific counts (services, tools, heuristics, compactors, and similar) and file paths track the codebase around **[v1.0.0-rc1](../RELEASE_NOTES_v1.0.0-rc1.md)** unless a chapter says otherwise. For what shipped today, prefer **[Architecture](../ARCHITECTURE.md)** and the source under `backend/`.
+**Inventory note:** Chapter-specific counts (services, tools, heuristics, compactors, and similar) and file paths are snapshots unless a chapter says otherwise. Chapters through **[45](45-the-product-surface-became-real.md)** track the productization arc around **[v1.0.0-rc1](../RELEASE_NOTES_v1.0.0-rc1.md)**; **[46](46-the-decomposition-wave.md)** and later updates track the 8.1 → 9.0 decomposition wave. For current behavior, prefer **[Architecture](../ARCHITECTURE.md)**, **[REFACTOR_BASELINE](../REFACTOR_BASELINE.md)**, and the source under `backend/`.
 
 ---
 
@@ -48,7 +48,7 @@ Eight months. Several distinct phases. One principle.
 
 **Month 7 (March–April 2026):** The Refinement. Decomposing monoliths into focused modules, pushing orchestration responsibilities into clearer service boundaries, and consolidating the context subsystem after a wave of exploratory variants. Hardening the local security profile. Building the CLI with tab completion, fuzzy command matching, slash commands, and an animated ASCII splash screen. Writing this document. Alongside that work, the terminal story grew a deliberate second layer: a native, OS-agnostic PTY path for **opt-in** interactive shells (no Docker required), sitting next to the original batch/tmux model instead of replacing it — because growing means adding truth, not erasing the chapter you already wrote about the console wars.
 
-**Current Phase (May-June 2026 onward):** Productization and Runtime UX. The architecture was always serious. Now the interface caught up. The mode split stabilized — Chat, Plan, and Agent as three distinct conversational contracts instead of one overloaded prompt. The autonomy knob separated from execution mode. The Textual TUI returned, no longer as product theater but as operational UI: transcript cards, HUD, settings/sessions dialogs, keyboard shortcuts, replay/load-earlier behavior, and backpressure-aware rendering. Piped stdin uses a non-interactive runner instead of pretending every use case is full-screen. The file editing facade collapsed into six intent-oriented tools with a single rule: read may search, write must target. XML and JSON transport formats died; only model intent remains. MCP servers were curated as deliberate capability extensions rather than infinite plugin soup. The launch path was hardened so installed Grinta does not collide with a user's unrelated `backend/` package. Model catalogs grew into a broader provider matrix, with local discovery handled under `backend.inference`. And the agent succeeded twice on a Raft/RFT consensus task from an empty directory — a serious receipt for what the architecture can do when given hard problems. The project is not finished, but it is no longer just an engine. It is becoming a coherent product.
+**Current Phase (May–June 2026 onward):** Productization, then legibility at scale. The architecture was always serious; the interface caught up first (mode split — Chat, Plan, Agent; autonomy as one honest knob; Textual TUI as operational cockpit; piped stdin on a non-interactive path; six intent-oriented file tools; curated MCP; launch hardening against namespace collisions; Raft/RFT empty-folder receipts). Then the **decomposition wave** landed: CLI/TUI monoliths split into `event_rendering/`, `tui/renderer/handlers/`, `settings/`, `session/`, `display/`, and mirrored tests; backend facades for context, ledger, inference, execution, and orchestration; file-size advisory and phase-based reliability gates; vocabulary locked in ADR-016 before the next rename sweep; MCP tool catalogs moved to per-turn addenda for prompt-cache hygiene; `sandboxed_local` as a third execution profile beside `standard` and `hardened_local`; stuck detection narrowed to provable hard signals while soft heuristics feed telemetry only. The project is not finished, but it is no longer just an engine — it is a coherent product strangers can navigate.
 
 ---
 
@@ -78,6 +78,7 @@ The file names stay stable for repository sanity, but the strongest reading arc 
 - **Act XV — The Plugin Boundary:** [43](43-the-plugin-boundary.md)
 - **Act XVI — The Empty Folder Trials:** [44](44-the-empty-folder-trials.md)
 - **Act XVII — The Product Surface Became Real:** [45](45-the-product-surface-became-real.md)
+- **Act XVIII — Legibility at Scale:** [46](46-the-decomposition-wave.md)
 - **Epilogue:** [07](07-the-road-ahead.md)
 
 Chapter 07 was written earlier in the repo's life, but it now reads best as the closing chapter after the rest of the system has been laid bare.
@@ -103,7 +104,7 @@ Chapter 07 was written earlier in the repo's life, but it now reads best as the 
 | [16](17-the-pragmatic-stack.md) | **The Pragmatic Stack** | Why Grinta chose practical defaults over trend-chasing: `uv`, JSON-first config, and Python with strict architectural discipline. |
 | [17](18-the-mind-of-the-agent.md) | **The Mind of the Agent** | The cognitive architecture behind tool use and memory: what was removed, what stayed optional, and what made autonomous behavior more reliable. |
 | [18](19-surviving-the-crash.md) | **Surviving the Crash** | How event streams, WAL markers, backpressure policy, and replay semantics make long agent sessions recoverable after real failures. |
-| [19](20-circuit-breakers-and-hallucinations.md) | **Circuit Breakers and Hallucinations** | Why stuck detection became multi-heuristic, how adaptive breaker thresholds work, and how Grinta limits runaway loops before they burn budget. |
+| [19](20-circuit-breakers-and-hallucinations.md) | **Circuit Breakers and Hallucinations** | How stuck detection grew into layered heuristics, how adaptive breaker thresholds work, and how Grinta limits runaway loops — with a 2026 addendum on the control/telemetry split. |
 | [20](21-the-safety-sandbox-is-not-optional.md) | **The Safety Sandbox Is Not Optional** | Why command-risk analysis and policy-driven validation are foundational in local-first agents, not optional polish. |
 | [21](22-who-grades-the-agent.md) | **Who Grades the Agent** | Why finish is a gated contract, how task validation blocks false completion, and why autonomous systems must not grade their own homework. |
 | [22](23-the-middleware-contract.md) | **The Middleware Contract** | Why middleware order is execution governance, how rollback became first-class in the pipeline, and why timing is architecture in autonomous systems. |
@@ -126,6 +127,7 @@ Chapter 07 was written earlier in the repo's life, but it now reads best as the 
 | [43](43-the-plugin-boundary.md) | **The Plugin Boundary** | Why MCP is dangerous as infinite tool soup, and how Grinta treats selected MCP servers as deliberate capability extensions rather than identity replacements. |
 | [44](44-the-empty-folder-trials.md) | **The Empty Folder Trials** | Lab notes from the Raft/RFT consensus stress test: what Grinta built from an empty directory, where it struggled, and what the receipts actually prove. |
 | [45](45-the-product-surface-became-real.md) | **The Product Surface Became Real** | Why the current repo is no longer just an engine with a prompt, how Textual became the primary TTY surface, why non-interactive runs got their own path, and what launch hardening taught me about packaging trust. |
+| [46](46-the-decomposition-wave.md) | **The Decomposition Wave** | The 8.1 → 9.0 refactor: CLI/TUI and backend package splits, facades, file-size discipline, reliability gates, vocabulary contract, MCP cache hygiene, graduated security profiles, and the stuck-detection control/telemetry split. |
 | [07](07-the-road-ahead.md) | **The Road Ahead** | What is still experimental, what deserves improvement, and why the most honest ending for this project is still unfinished. |
 
 ### Short reading paths
@@ -136,6 +138,7 @@ If you will not read linearly, three curated arcs:
 - **Pivot and subtraction:** [02 · Killed Darlings](02-the-killed-darlings.md) → [12 · Open Source Was the Better Business](12-open-source-was-the-better-business.md) → [27 · Myth of the Committee](31-the-myth-of-the-committee.md).
 - **Terminal and execution:** [11 · Console Wars](11-the-console-wars.md) → [28 · Two Lives of the Terminal](32-the-two-lives-of-the-terminal.md) → [29 · Small Async Wars](33-the-small-async-wars.md) → [30 · Fuzzy Match Heresy](34-the-fuzzy-match-heresy.md).
 - **Memory and retrieval:** [04 · Context War](04-the-context-war.md) → [17 · Mind of the Agent](18-the-mind-of-the-agent.md) → [39 · Semantic Memory That Survived](39-the-semantic-memory-that-survived.md).
+- **Productization and maintainability:** [45 · Product Surface](45-the-product-surface-became-real.md) → [46 · Decomposition Wave](46-the-decomposition-wave.md) → [07 · Road Ahead](07-the-road-ahead.md).
 
 ### Reference companion
 
@@ -150,6 +153,10 @@ Use these when a chapter names a subsystem and you want current behavior in pros
 | Security posture | [Security checklist](../SECURITY_CHECKLIST.md), [Reliability](../RELIABILITY.md) |
 | Memory and RAG stack | [39 · Semantic Memory That Survived](39-the-semantic-memory-that-survived.md); implementation under `backend/context/` |
 | Tool design and the editing facade | [40 · The Facade Pattern and the Smaller File API](40-the-facade-pattern-and-the-smaller-file-api.md); implementation under `backend/engine/tools/` |
+| CLI/TUI module layout and size budget | [CLI Module Map](../CLI_MODULE_MAP.md), [46 · Decomposition Wave](46-the-decomposition-wave.md) |
+| Refactor metrics and phase receipts | [Refactor Baseline](../REFACTOR_BASELINE.md) |
+| Canonical terminology | [Vocabulary](../VOCABULARY.md), [ADR-016](../ADR.md#adr-016-grinta-vocabulary-contract) |
+| Security execution profiles | [36 · Required Risk](36-the-required-risk.md), [33 · Small Async Wars](33-the-small-async-wars.md) (`sandboxed_local`), [Security checklist](../SECURITY_CHECKLIST.md) |
 
 ---
 

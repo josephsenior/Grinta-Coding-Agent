@@ -161,6 +161,16 @@ You need both. But only one of them can guarantee your token budget does not dis
 
 ---
 
+## Addendum: Control Path vs Telemetry (2026)
+
+This chapter describes how stuck detection **grew**. A later product decision narrowed what it **stops**.
+
+As of the decomposition wave documented in [46 · The Decomposition Wave](46-the-decomposition-wave.md), `StuckDetector.is_stuck()` only trips on **provable hard signals**: exact action-observation repeats, exact action-error repeats, and monologue loops. The softer heuristics named above (semantic loops, A-B oscillation, token repetition, cost acceleration, think-only loops, read-only inspection sweeps) remain for `compute_repetition_score` telemetry but no longer halt the agent.
+
+The reason: those soft signals false-positive on legitimate iterative work — TDD cycles, exploration, refactoring passes. Circuit breakers and iteration guards still provide separate containment. Stuck detection itself got honest about what it can prove versus what it can only suspect.
+
+---
+
 ## What Comes Next
 
 Loop containment solves one kind of damage. The next chapter addresses another: risky actions on the host itself.

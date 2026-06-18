@@ -22,16 +22,18 @@ There was definitely a version of me that wanted this chapter to sound more triu
 
 Right now, Grinta is a serious local-first coding agent with:
 
-- structured task execution with a 23-service orchestration layer
-- multi-step planning and model-agnostic inference across three direct client families
+- structured task execution with a ~23-module orchestration service layer
+- multi-step planning and model-agnostic inference across direct client families and 22 provider catalogs
 - explicit tool use with 30+ tools and a tree-sitter structural editor
 - event-sourced persistence with Write-Ahead Logging and replay
-- context compaction with 9 strategies and an auto-selector
-- stuck detection with 10 heuristics and adaptive circuit breakers
+- context compaction with ~10 compactor strategies and an auto-selector
+- stuck detection on **provable hard signals** (exact repeats and monologue loops), with softer heuristics reserved for telemetry — see [46 · The Decomposition Wave](46-the-decomposition-wave.md)
+- adaptive circuit breakers and iteration guards as separate safety layers
+- graduated execution profiles: `standard`, `hardened_local`, and `sandboxed_local` (OS-native isolation for non-interactive commands only)
 - risk-aware execution policies with 40+ threat patterns across four severity tiers
-- a codebase that has been repeatedly decomposed to stay maintainable
+- a codebase actively decomposed into packages with facades, file-size advisory, and phase-based reliability gates
 
-Concretely, that means 23 orchestration service files, a 15-step middleware/validator operation pipeline, 11 compactor strategy modules including selectors and pipelines, 19 provider catalog files, a security layer that would rather be explicit than pretend it is magical, and a terminal UI that keeps cost, tokens, model, MCP/skill counts, and runtime state visible.
+Concretely, that means orchestration service modules under `backend/orchestration/services/`, a multi-step middleware/validator operation pipeline, compactor strategy modules with selectors and pipelines, provider catalog JSON under `backend/inference/catalogs/`, a security layer that would rather be explicit than pretend it is magical, and a Textual TUI that keeps cost, tokens, model, MCP/skill counts, and runtime state visible.
 
 That is already far beyond a toy.
 
@@ -59,7 +61,7 @@ The challenge is not just whether the model can keep going. It is whether it can
 - without losing task coherence
 - without mistaking movement for progress
 
-The current architecture fights that with explicit state transitions, retry queues, warning-first circuit breakers, task validation before finish, and 10 stuck heuristics. But I do not want to oversell it. Long-horizon autonomy is still where good architecture meets the hard limits of current models.
+The current architecture fights that with explicit state transitions, retry queues, warning-first circuit breakers, task validation before finish, and stuck detection limited to patterns it can prove. But I do not want to oversell it. Long-horizon autonomy is still where good architecture meets the hard limits of current models.
 
 This is an active frontier, not a solved problem.
 
@@ -67,7 +69,7 @@ This is an active frontier, not a solved problem.
 
 The compaction system is much stronger than where it started — 9 implementations, an auto-selector that changes strategy by session shape, an abstraction layer that reconstructs prompt-ready history from prior compaction events, and modes ranging from raw masking to structured summaries. But memory remains one of the most fragile parts of any long-running agent.
 
-This is especially true across different model families, different prompt sensitivities, different task shapes, and different failure types. The compaction system could also benefit from tighter integration with the model's prompt cache hints. Anthropic and some other providers support cache control markers that tell the inference infrastructure which parts of the prompt are stable versus dynamic. Aligning compaction boundaries with cache control boundaries would mean compacted prompts hit the cache more often, reducing both latency and cost. The prompt builder already supports cache markers, but the compaction system does not yet coordinate with them.
+This is especially true across different model families, different prompt sensitivities, different task shapes, and different failure types. The compaction system could also benefit from tighter integration with the model's prompt cache hints. Anthropic and some other providers support cache control markers that tell the inference infrastructure which parts of the prompt are stable versus dynamic. Aligning compaction boundaries with cache control boundaries would mean compacted prompts hit the cache more often, reducing both latency and cost. The prompt builder already supports cache markers, and MCP tool catalogs now render as a per-turn user addendum so the stable system prefix can cache — but compaction still does not fully coordinate with those boundaries.
 
 That means context engineering in Grinta is powerful, but still very much a space of ongoing refinement.
 
@@ -81,11 +83,11 @@ The system design already reflects that tension. The terminal manager makes the 
 
 None of that fully erases the gap. That does not mean Windows is unsupported. It means this remains an active engineering zone.
 
-### 4. Local safety is still not sandboxing
+### 4. Local safety is still not full sandboxing
 
 I want to be extremely clear about this.
 
-`hardened_local` improves local safety by applying stricter policies. It is not a container boundary, not a VM, and not host isolation. The command analyzer carries 40+ threat patterns, the AST validator checks Python writes for injection patterns, and the sensitive path detector flags operations targeting credential files. But pattern matching has a ceiling. A sufficiently clever prompt injection that produces a dangerous command not in the pattern database could slip through.
+`hardened_local` improves local safety by applying stricter policies. `sandboxed_local` adds OS-native process isolation for **non-interactive** subprocess commands on supported platforms — but interactive PTY sessions remain unsandboxed, and pattern matching still has a ceiling. Neither profile is a container boundary, a VM, or host isolation. The command analyzer carries 40+ threat patterns, the AST validator checks Python writes for injection patterns, and the sensitive path detector flags operations targeting credential files. But a sufficiently clever prompt injection that produces a dangerous command not in the pattern database could slip through.
 
 That means one of the long-term questions in the project is how far local hardening can and should go without becoming a burden or creating fake guarantees.
 
@@ -161,7 +163,7 @@ I would rather make the current engine more reliable than add three shiny new fe
 
 One of the strongest long-term levers in systems like this is not just adding features. It is building better ways to inspect, replay, compare, and understand how the agent behaved over time.
 
-The raw ingredients are already there: durable event storage, conversation replay, transcripts, and lessons learned. The append-only audit log captures every action with a risk assessment, validation result, execution outcome, and optional filesystem snapshot ID for rollback. The event stream serializes with enough fidelity for full session replay. The lessons_learned field in the finish tool captures per-session observations that could feed back into future runs.
+The raw ingredients are already there: durable event storage, conversation replay, transcripts, lessons learned, and `backend/scripts/verify/reliability_gate.py` for phase-based pytest bundles during refactors. The append-only audit log captures every action with a risk assessment, validation result, execution outcome, and optional filesystem snapshot ID for rollback. The event stream serializes with enough fidelity for full session replay. The lessons_learned field in the finish tool captures per-session observations that could feed back into future runs.
 
 What I want is a tighter loop around those ingredients. Automatic comparison of two runs on the same task. Aggregated statistics on where the agent spends its tokens — is it in planning, execution, or recovery? Detection of behavioral regressions when a prompt change or model upgrade silently degrades performance on previously-passing tasks. The more grounded the evaluation loop becomes, the less the project has to rely on intuition alone.
 
@@ -185,7 +187,13 @@ The conversation memory layer has an active hybrid vector store (ChromaDB with F
 
 This is still a place where carefully chosen improvements could unlock much better long-session behavior.
 
-### 5. Better user-facing explanations of the engine
+### 5. Finishing the decomposition wave
+
+[46 · The Decomposition Wave](46-the-decomposition-wave.md) documents the CLI and backend splits completed in phases 0–3. Several backend files remain above the soft size budget — `direct_clients.py`, `conversation_memory.py`, `ledger/stream`, `prompt_window.py` — and the reliability gate should grow into a standing release discipline, not a migration-only tool.
+
+Legibility is now a product requirement. The next contributors should not have to rediscover import paths from a 1,400-line file.
+
+### 6. Better user-facing explanations of the engine
 
 One reason this documentation exists is that the project was carrying far more depth than the repo alone made obvious.
 
@@ -271,4 +279,4 @@ It will look like what it really is:
 
 ---
 
-← [The Product Surface Became Real](45-the-product-surface-became-real.md) | [The Book of Grinta](README.md)
+← [The Decomposition Wave](46-the-decomposition-wave.md) | [The Book of Grinta](README.md)

@@ -153,9 +153,9 @@ Here is what the operational economics look like in practice:
 |---|---|---|
 | Avg tokens per task | 80K–200K | 15K–50K |
 | Avg cost per task | $5–$40 | $0.20–$2.00 |
-| Stuck detection | None | 10 heuristics + circuit breaker |
+| Stuck detection | None | Hard-signal control path + telemetry heuristics + circuit breaker |
 | Budget gate | None | 80% warning, 100% hard stop |
-| Context compaction | None | 9 strategies, auto-selected |
+| Context compaction | None | ~10 strategies, auto-selected |
 
 The single agent is not just more reliable. It is **20× cheaper per task**. The cost discipline is not a luxury — it is what makes autonomous execution viable.
 
