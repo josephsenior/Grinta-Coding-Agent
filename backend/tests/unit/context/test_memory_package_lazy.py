@@ -7,14 +7,14 @@ import pytest
 
 def test_lazy_memory_import() -> None:
     import backend.context as mem
-    from backend.context.agent_memory import Memory as RealMemory
+    from backend.context.memory.agent_memory import Memory as RealMemory
 
     assert mem.Memory is RealMemory
 
 
 def test_lazy_context_memory_import() -> None:
     import backend.context as mem
-    from backend.context.conversation_memory import ContextMemory as RealCM
+    from backend.context.memory.conversation_memory import ContextMemory as RealCM
 
     assert mem.ContextMemory is RealCM
 

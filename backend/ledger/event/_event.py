@@ -22,7 +22,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, cast
 
 from backend.core.schemas import EventSource
-from backend.ledger.tool import ToolCallMetadata
+from backend.ledger.infra.tool import ToolCallMetadata
 
 if TYPE_CHECKING:
     from backend.inference.metrics import Metrics

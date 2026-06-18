@@ -366,7 +366,7 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         return self._current_model_for_provider(self._selected_provider())
 
     def _selected_entry(self, provider: str | None, model: str | None):
-        from backend.inference.param_profiles import (
+        from backend.inference.capabilities.param_profiles import (
             resolve_model_entry_for_capabilities,
         )
 

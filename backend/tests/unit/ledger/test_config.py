@@ -1,4 +1,4 @@
-"""Tests for backend.ledger.config — event subsystem configuration."""
+"""Tests for backend.ledger.infra.config — event subsystem configuration."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.ledger.config import EventRuntimeDefaults, get_event_runtime_defaults
+from backend.ledger.infra.config import EventRuntimeDefaults, get_event_runtime_defaults
 
 
 def _assert_event_runtime_attrs(

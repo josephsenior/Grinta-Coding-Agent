@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.context.conversation_memory import ContextMemory
+from backend.context.memory.conversation_memory import ContextMemory
 
 
 def _make_memory() -> ContextMemory:

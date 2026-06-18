@@ -1,8 +1,8 @@
-"""Tests for :mod:`backend.cli.path_links`."""
+"""Tests for :mod:`backend.cli.display.path_links`."""
 
 from __future__ import annotations
 
-from backend.cli.path_links import file_uri_for_path, linkify_plain
+from backend.cli.display.path_links import file_uri_for_path, linkify_plain
 
 
 def test_linkify_plain_preserves_non_path_text() -> None:

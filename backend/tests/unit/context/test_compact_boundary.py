@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.context.compact_boundary import (
+from backend.context.compaction.compact_boundary import (
     boundary_info,
     project_after_compact_boundary,
 )

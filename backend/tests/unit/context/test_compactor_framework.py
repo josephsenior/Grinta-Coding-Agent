@@ -421,7 +421,7 @@ class TestBaseLLMCompactor:
         c = ConcreteLLMCompactor(llm=None, max_size=10)
         c.llm = _BrokenLLM()  # type: ignore[assignment]
         with patch(
-            'backend.inference.provider_capabilities.model_token_correction',
+            'backend.inference.capabilities.provider_capabilities.model_token_correction',
             return_value=(1.23, None),
         ):
             assert c._model_token_multiplier() == 1.23

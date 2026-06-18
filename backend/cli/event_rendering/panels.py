@@ -14,7 +14,7 @@ from rich.table import Table
 from rich.text import Text
 
 from backend.cli.display.transcript import format_live_panel
-from backend.cli.layout_tokens import (
+from backend.cli.display.layout_tokens import (
     LIVE_PANEL_ACCENT_STYLE,
     WORKER_LABEL_WIDTH,
     WORKER_PANEL_ACCENT_STYLE,

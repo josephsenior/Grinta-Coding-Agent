@@ -2,38 +2,34 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from rich.console import Group
-from rich.syntax import Syntax
 from rich.text import Text
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
 from textual.widgets import Static
 
-from backend.cli.syntax_theme import get_grinta_rich_syntax_theme
 from backend.cli.theme import (
-    NAVY_BG,
     NAVY_BRAND,
     NAVY_ERROR,
     NAVY_READY,
     NAVY_TEXT_DIM,
     NAVY_TEXT_MUTED,
 )
-from backend.cli.tui.helpers import infer_display_shell_kind
-from backend.cli.tui.widgets.activity_card.diff_lines import (
-    DiffLine,
-    SplitDiffLine,
-    _decode_diff_line,
-    _decode_split_diff_line,
-    _format_file_delta_outcome,
-)
+from backend.cli.tui.widgets.activity_card.card_content import ActivityCardContentMixin
+from backend.cli.tui.widgets.activity_card.card_styles import ACTIVITY_CARD_DEFAULT_CSS
+from backend.cli.tui.widgets.activity_card.card_terminal import ActivityCardTerminalMixin
+from backend.cli.tui.widgets.activity_card.diff_lines import _format_file_delta_outcome
 from backend.cli.tui.widgets.terminal_pane import TerminalPane
 
 
-class ActivityCard(Container):
+class ActivityCard(
+    ActivityCardTerminalMixin,
+    ActivityCardContentMixin,
+    Container,
+):
     """Compact activity card with collapsed/expanded states.
 
     Collapsed (default):
@@ -46,155 +42,7 @@ class ActivityCard(Container):
       Bordered box with content/diff/output/metadata.
     """
 
-    DEFAULT_CSS = """
-    ActivityCard {
-        width: 100%;
-        height: auto;
-        margin: 0;
-        border: round #1b233a;
-        background: #08101d;
-        padding: 0 0 0 1;
-    }
-    ActivityCard:focus {
-        border: round #4a5f99;
-        background: #0d162a;
-    }
-    ActivityCard:hover {
-        background: #0a1323;
-        border: round #26365b;
-    }
-    ActivityCard.-category-shell,
-    ActivityCard.-category-terminal,
-    ActivityCard.-category-debugger {
-        border: round #24385c;
-        background: #050913;
-    }
-    ActivityCard.-category-shell.-running,
-    ActivityCard.-category-terminal.-running,
-    ActivityCard.-category-debugger.-running {
-        border-left: heavy #5eead4;
-    }
-    ActivityCard.-expanded.-category-shell,
-    ActivityCard.-expanded.-category-terminal,
-    ActivityCard.-expanded.-category-debugger {
-        border: round #24385c;
-        padding: 0;
-    }
-    ActivityCard.-collapsed.-category-shell .card-collapsed-text,
-    ActivityCard.-collapsed.-category-terminal .card-collapsed-text,
-    ActivityCard.-collapsed.-category-debugger .card-collapsed-text {
-        color: #cbd5e1;
-    }
-    ActivityCard.-category-grep,
-    ActivityCard.-category-glob,
-    ActivityCard.-category-search,
-    ActivityCard.-category-find_symbols,
-    ActivityCard.-category-read_symbols,
-    ActivityCard.-category-analyze {
-        border: round #2d4a6a;
-        background: #050c14;
-    }
-    ActivityCard.-category-web_search,
-    ActivityCard.-category-web_fetch {
-        border: round #3a4a6a;
-        background: #060d18;
-    }
-    ActivityCard.-category-browser {
-        border: round #3d5a4a;
-        background: #060f0c;
-    }
-    ActivityCard.-category-mcp {
-        border: round #3a3d5a;
-        background: #080a14;
-    }
-    ActivityCard.-collapsed {
-        border: none;
-        border-left: solid #1b233a;
-        padding: 0 1 0 1;
-    }
-    ActivityCard.-collapsed:focus {
-        border-left: solid #4a5f99;
-    }
-    ActivityCard.-collapsed:hover {
-        border-left: solid #26365b;
-    }
-    ActivityCard.-collapsed.-category-shell,
-    ActivityCard.-collapsed.-category-terminal,
-    ActivityCard.-collapsed.-category-debugger {
-        border-left: solid #24385c;
-    }
-    ActivityCard.-collapsed.-category-grep,
-    ActivityCard.-collapsed.-category-glob,
-    ActivityCard.-collapsed.-category-search,
-    ActivityCard.-collapsed.-category-find_symbols,
-    ActivityCard.-collapsed.-category-read_symbols,
-    ActivityCard.-collapsed.-category-analyze {
-        border-left: solid #2d4a6a;
-    }
-    ActivityCard.-collapsed.-category-web_search,
-    ActivityCard.-collapsed.-category-web_fetch {
-        border-left: solid #3a4a6a;
-    }
-    ActivityCard.-collapsed.-category-browser {
-        border-left: solid #3d5a4a;
-    }
-    ActivityCard.-collapsed.-category-mcp {
-        border-left: solid #3a3d5a;
-    }
-    ActivityCard #collapsed-row-container {
-        width: 100%;
-        height: 1;
-        layout: horizontal;
-    }
-    ActivityCard .card-collapsed-text {
-        width: 1fr;
-        height: 1;
-    }
-    ActivityCard.-pinned {
-        border-left: heavy #f6ff8f;
-    }
-    ActivityCard.-collapsed.-pinned {
-        border-left: heavy #f6ff8f;
-    }
-    ActivityCard .card-pin {
-        width: 2;
-        height: 1;
-        content-align: center middle;
-        color: #f6ff8f;
-    }
-    ActivityCard .card-pin.-hidden {
-        display: none;
-    }
-    ActivityCard .card-caret {
-        width: 3;
-        height: 1;
-        content-align: right middle;
-        color: #54597b;
-        padding: 0 1 0 0;
-    }
-    ActivityCard .card-caret:hover {
-        color: #91abec;
-    }
-    ActivityCard .card-expanded-body {
-        width: 100%;
-        height: auto;
-        padding: 0 1;
-        margin: 1 0;
-    }
-    ActivityCard .card-extra-content {
-        width: 100%;
-        height: auto;
-    }
-    ActivityCard .card-meta-row {
-        width: 100%;
-        height: auto;
-        padding: 0 1;
-        color: #54597b;
-    }
-    ActivityCard .card-meta-row.-hidden {
-        display: none;
-    }
-    """
+    DEFAULT_CSS = ACTIVITY_CARD_DEFAULT_CSS
 
     _STATUS_COLORS = {
         'ok': '#54efae',
@@ -272,33 +120,6 @@ class ActivityCard(Container):
         else:
             self.add_class('-expanded')
 
-    @staticmethod
-    def _command_from_detail(detail: str) -> str:
-        text = (detail or '').strip()
-        if text.startswith('$ '):
-            return text[2:].strip()
-        return text
-
-    def _default_shell_kind(self) -> str:
-        if self._badge_category == 'terminal':
-            return 'terminal'
-        if self._badge_category == 'debugger':
-            return 'debugger'
-        if self._badge_category == 'shell':
-            return infer_display_shell_kind(self._terminal_command)
-        return 'bash'
-
-    def _is_terminal_card(self) -> bool:
-        return self._badge_category in {'shell', 'terminal', 'debugger'}
-
-    def _sync_running_class(self) -> None:
-        if not self._is_terminal_card():
-            return
-        if self.processing:
-            self.add_class('-running')
-        else:
-            self.remove_class('-running')
-
     @property
     def is_pinned(self) -> bool:
         return self._pinned
@@ -309,14 +130,6 @@ class ActivityCard(Container):
         if self._is_terminal_card():
             return True
         return bool(self._extra_content) or self.processing
-
-    def _refresh_output_tail(self) -> None:
-        if not self._is_terminal_card():
-            return
-        lines = [
-            line for line in (self._extra_content or '').splitlines() if line.strip()
-        ]
-        self._output_tail = lines[-1][:100] if lines else ''
 
     def set_pinned(self, pinned: bool) -> None:
         self._pinned = pinned
@@ -344,83 +157,6 @@ class ActivityCard(Container):
             pin.set_class('-hidden', not self._pinned)
         except Exception:
             pass
-
-    def configure_terminal(
-        self,
-        *,
-        command: str | None = None,
-        cwd: str | None = None,
-        session_id: str | None = None,
-        shell_kind: str | None = None,
-        exit_code: int | None = None,
-    ) -> None:
-        """Update embedded terminal chrome metadata."""
-        if command is not None:
-            self._terminal_command = command.strip()
-        if cwd is not None:
-            self._terminal_cwd = cwd.strip() or None
-        if session_id is not None:
-            self._terminal_session_id = session_id.strip()
-        if shell_kind is not None:
-            self._shell_kind = shell_kind
-        if exit_code is not None:
-            self._terminal_exit_code = exit_code
-        if self._terminal_pane is not None and self.is_mounted:
-            self._apply_terminal_pane_state(self._terminal_pane)
-
-    def _terminal_footer_text(self) -> str:
-        parts: list[str] = []
-        if self._terminal_cwd:
-            parts.append(f'cwd: {self._terminal_cwd}')
-        if self._terminal_exit_code is not None:
-            parts.append(f'exit {self._terminal_exit_code}')
-        elif self.processing:
-            parts.append('running')
-        if self._outcome and self._terminal_exit_code is None:
-            parts.append(self._outcome)
-        return ' · '.join(parts)
-
-    def _ensure_terminal_pane(self, body: Container) -> TerminalPane:
-        if self._terminal_pane is not None:
-            return self._terminal_pane
-        try:
-            pane = body.query_one('#terminal-pane', TerminalPane)
-            self._terminal_pane = pane
-            self._apply_terminal_pane_state(pane)
-            return pane
-        except Exception:
-            pass
-        pane = TerminalPane(
-            shell_kind=self._shell_kind,
-            command=self._terminal_command,
-            cwd=self._terminal_cwd,
-            session_id=self._terminal_session_id,
-            footer=self._terminal_footer_text(),
-            exit_code=self._terminal_exit_code,
-            running=self.processing,
-            id='terminal-pane',
-        )
-        body.remove_children()
-        body.mount(pane)
-        self._terminal_pane = pane
-        self._apply_terminal_pane_state(pane)
-        return pane
-
-    def _apply_terminal_pane_state(self, pane: TerminalPane) -> None:
-        pane.set_shell_kind(self._shell_kind)
-        pane.set_command(self._terminal_command)
-        pane.set_cwd(self._terminal_cwd)
-        pane.set_session_id(self._terminal_session_id)
-        pane.set_exit_code(self._terminal_exit_code)
-        pane.set_footer(self._terminal_footer_text())
-        pane.set_running(self.processing)
-        if self._extra_content:
-            pane.set_output(self._extra_content)
-
-    def _mount_terminal_body(self, body: Container) -> None:
-        pane = self._ensure_terminal_pane(body)
-        pane.set_output(self._extra_content or '')
-        body.display = not self._collapsed
 
     def set_processing(self, processing: bool) -> None:
         """Set the card processing status."""
@@ -538,112 +274,6 @@ class ActivityCard(Container):
 
     def _caret_char(self) -> str:
         return chr(9660) if not self._collapsed else chr(9654)
-
-    def _build_syntax_renderable(
-        self,
-        content: str,
-        language: str,
-        *,
-        line_numbers: bool = False,
-    ) -> Syntax:
-        return Syntax(
-            content,
-            language,
-            theme=get_grinta_rich_syntax_theme(),
-            background_color=NAVY_BG,
-            line_numbers=line_numbers,
-            padding=(0, 1),
-            word_wrap=True,
-        )
-
-    def _is_diff_like_content(self, content: str) -> bool:
-        if content.startswith('--- ') or content.startswith('diff --git'):
-            return True
-        return any(
-            line.startswith(('+', '-', '@@'))
-            for line in content.splitlines()
-            if line and not line.startswith(('+++', '---'))
-        )
-
-    def _try_json_syntax(self, content: str) -> Any | None:
-        is_json_shape = (content.startswith('{') and content.endswith('}')) or (
-            content.startswith('[') and content.endswith(']')
-        )
-        if not is_json_shape:
-            return None
-        try:
-            json.loads(content)
-        except Exception:
-            return None
-        return self._build_syntax_renderable(content, 'json')
-
-    def _format_plain_content(self, content: str) -> str:
-        lines = content.splitlines() or ['']
-        styled_lines = [f'[{NAVY_TEXT_MUTED}]{line}[/]' for line in lines]
-        return '\n'.join(styled_lines)
-
-    @staticmethod
-    def _looks_like_json_buffer(content: str) -> bool:
-        stripped = content.strip()
-        return stripped.startswith('{') or stripped.startswith('[')
-
-    def _auto_detect_format(self, content: str) -> Any:
-        if self._is_diff_like_content(content):
-            return self._build_syntax_renderable(content, 'diff', line_numbers=True)
-        if self._looks_like_json_buffer(content):
-            return self._build_syntax_renderable(content, 'json')
-        json_result = self._try_json_syntax(content)
-        if json_result is not None:
-            return json_result
-        if '```' in content or '`' in content:
-            from backend.cli.tui.renderer.prep import prep_streaming_renderable
-
-            return prep_streaming_renderable(content, base_text_style=NAVY_TEXT_MUTED)
-        return self._format_plain_content(content)
-
-    def _get_formatted_extra_content(self) -> Any:
-        content = self._extra_content or ''
-
-        if '[on #' in content:
-            return content
-
-        if self._syntax_language:
-            return self._build_syntax_renderable(
-                content,
-                self._syntax_language,
-                line_numbers=self._syntax_language == 'diff',
-            )
-
-        return self._auto_detect_format(content)
-
-    def _extra_renderables(self) -> list[Any]:
-        content = self._extra_content or ''
-
-        if self._diff_encoded:
-            from backend.cli.tui.widgets.unified_diff_view import diff_view_from_encoded
-
-            diff_view = diff_view_from_encoded(content)
-            if diff_view is not None:
-                return [diff_view]
-
-            renderables: list[Any] = []
-            for line in content.splitlines():
-                split_decoded = _decode_split_diff_line(line)
-                if split_decoded is not None:
-                    left, right, left_kind, right_kind = split_decoded
-                    renderables.append(
-                        SplitDiffLine(left, right, left_kind, right_kind)
-                    )
-                    continue
-                decoded = _decode_diff_line(line)
-                if decoded is not None:
-                    kind, body = decoded
-                    renderables.append(DiffLine(body, kind))
-                else:
-                    renderables.append(DiffLine(line, 'ctx'))
-            return renderables or [Static('', id='extra')]
-
-        return [Static(self._get_formatted_extra_content(), id='extra')]
 
     def compose(self) -> ComposeResult:
         with Horizontal(id='collapsed-row-container'):

@@ -18,7 +18,7 @@ from backend.inference.direct_clients import (
     get_shared_async_http_client,
     get_shared_http_client,
 )
-from backend.inference.direct_clients_openai_ops import completion as openai_completion
+from backend.inference.providers.openai_ops import completion as openai_completion
 from backend.inference.exceptions import BadRequestError
 
 
@@ -239,7 +239,7 @@ class TestSharedHttpClients:
 
         with (
             patch('google.genai.types.HttpOptions') as http_options,
-            patch('backend.inference.direct_clients_gemini_ops.genai.Client'),
+            patch('backend.inference.providers.gemini_ops.genai.Client'),
         ):
             GeminiClient('gemini-2.5-pro', 'key', timeout=7)
 
@@ -270,7 +270,7 @@ class TestGetDirectClient:
             get_direct_client('claude-3.5-sonnet', api_key='sk-test')
 
     def test_gemini_model(self):
-        with patch('backend.inference.direct_clients_gemini_ops.genai'):
+        with patch('backend.inference.providers.gemini_ops.genai'):
             from backend.inference.direct_clients import GeminiClient
 
             client = get_direct_client('google/gemini-pro', api_key='key')
@@ -535,7 +535,7 @@ class TestAnthropicClientHelpers:
         ]
 
     def test_prepare_stream_request_strips_openai_only_stream_kwargs(self):
-        from backend.inference.direct_clients_anthropic_ops import (
+        from backend.inference.providers.anthropic_ops import (
             _prepare_anthropic_stream_request,
         )
 
@@ -588,7 +588,7 @@ class TestAnthropicClientHelpers:
         assert original_kwargs['stream'] is True
 
     def test_prepare_kwargs_adds_required_max_tokens_default(self):
-        from backend.inference.direct_clients_anthropic_ops import (
+        from backend.inference.providers.anthropic_ops import (
             prepare_anthropic_kwargs,
         )
 
@@ -603,7 +603,7 @@ class TestAnthropicClientHelpers:
         assert request_kwargs['max_tokens'] == 131072
 
     def test_prepare_kwargs_maps_max_completion_tokens_to_max_tokens(self):
-        from backend.inference.direct_clients_anthropic_ops import (
+        from backend.inference.providers.anthropic_ops import (
             prepare_anthropic_kwargs,
         )
 
@@ -673,7 +673,7 @@ class TestOpenAIClientHelpers:
         assert metadata['extra'] == '{"a":1}'
 
     def test_opencode_responses_model_uses_responses_api(self):
-        from backend.inference.direct_clients_opencode_responses_ops import (
+        from backend.inference.providers.opencode_responses_ops import (
             completion as responses_completion,
         )
 
@@ -732,7 +732,7 @@ class TestOpenAIClientHelpers:
         client.client.chat.completions.create.assert_not_called()
 
     def test_deepseek_thinking_history_recovers_stale_assistant_messages(self):
-        from backend.inference.direct_clients_openai_ops import (
+        from backend.inference.providers.openai_ops import (
             _recover_deepseek_thinking_history,
         )
 

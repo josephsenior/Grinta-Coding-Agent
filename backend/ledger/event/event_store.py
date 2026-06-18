@@ -27,7 +27,7 @@ _SEARCH_ABORT = object()
 
 def _verify_event_checksum(data: dict, event_id: int) -> None:
     """Verify integrity checksum if present; raise ValueError on mismatch."""
-    from backend.ledger.integrity import verify_event_integrity
+    from backend.ledger.infra.integrity import verify_event_integrity
 
     if not verify_event_integrity(data, event_id):
         raise ValueError(
@@ -36,8 +36,8 @@ def _verify_event_checksum(data: dict, event_id: int) -> None:
 
 
 def _file_store_fs_root(file_store: FileStore) -> str | None:
-    """Sync with :func:`backend.ledger.persistence._file_store_fs_root`."""
-    from backend.ledger.persistence import _file_store_fs_root as _root
+    """Sync with :func:`backend.ledger.stream.persistence._file_store_fs_root`."""
+    from backend.ledger.stream.persistence import _file_store_fs_root as _root
 
     return _root(file_store)
 

@@ -1,4 +1,4 @@
-"""Tests for backend.execution.security_enforcement module.
+"""Tests for backend.execution.aes.security_enforcement module.
 
 Targets the 17.4% (38 missed lines) coverage gap.
 """
@@ -8,7 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from backend.execution.security_enforcement import SecurityEnforcementMixin
+from backend.execution.aes.security_enforcement import SecurityEnforcementMixin
 
 
 class _FakeRuntime(SecurityEnforcementMixin):

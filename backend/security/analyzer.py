@@ -63,7 +63,7 @@ class SecurityAnalyzer:
     Returns ``ActionSecurityRisk.HIGH`` when the action matches a
     true-unsafe pattern (sensitive-path write, critical/high command tier),
     and ``ActionSecurityRisk.LOW`` otherwise. The caller in
-    :mod:`backend.execution.security_enforcement` combines this with the
+    :mod:`backend.execution.aes.security_enforcement` combines this with the
     agent-declared risk via ``max(declared, analyzed)``.
     """
 

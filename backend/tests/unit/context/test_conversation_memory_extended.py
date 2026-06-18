@@ -6,9 +6,9 @@ from types import SimpleNamespace
 from typing import cast
 from unittest.mock import MagicMock
 
-from backend.context.conversation_memory import ContextMemory
-from backend.context.memory_types import DecisionType
-from backend.context.message_formatting import (
+from backend.context.memory.conversation_memory import ContextMemory
+from backend.context.memory.types import DecisionType
+from backend.context.prompt.message_formatting import (
     apply_user_message_formatting,
     class_name_in_mro,
     extract_first_text,

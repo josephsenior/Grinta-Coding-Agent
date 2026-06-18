@@ -2,7 +2,7 @@
 
 All functions are pure — they receive data and return results without touching
 any instance state.  Extracted from
-:class:`~backend.context.conversation_memory.ContextMemory` to improve
+:class:`~backend.context.memory.conversation_memory.ContextMemory` to improve
 modularity and testability.
 """
 
@@ -15,7 +15,7 @@ from backend.core.message import Message
 if TYPE_CHECKING:
     from collections.abc import Generator
 
-    from backend.context.conversation_memory import _ToolCallTracking
+    from backend.context.memory.conversation_memory import _ToolCallTracking
 
 
 def flush_resolved_tool_calls(tool_state: _ToolCallTracking) -> list[Message]:

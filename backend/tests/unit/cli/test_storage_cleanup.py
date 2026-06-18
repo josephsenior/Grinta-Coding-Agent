@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from backend.cli.storage_cleanup import cleanup_project_storage
+from backend.cli.session.storage_cleanup import cleanup_project_storage
 from backend.core.workspace_resolution import workspace_agent_state_dir
 from backend.persistence.locations import get_project_local_data_root
 

@@ -155,7 +155,7 @@ def _grep_failure(
     path: str,
     output_mode: str,
 ) -> Observation:
-    from backend.execution.structured_edit_errors import build_search_error_observation
+    from backend.execution.aes.structured_edit_errors import build_search_error_observation
 
     return build_search_error_observation(
         tool='grep',

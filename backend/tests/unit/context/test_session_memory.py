@@ -1,10 +1,10 @@
-"""Tests for backend.context.session_memory."""
+"""Tests for backend.context.memory.session_memory."""
 
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from backend.context.session_memory import (
+from backend.context.memory.session_memory import (
     get_content_for_compaction,
     maybe_update,
     session_memory_exists,
@@ -25,7 +25,7 @@ def test_maybe_update_writes_session_memory_when_threshold_crossed(
 ):
     memory_path = tmp_path / 'session_memory.md'
     monkeypatch.setattr(
-        'backend.context.session_memory._session_memory_path',
+        'backend.context.memory.session_memory._session_memory_path',
         lambda state=None: memory_path,
     )
     state = MagicMock()
@@ -39,7 +39,7 @@ def test_maybe_update_writes_session_memory_when_threshold_crossed(
     events = [_user('x' * 5000, i) for i in range(1, 40)]
 
     with patch(
-        'backend.context.session_memory.extract_snapshot',
+        'backend.context.memory.session_memory.extract_snapshot',
         return_value={'decisions': ['use pipeline'], 'files_touched': {}},
     ):
         assert maybe_update(state, events) is True

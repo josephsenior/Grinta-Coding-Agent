@@ -1,11 +1,11 @@
-"""Tests for backend.context.prompt_assembly."""
+"""Tests for backend.context.prompt.prompt_assembly."""
 
 from __future__ import annotations
 
 from typing import Any, cast
 from unittest.mock import MagicMock
 
-from backend.context.prompt_assembly import (
+from backend.context.prompt.prompt_assembly import (
     _create_conversation_instructions,
     _create_repo_info,
     _create_runtime_info,

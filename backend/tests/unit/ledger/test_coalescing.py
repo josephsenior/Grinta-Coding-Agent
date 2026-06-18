@@ -1,11 +1,11 @@
-"""Unit tests for backend.ledger.coalescing — event batching & flush."""
+"""Unit tests for backend.ledger.stream.coalescing — event batching & flush."""
 
 from __future__ import annotations
 
 import time
 from unittest.mock import MagicMock
 
-from backend.ledger.coalescing import _COALESCE_TYPES, CoalescedBatch, EventCoalescer
+from backend.ledger.stream.coalescing import _COALESCE_TYPES, CoalescedBatch, EventCoalescer
 from backend.ledger.event import Event, EventSource
 
 # ---------------------------------------------------------------------------

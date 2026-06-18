@@ -1,4 +1,4 @@
-"""Unit tests for backend.execution.runtime_pool — RuntimePool, WarmRuntimePool, SingleUseRuntimePool."""
+"""Unit tests for backend.execution.runtime.pool — RuntimePool, WarmRuntimePool, SingleUseRuntimePool."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.execution.runtime_pool import (
+from backend.execution.runtime.pool import (
     PooledRuntime,
     RuntimePool,
     SingleUseRuntimePool,
@@ -88,12 +88,12 @@ class TestRuntimePoolBase:
 
 
 class TestSingleUseRuntimePool:
-    @patch('backend.execution.runtime_pool.call_async_disconnect')
+    @patch('backend.execution.runtime.pool.call_async_disconnect')
     def test_acquire_returns_none(self, mock_disconnect):
         pool = SingleUseRuntimePool()
         assert pool.acquire('key') is None
 
-    @patch('backend.execution.runtime_pool.call_async_disconnect')
+    @patch('backend.execution.runtime.pool.call_async_disconnect')
     def test_release_disconnects(self, mock_disconnect):
         pool = SingleUseRuntimePool()
         rt = _mock_runtime()
@@ -106,12 +106,12 @@ class TestSingleUseRuntimePool:
 
 
 class TestWarmRuntimePool:
-    @patch('backend.execution.runtime_pool.call_async_disconnect')
+    @patch('backend.execution.runtime.pool.call_async_disconnect')
     def test_acquire_empty_returns_none(self, _):
         pool = WarmRuntimePool()
         assert pool.acquire('docker') is None
 
-    @patch('backend.execution.runtime_pool.call_async_disconnect')
+    @patch('backend.execution.runtime.pool.call_async_disconnect')
     def test_release_and_acquire(self, _):
         pool = WarmRuntimePool(max_size_per_key=2, ttl_seconds=60.0)
         pr = _pooled()
@@ -119,7 +119,7 @@ class TestWarmRuntimePool:
         acquired = pool.acquire('docker')
         assert acquired is pr
 
-    @patch('backend.execution.runtime_pool.call_async_disconnect')
+    @patch('backend.execution.runtime.pool.call_async_disconnect')
     def test_fifo_ordering(self, _):
         pool = WarmRuntimePool(max_size_per_key=5, ttl_seconds=60.0)
         pr1 = _pooled()
@@ -129,7 +129,7 @@ class TestWarmRuntimePool:
         assert pool.acquire('docker') is pr1
         assert pool.acquire('docker') is pr2
 
-    @patch('backend.execution.runtime_pool.call_async_disconnect')
+    @patch('backend.execution.runtime.pool.call_async_disconnect')
     def test_eviction_when_over_max_size(self, mock_disconnect):
         pool = WarmRuntimePool(max_size_per_key=1, ttl_seconds=60.0)
         pr1 = _pooled()
@@ -140,7 +140,7 @@ class TestWarmRuntimePool:
         mock_disconnect.assert_called_once_with(pr1.runtime)
         assert pool.eviction_stats().get('docker', 0) == 1
 
-    @patch('backend.execution.runtime_pool.call_async_disconnect')
+    @patch('backend.execution.runtime.pool.call_async_disconnect')
     def test_stats(self, _):
         pool = WarmRuntimePool(max_size_per_key=5, ttl_seconds=60.0)
         pool.release('docker', _pooled())
@@ -150,7 +150,7 @@ class TestWarmRuntimePool:
         assert stats['docker'] == 2
         assert stats['local'] == 1
 
-    @patch('backend.execution.runtime_pool.call_async_disconnect')
+    @patch('backend.execution.runtime.pool.call_async_disconnect')
     def test_ttl_expiration_on_acquire(self, mock_disconnect):
         pool = WarmRuntimePool(max_size_per_key=5, ttl_seconds=0.01)
         pr = _pooled()
@@ -161,7 +161,7 @@ class TestWarmRuntimePool:
         mock_disconnect.assert_called_with(pr.runtime)
         assert pool.idle_reclaim_stats().get('docker', 0) >= 1
 
-    @patch('backend.execution.runtime_pool.call_async_disconnect')
+    @patch('backend.execution.runtime.pool.call_async_disconnect')
     def test_cleanup_expired(self, mock_disconnect):
         pool = WarmRuntimePool(max_size_per_key=5, ttl_seconds=0.01)
         pool.release('docker', _pooled())
@@ -171,7 +171,7 @@ class TestWarmRuntimePool:
         assert removed == 2
         assert pool.stats().get('docker', 0) == 0
 
-    @patch('backend.execution.runtime_pool.call_async_disconnect')
+    @patch('backend.execution.runtime.pool.call_async_disconnect')
     def test_cleanup_preserves_fresh_entries(self, _):
         pool = WarmRuntimePool(max_size_per_key=5, ttl_seconds=60.0)
         pool.release('docker', _pooled())
@@ -179,7 +179,7 @@ class TestWarmRuntimePool:
         assert removed == 0
         assert pool.stats()['docker'] == 1
 
-    @patch('backend.execution.runtime_pool.call_async_disconnect')
+    @patch('backend.execution.runtime.pool.call_async_disconnect')
     def test_remove_runtime_found(self, mock_disconnect):
         pool = WarmRuntimePool(max_size_per_key=5, ttl_seconds=60.0)
         rt = _mock_runtime()
@@ -189,7 +189,7 @@ class TestWarmRuntimePool:
         mock_disconnect.assert_called_with(rt)
         assert pool.stats().get('docker', 0) == 0
 
-    @patch('backend.execution.runtime_pool.call_async_disconnect')
+    @patch('backend.execution.runtime.pool.call_async_disconnect')
     def test_remove_runtime_not_found(self, _):
         pool = WarmRuntimePool(max_size_per_key=5, ttl_seconds=60.0)
         pool.release('docker', _pooled())
@@ -197,12 +197,12 @@ class TestWarmRuntimePool:
         assert pool.remove_runtime('docker', unknown_rt) is False
         assert pool.stats()['docker'] == 1
 
-    @patch('backend.execution.runtime_pool.call_async_disconnect')
+    @patch('backend.execution.runtime.pool.call_async_disconnect')
     def test_remove_runtime_empty_key(self, _):
         pool = WarmRuntimePool(max_size_per_key=5, ttl_seconds=60.0)
         assert pool.remove_runtime('docker', _mock_runtime()) is False
 
-    @patch('backend.execution.runtime_pool.call_async_disconnect')
+    @patch('backend.execution.runtime.pool.call_async_disconnect')
     def test_different_keys_isolated(self, _):
         pool = WarmRuntimePool(max_size_per_key=2, ttl_seconds=60.0)
         pool.release('docker', _pooled())
@@ -216,7 +216,7 @@ class TestWarmRuntimePool:
 
 
 class TestConfigurePolicies:
-    @patch('backend.execution.runtime_pool.call_async_disconnect')
+    @patch('backend.execution.runtime.pool.call_async_disconnect')
     def test_configure_default_policy(self, _):
         pool = WarmRuntimePool(max_size_per_key=5, ttl_seconds=60.0)
         pool.release('docker', _pooled())
@@ -228,7 +228,7 @@ class TestConfigurePolicies:
         pool.configure_policies(new_policy, {})
         assert pool.stats()['docker'] == 1
 
-    @patch('backend.execution.runtime_pool.call_async_disconnect')
+    @patch('backend.execution.runtime.pool.call_async_disconnect')
     def test_configure_zero_max_size_evicts_all(self, mock_disconnect):
         pool = WarmRuntimePool(max_size_per_key=5, ttl_seconds=60.0)
         pool.release('docker', _pooled())
@@ -238,7 +238,7 @@ class TestConfigurePolicies:
         pool.configure_policies(new_policy, {})
         assert pool.stats().get('docker', 0) == 0
 
-    @patch('backend.execution.runtime_pool.call_async_disconnect')
+    @patch('backend.execution.runtime.pool.call_async_disconnect')
     def test_configure_with_overrides(self, _):
         pool = WarmRuntimePool(max_size_per_key=5, ttl_seconds=60.0)
         pool.release('docker', _pooled())
@@ -254,7 +254,7 @@ class TestConfigurePolicies:
         # Local should remain at 1 (default allows 5)
         assert pool.stats()['local'] == 1
 
-    @patch('backend.execution.runtime_pool.call_async_disconnect')
+    @patch('backend.execution.runtime.pool.call_async_disconnect')
     def test_zero_max_acquire_returns_none(self, mock_disconnect):
         pool = WarmRuntimePool(max_size_per_key=5, ttl_seconds=60.0)
         pool.release('docker', _pooled())
@@ -263,7 +263,7 @@ class TestConfigurePolicies:
         pool.configure_policies(new_policy, {})
         assert pool.acquire('docker') is None
 
-    @patch('backend.execution.runtime_pool.call_async_disconnect')
+    @patch('backend.execution.runtime.pool.call_async_disconnect')
     def test_zero_max_release_disconnects(self, mock_disconnect):
         pool = WarmRuntimePool(max_size_per_key=5, ttl_seconds=60.0)
         new_policy = WarmPoolPolicy(max_size=0, ttl_seconds=60.0)
@@ -279,13 +279,13 @@ class TestConfigurePolicies:
 
 
 class TestCounters:
-    @patch('backend.execution.runtime_pool.call_async_disconnect')
+    @patch('backend.execution.runtime.pool.call_async_disconnect')
     def test_initial_counters_empty(self, _):
         pool = WarmRuntimePool()
         assert pool.idle_reclaim_stats() == {}
         assert pool.eviction_stats() == {}
 
-    @patch('backend.execution.runtime_pool.call_async_disconnect')
+    @patch('backend.execution.runtime.pool.call_async_disconnect')
     def test_eviction_counter_increments(self, _):
         pool = WarmRuntimePool(max_size_per_key=1, ttl_seconds=60.0)
         pool.release('k', _pooled())

@@ -6,13 +6,13 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from backend.context.prompt_window import estimate_prompt_events_tokens
+from backend.context.prompt.prompt_window import estimate_prompt_events_tokens
 from backend.core.constants import (
     DEFAULT_BOUNDARY_COMPACT_COOLDOWN_SECONDS,
     DEFAULT_COMPACTION_RESERVED_SUMMARY_TOKENS,
 )
-from backend.inference.context_limits import limits_from_config
-from backend.inference.provider_capabilities import model_token_correction
+from backend.inference.capabilities.context_limits import limits_from_config
+from backend.inference.capabilities.provider_capabilities import model_token_correction
 
 if TYPE_CHECKING:
     from backend.ledger.event import Event

@@ -19,7 +19,7 @@ from rich.live import Live
 from rich.text import Text
 
 from backend.cli.display.hud import HUDBar
-from backend.cli.layout_tokens import (
+from backend.cli.display.layout_tokens import (
     spacer_live_section,
 )
 from backend.cli.theme import (

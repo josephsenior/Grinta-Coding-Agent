@@ -10,7 +10,7 @@ from rich.markdown import Markdown
 from rich.syntax import PygmentsSyntaxTheme, Syntax
 from rich.theme import Theme
 
-from backend.cli.syntax_theme import (
+from backend.cli.theme.syntax_theme import (
     GRINTA_SYNTAX_COLORS,
     get_grinta_pygments_style,
     get_grinta_rich_syntax_theme,

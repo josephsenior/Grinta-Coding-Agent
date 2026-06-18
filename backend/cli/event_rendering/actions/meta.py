@@ -21,7 +21,7 @@ from backend.cli.display.transcript import (  # noqa: E402
 from backend.cli.event_rendering.delegate import (
     summarize_delegate_action as _summarize_delegate_action,
 )
-from backend.cli.layout_tokens import (
+from backend.cli.display.layout_tokens import (
     ACTIVITY_CARD_TITLE_DELEGATION,
     DECISION_PANEL_ACCENT_STYLE,
 )

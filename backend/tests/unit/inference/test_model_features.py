@@ -1,4 +1,4 @@
-"""Unit tests for backend.inference.model_features."""
+"""Unit tests for backend.inference.capabilities.model_features."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from backend.inference.model_features import (
+from backend.inference.capabilities.model_features import (
     FUNCTION_CALLING_PATTERNS,
     PROMPT_CACHE_PATTERNS,
     REASONING_EFFORT_PATTERNS,

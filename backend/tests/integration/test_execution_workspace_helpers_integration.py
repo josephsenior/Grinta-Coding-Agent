@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.execution import action_execution_server_helpers as h
+from backend.execution.aes import helpers as h
 from backend.ledger.observation import ErrorObservation
 
 
@@ -59,7 +59,7 @@ def test_validate_workspace_scoped_cwd_errors_when_outside_workspace(
 ) -> None:
     ex = _executor_for_workspace(tmp_path)
     with patch(
-        'backend.execution.action_execution_server_helpers.path_is_within_workspace',
+        'backend.execution.aes.helpers.path_is_within_workspace',
         return_value=False,
     ):
         err = h.validate_workspace_scoped_cwd(ex, 'run', '../../outside')

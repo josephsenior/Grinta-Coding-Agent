@@ -17,7 +17,7 @@ def persist_finish_lessons(
 
     lesson_body = summary[:800]
     try:
-        from backend.context.session_context import bind_session_context
+        from backend.context.memory.session_context import bind_session_context
         from backend.engine.tools.working_memory import _load_memory
 
         bind_session_context(session_id=session_id)

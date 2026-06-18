@@ -414,7 +414,7 @@ def _resolve_prompt_cache_mode(
     runtime: dict[str, Any],
     client: str | None,
 ) -> str:
-    from backend.inference.prompt_caching import resolve_prompt_cache_mode_from_runtime
+    from backend.inference.caching.prompt_caching import resolve_prompt_cache_mode_from_runtime
 
     return resolve_prompt_cache_mode_from_runtime(
         provider=provider,
@@ -861,7 +861,7 @@ def get_token_limits(model: str) -> tuple[int | None, int | None]:
     """Return ``(max_input_tokens, max_output_tokens)`` for *model*."""
     entry = lookup(model)
     if entry:
-        from backend.inference.context_limits import derive_usable_input_tokens
+        from backend.inference.capabilities.context_limits import derive_usable_input_tokens
 
         usable_input = derive_usable_input_tokens(
             context_window_tokens=entry.context_window_tokens,
@@ -1114,7 +1114,7 @@ def _apply_prompt_cache_call_kwargs(
         return
     if 'prompt_cache_key' in call_kwargs:
         return
-    from backend.inference.prompt_caching import implicit_prompt_cache_key
+    from backend.inference.caching.prompt_caching import implicit_prompt_cache_key
 
     call_kwargs['prompt_cache_key'] = implicit_prompt_cache_key(entry)
 

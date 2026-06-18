@@ -20,7 +20,7 @@ from backend.cli.event_rendering.constants import (
     VISIBLE_INTERNAL_SECTION_RE,
     VISIBLE_SUPPRESSED_LINE_RE,
 )
-from backend.cli.layout_tokens import (
+from backend.cli.display.layout_tokens import (
     ACTIVITY_CARD_TITLE_TERMINAL,
     TRANSCRIPT_LEFT_INSET,
     TRANSCRIPT_RIGHT_INSET,

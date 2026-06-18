@@ -1,4 +1,4 @@
-"""Tests for backend.execution.file_operations — file read/write/resolve/encode helpers."""
+"""Tests for backend.execution.aes.file_operations — file read/write/resolve/encode helpers."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.execution.file_operations import (
+from backend.execution.aes.file_operations import (
     _format_directory_listing,
     _get_max_cmd_output_chars,
     _list_directory_recursive,
@@ -227,7 +227,7 @@ class TestHandleFileReadErrors:
 class TestSetFilePermissions:
     def test_windows_noop(self):
         # On Windows, this is a noop
-        with patch('backend.execution.file_operations.os.name', 'nt'):
+        with patch('backend.execution.aes.file_operations.os.name', 'nt'):
             set_file_permissions('/tmp/test', False, None)  # Should not raise
 
 
@@ -315,7 +315,7 @@ class TestDirectoryViewing:
 
     def test_format_directory_listing_windows_hidden_hint(self):
         files = ['subdir/', 'file1.txt']
-        with patch('backend.execution.file_operations.OS_CAPS') as mock_caps:
+        with patch('backend.execution.aes.file_operations.OS_CAPS') as mock_caps:
             mock_caps.is_windows = True
             result = _format_directory_listing('/workspace', files, 1)
 

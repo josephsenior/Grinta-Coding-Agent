@@ -11,7 +11,7 @@ from rich.prompt import Prompt
 from rich.table import Table
 from rich.text import Text
 
-from backend.cli.text_truncation import shorten_middle, shorten_path
+from backend.cli.display.text_truncation import shorten_middle, shorten_path
 from backend.cli.theme import (
     CLR_BRAND,
     CLR_CARD_BORDER,

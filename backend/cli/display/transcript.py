@@ -14,11 +14,11 @@ from rich.console import Group, RenderableType
 from rich.panel import Panel
 from rich.text import Text
 
-from backend.cli.layout_tokens import (
+from backend.cli.display.layout_tokens import (
     ACTIVITY_CARD_TITLE_STYLE,
     CALLOUT_PANEL_PADDING,
 )
-from backend.cli.path_links import linkify_plain
+from backend.cli.display.path_links import linkify_plain
 from backend.cli.theme import (
     CLR_CARD_BORDER,
     CLR_DIFF_ADD,

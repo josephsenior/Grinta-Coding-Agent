@@ -33,14 +33,14 @@ from backend.execution.action_execution_server_io import (
     RuntimeExecutorIOAndTerminalMixin,
 )
 from backend.execution.debugger import DAPDebugManager
-from backend.execution.file_operations import (
+from backend.execution.aes.file_operations import (
     get_max_edit_observation_chars,
     truncate_large_text,
 )
 from backend.execution.mcp.proxy import MCPProxyManager
 from backend.execution.plugin_loader import init_plugins
 from backend.execution.plugins import Plugin
-from backend.execution.server_routes import (
+from backend.execution.server.routes import (
     register_exception_handlers,
     register_routes,
 )

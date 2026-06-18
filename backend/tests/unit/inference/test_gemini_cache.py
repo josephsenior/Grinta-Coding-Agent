@@ -4,7 +4,7 @@ import unittest
 from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
-from backend.inference.gemini_cache import GeminiCacheManager
+from backend.inference.caching.gemini_cache import GeminiCacheManager
 
 
 class TestGeminiCacheManager(unittest.TestCase):
@@ -70,7 +70,7 @@ class TestGeminiCacheManager(unittest.TestCase):
         self.assertEqual(result, 'cache/abc')
         self.mock_client.caches.get.assert_called_once_with(name='cache/abc')
 
-    @patch('backend.inference.gemini_cache.time')
+    @patch('backend.inference.caching.gemini_cache.time')
     def test_cache_hit_expired_recreates(self, mock_time):
         """If cached name is gone from Google, delete and create new."""
         mock_time.time.return_value = 1000000
@@ -93,7 +93,7 @@ class TestGeminiCacheManager(unittest.TestCase):
 
     # -- get_or_create_cache (cache miss) -----------------------------------
 
-    @patch('backend.inference.gemini_cache.time')
+    @patch('backend.inference.caching.gemini_cache.time')
     def test_cache_miss_creates_new(self, mock_time):
         """No existing cache → creates new one."""
         mock_time.time.return_value = 1000000
@@ -129,7 +129,7 @@ class TestGeminiCacheManager(unittest.TestCase):
 
     # -- message role mapping -----------------------------------------------
 
-    @patch('backend.inference.gemini_cache.time')
+    @patch('backend.inference.caching.gemini_cache.time')
     def test_role_mapping(self, mock_time):
         """User stays user, non-user becomes model."""
         mock_time.time.return_value = 1000000
@@ -167,7 +167,7 @@ class TestGeminiCacheManager(unittest.TestCase):
 
     # -- cache stores hash correctly ----------------------------------------
 
-    @patch('backend.inference.gemini_cache.time')
+    @patch('backend.inference.caching.gemini_cache.time')
     def test_cache_stores_hash(self, mock_time):
         mock_time.time.return_value = 1000000
         mock_cache_obj = MagicMock()
@@ -183,7 +183,7 @@ class TestGeminiCacheManager(unittest.TestCase):
         h = self.manager._get_hash('test', [])
         self.assertEqual(self.manager._caches[h], 'cache/stored')
 
-    @patch('backend.inference.gemini_cache.time')
+    @patch('backend.inference.caching.gemini_cache.time')
     def test_default_ttl(self, mock_time):
         mock_time.time.return_value = 1000000
         mock_cache_obj = MagicMock()

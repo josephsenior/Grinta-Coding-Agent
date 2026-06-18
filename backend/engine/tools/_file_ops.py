@@ -346,7 +346,7 @@ def _resolve_symbol_candidates(
 def _symbol_action_ambiguity_error(
     symbol_name: str, candidates: list[dict[str, Any]]
 ) -> str:
-    from backend.execution.structured_edit_errors import (
+    from backend.execution.aes.structured_edit_errors import (
         compact_symbol_candidates,
         symbol_ambiguity_summary,
     )

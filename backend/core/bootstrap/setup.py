@@ -17,7 +17,7 @@ import uuid
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, cast
 
-from backend.context.agent_memory import Memory
+from backend.context.memory.agent_memory import Memory
 from backend.core.constants import GENERAL_TIMEOUT
 from backend.core.enums import RuntimeStatus
 from backend.core.errors import AgentNotRegisteredError
@@ -134,7 +134,7 @@ def _acquire_event_stream(
     if event_stream is not None:
         session_id = sid or event_stream.sid
         try:
-            from backend.context.session_context import bind_session_context
+            from backend.context.memory.session_context import bind_session_context
 
             bind_session_context(session_id=session_id)
         except Exception:
@@ -143,7 +143,7 @@ def _acquire_event_stream(
 
     session_id = sid or generate_sid(config)
     try:
-        from backend.context.session_context import bind_session_context
+        from backend.context.memory.session_context import bind_session_context
 
         bind_session_context(session_id=session_id)
     except Exception:
@@ -261,7 +261,7 @@ def create_runtime(
         bind_session_logging(session_id)
     agent_cls = type(agent) if agent else Agent.get_cls(config.default_agent)
 
-    from backend.execution.runtime_factory import get_runtime_cls
+    from backend.execution.runtime.factory import get_runtime_cls
 
     plugins = _build_runtime_plugins(agent_cls, agent, config)
     resolved_ws = _resolve_runtime_project_root(config, project_root)

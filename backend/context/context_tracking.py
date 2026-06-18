@@ -1,6 +1,6 @@
 """Decision tracking and context anchoring for ContextMemory.
 
-Extracted from :mod:`backend.context.conversation_memory` to keep module
+Extracted from :mod:`backend.context.memory.conversation_memory` to keep module
 sizes within the repository guideline (~400 LOC).
 """
 
@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from backend.context.memory_types import ContextAnchor, Decision, DecisionType
+from backend.context.memory.types import ContextAnchor, Decision, DecisionType
 from backend.context.vector_store import EnhancedVectorStore
 from backend.core.logger import app_logger as logger
 
@@ -22,7 +22,7 @@ class ContextTracker:
     """Manages decisions, context anchors, and optional vector memory.
 
     Used as a mixin / composition helper by
-    :class:`~backend.context.conversation_memory.ContextMemory`.
+    :class:`~backend.context.memory.conversation_memory.ContextMemory`.
     """
 
     def __init__(

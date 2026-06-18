@@ -27,11 +27,11 @@ from backend.cli.display.transcript import (
 from backend.cli.event_rendering.panels import (
     PendingActivityCard,
 )
-from backend.cli.layout_tokens import (
+from backend.cli.display.layout_tokens import (
     ACTIVITY_BLOCK_BOTTOM_PAD,
     ACTIVITY_CARD_TITLE_SHELL,
 )
-from backend.cli.path_links import file_uri_for_path, linkify_plain
+from backend.cli.display.path_links import file_uri_for_path, linkify_plain
 
 if TYPE_CHECKING:
     from backend.cli.event_renderer import CLIEventRenderer

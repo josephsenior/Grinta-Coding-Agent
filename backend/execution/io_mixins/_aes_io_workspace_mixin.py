@@ -10,40 +10,40 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     annotate_environment_errors as _annotate_environment_errors_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     detect_powershell_in_bash_mismatch as _detect_powershell_in_bash_mismatch_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     detect_scaffold_setup_failure as _detect_scaffold_setup_failure_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     evaluate_interactive_terminal_command as _evaluate_interactive_terminal_command_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     is_sandboxed_local as _is_sandboxed_local_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     is_workspace_restricted_profile as _is_workspace_restricted_profile_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     predict_interactive_cwd_change as _predict_interactive_cwd_change_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     resolve_effective_cwd as _resolve_effective_cwd_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     resolve_workspace_file_path as _resolve_workspace_file_path_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     validate_interactive_session_scope as _validate_interactive_session_scope_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     validate_workspace_scoped_cwd as _validate_workspace_scoped_cwd_impl,
 )
-from backend.execution.action_execution_server_helpers import (
+from backend.execution.aes.helpers import (
     workspace_root as _workspace_root_impl,
 )
 from backend.ledger.observation import (

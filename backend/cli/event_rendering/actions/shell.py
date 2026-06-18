@@ -17,7 +17,7 @@ from backend.cli.display.tool_call_display import tool_headline
 from backend.cli.event_rendering.text_utils import (
     sync_reasoning_after_tool_line as _sync_reasoning_after_tool_line,
 )
-from backend.cli.layout_tokens import (
+from backend.cli.display.layout_tokens import (
     ACTIVITY_CARD_TITLE_SHELL,
 )
 from backend.ledger.action import (  # noqa: E402

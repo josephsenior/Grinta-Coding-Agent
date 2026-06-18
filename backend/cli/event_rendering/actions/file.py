@@ -16,10 +16,10 @@ from backend.cli._typing import ActionRenderersHost
 from backend.cli.event_rendering.text_utils import (
     sync_reasoning_after_tool_line as _sync_reasoning_after_tool_line,
 )
-from backend.cli.layout_tokens import (
+from backend.cli.display.layout_tokens import (
     ACTIVITY_CARD_TITLE_FILES,
 )
-from backend.cli.orient_tools import (
+from backend.cli.tool_display.orient_tools import (
     file_read_action_model,
 )
 from backend.ledger.action import (  # noqa: E402

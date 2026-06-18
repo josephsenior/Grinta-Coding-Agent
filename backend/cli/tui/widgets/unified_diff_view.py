@@ -15,7 +15,7 @@ from rich.text import Text
 from textual.containers import Horizontal, VerticalScroll
 from textual.widgets import Static
 
-from backend.cli.syntax_theme import get_grinta_rich_syntax_theme
+from backend.cli.theme.syntax_theme import get_grinta_rich_syntax_theme
 from backend.cli.theme.cards import (
     DIFF_HDR,
     DIFF_INLINE_ADD,

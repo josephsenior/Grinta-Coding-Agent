@@ -90,7 +90,7 @@ def test_long_history_baseline_checks() -> None:
     """Programmatic long-history harness without a committed 500-event fixture."""
     from types import SimpleNamespace
 
-    from backend.context.prompt_window import select_prompt_events
+    from backend.context.prompt.prompt_window import select_prompt_events
     from backend.ledger.action import CmdRunAction, MessageAction
     from backend.ledger.event import EventSource
     from backend.ledger.observation import CmdOutputObservation

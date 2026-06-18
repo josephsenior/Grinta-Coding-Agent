@@ -64,7 +64,7 @@ class TestSupportsReasoning:
 
 class TestGatewayReasoningOptions:
     def test_openrouter_claude_via_effective_entry(self):
-        from backend.inference.param_profiles import (
+        from backend.inference.capabilities.param_profiles import (
             resolve_model_entry_for_capabilities,
         )
         from backend.inference.reasoning import reasoning_effort_options
@@ -80,7 +80,7 @@ class TestGatewayReasoningOptions:
         assert 'minimal' not in options
 
     def test_openrouter_gpt41_has_no_reasoning_options(self):
-        from backend.inference.param_profiles import (
+        from backend.inference.capabilities.param_profiles import (
             resolve_model_entry_for_capabilities,
         )
         from backend.inference.reasoning import (
@@ -97,7 +97,7 @@ class TestGatewayReasoningOptions:
         assert reasoning_effort_display_options(entry, include_disabled=True) == []
 
     def test_vercel_claude_via_effective_entry(self):
-        from backend.inference.param_profiles import (
+        from backend.inference.capabilities.param_profiles import (
             resolve_model_entry_for_capabilities,
         )
         from backend.inference.reasoning import reasoning_effort_options
@@ -111,7 +111,7 @@ class TestGatewayReasoningOptions:
         assert 'medium' in options
 
     def test_vercel_deepseek_gateway_reasoning_wire(self):
-        from backend.inference.param_profiles import (
+        from backend.inference.capabilities.param_profiles import (
             resolve_model_entry_for_capabilities,
         )
         from backend.inference.reasoning import resolve_reasoning_plan
@@ -133,7 +133,7 @@ class TestGatewayReasoningOptions:
         }
 
     def test_vercel_minimax_gateway_reasoning_split(self):
-        from backend.inference.param_profiles import (
+        from backend.inference.capabilities.param_profiles import (
             resolve_model_entry_for_capabilities,
         )
         from backend.inference.reasoning import resolve_reasoning_plan
@@ -152,7 +152,7 @@ class TestGatewayReasoningOptions:
         }
 
     def test_vercel_minimax_m25_gateway_reasoning_split_only(self):
-        from backend.inference.param_profiles import (
+        from backend.inference.capabilities.param_profiles import (
             resolve_model_entry_for_capabilities,
         )
         from backend.inference.reasoning import resolve_reasoning_plan
@@ -169,7 +169,7 @@ class TestGatewayReasoningOptions:
         }
 
     def test_vercel_kimi_k25_gateway_reasoning_wire(self):
-        from backend.inference.param_profiles import (
+        from backend.inference.capabilities.param_profiles import (
             resolve_model_entry_for_capabilities,
         )
         from backend.inference.reasoning import resolve_reasoning_plan
@@ -187,7 +187,7 @@ class TestGatewayReasoningOptions:
         }
 
     def test_vercel_gemini_pro_gateway_reasoning_wire(self):
-        from backend.inference.param_profiles import (
+        from backend.inference.capabilities.param_profiles import (
             resolve_model_entry_for_capabilities,
         )
         from backend.inference.reasoning import resolve_reasoning_plan

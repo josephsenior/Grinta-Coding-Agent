@@ -1,4 +1,4 @@
-"""Tests for backend.ledger.adapter — EventServiceAdapter."""
+"""Tests for backend.ledger.infra.adapter — EventServiceAdapter."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.ledger.adapter import EventServiceAdapter
+from backend.ledger.infra.adapter import EventServiceAdapter
 
 
 @pytest.fixture()

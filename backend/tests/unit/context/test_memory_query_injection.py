@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from backend.context.conversation_memory import ContextMemory
+from backend.context.memory.conversation_memory import ContextMemory
 from backend.ledger.action import MessageAction
 from backend.ledger.event import EventSource
 

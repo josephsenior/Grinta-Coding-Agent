@@ -54,9 +54,9 @@ from backend.engine.prompts.section_renderers import (
 )
 
 # Per-model capability classification (capability adaptation, not provider tuning).
-# Model-class fingerprints live in ``backend.inference.provider_capabilities``;
+# Model-class fingerprints live in ``backend.inference.capabilities.provider_capabilities``;
 # adding a new model is a one-line entry there — no edits needed in this file.
-from backend.inference.provider_capabilities import (
+from backend.inference.capabilities.provider_capabilities import (
     model_is_small as _model_is_small,
 )
 

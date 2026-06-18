@@ -15,8 +15,8 @@ else:
 from rich.padding import Padding
 
 from backend.cli._typing import ObservationRenderersHost
-from backend.cli.layout_tokens import ACTIVITY_BLOCK_BOTTOM_PAD
-from backend.cli.orient_tools import (
+from backend.cli.display.layout_tokens import ACTIVITY_BLOCK_BOTTOM_PAD
+from backend.cli.tool_display.orient_tools import (
     file_read_observation_model,
 )
 from backend.ledger.observation import (

@@ -22,7 +22,7 @@ from backend.engine.streaming_checkpoint import (
     StreamingCheckpoint,
     StreamingCheckpointRecoveryError,
 )
-from backend.ledger.persistence import EventPersistence
+from backend.ledger.stream.persistence import EventPersistence
 
 if TYPE_CHECKING:
     from backend.ledger.stream import EventStream
@@ -165,7 +165,7 @@ class _ExecutorLifecycleMixin:
         return sid if isinstance(sid, str) and sid else '__global__'
 
     def _estimate_request_tokens(self, call_params: dict[str, Any]) -> int:
-        from backend.inference.llm_utils import get_token_count
+        from backend.inference.llm.utils import get_token_count
 
         model = self._llm_model_name(self._llm) or 'gpt-4o'
         messages = call_params.get('messages') or []

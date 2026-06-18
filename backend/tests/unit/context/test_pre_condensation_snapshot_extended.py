@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
-from backend.context import pre_condensation_snapshot as snapshot_module
-from backend.context.pre_condensation_snapshot import extract_snapshot
+import backend.context.compaction.pre_condensation_snapshot as snapshot_module
+from backend.context.compaction.pre_condensation_snapshot import extract_snapshot
 from backend.ledger.action.agent import AgentThinkAction, TaskTrackingAction
 from backend.ledger.action.commands import CmdRunAction
 from backend.ledger.action.files import FileEditAction
@@ -246,7 +246,7 @@ class TestPreCondensationSnapshot(unittest.TestCase):
         ]
 
     def test_format_snapshot_for_injection(self):
-        from backend.context.pre_condensation_snapshot import (
+        from backend.context.compaction.pre_condensation_snapshot import (
             format_snapshot_for_injection,
         )
 

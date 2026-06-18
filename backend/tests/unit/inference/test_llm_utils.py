@@ -1,4 +1,4 @@
-"""Tests for backend.inference.llm_utils — tool adaptation and token counting."""
+"""Tests for backend.inference.llm.utils — tool adaptation and token counting."""
 
 import copy
 from typing import Any
@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 from backend.core.config import LLMConfig
 from backend.core.message import Message, TextContent
-from backend.inference.llm_utils import (
+from backend.inference.llm.utils import (
     _clean_tool_properties,
     _clean_tools_for_gemini,
     check_tools,

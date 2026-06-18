@@ -20,37 +20,37 @@ from openai import AsyncOpenAI, OpenAI
 
 from backend.core import json_compat as json
 from backend.core.logger import app_logger as logger
-from backend.inference.direct_clients_anthropic_ops import (
+from backend.inference.providers.anthropic_ops import (
     acompletion as _anthropic_acompletion,
 )
-from backend.inference.direct_clients_anthropic_ops import astream as _anthropic_astream
-from backend.inference.direct_clients_anthropic_ops import (
+from backend.inference.providers.anthropic_ops import astream as _anthropic_astream
+from backend.inference.providers.anthropic_ops import (
     completion as _anthropic_completion,
 )
-from backend.inference.direct_clients_anthropic_ops import (
+from backend.inference.providers.anthropic_ops import (
     extract_anthropic_tool_calls as _extract_anthropic_tool_calls_impl,
 )
-from backend.inference.direct_clients_anthropic_ops import (
+from backend.inference.providers.anthropic_ops import (
     map_anthropic_error as _map_anthropic_error_impl,
 )
-from backend.inference.direct_clients_anthropic_ops import (
+from backend.inference.providers.anthropic_ops import (
     prepare_anthropic_kwargs as _prepare_anthropic_kwargs_impl,
 )
-from backend.inference.direct_clients_openai_ops import (
+from backend.inference.providers.openai_ops import (
     acompletion as _openai_acompletion,
 )
-from backend.inference.direct_clients_openai_ops import astream as _openai_astream
-from backend.inference.direct_clients_openai_ops import (
+from backend.inference.providers.openai_ops import astream as _openai_astream
+from backend.inference.providers.openai_ops import (
     clean_messages as _clean_messages_impl,
 )
-from backend.inference.direct_clients_openai_ops import completion as _openai_completion
-from backend.inference.direct_clients_openai_ops import (
+from backend.inference.providers.openai_ops import completion as _openai_completion
+from backend.inference.providers.openai_ops import (
     extract_openai_tool_calls as _extract_openai_tool_calls_impl,
 )
-from backend.inference.direct_clients_openai_ops import (
+from backend.inference.providers.openai_ops import (
     map_openai_error as _map_openai_error_impl,
 )
-from backend.inference.direct_clients_openai_ops import (
+from backend.inference.providers.openai_ops import (
     strip_unsupported_params as _strip_unsupported_params_impl,
 )
 from backend.inference.tool_history import flatten_tool_call_for_history
@@ -566,7 +566,7 @@ def _resolve_transport_profile(
     """Resolve transport capabilities for an OpenAI-compatible client.
 
     The decision combines the **model family** (queried via
-    :func:`backend.inference.provider_capabilities.get_provider_capabilities`
+    :func:`backend.inference.capabilities.provider_capabilities.get_provider_capabilities`
     so adding a new provider quirk only touches the registry) with the
     transport URL. Native SDK clients (``AnthropicClient``, ``GeminiClient``)
     don't need this — they speak their own protocol natively.
@@ -578,7 +578,7 @@ def _resolve_transport_profile(
         base_url: The endpoint URL being used. ``None`` means the SDK
             default.
     """
-    from backend.inference.provider_capabilities import get_provider_capabilities
+    from backend.inference.capabilities.provider_capabilities import get_provider_capabilities
 
     # Metadata: only the real OpenAI API accepts the `metadata` request field.
     is_native_openai = model_family == 'openai' and (
@@ -779,7 +779,7 @@ class OpenCodeResponsesClient(OpenAIClient):
     """OpenCode Zen models served via OpenAI Responses API (/responses)."""
 
     def completion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
-        from backend.inference.direct_clients_opencode_responses_ops import (
+        from backend.inference.providers.opencode_responses_ops import (
             completion as responses_completion,
         )
 
@@ -788,7 +788,7 @@ class OpenCodeResponsesClient(OpenAIClient):
     async def acompletion(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> LLMResponse:
-        from backend.inference.direct_clients_opencode_responses_ops import (
+        from backend.inference.providers.opencode_responses_ops import (
             acompletion as responses_acompletion,
         )
 
@@ -797,7 +797,7 @@ class OpenCodeResponsesClient(OpenAIClient):
     async def astream(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> AsyncIterator[dict[str, Any]]:
-        from backend.inference.direct_clients_opencode_responses_ops import (
+        from backend.inference.providers.opencode_responses_ops import (
             astream as responses_astream,
         )
 
@@ -952,7 +952,7 @@ def _model_metadata_for_log(
         runtime_model_id,
         runtime_parameter_mode,
     )
-    from backend.inference.context_limits import derive_usable_input_tokens
+    from backend.inference.capabilities.context_limits import derive_usable_input_tokens
     from backend.inference.reasoning import reasoning_effort_options
 
     entry = lookup_provider_model(
@@ -1059,7 +1059,7 @@ def _try_opencode_gemini_client(
 ) -> DirectLLMClient | None:
     if provider != 'opencode':
         return None
-    from backend.inference.direct_clients_opencode_gemini_ops import (
+    from backend.inference.providers.opencode_gemini_ops import (
         OpenCodeGeminiClient,
     )
     from backend.inference.provider_resolver import opencode_required_endpoint
@@ -1145,7 +1145,7 @@ def _route_by_provider(
             provider_name='anthropic',
         )
 
-    from backend.inference.direct_clients_gemini_ops import GeminiClient
+    from backend.inference.providers.gemini_ops import GeminiClient
 
     if provider == 'google':
         return GeminiClient(model_name=stripped_model, api_key=api_key, timeout=timeout)
@@ -1171,11 +1171,11 @@ def __getattr__(name: str):
     """Lazy module-level attribute access (PEP 562).
 
     Used to expose GeminiClient without creating an import cycle with
-    backend.inference.direct_clients_gemini_ops (which imports
+    backend.inference.providers.gemini_ops (which imports
     DirectLLMClient from us).
     """
     if name == 'GeminiClient':
-        from backend.inference.direct_clients_gemini_ops import GeminiClient
+        from backend.inference.providers.gemini_ops import GeminiClient
 
         return GeminiClient
     raise AttributeError(f'module {__name__!r} has no attribute {name!r}')

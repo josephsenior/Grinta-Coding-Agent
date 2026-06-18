@@ -1,4 +1,4 @@
-"""Tests for backend.ledger.tool — ToolCallMetadata and helpers."""
+"""Tests for backend.ledger.infra.tool — ToolCallMetadata and helpers."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from backend.ledger.model_response_lite import (
     ChoiceLite,
     ModelResponseLite,
 )
-from backend.ledger.tool import ToolCallMetadata, build_tool_call_metadata
+from backend.ledger.infra.tool import ToolCallMetadata, build_tool_call_metadata
 
 # ---------------------------------------------------------------------------
 # Helpers

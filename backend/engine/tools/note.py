@@ -82,7 +82,7 @@ def create_recall_tool() -> ChatCompletionToolParam:
 
 def _notes_path() -> Path:
     """Return the absolute path to the session-scoped scratchpad JSON file."""
-    from backend.context.session_context import scoped_agent_path
+    from backend.context.memory.session_context import scoped_agent_path
 
     return scoped_agent_path('agent_notes', '.json')
 

@@ -1,4 +1,4 @@
-"""Tests for backend.ledger.nested_event_store — HTTP-backed NestedEventStore."""
+"""Tests for backend.ledger.stream.nested_event_store — HTTP-backed NestedEventStore."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.ledger.nested_event_store import NestedEventStore
+from backend.ledger.stream.nested_event_store import NestedEventStore
 
 # ── _build_search_params ─────────────────────────────────────────────
 

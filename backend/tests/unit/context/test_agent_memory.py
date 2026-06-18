@@ -1,4 +1,4 @@
-"""Tests for backend.context.agent_memory.Memory."""
+"""Tests for backend.context.memory.agent_memory.Memory."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.context.agent_memory import USER_PLAYBOOKS_DIR, Memory
+from backend.context.memory.agent_memory import USER_PLAYBOOKS_DIR, Memory
 from backend.core.enums import RecallType
 from backend.ledger.action.agent import RecallAction
 from backend.ledger.observation.agent import PlaybookKnowledge, RecallObservation
@@ -28,7 +28,7 @@ def memory(mock_event_stream):
     with (
         patch.object(Memory, '_load_global_playbooks'),
         patch.object(Memory, '_load_user_playbooks'),
-        patch('backend.context.agent_memory.KnowledgeBaseManager'),
+        patch('backend.context.memory.agent_memory.KnowledgeBaseManager'),
     ):
         return Memory(mock_event_stream, sid='test-sid')
 
@@ -48,7 +48,7 @@ class TestMemoryInit:
         with (
             patch.object(Memory, '_load_global_playbooks'),
             patch.object(Memory, '_load_user_playbooks'),
-            patch('backend.context.agent_memory.KnowledgeBaseManager'),
+            patch('backend.context.memory.agent_memory.KnowledgeBaseManager'),
         ):
             Memory(mock_event_stream, sid='sub-test')
         mock_event_stream.subscribe.assert_called_once()

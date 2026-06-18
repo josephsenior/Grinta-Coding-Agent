@@ -16,7 +16,7 @@ from backend.inference.catalog_loader import (
     supports_function_calling,
     supports_tool_choice,
 )
-from backend.inference.llm_utils import check_tools, get_token_count
+from backend.inference.llm.utils import check_tools, get_token_count
 
 ChatCompletionToolParam = Any
 
@@ -506,7 +506,7 @@ class OrchestratorPlanner:
 
     def _usable_input_tokens(self) -> int:
         try:
-            from backend.inference.context_limits import limits_from_config
+            from backend.inference.capabilities.context_limits import limits_from_config
 
             limits = limits_from_config(self._llm.config, unknown_default=True)
             return int(limits.usable_input_tokens or 0)

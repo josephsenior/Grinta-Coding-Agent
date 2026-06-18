@@ -15,7 +15,7 @@ else:
 
 
 from backend.cli._typing import ObservationRenderersHost
-from backend.cli.orient_tools import (
+from backend.cli.tool_display.orient_tools import (
     OrientLineModel,
     analyze_observation_model,
     find_symbols_observation_model,

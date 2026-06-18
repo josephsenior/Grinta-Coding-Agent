@@ -20,7 +20,7 @@ from typing import Any
 from rich.console import Console, ConsoleOptions, Group, RenderResult
 from rich.text import Text
 
-from backend.cli.layout_tokens import (
+from backend.cli.display.layout_tokens import (
     CALLOUT_PANEL_CHROME_WIDTH,
 )
 from backend.cli.theme import CLR_META, NAVY_TEXT_DIM

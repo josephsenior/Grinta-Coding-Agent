@@ -1,8 +1,8 @@
-"""Tests for backend.ledger.tool — ToolCallMetadata and build_tool_call_metadata."""
+"""Tests for backend.ledger.infra.tool — ToolCallMetadata and build_tool_call_metadata."""
 
 from types import SimpleNamespace
 
-from backend.ledger.tool import ToolCallMetadata, build_tool_call_metadata
+from backend.ledger.infra.tool import ToolCallMetadata, build_tool_call_metadata
 
 
 class TestBuildToolCallMetadata:

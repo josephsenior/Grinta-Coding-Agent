@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from backend.context.working_set import (
+from backend.context.memory.working_set import (
     get_durable_context_block,
     sync_snapshot_to_working_memory,
 )
@@ -53,7 +53,7 @@ def test_sync_snapshot_to_working_memory_updates_sections(tmp_path) -> None:
             'backend.engine.tools.working_memory._memory_path', return_value=memory_file
         ),
         patch(
-            'backend.context.pre_condensation_snapshot.format_snapshot_for_injection',
+            'backend.context.compaction.pre_condensation_snapshot.format_snapshot_for_injection',
             return_value='<RESTORED_CONTEXT>summary</RESTORED_CONTEXT>',
         ),
     ):
@@ -105,7 +105,7 @@ def test_failed_approaches_are_deduped_outside_hypothesis(tmp_path) -> None:
             'backend.engine.tools.working_memory._memory_path', return_value=memory_file
         ),
         patch(
-            'backend.context.pre_condensation_snapshot.format_snapshot_for_injection',
+            'backend.context.compaction.pre_condensation_snapshot.format_snapshot_for_injection',
             return_value='',
         ),
     ):
@@ -141,7 +141,7 @@ def test_sync_snapshot_preserves_background_task_as_blocker(tmp_path) -> None:
             'backend.engine.tools.working_memory._memory_path', return_value=memory_file
         ),
         patch(
-            'backend.context.pre_condensation_snapshot.format_snapshot_for_injection',
+            'backend.context.compaction.pre_condensation_snapshot.format_snapshot_for_injection',
             return_value='',
         ),
     ):
@@ -210,7 +210,7 @@ def test_get_durable_context_block_includes_task_and_pytest() -> None:
 
 
 def test_build_working_set_skips_fresh_session_without_artifacts() -> None:
-    from backend.context.working_set import build_working_set_observation
+    from backend.context.memory.working_set import build_working_set_observation
     from backend.ledger.action import MessageAction
     from backend.ledger.event import EventSource
 
@@ -222,7 +222,7 @@ def test_build_working_set_skips_fresh_session_without_artifacts() -> None:
 
 
 def test_working_set_observation_skips_condensation_boilerplate() -> None:
-    from backend.context.observation_processors import convert_observation_to_message
+    from backend.context.processors.observation_processors import convert_observation_to_message
     from backend.ledger.observation.agent import AgentCondensationObservation
 
     obs = AgentCondensationObservation(

@@ -1,4 +1,4 @@
-"""Unit tests for backend.cli.orient_tools."""
+"""Unit tests for backend.cli.tool_display.orient_tools."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from backend.cli.orient_tools import (
+from backend.cli.tool_display.orient_tools import (
     OrientLineModel,
     _count_collection,
     _fetch_target,
@@ -301,7 +301,7 @@ def test_library_and_fetch_target_helpers() -> None:
 
 
 def test_count_result_lines_and_json_helpers() -> None:
-    from backend.cli.orient_tools import (
+    from backend.cli.tool_display.orient_tools import (
         _count_result_lines,
         _extract_json_list_count,
         _file_count_from_candidates,

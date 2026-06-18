@@ -1,11 +1,11 @@
-"""Tests for backend.context.message_formatting — message utilities and type checks."""
+"""Tests for backend.context.prompt.message_formatting — message utilities and type checks."""
 
 from __future__ import annotations
 
 from typing import Any, cast
 from unittest.mock import MagicMock
 
-from backend.context.message_formatting import (
+from backend.context.prompt.message_formatting import (
     apply_user_message_formatting,
     class_name_in_mro,
     extract_first_text,

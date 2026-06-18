@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock
 
-from backend.context.observation_processors import (
+from backend.context.processors.observation_processors import (
     _get_observation_content,
     _is_valid_image_url,
 )

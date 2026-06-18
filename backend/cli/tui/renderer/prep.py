@@ -14,7 +14,7 @@ from rich.syntax import Syntax
 from rich.text import Text
 from rich.theme import Theme
 
-from backend.cli.syntax_theme import (
+from backend.cli.theme.syntax_theme import (
     get_grinta_rich_syntax_theme,
     grinta_syntax_kwargs,
     inline_code_style,

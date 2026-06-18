@@ -14,7 +14,7 @@ from backend.context.view import View
 from backend.core.constants import DEFAULT_COMPACTION_RESERVED_SUMMARY_TOKENS
 from backend.core.logger import app_logger as logger
 from backend.ledger.action.agent import CondensationAction
-from backend.ledger.compaction import EventCompactor
+from backend.ledger.stream.compaction import EventCompactor
 from backend.ledger.serialization.event import event_to_dict
 
 if TYPE_CHECKING:
@@ -468,7 +468,7 @@ class BaseLLMCompactor(RollingCompactor, ABC):
             )
         except Exception:
             pass
-        from backend.inference.provider_capabilities import model_token_correction
+        from backend.inference.capabilities.provider_capabilities import model_token_correction
 
         factor, _ = model_token_correction(model)
         return factor

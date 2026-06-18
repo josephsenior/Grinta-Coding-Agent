@@ -103,7 +103,7 @@ def build_glob_action(
 
 
 def _glob_failure(*, message: str, pattern: str, path: str) -> Observation:
-    from backend.execution.structured_edit_errors import build_search_error_observation
+    from backend.execution.aes.structured_edit_errors import build_search_error_observation
 
     return build_search_error_observation(
         tool='glob',

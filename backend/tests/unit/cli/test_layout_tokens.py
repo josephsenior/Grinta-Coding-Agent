@@ -1,11 +1,11 @@
-"""Tests for :mod:`backend.cli.layout_tokens`."""
+"""Tests for :mod:`backend.cli.display.layout_tokens`."""
 
 from __future__ import annotations
 
 from rich.padding import Padding
 from rich.text import Text
 
-from backend.cli.layout_tokens import (
+from backend.cli.display.layout_tokens import (
     ACTIVITY_BLOCK_BOTTOM_PAD,
     CALLOUT_PANEL_PADDING,
     TRANSCRIPT_LEFT_INSET,
