@@ -162,24 +162,23 @@ class RendererActionHandlersMixin:
     def flush_pending_final_commits_sync(self) -> None:
         if not self._pending_final_commits:
             return
-        from backend.cli.tui.renderer.prep import prep_markdown
         from backend.cli.tui.widgets.activity_card import AgentMessage
 
         for content in list(self._pending_final_commits):
-            self.add_to_history(
-                AgentMessage(content, renderable=prep_markdown(content))
-            )
+            widget = AgentMessage(content)
+            self._append_transcript_widget(widget)
+            self._history.append(widget)
         self._pending_final_commits.clear()
 
     async def flush_pending_final_commits(self) -> None:
         if not self._pending_final_commits:
             return
-        from backend.cli.tui.renderer.prep import prep_markdown_async
         from backend.cli.tui.widgets.activity_card import AgentMessage
 
         for content in list(self._pending_final_commits):
-            renderable = await prep_markdown_async(content)
-            self.add_to_history(AgentMessage(content, renderable=renderable))
+            widget = AgentMessage(content)
+            self._append_transcript_widget(widget)
+            self._history.append(widget)
         self._pending_final_commits.clear()
 
     def _handle_message_action(self, action: MessageAction) -> None:

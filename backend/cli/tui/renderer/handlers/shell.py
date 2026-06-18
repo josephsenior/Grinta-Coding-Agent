@@ -1,4 +1,8 @@
-"""Shell / CmdRun event handlers for the TUI renderer."""
+"""Shell / CmdRun event handlers for the TUI renderer.
+
+Now mounts :class:`ShellCard` (1-line scan row with ⤢ detail) instead of
+the legacy :class:`SessionPanel`.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +12,7 @@ from backend.cli.tui.renderer.helpers.shell import (
     resolve_cmd_output_cwd,
     sanitize_cmd_output,
 )
+from backend.cli.tui.widgets.scan_line import ShellCard
 from backend.ledger.action import CmdRunAction
 from backend.ledger.observation import CmdOutputObservation
 
@@ -22,7 +27,7 @@ def _handle_cmd_run_action(
 ) -> None:
     cmd = getattr(event, 'command', '') or ''
     if not getattr(event, 'hidden', False):
-        orch._create_shell_command_card(cmd)
+        orch._create_shell_scan_card(cmd)
 
 
 def _handle_cmd_output_observation(
@@ -34,9 +39,9 @@ def _handle_cmd_output_observation(
     cwd = resolve_cmd_output_cwd(event)
     output = sanitize_cmd_output(output)
     if output or exit_code is not None:
-        orch._complete_shell_command_card(
+        orch._complete_shell_scan_card(
             cmd,
-            output=output[:500],
+            output=output,
             exit_code=exit_code,
             cwd=cwd,
         )

@@ -538,3 +538,91 @@ def validate_and_sanitize_path(
     if must_exist and not validated_path.exists():
         raise PathValidationError(f'Path does not exist: {path}', path)
     return validated_path
+
+
+def _path_under_root(full_path: Path, root: Path) -> bool:
+    """Return True when *full_path* resolves inside *root* (Windows-safe)."""
+    resolved = full_path.resolve()
+    base = root.resolve()
+    try:
+        resolved.relative_to(base)
+        return True
+    except ValueError:
+        if not OS_CAPS.is_windows:
+            return False
+        import os
+
+        full_str = str(resolved).lower()
+        base_str = str(base).lower()
+        if not base_str.endswith(os.sep):
+            base_str += os.sep
+        return full_str.startswith(base_str) or full_str == base_str.rstrip(os.sep)
+
+
+def _readable_path_roots(workspace_root: str | Path) -> tuple[Path, Path]:
+    from backend.core.workspace_resolution import workspace_grinta_root
+
+    workspace = Path(workspace_root).resolve()
+    return workspace, workspace_grinta_root(workspace).resolve()
+
+
+def _resolve_readable_candidate(
+    path: str,
+    workspace: Path,
+    sanitized: str,
+) -> Path:
+    if _is_absolute_input_path(sanitized):
+        return Path(sanitized).resolve()
+    normalized = _normalize_workspace_relative_input(sanitized)
+    return (workspace / normalized).resolve()
+
+
+def validate_readable_path(
+    path: str,
+    workspace_root: str | Path,
+    *,
+    must_exist: bool = False,
+) -> Path:
+    """Validate a path for agent read access.
+
+    Allows paths under the project workspace or the Grinta workspace data
+    bucket (``~/.grinta/workspaces/<id>/``), including persisted tool outputs
+    under ``agent/tool-results/``.
+    """
+    if not path:
+        raise PathValidationError('Path must be a non-empty string', path)
+
+    workspace, data_root = _readable_path_roots(workspace_root)
+    allowed_roots = (workspace, data_root)
+    validation_must_be_relative = not _is_absolute_input_path(path)
+    sanitized = _validate_path_string(
+        path,
+        must_be_relative=validation_must_be_relative,
+    )
+
+    try:
+        full_path = _resolve_readable_candidate(path, workspace, sanitized)
+    except (OSError, ValueError) as exc:
+        raise PathValidationError(f'Invalid path: {exc}', path) from exc
+
+    containing_root = next(
+        (root for root in allowed_roots if _path_under_root(full_path, root)),
+        None,
+    )
+    if containing_root is None:
+        raise PathValidationError(
+            f'Path outside workspace boundary: {path}',
+            path,
+        )
+
+    rel_parts = _relative_parts_with_boundary_fallback(
+        full_path,
+        containing_root,
+        path,
+    )
+    _validate_path_depth(path, rel_parts)
+    _reject_unsafe_links(path, full_path, containing_root)
+
+    if must_exist and not full_path.exists():
+        raise PathValidationError(f'Path does not exist: {path}', path)
+    return full_path

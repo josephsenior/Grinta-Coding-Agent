@@ -201,7 +201,7 @@ def _validate_symbol_range_on_temp(
             operation='edit_symbol',
             failed_op_index=failed_op_index,
             total_ops=total_ops,
-            retryable=False,
+            retryable=True,
         )
     line_count = len(temp_path.read_text(encoding='utf-8').splitlines())
     if start_line < 1 or end_line < start_line or end_line > line_count:
@@ -245,7 +245,7 @@ def _validate_multi_edit_file_final(
     )
     if regression_error is not None:
         _multi_edit_raise(
-            'multi_edit failed: introduced syntax error.',
+            'multi_edit failed: file has syntax errors.',
             error_code='INTRODUCED_SYNTAX_ERROR',
             path=rel_path,
             operation='multi_edit',
@@ -299,7 +299,7 @@ def _apply_multi_edit_operation(
                 operation='edit_symbol',
                 failed_op_index=failed_op_index,
                 total_ops=total_ops,
-                retryable=False,
+                retryable=True,
             )
         resolved_ops = _resolve_deferred_edit_symbol(temp_path, rel_path, edits)
         for resolved in resolved_ops:
@@ -384,10 +384,6 @@ def _apply_multi_edit_operation(
                 line=extra.get('line'),
             )
         return
-
-    raise FunctionCallValidationError(
-        f'multi_edit internal operation {operation!r} is unsupported.'
-    )
 
 
 def _validate_multi_edit_arguments(raw_edits: Any) -> None:
@@ -560,18 +556,9 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
     parsed = _parse_multi_edit_items(raw_edits)
     seen_paths = {p for p, _, _, _ in parsed}
 
-    try:
-        from backend.core.workspace_resolution import require_effective_workspace_root
-        from backend.engine.tools.atomic_refactor import AtomicRefactor
-        from backend.execution.utils.file_editor import FileEditor, _file_lock_for_path
-    except Exception as e:  # pragma: no cover - defensive import guard
-        _multi_edit_raise(
-            'multi_edit unavailable: AtomicRefactor import failed.',
-            error_code='MULTI_EDIT_UNAVAILABLE',
-            operation='multi_edit',
-            detail=str(e),
-            retryable=False,
-        )
+    from backend.core.workspace_resolution import require_effective_workspace_root
+    from backend.engine.tools.atomic_refactor import AtomicRefactor
+    from backend.execution.utils.file_editor import FileEditor, _file_lock_for_path
 
     workspace_root = require_effective_workspace_root()
     refactor = AtomicRefactor()
@@ -607,7 +594,7 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
         except Exception:
             pass
         _multi_edit_raise(
-            'multi_edit failed before commit.',
+            f'multi_edit failed: {e}',
             error_code='MULTI_EDIT_COMMIT_FAILED',
             operation='multi_edit',
             detail=str(e),
@@ -618,4 +605,3 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
     if result.success:
         return _format_multi_edit_success(parsed, result)
     _format_multi_edit_failure(result)
-    raise AssertionError('unreachable: _format_multi_edit_failure always raises')

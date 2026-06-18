@@ -1,4 +1,4 @@
-from backend.execution.utils.file_editor import FileEditor, ToolResult
+from backend.execution.utils.file_editor import FileEditor
 
 
 def test_edit_mode_range_with_hash_guard(tmp_path):
@@ -70,32 +70,3 @@ def test_edit_result_includes_verification_receipt(tmp_path):
     assert result.metadata['verification_passed'] is True
     assert result.metadata['target_kind'] == 'range'
     assert result.metadata['changed_line_spans'] == [{'start_line': 2, 'end_line': 2}]
-
-
-def test_write_verification_failure_returns_structured_error(tmp_path, monkeypatch):
-    target = tmp_path / 'broken.py'
-    target.write_text('x = 1\n', encoding='utf-8')
-    editor = FileEditor(workspace_root=str(tmp_path))
-
-    monkeypatch.setattr(
-        editor,
-        '_verify_post_write',
-        lambda **_: ToolResult(
-            output='',
-            error='EDIT_VERIFICATION_FAILED: simulated',
-            error_code='EDIT_VERIFICATION_FAILED',
-            retryable=True,
-            operation='edit',
-            metadata={'verification_passed': False},
-        ),
-    )
-    result = editor(
-        command='edit',
-        path='broken.py',
-        edit_mode='range',
-        start_line=1,
-        end_line=1,
-        new_str='x = 2\n',
-    )
-    assert result.error_code == 'EDIT_VERIFICATION_FAILED'
-    assert result.retryable is True

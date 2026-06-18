@@ -214,17 +214,12 @@ def execute_scratchpad_recall(
         )
     if key == 'lessons':
         return ScratchpadRecallObservation(
-            content=(
-                "No lessons stored yet. Do not recall 'lessons' again this "
-                'session; it will be populated only if a future tool stores lessons.'
-            ),
+            content='No lessons stored yet.',
             key=key,
             found=False,
         )
     return ScratchpadRecallObservation(
-        content=(
-            f'Note {key!r} not found. Stop trying to recall it unless you create it first.'
-        ),
+        content=f'Note {key!r} not found.',
         key=key,
         found=False,
     )

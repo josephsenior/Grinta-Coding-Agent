@@ -273,7 +273,6 @@ from backend.engine.tools._file_edits import (  # noqa: E402, F401
     _build_create_file_action,
     _build_edit_symbol_target_spec,
     _build_read_file_action,
-    _build_symbol_insert_action,
     _coerce_insert_position,
     _coerce_read_symbol_targets,
     _handle_create_symbol_public,

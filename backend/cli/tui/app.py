@@ -320,6 +320,7 @@ class TUIRenderer(
         self._pending_analyze_project_structure_card: Any | None = None
         self._pending_mcp_card: Any | None = None
         self._pending_delegate_card: Any | None = None
+        self._file_edit_actions_by_id: dict[int, Any] = {}
         self._orient_burst_lines: list[Any] = []
         self._orient_burst_widgets: list[Any] = []
         self._orient_burst_area: str = 'codebase'

@@ -10,7 +10,7 @@ from backend.cli.display.reasoning_display import ReasoningDisplay
 from backend.cli.tui.app import TUIRenderer
 from backend.cli.tui.main import GrintaTUIApp
 from backend.cli.tui.widgets.record_panel import RecordPanel
-from backend.cli.tui.widgets.session_panel import SessionPanel
+from backend.cli.tui.widgets.scan_line import ShellCard
 from backend.ledger.action import CmdRunAction, MCPAction
 from backend.ledger.observation import CmdOutputObservation, MCPObservation
 from backend.tests.unit.cli.tui._shared import _get_screen
@@ -44,14 +44,14 @@ async def test_shell_session_panels_stay_open_when_next_shell_starts(
         renderer._process_event(CmdRunAction(command='npm test'))
         await pilot.pause()
 
-        shell_panels = [
-            panel
-            for panel in screen.query(SessionPanel).results()
-            if 'category-shell' in panel.classes
+        shell_cards = [
+            card
+            for card in screen.query(ShellCard).results()
+            if card.command in ('pytest -q', 'npm test')
         ]
-        assert len(shell_panels) == 2
-        assert shell_panels[0].query_one('#terminal-prompt')
-        assert shell_panels[1].query_one('#terminal-prompt')
+        assert len(shell_cards) == 2
+        assert shell_cards[0].command == 'pytest -q'
+        assert shell_cards[1].command == 'npm test'
 
 
 @pytest.mark.asyncio
@@ -79,13 +79,13 @@ async def test_shell_session_panel_keeps_body_visible_after_completion(
         )
         await pilot.pause()
 
-        panel = next(
-            p
-            for p in screen.query(SessionPanel).results()
-            if 'category-shell' in p.classes
+        card = next(
+            c
+            for c in screen.query(ShellCard).results()
+            if c.command == 'pytest -q'
         )
-        assert '-running' not in panel.classes
-        assert panel.query_one('#terminal-output-wrap')
+        assert card.exit_code == 0
+        assert card.output == '2 passed'
 
 
 @pytest.mark.asyncio

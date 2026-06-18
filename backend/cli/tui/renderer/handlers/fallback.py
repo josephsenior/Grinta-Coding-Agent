@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Any
 
 from rich.text import Text
 
-from backend.cli.event_rendering.unified_renderer import ActivityRenderer
 from backend.cli.theme import NAVY_TEXT_MUTED, NAVY_TEXT_PRIMARY
+from backend.cli.tool_display.orient_tools import OrientLineModel
 from backend.ledger.action import StreamingChunkAction
 from backend.ledger.observation import (
     AgentStateChangedObservation,
@@ -48,8 +48,14 @@ def _handle_state_change_dispatch(
 def _handle_user_reject_dispatch(
     orch: 'RendererEventProcessorMixin', event: UserRejectObservation
 ) -> None:
-    card = ActivityRenderer.user_reject()
-    orch._write_card(card)
+    model = OrientLineModel(
+        tool='system',
+        icon='✗',
+        verb='Rejected',
+        target='Action rejected by user',
+        result='',
+    )
+    orch._write_orient_line(model)
 
 
 def _handle_server_ready_dispatch(
@@ -57,8 +63,15 @@ def _handle_server_ready_dispatch(
 ) -> None:
     url = getattr(event, 'url', '')
     port = getattr(event, 'port', '')
-    card = ActivityRenderer.server_ready(url, port)
-    orch._write_card(card)
+    label = url or f'port {port}'
+    model = OrientLineModel(
+        tool='server',
+        icon='✓',
+        verb='Ready',
+        target=f'Server accepting connections · {label}',
+        result='',
+    )
+    orch._write_orient_line(model)
 
 
 def _handle_file_download_dispatch(

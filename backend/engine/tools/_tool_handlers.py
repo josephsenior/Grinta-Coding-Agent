@@ -274,8 +274,7 @@ def _handle_undo_last_edit_tool(arguments: Mapping[str, Any]) -> Action:
     safe_path = _safe_workspace_path(path)
     if not safe_path.is_file():
         raise FunctionCallValidationError(
-            f"File '{path}' does not exist. undo_last_edit only applies to existing files. "
-            'To undo a file creation, delete the file instead.'
+            f"File '{path}' does not exist."
         )
     return FileEditAction(
         path=_relative_display_path(safe_path),

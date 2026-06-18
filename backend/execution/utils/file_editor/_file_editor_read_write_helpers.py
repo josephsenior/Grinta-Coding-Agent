@@ -182,7 +182,7 @@ def replace_range_impl(
     if expected_hash and content_hash != expected_hash:
         return ToolResult(
             output='',
-            error='FILE_UNEXPECTEDLY_MODIFIED: file changed since it was read.',
+            error='File was modified since it was read. Re-read and retry.',
             old_content=content,
             new_content=content,
         )

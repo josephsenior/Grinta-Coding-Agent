@@ -354,6 +354,7 @@ class CircuitBreaker:
         agent_state: 'AgentState | None' = None,
         now: float | None = None,
         llm_stream_active: bool = False,
+        runtime_work_active: bool = False,
     ) -> CircuitBreakerResult | None:
         """Watchdog: detect RUNNING state with no recent step() call.
 
@@ -366,6 +367,11 @@ class CircuitBreaker:
             - ``CircuitBreakerResult(action='stop', tripped=True)`` when a
               second stall occurs within ``auto_recover_cooldown_seconds``,
               indicating a persistent race that auto-recovery can't fix.
+
+        ``runtime_work_active`` covers in-flight tool execution (terminal,
+        browser, shell, etc.) so long-running runtime work is not mistaken
+        for a stalled step loop. This is separate from the LLM inter-chunk
+        timeout, which only applies while a provider stream is open.
         """
         if not self.config.enabled:
             return None
@@ -388,10 +394,13 @@ class CircuitBreaker:
 
         current = now if now is not None else _time.monotonic()
 
-        if llm_stream_active:
+        if llm_stream_active or runtime_work_active:
             self.record_step_call(ts=current)
             logger.debug(
-                'No-step-progress watchdog: suppressed while LLM stream is active'
+                'No-step-progress watchdog: suppressed while agent work is in flight '
+                '(llm_stream=%s runtime_work=%s)',
+                llm_stream_active,
+                runtime_work_active,
             )
             return None
 
@@ -411,11 +420,10 @@ class CircuitBreaker:
             self._auto_recover_attempts += 1
             self._last_auto_recover_ts = current
             logger.warning(
-                'No-step-progress watchdog: no step() call for %.1fs in RUNNING; '
-                'issuing auto-recover (attempt %d, cooldown=%.0fs)',
+                'No step progress for %.1fs; auto-recover #%d',
                 elapsed,
                 self._auto_recover_attempts,
-                cooldown,
+                extra={'msg_type': 'NO_STEP_PROGRESS_WATCHDOG'},
             )
             return CircuitBreakerResult(
                 tripped=False,
@@ -433,9 +441,9 @@ class CircuitBreaker:
 
         # Second stall within the cooldown window → fatal.
         logger.error(
-            'No-step-progress watchdog: auto-recover did not help after %.1fs; '
-            'forcing ERROR state to break the stall loop',
+            'No step progress for %.1fs after auto-recover',
             elapsed,
+            extra={'msg_type': 'NO_STEP_PROGRESS_WATCHDOG'},
         )
         return CircuitBreakerResult(
             tripped=True,

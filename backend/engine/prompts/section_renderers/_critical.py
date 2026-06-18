@@ -31,8 +31,9 @@ def _render_critical(
     think_execution_rule = '**Reasoning alone does not execute** — after reasoning, you must still call tools.'
     if terminal_manager_available and can_edit:
         terminal_manager_rule = (
-            '**Interactive sessions use `terminal_manager`** — call `open` once per session, '
-            'then use `read`/`input` with the same `session_id`; do not call `open` again for follow-up commands.'
+            '**Shell vs interactive terminal** — use `{terminal_command_tool}` for one-shot commands '
+            '(build, test, install, git). Use `terminal_manager` for interactive programs (REPLs, ssh, '
+            '`python -i`, programs that ask questions) or reading detached background sessions.'
         )
     else:
         terminal_manager_rule = ''

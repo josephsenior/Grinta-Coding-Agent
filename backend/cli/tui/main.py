@@ -34,6 +34,7 @@ class GrintaTUIApp(App):
 
     TITLE = 'GRINTA'
     SUB_TITLE = 'AI-Powered Development Platform'
+    ENABLE_COMMAND_PALETTE = False
     ansi_theme_dark = Reactive(GRINTA_TERMINAL_THEME, init=False)
 
     def __init__(

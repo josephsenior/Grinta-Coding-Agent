@@ -250,6 +250,22 @@ class TestCircuitBreakerMiddlewarePipeline:
         service.record_error.assert_not_called()
         service.record_success.assert_not_called()
 
+    @pytest.mark.asyncio
+    async def test_observe_cmd_output_records_progress_signal(self):
+        from backend.ledger.observation.commands import CmdOutputObservation
+
+        controller = MagicMock()
+        service = MagicMock()
+        controller.circuit_breaker_service = service
+        mw = CircuitBreakerMiddleware(controller)
+        ctx = ToolInvocationContext(
+            controller=controller, action=MagicMock(), state=MagicMock()
+        )
+        obs = CmdOutputObservation(content='ok', command='echo hi')
+        await mw.observe(ctx, obs)
+        service.record_success.assert_called_once()
+        service.record_progress_signal.assert_called_once_with('CmdOutputObservation')
+
 
 # ── LoggingMiddleware ─────────────────────────────────────────────────
 

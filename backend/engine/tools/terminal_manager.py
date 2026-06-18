@@ -19,14 +19,15 @@ def create_terminal_manager_tool() -> dict[str, Any]:
         'function': {
             'name': TERMINAL_MANAGER_TOOL_NAME,
             'description': (
-                'Interactive PTY terminal (same session across open → read → input). '
+                'Interactive PTY terminal for long-running or interactive programs. '
+                'Use `terminal_manager` for REPLs, ssh, `python -i`, programs that ask questions, '
+                'or reading output from a detached background session. '
+                'For one-shot build/test/install/git commands, use `execute_powershell` instead.\n\n'
                 'action=open starts a session and runs the first command. '
-                'action=read fetches output (use mode=delta, remember next_offset). '
-                'action=input sends subsequent commands to the SAME session. '
-                'Do NOT call action=open again for new commands — that creates a new session. '
+                'action=read fetches output (prefer mode=delta, remember next_offset). '
+                'action=input sends follow-up commands to the SAME session — do NOT call open again. '
                 'On Windows the shell is usually PowerShell. '
-                'IMPORTANT: If action=read returns empty output, wait 1-2 seconds and retry — '
-                'slow commands take time to produce output. Do NOT resend the command.'
+                'If action=read returns empty output, wait 1–2s and retry — slow commands take time.'
             ),
             'parameters': {
                 'type': 'object',
@@ -162,16 +163,11 @@ def _validate_action(arguments: dict) -> str:
     action = arguments.get('action')
     if not action:
         raise FunctionCallValidationError(
-            "terminal_manager requires an 'action' argument. "
-            "Valid actions: 'open' (start session + run command), "
-            "'read' (fetch output), 'input' (send more text). "
-            'Example: {"action": "open", "command": "Get-ChildItem"}'
+            "terminal_manager requires an 'action' (open, input, or read)."
         )
     if action not in ('open', 'input', 'read'):
         raise FunctionCallValidationError(
-            f'Unknown terminal_manager action: {action!r}. '
-            f"Must be one of: 'open', 'input', 'read'. "
-            f"To run a command use action='open' with a 'command' argument."
+            f"Unknown action: {action!r}. Use 'open', 'input', or 'read'."
         )
     return action
 
@@ -206,8 +202,7 @@ def _validate_input_params(
 ) -> None:
     if not session_id:
         raise ValueError(
-            "Terminal 'input' action requires 'session_id'. "
-            "Call action='open' first to start a terminal session and obtain a session_id."
+            "Terminal 'input' requires 'session_id'. Use action='open' first."
         )
     if not _has_input_content(input_val, control_val, rows):
         raise ValueError(
@@ -254,8 +249,7 @@ def _handle_read_action(arguments: dict) -> TerminalReadAction:
     session_id = arguments.get('session_id')
     if not session_id:
         raise ValueError(
-            "Terminal 'read' action requires 'session_id'. "
-            "Call action='open' first to start a terminal session and obtain a session_id."
+            "Terminal 'read' requires 'session_id'. Use action='open' first."
         )
     mode = str(arguments.get('mode', 'delta') or 'delta').lower()
     if mode not in {'delta', 'snapshot'}:

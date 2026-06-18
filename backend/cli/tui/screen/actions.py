@@ -80,6 +80,20 @@ class ScreenActionsMixin:
     def _scroll_to_bottom(self) -> None:
         self._get_display().user_scroll_end()
 
+    def _refresh_scanline_cards(self) -> None:
+        """250 ms refresh loop — update live summaries for running scan-line cards."""
+        try:
+            display = self._get_display()
+        except Exception:
+            return
+        from backend.cli.tui.widgets.scan_line import ScanLineCard
+
+        for card in list(display.query(ScanLineCard)):
+            try:
+                card.refresh_summary()
+            except Exception:
+                pass
+
     @staticmethod
     def _normalize_risk_key(risk: Any) -> str:
         """Return the display key used by the confirmation risk map."""
