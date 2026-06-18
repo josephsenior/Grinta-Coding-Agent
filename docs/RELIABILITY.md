@@ -42,8 +42,9 @@ actions so the agent does not lose context on an unrelated tool result.
 ## Debugger latency contract
 
 The DAP debugger (`backend/execution/debugger.py`) is one of the slowest tools
-because it spawns a real `debugpy.adapter` subprocess. The runtime ships with
-three reliability primitives specifically for that path:
+because it spawns a real debug-adapter subprocess (for Python, typically
+``debugpy.adapter`` when ``debugpy`` is installed). The runtime provides two
+reliability primitives for that path:
 
 1. **Off-loaded sync work.** `action_execution_server_io.py::debugger` runs
    `DAPDebugManager.handle` via `asyncio.to_thread`, so the event loop is
@@ -52,9 +53,10 @@ three reliability primitives specifically for that path:
    `initialize`, `launch`, `initialized event`, `configurationDone`,
    `ready in N s`) emits an INFO log line so "frozen" becomes "visibly
    working".
-3. **Optional warmup.** When `GRINTA_DEBUGPY_WARMUP=1` (default on) the
-   in-process runtime pre-imports `debugpy.adapter` in a background thread so
-   the first real `debugger` call avoids cold-import latency.
+
+Python debugging uses the same auto-detection model as other DAP adapters and
+LSP servers: install ``debugpy`` in the active environment when you need the
+``debugger`` tool for Python (``pip install debugpy``).
 
 Failure path: if the adapter cannot start, the returned `ErrorObservation`
 includes the **adapter's stderr tail** so the model can react meaningfully
@@ -81,8 +83,9 @@ instead of seeing a bare `DAPError`.
   most recent `_handle_action START` and the matching `END`. If you see the
   new `DAP: …` lines, the debugger is working through its handshake. If you
   see no progress for > 30 s, copy the tail and file an issue.
-* **Wedged debug session.** Run `/health` in the REPL — it verifies that
-  `debugpy.adapter` is importable and reports `git`/`rg` availability.
+* **Wedged debug session.** Run `/health` in the REPL — it reports whether
+  `debugpy` is importable (install with `pip install debugpy` when needed) and
+  checks `git`/`rg` availability.
 * **Provider failure.** The agent retries with exponential back-off; the UI
   may show compact messages while some transient classes are kept out of the
   model transcript (`notify_ui_only`). Use `/cost` to see cumulative spend

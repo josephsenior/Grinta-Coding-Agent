@@ -1177,7 +1177,6 @@ dependencies = [
     { name = "binaryornot" },
     { name = "chardet" },
     { name = "charset-normalizer" },
-    { name = "debugpy" },
     { name = "fastapi" },
     { name = "fastmcp" },
     { name = "google-genai" },
@@ -1192,11 +1191,15 @@ dependencies = [
     { name = "psutil" },
     { name = "ptyprocess", marker = "sys_platform != 'win32'" },
     { name = "pyfiglet" },
+    { name = "pylatexenc" },
+    { name = "pypdf" },
     { name = "pyperclip" },
+    { name = "python-docx" },
     { name = "python-dotenv" },
     { name = "python-frontmatter" },
     { name = "python-json-logger" },
     { name = "python-multipart" },
+    { name = "python-pptx" },
     { name = "pywinpty", marker = "sys_platform == 'win32'" },
     { name = "rapidfuzz" },
     { name = "requests" },
@@ -1216,19 +1219,11 @@ dependencies = [
 all = [
     { name = "browser-use" },
     { name = "chromadb" },
-    { name = "pylatexenc" },
-    { name = "pypdf" },
-    { name = "python-docx" },
-    { name = "python-pptx" },
+    { name = "fastembed" },
+    { name = "flashrank" },
 ]
 browser = [
     { name = "browser-use" },
-]
-documents = [
-    { name = "pylatexenc" },
-    { name = "pypdf" },
-    { name = "python-docx" },
-    { name = "python-pptx" },
 ]
 rag = [
     { name = "chromadb" },
@@ -1240,6 +1235,7 @@ rag = [
 dev = [
     { name = "bandit" },
     { name = "build" },
+    { name = "debugpy" },
     { name = "grpcio" },
     { name = "grpcio-tools" },
     { name = "mypy" },
@@ -1277,10 +1273,11 @@ requires-dist = [
     { name = "charset-normalizer", specifier = ">=2,<4" },
     { name = "chromadb", marker = "extra == 'all'", specifier = ">=1.4,<2" },
     { name = "chromadb", marker = "extra == 'rag'", specifier = ">=1.4,<2" },
-    { name = "debugpy", specifier = ">=1.8,<2" },
     { name = "fastapi", specifier = ">=0.115,<1" },
+    { name = "fastembed", marker = "extra == 'all'", specifier = ">=0.2,<1" },
     { name = "fastembed", marker = "extra == 'rag'", specifier = ">=0.2,<1" },
     { name = "fastmcp", specifier = ">=3.2,<4" },
+    { name = "flashrank", marker = "extra == 'all'", specifier = ">=0.2,<1" },
     { name = "flashrank", marker = "extra == 'rag'", specifier = ">=0.2,<1" },
     { name = "google-genai", specifier = ">=0.1" },
     { name = "httpx", specifier = ">=0.27,<1" },
@@ -1294,19 +1291,15 @@ requires-dist = [
     { name = "psutil", specifier = ">=7,<8" },
     { name = "ptyprocess", marker = "sys_platform != 'win32'", specifier = ">=0.7,<1" },
     { name = "pyfiglet", specifier = ">=1.0.4" },
-    { name = "pylatexenc", marker = "extra == 'all'", specifier = ">=2.10,<3" },
-    { name = "pylatexenc", marker = "extra == 'documents'", specifier = ">=2.10,<3" },
-    { name = "pypdf", marker = "extra == 'all'", specifier = ">=6.12.0,<7" },
-    { name = "pypdf", marker = "extra == 'documents'", specifier = ">=6.12.0,<7" },
+    { name = "pylatexenc", specifier = ">=2.10,<3" },
+    { name = "pypdf", specifier = ">=6.12,<7" },
     { name = "pyperclip", specifier = ">=1.9,<2" },
-    { name = "python-docx", marker = "extra == 'all'", specifier = ">=1.1,<2" },
-    { name = "python-docx", marker = "extra == 'documents'", specifier = ">=1.1,<2" },
+    { name = "python-docx", specifier = ">=1.1,<2" },
     { name = "python-dotenv", specifier = ">=1.2.2,<2" },
     { name = "python-frontmatter", specifier = ">=1.1,<2" },
     { name = "python-json-logger", specifier = ">=3.2.1,<4" },
     { name = "python-multipart", specifier = ">=0.0.20,<1" },
-    { name = "python-pptx", marker = "extra == 'all'", specifier = ">=1,<2" },
-    { name = "python-pptx", marker = "extra == 'documents'", specifier = ">=1,<2" },
+    { name = "python-pptx", specifier = ">=1,<2" },
     { name = "pywinpty", marker = "sys_platform == 'win32'", specifier = ">=2,<3" },
     { name = "rapidfuzz", specifier = ">=3.9,<4" },
     { name = "requests", specifier = ">=2.32.4,<3" },
@@ -1321,12 +1314,13 @@ requires-dist = [
     { name = "urllib3", specifier = ">=2.7,<3" },
     { name = "uvicorn", specifier = ">=0.30,<1" },
 ]
-provides-extras = ["all", "browser", "documents", "rag"]
+provides-extras = ["all", "browser", "rag"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "bandit", specifier = ">=1.9.3" },
     { name = "build", specifier = ">=1.2.2" },
+    { name = "debugpy", specifier = ">=1.8,<2" },
     { name = "grpcio", specifier = ">=1.70" },
     { name = "grpcio-tools", specifier = ">=1.70" },
     { name = "mypy", specifier = "==1.17" },

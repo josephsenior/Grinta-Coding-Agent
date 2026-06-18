@@ -30,7 +30,6 @@ dependencies = [
   "binaryornot>=0.4.4,<0.5",
   "chardet>=3.0.2,<6",
   "charset-normalizer>=2,<4",
-  "debugpy>=1.8,<2",
   "fastapi>=0.115,<1",
   "fastmcp>=3.2,<4",
   "google-genai>=0.1",
@@ -42,12 +41,16 @@ dependencies = [
   "orjson>=3.10,<4",
   "pathspec>=0.12,<1",
   "prompt-toolkit>=3.0.50,<4",
+  "pylatexenc>=2.10,<3",
+  "pypdf>=6.12,<7",
   "psutil>=7,<8",
   "ptyprocess>=0.7,<1; sys_platform!='win32'",
   "pyfiglet>=1.0.4",
   "pyperclip>=1.9,<2",
+  "python-docx>=1.1,<2",
   "python-dotenv>=1.2.2,<2",
   "python-frontmatter>=1.1,<2",
+  "python-pptx>=1,<2",
   "python-json-logger>=3.2.1,<4",
   "python-multipart>=0.0.20,<1",
   "pywinpty>=2,<3; sys_platform=='win32'",
@@ -68,19 +71,11 @@ dependencies = [
 optional-dependencies.all = [
   "browser-use>=0.12,<0.15",
   "chromadb>=1.4,<2",
-  "pylatexenc>=2.10,<3",
-  "pypdf>=6.12,<7",
-  "python-docx>=1.1,<2",
-  "python-pptx>=1,<2",
+  "fastembed>=0.2,<1",
+  "flashrank>=0.2,<1",
 ]
 optional-dependencies.browser = [
   "browser-use>=0.12,<0.15",
-]
-optional-dependencies.documents = [
-  "pylatexenc>=2.10,<3",
-  "pypdf>=6.12,<7",
-  "python-docx>=1.1,<2",
-  "python-pptx>=1,<2",
 ]
 optional-dependencies.rag = [
   "chromadb>=1.4,<2",
@@ -89,17 +84,17 @@ optional-dependencies.rag = [
 ]
 urls = { Repository = "https://github.com/josephsenior/Grinta-Coding-Agent", Issues = "https://github.com/josephsenior/Grinta-Coding-Agent/issues", Documentation = "https://github.com/josephsenior/Grinta-Coding-Agent/tree/main/docs" }
 
-# User-installable extras. Default install stays lean (~150 MB).
-# pip install "grinta-ai[rag]"        — long-term semantic memory (Chroma + ONNX MiniLM, ~250 MB)
-# pip install "grinta-ai[documents]"  — PDF / DOCX / PPTX / LaTeX parsers
-# pip install "grinta-ai[browser]"    — native browser automation (browser-use)
-# pip install "grinta-ai[all]"        — kitchen sink
+# User-installable extras. Base install includes PDF/DOCX/PPTX/LaTeX parsers.
+# pip install "grinta-ai[rag]"     — long-term semantic memory (Chroma + ONNX embeddings)
+# pip install "grinta-ai[browser]" — native browser automation (browser-use)
+# pip install "grinta-ai[all]"     — rag + browser
 scripts.grinta = "launch.entry:main"
 
 [dependency-groups]
 dev = [
   "bandit>=1.9.3",
   "build>=1.2.2",
+  "debugpy>=1.8,<2",
   "grpcio>=1.70",
   "grpcio-tools>=1.70",
   "mypy==1.17",

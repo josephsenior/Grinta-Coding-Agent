@@ -11,7 +11,7 @@ from backend.execution.document_readers import (
 )
 
 
-def test_extract_pdf_text_requires_documents_extra(monkeypatch):
+def test_extract_pdf_text_raises_when_pypdf_missing(monkeypatch):
     import builtins
 
     real_import = builtins.__import__
@@ -22,11 +22,11 @@ def test_extract_pdf_text_requires_documents_extra(monkeypatch):
         return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr(builtins, '__import__', _import)
-    with pytest.raises(RuntimeError, match='documents'):
+    with pytest.raises(RuntimeError, match='parser dependency missing'):
         extract_pdf_text('sample.pdf')
 
 
-def test_extract_docx_text_requires_documents_extra(monkeypatch):
+def test_extract_docx_text_raises_when_docx_missing(monkeypatch):
     import builtins
 
     real_import = builtins.__import__
@@ -37,11 +37,11 @@ def test_extract_docx_text_requires_documents_extra(monkeypatch):
         return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr(builtins, '__import__', _import)
-    with pytest.raises(RuntimeError, match='documents'):
+    with pytest.raises(RuntimeError, match='parser dependency missing'):
         extract_docx_text('sample.docx')
 
 
-def test_extract_pptx_text_requires_documents_extra(monkeypatch):
+def test_extract_pptx_text_raises_when_pptx_missing(monkeypatch):
     import builtins
 
     real_import = builtins.__import__
@@ -52,5 +52,5 @@ def test_extract_pptx_text_requires_documents_extra(monkeypatch):
         return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr(builtins, '__import__', _import)
-    with pytest.raises(RuntimeError, match='documents'):
+    with pytest.raises(RuntimeError, match='parser dependency missing'):
         extract_pptx_text('sample.pptx')

@@ -213,13 +213,6 @@ TOOL_BRIDGE_TIMEOUT_DEBUGGER = DEBUGGER_PENDING_ACTION_TIMEOUT_FLOOR
 TOOL_BRIDGE_TIMEOUT_TERMINAL_RUN = TERMINAL_RUN_PENDING_ACTION_TIMEOUT_FLOOR
 TOOL_BRIDGE_TIMEOUT_TERMINAL_IO = TERMINAL_IO_PENDING_ACTION_TIMEOUT_FLOOR
 TOOL_BRIDGE_TIMEOUT_BUFFER = 10.0
-# Opt-in (default-on) debugpy import warmup at agent startup. Keeps the first
-# real ``debugger`` tool call snappy. Set GRINTA_DEBUGPY_WARMUP=0 to disable.
-DEBUGPY_WARMUP_ENABLED = os.getenv('GRINTA_DEBUGPY_WARMUP', '1') not in {
-    '0',
-    'false',
-    'False',
-}
 # Native browser: per-stage fail-fast budgets (see GrintaNativeBrowser).
 BROWSER_SESSION_START_TIMEOUT_SEC = 90.0
 BROWSER_CDP_NAVIGATE_TIMEOUT_SEC = 20.0

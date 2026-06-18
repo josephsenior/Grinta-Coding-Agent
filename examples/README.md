@@ -47,14 +47,16 @@ if __name__ == '__main__':
     parse_age('-5')
 ```
 
-Expected behaviour with the new debugger reliability work:
+Expected behaviour with the debugger reliability work:
 
 * Cold start (first `debugger` call in the session) completes in
-  ~2-5 s on Windows; subsequent calls reuse the warmed adapter.
+  ~2-5 s on Windows when `debugpy` is installed; subsequent calls reuse the
+  adapter process when possible.
 * `app.log` shows: `DAP: spawning adapter`, `DAP: initialize sent`,
   `DAP: launch sent`, `DAP: configurationDone ack`, `DAP: ready in N s`.
 * If the adapter cannot start, the returned `ErrorObservation` includes
   the adapter's stderr tail so the model knows what went wrong.
 
-Run `/health` first if your machine has not used the debugger before — it
-pre-imports `debugpy.adapter` and verifies `rg` + `git` are on PATH.
+Run `/health` first if Python debugging is new on this machine — it reports
+whether `debugpy` is available (`pip install debugpy`) and verifies `rg` +
+`git` are on PATH.

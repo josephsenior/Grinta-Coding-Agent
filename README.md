@@ -1,6 +1,6 @@
 # Grinta
 
-![Grinta logo](logo.svg)
+![Grinta logo](docs/assets/logo.svg)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://python.org)
@@ -20,9 +20,9 @@
 
 ### Grinta in action
 
-![Grinta terminal demo](docs/grinta-demo.gif)
+![Grinta terminal demo](docs/assets/grinta-demo.gif)
 
-Direct link if the animation does not load: [`docs/grinta-demo.gif`](docs/grinta-demo.gif).
+Direct link if the animation does not load: [`docs/assets/grinta-demo.gif`](docs/assets/grinta-demo.gif).
 
 ## Release status
 
@@ -62,13 +62,12 @@ grinta                          # launch the terminal app in the current directo
 Optional extras (install only what you need):
 
 ```bash
-pipx install "grinta-ai[rag]"        # adds chromadb (~80MB ONNX model) for vector memory
-pipx install "grinta-ai[documents]"  # adds PDF / DOCX / PPTX / LaTeX parsing
-pipx install "grinta-ai[browser]"    # adds browser-use for web automation
-pipx install "grinta-ai[all]"        # everything
+pipx install "grinta-ai[rag]"      # adds chromadb + embeddings for vector memory
+pipx install "grinta-ai[browser]"  # adds browser-use for web automation
+pipx install "grinta-ai[all]"      # rag + browser
 ```
 
-The base install keeps RAG, document parsing, and browser automation out of the default wheel, but the isolated Python environment is still about 150 MB before opt-in extras. The `grinta init` wizard configures provider, model, and key; local Ollama, LM Studio, and vLLM models can also be discovered with `uv run python -m backend.inference.discover_models` from a source checkout. Installed runs use `~/.grinta/settings.json`; source checkouts use the repository `settings.json`; `APP_ROOT` can intentionally override that root. Other install paths (uv, Homebrew, Scoop, and experimental Docker image usage) are in [docs/INSTALL.md](docs/INSTALL.md).
+The base install includes PDF, DOCX, PPTX, and LaTeX parsing. RAG and browser automation stay opt-in. The isolated Python environment is roughly **~400 MB on disk** before optional extras (tree-sitter grammars dominate); idle runtime memory is **~150 MB RAM** — see [docs/PERFORMANCE.md](docs/PERFORMANCE.md). The `grinta init` wizard configures provider, model, and key; local Ollama, LM Studio, and vLLM models can also be discovered with `uv run python -m backend.inference.discover_models` from a source checkout. Installed runs use `~/.grinta/settings.json`; source checkouts use the repository `settings.json`; `APP_ROOT` can intentionally override that root. Other install paths (uv, Homebrew, Scoop, and experimental Docker image usage) are in [docs/INSTALL.md](docs/INSTALL.md).
 
 ## What you get
 
@@ -100,7 +99,7 @@ Autonomy (`/autonomy`: conservative, balanced, full) controls confirmation promp
 | `/autonomy`   | View or set confirmation behavior                          |
 | `/cost`       | Tokens, calls, USD spent this session                      |
 | `/diff`       | Workspace git changes (`--stat`, `--name-only`, `--patch`) |
-| `/health`     | Fast self-check for debugpy, ripgrep, git, and model setup |
+| `/health`     | Fast self-check for debug adapters, ripgrep, git, and model setup |
 | `/checkpoint` | Snapshot the workspace (revertable)                        |
 | `/status`     | HUD snapshot; `/status verbose` adds diagnostics           |
 | `/compact`    | Force context compaction now                               |
