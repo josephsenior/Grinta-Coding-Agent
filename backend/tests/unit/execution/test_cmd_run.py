@@ -8,7 +8,7 @@ import pytest
 
 from backend.core.os_capabilities import OS_CAPS, override_os_capabilities
 from backend.execution.action_execution_server import RuntimeExecutor
-from backend.execution.utils.unified_shell import BaseShellSession
+from backend.execution.utils.shell.unified_shell import BaseShellSession
 from backend.ledger.action import CmdRunAction, FileReadAction
 from backend.ledger.action.terminal import (
     TerminalInputAction,

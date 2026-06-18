@@ -106,7 +106,7 @@ class TestHandleBlockedInvocation(unittest.TestCase):
 
         with (
             patch(
-                'backend.orchestration.tool_telemetry.ToolTelemetry.get_instance'
+                'backend.orchestration.telemetry.tool_telemetry.ToolTelemetry.get_instance'
             ) as mock_tm,
             patch('backend.ledger.observation_cause.attach_observation_cause'),
             patch(
@@ -141,7 +141,7 @@ class TestHandleBlockedInvocation(unittest.TestCase):
 
         with (
             patch(
-                'backend.orchestration.tool_telemetry.ToolTelemetry.get_instance'
+                'backend.orchestration.telemetry.tool_telemetry.ToolTelemetry.get_instance'
             ) as mock_tm,
             patch('backend.ledger.observation_cause.attach_observation_cause'),
             patch(
@@ -1574,7 +1574,7 @@ class TestStepDispatch(unittest.TestCase):
         self.ctrl._step_with_exception_handling = _noop_inner  # type: ignore[method-assign]
 
         with patch(
-            'backend.utils.async_utils.create_tracked_task',
+            'backend.utils.async_helpers.async_utils.create_tracked_task',
             return_value=MagicMock(name='tracked_task'),
         ) as mock_create:
             self.ctrl._create_step_task()

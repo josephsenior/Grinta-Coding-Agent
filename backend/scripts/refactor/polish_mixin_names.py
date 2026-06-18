@@ -30,15 +30,15 @@ CLASS_REPLACEMENTS: list[tuple[str, str]] = [
 IMPORT_REPLACEMENTS: list[tuple[str, str]] = [
     (
         'backend.execution.utils._file_editor_ops_mixin',
-        'backend.execution.utils.file_editor_ops_mixin',
+        'backend.execution.utils.file_editor.file_editor_ops_mixin',
     ),
     (
         'backend.execution.utils._file_editor_rollback_mixin',
-        'backend.execution.utils.file_editor_rollback_mixin',
+        'backend.execution.utils.file_editor.file_editor_rollback_mixin',
     ),
     (
         'backend.execution.utils._file_editor_view_mixin',
-        'backend.execution.utils.file_editor_view_mixin',
+        'backend.execution.utils.file_editor.file_editor_view_mixin',
     ),
 ]
 

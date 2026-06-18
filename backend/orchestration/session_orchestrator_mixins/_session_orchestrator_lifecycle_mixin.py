@@ -106,12 +106,12 @@ class _SessionOrchestratorLifecycleMixin(SessionOrchestratorAccessorsMixin):
         14. ToolResultValidator - validates results after all observe() hooks complete
 
         """
-        from backend.orchestration.file_state_tracker import FileStateMiddleware
+        from backend.orchestration.file_edits.file_state_tracker import FileStateMiddleware
         from backend.orchestration.middleware.destructive_command import (
             DestructiveCommandMiddleware,
         )
-        from backend.orchestration.pre_exec_diff import PreExecDiffMiddleware
-        from backend.orchestration.rollback_middleware import RollbackMiddleware
+        from backend.orchestration.file_edits.pre_exec_diff import PreExecDiffMiddleware
+        from backend.orchestration.middleware.rollback_middleware import RollbackMiddleware
         from backend.orchestration.tool_pipeline import (
             AutoCheckMiddleware,
             BlackboardMiddleware,
@@ -124,7 +124,7 @@ class _SessionOrchestratorLifecycleMixin(SessionOrchestratorAccessorsMixin):
             SafetyValidatorMiddleware,
             TelemetryMiddleware,
         )
-        from backend.orchestration.tool_result_validator import ToolResultValidator
+        from backend.orchestration.middleware.tool_result_validator import ToolResultValidator
 
         middlewares = [
             SafetyValidatorMiddleware(self),
@@ -234,7 +234,7 @@ class _SessionOrchestratorLifecycleMixin(SessionOrchestratorAccessorsMixin):
         model but are not rendered in the CLI transcript.
 
         """
-        from backend.orchestration.tool_telemetry import ToolTelemetry
+        from backend.orchestration.telemetry.tool_telemetry import ToolTelemetry
 
         self._cleanup_action_context(ctx, action=action)
 

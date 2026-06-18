@@ -1,4 +1,4 @@
-"""Tests for backend.utils.async_utils — Async bridging and task coordination."""
+"""Tests for backend.utils.async_helpers.async_utils — Async bridging and task coordination."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import asyncio
 
 import pytest
 
-from backend.utils.async_utils import (
+from backend.utils.async_helpers.async_utils import (
     AsyncException,
     _collect_results,
     _handle_pending_tasks,
@@ -68,7 +68,7 @@ class TestCreateTrackedTask:
     @pytest.mark.asyncio
     async def test_default_set(self):
         """Task added to module-level _background_tasks by default."""
-        from backend.utils import async_utils
+        from backend.utils.async_helpers import async_utils
 
         async def noop():
             return 1

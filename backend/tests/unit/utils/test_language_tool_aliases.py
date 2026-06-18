@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.utils.language_tool_aliases import (
+from backend.utils.lsp.language_tool_aliases import (
     DEBUG_ADAPTER_SYNONYMS,
     normalize_debug_adapter_name,
 )

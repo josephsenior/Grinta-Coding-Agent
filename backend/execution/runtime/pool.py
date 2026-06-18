@@ -199,7 +199,7 @@ def call_async_disconnect(runtime: Runtime) -> None:
     try:
         if callable(disconnect_fn):
             from backend.core.constants import GENERAL_TIMEOUT
-            from backend.utils.async_utils import call_async_from_sync
+            from backend.utils.async_helpers.async_utils import call_async_from_sync
 
             call_async_from_sync(disconnect_fn, GENERAL_TIMEOUT)
         else:

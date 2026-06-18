@@ -130,7 +130,7 @@ def _find_symbol_candidates_in_file(
     symbol_kind: str | None = None,
     include_private: bool = False,
 ) -> list[dict[str, Any]]:
-    from backend.utils.treesitter_editor import TreeSitterEditor
+    from backend.utils.treesitter.treesitter_editor import TreeSitterEditor
 
     editor = TreeSitterEditor()
     parse_result = editor.parse_file(str(path), use_cache=False)

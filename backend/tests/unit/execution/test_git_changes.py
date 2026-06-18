@@ -1,10 +1,10 @@
-"""Tests for backend.execution.utils.git_changes — git change parsing."""
+"""Tests for backend.execution.utils.git.git_changes — git change parsing."""
 
 from __future__ import annotations
 
 import pytest
 
-from backend.execution.utils.git_changes import (
+from backend.execution.utils.git.git_changes import (
     _normalize_status,
     _parse_git_status_line,
 )

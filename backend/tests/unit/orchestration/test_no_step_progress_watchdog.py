@@ -3,7 +3,7 @@
 import pytest
 
 from backend.core.schemas import AgentState
-from backend.orchestration.agent_circuit_breaker import (
+from backend.orchestration.agent.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerConfig,
 )

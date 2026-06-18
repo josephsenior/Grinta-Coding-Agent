@@ -13,7 +13,7 @@ from threading import Lock
 from typing import TYPE_CHECKING, Any
 
 from backend.core.logger import app_logger as logger
-from backend.utils.async_utils import call_sync_from_async
+from backend.utils.async_helpers.async_utils import call_sync_from_async
 
 if TYPE_CHECKING:
     pass

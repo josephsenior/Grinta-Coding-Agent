@@ -20,7 +20,7 @@ from backend.ledger.observation import (
     CmdOutputObservation,
     ErrorObservation,
 )
-from backend.utils.async_utils import call_sync_from_async
+from backend.utils.async_helpers.async_utils import call_sync_from_async
 
 if TYPE_CHECKING:
     from backend.core.enums import RuntimeStatus

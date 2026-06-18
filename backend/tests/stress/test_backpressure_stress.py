@@ -20,7 +20,7 @@ import pytest
 from backend.ledger.stream.backpressure import BackpressureManager
 from backend.ledger.stream.durable_writer import DurableEventWriter, PersistedEvent
 from backend.ledger.observation import NullObservation
-from backend.utils.circuit_breaker import CircuitBreaker, CircuitBreakerManager
+from backend.utils.async_helpers.circuit_breaker import CircuitBreaker, CircuitBreakerManager
 
 pytestmark = pytest.mark.stress
 

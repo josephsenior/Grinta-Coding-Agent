@@ -1,6 +1,6 @@
-"""Tests for backend.utils.chunk_localizer — text chunking and LCS matching."""
+"""Tests for backend.utils.treesitter.chunk_localizer — text chunking and LCS matching."""
 
-from backend.utils.chunk_localizer import (
+from backend.utils.treesitter.chunk_localizer import (
     Chunk,
     _create_chunks_from_raw_string,
     create_chunks,

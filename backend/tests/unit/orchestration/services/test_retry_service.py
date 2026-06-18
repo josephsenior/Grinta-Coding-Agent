@@ -62,7 +62,7 @@ class TestRetryService(unittest.IsolatedAsyncioTestCase):
                 side_effect=RuntimeError('No loop'),
             ),
             patch(
-                'backend.utils.async_utils.get_main_event_loop',
+                'backend.utils.async_helpers.async_utils.get_main_event_loop',
                 return_value=None,
             ),
         ):
@@ -87,7 +87,7 @@ class TestRetryService(unittest.IsolatedAsyncioTestCase):
                 side_effect=RuntimeError('No loop'),
             ),
             patch(
-                'backend.utils.async_utils.get_main_event_loop',
+                'backend.utils.async_helpers.async_utils.get_main_event_loop',
                 return_value=None,
             ),
         ):

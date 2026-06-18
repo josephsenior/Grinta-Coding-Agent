@@ -22,7 +22,7 @@ from backend.ledger.observation import (
     LspQueryObservation,
     MCPObservation,
 )
-from backend.utils.lsp_client import LspClient, LspResult
+from backend.utils.lsp.lsp_client import LspClient, LspResult
 
 
 class TestProviderEdgeCases:
@@ -203,7 +203,7 @@ class TestLSPEdgeCases:
             error='Symbol not found in this context',
         )
 
-        with patch('backend.utils.lsp_client.LspClient') as LC:
+        with patch('backend.utils.lsp.lsp_client.LspClient') as LC:
             LC.return_value.query.return_value = result
             obs = await ex.lsp_query(action)
 
@@ -231,7 +231,7 @@ class TestLSPEdgeCases:
             error='',
         )
 
-        with patch('backend.utils.lsp_client.LspClient') as LC:
+        with patch('backend.utils.lsp.lsp_client.LspClient') as LC:
             LC.return_value.query.return_value = result
             obs = await ex.lsp_query(action)
 

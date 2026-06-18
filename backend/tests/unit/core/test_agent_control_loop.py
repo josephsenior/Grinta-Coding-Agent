@@ -51,7 +51,7 @@ class TestHandleErrorStatus:
             side_effect=Exception('run_or_schedule failed'),
         ):
             with patch(
-                'backend.utils.async_utils.create_tracked_task'
+                'backend.utils.async_helpers.async_utils.create_tracked_task'
             ) as mock_create_task:
                 _handle_error_status(controller, RuntimeStatus.ERROR, 'something broke')
 
@@ -69,7 +69,7 @@ class TestHandleErrorStatus:
             side_effect=Exception('run_or_schedule failed'),
         ):
             with patch(
-                'backend.utils.async_utils.create_tracked_task',
+                'backend.utils.async_helpers.async_utils.create_tracked_task',
                 side_effect=Exception('create_tracked_task failed'),
             ):
                 _handle_error_status(controller, RuntimeStatus.ERROR, 'something broke')

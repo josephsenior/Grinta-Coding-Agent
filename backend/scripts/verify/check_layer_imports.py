@@ -96,7 +96,7 @@ EXEMPTIONS: dict[str, str] = {
     'backend.engine.__init__': '__init__.py re-exports orchestration.agent for backwards compat',
     'backend.execution.action_execution_server': 'Execution imports engine.tools.prompt for tool registry',
     'backend.execution.aes.helpers': 'Execution imports engine.function_calling for multi-edit handler',
-    'backend.execution.utils.unified_shell': 'Execution imports engine.tools.prompt for tool registry',
+    'backend.execution.utils.shell.unified_shell': 'Execution imports engine.tools.prompt for tool registry',
     'backend.inference.fn_call': 'Inference imports engine.tools.prompt for tool registry',
 }
 

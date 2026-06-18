@@ -312,7 +312,7 @@ class ScreenLifecycleMixin:
             )
             self._hud.update_autonomy(autonomy_level)
 
-            from backend.utils.async_utils import set_main_event_loop
+            from backend.utils.async_helpers.async_utils import set_main_event_loop
 
             set_main_event_loop(self._loop)
             _tui_logger.debug(f'_bootstrap: set_main_event_loop to {self._loop}')

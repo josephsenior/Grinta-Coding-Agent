@@ -303,7 +303,7 @@ class SafetyValidator:
 
         # Send webhook alert if configured
         if self.config.alert_webhook_url:
-            from backend.utils.async_utils import create_tracked_task
+            from backend.utils.async_helpers.async_utils import create_tracked_task
 
             create_tracked_task(
                 self._send_webhook_alert(alert_message),

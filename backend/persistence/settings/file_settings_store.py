@@ -18,7 +18,7 @@ from backend.core.pydantic_compat import model_dump_with_options
 from backend.persistence import get_file_store
 from backend.persistence.data_models.settings import Settings
 from backend.persistence.settings.settings_store import SettingsStore
-from backend.utils.async_utils import call_sync_from_async
+from backend.utils.async_helpers.async_utils import call_sync_from_async
 
 if TYPE_CHECKING:
     from backend.core.config.app_config import AppConfig

@@ -122,7 +122,7 @@ class TestIterationGuardService(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(result)
 
-    @patch('backend.utils.async_utils.create_tracked_task')
+    @patch('backend.utils.async_helpers.async_utils.create_tracked_task')
     def test_schedule_graceful_shutdown(self, mock_create_task):
         """Test _schedule_graceful_shutdown creates async task."""
         self.service._schedule_graceful_shutdown('Test reason')

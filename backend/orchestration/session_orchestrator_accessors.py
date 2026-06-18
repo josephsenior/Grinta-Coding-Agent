@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from backend.ledger import EventStream
     from backend.orchestration.agent import Agent
-    from backend.orchestration.conversation_stats import ConversationStats
+    from backend.orchestration.telemetry.conversation_stats import ConversationStats
     from backend.orchestration.state.state import State
 
 

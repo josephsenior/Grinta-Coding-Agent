@@ -356,7 +356,7 @@ class SmartChunker:
         is unsupported.
         """
         try:
-            from backend.utils.treesitter_editor import (
+            from backend.utils.treesitter.treesitter_editor import (
                 LANGUAGE_EXTENSIONS,
                 TREE_SITTER_AVAILABLE,
                 _get_parser,

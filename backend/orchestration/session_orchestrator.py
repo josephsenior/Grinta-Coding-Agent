@@ -7,7 +7,7 @@ import contextlib
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, cast
 
-from backend.utils.async_utils import (
+from backend.utils.async_helpers.async_utils import (
     get_main_event_loop,
     set_main_event_loop,
 )

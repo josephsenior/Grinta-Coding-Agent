@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.execution.utils.prompt_detector import (
+from backend.execution.utils.shell.prompt_detector import (
     InteractivePromptDetector,
     PromptType,
     suggest_noninteractive_command,

@@ -1,8 +1,8 @@
-"""Tests for backend.execution.utils.bash — split_bash_commands, escape_bash_special_chars, BashCommandStatus."""
+"""Tests for backend.execution.utils.shell.bash — split_bash_commands, escape_bash_special_chars, BashCommandStatus."""
 
 from __future__ import annotations
 
-from backend.execution.utils.bash import (
+from backend.execution.utils.shell.bash import (
     BashCommandStatus,
     _remove_command_prefix,
     split_bash_commands,

@@ -125,7 +125,7 @@ class TestListSessions:
         resumer = ConversationResumer(fs)
 
         with patch(
-            'backend.utils.async_utils.call_sync_from_async',
+            'backend.utils.async_helpers.async_utils.call_sync_from_async',
             new_callable=AsyncMock,
             return_value=['session1/', 'session2/', '.hidden/'],
         ):
@@ -139,7 +139,7 @@ class TestListSessions:
         resumer = ConversationResumer(fs)
 
         with patch(
-            'backend.utils.async_utils.call_sync_from_async',
+            'backend.utils.async_helpers.async_utils.call_sync_from_async',
             new_callable=AsyncMock,
             side_effect=FileNotFoundError,
         ):
@@ -157,7 +157,7 @@ class TestLoadMetadata:
         raw_json = json.dumps({'title': 'meta test', 'key': 42})
 
         with patch(
-            'backend.utils.async_utils.call_sync_from_async',
+            'backend.utils.async_helpers.async_utils.call_sync_from_async',
             new_callable=AsyncMock,
             return_value=raw_json,
         ):
@@ -175,7 +175,7 @@ class TestReplayEvents:
         resumer = ConversationResumer(fs)
 
         with patch(
-            'backend.utils.async_utils.call_sync_from_async',
+            'backend.utils.async_helpers.async_utils.call_sync_from_async',
             new_callable=AsyncMock,
             side_effect=FileNotFoundError,
         ):
@@ -206,7 +206,7 @@ class TestReplayEvents:
 
         with (
             patch(
-                'backend.utils.async_utils.call_sync_from_async',
+                'backend.utils.async_helpers.async_utils.call_sync_from_async',
                 side_effect=mock_call_sync,
             ),
             patch(
@@ -234,7 +234,7 @@ class TestReplayEvents:
 
         with (
             patch(
-                'backend.utils.async_utils.call_sync_from_async',
+                'backend.utils.async_helpers.async_utils.call_sync_from_async',
                 side_effect=mock_call_sync,
             ),
             patch(
@@ -260,7 +260,7 @@ class TestReplayEvents:
 
         with (
             patch(
-                'backend.utils.async_utils.call_sync_from_async',
+                'backend.utils.async_helpers.async_utils.call_sync_from_async',
                 side_effect=mock_call_sync,
             ),
             patch(

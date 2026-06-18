@@ -1,8 +1,8 @@
-"""Tests for backend.execution.utils.prompt_detector — InteractivePromptDetector."""
+"""Tests for backend.execution.utils.shell.prompt_detector — InteractivePromptDetector."""
 
 from __future__ import annotations
 
-from backend.execution.utils.prompt_detector import (
+from backend.execution.utils.shell.prompt_detector import (
     InteractivePromptDetector,
     PromptPattern,
     PromptType,

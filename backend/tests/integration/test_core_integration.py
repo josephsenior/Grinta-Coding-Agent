@@ -33,7 +33,7 @@ from backend.ledger.action.message import MessageAction, SystemMessageAction
 from backend.ledger.event import EventSource
 from backend.ledger.observation.error import ErrorObservation
 from backend.ledger.observation.files import FileEditObservation
-from backend.orchestration.agent_circuit_breaker import (
+from backend.orchestration.agent.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerConfig,
 )

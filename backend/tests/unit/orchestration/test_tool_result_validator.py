@@ -1,4 +1,4 @@
-"""Unit tests for backend.orchestration.tool_result_validator module.
+"""Unit tests for backend.orchestration.middleware.tool_result_validator module.
 
 Tests cover:
 - ValidationRule dataclass creation
@@ -21,7 +21,7 @@ from backend.ledger.observation import (
 )
 from backend.ledger.observation.terminal import TerminalObservation
 from backend.orchestration.tool_pipeline import ToolInvocationContext
-from backend.orchestration.tool_result_validator import (
+from backend.orchestration.middleware.tool_result_validator import (
     ToolResultValidator,
     ValidationResult,
     ValidationRule,

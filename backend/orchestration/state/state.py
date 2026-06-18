@@ -28,7 +28,7 @@ from backend.orchestration.state.control_flags import (
 from backend.persistence.locations import get_conversation_agent_state_filename
 
 if TYPE_CHECKING:
-    from backend.orchestration.conversation_stats import ConversationStats
+    from backend.orchestration.telemetry.conversation_stats import ConversationStats
     from backend.persistence.files import FileStore
 
 RESUMABLE_STATES = [

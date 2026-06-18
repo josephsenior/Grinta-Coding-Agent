@@ -53,7 +53,7 @@ class RetryService:
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
-            from backend.utils.async_utils import get_main_event_loop
+            from backend.utils.async_helpers.async_utils import get_main_event_loop
 
             loop = get_main_event_loop()
 
@@ -74,7 +74,7 @@ class RetryService:
                     exc,
                 )
 
-        from backend.utils.async_utils import create_tracked_task
+        from backend.utils.async_helpers.async_utils import create_tracked_task
 
         self._retry_worker_task = create_tracked_task(
             _worker_wrapper(),
@@ -227,7 +227,7 @@ class RetryService:
 
     async def schedule_retry_after_failure(self, exc: Exception) -> bool:
         """Schedule an automatic retry for transient failures."""
-        from backend.orchestration.tool_telemetry import ToolTelemetry
+        from backend.orchestration.telemetry.tool_telemetry import ToolTelemetry
 
         queue = self._retry_queue or get_retry_queue()
         if not queue or not self._is_retryable_exception(exc):

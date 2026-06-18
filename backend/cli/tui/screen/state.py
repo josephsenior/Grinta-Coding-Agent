@@ -128,7 +128,7 @@ class ScreenStateMixin:
 
     @staticmethod
     def _visible_autonomy_level(value: object, *, default: str = '') -> str:
-        from backend.orchestration.autonomy import normalize_autonomy_level
+        from backend.orchestration.agent.autonomy import normalize_autonomy_level
 
         level = normalize_autonomy_level(value)
         return level if level in {'conservative', 'balanced', 'full'} else default

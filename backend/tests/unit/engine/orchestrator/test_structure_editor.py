@@ -12,7 +12,7 @@ from backend.engine.tools.structure_editor import (
     EditorConfig,
     StructureEditor,
 )
-from backend.utils.treesitter_editor import (
+from backend.utils.treesitter.treesitter_editor import (
     TREE_SITTER_AVAILABLE,
 )
 

@@ -9,11 +9,11 @@ from typing import Any, cast
 
 import pytest
 
-import backend.utils.async_utils as async_utils
-import backend.utils.circuit_breaker as circuit_breaker
+import backend.utils.async_helpers.async_utils as async_utils
+import backend.utils.async_helpers.circuit_breaker as circuit_breaker
 import backend.utils.import_utils as import_utils
-import backend.utils.tenacity_metrics as tenacity_metrics
-import backend.utils.tenacity_stop as tenacity_stop
+import backend.utils.async_helpers.tenacity_metrics as tenacity_metrics
+import backend.utils.async_helpers.tenacity_stop as tenacity_stop
 
 
 class TestImportUtilsFinal:
@@ -87,7 +87,7 @@ class TestCircuitBreakerFinal:
             return 'ok'
 
         with unittest.mock.patch(
-            'backend.utils.circuit_breaker._CB_METRICS'
+            'backend.utils.async_helpers.circuit_breaker._CB_METRICS'
         ) as mock_metrics:
             await cb.async_call(success)
             mock_metrics.on_close_success.assert_called_with('test')
@@ -133,7 +133,7 @@ class TestTenacityStopFinal:
         stop_cond = tenacity_stop.stop_if_should_exit()
 
         def side_effect(name):
-            if name == 'backend.utils.tenacity_stop':
+            if name == 'backend.utils.async_helpers.tenacity_stop':
                 m = unittest.mock.MagicMock()
                 m.should_exit.side_effect = RuntimeError('fail')
                 return m
@@ -153,7 +153,7 @@ class TestTenacityStopFinal:
         try:
 
             def side_effect_mock(name):
-                if name == 'backend.utils.tenacity_stop':
+                if name == 'backend.utils.async_helpers.tenacity_stop':
                     m = unittest.mock.MagicMock()
                     m.should_exit.side_effect = Exception('fail')
                     return m
@@ -197,7 +197,7 @@ class TestTenacityMetricsFinal:
         """Covers lines 95-100 (exception in _after start)."""
         hook = tenacity_metrics.tenacity_after_factory('op')
         with unittest.mock.patch(
-            'backend.utils.tenacity_metrics.sanitize_operation_label',
+            'backend.utils.async_helpers.tenacity_metrics.sanitize_operation_label',
             side_effect=Exception,
         ):
             hook(unittest.mock.MagicMock())

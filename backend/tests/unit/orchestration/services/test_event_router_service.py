@@ -673,7 +673,7 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
             mock_observation
         )
 
-    @patch('backend.utils.async_utils.run_or_schedule')
+    @patch('backend.utils.async_helpers.async_utils.run_or_schedule')
     async def test_handle_delegate_task_action(self, mock_run_schedule):
         """Test _handle_delegate_task_action schedules worker execution."""
         from backend.ledger.action.agent import DelegateTaskAction
@@ -753,7 +753,7 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
             async def close(self, set_stop_state=False):
                 return None
 
-        with patch('backend.utils.async_utils.run_or_schedule', side_effect=_capture):
+        with patch('backend.utils.async_helpers.async_utils.run_or_schedule', side_effect=_capture):
             with patch(
                 'backend.orchestration.services.event_router_mixins._event_router_delegate_mixin.EventStream'
             ) as mock_event_stream:
@@ -764,7 +764,7 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
                     return_value=_FakeWorkerAgent,
                 ):
                     with patch(
-                        'backend.orchestration.conversation_stats.ConversationStats',
+                        'backend.orchestration.telemetry.conversation_stats.ConversationStats',
                         return_value=MagicMock(),
                     ):
                         with patch(

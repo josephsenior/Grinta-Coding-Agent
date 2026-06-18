@@ -12,7 +12,7 @@ import logging
 
 import pytest
 
-from backend.utils import async_utils as au
+from backend.utils.async_helpers import async_utils as au
 
 
 class _Cap(logging.Handler):

@@ -155,7 +155,7 @@ class ObservationService:
         # Plugin hook: action_post
         assert pending_action is not None  # _matches_pending_action requires this
         try:
-            from backend.orchestration.file_edit_transaction import (
+            from backend.orchestration.file_edits.file_edit_transaction import (
                 get_file_edit_transaction_coordinator,
             )
 

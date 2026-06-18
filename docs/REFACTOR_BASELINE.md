@@ -65,6 +65,17 @@ Post-v1.0 split candidates — use `docs/internals/import-manifest.json` before 
 | Inference capabilities + prompt caching | `inference/capabilities/` (`ModelCapabilities`, `model_features`, `context_limits`, …), `inference/caching/` |
 | Execution AES helpers | `execution/aes/` (`helpers`, `file_operations`, `structured_edit_errors`, `security_enforcement`) |
 | Execution HTTP server | `execution/server/` (`routes`, `utils`, `file_viewer_server`) |
+| Utils tree-sitter editor + syntax | `utils/treesitter/` (`treesitter_editor`, `syntax_check`, `chunk_localizer`, `_tse_*`) |
+| Utils async bridging + retries | `utils/async_helpers/` (`async_utils`, `retry`, `circuit_breaker`, `tenacity_*`, `subprocess_bridge`) — not `async/` (`async` is a reserved keyword) |
+| Utils LSP client + language aliases | `utils/lsp/` (`lsp_client`, `language_tool_aliases`) |
+| Utils HTTP session + stdio JSON-RPC | `utils/http/` (`http_session`, `stdio_json_rpc`) |
+| Utils terminal colors + shell contract | `utils/terminal/` (`term_color`, `terminal_contract`) |
+| Orchestration stuck detection | `orchestration/stuck/` (`__init__.py` = `StuckDetector`, `patterns.py`) |
+| Orchestration agent + autonomy | `orchestration/agent/` (`__init__.py` = `Agent`, `tools`, `circuit_breaker`, `autonomy`) |
+| Orchestration file edits | `orchestration/file_edits/` (`file_edit_transaction`, `file_state_tracker`, `pre_exec_diff`) |
+| Orchestration telemetry | `orchestration/telemetry/` (`tool_telemetry`, `conversation_stats`, `progress_tracker`) |
+| Orchestration middleware (consolidated) | root `rollback_middleware`, `tool_result_validator` → `middleware/` |
+| Execution utils git / file editor / shell | `execution/utils/git/`, `file_editor/` (`__init__.py` = `FileEditor`), `shell/` |
 
 ## Commands to refresh
 
@@ -128,3 +139,16 @@ uv run python backend/scripts/verify/check_file_size.py
 - `from backend.cli.event_rendering.observations import ObservationRenderersMixin`
 - `from backend.ledger.infra.config import …` — event config, integrity, masking, tool metadata
 - `from backend.ledger.stream import EventStream`
+- `from backend.utils.treesitter.treesitter_editor import TreeSitterEditor`
+- `from backend.utils.async_helpers.async_utils import call_async_from_sync`
+- `from backend.utils import retry` — re-exported from `async_helpers/retry`
+- `from backend.utils.lsp.lsp_client import get_lsp_client`
+- `from backend.utils.http.http_session import HttpSession`
+- `from backend.utils.terminal.terminal_contract import get_terminal_tool_name`
+- `from backend.orchestration.agent import Agent` — package unchanged
+- `from backend.orchestration.stuck import StuckDetector`
+- `from backend.orchestration.middleware.rollback_middleware import RollbackMiddleware`
+- `from backend.execution.utils.file_editor import FileEditor` — package unchanged
+- `from backend.execution.utils.shell.unified_shell import BaseShellSession`
+- `from backend.execution.utils.git.git_handler import GitHandler`
+- `from backend.execution.utils.tool_registry import …` — host OS binaries (not `engine.tool_registry`)

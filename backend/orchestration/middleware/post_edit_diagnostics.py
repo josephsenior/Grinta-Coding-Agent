@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from backend.core.logger import app_logger as logger
 from backend.orchestration.tool_pipeline import ToolInvocationMiddleware
-from backend.utils.async_utils import call_sync_from_async
+from backend.utils.async_helpers.async_utils import call_sync_from_async
 
 if TYPE_CHECKING:
     from backend.ledger.observation import Observation
@@ -220,7 +220,7 @@ def _check_skip_conditions(path: Path, max_file_bytes: int) -> str | None:
 
 def _query_lsp(path: Path, timeout_seconds: float):
     try:
-        from backend.utils.lsp_client import get_lsp_client
+        from backend.utils.lsp.lsp_client import get_lsp_client
 
         return get_lsp_client().query(
             'diagnostics',

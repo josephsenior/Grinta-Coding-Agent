@@ -88,14 +88,14 @@ async def test_lsp_query_success_and_failure(mock_executor) -> None:
         error='',
         format_text=lambda _cmd: 'ok',
     )
-    with patch('backend.utils.lsp_client.LspClient') as cls:
+    with patch('backend.utils.lsp.lsp_client.LspClient') as cls:
         cls.return_value.query.return_value = success_result
         ok = await mock_executor.lsp_query(action)
     assert ok.__class__.__name__ == 'LspQueryObservation'
     assert ok.tool_result['available'] is True
 
     with patch(
-        'backend.utils.lsp_client.LspClient', side_effect=RuntimeError('lsp down')
+        'backend.utils.lsp.lsp_client.LspClient', side_effect=RuntimeError('lsp down')
     ):
         bad = await mock_executor.lsp_query(action)
     assert isinstance(bad, ErrorObservation)
@@ -129,7 +129,7 @@ def test_close_cleans_resources(mock_executor) -> None:
     mock_executor._native_browser = native
     mock_executor.browser = MagicMock()
 
-    with patch('backend.utils.async_utils.call_async_from_sync', return_value=None):
+    with patch('backend.utils.async_helpers.async_utils.call_async_from_sync', return_value=None):
         mock_executor.close()
 
     mock_executor.debug_manager.close_all.assert_called_once()

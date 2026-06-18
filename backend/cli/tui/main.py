@@ -152,7 +152,7 @@ async def run_tui(
 
         # Drain remaining tracked background tasks so asyncio.run() cleanup
         # doesn't hit RecursionError from Python 3.12's recursive Task.cancel().
-        from backend.utils.async_utils import drain_background_tasks
+        from backend.utils.async_helpers.async_utils import drain_background_tasks
 
         await drain_background_tasks(max_rounds=2, timeout=2.0)
 

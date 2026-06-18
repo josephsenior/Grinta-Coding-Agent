@@ -22,7 +22,7 @@ from backend.engine.tools.atomic_refactor import (
 )
 from backend.engine.tools.smart_errors import SmartErrorHandler
 from backend.engine.tools.whitespace_handler import WhitespaceHandler
-from backend.utils.treesitter_editor import EditResult, SymbolLocation, TreeSitterEditor
+from backend.utils.treesitter.treesitter_editor import EditResult, SymbolLocation, TreeSitterEditor
 
 
 def _find_changed_ranges(

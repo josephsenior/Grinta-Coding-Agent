@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from backend.inference.metrics import Metrics
-from backend.orchestration.conversation_stats import ConversationStats
+from backend.orchestration.telemetry.conversation_stats import ConversationStats
 from backend.persistence.files import FileStore
 
 

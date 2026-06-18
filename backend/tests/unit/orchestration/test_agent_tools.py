@@ -1,9 +1,9 @@
-"""Tests for backend.orchestration.agent_tools — tool construction helpers."""
+"""Tests for backend.orchestration.agent.tools — tool construction helpers."""
 
 from typing import cast
 from unittest.mock import MagicMock, patch
 
-from backend.orchestration.agent_tools import (
+from backend.orchestration.agent.tools import (
     AgentFunctionChunkArgs,
     attach_additional_fields,
     build_tool,
@@ -27,10 +27,10 @@ class TestBuildTool:
         }
 
         with patch(
-            'backend.orchestration.agent_tools.make_function_chunk'
+            'backend.orchestration.agent.tools.make_function_chunk'
         ) as mock_chunk:
             with patch(
-                'backend.orchestration.agent_tools.make_tool_param'
+                'backend.orchestration.agent.tools.make_tool_param'
             ) as mock_param:
                 mock_chunk.return_value = {'name': 'search'}
                 mock_param.return_value = {
@@ -77,7 +77,7 @@ class TestBuildTool:
         }
 
         with patch(
-            'backend.orchestration.agent_tools.make_function_chunk'
+            'backend.orchestration.agent.tools.make_function_chunk'
         ) as mock_chunk:
             mock_chunk.side_effect = TypeError('Invalid parameter')
             result = build_tool(tool)
@@ -92,9 +92,9 @@ class TestBuildTool:
             'another_field': 42,
         }
 
-        with patch('backend.orchestration.agent_tools.make_function_chunk'):
+        with patch('backend.orchestration.agent.tools.make_function_chunk'):
             with patch(
-                'backend.orchestration.agent_tools.make_tool_param'
+                'backend.orchestration.agent.tools.make_tool_param'
             ) as mock_param:
                 mock_obj = MagicMock()
                 mock_param.return_value = mock_obj
@@ -188,7 +188,7 @@ class TestMakeFunctionChunkWrapper:
         """Test successful function chunk creation."""
         chunk_kwargs = cast(AgentFunctionChunkArgs, {'name': 'test'})
 
-        with patch('backend.orchestration.agent_tools.make_function_chunk') as mock:
+        with patch('backend.orchestration.agent.tools.make_function_chunk') as mock:
             mock.return_value = {'name': 'test'}
             result = make_function_chunk_wrapper(chunk_kwargs, {})
             assert result == {'name': 'test'}
@@ -198,7 +198,7 @@ class TestMakeFunctionChunkWrapper:
         """Test TypeError returns None."""
         chunk_kwargs = cast(AgentFunctionChunkArgs, {'name': 'test'})
 
-        with patch('backend.orchestration.agent_tools.make_function_chunk') as mock:
+        with patch('backend.orchestration.agent.tools.make_function_chunk') as mock:
             mock.side_effect = TypeError('Invalid')
             result = make_function_chunk_wrapper(chunk_kwargs, {})
             assert result is None
@@ -215,7 +215,7 @@ class TestMakeFunctionChunkWrapper:
             },
         )
 
-        with patch('backend.orchestration.agent_tools.make_function_chunk') as mock:
+        with patch('backend.orchestration.agent.tools.make_function_chunk') as mock:
             make_function_chunk_wrapper(chunk_kwargs, {})
             mock.assert_called_once_with(**chunk_kwargs)
 

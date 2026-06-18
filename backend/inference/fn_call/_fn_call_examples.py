@@ -185,7 +185,7 @@ def get_example_for_tools(tools: list[dict], mode: str = 'agent') -> str:
         str: The built example string, or empty string if no tools found.
 
     """
-    from backend.utils.terminal_contract import get_terminal_tool_name
+    from backend.utils.terminal.terminal_contract import get_terminal_tool_name
 
     # Extract available tools from the tools list
     available_tools = _extract_available_tools(tools)
@@ -247,7 +247,7 @@ def _extract_available_tools(tools: list[dict]) -> set[str]:
 
 def _get_tool_name_mapping() -> dict[str, str]:
     """Get mapping from tool names to example keys."""
-    from backend.utils.terminal_contract import get_terminal_tool_name
+    from backend.utils.terminal.terminal_contract import get_terminal_tool_name
 
     return {
         get_terminal_tool_name(): TERMINAL_EXAMPLE_KEY,

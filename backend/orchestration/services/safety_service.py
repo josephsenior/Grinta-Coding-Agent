@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 def _autonomy_level(autonomy: object | None) -> str:
     if autonomy is None:
         return ''
-    from backend.orchestration.autonomy import normalize_autonomy_level
+    from backend.orchestration.agent.autonomy import normalize_autonomy_level
 
     return normalize_autonomy_level(getattr(autonomy, 'autonomy_level', ''))
 
@@ -57,7 +57,7 @@ class SafetyService:
 
     def confirmation_disabled_by_autonomy(self) -> bool:
         """True when the configured autonomy level forbids confirmation prompts."""
-        from backend.orchestration.autonomy import AutonomyLevel
+        from backend.orchestration.agent.autonomy import AutonomyLevel
 
         return (
             _autonomy_level(self._context.autonomy_controller)

@@ -217,7 +217,7 @@ class TestDefaultLinterLintFile:
         with patch.object(DefaultLinter, '_check_backend_available', return_value=True):
             linter = DefaultLinter(backend='tree-sitter')
         with patch(
-            'backend.utils.lsp_client.get_lsp_client',
+            'backend.utils.lsp.lsp_client.get_lsp_client',
             return_value=MagicMock(
                 query=MagicMock(
                     return_value=MagicMock(available=False, error=True, locations=[])
@@ -236,7 +236,7 @@ class TestDefaultLinterLintFile:
         mock_loc.line = 5
         mock_loc.column = 3
         with patch(
-            'backend.utils.lsp_client.get_lsp_client',
+            'backend.utils.lsp.lsp_client.get_lsp_client',
             return_value=MagicMock(
                 query=MagicMock(
                     return_value=MagicMock(
@@ -256,7 +256,7 @@ class TestDefaultLinterLintFile:
         with patch.object(DefaultLinter, '_check_backend_available', return_value=True):
             linter = DefaultLinter(backend='ruff')
         with patch(
-            'backend.utils.lsp_client.get_lsp_client',
+            'backend.utils.lsp.lsp_client.get_lsp_client',
             return_value=MagicMock(
                 query=MagicMock(
                     return_value=MagicMock(available=False, error=True, locations=[])

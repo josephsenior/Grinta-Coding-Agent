@@ -59,7 +59,7 @@ from backend.ledger.action.terminal import (
 )
 from backend.ledger.observation import ErrorObservation, Observation
 from backend.security.analyzer import SecurityAnalyzer
-from backend.utils.async_utils import call_async_from_sync
+from backend.utils.async_helpers.async_utils import call_async_from_sync
 
 if TYPE_CHECKING:
     from backend.core.config import AppConfig

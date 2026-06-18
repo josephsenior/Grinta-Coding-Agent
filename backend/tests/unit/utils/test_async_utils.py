@@ -1,4 +1,4 @@
-"""Tests for backend.utils.async_utils — async/sync bridging and task coordination."""
+"""Tests for backend.utils.async_helpers.async_utils — async/sync bridging and task coordination."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ from unittest.mock import patch
 
 import pytest
 
-from backend.utils import async_utils
-from backend.utils.async_utils import (
+from backend.utils.async_helpers import async_utils
+from backend.utils.async_helpers.async_utils import (
     AsyncException,
     call_async_from_sync,
     call_coro_in_bg_thread,
@@ -53,7 +53,7 @@ class TestCreateTrackedTask:
     @pytest.mark.asyncio
     async def test_task_added_to_default_set(self):
         """Test task is added to module-level background tasks."""
-        from backend.utils.async_utils import _background_tasks
+        from backend.utils.async_helpers.async_utils import _background_tasks
 
         async def sample_coro():
             await asyncio.sleep(0.01)
@@ -376,7 +376,7 @@ class TestGetActiveLoop:
 class TestDrainStepBarrier:
     @pytest.mark.asyncio
     async def test_returns_true_when_pending_clears(self):
-        from backend.utils.async_utils import drain_step_barrier
+        from backend.utils.async_helpers.async_utils import drain_step_barrier
 
         outstanding = {'value': True}
 
@@ -397,7 +397,7 @@ class TestDrainStepBarrier:
 
     @pytest.mark.asyncio
     async def test_returns_false_on_timeout(self):
-        from backend.utils.async_utils import drain_step_barrier
+        from backend.utils.async_helpers.async_utils import drain_step_barrier
 
         drained = await drain_step_barrier(
             has_outstanding=lambda: True,
@@ -416,7 +416,7 @@ class TestRunOrSchedule:
     @pytest.mark.asyncio
     async def test_schedules_when_loop_running(self):
         """Test schedules task when loop is running."""
-        from backend.utils.async_utils import _background_tasks
+        from backend.utils.async_helpers.async_utils import _background_tasks
 
         async def to_schedule():
             await asyncio.sleep(0.01)

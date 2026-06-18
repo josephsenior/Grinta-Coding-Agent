@@ -1,11 +1,11 @@
-"""Tests for backend.orchestration.pre_exec_diff.PreExecDiffMiddleware."""
+"""Tests for backend.orchestration.file_edits.pre_exec_diff.PreExecDiffMiddleware."""
 
 from __future__ import annotations
 
 import os
 from unittest.mock import MagicMock, patch
 
-from backend.orchestration.pre_exec_diff import PreExecDiffMiddleware
+from backend.orchestration.file_edits.pre_exec_diff import PreExecDiffMiddleware
 
 
 def _make_ctx(action=None, workspace=None):
@@ -139,7 +139,7 @@ class TestExecuteEdit:
 
         with (
             patch(
-                'backend.orchestration.pre_exec_diff.PreExecDiffMiddleware._resolve_path',
+                'backend.orchestration.file_edits.pre_exec_diff.PreExecDiffMiddleware._resolve_path',
                 return_value=str(test_file),
             ),
         ):

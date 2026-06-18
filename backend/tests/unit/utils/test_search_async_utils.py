@@ -1,4 +1,4 @@
-"""Tests for backend.utils.search_utils and backend.utils.async_utils."""
+"""Tests for backend.utils.search_utils and backend.utils.async_helpers.async_utils."""
 
 from __future__ import annotations
 
@@ -94,7 +94,7 @@ class TestIterate(unittest.IsolatedAsyncioTestCase):
 # async_utils
 # ---------------------------------------------------------------------------
 
-from backend.utils.async_utils import (  # noqa: E402
+from backend.utils.async_helpers.async_utils import (  # noqa: E402
     AsyncException,
     _collect_results,
     _handle_pending_tasks,

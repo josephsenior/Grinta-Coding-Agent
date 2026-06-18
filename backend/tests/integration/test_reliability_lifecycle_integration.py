@@ -20,7 +20,7 @@ from backend.orchestration.session_orchestrator_mixins._session_orchestrator_par
     _SessionOrchestratorParallelMixin,
 )
 from backend.persistence.local_file_store import LocalFileStore
-from backend.utils.async_utils import drain_step_barrier, run_or_schedule
+from backend.utils.async_helpers.async_utils import drain_step_barrier, run_or_schedule
 
 pytestmark = pytest.mark.integration
 

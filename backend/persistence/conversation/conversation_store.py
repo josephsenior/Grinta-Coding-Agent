@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
-from backend.utils.async_utils import wait_all
+from backend.utils.async_helpers.async_utils import wait_all
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

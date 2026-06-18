@@ -16,7 +16,7 @@ from backend.ledger.observation.commands import CmdOutputObservation
 from backend.ledger.observation.empty import NullObservation
 from backend.ledger.observation.error import ErrorObservation
 from backend.orchestration.stuck import StuckDetector
-from backend.orchestration.stuck_patterns import (
+from backend.orchestration.stuck.patterns import (
     eq_no_pid,
     is_stuck_monologue,
     is_stuck_repeating_action_error,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from backend.orchestration.agent_circuit_breaker import (
+from backend.orchestration.agent.circuit_breaker import (
     FILE_EDIT_BUCKET,
     classify_file_edit_error_bucket,
 )

@@ -14,7 +14,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from backend.ledger.action import ActionSecurityRisk, CmdRunAction
-from backend.orchestration.agent_circuit_breaker import (
+from backend.orchestration.agent.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerConfig,
 )

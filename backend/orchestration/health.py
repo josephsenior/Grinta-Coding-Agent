@@ -79,7 +79,7 @@ def _controller_circuit_breaker_stats(controller: Any) -> list[CircuitBreakerHea
 def _legacy_circuit_breaker_stats() -> list[CircuitBreakerHealth]:
     """Fallback: read from the utility circuit breaker manager (deprecated)."""
     try:
-        from backend.utils.circuit_breaker import get_circuit_breaker_manager
+        from backend.utils.async_helpers.circuit_breaker import get_circuit_breaker_manager
 
         manager = get_circuit_breaker_manager()
         stats = []
@@ -204,7 +204,7 @@ def _controller_circuit_breaker_health(name: str, controller: Any) -> dict[str, 
 def _legacy_circuit_breaker_health(name: str) -> dict[str, Any]:
     """Fallback: read from the utility circuit breaker manager."""
     try:
-        from backend.utils.circuit_breaker import get_circuit_breaker_manager
+        from backend.utils.async_helpers.circuit_breaker import get_circuit_breaker_manager
 
         manager = get_circuit_breaker_manager()
         if name in manager.breakers:

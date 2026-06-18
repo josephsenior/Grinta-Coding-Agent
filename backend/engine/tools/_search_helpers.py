@@ -21,7 +21,7 @@ from backend.engine.tools.ignore_filter import (
     prune_ignored_dirs,
 )
 from backend.ledger.observation.search import GlobObservation, GrepObservation
-from backend.utils.subprocess_bridge import run_bounded_subprocess_sync
+from backend.utils.async_helpers.subprocess_bridge import run_bounded_subprocess_sync
 
 # Directories excluded from the file walker / ripgrep discovery.  Shared by
 # the ``grep`` and ``glob`` tools so they share the same noise floor.

@@ -1,4 +1,4 @@
-"""Tests for backend.execution.utils.git_diff."""
+"""Tests for backend.execution.utils.git.git_diff."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from backend.execution.utils import git_diff as gd
+from backend.execution.utils.git import git_diff as gd
 
 
 def test_get_closest_git_repo_returns_repo_root(tmp_path: Path) -> None:

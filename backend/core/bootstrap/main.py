@@ -18,7 +18,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, cast
 
-from backend.utils.async_utils import run_or_schedule
+from backend.utils.async_helpers.async_utils import run_or_schedule
 
 if TYPE_CHECKING:
     from backend.context.memory.agent_memory import Memory
@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from backend.ledger.stream import EventStream
     from backend.orchestration import SessionOrchestrator
     from backend.orchestration.agent import Agent
-    from backend.orchestration.conversation_stats import ConversationStats
+    from backend.orchestration.telemetry.conversation_stats import ConversationStats
     from backend.orchestration.state.state import State
 
 
@@ -62,7 +62,7 @@ from backend.ledger import EventSource, EventStreamSubscriber
 from backend.ledger.action import MessageAction, NullAction
 from backend.ledger.observation import AgentStateChangedObservation
 from backend.orchestration.replay import ReplayManager
-from backend.utils.async_utils import call_async_from_sync
+from backend.utils.async_helpers.async_utils import call_async_from_sync
 from backend.utils.core_utils import create_registry_and_conversation_stats
 
 _RUNTIME_ORCHESTRATOR: RuntimeOrchestrator = runtime_orchestrator
@@ -271,7 +271,7 @@ def _create_early_status_callback(
                     run_or_schedule(controller.set_agent_state_to(AgentState.ERROR))
                 except Exception:
                     try:
-                        from backend.utils.async_utils import create_tracked_task
+                        from backend.utils.async_helpers.async_utils import create_tracked_task
 
                         create_tracked_task(
                             controller.set_agent_state_to(AgentState.ERROR),

@@ -1,4 +1,4 @@
-"""Tests for backend.execution.utils.command — startup command helpers."""
+"""Tests for backend.execution.utils.shell.command — startup command helpers."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from typing import cast
 from unittest.mock import MagicMock
 
 from backend.execution.plugins.requirement import PluginRequirement
-from backend.execution.utils.command import (
+from backend.execution.utils.shell.command import (
     _build_plugin_args,
     _validate_and_get_username,
     _validate_env_part,

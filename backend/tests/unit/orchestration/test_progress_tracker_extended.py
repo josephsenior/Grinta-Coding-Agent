@@ -1,4 +1,4 @@
-"""Tests for backend.orchestration.progress_tracker — ProgressTracker & ProgressMetrics."""
+"""Tests for backend.orchestration.telemetry.progress_tracker — ProgressTracker & ProgressMetrics."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.orchestration.progress_tracker import (
+from backend.orchestration.telemetry.progress_tracker import (
     Milestone,
     ProgressMetrics,
     ProgressTracker,

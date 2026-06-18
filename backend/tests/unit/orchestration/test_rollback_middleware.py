@@ -1,4 +1,4 @@
-"""Unit tests for backend.orchestration.rollback_middleware — checkpoint creation."""
+"""Unit tests for backend.orchestration.middleware.rollback_middleware — checkpoint creation."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from backend.orchestration.rollback_middleware import (
+from backend.orchestration.middleware.rollback_middleware import (
     _RISKY_ACTION_TYPES,
     RollbackMiddleware,
 )

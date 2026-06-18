@@ -1,4 +1,4 @@
-"""Unit tests for backend.orchestration.pre_exec_diff module.
+"""Unit tests for backend.orchestration.file_edits.pre_exec_diff module.
 
 Tests cover:
 - PreExecDiffMiddleware initialization
@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock, mock_open, patch
 import pytest
 
 from backend.ledger.action import CmdRunAction, FileEditAction
-from backend.orchestration.pre_exec_diff import PreExecDiffMiddleware
+from backend.orchestration.file_edits.pre_exec_diff import PreExecDiffMiddleware
 
 
 class TestPreExecDiffMiddlewareInit:

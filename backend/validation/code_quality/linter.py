@@ -284,8 +284,8 @@ class DefaultLinter:
     def _lint_file(self, file_path: str) -> LintResult:
         """Lint a file using the detected backend."""
         # Try LSP first for all supported languages
-        from backend.utils.lsp_client import get_lsp_client
-        from backend.utils.syntax_check import check_syntax
+        from backend.utils.lsp.lsp_client import get_lsp_client
+        from backend.utils.treesitter.syntax_check import check_syntax
 
         lsp = get_lsp_client()
         lsp_res = lsp.query('diagnostics', file_path)
@@ -316,7 +316,7 @@ class DefaultLinter:
 
     def _lint_content(self, content: str, file_path: str | None = None) -> LintResult:
         """Lint content string using the detected backend."""
-        from backend.utils.syntax_check import check_syntax
+        from backend.utils.treesitter.syntax_check import check_syntax
 
         path = file_path or '<memory>.py'
         syntax_result = check_syntax(path, content)

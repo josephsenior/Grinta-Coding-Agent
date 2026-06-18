@@ -1,4 +1,4 @@
-"""Tests for backend.execution.utils.unified_shell module.
+"""Tests for backend.execution.utils.shell.unified_shell module.
 
 Targets 23.1% coverage (78 statements) by testing BaseShellSession.
 """
@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from backend.core.os_capabilities import OSCapabilities, override_os_capabilities
-from backend.execution.utils.unified_shell import BaseShellSession, create_shell_session
+from backend.execution.utils.shell.unified_shell import BaseShellSession, create_shell_session
 
 
 def _force_os(request, *, windows: bool) -> None:
@@ -218,7 +218,7 @@ class TestCreateShellSession:
         _force_os(request, windows=False)
         monkeypatch.setitem(
             sys.modules,
-            'backend.execution.utils.bash',
+            'backend.execution.utils.shell.bash',
             types.SimpleNamespace(BashSession=_DummySession),
         )
 
@@ -236,7 +236,7 @@ class TestCreateShellSession:
         _force_os(request, windows=False)
         monkeypatch.setitem(
             sys.modules,
-            'backend.execution.utils.simple_bash',
+            'backend.execution.utils.shell.simple_bash',
             types.SimpleNamespace(SimpleBashSession=_DummySession),
         )
 
@@ -255,12 +255,12 @@ class TestCreateShellSession:
 
         monkeypatch.setitem(
             sys.modules,
-            'backend.execution.utils.pty_session',
+            'backend.execution.utils.shell.pty_session',
             types.SimpleNamespace(PtyUnavailableError=_FakePtyUnavailableError),
         )
         monkeypatch.setitem(
             sys.modules,
-            'backend.execution.utils.pty_shell_session',
+            'backend.execution.utils.shell.pty_shell_session',
             types.SimpleNamespace(PtyInteractiveShellSession=_DummySession),
         )
 
@@ -288,17 +288,17 @@ class TestCreateShellSession:
         _force_os(request, windows=False)
         monkeypatch.setitem(
             sys.modules,
-            'backend.execution.utils.pty_session',
+            'backend.execution.utils.shell.pty_session',
             types.SimpleNamespace(PtyUnavailableError=_FakePtyUnavailableError),
         )
         monkeypatch.setitem(
             sys.modules,
-            'backend.execution.utils.pty_shell_session',
+            'backend.execution.utils.shell.pty_shell_session',
             types.SimpleNamespace(PtyInteractiveShellSession=_RaisingPtySession),
         )
         monkeypatch.setitem(
             sys.modules,
-            'backend.execution.utils.bash',
+            'backend.execution.utils.shell.bash',
             types.SimpleNamespace(BashSession=_DummySession),
         )
 
@@ -319,7 +319,7 @@ class TestCreateShellSession:
         _force_os(request, windows=False)
         monkeypatch.setitem(
             sys.modules,
-            'backend.execution.utils.simple_bash',
+            'backend.execution.utils.shell.simple_bash',
             types.SimpleNamespace(SimpleBashSession=_DummySession),
         )
 
@@ -337,7 +337,7 @@ class TestCreateShellSession:
         _force_os(request, windows=True)
         monkeypatch.setitem(
             sys.modules,
-            'backend.execution.utils.windows_bash',
+            'backend.execution.utils.shell.windows_bash',
             types.SimpleNamespace(WindowsPowershellSession=_DummySession),
         )
 
@@ -360,7 +360,7 @@ class TestCreateShellSession:
         _force_os(request, windows=True)
         monkeypatch.setitem(
             sys.modules,
-            'backend.execution.utils.simple_bash',
+            'backend.execution.utils.shell.simple_bash',
             types.SimpleNamespace(SimpleBashSession=_DummySession),
         )
 
