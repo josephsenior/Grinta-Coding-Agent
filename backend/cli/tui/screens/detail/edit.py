@@ -13,15 +13,9 @@ class EditDetailScreen(DetailScreen):
 
     DEFAULT_CSS = """
     EditDetailScreen #detail-body > UnifiedDiffView {
-        height: 1fr;
-        min-height: 0;
-    }
-    EditDetailScreen #detail-body > UnifiedDiffView.-scrollable {
-        height: 1fr;
-        overflow-y: auto;
-    }
-    EditDetailScreen #detail-body > UnifiedDiffView.-compact {
         height: auto;
+        min-height: 0;
+        overflow-y: hidden;
     }
     """
 
@@ -51,6 +45,7 @@ class EditDetailScreen(DetailScreen):
                     old_content=payload.get('old'),
                     new_content=payload.get('new'),
                     patch=payload.get('patch'),
+                    max_lines=1_000_000,
                 )
                 widgets.append(view)
             else:

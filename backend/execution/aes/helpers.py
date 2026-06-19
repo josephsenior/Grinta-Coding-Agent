@@ -837,6 +837,7 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
     if tool_result.get('ok') is False:
         obs: ErrorObservation | FileEditObservation = ErrorObservation(result_str)
         obs.tool_result = tool_result
+        obs.error_id = (tool_result or {}).get('error_code', '') or ''
         return obs
 
     # Compute SHA-256 hash of new_content for verification
@@ -976,7 +977,9 @@ def _execute_structured_file_edit_action(executor: Any, action: Any) -> Any:
     payload = _structured_payload_dict(action)
 
     if command != 'multi_edit':
-        return ErrorObservation(f'Unsupported structured file edit command: {command}')
+        obs = ErrorObservation(f'Unsupported structured file edit command: {command}')
+        obs.error_id = 'UNSUPPORTED_COMMAND'
+        return obs
 
     return _execute_multi_edit(executor, action, payload)
 
@@ -1027,6 +1030,7 @@ def _make_edit_error_obs(exc: Exception, payload: dict, command: str) -> Any:
     message, tool_result = normalize_edit_exception(exc, payload, command=command)
     obs: ErrorObservation = ErrorObservation(message)
     obs.tool_result = tool_result
+    obs.error_id = (tool_result or {}).get('error_code', '') or ''
     return obs
 
 
