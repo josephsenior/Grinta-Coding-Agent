@@ -122,11 +122,17 @@ class EditCard(ScanLineCard):
         verb = 'Created' if self._is_create else 'Edited'
         path = _compact_path(self._display_path)
         badge = ''
+        pipe_color = {
+            'queued': '#2d4a6a',
+            'running': '#EF9F27',
+            'done': '#639922',
+            'failed': '#E24B4A',
+        }.get(self._state, '#2d4a6a')
         if self._syntax_pass is True:
             badge = ' [#639922]✓[/]'
         elif self._syntax_pass is False:
             badge = ' [#E24B4A]✗[/]'
-        return f'[#5eead4]{verb}[/]  [#c8d4e8]{path}[/]{badge}'
+        return f'[{pipe_color}]{verb}[/]  [#c8d4e8]{path}[/]{badge}'
 
     def _delta_text(self) -> str:
         parts: list[str] = []

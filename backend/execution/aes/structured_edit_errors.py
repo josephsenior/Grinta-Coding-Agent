@@ -231,10 +231,7 @@ def normalize_edit_exception(
     command: str,
 ) -> tuple[str, dict[str, Any]]:
     if isinstance(exc, ToolExecutionError) and exc.context:
-        context = dict(exc.context)
-        fallback = str(exc).strip() or 'multi_edit failed.'
-        message = format_agent_edit_error_message(context, fallback=fallback)
-        return message, build_edit_error_tool_result(context, operation=command)
+        return str(exc).strip(), build_edit_error_tool_result(dict(exc.context), operation=command)
 
     if isinstance(exc, FunctionCallValidationError):
         context = parse_validation_error(str(exc), payload)

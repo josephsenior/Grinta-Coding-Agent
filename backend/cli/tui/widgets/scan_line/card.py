@@ -35,11 +35,11 @@ class ScanLineCard(Container):
     ScanLineCard {
         width: 100%;
         height: auto;
-        margin: 0 0 1 0;
+        margin: 0;
         border: transparent;
         background: #090d18;
         border-left: solid #2d4a6a;
-        padding: 0 1 0 2;
+        padding: 0 1 0 1;
     }
     ScanLineCard.queued {
         border-left: solid #2d4a6a;

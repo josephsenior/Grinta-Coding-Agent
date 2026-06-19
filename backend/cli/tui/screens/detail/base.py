@@ -5,7 +5,7 @@ from __future__ import annotations
 from textual.app import ComposeResult
 from textual.containers import VerticalScroll
 from textual.screen import Screen
-from textual.widgets import Footer, Header, Static
+from textual.widgets import Footer, Static
 
 
 class DetailScreen(Screen):
@@ -26,7 +26,6 @@ class DetailScreen(Screen):
 
     def compose(self) -> ComposeResult:
         title = Static(self._detail_title, id='detail-title')
-        yield Header()
         yield title
         yield VerticalScroll(*self.build_content(), id='detail-body')
         yield Footer()
