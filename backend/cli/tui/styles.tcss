@@ -1115,7 +1115,6 @@ LiveResponse {
 
 LiveResponse.-streaming {
     color: #d5dee8;
-    border-left: solid #5eead4;
 }
 
 ThinkingIndicator {

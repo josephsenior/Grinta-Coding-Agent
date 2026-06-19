@@ -111,7 +111,6 @@ class LiveResponse(Static):
     }
     LiveResponse.-streaming {
         color: #d5dee8;
-        border-left: solid #5eead4;
     }
     """
 
@@ -157,7 +156,6 @@ class ThinkingIndicator(Container):
     }
     ThinkingIndicator.-streaming {
         background: #0a101c;
-        border-left: solid #5eead4;
     }
     ThinkingIndicator > #thinking-content {
         width: 100%;
