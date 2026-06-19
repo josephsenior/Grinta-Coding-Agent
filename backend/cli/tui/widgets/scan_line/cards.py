@@ -164,12 +164,14 @@ class ShellCard(ScanLineCard):
         *,
         output: str = '',
         exit_code: int | None = None,
+        cwd: str = '',
         id: str | None = None,
     ) -> None:
         super().__init__(id=id)
         self.command = command
         self.output = output
         self.exit_code = exit_code
+        self.cwd = cwd
         self._apply_initial_state()
 
     def _apply_initial_state(self) -> None:
@@ -211,6 +213,7 @@ class ShellCard(ScanLineCard):
             command=self.command,
             output=self.output,
             exit_code=self.exit_code,
+            cwd=self.cwd,
             title=f'Shell  {_truncate(self.command, 60)}',
         )
 
