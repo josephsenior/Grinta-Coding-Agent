@@ -46,6 +46,8 @@ def _build_gemini_tool_response_parts(name: str, content: Any) -> list[dict[str,
         payload: Any = '\n'.join(text_chunks)
     else:
         payload = content if content is not None else ''
+    if isinstance(payload, str) and not payload.strip():
+        payload = f'[{name or "tool"} completed]'
     return [
         {
             'function_response': {

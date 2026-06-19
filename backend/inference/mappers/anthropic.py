@@ -190,20 +190,28 @@ def _normalize_tool_message(
 ) -> dict[str, Any]:
     tool_call_id = message.get('tool_call_id')
     content = _content_to_text(message.get('content'))
-    if isinstance(tool_call_id, str) and tool_call_id in known_tool_ids:
-        return {
-            'role': 'user',
-            'content': [
-                {
-                    'type': 'tool_result',
-                    'tool_use_id': tool_call_id,
-                    'content': content,
-                }
-            ],
-        }
-
     tool_name = message.get('name')
     label = tool_name if isinstance(tool_name, str) and tool_name else 'tool'
+
+    if isinstance(tool_call_id, str) and tool_call_id in known_tool_ids:
+        result_content: list[dict[str, Any]] = []
+        if content.strip():
+            result_content.append({
+                'type': 'tool_result',
+                'tool_use_id': tool_call_id,
+                'content': content,
+            })
+        else:
+            result_content.append({
+                'type': 'tool_result',
+                'tool_use_id': tool_call_id,
+                'content': f'[{label} completed]',
+            })
+        return {
+            'role': 'user',
+            'content': result_content,
+        }
+
     return {
         'role': 'user',
         'content': f'[Unmatched tool result from {label}]\n{content}'.strip(),
