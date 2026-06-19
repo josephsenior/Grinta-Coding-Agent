@@ -120,7 +120,7 @@ jobs:
               (contains(github.event.review.body, '@grinta-agent-exp') || contains(github.event.review.body, '@App-agent-exp'))
             )
           )
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
         with:
           path: ${{ env.pythonLocation }}/lib/python3.12/site-packages/*
           key: ${{ runner.os }}-pip-grinta-resolver-${{ hashFiles('/tmp/requirements.txt') }}
