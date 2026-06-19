@@ -10,6 +10,10 @@ import pytest
 
 from backend.context.compactor.compactor import Compaction
 from backend.context.compactor.strategies.structured_summary_compactor import (
+    CommandResult,
+    Dependency,
+    FailedCommand,
+    FileModification,
     StateSummary,
     StructuredSummaryCompactor,
 )
@@ -105,11 +109,50 @@ class TestStateSummary:
         s = StateSummary()
         assert str(s) != ''
 
+    def test_tool_description_uses_json_schema_for_nested_models(self):
+        desc = StateSummary.tool_description()
+        params = desc['function']['parameters']
+        props = params['properties']
+        # files_modified should be an array with $ref to FileModification
+        files_schema = props['files_modified']
+        assert files_schema['type'] == 'array'
+        assert '$ref' in files_schema['items']
+        # Definitions should be present
+        assert 'definitions' in params
+        assert 'FileModification' in params['definitions']
+        fm_def = params['definitions']['FileModification']
+        assert 'path' in fm_def['properties']
+        assert 'change_type' in fm_def['properties']
+        # error_messages should reference FailedCommand
+        errors_schema = props['error_messages']
+        assert errors_schema['type'] == 'array'
+        assert '$ref' in errors_schema['items']
+        assert 'FailedCommand' in params['definitions']
+        # dependencies should reference Dependency
+        deps_schema = props['dependencies']
+        assert deps_schema['type'] == 'array'
+        assert '$ref' in deps_schema['items']
+        assert 'Dependency' in params['definitions']
+
+    def test_str_renders_list_fields(self):
+        s = StateSummary(
+            files_modified=[FileModification(path='/a.py', change_type='created')],
+            error_messages=[
+                FailedCommand(command='pytest', exact_error='FAIL', exit_code=1),
+            ],
+            dependencies=[Dependency(name='fastapi', version='0.100')],
+        )
+        rendered = str(s)
+        assert '/a.py' in rendered
+        assert '(created)' in rendered
+        assert 'exit=1' in rendered
+        assert 'fastapi@0.100' in rendered
+
     def test_canonical_patch_prefers_explicit_patch_fields(self):
         s = StateSummary(
             pending_tasks='old pending task',
             current_working_step='old next step',
-            files_modified='old.py',
+            files_modified=[FileModification(path='old.py', change_type='modified')],
             canonical_active_plan='patch plan',
             canonical_next_action='run focused test',
             canonical_active_files='backend/context/canonical_state.py',
@@ -124,6 +167,17 @@ class TestStateSummary:
         assert patch['active_files'] == 'backend/context/canonical_state.py'
         assert patch['blockers'] == 'pytest still failing'
         assert patch['narrative_summary'] == 'short current summary'
+
+    def test_canonical_patch_falls_back_to_files_modified(self):
+        s = StateSummary(
+            files_modified=[
+                FileModification(path='/src/main.py', change_type='created'),
+                FileModification(path='/src/util.py', change_type='modified'),
+            ],
+        )
+        patch = s.canonical_patch()
+        assert '/src/main.py' in patch['active_files']
+        assert '/src/util.py' in patch['active_files']
 
 
 # ---------------------------------------------------------------------------
@@ -177,14 +231,33 @@ class TestParseLlmResponse:
             'user_context': 'ctx',
             'completed_tasks': 'done',
             'pending_tasks': 'todo',
-            'files_modified': 'auth.py',
+            'files_modified': [
+                {'path': '/abs/auth.py', 'change_type': 'modified'},
+            ],
+            'error_messages': [
+                {'command': 'pytest', 'exact_error': 'AssertionError', 'exit_code': 1},
+            ],
+            'exact_commands_and_results': [
+                {'command': 'npm test', 'exit_code': 0, 'output_summary': '5 passed'},
+            ],
+            'dependencies': [
+                {'name': 'pydantic', 'version': '2.0'},
+            ],
             'tests_passing': 'true',
             'branch_name': 'fix-auth',
             'pr_status': 'open',
         }
         response = _make_tool_call_response(args)
         result = self.condenser._parse_llm_response(response)
-        assert result.files_modified == 'auth.py'
+        assert len(result.files_modified) == 1
+        assert result.files_modified[0].path == '/abs/auth.py'
+        assert result.files_modified[0].change_type == 'modified'
+        assert len(result.error_messages) == 1
+        assert result.error_messages[0].exit_code == 1
+        assert len(result.exact_commands_and_results) == 1
+        assert result.exact_commands_and_results[0].exit_code == 0
+        assert len(result.dependencies) == 1
+        assert result.dependencies[0].name == 'pydantic'
         assert result.branch_name == 'fix-auth'
         assert result.pr_status == 'open'
 
@@ -224,6 +297,20 @@ class TestParseLlmResponse:
         response.choices = [choice]
         result = self.condenser._parse_llm_response(response)
         assert isinstance(result, StateSummary)
+
+    def test_string_for_list_field_falls_back_to_empty_summary(self):
+        """When LLM returns a string for a list field, validation fails gracefully."""
+        args = {
+            'user_context': 'ctx',
+            'completed_tasks': 'done',
+            'pending_tasks': 'todo',
+            'files_modified': 'just a string',  # wrong type
+        }
+        response = _make_tool_call_response(args)
+        result = self.condenser._parse_llm_response(response)
+        # Falls back to empty summary
+        assert isinstance(result, StateSummary)
+        assert result.files_modified == []
 
 
 # ---------------------------------------------------------------------------

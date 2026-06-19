@@ -265,7 +265,12 @@ def _enforce_max_event_count(
     max_events: int,
     min_tool_loops: int = 0,
 ) -> list[Event]:
-    """Drop oldest removable events until the selection fits *max_events*."""
+    """Drop oldest removable events until the selection fits *max_events*.
+
+    Events are dropped at causal-chunk granularity to preserve
+    ``(action, observation)`` pair integrity. Dropping one half of a pair
+    produces an invalid message sequence that most LLM APIs reject.
+    """
     if len(selected) <= max_events:
         return selected
     protected_ids = _event_id_set(protected)
@@ -280,7 +285,17 @@ def _enforce_max_event_count(
     if len(protected_events) >= max_events:
         return selected
     slots = max_events - len(protected_events)
-    return _dedupe_events_preserve_order(protected_events + removable[-slots:])
+    # Drop at causal-chunk granularity to preserve tool_call/tool_result pairs.
+    removable_chunks = _causal_chunks(removable)
+    kept_chunks: list[list[Event]] = []
+    total = 0
+    for chunk in reversed(removable_chunks):
+        if total + len(chunk) > slots:
+            break
+        kept_chunks.insert(0, chunk)
+        total += len(chunk)
+    kept_removable = [e for chunk in kept_chunks for e in chunk]
+    return _dedupe_events_preserve_order(protected_events + kept_removable)
 
 
 def _build_windowed_result(ctx, protected, selected_chunks, llm_config):

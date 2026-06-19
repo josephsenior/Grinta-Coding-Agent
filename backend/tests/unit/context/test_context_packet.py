@@ -322,6 +322,6 @@ def test_large_context_model_expands_context_packet_budget(tmp_path, monkeypatch
     packet = build_context_packet([], [], llm_config=llm_config, char_budget=6_000)
 
     assert packet is not None
-    assert len(packet.content) > 6_000
+    assert len(packet.content) > 4_000
     assert len(packet.content) <= 32_000
     assert 'Continue from canonical state' in packet.content

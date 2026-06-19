@@ -20,6 +20,52 @@ if TYPE_CHECKING:
     pass
 
 
+class FileModification(BaseModel):
+    """A file that was created, modified, or deleted."""
+
+    path: str = Field(description='Absolute file path.')
+    change_type: str = Field(
+        description='One of: "created", "modified", "deleted".',
+    )
+
+
+class FailedCommand(BaseModel):
+    """A command that failed with a non-zero exit code."""
+
+    command: str = Field(description='The exact command that was run.')
+    exact_error: str = Field(description='The exact error message or stderr output.')
+    exit_code: int = Field(description='The non-zero exit code.')
+
+
+class CommandResult(BaseModel):
+    """A command and its outcome."""
+
+    command: str = Field(description='The exact command that was run.')
+    exit_code: int = Field(description='The exit code (0 = success).')
+    output_summary: str = Field(
+        description='First ~200 chars of stdout/stderr output.',
+    )
+
+
+class Dependency(BaseModel):
+    """A dependency or package that was added or modified."""
+
+    name: str = Field(description='Package or module name.')
+    version: str = Field(description='Version string or "latest".')
+
+
+def _strip_title(schema_obj: dict[str, Any]) -> dict[str, Any]:
+    """Remove 'title' keys from a JSON schema object (LLMs don't need them)."""
+    result = {k: v for k, v in schema_obj.items() if k != 'title'}
+    if 'items' in result and isinstance(result['items'], dict):
+        result['items'] = _strip_title(result['items'])
+    if 'properties' in result and isinstance(result['properties'], dict):
+        result['properties'] = {
+            k: _strip_title(v) for k, v in result['properties'].items()
+        }
+    return result
+
+
 class StateSummary(BaseModel):
     """A structured representation summarizing the state of the agent and the task."""
 
@@ -49,8 +95,9 @@ class StateSummary(BaseModel):
         default='',
         description='Current variables, data structures, or other relevant state information.',
     )
-    files_modified: str = Field(
-        default='', description='List of files that have been created or modified.'
+    files_modified: list[FileModification] = Field(
+        default_factory=list,
+        description='Files created, modified, or deleted. Each entry must have absolute path and change_type.',
     )
     function_changes: str = Field(
         default='', description='List of functions that have been created or modified.'
@@ -69,12 +116,13 @@ class StateSummary(BaseModel):
     failing_tests: str = Field(
         default='', description='List of names or descriptions of any failing tests.'
     )
-    error_messages: str = Field(
-        default='', description='List of key error messages encountered.'
+    error_messages: list[FailedCommand] = Field(
+        default_factory=list,
+        description='Commands that failed. Each entry must have command, exact_error, and exit_code.',
     )
-    exact_commands_and_results: str = Field(
-        default='',
-        description='Important commands/tool calls and their exact outcome, including paths and exit statuses when known.',
+    exact_commands_and_results: list[CommandResult] = Field(
+        default_factory=list,
+        description='Important commands and their outcomes. Each entry must have command, exit_code, and output_summary.',
     )
     verification_status: str = Field(
         default='',
@@ -103,9 +151,9 @@ class StateSummary(BaseModel):
         default='',
         description="Status of any pull request: 'draft', 'open', 'merged', 'closed', or 'unknown'.",
     )
-    dependencies: str = Field(
-        default='',
-        description='List of dependencies or imports that have been added or modified.',
+    dependencies: list[Dependency] = Field(
+        default_factory=list,
+        description='Dependencies added or modified. Each entry must have name and version.',
     )
     other_relevant_context: str = Field(
         default='',
@@ -145,19 +193,38 @@ class StateSummary(BaseModel):
         """Description of a tool whose arguments are the fields of this class.
 
         Can be given to an LLM to force structured generation.
+        Uses Pydantic's JSON schema generation for correct nested model schemas.
         """
-        properties = {}
-        for field_name, field in cls.model_fields.items():
-            description = field.description or ''
-            properties[field_name] = {'type': 'string', 'description': description}
-        return {
+        schema = cls.model_json_schema()
+        # Strip top-level metadata that OpenAI/function-calling APIs reject.
+        defs = schema.get('$defs', schema.get('definitions', {}))
+        props = schema.get('properties', {})
+
+        # Strip 'title' keys from properties and nested defs (LLMs don't need them).
+        cleaned_props: dict[str, Any] = {}
+        for name, prop in props.items():
+            cleaned_props[name] = _strip_title(prop)
+        cleaned_defs: dict[str, Any] = {}
+        for name, defn in defs.items():
+            cleaned_defs[name] = _strip_title(defn)
+
+        result: dict[str, Any] = {
             'type': 'function',
             'function': {
                 'name': 'create_state_summary',
-                'description': 'Creates a comprehensive summary of the current state of the interaction to preserve context when history grows too large. You must include non-empty values for original_objective, user_context, completed_tasks, and pending_tasks.',
+                'description': (
+                    'Creates a comprehensive summary of the current state of the '
+                    'interaction to preserve context when history grows too large. '
+                    'You must include non-empty values for original_objective, '
+                    'user_context, completed_tasks, and pending_tasks. '
+                    'For files_modified, error_messages, exact_commands_and_results, '
+                    'and dependencies you MUST return structured arrays with the '
+                    'exact field names specified in the schema — do NOT write '
+                    'free-text summaries for these fields.'
+                ),
                 'parameters': {
                     'type': 'object',
-                    'properties': properties,
+                    'properties': cleaned_props,
                     'required': [
                         'original_objective',
                         'user_context',
@@ -167,9 +234,38 @@ class StateSummary(BaseModel):
                 },
             },
         }
+        if cleaned_defs:
+            result['function']['parameters']['definitions'] = cleaned_defs
+        return result
 
     def __str__(self) -> str:
         """Format the state summary in a clear way for Claude 3.7 Sonnet."""
+        files_str = (
+            '\n'.join(
+                f'  - {fm.path} ({fm.change_type})' for fm in self.files_modified
+            )
+            or '(none)'
+        )
+        errors_str = (
+            '\n'.join(
+                f'  - {fc.command}: {fc.exact_error} (exit={fc.exit_code})'
+                for fc in self.error_messages
+            )
+            or '(none)'
+        )
+        commands_str = (
+            '\n'.join(
+                f'  - {cr.command} → exit={cr.exit_code}: {cr.output_summary}'
+                for cr in self.exact_commands_and_results
+            )
+            or '(none)'
+        )
+        deps_str = (
+            '\n'.join(
+                f'  - {dep.name}@{dep.version}' for dep in self.dependencies
+            )
+            or '(none)'
+        )
         sections = [
             '# State Summary',
             '## Core Information',
@@ -181,16 +277,16 @@ class StateSummary(BaseModel):
             f'**Current Working Step**: {self.current_working_step}',
             f'**Current State**: {self.current_state}',
             '## Code Changes',
-            f'**Files Modified**: {self.files_modified}',
+            f'**Files Modified**:\n{files_str}',
             f'**Function Changes**: {self.function_changes}',
             f'**Data Structures**: {self.data_structures}',
-            f'**Dependencies**: {self.dependencies}',
+            f'**Dependencies**:\n{deps_str}',
             '## Testing Status',
             f'**Tests Written**: {self.tests_written}',
             f'**Tests Passing**: {self.tests_passing}',
             f'**Failing Tests**: {self.failing_tests}',
-            f'**Error Messages**: {self.error_messages}',
-            f'**Exact Commands And Results**: {self.exact_commands_and_results}',
+            f'**Error Messages**:\n{errors_str}',
+            f'**Exact Commands And Results**:\n{commands_str}',
             f'**Verification Status**: {self.verification_status}',
             f'**Known Failures Or Avoid**: {self.known_failures_or_avoid}',
             '## Version Control',
@@ -230,7 +326,8 @@ class StateSummary(BaseModel):
             'blockers': self.canonical_blockers or self.known_failures_or_avoid,
             'decisions': self.canonical_decisions,
             'invalidated_assumptions': self.canonical_invalidated_assumptions,
-            'active_files': self.canonical_active_files or self.files_modified,
+            'active_files': self.canonical_active_files
+            or '\n'.join(fm.path for fm in self.files_modified),
             'narrative_summary': narrative[:1200],
             'vcs_status': self._vcs_status_patch(),
         }
@@ -390,6 +487,11 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             '- Explicit approaches the user rejected or asked not to repeat\n'
             '- Current state of code, variables, and data structures\n'
             '- The status of any version control operations\n\n'
+            'STRUCTURED FIELDS — you MUST return these as typed arrays, not free text:\n'
+            '- files_modified: list of {path, change_type} objects with absolute paths\n'
+            '- error_messages: list of {command, exact_error, exit_code} objects\n'
+            '- exact_commands_and_results: list of {command, exit_code, output_summary} objects\n'
+            '- dependencies: list of {name, version} objects\n\n'
             'For canonical_next_action, write one concrete next action. For canonical_active_files, include only paths still relevant to upcoming work. For canonical_blockers, include only unresolved blockers.\n\n'
         )
 

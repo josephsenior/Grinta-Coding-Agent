@@ -324,7 +324,9 @@ _CONDENSATION_BANNER = (
 
 _POST_CONDENSATION_RECOVERY = (
     '\n' + '─' * 60 + '\n'
-    'Context was condensed. Continue working from where you left off.\n'
+    'Context was condensed. The canonical task state and restored context '
+    'above are your source of truth — do not hallucinate next actions.\n'
+    'Continue from the next_action field in the canonical state.\n'
     'Do NOT re-read files you already created — trust your prior writes.\n'
 )
 

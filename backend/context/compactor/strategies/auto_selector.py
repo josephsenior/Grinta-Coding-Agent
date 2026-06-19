@@ -105,7 +105,7 @@ def compute_signals(events: Sequence[Event]) -> TaskSignals:
 
 # Thresholds (tunable via config in future)
 _SHORT_SESSION = 30
-_MEDIUM_SESSION = 120
+_MEDIUM_SESSION = 31  # Was 120; microcompact now activates at 31 to close the dead zone
 _LONG_SESSION = 250
 _HIGH_ERROR_RATIO = 0.15
 
