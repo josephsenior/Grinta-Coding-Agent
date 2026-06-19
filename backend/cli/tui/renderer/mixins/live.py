@@ -128,13 +128,25 @@ class RendererLiveMixin:
             self._maybe_scroll_to_tail(display)
 
     def _apply_live_response_render(self, text: str) -> None:
-        from backend.cli.tui.renderer.prep import prep_streaming_renderable
+        from backend.cli.tui.renderer.prep import (
+            prep_streaming_renderable,
+            streaming_render_cache_key,
+        )
 
         widget = self._live_response_widget
         if widget is None:
             return
+        # Reuse an off-thread-prepared renderable when available (filled by
+        # prep_streaming_response_async during _preprocess_event_async) so the
+        # heavy Pygments/Markdown pass never runs on the Textual event loop.
+        cache = getattr(self, '_streaming_render_cache', None)
+        renderable = None
+        if cache is not None:
+            renderable = cache.get(streaming_render_cache_key(text))
         try:
-            widget.set_streaming_renderable(prep_streaming_renderable(text))
+            if renderable is None:
+                renderable = prep_streaming_renderable(text)
+            widget.set_streaming_renderable(renderable)
         except Exception:
             widget.set_streaming_text(text)
 

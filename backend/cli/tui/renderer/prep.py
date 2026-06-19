@@ -247,3 +247,46 @@ def prep_file_edit_encoded_diff(orch: Any, event: Any) -> str | None:
 
 async def prep_file_edit_encoded_diff_async(orch: Any, event: Any) -> str | None:
     return await asyncio.to_thread(prep_file_edit_encoded_diff, orch, event)
+
+
+# Bounded cache of off-thread-prepared streaming renderables, keyed by the
+# accumulated response text. Keeps the Textual event loop free of synchronous
+# Pygments/Markdown work for the in-flight assistant response.
+_STREAMING_RENDER_CACHE_MAX = 8
+
+
+def streaming_render_cache_key(text: str) -> str:
+    """Stable cache key for an accumulated streaming-response snapshot."""
+    return text or ''
+
+
+async def prep_streaming_response_async(orch: Any, text: str) -> None:
+    """Prepare the streaming-response renderable off the UI thread.
+
+    Populates ``orch._streaming_render_cache`` (a dict keyed by the accumulated
+    text) so ``_apply_live_response_render`` can reuse it without blocking the
+    event loop. Best-effort: failures are swallowed and the synchronous path
+    remains the fallback.
+    """
+    content = text or ''
+    if not content.strip():
+        return
+    cache = getattr(orch, '_streaming_render_cache', None)
+    if cache is None:
+        cache = {}
+        orch._streaming_render_cache = cache
+    key = streaming_render_cache_key(content)
+    if key in cache:
+        return
+    try:
+        renderable = await asyncio.to_thread(prep_streaming_renderable, content)
+    except Exception:
+        return
+    cache[key] = renderable
+    # Bound the cache: streaming text only grows, so the oldest (shortest)
+    # snapshots are the safest to drop.
+    if len(cache) > _STREAMING_RENDER_CACHE_MAX:
+        for stale_key in sorted(cache, key=len)[
+            : len(cache) - _STREAMING_RENDER_CACHE_MAX
+        ]:
+            cache.pop(stale_key, None)
