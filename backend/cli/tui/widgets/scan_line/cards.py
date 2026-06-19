@@ -65,6 +65,12 @@ def _format_diff_delta(added: int, removed: int) -> str:
 class AgentMessageCard(ScanLineCard):
     """1-line agent message summary — full markdown in detail screen."""
 
+    DEFAULT_CSS = """
+    AgentMessageCard {
+        border-left: none;
+    }
+    """
+
     def __init__(self, text: str, *, id: str | None = None) -> None:
         super().__init__(id=id)
         self._text = text
