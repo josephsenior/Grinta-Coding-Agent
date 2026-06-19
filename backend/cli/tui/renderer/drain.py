@@ -328,6 +328,21 @@ async def _preprocess_event_async(
     orch: 'RendererEventProcessorMixin', event: Any
 ) -> None:
     """Run heavy prep off the UI thread before synchronous dispatch."""
+    from backend.ledger.action.message import StreamingChunkAction
+
+    # Streaming-response markdown/syntax highlighting is CPU-heavy; prepare it
+    # off-thread so _apply_live_response_render can reuse the result instead of
+    # running Pygments/Markdown on the Textual event loop.
+    if isinstance(event, StreamingChunkAction):
+        if getattr(event, 'is_tool_call', False):
+            return
+        text = getattr(event, 'accumulated', '') or ''
+        if text.strip():
+            from backend.cli.tui.renderer.prep import prep_streaming_response_async
+
+            await prep_streaming_response_async(orch, text)
+        return
+
     event_id = getattr(event, 'id', -1)
     if event_id < 0:
         return
