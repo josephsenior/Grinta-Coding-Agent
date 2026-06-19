@@ -12,7 +12,12 @@ class EditDetailScreen(DetailScreen):
     """Full file-edit diff or new-file content with syntax error display."""
 
     DEFAULT_CSS = """
-    EditDetailScreen #detail-body > UnifiedDiffView {
+    EditDetailScreen #detail-body > .-scrollable {
+        height: auto;
+        min-height: 0;
+        overflow-y: hidden;
+    }
+    EditDetailScreen #detail-body > .-compact {
         height: auto;
         min-height: 0;
         overflow-y: hidden;
