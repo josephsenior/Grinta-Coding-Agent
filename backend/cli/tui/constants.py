@@ -53,7 +53,7 @@ _TUI_TERMINAL_DISPLAY_LINE_CAP = _bounded_int_env(
 )
 _TUI_VIEWPORT_MAX_MOUNTED = _bounded_int_env(
     'GRINTA_TUI_VIEWPORT_MAX_MOUNTED',
-    default=120,
+    default=80,
     minimum=40,
 )
 _TUI_VIEWPORT_OVERSCAN = _bounded_int_env(

@@ -87,7 +87,12 @@ class InfoSidebar(VerticalScroll):
 class Transcript(VerticalScroll):
     """Scrollable conversation transcript container with auto-scroll awareness."""
 
-    _VIEWPORT_MAX_MOUNTED = 120
+    # Single source of truth for the mounted-widget cap. The legacy prune path
+    # in RendererDisplayMixin reads ``display._VIEWPORT_MAX_MOUNTED``; keep it in
+    # sync with the env-overridable constant resolved at import time.
+    from backend.cli.tui.constants import (
+        _TUI_VIEWPORT_MAX_MOUNTED as _VIEWPORT_MAX_MOUNTED,
+    )
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
