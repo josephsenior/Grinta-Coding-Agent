@@ -214,6 +214,8 @@ class Transcript(VerticalScroll):
                 continue
             if child is self._load_earlier_button:
                 continue
+            if getattr(child, '_tui_removing', False):
+                continue
             widgets.append(child)
         return widgets
 
@@ -235,6 +237,7 @@ class Transcript(VerticalScroll):
 
         cache = getattr(renderer, '_render_cache', None)
         for widget in to_unmount:
+            setattr(widget, '_tui_removing', True)
             event_id = getattr(widget, '_ledger_event_id', None)
             if cache is not None and event_id is not None:
                 cache[event_id] = RenderArtifact(
@@ -379,6 +382,8 @@ class Transcript(VerticalScroll):
                 continue
             if child is self._load_earlier_button:
                 continue
+            if getattr(child, '_tui_removing', False):
+                continue
             count += 1
         return count
 
@@ -392,7 +397,10 @@ class Transcript(VerticalScroll):
                 continue
             if child is self._load_earlier_button:
                 continue
+            if getattr(child, '_tui_removing', False):
+                continue
             try:
+                setattr(child, '_tui_removing', True)
                 child.remove()
                 removed += 1
             except Exception:
