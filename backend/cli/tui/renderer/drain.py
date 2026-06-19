@@ -37,6 +37,11 @@ if TYPE_CHECKING:
 
 _TUI_DRAIN_DEBOUNCE_SECONDS = 0.016
 
+# Pending-queue depth at which we proactively disable transcript mount
+# animations. Skipping the per-widget 0.2s animation during bursts prevents
+# the Textual event loop from stalling while many cards mount at once.
+_TUI_BACKPRESSURE_PENDING_THRESHOLD = 8
+
 
 def _set_display_backpressure(
     orch: 'RendererEventProcessorMixin', active: bool
@@ -617,6 +622,12 @@ def _on_event(orch: 'RendererEventProcessorMixin', event: Any) -> None:
         if not orch._drain_scheduled:
             orch._drain_scheduled = True
             should_schedule_drain = True
+        # Predictive backpressure: flag the display as soon as the queue starts
+        # backing up so the very first burst card mounts without animation,
+        # rather than waiting for a drain pass to observe leftover events.
+        pending_backpressure = (
+            len(orch._pending_events) > _TUI_BACKPRESSURE_PENDING_THRESHOLD
+        )
     try:
         orch._loop.call_soon_threadsafe(
             partial(_signal_activity, orch),
@@ -624,6 +635,15 @@ def _on_event(orch: 'RendererEventProcessorMixin', event: Any) -> None:
         )
     except RuntimeError:
         pass
+    # _on_event runs on a background thread; never touch Textual widgets here.
+    # Hop onto the event loop to toggle display backpressure.
+    if pending_backpressure:
+        try:
+            orch._loop.call_soon_threadsafe(
+                partial(_set_display_backpressure, orch, True),
+            )
+        except RuntimeError:
+            pass
 
 
 def _post_drain_message(orch: 'RendererEventProcessorMixin') -> None:
