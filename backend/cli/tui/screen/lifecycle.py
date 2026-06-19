@@ -614,7 +614,8 @@ class ScreenLifecycleMixin:
 
     async def _poll_wait(self):
         # Keep the poll loop lightweight; renderer drains are event-driven.
-        await asyncio.sleep(0.1)
+        # 250ms sleep balances responsiveness with reduced CPU wakeups (~4/sec).
+        await asyncio.sleep(0.25)
 
     def _get_current_event_count(self) -> int:
         try:

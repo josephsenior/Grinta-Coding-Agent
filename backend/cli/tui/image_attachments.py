@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import mimetypes
 import platform
@@ -59,10 +60,10 @@ def encode_image_bytes_as_data_url(
     return f'data:{mime_type or "image/png"};base64,{encoded}'
 
 
-def encode_image_path_as_data_url(path: str | Path, *, max_bytes: int) -> str:
+async def encode_image_path_as_data_url(path: str | Path, *, max_bytes: int) -> str:
     """Read an image file and return a ``data:image/...;base64,...`` URL."""
     file_path = Path(path)
-    data = file_path.read_bytes()
+    data = await asyncio.to_thread(file_path.read_bytes)
     mime_type, _ = mimetypes.guess_type(str(file_path))
     return encode_image_bytes_as_data_url(
         data,
@@ -92,7 +93,6 @@ def _dib_to_bmp(dib: bytes) -> bytes | None:
 def _read_windows_clipboard_image() -> ClipboardImage | None:
     if sys.platform != 'win32':
         return None
-    # Prefer PowerShell: handles CF_DIB / screenshots; ctypes only sees rare PNG formats.
     image = _read_windows_clipboard_image_powershell()
     if image is not None:
         return image
@@ -228,8 +228,8 @@ def _read_linux_clipboard_image() -> ClipboardImage | None:
     return None
 
 
-def read_clipboard_image_blocking() -> ClipboardImage | None:
-    """Return clipboard image bytes when the OS clipboard holds an image."""
+def _read_clipboard_image_sync() -> ClipboardImage | None:
+    """Synchronous clipboard read - used internally by read_clipboard_image()."""
     readers = (
         _read_windows_clipboard_image,
         _read_macos_clipboard_image,
@@ -245,8 +245,17 @@ def read_clipboard_image_blocking() -> ClipboardImage | None:
     return None
 
 
-def pick_image_files_blocking() -> tuple[str, ...]:
-    """Open a native file picker and return selected image paths."""
+async def read_clipboard_image() -> ClipboardImage | None:
+    """Read clipboard image bytes when the OS clipboard holds an image.
+
+    Offloads the blocking clipboard read to a thread pool to avoid
+    freezing the Textual event loop.
+    """
+    return await asyncio.to_thread(_read_clipboard_image_sync)
+
+
+def _pick_image_files_sync() -> tuple[str, ...]:
+    """Synchronous file picker - used internally by pick_image_files()."""
     import tkinter as tk
     from tkinter import filedialog
 
@@ -267,3 +276,12 @@ def pick_image_files_blocking() -> tuple[str, ...]:
     finally:
         root.destroy()
     return tuple(str(path) for path in selected if path)
+
+
+async def pick_image_files() -> tuple[str, ...]:
+    """Open a native file picker and return selected image paths.
+
+    Offloads the blocking native file dialog to a thread pool to avoid
+    freezing the Textual event loop.
+    """
+    return await asyncio.to_thread(_pick_image_files_sync)

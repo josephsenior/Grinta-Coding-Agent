@@ -91,7 +91,7 @@ def _process_workspace_context_recall(
         filtered_agents,
         prompt_manager,
     )
-    return [Message(role='user', content=message_content)]
+    return [Message(role='system', content=message_content)]
 
 
 def _create_repo_info(obs: RecallObservation) -> RepositoryInfo | None:
@@ -233,7 +233,7 @@ def _process_knowledge_recall(
         content_items: list[TextContent | ImageContent] = [
             TextContent(text=formatted_text)
         ]
-        return [Message(role='user', content=content_items)]
+        return [Message(role='system', content=content_items)]
     return []
 
 

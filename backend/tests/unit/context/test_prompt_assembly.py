@@ -140,7 +140,7 @@ class TestProcessRecallObservation:
         pm = _prompt_manager()
         msgs = process_recall_observation(obs, 0, [], cfg, pm)
         assert msgs
-        assert msgs[0].role == 'user'
+        assert msgs[0].role == 'system'
         pm.build_workspace_context.assert_called_once()
 
     def test_knowledge_with_playbooks(self):

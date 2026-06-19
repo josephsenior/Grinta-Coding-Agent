@@ -366,7 +366,7 @@ class ScreenSettingsMixin:
             )
         )
         if result == 'delete':
-            self._delete_skill(skill_name)
+            await self._delete_skill(skill_name)
 
     async def _confirm_delete_mcp(self, mcp_name: str) -> None:
         result = await self.app.push_screen_wait(
@@ -377,9 +377,10 @@ class ScreenSettingsMixin:
             )
         )
         if result == 'delete':
-            self._delete_mcp_server(mcp_name)
+            await self._delete_mcp_server(mcp_name)
 
-    def _delete_skill(self, name: str) -> None:
+    def _delete_skill_sync(self, name: str) -> None:
+        """Synchronous skill deletion - used internally by _delete_skill()."""
         if not name.endswith('.md'):
             name += '.md'
         skill_path = Path.home() / '.grinta' / 'skills' / name
@@ -393,7 +394,13 @@ class ScreenSettingsMixin:
         except Exception as e:
             self.notify(f'Failed to delete skill: {e}', severity='error')
 
-    def _delete_mcp_server(self, name: str) -> None:
+    async def _delete_skill(self, name: str) -> None:
+        """Delete a skill file, offloaded to a thread pool."""
+        import asyncio
+        await asyncio.to_thread(self._delete_skill_sync, name)
+
+    def _delete_mcp_server_sync(self, name: str) -> None:
+        """Synchronous MCP server deletion - used internally by _delete_mcp_server()."""
         from backend.integrations.mcp.native_backends import is_user_visible_mcp_server
 
         if not is_user_visible_mcp_server(name):
@@ -411,6 +418,11 @@ class ScreenSettingsMixin:
         except Exception as e:
             self.notify(f'Failed to remove MCP server: {e}', severity='error')
 
+    async def _delete_mcp_server(self, name: str) -> None:
+        """Delete an MCP server, offloaded to a thread pool."""
+        import asyncio
+        await asyncio.to_thread(self._delete_mcp_server_sync, name)
+
     @work
     async def on_collapsible_section_action_clicked(self, event: Any) -> None:
         """Handle [+] Add clicks on sidebar sections."""
@@ -420,13 +432,14 @@ class ScreenSettingsMixin:
         if event.control.id == 'sidebar-skills':
             result = await self.app.push_screen_wait(GrintaAddSkillDialog())
             if result:
-                self._create_skill(result['name'], result['content'])
+                await self._create_skill(result['name'], result['content'])
         elif event.control.id == 'sidebar-mcp':
             result = await self.app.push_screen_wait(GrintaAddMCPDialog())
             if result:
-                self._add_mcp_server(result['name'], result['command'])
+                await self._add_mcp_server(result['name'], result['command'])
 
-    def _create_skill(self, name: str, content: str) -> None:
+    def _create_skill_sync(self, name: str, content: str) -> None:
+        """Synchronous skill creation - used internally by _create_skill()."""
         skills_dir = Path.home() / '.grinta' / 'skills'
         skills_dir.mkdir(parents=True, exist_ok=True)
         if not name.endswith('.md'):
@@ -435,16 +448,27 @@ class ScreenSettingsMixin:
         try:
             skill_path.write_text(content, encoding='utf-8')
             self.notify(f'Skill created: {name}', severity='information')
-            self._last_sidebar_state = None  # Force full refresh next tick
+            self._last_sidebar_state = None
         except Exception as e:
             self.notify(f'Failed to create skill: {e}', severity='error')
 
-    def _add_mcp_server(self, name: str, command: str) -> None:
+    async def _create_skill(self, name: str, content: str) -> None:
+        """Create a skill file, offloaded to a thread pool."""
+        import asyncio
+        await asyncio.to_thread(self._create_skill_sync, name, content)
+
+    def _add_mcp_server_sync(self, name: str, command: str) -> None:
+        """Synchronous MCP server addition - used internally by _add_mcp_server()."""
         from backend.cli.settings import add_mcp_server
 
         try:
             add_mcp_server(name, command=command)
             self.notify(f'MCP Server added: {name}', severity='information')
-            self._last_sidebar_state = None  # Force full refresh next tick
+            self._last_sidebar_state = None
         except Exception as e:
             self.notify(f'Failed to add MCP server: {e}', severity='error')
+
+    async def _add_mcp_server(self, name: str, command: str) -> None:
+        """Add an MCP server, offloaded to a thread pool."""
+        import asyncio
+        await asyncio.to_thread(self._add_mcp_server_sync, name, command)
