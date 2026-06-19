@@ -52,7 +52,9 @@ class TestHandleSimpleObservation:
         obs = SimpleNamespace(content='output')
         msg = _handle_simple_observation(obs, None)  # type: ignore[arg-type]
         assert msg.role == 'user'
-        assert msg.content[0].text == 'output'  # type: ignore[union-attr]
+        # Observations without tool_call_metadata get disambiguation prefix
+        assert '[Observation:' in msg.content[0].text  # type: ignore[union-attr]
+        assert 'output' in msg.content[0].text  # type: ignore[union-attr]
 
     def test_with_prefix_and_suffix(self):
         obs = SimpleNamespace(content='body')
