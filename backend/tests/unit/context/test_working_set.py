@@ -218,7 +218,11 @@ def test_build_working_set_skips_fresh_session_without_artifacts() -> None:
     user.source = EventSource.USER
     user.id = 1
 
-    assert build_working_set_observation([user]) is None
+    with patch(
+        'backend.context.memory.working_set._session_has_durable_artifacts',
+        return_value=False,
+    ):
+        assert build_working_set_observation([user]) is None
 
 
 def test_working_set_observation_skips_condensation_boilerplate() -> None:

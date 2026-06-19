@@ -26,6 +26,13 @@ DEFAULT_CONTEXT_PACKET_CHAR_BUDGET = 6_000
 MIN_LARGE_CONTEXT_PACKET_CHAR_BUDGET = 8_000
 MAX_CONTEXT_PACKET_CHAR_BUDGET = 32_000
 
+_POST_COMPACT_FRAMING = (
+    '⚠️ SYSTEM NOTE: Conversation history was compressed. '
+    'The canonical task state and restored context above are your '
+    'source of truth — do not hallucinate next actions. '
+    'Continue from the next_action field.\n\n'
+)
+
 
 @dataclass(frozen=True)
 class ContextPacket:
@@ -91,7 +98,7 @@ def build_context_packet(
                 _bounded_section(
                     'Recent user request context',
                     user_context,
-                    max(1400, int(char_budget * 0.16)),
+                    max(1400, int(char_budget * 0.11)),
                 ),
             )
         )
@@ -103,14 +110,14 @@ def build_context_packet(
                 _bounded_section(
                     'Operational checkpoint',
                     checkpoint,
-                    max(1200, int(char_budget * 0.15)),
+                    max(1200, int(char_budget * 0.11)),
                 ),
             )
         )
     if _canonical_has_packet_details(canonical):
         canonical_block = render_canonical_state_for_prompt(
             canonical,
-            char_budget=max(4200, int(char_budget * 0.58)),
+            char_budget=max(4200, int(char_budget * 0.41)),
             include_objective=False,
             include_latest_directive=False,
             include_next_action=False,
@@ -125,7 +132,7 @@ def build_context_packet(
                 _bounded_section(
                     'Active tool/background status',
                     active_status,
-                    max(900, int(char_budget * 0.10)),
+                    max(900, int(char_budget * 0.07)),
                 ),
             )
         )
@@ -137,7 +144,7 @@ def build_context_packet(
                 _bounded_section(
                     'Latest validated summary',
                     summary,
-                    max(900, int(char_budget * 0.12)),
+                    max(900, int(char_budget * 0.09)),
                 ),
             )
         )
@@ -149,7 +156,7 @@ def build_context_packet(
                 _bounded_section(
                     'Recent causal tail',
                     tail,
-                    max(1200, int(char_budget * 0.20)),
+                    max(1200, int(char_budget * 0.14)),
                 ),
             )
         )
@@ -168,13 +175,16 @@ def build_context_packet(
                 _bounded_section(
                     'Compact restore hints',
                     restore_hints,
-                    max(900, int(char_budget * 0.10)),
+                    max(900, int(char_budget * 0.07)),
                 ),
             )
         )
     if not sections:
         return None
     content, lengths = _assemble_sections(sections, char_budget)
+    if just_compacted:
+        content = _POST_COMPACT_FRAMING + content
+        lengths['_post_compact_framing'] = len(_POST_COMPACT_FRAMING)
     return ContextPacket(content=content, section_lengths=lengths)
 
 

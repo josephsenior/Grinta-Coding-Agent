@@ -25,11 +25,11 @@ def _event(eid: int, content: str = '') -> MessageAction:
 async def test_microcompact_clears_old_tool_outputs_only():
     events = [
         _event(1),
-        CmdOutputObservation(content='old pytest output ' * 100, command='pytest'),
+        CmdOutputObservation(content='old output ' * 100, command='pytest'),
         FileReadObservation(path='a.py', content='print(1)\n' * 50),
         ErrorObservation(content='recent failure'),
         _event(5),
-        CmdOutputObservation(content='recent pytest output', command='pytest'),
+        CmdOutputObservation(content='recent output', command='pytest'),
     ]
     compactor = MicrocompactCompactor(preserve_recent=2)
     result = await compactor.compact(View(events=events))
@@ -38,4 +38,4 @@ async def test_microcompact_clears_old_tool_outputs_only():
     assert result[1].content == TOOL_RESULT_CLEARED_MESSAGE
     assert result[2].content == TOOL_RESULT_CLEARED_MESSAGE
     assert result[3].content == 'recent failure'
-    assert 'recent pytest output' in str(result[5].content)
+    assert 'recent output' in str(result[5].content)

@@ -55,6 +55,43 @@ def _clear_observation_content(event: Event) -> Event:
     return copied
 
 
+# Keywords that indicate important content worth preserving
+_IMPORTANT_CONTENT_KEYWORDS: tuple[str, ...] = (
+    'failed', 'error', 'traceback', 'exception',
+    'passed', 'failed', 'assert', 'pytest',
+    'exit code', 'exit_code', 'fatal',
+    'warning', 'deprecated',
+)
+
+# Minimum content size below which clearing is not worth the risk
+_MIN_CLEAR_SIZE = 200
+
+
+def _should_preserve_observation(event: Event) -> bool:
+    """Determine if an observation's content is important enough to preserve.
+
+    Heuristics:
+    1. Small observations (< 200 chars) are cheap to keep
+    2. Observations with error/failure indicators are important
+    3. Observations with test results are important
+    """
+    content = getattr(event, 'content', '') or ''
+    if not isinstance(content, str):
+        return False
+
+    # Small observations are cheap to keep
+    if len(content) < _MIN_CLEAR_SIZE:
+        return True
+
+    # Check for important content indicators
+    lower = content.lower()
+    for keyword in _IMPORTANT_CONTENT_KEYWORDS:
+        if keyword in lower:
+            return True
+
+    return False
+
+
 class MicrocompactCompactor(Compactor):
     """Clear old tool observation bodies outside a recent preservation window."""
 
@@ -72,6 +109,10 @@ class MicrocompactCompactor(Compactor):
         for index, event in enumerate(view):
             if index < cutoff and _is_microcompactable(event):
                 if isinstance(event, AgentCondensationObservation):
+                    results.append(event)
+                    continue
+                # Preserve observations with important content
+                if _should_preserve_observation(event):
                     results.append(event)
                     continue
                 results.append(_clear_observation_content(event))
