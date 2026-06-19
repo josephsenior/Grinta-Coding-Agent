@@ -321,12 +321,14 @@ class RendererTerminalMixin:
                 command=command,
                 output=output,
                 exit_code=exit_code,
+                cwd=cwd or '',
             )
             self._append_scan_line_card(card)
             return
 
         card.output = output
         card.exit_code = exit_code
+        card.cwd = cwd or card.cwd
         if exit_code == 0:
             card.set_state('done')
         elif exit_code is not None:

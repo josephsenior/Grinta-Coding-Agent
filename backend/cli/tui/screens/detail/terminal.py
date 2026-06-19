@@ -1,4 +1,4 @@
-"""TerminalDetailScreen — full PTY/tmux scrollback for an interaction."""
+"""TerminalDetailScreen — styled full PTY/tmux scrollback for an interaction."""
 
 from __future__ import annotations
 
@@ -9,6 +9,37 @@ from backend.cli.tui.screens.detail.base import DetailScreen
 
 class TerminalDetailScreen(DetailScreen):
     """Full session scrollback with ``$``-prefixed commands."""
+
+    DEFAULT_CSS = """
+    TerminalDetailScreen #terminal-session {
+        width: 100%;
+        height: auto;
+        padding: 1 2 0 2;
+        color: #91abec;
+        background: #080c18;
+        border-bottom: solid #1e293b;
+    }
+    TerminalDetailScreen #terminal-cmd-row {
+        width: 100%;
+        height: auto;
+        padding: 1 2 0 2;
+        color: #e2e8f0;
+    }
+    TerminalDetailScreen #terminal-scrollback {
+        width: 100%;
+        height: auto;
+        padding: 0;
+        background: #060a14;
+        color: #6b7280;
+    }
+    TerminalDetailScreen #terminal-empty {
+        width: 100%;
+        height: auto;
+        padding: 2;
+        color: #54597b;
+        text-align: center;
+    }
+    """
 
     def __init__(
         self,
@@ -26,29 +57,41 @@ class TerminalDetailScreen(DetailScreen):
         self._cwd = cwd
 
     def build_content(self) -> list:
-        from rich.text import Text as RichText
-
         widgets: list = []
 
-        header_parts = [f'session {self._session_id}'] if self._session_id else []
+        meta_parts: list[str] = []
+        if self._session_id:
+            meta_parts.append(f'[#91abec]{self._session_id}[/]')
         if self._cwd:
-            header_parts.append(f'@{self._cwd}')
-        if header_parts:
+            meta_parts.append(f'[#969aad]{self._cwd}[/]')
+        if meta_parts:
             widgets.append(
-                Static(
-                    '[#91abec]' + ' '.join(header_parts) + '[/]',
-                    id='terminal-header',
-                )
+                Static(' · '.join(meta_parts), id='terminal-session')
+            )
+
+        if self._command and not self._scrollback:
+            prompt = '[#5eead4]$[/]'
+            cmd_text = f'[bold #e2e8f0]{self._command}[/]'
+            widgets.append(
+                Static(f'{prompt} {cmd_text}', id='terminal-cmd-row')
             )
 
         if self._scrollback:
-            display = RichText.from_ansi(self._scrollback)
+            display = self._format_scrollback(self._scrollback)
             widgets.append(Static(display, id='terminal-scrollback'))
-        elif self._command:
-            cmd_display = f'[bold #5eead4]$[/] [#e2e8f0]{self._command}[/]'
-            widgets.append(Static(cmd_display, id='terminal-cmd'))
-
-        if not widgets:
+        elif not self._command:
             widgets.append(Static('(no terminal content)', id='terminal-empty'))
 
         return widgets
+
+    @staticmethod
+    def _format_scrollback(scrollback: str) -> str:
+        lines = scrollback.splitlines()
+        if not lines:
+            return scrollback
+        max_width = len(str(len(lines)))
+        numbered: list[str] = []
+        for i, line in enumerate(lines, 1):
+            gutter = f'[#374151]{i:>{max_width}} │[/] '
+            numbered.append(gutter + line)
+        return '\n'.join(numbered)
