@@ -814,11 +814,27 @@ def _causal_chunks(events: Iterable[Event]) -> list[list[Event]]:
 
 
 def _copy_event_for_prompt(event: Event) -> Event:
-    """Return a prompt-only copy so windowing never mutates state.history."""
+    """Return a prompt-only copy so windowing never mutates state.history.
+
+    Preserves ``tool_call_metadata`` across the serialize/deserialize cycle
+    so that observations retain their pairing with tool calls and are
+    rendered as ``role='tool'`` rather than ``role='user'``.
+    """
+    # Capture metadata before serialization.
+    tcm = getattr(event, '_tool_call_metadata', None)
+    tr = getattr(event, '_tool_result', None)
+
     try:
-        return event_from_dict(event_to_dict(event))
+        copied = event_from_dict(event_to_dict(event))
     except Exception:
         return copy.deepcopy(event)
+
+    # Restore metadata if it was lost during the cycle.
+    if tcm is not None and getattr(copied, '_tool_call_metadata', None) is None:
+        copied._tool_call_metadata = tcm  # type: ignore[attr-defined]
+    if tr is not None and getattr(copied, '_tool_result', None) is None:
+        copied._tool_result = tr  # type: ignore[attr-defined]
+    return copied
 
 
 def _find_first_action_index(chunk):

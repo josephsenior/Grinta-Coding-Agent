@@ -294,9 +294,21 @@ def _handle_simple_observation(
     prefix: str = '',
     suffix: str = '',
 ) -> Message:
-    """Handle simple/generic observations."""
+    """Handle simple/generic observations.
+
+    Observations without tool_call_metadata are rendered as role='user' but
+    prefixed with a clear marker to disambiguate them from real user input.
+    This prevents the LLM from confusing tool output with user messages.
+    """
     content_str = _get_observation_content(obs)
     text = truncate_content(content_str, max_message_chars)
+
+    # Add disambiguation prefix for observations without metadata
+    has_metadata = getattr(obs, 'tool_call_metadata', None) is not None
+    if not has_metadata and not prefix:
+        obs_type = type(obs).__name__
+        text = f'[Observation: {obs_type}]\n{text}'
+
     if prefix:
         text = prefix + text
     if suffix:

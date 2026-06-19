@@ -91,13 +91,50 @@ def _process_key_value(key: str, value: Any) -> Any:
 
 
 def _process_tool_call_metadata(value: Any) -> Any:
-    """Process tool call metadata value."""
+    """Process tool call metadata value.
+
+    If deserialization into ``ToolCallMetadata`` fails, attempt a lenient
+    recovery that preserves the raw dict so that downstream processors can
+    still extract ``tool_call_id`` and ``function_name``.  This prevents
+    observations from silently losing their metadata pairing, which would
+    cause them to be rendered as ``role='user'`` instead of ``role='tool'``.
+    """
     if not value:
         return None
     try:
         return ToolCallMetadata(**value)
     except Exception:
-        return None
+        pass
+
+    # Lenient recovery: build a minimal object from the raw dict fields.
+    if isinstance(value, dict):
+        function_name = value.get('function_name') or ''
+        tool_call_id = value.get('tool_call_id') or ''
+        total_calls = value.get('total_calls_in_response')
+        if function_name and tool_call_id:
+            try:
+                return ToolCallMetadata(
+                    function_name=str(function_name),
+                    tool_call_id=str(tool_call_id),
+                    total_calls_in_response=int(total_calls) if total_calls else 1,
+                    model_response=value.get('model_response'),
+                )
+            except Exception:
+                # Last resort: attach raw dict as attribute on a stub object.
+                stub = ToolCallMetadata(
+                    function_name=str(function_name),
+                    tool_call_id=str(tool_call_id),
+                    total_calls_in_response=1,
+                )
+                stub._raw_dict = value  # type: ignore[attr-defined]
+                return stub
+
+    # Cannot recover – return None but log so we can track occurrences.
+    import logging
+    logging.getLogger(__name__).warning(
+        'tool_call_metadata deserialization failed; value=%r', value
+    )
+    return None
 
 
 def _process_llm_metrics(value: Any) -> Metrics:
