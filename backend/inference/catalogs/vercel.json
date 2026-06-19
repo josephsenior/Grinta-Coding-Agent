@@ -629,6 +629,7 @@
         "output_price_per_m": 1.6,
         "verified": true,
         "featured": true,
+        "default_temperature": 0.6,
         "supports_function_calling": true,
         "supports_parallel_tool_calls": true,
         "supports_reasoning_effort": true,

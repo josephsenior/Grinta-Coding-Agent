@@ -56,12 +56,12 @@ def test_image_attachment_status_text() -> None:
     )
 
 
-def test_encode_image_path_as_data_url() -> None:
+async def test_encode_image_path_as_data_url() -> None:
     with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as handle:
         handle.write(b'\x89PNG\r\n\x1a\n')
         path = handle.name
     try:
-        url = encode_image_path_as_data_url(path, max_bytes=1024)
+        url = await encode_image_path_as_data_url(path, max_bytes=1024)
         assert url.startswith('data:image/png;base64,')
         payload = url.split(',', 1)[1]
         assert base64.b64decode(payload).startswith(b'\x89PNG')
@@ -88,9 +88,9 @@ def test_read_clipboard_image_returns_none_when_unavailable(monkeypatch) -> None
         'backend.cli.tui.image_attachments._read_linux_clipboard_image',
         lambda: None,
     )
-    from backend.cli.tui.image_attachments import read_clipboard_image_blocking
+    from backend.cli.tui.image_attachments import _read_clipboard_image_sync
 
-    assert read_clipboard_image_blocking() is None
+    assert _read_clipboard_image_sync() is None
 
 
 def test_read_clipboard_image_prefers_first_available_reader(monkeypatch) -> None:
@@ -103,6 +103,6 @@ def test_read_clipboard_image_prefers_first_available_reader(monkeypatch) -> Non
         'backend.cli.tui.image_attachments._read_windows_clipboard_image',
         lambda: sample,
     )
-    from backend.cli.tui.image_attachments import read_clipboard_image_blocking
+    from backend.cli.tui.image_attachments import _read_clipboard_image_sync
 
-    assert read_clipboard_image_blocking() == sample
+    assert _read_clipboard_image_sync() == sample

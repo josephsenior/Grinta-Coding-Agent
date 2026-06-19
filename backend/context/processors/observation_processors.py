@@ -422,7 +422,7 @@ def _handle_condensation_observation(
     """Handle AgentCondensationObservation with an explicit visibility banner."""
     if _is_working_set_observation(obs):
         text = truncate_content(obs.content or '', max_message_chars)
-        return Message(role='user', content=[TextContent(text=text)])
+        return Message(role='system', content=[TextContent(text=text)])
 
     summary = obs.content or '(no summary provided)'
     restored_context = _load_restored_context_snapshot()
@@ -438,7 +438,7 @@ def _handle_condensation_observation(
         + _POST_CONDENSATION_RECOVERY,
         max_message_chars,
     )
-    return Message(role='user', content=[TextContent(text=text)])
+    return Message(role='system', content=[TextContent(text=text)])
 
 
 def _find_diff_hunk_boundaries(lines: list[str]) -> tuple[list[int], list[int]]:

@@ -823,7 +823,7 @@ class ContextMemory:
     @staticmethod
     def _first_user_message_leading_text(messages: list[Message]) -> str | None:
         existing = messages[1] if len(messages) > 1 else None
-        if existing is None or existing.role != 'user':
+        if existing is None or existing.role not in ('user', 'system'):
             return None
         text_parts = [
             content.text for content in existing.content if is_text_content(content)
@@ -862,7 +862,7 @@ class ContextMemory:
         if leading == addendum:
             return
 
-        messages.insert(1, message_with_text('user', addendum))
+        messages.insert(1, message_with_text('system', addendum))
 
     def _dedupe_system_messages(self, messages: list[Message]) -> list[Message]:
         """Return list with leading message plus non-system messages only."""
@@ -876,8 +876,9 @@ class ContextMemory:
             return messages
         self._ensure_leading_system_message(messages)
         self._inject_context_summary_into_system(messages)
+        messages[:] = self._dedupe_system_messages(messages)
         self._ensure_mcp_user_addendum(messages)
-        return self._dedupe_system_messages(messages)
+        return messages
 
     def _process_action(
         self,

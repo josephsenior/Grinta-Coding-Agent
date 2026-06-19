@@ -113,7 +113,7 @@ class TestMcpUserAddendum:
         normalized = mem._normalize_system_messages(messages)
 
         assert normalized[0].role == 'system'
-        assert normalized[1].role == 'user'
+        assert normalized[1].role == 'system'
         assert (
             extract_first_text(normalized[1])
             == '<MCP_TOOLS>\n`github_search`\n</MCP_TOOLS>'

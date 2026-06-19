@@ -129,6 +129,12 @@ def _resolve_edit_diff(
         new_content = getattr(event, 'new_content', '') or ''
         return encode_create_file_diff(path or event.path, new_content)
 
+    # Check if the diff was already prepared async (avoids blocking git diff subprocess)
+    event_id = getattr(event, 'id', -1)
+    cache = getattr(orch, '_render_prep_cache', None)
+    if cache is not None and event_id in cache:
+        return cache[event_id]
+
     encoded = orch._extract_file_edit_group_rows(event)
     if encoded:
         return encoded
@@ -153,7 +159,13 @@ def _handle_multiedit_observation(
     file_edits = (payload or {}).get('file_edits') or []
 
     # Get per-file diff chunks from the combined observation diff
-    diff_text = orch._extract_file_edit_diff(event) or ''
+    # Check cache first to avoid blocking git diff subprocess
+    event_id = getattr(event, 'id', -1)
+    cache = getattr(orch, '_render_prep_cache', None)
+    if cache is not None and event_id in cache:
+        diff_text = cache[event_id] or ''
+    else:
+        diff_text = orch._extract_file_edit_diff(event) or ''
     per_file = _split_combined_diff(diff_text) if diff_text else []
 
     # Map filename → diff chunk

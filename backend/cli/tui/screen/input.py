@@ -21,7 +21,7 @@ from backend.cli.tui.helpers import (
 from backend.cli.tui.image_attachments import (
     encode_image_bytes_as_data_url,
     image_attachment_status_text,
-    read_clipboard_image_blocking,
+    read_clipboard_image,
 )
 from backend.cli.tui.image_input_gate import image_input_blocked_reason
 from backend.cli.tui.renderer.handlers.status import notify_ui_only_error
@@ -193,13 +193,13 @@ class ScreenInputMixin:
         self._refresh_input_attachment_hint()
         return True
 
-    def try_paste_clipboard_image(self) -> bool:
+    async def try_paste_clipboard_image(self) -> bool:
         """Attach an image from the OS clipboard when one is available."""
         if getattr(self, '_turn_in_flight', False):
             self.notify_warning('Wait for the current turn to finish.')
             return True
         try:
-            image = read_clipboard_image_blocking()
+            image = await read_clipboard_image()
         except Exception as exc:
             self.notify_error(
                 f'Could not read clipboard image: {type(exc).__name__}: {exc}'

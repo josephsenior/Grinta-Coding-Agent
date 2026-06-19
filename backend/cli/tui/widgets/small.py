@@ -467,20 +467,20 @@ class PromptTextArea(TextArea):
             return
         screen = self._paste_target_screen()
         if screen is not None and hasattr(screen, 'try_paste_clipboard_image'):
-            if screen.try_paste_clipboard_image():
+            if await screen.try_paste_clipboard_image():
                 event.prevent_default()
                 event.stop()
                 return
         event.prevent_default()
         self._paste_text_from_clipboard(event)
 
-    def action_paste(self) -> None:
+    async def action_paste(self) -> None:
         """Paste from system clipboard directly."""
         if self.read_only:
             return
         screen = self._paste_target_screen()
         if screen is not None and hasattr(screen, 'try_paste_clipboard_image'):
-            if screen.try_paste_clipboard_image():
+            if await screen.try_paste_clipboard_image():
                 return
         try:
             pyperclip.paste()

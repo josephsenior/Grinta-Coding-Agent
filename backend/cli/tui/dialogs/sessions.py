@@ -164,14 +164,19 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
         table.add_columns('#', 'Session ID', 'Title', 'Events', 'Updated')
         self._refresh_table()
         if self._delete_targets:
-            deleted, errors = self._delete_sessions(self._delete_targets)
-            self._set_feedback(
-                f'Deleted {deleted} session(s). {" ".join(errors)}'.strip()
-            )
-            self._refresh_table()
+            # Use run_worker to offload shutil.rmtree to a thread without blocking
+            self.run_worker(self._delete_sessions_on_mount(self._delete_targets))
         if self._preview_target:
             self._select_target(self._preview_target)
         self.query_one('#sessions-search', Input).focus()
+
+    async def _delete_sessions_on_mount(self, targets: list[str]) -> None:
+        """Async wrapper for session deletion during on_mount."""
+        deleted, errors = await self._delete_sessions(targets)
+        self._set_feedback(
+            f'Deleted {deleted} session(s). {" ".join(errors)}'.strip()
+        )
+        self._refresh_table()
 
     def action_refresh(self) -> None:
         self._sync_filters_from_ui()
@@ -191,7 +196,7 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
         )
         if result != 'delete':
             return
-        deleted, errors = self._delete_sessions([sid])
+        deleted, errors = await self._delete_sessions([sid])
         if deleted:
             self._set_feedback(f'Deleted session {sid[:12]}.')
         elif errors:
@@ -386,7 +391,8 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
         lines = self._build_preview_lines(sid, meta, event_count)
         self.query_one('#sessions-preview', Static).update('\n'.join(lines))
 
-    def _delete_sessions(self, targets: list[str]) -> tuple[int, list[str]]:
+    def _delete_sessions_sync(self, targets: list[str]) -> tuple[int, list[str]]:
+        """Synchronous session deletion - used internally by _delete_sessions()."""
         from backend.cli.session.session_manager import (
             _resolve_target,
             _session_dir_for,
@@ -409,3 +415,8 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
             except Exception as exc:
                 errors.append(f'{sid[:12]}: {exc}')
         return deleted, errors
+
+    async def _delete_sessions(self, targets: list[str]) -> tuple[int, list[str]]:
+        """Delete sessions, offloaded to a thread pool to avoid blocking the event loop."""
+        import asyncio
+        return await asyncio.to_thread(self._delete_sessions_sync, targets)
