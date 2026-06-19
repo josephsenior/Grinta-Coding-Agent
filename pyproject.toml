@@ -42,7 +42,7 @@ dependencies = [
   "pathspec>=0.12,<2",
   "prompt-toolkit>=3.0.50,<4",
   "pylatexenc>=2.10,<3",
-  "pypdf>=6.12,<7",
+  "pypdf>=6.13.3,<7",
   "psutil>=7,<8",
   "ptyprocess>=0.7,<1; sys_platform!='win32'",
   "pyfiglet>=1.0.4",
