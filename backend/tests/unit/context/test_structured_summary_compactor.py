@@ -10,7 +10,6 @@ import pytest
 
 from backend.context.compactor.compactor import Compaction
 from backend.context.compactor.strategies.structured_summary_compactor import (
-    CommandResult,
     Dependency,
     FailedCommand,
     FileModification,

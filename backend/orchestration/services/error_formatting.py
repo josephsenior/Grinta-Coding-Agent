@@ -149,13 +149,16 @@ def _format_rate_limit_guidance(rate_kind, retry_after) -> str:
 
 def format_exception(exc, hard_stop_exceptions, rate_limited_exceptions, transient_exceptions):
     """Format an exception into (text, error_id, notify_ui_only)."""
-    from backend.inference.exceptions import Timeout as InfraTimeout
+    from backend.core.errors import AgentRuntimeError
+    from backend.inference.exceptions import APIError, Timeout as InfraTimeout
 
     notify_ui_only = (
         isinstance(exc, hard_stop_exceptions)
         or isinstance(exc, InfraTimeout)
         or isinstance(exc, rate_limited_exceptions)
         or isinstance(exc, transient_exceptions)
+        or isinstance(exc, (APIError, AgentRuntimeError))
+        or isinstance(exc, (ImportError, ModuleNotFoundError))
     )
     err_id = resolve_error_id(exc)
     text = format_error_text(exc)

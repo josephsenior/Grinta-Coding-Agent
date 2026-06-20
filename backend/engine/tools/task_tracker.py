@@ -10,9 +10,9 @@ from backend.core.tasks.task_status import (
     TASK_STATUS_TODO,
 )
 from backend.core.tasks.task_tracker import TaskTracker
+from backend.core.tools.tool_names import TASK_TRACKER_TOOL_NAME
 from backend.engine.contracts import ChatCompletionToolParam
 from backend.engine.tools.param_defs import create_tool_definition, get_command_param
-from backend.core.tools.tool_names import TASK_TRACKER_TOOL_NAME
 
 _TASK_TRACKER_DESCRIPTION = (
     'Maintain a structured plan to track progress. '

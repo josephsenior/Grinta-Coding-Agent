@@ -33,17 +33,6 @@ from backend.core.interaction_modes import (
     normalize_interaction_mode,
 )
 from backend.core.logging.logger import app_logger as logger
-from backend.engine.response_processing import common_response_to_actions
-from backend.engine.function_calling.helpers import combine_thought
-from backend.engine.tools import (
-    create_cmd_run_tool,
-    create_create_tool,
-    create_edit_symbol_tool,
-    create_find_symbols_tool,
-    create_multiedit_tool,
-    create_read_tool,
-    create_replace_string_tool,
-)
 from backend.core.tools.tool_names import (
     ANALYZE_PROJECT_STRUCTURE_TOOL_NAME,
     ASK_USER_TOOL_NAME,
@@ -64,6 +53,17 @@ from backend.core.tools.tool_names import (
     UNDO_LAST_EDIT_TOOL_NAME,
     WEB_FETCH_TOOL_NAME,
     WEB_SEARCH_TOOL_NAME,
+)
+from backend.engine.function_calling.helpers import combine_thought
+from backend.engine.response_processing import common_response_to_actions
+from backend.engine.tools import (
+    create_cmd_run_tool,
+    create_create_tool,
+    create_edit_symbol_tool,
+    create_find_symbols_tool,
+    create_multiedit_tool,
+    create_read_tool,
+    create_replace_string_tool,
 )
 from backend.ledger.action import Action, AgentThinkAction
 

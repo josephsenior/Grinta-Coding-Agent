@@ -31,7 +31,8 @@
           "xhigh"
         ],
         "reasoning_wire": "anthropic_extended",
-        "supports_reasoning_effort": true
+        "supports_reasoning_effort": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -133,7 +134,8 @@
           "high",
           "max"
         ],
-        "reasoning_wire": "anthropic_extended"
+        "reasoning_wire": "anthropic_extended",
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -212,7 +214,8 @@
           "high",
           "max"
         ],
-        "reasoning_wire": "anthropic_extended"
+        "reasoning_wire": "anthropic_extended",
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -292,7 +295,8 @@
           "low",
           "medium"
         ],
-        "reasoning_wire": "anthropic_extended"
+        "reasoning_wire": "anthropic_extended",
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -370,7 +374,8 @@
           "max",
           "medium"
         ],
-        "reasoning_wire": "anthropic_extended"
+        "reasoning_wire": "anthropic_extended",
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -464,7 +469,8 @@
           "xhigh"
         ],
         "reasoning_wire": "anthropic_extended",
-        "supports_reasoning_effort": true
+        "supports_reasoning_effort": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -569,7 +575,8 @@
           "xhigh"
         ],
         "reasoning_wire": "anthropic_extended",
-        "supports_reasoning_effort": true
+        "supports_reasoning_effort": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -676,7 +683,8 @@
           "high",
           "max"
         ],
-        "reasoning_wire": "anthropic_extended"
+        "reasoning_wire": "anthropic_extended",
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -771,7 +779,8 @@
           "max",
           "medium"
         ],
-        "reasoning_wire": "anthropic_extended"
+        "reasoning_wire": "anthropic_extended",
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -863,7 +872,8 @@
           "max",
           "medium"
         ],
-        "reasoning_wire": "openai_reasoning_effort"
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -945,7 +955,8 @@
           "max",
           "medium"
         ],
-        "reasoning_wire": "openai_reasoning_effort"
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -1027,7 +1038,8 @@
           "max",
           "medium"
         ],
-        "reasoning_wire": "openai_reasoning_effort"
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -1109,7 +1121,8 @@
           "medium",
           "minimal"
         ],
-        "reasoning_wire": "gemini_openai_compat"
+        "reasoning_wire": "gemini_openai_compat",
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -1205,7 +1218,8 @@
           "low",
           "medium"
         ],
-        "reasoning_wire": "gemini_openai_compat"
+        "reasoning_wire": "gemini_openai_compat",
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -1305,7 +1319,8 @@
           "medium",
           "minimal"
         ],
-        "reasoning_wire": "gemini_openai_compat"
+        "reasoning_wire": "gemini_openai_compat",
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -1389,7 +1404,8 @@
         "supports_parallel_tool_calls": true,
         "supports_vision": false,
         "inference_endpoint": "/chat/completions",
-        "supports_stop_words": true
+        "supports_stop_words": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -1450,7 +1466,8 @@
         "supports_parallel_tool_calls": true,
         "supports_vision": false,
         "inference_endpoint": "/chat/completions",
-        "supports_stop_words": true
+        "supports_stop_words": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -1521,7 +1538,8 @@
           "minimal"
         ],
         "reasoning_wire": "openai_reasoning_effort",
-        "supports_reasoning_effort": true
+        "supports_reasoning_effort": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -1618,7 +1636,8 @@
           "medium"
         ],
         "reasoning_wire": "openai_reasoning_effort",
-        "supports_reasoning_effort": true
+        "supports_reasoning_effort": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -1709,7 +1728,8 @@
           "minimal"
         ],
         "reasoning_wire": "openai_reasoning_effort",
-        "supports_reasoning_effort": true
+        "supports_reasoning_effort": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -1807,7 +1827,8 @@
           "none"
         ],
         "reasoning_wire": "openai_reasoning_effort",
-        "supports_reasoning_effort": true
+        "supports_reasoning_effort": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -1904,7 +1925,8 @@
           "medium"
         ],
         "reasoning_wire": "openai_reasoning_effort",
-        "supports_reasoning_effort": true
+        "supports_reasoning_effort": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -1995,7 +2017,8 @@
           "xhigh"
         ],
         "reasoning_wire": "openai_reasoning_effort",
-        "supports_reasoning_effort": true
+        "supports_reasoning_effort": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -2092,7 +2115,8 @@
           "medium"
         ],
         "reasoning_wire": "openai_reasoning_effort",
-        "supports_reasoning_effort": true
+        "supports_reasoning_effort": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -2184,7 +2208,8 @@
           "xhigh"
         ],
         "reasoning_wire": "openai_reasoning_effort",
-        "supports_reasoning_effort": true
+        "supports_reasoning_effort": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -2289,7 +2314,8 @@
           "xhigh"
         ],
         "reasoning_wire": "openai_reasoning_effort",
-        "supports_reasoning_effort": true
+        "supports_reasoning_effort": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -2388,7 +2414,8 @@
           "xhigh"
         ],
         "reasoning_wire": "openai_reasoning_effort",
-        "supports_reasoning_effort": true
+        "supports_reasoning_effort": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -2494,7 +2521,8 @@
           "xhigh"
         ],
         "reasoning_wire": "openai_reasoning_effort",
-        "supports_reasoning_effort": true
+        "supports_reasoning_effort": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -2605,7 +2633,8 @@
           "xhigh"
         ],
         "reasoning_wire": "openai_reasoning_effort",
-        "supports_reasoning_effort": true
+        "supports_reasoning_effort": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -2725,7 +2754,8 @@
           "xhigh"
         ],
         "reasoning_wire": "openai_reasoning_effort",
-        "supports_reasoning_effort": true
+        "supports_reasoning_effort": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -2831,7 +2861,8 @@
           "xhigh"
         ],
         "reasoning_wire": "openai_reasoning_effort",
-        "supports_reasoning_effort": true
+        "supports_reasoning_effort": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -2935,7 +2966,8 @@
           "xhigh"
         ],
         "reasoning_wire": "openai_reasoning_effort",
-        "supports_reasoning_effort": true
+        "supports_reasoning_effort": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -3032,7 +3064,8 @@
           "xhigh"
         ],
         "reasoning_wire": "openai_reasoning_effort",
-        "supports_reasoning_effort": true
+        "supports_reasoning_effort": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -3150,7 +3183,8 @@
           "xhigh"
         ],
         "reasoning_wire": "openai_reasoning_effort",
-        "supports_reasoning_effort": true
+        "supports_reasoning_effort": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -3231,7 +3265,8 @@
         "supports_parallel_tool_calls": true,
         "supports_vision": true,
         "inference_endpoint": "/chat/completions",
-        "supports_stop_words": true
+        "supports_stop_words": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -3290,7 +3325,8 @@
         "supports_parallel_tool_calls": true,
         "supports_vision": true,
         "inference_endpoint": "/chat/completions",
-        "supports_stop_words": true
+        "supports_stop_words": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -3351,7 +3387,8 @@
         "supports_parallel_tool_calls": true,
         "supports_vision": true,
         "inference_endpoint": "/chat/completions",
-        "supports_stop_words": true
+        "supports_stop_words": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -3764,7 +3801,8 @@
         "supports_parallel_tool_calls": true,
         "supports_vision": true,
         "inference_endpoint": "/messages",
-        "supports_stop_words": true
+        "supports_stop_words": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",

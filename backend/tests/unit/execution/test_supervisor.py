@@ -6,7 +6,10 @@ import asyncio
 from unittest import IsolatedAsyncioTestCase
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from backend.execution.server.supervisor import RuntimeSupervisor, RuntimeSupervisorConfig
+from backend.execution.server.supervisor import (
+    RuntimeSupervisor,
+    RuntimeSupervisorConfig,
+)
 
 
 class TestRuntimeSupervisorConfig(IsolatedAsyncioTestCase):

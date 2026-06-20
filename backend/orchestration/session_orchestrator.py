@@ -34,14 +34,6 @@ from backend.ledger.action import (
 )
 from backend.orchestration.action_scheduler import ActionScheduler
 from backend.orchestration.memory_pressure import MemoryPressureMonitor
-from backend.orchestration.orchestration_config import (
-    OrchestrationConfig,
-    OrchestrationServices,
-)
-from backend.orchestration.rate_governor import LLMRateGovernor
-from backend.orchestration.session_orchestrator_accessors import (
-    SessionOrchestratorAccessorsMixin,
-)
 from backend.orchestration.mixins.action import (
     _SessionOrchestratorActionMixin,
 )
@@ -56,9 +48,18 @@ from backend.orchestration.mixins.state import (
 )
 from backend.orchestration.mixins.step import (
     _SessionOrchestratorStepMixin,
+
 )
 from backend.orchestration.mixins.watchdog import (
     _SessionOrchestratorWatchdogMixin,
+)
+from backend.orchestration.orchestration_config import (
+    OrchestrationConfig,
+    OrchestrationServices,
+)
+from backend.orchestration.rate_governor import LLMRateGovernor
+from backend.orchestration.session_orchestrator_accessors import (
+    SessionOrchestratorAccessorsMixin,
 )
 from backend.orchestration.tool_pipeline import ToolInvocationContext
 
@@ -279,7 +280,9 @@ class SessionOrchestrator(
     async def _step(self) -> None:
         """Execute one agent step."""
         from backend.core.constants import DEFAULT_STEP_TASK_LIVENESS_SECONDS
-        from backend.core.timeouts.llm_step_timeout import resolve_step_task_liveness_seconds
+        from backend.core.timeouts.llm_step_timeout import (
+            resolve_step_task_liveness_seconds,
+        )
 
         self.services.retry.ensure_worker_started()
 
@@ -613,8 +616,3 @@ class SessionOrchestrator(
     def _closed(self) -> bool:
         """Read-only view that is True when lifecycle is CLOSING or CLOSED."""
         return self._lifecycle in (LifecyclePhase.CLOSING, LifecyclePhase.CLOSED)
-
-
-# --------------------------------------------------------------------------- #
-# Backward-compat re-exports (used by tests via monkeypatch.setattr).
-# --------------------------------------------------------------------------- #

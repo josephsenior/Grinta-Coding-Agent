@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from backend._canonical import CanonicalModelMetaclass
-from backend.core.logging import logger
 from backend.core.constants import (
     DEFAULT_COMPACTOR_ATTENTION_WINDOW,
     DEFAULT_COMPACTOR_KEEP_FIRST,
@@ -21,6 +20,7 @@ from backend.core.constants import (
     DEFAULT_SMART_COMPACTOR_MAX_SIZE,
     DEFAULT_SMART_COMPACTOR_RECENCY_BONUS_WINDOW,
 )
+from backend.core.logging import logger
 
 if TYPE_CHECKING:
     from backend.core.config.llm_config import LLMConfig

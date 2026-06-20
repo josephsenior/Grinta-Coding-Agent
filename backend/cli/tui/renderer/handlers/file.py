@@ -7,7 +7,7 @@ Supports multiedit splitting — one card per entry in
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from backend.cli.tool_display.orient_tools import (
     OrientLineModel,
@@ -22,13 +22,10 @@ from backend.cli.tui.helpers import (
 from backend.cli.tui.renderer.helpers.file import (
     clean_file_edit_content,
     encode_create_file_diff,
-    file_change_outcome,
 )
 from backend.cli.tui.widgets.scan_line import (
     EditCard,
-    _compact_path,
     _extract_syntax_error,
-    _format_diff_delta,
     _parse_syntax_badge,
 )
 from backend.ledger.action import FileEditAction, FileReadAction
@@ -171,7 +168,6 @@ def _handle_multiedit_observation(
     # Map filename → diff chunk
     per_file_map: dict[str, str] = {}
     for fp, file_diff in per_file:
-        key = fp.replace('\\', '/').split('/')[-1] if len(fp.replace('\\', '/').split('/')) > 1 else fp
         per_file_map[fp] = file_diff
 
     content = getattr(event, 'content', '') or ''

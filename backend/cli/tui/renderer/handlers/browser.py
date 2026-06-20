@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-from backend.cli.event_rendering.unified_renderer import ActivityRenderer
 from backend.cli.tui.renderer.helpers.browser import (
     resolve_browser_action_url,
-    should_update_browser_card,
 )
 from backend.ledger.action import BrowseInteractiveAction, BrowserToolAction
 from backend.ledger.observation import BrowserScreenshotObservation

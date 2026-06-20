@@ -535,7 +535,6 @@ class ScreenInputMixin:
 
             await self._handle_input_prepare_ui()
 
-            self.add_user_message(text, image_count=len(image_urls))
             self._pending_image_urls = []
             self._refresh_input_attachment_hint()
             self._render_hud_bar()
@@ -551,6 +550,7 @@ class ScreenInputMixin:
                 )
                 if getattr(self, '_pending_llm_config_apply', False):
                     self._apply_llm_config_to_active_session(self._config)
+                self.add_user_message(text, image_count=len(image_urls))
                 agent_text = text
                 self._turn_in_flight = True
             except Exception as exc:

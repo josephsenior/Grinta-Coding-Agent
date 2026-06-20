@@ -9,9 +9,7 @@ from backend.core.logging.logger import app_logger as logger
 from backend.inference.clients.anthropic_client import AnthropicClient
 from backend.inference.clients.base import (
     DirectLLMClient,
-    TransportProfile,
     _resolve_transport_profile,
-    _with_default_timeout,
 )
 from backend.inference.clients.openai_client import (
     OpenAIClient,

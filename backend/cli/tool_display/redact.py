@@ -13,6 +13,10 @@ from backend.cli.tool_display.constants import (
     _TOOL_CALL_PREFIX,
     _TOOL_CALL_PREFIX_PARTIAL,
 )
+from backend.core.tools.tool_transport import (  # noqa: F401
+    _normalize_minimax_split_tool_markup,
+    contains_tool_transport_markup,
+)
 
 
 def strip_tool_call_marker_lines(text: str) -> str:
@@ -77,11 +81,6 @@ _BRACKET_TOOL_SENTINELS = frozenset(
         '[/TOOL_CALL]',
         '[/TOOL_CALLS]',
     }
-)
-
-from backend.core.tools.tool_transport import (  # noqa: F401
-    _normalize_minimax_split_tool_markup,
-    contains_tool_transport_markup,
 )
 
 _INVOKE_BLOCK_RE = re.compile(

@@ -429,7 +429,7 @@ class StructureEditor:
             )
             return EditResult(
                 success=False,
-                message=f'Unsupported file type: {ext}',
+                message=f'Unsupported file type: {ext}. Supported: {supported}',
             )
 
         # Read old content before edit for context window

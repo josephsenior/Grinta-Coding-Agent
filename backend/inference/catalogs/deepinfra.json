@@ -15,7 +15,8 @@
         "featured": true,
         "supports_function_calling": true,
         "supports_parallel_tool_calls": true,
-        "supports_stop_words": true
+        "supports_stop_words": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "display_name": "Llama 3.3 70B Instruct"
@@ -34,7 +35,8 @@
         "featured": true,
         "supports_function_calling": true,
         "supports_parallel_tool_calls": true,
-        "supports_stop_words": true
+        "supports_stop_words": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "display_name": "Qwen 2.5 72B Instruct"
@@ -53,7 +55,8 @@
         "featured": true,
         "supports_function_calling": true,
         "supports_parallel_tool_calls": true,
-        "supports_stop_words": true
+        "supports_stop_words": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "display_name": "DeepSeek V3"

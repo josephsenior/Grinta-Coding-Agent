@@ -21,7 +21,6 @@ from uuid import uuid4
 
 from pydantic import SecretStr
 
-from backend.core.logging import logger
 from backend.core.app_paths import get_canonical_settings_path
 from backend.core.config.agent_config import AgentConfig
 from backend.core.config.app_config import AppConfig
@@ -37,6 +36,7 @@ from backend.core.config.llm_config import LLMConfig
 from backend.core.config.model_rebuild import rebuild_config_models
 from backend.core.config.security_config import SecurityConfig
 from backend.core.constants import JWT_SECRET_FILE as JWT_SECRET
+from backend.core.logging import logger
 from backend.utils.import_utils import get_impl
 
 if TYPE_CHECKING:

@@ -16,7 +16,9 @@ from backend.core.constants import (
     TERMINAL_RUN_PENDING_ACTION_TIMEOUT_FLOOR,
 )
 from backend.core.logging.logger import app_logger as logger
-from backend.core.timeouts.timeout_policy import effective_cmd_run_pending_timeout_seconds
+from backend.core.timeouts.timeout_policy import (
+    effective_cmd_run_pending_timeout_seconds,
+)
 from backend.ledger import EventSource
 from backend.ledger.action import Action, ActionConfirmationStatus
 from backend.ledger.observation import ErrorObservation, Observation

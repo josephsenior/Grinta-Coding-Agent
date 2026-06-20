@@ -9,9 +9,9 @@ Note: Only handles ImportError retry. LLM errors are already handled by LLM Retr
 from __future__ import annotations
 
 import logging
-from enum import Enum
 from typing import TYPE_CHECKING
 
+from backend.core.autonomy import AutonomyLevel, normalize_autonomy_level  # noqa: F401
 from backend.ledger.action import (
     Action,
     ActionSecurityRisk,
@@ -30,9 +30,6 @@ if TYPE_CHECKING:
     from backend.core.config.agent_config import AgentConfig
 
 logger = logging.getLogger(__name__)
-
-
-from backend.core.autonomy import AutonomyLevel, normalize_autonomy_level  # noqa: F401
 
 
 class AutonomyController:

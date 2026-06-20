@@ -15,7 +15,7 @@ class DetailScreen(Screen):
     Press ``escape`` to return to the feed.
     """
 
-    BINDINGS = [("escape", "app.pop_screen", "Back")]
+    BINDINGS = [('escape', 'app.pop_screen', 'Back')]
 
     def __init__(self, title: str = '') -> None:
         super().__init__()
@@ -23,6 +23,7 @@ class DetailScreen(Screen):
 
     def build_content(self) -> list:
         """Return widgets to place in the scrollable body."""
+        raise NotImplementedError
 
     def compose(self) -> ComposeResult:
         title = Static(self._detail_title, id='detail-title')

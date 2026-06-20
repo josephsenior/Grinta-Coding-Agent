@@ -30,28 +30,31 @@ from collections import deque
 from typing import TYPE_CHECKING, Any
 
 from backend.core.config import AgentConfig
+from backend.core.contracts.plugins import AgentSkillsRequirement, PluginRequirement
 from backend.core.interaction_modes import normalize_interaction_mode
 from backend.core.logging.logger import app_logger as logger
-from backend.engine import function_calling as orchestrator_function_calling
 from backend.engine.contracts import (
     ExecutorProtocol,
     MemoryManagerProtocol,
+    NoopSafetyManager,
     PlannerProtocol,
     SafetyManagerProtocol,
 )
 from backend.engine.executor import OrchestratorExecutor
+from backend.engine.function_calling.dispatch import (
+    register_semantic_recall,
+    response_to_actions,
+)
 from backend.engine.memory_manager import ContextMemoryManager
 from backend.engine.planner import OrchestratorPlanner
-from backend.engine.contracts import NoopSafetyManager
-from backend.core.contracts.plugins import AgentSkillsRequirement, PluginRequirement
 from backend.inference.llm_registry import LLMRegistry
 from backend.orchestration.agent import Agent
 from backend.utils.prompt import PromptManager
 
 if TYPE_CHECKING:
-    from backend.orchestration.state.state import State
     from backend.ledger.action import Action
     from backend.ledger.stream import EventStream
+    from backend.orchestration.state.state import State
 
 
 class Orchestrator(Agent):
@@ -93,7 +96,7 @@ class Orchestrator(Agent):
 
         # Register vector-memory callback for the semantic_recall tool
         if self.conversation_memory is not None:
-            orchestrator_function_calling.register_semantic_recall(
+            register_semantic_recall(
                 self.conversation_memory.recall_from_memory
             )
 
@@ -157,7 +160,7 @@ class Orchestrator(Agent):
 
     def response_to_actions(self, response) -> list[Action]:
         """Convert an LLM response into executable actions."""
-        return orchestrator_function_calling.response_to_actions(
+        return response_to_actions(
             response,
             mcp_tool_names=list(self.mcp_tools.keys()),
             mcp_tools=self.mcp_tools,

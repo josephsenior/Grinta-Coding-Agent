@@ -332,7 +332,7 @@ class TestExecutorRecoveryBlock:
     ):
         import sys
 
-        import backend.engine.function_calling as fc
+        import backend.engine.function_calling.dispatch as fc
         from backend.engine import executor as executor_module
 
         monkeypatch.setenv('APP_DATA_DIR', str(tmp_path))

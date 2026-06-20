@@ -136,7 +136,7 @@ def test_executor_emits_streaming_chunk_actions(monkeypatch):
     # The executor keeps a proxy to a module name under the `app.*` namespace.
     # In unit tests we import via `backend.*`, so we register an alias to keep
     # the proxy resolvable.
-    import backend.engine.function_calling as fc
+    import backend.engine.function_calling.dispatch as fc
     from backend.engine.executor import OrchestratorExecutor
 
     sys.modules.setdefault('app.engine.function_calling', fc)
@@ -215,7 +215,7 @@ def test_executor_extract_last_user_text_supports_object_messages():
 
 def test_async_execute_emits_real_streaming_chunks(monkeypatch):
     """async_execute should stream real chunks via astream and emit StreamingChunkAction."""
-    import backend.engine.function_calling as fc
+    import backend.engine.function_calling.dispatch as fc
     from backend.engine.executor import OrchestratorExecutor
 
     monkeypatch.setenv('APP_STREAM_EMIT_INTERVAL_MS', '0')
@@ -274,7 +274,7 @@ def test_async_execute_emits_real_streaming_chunks(monkeypatch):
 
 def test_async_execute_preserves_streamed_reasoning_content(monkeypatch):
     """DeepSeek thinking-mode streams must replay reasoning_content next turn."""
-    import backend.engine.function_calling as fc
+    import backend.engine.function_calling.dispatch as fc
     from backend.engine.executor import OrchestratorExecutor
 
     sys.modules.setdefault('app.engine.function_calling', fc)
@@ -349,7 +349,7 @@ def test_async_execute_preserves_streamed_reasoning_content(monkeypatch):
 
 def test_async_execute_preserves_vercel_gateway_reasoning_delta(monkeypatch):
     """Vercel AI Gateway streams reasoning in delta.reasoning."""
-    import backend.engine.function_calling as fc
+    import backend.engine.function_calling.dispatch as fc
     from backend.engine.executor import OrchestratorExecutor
 
     sys.modules.setdefault('app.engine.function_calling', fc)
@@ -419,7 +419,7 @@ def test_async_execute_preserves_vercel_gateway_reasoning_delta(monkeypatch):
 
 def test_async_execute_preserves_reasoning_details_delta(monkeypatch):
     """Gateway reasoning_details chunks must route to thinking, not visible text."""
-    import backend.engine.function_calling as fc
+    import backend.engine.function_calling.dispatch as fc
     from backend.engine.executor import OrchestratorExecutor
 
     sys.modules.setdefault('app.engine.function_calling', fc)
@@ -497,7 +497,7 @@ def test_async_execute_preserves_reasoning_details_delta(monkeypatch):
 
 def test_async_execute_preserves_redacted_thinking_in_content(monkeypatch):
     """MiniMax native format embeds thinking in content when reasoning_split is off."""
-    import backend.engine.function_calling as fc
+    import backend.engine.function_calling.dispatch as fc
     from backend.engine.executor import OrchestratorExecutor
 
     sys.modules.setdefault('app.engine.function_calling', fc)
@@ -565,7 +565,7 @@ def test_async_execute_preserves_redacted_thinking_in_content(monkeypatch):
 
 
 def test_async_execute_clamps_completion_budget_before_stream_call(monkeypatch):
-    import backend.engine.function_calling as fc
+    import backend.engine.function_calling.dispatch as fc
     from backend.engine.executor import OrchestratorExecutor
 
     sys.modules.setdefault('app.engine.function_calling', fc)
@@ -630,7 +630,7 @@ def test_async_execute_clamps_completion_budget_before_stream_call(monkeypatch):
 def test_async_execute_raises_preflight_context_error_before_provider_call(
     monkeypatch,
 ):
-    import backend.engine.function_calling as fc
+    import backend.engine.function_calling.dispatch as fc
     from backend.engine.executor import OrchestratorExecutor
 
     sys.modules.setdefault('app.engine.function_calling', fc)
@@ -678,7 +678,7 @@ def test_async_execute_raises_preflight_context_error_before_provider_call(
 
 def test_async_execute_does_not_timeout_active_reasoning_stream(monkeypatch, tmp_path):
     """Active reasoning streams are governed by per-chunk stall timeouts."""
-    import backend.engine.function_calling as fc
+    import backend.engine.function_calling.dispatch as fc
     from backend.engine.executor import OrchestratorExecutor
 
     sys.modules.setdefault('app.engine.function_calling', fc)
@@ -743,7 +743,7 @@ def test_async_execute_does_not_timeout_active_reasoning_stream(monkeypatch, tmp
 def test_cancel_step_cancels_active_stream_and_discards_checkpoint(
     monkeypatch, tmp_path
 ):
-    import backend.engine.function_calling as fc
+    import backend.engine.function_calling.dispatch as fc
     from backend.engine.executor import OrchestratorExecutor
 
     sys.modules.setdefault('app.engine.function_calling', fc)
@@ -808,7 +808,7 @@ def test_cancel_step_cancels_active_stream_and_discards_checkpoint(
 
 def test_async_execute_accumulates_tool_calls(monkeypatch):
     """async_execute should accumulate streamed tool call deltas into complete tool calls."""
-    import backend.engine.function_calling as fc
+    import backend.engine.function_calling.dispatch as fc
     from backend.engine.executor import OrchestratorExecutor
     from backend.ledger.action import AgentThinkAction
 
@@ -889,7 +889,7 @@ def test_async_execute_accumulates_tool_calls(monkeypatch):
 
 def test_async_execute_handles_cumulative_tool_call_name_and_args(monkeypatch):
     """Stream assembly should not duplicate tool names for cumulative chunks."""
-    import backend.engine.function_calling as fc
+    import backend.engine.function_calling.dispatch as fc
     from backend.engine.executor import OrchestratorExecutor
     from backend.ledger.action import AgentThinkAction
 
@@ -975,7 +975,7 @@ def test_async_execute_handles_cumulative_tool_call_name_and_args(monkeypatch):
 
 def _stream_chunks_to_tool_args(chunks: list[str]) -> str:
     """Drive `chunks` through the live streaming path and return assembled args."""
-    import backend.engine.function_calling as fc
+    import backend.engine.function_calling.dispatch as fc
     from backend.engine.executor import OrchestratorExecutor
     from backend.ledger.action import AgentThinkAction
 
@@ -1534,8 +1534,8 @@ def test_response_to_actions_converts_common_tool_call_validation_error_to_recov
     monkeypatch,
 ):
     from backend.engine import executor as executor_module
-    from backend.engine.response_processing import FunctionCallValidationError
     from backend.engine.executor import OrchestratorExecutor
+    from backend.engine.response_processing import FunctionCallValidationError
     from backend.ledger.action import AgentThinkAction
 
     monkeypatch.setattr(

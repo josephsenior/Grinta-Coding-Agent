@@ -14,9 +14,7 @@ from backend.context.view import View
 from backend.core.logging.logger import app_logger as logger
 from backend.core.schemas import AgentState
 from backend.core.tasks.task_status import (
-    TASK_STATUS_DONE,
     TASK_STATUS_TODO,
-    normalize_task_status,
 )
 from backend.inference.metrics import Metrics
 from backend.ledger.action import MessageAction
@@ -176,12 +174,6 @@ def _apply_state_metrics(state: State, doc: dict) -> None:
 
 
 from backend.core.tasks.plan_step import (  # noqa: E402
-    _build_plan_step_result,
-    _coerce_plan_step_tags,
-    _normalize_plan_step_status,
-    _normalize_plan_step_subtasks,
-    _normalize_plan_step_tags,
-    _resolve_plan_step_status,
     normalize_plan_step_payload,
 )
 

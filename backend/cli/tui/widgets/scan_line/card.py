@@ -10,7 +10,6 @@ from textual.containers import Container, Horizontal
 from textual.widgets import Static
 
 if TYPE_CHECKING:
-    from textual.screen import Screen
 
     from backend.cli.tui.screens.detail.base import DetailScreen
 
@@ -155,6 +154,7 @@ class ScanLineCard(Container):
         target = event.widget
         if target is self or (
             hasattr(target, 'id')
+            and isinstance(target.id, str)
             and target.id in ('scan-summary', 'scan-expand')
         ):
             self._open_detail()

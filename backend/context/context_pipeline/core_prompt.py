@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import backend.context.context_pipeline as _cp
 from backend.context.compactor.compactor import Compaction
 from backend.context.context_pipeline.core_base import _EmptyState
+from backend.context.context_pipeline.core_compact import ContextPipelineCompactionMixin
 from backend.context.context_pipeline.helpers import (
     _drop_stale_prompt_state_artifacts,
 )
@@ -29,7 +30,7 @@ if TYPE_CHECKING:
     from backend.orchestration.state.state import State
 
 
-class ContextPipelinePromptMixin:
+class ContextPipelinePromptMixin(ContextPipelineCompactionMixin):
     """ContextPipeline methods (mixin)."""
 
     def build_prompt_events(

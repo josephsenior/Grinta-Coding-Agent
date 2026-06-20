@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from backend.cli.tui.screens.detail.base import DetailScreen
 from backend.cli.tui.widgets.scan_line import (
     AgentMessageCard,
@@ -18,7 +16,6 @@ from backend.cli.tui.widgets.scan_line import (
     _format_diff_delta,
     _parse_syntax_badge,
 )
-
 
 # ── test-only minimal ScanLineCard ─────────────────────────────────────
 

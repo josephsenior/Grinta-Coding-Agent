@@ -240,11 +240,11 @@ class RendererTerminalMixin:
             panel.configure_terminal(command=command, cwd=cwd, exit_code=exit_code)
             output_text = output or ''
             if not output_text and card.extra_lines:
-                output_lines: list[str] = []
+                panel_output_lines: list[str] = []
                 for extra in card.extra_lines:
                     indent = '  ' * extra.indent
-                    output_lines.append(f'{indent}{extra.text}')
-                output_text = '\n'.join(output_lines)
+                    panel_output_lines.append(f'{indent}{extra.text}')
+                output_text = '\n'.join(panel_output_lines)
             panel.update_content(output_text)
             panel.set_processing(False)
             self._mount_session_panel(panel)
@@ -258,11 +258,11 @@ class RendererTerminalMixin:
 
         output_text = output or ''
         if not output_text and card.extra_lines:
-            output_lines: list[str] = []
+            extra_output_lines: list[str] = []
             for extra in card.extra_lines:
                 indent = '  ' * extra.indent
-                output_lines.append(f'{indent}{extra.text}')
-            output_text = '\n'.join(output_lines)
+                extra_output_lines.append(f'{indent}{extra.text}')
+            output_text = '\n'.join(extra_output_lines)
 
         widget.update_content(output_text)
         widget.set_processing(False)

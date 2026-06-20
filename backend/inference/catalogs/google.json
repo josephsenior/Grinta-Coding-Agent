@@ -29,7 +29,8 @@
           "medium",
           "high"
         ],
-        "reasoning_wire": "gemini_native"
+        "reasoning_wire": "gemini_native",
+        "supports_response_schema": true
       },
       "metadata": {}
     },
@@ -58,7 +59,8 @@
           "medium",
           "high"
         ],
-        "reasoning_wire": "gemini_native"
+        "reasoning_wire": "gemini_native",
+        "supports_response_schema": true
       },
       "metadata": {}
     },
@@ -85,7 +87,8 @@
           "medium",
           "high"
         ],
-        "reasoning_wire": "gemini_native"
+        "reasoning_wire": "gemini_native",
+        "supports_response_schema": true
       },
       "metadata": {}
     }

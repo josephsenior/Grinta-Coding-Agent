@@ -13,11 +13,6 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from backend.orchestration.agent.agent_protocol import (
-    mark_tracker_created,
-    reset_terminal_cycle,
-    tracker_terminal,
-)
 from backend.core.interaction_modes import (
     CHAT_MODE,
     PLAN_MODE,
@@ -39,6 +34,11 @@ from backend.ledger.action.agent import (
 from backend.ledger.action.message import StreamingChunkAction
 from backend.ledger.observation import (
     Observation,
+)
+from backend.orchestration.agent.agent_protocol import (
+    mark_tracker_created,
+    reset_terminal_cycle,
+    tracker_terminal,
 )
 
 if TYPE_CHECKING:

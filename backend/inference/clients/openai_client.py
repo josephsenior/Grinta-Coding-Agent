@@ -7,14 +7,11 @@ from typing import Any
 
 from openai import AsyncOpenAI, OpenAI
 
-from backend.core import json_compat as json
-from backend.core.logging.logger import app_logger as logger
 from backend.inference.clients.base import (
     DirectLLMClient,
     LLMResponse,
     TransportProfile,
     _normalize_timeout_seconds,
-    _resolve_transport_profile,
     _with_default_timeout,
     get_shared_async_http_client,
     get_shared_http_client,

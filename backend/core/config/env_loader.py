@@ -13,9 +13,9 @@ from typing import Any, get_args, get_origin
 
 from pydantic import BaseModel, SecretStr
 
-from backend.core.logging import logger
 from backend.core.config.app_config import AppConfig
 from backend.core.config.llm_config import LLMConfig
+from backend.core.logging import logger
 
 if __name__ != '__main__':
     from collections.abc import MutableMapping

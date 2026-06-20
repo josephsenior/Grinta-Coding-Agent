@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from backend.inference.caching.prompt_caching import VALID_PROMPT_CACHE_MODES
+from backend.inference.capabilities.model_features import should_support_response_schema
 from backend.inference.catalog.catalog_loader import (
     _CATALOG_DIR,
     ModelEntry,
@@ -103,6 +104,31 @@ def _validate_runtime_block(
                     provider,
                     model_name,
                     'runtime.supports_function_calling should be true for catalog models',
+                )
+            )
+    elif provider not in _SEARCH_ONLY_PROVIDERS:
+        aliases = runtime.get('aliases', [])
+        alias_list = aliases if isinstance(aliases, list) else []
+        expected_schema = should_support_response_schema(
+            model_name,
+            provider=provider,
+            aliases=[str(alias) for alias in alias_list],
+        )
+        has_schema = _as_bool(runtime.get('supports_response_schema', False))
+        if expected_schema and not has_schema:
+            issues.append(
+                CatalogValidationIssue(
+                    provider,
+                    model_name,
+                    'supports_response_schema should be true (vendor documents JSON/schema mode)',
+                )
+            )
+        elif has_schema and not expected_schema:
+            issues.append(
+                CatalogValidationIssue(
+                    provider,
+                    model_name,
+                    'supports_response_schema is true but model is not in documented schema patterns',
                 )
             )
 

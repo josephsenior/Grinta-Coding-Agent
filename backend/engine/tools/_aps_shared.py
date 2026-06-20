@@ -16,12 +16,12 @@ import re
 import shutil
 from typing import Any
 
+from backend.core.bounded_result import BoundedResult
 from backend.engine.tools.ignore_filter import (
     get_ignore_spec,
     is_ignored_file,
     prune_ignored_dirs,
 )
-from backend.core.bounded_result import BoundedResult
 from backend.utils.async_helpers.subprocess_bridge import run_bounded_subprocess_sync
 
 

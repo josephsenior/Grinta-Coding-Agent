@@ -29,7 +29,9 @@ from backend.core.constants import (
 )
 
 # Re-export formatter/filter classes from dedicated module for backward compat.
-from backend.core.logging.log_formatters import _TRACE_LOCAL as TRACE_LOCAL  # type: ignore
+from backend.core.logging.log_formatters import (
+    _TRACE_LOCAL as TRACE_LOCAL,  # type: ignore
+)
 from backend.core.logging.log_formatters import (
     ColoredFormatter,
     ColorType,
@@ -42,7 +44,9 @@ from backend.core.logging.log_formatters import (
     file_formatter,
     strip_ansi,
 )
-from backend.core.logging.log_formatters import _fix_record as fix_record  # type: ignore
+from backend.core.logging.log_formatters import (
+    _fix_record as fix_record,  # type: ignore
+)
 
 __all__ = [
     'configure_file_logging',
@@ -331,7 +335,10 @@ LOG_SHIPPING_ENABLED = os.getenv('LOG_SHIPPING_ENABLED', 'false').lower() in [
 ]
 if LOG_SHIPPING_ENABLED:
     try:
-        from backend.core.logging.log_shipping import LogShippingHandler, get_log_shipper
+        from backend.core.logging.log_shipping import (
+            LogShippingHandler,
+            get_log_shipper,
+        )
 
         log_shipper = get_log_shipper()
         if log_shipper:

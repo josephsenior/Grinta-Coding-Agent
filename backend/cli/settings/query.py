@@ -193,8 +193,8 @@ def sync_persisted_autonomy_to_controller(
     Returns the effective autonomy level on the controller after sync.
     When no persisted value exists, returns the controller's current level.
     """
-    from backend.core.constants import DEFAULT_AGENT_NAME
     from backend.core.autonomy import normalize_autonomy_level
+    from backend.core.constants import DEFAULT_AGENT_NAME
 
     level = get_persisted_autonomy_level(agent_name)
     if not level:
@@ -230,8 +230,8 @@ def sync_persisted_autonomy_to_controller(
 
 def get_persisted_autonomy_level(agent_name: str | None = None) -> str:
     """Return the user-configured autonomy level from settings.json (empty = default)."""
-    from backend.core.constants import DEFAULT_AGENT_NAME
     from backend.core.autonomy import normalize_autonomy_level
+    from backend.core.constants import DEFAULT_AGENT_NAME
 
     agent_section = _load_raw_settings().get('agent')
     if not isinstance(agent_section, dict):
@@ -264,8 +264,8 @@ def get_persisted_autonomy_level(agent_name: str | None = None) -> str:
 
 def update_autonomy_level(level: str, agent_name: str | None = None) -> None:
     """Persist autonomy level without touching other agent fields."""
-    from backend.core.constants import DEFAULT_AGENT_NAME
     from backend.core.autonomy import normalize_autonomy_level
+    from backend.core.constants import DEFAULT_AGENT_NAME
 
     normalized = normalize_autonomy_level(level)
     if normalized not in {'conservative', 'balanced', 'full'}:

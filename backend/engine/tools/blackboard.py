@@ -6,11 +6,11 @@ is True. The planner adds this tool when agent.blackboard is set.
 
 from __future__ import annotations
 
-from backend.engine.contracts import ChatCompletionToolParam
-from backend.engine.tools.param_defs import create_tool_definition
 from backend.core.tools.tool_names import (
     SHARED_TASK_BOARD_TOOL_NAME,
 )
+from backend.engine.contracts import ChatCompletionToolParam
+from backend.engine.tools.param_defs import create_tool_definition
 from backend.ledger.action.agent import BlackboardAction
 
 _DESCRIPTION = (

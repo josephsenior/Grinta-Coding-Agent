@@ -5,9 +5,9 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from backend.core.constants import RISK_LEVELS
 from backend.core.errors import FunctionCallValidationError
 from backend.core.logging.logger import app_logger as logger
-from backend.core.constants import RISK_LEVELS
 from backend.ledger.action import Action, ActionSecurityRisk
 
 

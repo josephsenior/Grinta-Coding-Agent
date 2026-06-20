@@ -226,14 +226,14 @@ class TestRetryQueue:
 class TestGetRetryQueue:
     def test_disabled_returns_none(self, monkeypatch):
         monkeypatch.setenv('RETRY_QUEUE_ENABLED', 'false')
-        import backend.core.retry_queue as rq
+        import backend.orchestration.services.retry_queue as rq
 
         rq._retry_queue = None
         assert get_retry_queue() is None
 
     def test_existing_singleton(self, monkeypatch):
         monkeypatch.setenv('RETRY_QUEUE_ENABLED', 'true')
-        import backend.core.retry_queue as rq
+        import backend.orchestration.services.retry_queue as rq
 
         rq._retry_queue = RetryQueue(
             backend=InMemoryRetryBackend(),
@@ -248,7 +248,7 @@ class TestGetRetryQueue:
         monkeypatch.setenv('RETRY_QUEUE_ENABLED', 'true')
         monkeypatch.setenv('RETRY_QUEUE_BACKEND', 'redis')
 
-        import backend.core.retry_queue as rq
+        import backend.orchestration.services.retry_queue as rq
 
         rq._retry_queue = None
         queue = get_retry_queue()

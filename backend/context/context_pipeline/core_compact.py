@@ -12,6 +12,7 @@ from backend.context.canonical_state import (
 )
 from backend.context.compactor.compactor import Compaction
 from backend.context.context_budget import ContextBudget
+from backend.context.context_pipeline.core_gates import ContextPipelineGatesMixin
 from backend.context.context_pipeline.helpers import (
     _latest_event_id,
     _pruned_ids,
@@ -33,7 +34,7 @@ if TYPE_CHECKING:
     from backend.orchestration.state.state import State
 
 
-class ContextPipelineCompactionMixin:
+class ContextPipelineCompactionMixin(ContextPipelineGatesMixin):
     """ContextPipeline methods (mixin)."""
 
     async def _run_compaction(
@@ -303,17 +304,18 @@ class ContextPipelineCompactionMixin:
             keep_first=0,
         )
         try:
-            self._structured_compactor = StructuredSummaryCompactor.from_config(
+            compactor = StructuredSummaryCompactor.from_config(
                 cfg, self._llm_registry
             )
         except ValueError as exc:
             logger.warning('ContextPipeline: structured compactor unavailable: %s', exc)
             return None
-        if self._structured_compactor.token_budget is None:
+        self._structured_compactor = compactor
+        if compactor.token_budget is None:
             agent_llm = getattr(getattr(state, 'agent', None), 'llm', None)
             max_input = getattr(
                 getattr(agent_llm, 'config', None), 'max_input_tokens', None
             )
             if isinstance(max_input, int) and max_input > 0:
-                self._structured_compactor.token_budget = int(max_input * 0.80)
-        return self._structured_compactor
+                compactor.token_budget = int(max_input * 0.80)
+        return compactor

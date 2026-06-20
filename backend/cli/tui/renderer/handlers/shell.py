@@ -12,7 +12,6 @@ from backend.cli.tui.renderer.helpers.shell import (
     resolve_cmd_output_cwd,
     sanitize_cmd_output,
 )
-from backend.cli.tui.widgets.scan_line import ShellCard
 from backend.ledger.action import CmdRunAction
 from backend.ledger.observation import CmdOutputObservation
 

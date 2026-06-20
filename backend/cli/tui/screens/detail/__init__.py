@@ -12,12 +12,12 @@ The six concrete detail screens correspond to:
 from __future__ import annotations
 
 from backend.cli.tui.screens.detail.base import DetailScreen
-from backend.cli.tui.screens.detail.message import MessageDetailScreen
-from backend.cli.tui.screens.detail.edit import EditDetailScreen
-from backend.cli.tui.screens.detail.shell import ShellDetailScreen
-from backend.cli.tui.screens.detail.terminal import TerminalDetailScreen
 from backend.cli.tui.screens.detail.browser import BrowserDetailScreen
 from backend.cli.tui.screens.detail.debugger import DebuggerDetailScreen
+from backend.cli.tui.screens.detail.edit import EditDetailScreen
+from backend.cli.tui.screens.detail.message import MessageDetailScreen
+from backend.cli.tui.screens.detail.shell import ShellDetailScreen
+from backend.cli.tui.screens.detail.terminal import TerminalDetailScreen
 
 __all__ = [
     'DetailScreen',

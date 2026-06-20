@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from textual.containers import Vertical
 from textual.widgets import Static
 
 from backend.cli.tui.screens.detail.base import DetailScreen

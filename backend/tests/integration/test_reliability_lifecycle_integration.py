@@ -15,10 +15,10 @@ from backend.ledger.observation import StatusObservation
 from backend.ledger.observation.empty import NullObservation
 from backend.ledger.stream import EventStream
 from backend.orchestration.health import collect_orchestration_health
-from backend.orchestration.services.pending_action_service import PendingActionService
 from backend.orchestration.mixins.parallel import (
     _SessionOrchestratorParallelMixin,
 )
+from backend.orchestration.services.pending_action_service import PendingActionService
 from backend.persistence.file_store.local_file_store import LocalFileStore
 from backend.utils.async_helpers.async_utils import drain_step_barrier, run_or_schedule
 

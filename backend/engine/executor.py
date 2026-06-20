@@ -9,16 +9,14 @@ from typing import TYPE_CHECKING, Any
 
 from backend.core.errors import ModelProviderError
 from backend.core.logging.logger import app_logger as logger
-from backend.engine import function_calling as _function_calling_module  # noqa: F401
 from backend.engine.streaming_checkpoint import StreamingCheckpoint
 
 if TYPE_CHECKING:
     from backend.inference.llm import LLM
     from backend.ledger.stream import EventStream
 
-    from .planner import OrchestratorPlanner
-
     from .contracts import NoopSafetyManager
+    from .planner import OrchestratorPlanner
 
 from backend.engine.executor_mixins._executor_lifecycle_mixin import (
     _ExecutorLifecycleMixin,

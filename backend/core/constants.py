@@ -112,7 +112,7 @@ LOOP_WATCHDOG_SUSPEND_SECONDS = float(
 DEFAULT_AGENT_RUN_FREEZE_GRACE_SECONDS = float(
     os.getenv('GRINTA_AGENT_RUN_FREEZE_GRACE_SECONDS', '30')
 )
-# ── LLM HTTP socket timeouts (backend.inference.direct_clients) ─────
+# ── LLM HTTP socket timeouts (backend.inference.clients.base) ─────
 # Per-request thinking budgets may be large, but connect/read on the wire are
 # capped so a dead socket fails fast and hits retry logic instead of wedging
 # the agent loop for minutes (Windows TCP give-up ~16m40s).

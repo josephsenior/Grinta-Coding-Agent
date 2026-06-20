@@ -7,12 +7,6 @@ files/symbols, while editing existing content is limited to ``replace_string``,
 
 from __future__ import annotations
 
-from backend.engine.contracts import ChatCompletionToolParam
-from backend.engine.tools.param_defs import (
-    create_tool_definition,
-    get_path_param,
-    get_security_risk_param,
-)
 from backend.core.tools.tool_names import (
     CREATE_TOOL_NAME,
     EDIT_SYMBOL_TOOL_NAME,
@@ -21,6 +15,12 @@ from backend.core.tools.tool_names import (
     READ_TOOL_NAME,
     REPLACE_STRING_TOOL_NAME,
     UNDO_LAST_EDIT_TOOL_NAME,
+)
+from backend.engine.contracts import ChatCompletionToolParam
+from backend.engine.tools.param_defs import (
+    create_tool_definition,
+    get_path_param,
+    get_security_risk_param,
 )
 
 

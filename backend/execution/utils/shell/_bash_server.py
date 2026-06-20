@@ -16,7 +16,9 @@ if TYPE_CHECKING:
 
 def _detect_server_startup(orch: BashSession, output: str) -> None:
     """Check for server startup in command output."""
-    from backend.execution.utils.process.server_detector import detect_server_from_output
+    from backend.execution.utils.process.server_detector import (
+        detect_server_from_output,
+    )
 
     detected_server = detect_server_from_output(output, perform_health_check=True)
     if detected_server and not hasattr(orch, '_last_detected_server_url'):

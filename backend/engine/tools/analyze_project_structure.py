@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from backend.core.tools.tool_names import ANALYZE_PROJECT_STRUCTURE_TOOL_NAME
 from backend.engine.tools._aps_callers_coverage import _build_callers_action
 from backend.engine.tools._aps_dependencies import _build_dependencies_action
 from backend.engine.tools._aps_file_modes import (
@@ -30,7 +31,6 @@ from backend.engine.tools._aps_file_modes import (
 )
 from backend.engine.tools._aps_shared import _analyze_depth, _diag
 from backend.engine.tools._aps_tree import _build_symbols_action, _build_tree_action
-from backend.core.tools.tool_names import ANALYZE_PROJECT_STRUCTURE_TOOL_NAME
 from backend.ledger.action.search import AnalyzeProjectStructureAction
 from backend.ledger.observation.search import AnalyzeProjectStructureObservation
 

@@ -12,6 +12,8 @@ from backend.engine.function_calling.dispatch import (
     _handle_cmd_run_tool,
     _process_single_tool_call,
     combine_thought,
+    register_semantic_recall,
+    response_to_actions,
     set_security_risk,
 )
 from backend.ledger.action import (

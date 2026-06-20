@@ -175,7 +175,7 @@ except Exception:
 
 
 def completion(client: Any, messages: list[dict[str, Any]], **kwargs) -> Any:
-    from backend.inference import direct_clients as dc
+    from backend.inference.clients.base import LLMResponse
 
     filtered, kwargs = client._prepare_anthropic_kwargs(messages, kwargs)
     model = kwargs.pop('model', client.model_name)
@@ -188,7 +188,7 @@ def completion(client: Any, messages: list[dict[str, Any]], **kwargs) -> Any:
     except Exception as e:
         raise client._map_anthropic_error(e) from e
     content, tool_calls = client._extract_anthropic_tool_calls(response.content)
-    return dc.LLMResponse(
+    return LLMResponse(
         content=content,
         model=response.model,
         usage={
@@ -203,7 +203,7 @@ def completion(client: Any, messages: list[dict[str, Any]], **kwargs) -> Any:
 
 
 async def acompletion(client: Any, messages: list[dict[str, Any]], **kwargs) -> Any:
-    from backend.inference import direct_clients as dc
+    from backend.inference.clients.base import LLMResponse
 
     filtered, kwargs = client._prepare_anthropic_kwargs(messages, kwargs)
     model = kwargs.pop('model', client.model_name)
@@ -216,7 +216,7 @@ async def acompletion(client: Any, messages: list[dict[str, Any]], **kwargs) -> 
     except Exception as e:
         raise client._map_anthropic_error(e) from e
     content, tool_calls = client._extract_anthropic_tool_calls(response.content)
-    return dc.LLMResponse(
+    return LLMResponse(
         content=content,
         model=response.model,
         usage={

@@ -13,7 +13,9 @@ from pathlib import Path, PurePath
 from typing import TYPE_CHECKING, Any
 
 from backend.core.logging.logger import app_logger as logger
-from backend.execution.runtime_mixins.editor_only_shell_policy import evaluate_editor_only_shell_block
+from backend.execution.runtime_mixins.editor_only_shell_policy import (
+    evaluate_editor_only_shell_block,
+)
 from backend.execution.sandboxing import is_workspace_restricted_profile
 from backend.security.command_analyzer import CommandAnalyzer, RiskCategory
 

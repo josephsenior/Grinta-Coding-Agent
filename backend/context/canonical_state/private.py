@@ -237,7 +237,10 @@ def _coerce_task_plan(value: object, event_id: int | None) -> list[TaskPlanItem]
 
 def _normalize_task_status(value: object) -> str:
     try:
-        from backend.core.tasks.task_status import TASK_STATUS_TODO, normalize_task_status
+        from backend.core.tasks.task_status import (
+            TASK_STATUS_TODO,
+            normalize_task_status,
+        )
 
         return normalize_task_status(value, default=TASK_STATUS_TODO)
     except Exception:

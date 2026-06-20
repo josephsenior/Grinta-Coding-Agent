@@ -26,7 +26,8 @@
           "high",
           "max"
         ],
-        "reasoning_wire": "glm_thinking"
+        "reasoning_wire": "glm_thinking",
+        "supports_response_schema": true
       },
       "metadata": {
         "display_name": "GLM-5.2",
