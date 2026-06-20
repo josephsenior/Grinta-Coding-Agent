@@ -5,14 +5,14 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Any
 
-from backend.inference.direct_clients import (
+from backend.inference.clients import (
     DirectLLMClient,
     LLMResponse,
-    _normalize_timeout_seconds,
     bounded_llm_http_timeout,
     get_shared_async_http_client,
     get_shared_http_client,
 )
+from backend.inference.clients.base import _normalize_timeout_seconds
 
 
 def _message_content_to_text(content: Any) -> str:

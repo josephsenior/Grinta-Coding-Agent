@@ -210,7 +210,7 @@ class TestBashSession:
 
     def test_detect_server_startup(self, session):
         with patch(
-            'backend.execution.utils.server_detector.detect_server_from_output'
+            'backend.execution.utils.process.server_detector.detect_server_from_output'
         ) as mock_detect:
             mock_server = MagicMock()
             mock_server.url = 'http://localhost:8080'

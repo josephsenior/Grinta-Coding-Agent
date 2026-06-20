@@ -20,7 +20,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.orchestration.tool_pipeline import (
     ToolInvocationContext,
     ToolInvocationMiddleware,

@@ -376,7 +376,7 @@ def _load_scratchpad_snapshot() -> str:
     a programmatic guarantee that scratchpad data survives condensation.
     """
     try:
-        from backend.engine.tools.note import _load_notes
+        from backend.engine.tools.scratchpad import _load_notes
 
         notes = _load_notes()
         if not notes:
@@ -407,7 +407,7 @@ def _load_working_memory_snapshot() -> str:
 def _load_restored_context_snapshot() -> str:
     """Load durable pre-condensation snapshot for recovery injection."""
     try:
-        from backend.context.compaction.pre_condensation_snapshot import (
+        from backend.context.compactor.pre_condensation_snapshot import (
             format_snapshot_for_injection,
             load_snapshot,
         )

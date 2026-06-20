@@ -7,7 +7,7 @@ from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, cast
 from unittest.mock import Mock
 
-from backend.core.agent_protocol import ABANDONED_RETRY_PROMPT
+from backend.orchestration.agent.agent_protocol import ABANDONED_RETRY_PROMPT
 from backend.core.constants import (
     DEFAULT_AGENT_MAX_CONSECUTIVE_NULL_ACTIONS,
     DEFAULT_AGENT_MAX_IDENTICAL_RETRIES,
@@ -22,13 +22,7 @@ from backend.core.errors import (
     LLMNoActionError,
     LLMResponseError,
 )
-from backend.core.logger import app_logger as logger
-from backend.engine.common import (
-    FunctionCallNotExistsError as CommonFunctionCallNotExistsError,
-)
-from backend.engine.common import (
-    FunctionCallValidationError as CommonFunctionCallValidationError,
-)
+from backend.core.logging.logger import app_logger as logger
 from backend.inference.exceptions import (
     BadRequestError,
     ContextWindowExceededError,
@@ -151,7 +145,7 @@ def _resolve_llm_step_timeout_seconds(agent: object) -> float | None:
     ``APP_LLM_STEP_TIMEOUT_SECONDS`` to a positive value, to enforce a cap.
     Zero, negative, or empty/unset env leaves the step uncapped.
     """
-    from backend.core.llm_step_timeout import llm_step_timeout_seconds_from_env
+    from backend.core.timeouts.llm_step_timeout import llm_step_timeout_seconds_from_env
 
     cfg = getattr(agent, 'config', None)
     if cfg is not None:
@@ -401,15 +395,9 @@ class ActionExecutionService:
 
     @staticmethod
     def _format_repair_error_message(exc: Exception) -> str:
-        if isinstance(
-            exc,
-            (FunctionCallValidationError, CommonFunctionCallValidationError),
-        ):
+        if isinstance(exc, FunctionCallValidationError):
             return f'Tool validation failed: {exc}'
-        if isinstance(
-            exc,
-            (FunctionCallNotExistsError, CommonFunctionCallNotExistsError),
-        ):
+        if isinstance(exc, FunctionCallNotExistsError):
             return f'Tool not found: {exc}'
         if isinstance(exc, LLMNoActionError):
             return 'No tool call or final text was detected.'
@@ -565,8 +553,7 @@ class ActionExecutionService:
                 LLMResponseError,
                 FunctionCallValidationError,
                 FunctionCallNotExistsError,
-                CommonFunctionCallValidationError,
-                CommonFunctionCallNotExistsError,
+                FunctionCallValidationError,
             ) as exc:
                 (
                     should_continue,

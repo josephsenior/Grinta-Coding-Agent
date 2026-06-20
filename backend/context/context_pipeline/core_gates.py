@@ -10,7 +10,7 @@ from backend.context.canonical_state import (
     render_canonical_state_for_prompt,
     validate_canonical_state_for_compaction,
 )
-from backend.context.compaction.compact_boundary import project_after_compact_boundary
+from backend.context.compactor.compact_boundary import project_after_compact_boundary
 from backend.context.context_budget import ContextBudget
 from backend.context.context_pipeline.helpers import (
     _pruned_ids,
@@ -29,7 +29,7 @@ from backend.core.constants import (
     DEFAULT_COMPACT_MIN_PRUNED_EVENTS,
     DEFAULT_COMPACT_MIN_TOKEN_REDUCTION,
 )
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.ledger.action.agent import CondensationAction
 from backend.ledger.event import Event
 

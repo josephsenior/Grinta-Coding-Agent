@@ -22,7 +22,7 @@ def _multi_edit_raise(
     transaction_rolled_back: bool = False,
     hint: str | None = None,
 ) -> NoReturn:
-    from backend.execution.aes.structured_edit_errors import multi_edit_raise
+    from backend.core.errors.structured_edit_errors import multi_edit_raise
 
     multi_edit_raise(
         summary,

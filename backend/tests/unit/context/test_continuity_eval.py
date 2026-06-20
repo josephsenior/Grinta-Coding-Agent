@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.context.compaction.pre_condensation_snapshot import (
+from backend.context.compactor.pre_condensation_snapshot import (
     extract_snapshot,
     format_snapshot_for_injection,
 )

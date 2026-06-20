@@ -22,7 +22,7 @@ from backend.utils.async_helpers.async_utils import call_sync_from_async
 
 if TYPE_CHECKING:
     from backend.core.config.app_config import AppConfig
-    from backend.persistence.files import FileStore
+    from backend.persistence.file_store.files import FileStore
 
 # 🚀 PERFORMANCE FIX: Global cache and lock for concurrent file access
 #   Prevents file I/O contention when multiple users load settings simultaneously

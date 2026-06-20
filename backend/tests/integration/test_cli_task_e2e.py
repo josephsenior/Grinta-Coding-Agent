@@ -21,8 +21,8 @@ def _sitecustomize_source() -> str:
         import asyncio
         from types import SimpleNamespace
 
-        import backend.core.bootstrap.agent_control_loop as agent_loop
-        import backend.core.bootstrap.setup as bootstrap_setup
+        import backend.app.agent_control_loop as agent_loop
+        import backend.app.setup as bootstrap_setup
         from backend.core.schemas import AgentState
         from backend.ledger import EventSource, EventStreamSubscriber
         from backend.ledger.action import MessageAction

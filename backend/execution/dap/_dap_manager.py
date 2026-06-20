@@ -13,7 +13,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.execution.dap._dap_adapters import (
     DAPAdapterSpec,
     _language_from_extension,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from backend.core.provider_types import ProviderType
+from backend.core.providers.provider_models import ProviderType
 from backend.persistence.data_models.conversation_metadata import (
     ConversationMetadata,
     ConversationTrigger,

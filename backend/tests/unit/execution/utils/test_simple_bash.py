@@ -12,7 +12,7 @@ from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.commands import CmdOutputObservation
 
 if TYPE_CHECKING:
-    from backend.execution.utils.process_registry import TaskCancellationService
+    from backend.execution.utils.process.process_registry import TaskCancellationService
     from backend.ledger.observation.commands import CmdOutputObservation
 
 
@@ -71,7 +71,7 @@ class TestSimpleBashSession:
     def test_execute_command_success(
         self, mock_popen: MagicMock, mock_bc: MagicMock, session: SimpleBashSession
     ) -> None:
-        from backend.execution.utils.bounded_io import BoundedResult
+        from backend.core.bounded_result import BoundedResult
 
         mock_popen.return_value = MagicMock(pid=1234)
         mock_bc.return_value = BoundedResult(
@@ -95,7 +95,7 @@ class TestSimpleBashSession:
         self, mock_popen: MagicMock, mock_bc: MagicMock, session: SimpleBashSession
     ) -> None:
         """Covers lines 123, 150."""
-        from backend.execution.utils.bounded_io import BoundedResult
+        from backend.core.bounded_result import BoundedResult
 
         mock_popen.return_value = MagicMock(pid=1234)
         mock_bc.return_value = BoundedResult(
@@ -120,7 +120,7 @@ class TestSimpleBashSession:
         self, mock_popen: MagicMock, mock_bc: MagicMock, session: SimpleBashSession
     ) -> None:
         """Covers lines 103-106."""
-        from backend.execution.utils.bounded_io import BoundedResult
+        from backend.core.bounded_result import BoundedResult
 
         mock_popen.return_value = MagicMock(pid=1234)
         # First call (nohup) returns non-digit, second (fallback) returns text
@@ -153,7 +153,7 @@ class TestSimpleBashSession:
         self, mock_popen: MagicMock, mock_bc: MagicMock, session: SimpleBashSession
     ) -> None:
         """Covers lines 93-94."""
-        from backend.execution.utils.bounded_io import BoundedResult
+        from backend.core.bounded_result import BoundedResult
 
         mock_popen.return_value = MagicMock(pid=1234)
         mock_bc.return_value = BoundedResult(
@@ -187,7 +187,7 @@ class TestSimpleBashSession:
     def test_handle_subprocess_timeout(
         self, mock_popen: MagicMock, mock_bc: MagicMock, session: SimpleBashSession
     ) -> None:
-        from backend.execution.utils.bounded_io import BoundedResult
+        from backend.core.bounded_result import BoundedResult
 
         mock_popen.return_value = MagicMock(pid=1234)
         mock_bc.return_value = BoundedResult(

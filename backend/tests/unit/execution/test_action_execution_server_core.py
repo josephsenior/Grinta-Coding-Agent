@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi import FastAPI
 
-import backend.execution.action_execution_server as aes
+import backend.execution.server.action_execution_server as aes
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.code_nav import LspQueryAction
 from backend.ledger.action.mcp import MCPAction

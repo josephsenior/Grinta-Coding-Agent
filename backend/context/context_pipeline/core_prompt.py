@@ -22,7 +22,7 @@ from backend.context.prompt.prompt_window import select_prompt_events
 from backend.core.constants import (
     DEFAULT_EMERGENCY_PROMPT_MIN_EVENTS,
 )
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.ledger.event import Event
 
 if TYPE_CHECKING:

@@ -246,7 +246,7 @@ EVICTION_SPIKE_THRESHOLD = 1
 # ── Runtime Bootstrap ───────────────────────────────────────────────
 # Empty prefix: invoke ``python_executable`` directly. Container images may inject a prefix.
 DEFAULT_PYTHON_PREFIX: list[str] = []
-DEFAULT_MAIN_MODULE = 'backend.execution.action_execution_server'
+DEFAULT_MAIN_MODULE = 'backend.execution.server.action_execution_server'
 
 # ── Storage ─────────────────────────────────────────────────────────
 # Relative sub-directory under local_data_root for conversation files.

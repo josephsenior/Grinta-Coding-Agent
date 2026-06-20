@@ -10,7 +10,7 @@ from __future__ import annotations
 import contextlib
 from typing import Any
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.ledger.event import Event
 
 

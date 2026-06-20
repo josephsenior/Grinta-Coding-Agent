@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from backend.core.errors import FunctionCallValidationError, ToolExecutionError
-from backend.engine.function_calling_helpers import (
+from backend.engine.function_calling.helpers import (
     parse_bool_argument,
 )
 from backend.engine.tools._file_edits_common import (
@@ -229,7 +229,7 @@ def _validate_multi_edit_file_final(
     failed_op_index: int | None = None,
     total_ops: int | None = None,
 ) -> None:
-    from backend.execution.aes.structured_edit_errors import (
+    from backend.core.errors.structured_edit_errors import (
         compact_syntax_detail,
         extract_syntax_line,
     )
@@ -283,7 +283,7 @@ def _apply_multi_edit_operation(
     failed_op_index: int | None = None,
     total_ops: int | None = None,
 ) -> None:
-    from backend.execution.aes.structured_edit_errors import summarize_editor_error
+    from backend.core.errors.structured_edit_errors import summarize_editor_error
 
     if operation == 'edit_symbol_deferred':
         edits = item.get('edits')

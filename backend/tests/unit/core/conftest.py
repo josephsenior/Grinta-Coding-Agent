@@ -6,7 +6,7 @@ from typing import Any
 
 
 def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
-    """Run ``test_logger_init`` last — it reloads ``backend.core.logger`` and would
+    """Run ``test_logger_init`` last — it reloads ``backend.core.logging.logger`` and would
     break ``isinstance(..., AppLoggerAdapter)`` in other modules loaded earlier.
     """
 

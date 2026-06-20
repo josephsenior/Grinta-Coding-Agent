@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.ledger.action.agent import ChangeAgentStateAction
 from backend.ledger.action.empty import NullAction
 from backend.ledger.action.message import MessageAction
@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from backend.ledger.event import Event
     from backend.ledger.stream import EventStream
     from backend.orchestration.telemetry.conversation_stats import ConversationStats
-    from backend.persistence.files import FileStore
+    from backend.persistence.file_store.files import FileStore
 
 
 class StateTracker:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from backend.core.llm_step_timeout import resolve_step_task_liveness_seconds
+from backend.core.timeouts.llm_step_timeout import resolve_step_task_liveness_seconds
 
 
 def test_resolve_step_task_liveness_covers_two_astep_attempts() -> None:

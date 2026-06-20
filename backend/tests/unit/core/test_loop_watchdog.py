@@ -16,8 +16,8 @@ import time
 import pytest
 
 from backend.core import loop_watchdog as lw
-from backend.core.bootstrap.agent_control_loop import _apply_freeze_credit
-from backend.core.logger import app_logger
+from backend.app.agent_control_loop import _apply_freeze_credit
+from backend.core.logging.logger import app_logger
 
 
 class _Capture(logging.Handler):

@@ -12,8 +12,8 @@ from backend.context.canonical_state import (
     reduce_events_into_state,
     render_canonical_state_for_prompt,
 )
-from backend.context.compaction.pre_condensation_snapshot import load_snapshot
-from backend.core.logger import app_logger as logger
+from backend.context.compactor.pre_condensation_snapshot import load_snapshot
+from backend.core.logging.logger import app_logger as logger
 from backend.ledger.action import MessageAction
 from backend.ledger.observation.agent import AgentCondensationObservation
 

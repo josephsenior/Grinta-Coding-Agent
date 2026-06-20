@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from backend.orchestration.tool_pipeline import ToolInvocationContext
@@ -82,7 +82,7 @@ class PreExecDiffMiddleware(ToolInvocationMiddleware):
             if new_content is None or old_content == new_content:
                 return
 
-            from backend.execution.utils.diff import get_diff
+            from backend.execution.utils.files.diff import get_diff
 
             diff = get_diff(old_content, new_content, path=action.path)
             if diff:

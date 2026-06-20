@@ -48,7 +48,7 @@ import hashlib
 import logging
 from threading import Lock
 
-from backend.inference.tool_names import (
+from backend.core.tools.tool_names import (
     CREATE_TOOL_NAME,
 )
 

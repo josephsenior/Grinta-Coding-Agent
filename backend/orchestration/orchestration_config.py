@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from backend.ledger.event import Event
     from backend.orchestration.session_orchestrator import SessionOrchestrator
     from backend.orchestration.telemetry.conversation_stats import ConversationStats
-    from backend.persistence.files import FileStore
+    from backend.persistence.file_store.files import FileStore
     from backend.security.analyzer import SecurityAnalyzer
 
 from backend.core.constants import DEFAULT_PENDING_ACTION_TIMEOUT

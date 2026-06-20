@@ -29,7 +29,7 @@ from backend.core.constants import (
     PTY_OPEN_READ_TIMEOUT_SECONDS,
     PTY_SHELL_READY_TIMEOUT_SECONDS,
 )
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.core.os_capabilities import OS_CAPS
 from backend.execution.utils.shell.pty_session import (
     CONTROL_SEQUENCES,
@@ -46,7 +46,7 @@ from backend.ledger.observation.commands import (
 )
 
 if TYPE_CHECKING:
-    from backend.execution.utils.process_registry import TaskCancellationService
+    from backend.execution.utils.process.process_registry import TaskCancellationService
     from backend.ledger.action import CmdRunAction
     from backend.ledger.observation import Observation
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.inference.tool_names import (
+from backend.core.tools.tool_names import (
     ANALYZE_PROJECT_STRUCTURE_TOOL_NAME,
     ASK_USER_TOOL_NAME,
     DOCS_QUERY_TOOL_NAME,

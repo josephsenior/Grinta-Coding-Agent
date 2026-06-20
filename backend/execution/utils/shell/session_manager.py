@@ -7,7 +7,7 @@ import os
 import uuid
 from typing import TYPE_CHECKING, Any, cast
 
-from backend.execution.utils.process_registry import TaskCancellationService
+from backend.execution.utils.process.process_registry import TaskCancellationService
 from backend.execution.utils.shell.unified_shell import (
     UnifiedShellSession,
     create_shell_session,

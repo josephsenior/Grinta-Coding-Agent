@@ -9,10 +9,6 @@ from pydantic import BaseModel
 
 from backend.core.errors import LLMResponseError
 from backend.core.pydantic_compat import model_dump_with_options
-from backend.inference.metrics import Metrics
-from backend.ledger.event import Event
-from backend.ledger.observation import CmdOutputMetadata
-from backend.ledger.serialization import event_to_dict
 
 
 class AppJSONEncoder(json.JSONEncoder):
@@ -31,6 +27,11 @@ _NOT_SERIALIZED = object()
 
 def _try_serialize_app_object(obj: Any) -> Any:
     """Serialize app-specific types; return _NOT_SERIALIZED if not handled."""
+    from backend.inference.metrics import Metrics
+    from backend.ledger.event import Event
+    from backend.ledger.observation import CmdOutputMetadata
+    from backend.ledger.serialization import event_to_dict
+
     handlers = (
         (datetime, lambda o: o.isoformat()),
         (Event, event_to_dict),

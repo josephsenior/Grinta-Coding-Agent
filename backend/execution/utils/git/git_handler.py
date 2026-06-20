@@ -7,7 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.execution.utils.git import git_changes, git_diff
 
 # Placeholder paths fail on first use; GitHandler then copies in-tree helpers (see get_git_changes).

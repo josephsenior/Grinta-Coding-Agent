@@ -16,7 +16,7 @@ from backend.core.constants import (
     DEFAULT_TOOL_RESULT_PREVIEW_CHARS,
     DEFAULT_TOOL_RESULTS_PER_MESSAGE_CHARS,
 )
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.ledger.event import Event
 from backend.ledger.observation import Observation
 from backend.ledger.observation.commands import CmdOutputObservation

@@ -18,9 +18,9 @@ from backend.ledger.observation import NullObservation
 from backend.ledger.stream import (
     EventStream,
     EventStreamSubscriber,
-    _warn_unclosed_stream,
-    get_aggregated_event_stream_stats,
 )
+from backend.ledger.stream.event_stream import _warn_unclosed_stream
+from backend.ledger.stream.stream_stats import get_aggregated_event_stream_stats
 from backend.persistence import get_file_store
 
 # ---------------------------------------------------------------------------

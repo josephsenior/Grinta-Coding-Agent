@@ -515,11 +515,11 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
         bootstrap_task: asyncio.Task[None] | None = None
 
         # -- imports (always needed) ----------------------------------------
-        from backend.core.bootstrap.agent_control_loop import run_agent_until_done
-        from backend.core.bootstrap.main import (
+        from backend.app.agent_control_loop import run_agent_until_done
+        from backend.app.main import (
             _create_early_status_callback,
         )
-        from backend.core.bootstrap.setup import create_controller
+        from backend.app.setup import create_controller
 
         try:
             config = self._config

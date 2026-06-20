@@ -12,7 +12,7 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Any
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.execution.utils.shell.bash_constants import TIMEOUT_MESSAGE_TEMPLATE
 from backend.ledger.observation.commands import (
     CMD_OUTPUT_PS1_END,
@@ -334,7 +334,7 @@ def _check_timeouts(
     # Hard timeout: always enforced.  If the action has no explicit
     # timeout we fall back to _SAFETY_NET_TIMEOUT (600s) to prevent
     # truly pathological hangs.
-    from backend.execution.command_timeout import SAFETY_NET_TIMEOUT
+    from backend.execution.runtime_mixins.command_timeout import SAFETY_NET_TIMEOUT
 
     effective_timeout = (
         min(action.timeout, SAFETY_NET_TIMEOUT)

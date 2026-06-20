@@ -11,7 +11,7 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from backend.context.compaction.pre_condensation_snapshot import extract_snapshot
+from backend.context.compactor.pre_condensation_snapshot import extract_snapshot
 from backend.core.constants import DEFAULT_CONTINUITY_GATE_MIN_SCORE
 
 if TYPE_CHECKING:
@@ -145,7 +145,7 @@ def compaction_passes_continuity_gate(
     # the rejected summary for non-critical prose. We only surface a low
     # score for observability.
     if result.total and result.score < min_score:
-        from backend.core.logger import app_logger as logger
+        from backend.core.logging.logger import app_logger as logger
 
         logger.info(
             'Compaction continuity score below floor (score=%.2f < min=%.2f, '

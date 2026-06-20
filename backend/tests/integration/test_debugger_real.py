@@ -20,7 +20,7 @@ import pytest
 
 debugpy = pytest.importorskip('debugpy', reason='debugpy not installed')
 
-from backend.execution.debugger import DAPDebugManager  # noqa: E402
+from backend.execution.server.debugger import DAPDebugManager  # noqa: E402
 from backend.ledger.action.debugger import DebuggerAction  # noqa: E402
 from backend.ledger.observation import ErrorObservation  # noqa: E402
 from backend.ledger.observation.debugger import DebuggerObservation  # noqa: E402
@@ -48,7 +48,7 @@ def test_real_debugpy_cold_start_and_stop(tmp_path) -> None:
         def emit(self, record: logging.LogRecord) -> None:
             captured.append(record.getMessage())
 
-    from backend.core.logger import app_logger
+    from backend.core.logging.logger import app_logger
 
     handler = _CaptureHandler(level=logging.INFO)
     start: DebuggerObservation | ErrorObservation

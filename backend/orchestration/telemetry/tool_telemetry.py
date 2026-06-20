@@ -5,7 +5,7 @@ import threading
 import time
 from typing import TYPE_CHECKING, Any, cast
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.core.schemas import (
     ActionSchemaUnion,
     ObservationSchemaUnion,

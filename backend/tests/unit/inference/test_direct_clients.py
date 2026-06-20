@@ -1,4 +1,4 @@
-"""Unit tests for backend.inference.direct_clients — factory routing and LLMResponse."""
+"""Unit tests for backend.inference.clients — factory routing and LLMResponse."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.inference.direct_clients import (
+from backend.inference.clients import (
     LLMResponse,
     _pool_key,
     get_direct_client,
@@ -20,14 +20,14 @@ from backend.inference.direct_clients import (
 def _mock_openai_sdk():
     """Return a patch context that makes OpenAI + AsyncOpenAI constructors no-ops."""
     return [
-        patch('backend.inference.direct_clients.OpenAI'),
-        patch('backend.inference.direct_clients.AsyncOpenAI'),
+        patch('backend.inference.clients.OpenAI'),
+        patch('backend.inference.clients.AsyncOpenAI'),
         patch(
-            'backend.inference.direct_clients.get_shared_http_client',
+            'backend.inference.clients.get_shared_http_client',
             return_value=MagicMock(spec=True),
         ),
         patch(
-            'backend.inference.direct_clients.get_shared_async_http_client',
+            'backend.inference.clients.get_shared_async_http_client',
             return_value=MagicMock(spec=True),
         ),
     ]
@@ -112,14 +112,14 @@ class TestLLMResponse:
 class TestGetDirectClientRouting:
     """Verify factory routes models to the correct client classes."""
 
-    @patch('backend.inference.direct_clients.AsyncOpenAI')
-    @patch('backend.inference.direct_clients.OpenAI')
+    @patch('backend.inference.clients.AsyncOpenAI')
+    @patch('backend.inference.clients.OpenAI')
     @patch(
-        'backend.inference.direct_clients.get_shared_async_http_client',
+        'backend.inference.clients.get_shared_async_http_client',
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client',
+        'backend.inference.clients.get_shared_http_client',
         return_value=MagicMock(),
     )
     def test_openai_default(self, _h, _ah, _oai, _aoai):
@@ -127,14 +127,14 @@ class TestGetDirectClientRouting:
         assert type(client).__name__ == 'OpenAIClient'
         assert client._model_name == 'gpt-5'
 
-    @patch('backend.inference.direct_clients.Anthropic')
-    @patch('backend.inference.direct_clients.AsyncAnthropic')
+    @patch('backend.inference.clients.Anthropic')
+    @patch('backend.inference.clients.AsyncAnthropic')
     def test_anthropic_routing(self, _async, _sync):
         client = get_direct_client('anthropic/claude-3.5-sonnet', api_key='key')
         assert type(client).__name__ == 'AnthropicClient'
 
-    @patch('backend.inference.direct_clients.Anthropic')
-    @patch('backend.inference.direct_clients.AsyncAnthropic')
+    @patch('backend.inference.clients.Anthropic')
+    @patch('backend.inference.clients.AsyncAnthropic')
     def test_claude_routing(self, _async, _sync):
         client = get_direct_client('anthropic/claude-sonnet-4-5', api_key='key')
         assert type(client).__name__ == 'AnthropicClient'
@@ -149,14 +149,14 @@ class TestGetDirectClientRouting:
         client = get_direct_client('google/gemini-1.5-pro', api_key='key')
         assert type(client).__name__ == 'GeminiClient'
 
-    @patch('backend.inference.direct_clients.AsyncOpenAI')
-    @patch('backend.inference.direct_clients.OpenAI')
+    @patch('backend.inference.clients.AsyncOpenAI')
+    @patch('backend.inference.clients.OpenAI')
     @patch(
-        'backend.inference.direct_clients.get_shared_async_http_client',
+        'backend.inference.clients.get_shared_async_http_client',
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client',
+        'backend.inference.clients.get_shared_http_client',
         return_value=MagicMock(),
     )
     def test_lightning_routing_strips_provider_prefix(self, _h, _ah, _oai, _aoai):
@@ -167,42 +167,42 @@ class TestGetDirectClientRouting:
         assert type(client).__name__ == 'OpenAIClient'
         assert client._model_name == 'google/gemini-3-flash-preview'
 
-    @patch('backend.inference.direct_clients.AsyncOpenAI')
-    @patch('backend.inference.direct_clients.OpenAI')
+    @patch('backend.inference.clients.AsyncOpenAI')
+    @patch('backend.inference.clients.OpenAI')
     @patch(
-        'backend.inference.direct_clients.get_shared_async_http_client',
+        'backend.inference.clients.get_shared_async_http_client',
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client',
+        'backend.inference.clients.get_shared_http_client',
         return_value=MagicMock(),
     )
     def test_xai_grok_routing(self, _h, _ah, _oai, _aoai):
         client = get_direct_client('xai/grok-3', api_key='key')
         assert type(client).__name__ == 'OpenAIClient'
 
-    @patch('backend.inference.direct_clients.AsyncOpenAI')
-    @patch('backend.inference.direct_clients.OpenAI')
+    @patch('backend.inference.clients.AsyncOpenAI')
+    @patch('backend.inference.clients.OpenAI')
     @patch(
-        'backend.inference.direct_clients.get_shared_async_http_client',
+        'backend.inference.clients.get_shared_async_http_client',
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client',
+        'backend.inference.clients.get_shared_http_client',
         return_value=MagicMock(),
     )
     def test_grok_routing(self, _h, _ah, _oai, _aoai):
         client = get_direct_client('xai/grok-build-0.1', api_key='key')
         assert type(client).__name__ == 'OpenAIClient'
 
-    @patch('backend.inference.direct_clients.AsyncOpenAI')
-    @patch('backend.inference.direct_clients.OpenAI')
+    @patch('backend.inference.clients.AsyncOpenAI')
+    @patch('backend.inference.clients.OpenAI')
     @patch(
-        'backend.inference.direct_clients.get_shared_async_http_client',
+        'backend.inference.clients.get_shared_async_http_client',
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client',
+        'backend.inference.clients.get_shared_http_client',
         return_value=MagicMock(),
     )
     def test_ollama_routing_strips_prefix(self, _h, _ah, _oai, _aoai):
@@ -210,28 +210,28 @@ class TestGetDirectClientRouting:
         assert type(client).__name__ == 'OpenAIClient'
         assert client._model_name == 'llama3.2'
 
-    @patch('backend.inference.direct_clients.AsyncOpenAI')
-    @patch('backend.inference.direct_clients.OpenAI')
+    @patch('backend.inference.clients.AsyncOpenAI')
+    @patch('backend.inference.clients.OpenAI')
     @patch(
-        'backend.inference.direct_clients.get_shared_async_http_client',
+        'backend.inference.clients.get_shared_async_http_client',
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client',
+        'backend.inference.clients.get_shared_http_client',
         return_value=MagicMock(),
     )
     def test_ollama_defaults_base_url(self, _h, _ah, _oai, _aoai):
         client = get_direct_client('ollama/codestral', api_key='')
         assert client._model_name == 'codestral'
 
-    @patch('backend.inference.direct_clients.AsyncOpenAI')
-    @patch('backend.inference.direct_clients.OpenAI')
+    @patch('backend.inference.clients.AsyncOpenAI')
+    @patch('backend.inference.clients.OpenAI')
     @patch(
-        'backend.inference.direct_clients.get_shared_async_http_client',
+        'backend.inference.clients.get_shared_async_http_client',
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client',
+        'backend.inference.clients.get_shared_http_client',
         return_value=MagicMock(),
     )
     def test_ollama_custom_base_url_respected(self, _h, _ah, _oai, _aoai):
@@ -242,14 +242,14 @@ class TestGetDirectClientRouting:
         )
         assert client._model_name == 'phi3'
 
-    @patch('backend.inference.direct_clients.AsyncOpenAI')
-    @patch('backend.inference.direct_clients.OpenAI')
+    @patch('backend.inference.clients.AsyncOpenAI')
+    @patch('backend.inference.clients.OpenAI')
     @patch(
-        'backend.inference.direct_clients.get_shared_async_http_client',
+        'backend.inference.clients.get_shared_async_http_client',
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client',
+        'backend.inference.clients.get_shared_http_client',
         return_value=MagicMock(),
     )
     def test_ollama_without_prefix(self, _h, _ah, _oai, _aoai):
@@ -257,42 +257,42 @@ class TestGetDirectClientRouting:
         with pytest.raises(ValueError, match='Provider is ambiguous'):
             get_direct_client('ollama-test-model', api_key='')
 
-    @patch('backend.inference.direct_clients.AsyncOpenAI')
-    @patch('backend.inference.direct_clients.OpenAI')
+    @patch('backend.inference.clients.AsyncOpenAI')
+    @patch('backend.inference.clients.OpenAI')
     @patch(
-        'backend.inference.direct_clients.get_shared_async_http_client',
+        'backend.inference.clients.get_shared_async_http_client',
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client',
+        'backend.inference.clients.get_shared_http_client',
         return_value=MagicMock(),
     )
     def test_unknown_model_defaults_to_openai(self, _h, _ah, _oai, _aoai):
         with pytest.raises(ValueError, match='Provider is ambiguous'):
             get_direct_client('my-custom-model', api_key='key')
 
-    @patch('backend.inference.direct_clients.AsyncOpenAI')
-    @patch('backend.inference.direct_clients.OpenAI')
+    @patch('backend.inference.clients.AsyncOpenAI')
+    @patch('backend.inference.clients.OpenAI')
     @patch(
-        'backend.inference.direct_clients.get_shared_async_http_client',
+        'backend.inference.clients.get_shared_async_http_client',
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client',
+        'backend.inference.clients.get_shared_http_client',
         return_value=MagicMock(),
     )
     def test_explicit_custom_openai_model_routes(self, _h, _ah, _oai, _aoai):
         client = get_direct_client('openai/my-custom-model', api_key='key')
         assert type(client).__name__ == 'OpenAIClient'
 
-    @patch('backend.inference.direct_clients.AsyncOpenAI')
-    @patch('backend.inference.direct_clients.OpenAI')
+    @patch('backend.inference.clients.AsyncOpenAI')
+    @patch('backend.inference.clients.OpenAI')
     @patch(
-        'backend.inference.direct_clients.get_shared_async_http_client',
+        'backend.inference.clients.get_shared_async_http_client',
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client',
+        'backend.inference.clients.get_shared_http_client',
         return_value=MagicMock(),
     )
     def test_custom_base_url_passthrough(self, _h, _ah, _oai, _aoai):
@@ -301,14 +301,14 @@ class TestGetDirectClientRouting:
         )
         assert type(client).__name__ == 'OpenAIClient'
 
-    @patch('backend.inference.direct_clients.Anthropic')
-    @patch('backend.inference.direct_clients.AsyncAnthropic')
+    @patch('backend.inference.clients.Anthropic')
+    @patch('backend.inference.clients.AsyncAnthropic')
     @patch(
-        'backend.inference.direct_clients.get_shared_async_http_client',
+        'backend.inference.clients.get_shared_async_http_client',
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client',
+        'backend.inference.clients.get_shared_http_client',
         return_value=MagicMock(),
     )
     def test_opencode_go_minimax_routes_to_anthropic_messages(
@@ -318,14 +318,14 @@ class TestGetDirectClientRouting:
         assert type(client).__name__ == 'AnthropicClient'
         assert client._model_name == 'minimax-m2.7'
 
-    @patch('backend.inference.direct_clients.AsyncOpenAI')
-    @patch('backend.inference.direct_clients.OpenAI')
+    @patch('backend.inference.clients.AsyncOpenAI')
+    @patch('backend.inference.clients.OpenAI')
     @patch(
-        'backend.inference.direct_clients.get_shared_async_http_client',
+        'backend.inference.clients.get_shared_async_http_client',
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client',
+        'backend.inference.clients.get_shared_http_client',
         return_value=MagicMock(),
     )
     def test_opencode_go_qwen_routes_to_openai_compatible(self, _h, _ah, _oai, _aoai):
@@ -340,14 +340,14 @@ class TestGetDirectClientRouting:
 
 
 class TestDirectLLMClientModelName:
-    @patch('backend.inference.direct_clients.AsyncOpenAI')
-    @patch('backend.inference.direct_clients.OpenAI')
+    @patch('backend.inference.clients.AsyncOpenAI')
+    @patch('backend.inference.clients.OpenAI')
     @patch(
-        'backend.inference.direct_clients.get_shared_async_http_client',
+        'backend.inference.clients.get_shared_async_http_client',
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client',
+        'backend.inference.clients.get_shared_http_client',
         return_value=MagicMock(),
     )
     def test_model_name_set(self, _h, _ah, _oai, _aoai):

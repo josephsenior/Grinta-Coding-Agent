@@ -21,7 +21,7 @@ from pydantic import (
 
 from backend._canonical import CanonicalModelMetaclass
 from backend.core.constants import DEFAULT_APP_MCP_CONFIG_CLS
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from backend.core.config.app_config import AppConfig

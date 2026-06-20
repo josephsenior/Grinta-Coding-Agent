@@ -20,12 +20,12 @@ with warnings.catch_warnings():
     from google import genai
 
 from backend.core import json_compat as json
-from backend.core.logger import app_logger as logger
-from backend.inference.direct_clients import (
+from backend.core.logging.logger import app_logger as logger
+from backend.inference.clients import (
     DirectLLMClient,
     LLMResponse,
-    _normalize_timeout_seconds,
 )
+from backend.inference.clients.base import _normalize_timeout_seconds
 
 
 def _gemini_timeout_ms(timeout: float | int | None) -> int:

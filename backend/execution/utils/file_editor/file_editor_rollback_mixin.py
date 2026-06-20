@@ -208,7 +208,7 @@ class FileEditorRollbackMixin:
                     )
             except Exception as e:
                 # Log but continue rollback for other files
-                from backend.core.logger import app_logger as logger
+                from backend.core.logging.logger import app_logger as logger
 
                 logger.warning('Failed to rollback %s: %s', file_path, e)
                 results.append(

@@ -28,12 +28,12 @@ from backend.cli.tui.widgets.small import (
     RendererDrainRequested,
     Transcript,
 )
-from backend.core.bootstrap.agent_control_loop import run_agent_until_done
-from backend.core.bootstrap.main import (
+from backend.app.agent_control_loop import run_agent_until_done
+from backend.app.main import (
     create_agent,
     create_registry_and_conversation_stats,
 )
-from backend.core.bootstrap.setup import (
+from backend.app.setup import (
     create_controller,
     create_memory,
     create_runtime,
@@ -41,7 +41,7 @@ from backend.core.bootstrap.setup import (
 )
 from backend.core.constants import DEFAULT_TUI_DISPATCH_TIMEOUT_SECONDS
 from backend.core.enums import AgentState, EventSource
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.ledger import EventStream, EventStreamSubscriber
 from backend.ledger.action import (
     MessageAction,
@@ -210,7 +210,7 @@ class ScreenLifecycleMixin:
             finally:
                 self._event_stream = None
         try:
-            from backend.core.logger import finalize_session_logging_audit
+            from backend.core.logging.logger import finalize_session_logging_audit
 
             finalize_session_logging_audit()
         except Exception as exc:
@@ -366,7 +366,7 @@ class ScreenLifecycleMixin:
         self, agent: Any, runtime: Any, memory: Any
     ) -> None:
         try:
-            from backend.core.bootstrap.main import _setup_mcp_tools
+            from backend.app.main import _setup_mcp_tools
 
             await _setup_mcp_tools(agent, runtime, memory)
             from backend.integrations.mcp.native_backends import (

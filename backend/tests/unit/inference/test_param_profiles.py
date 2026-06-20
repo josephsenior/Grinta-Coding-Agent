@@ -8,7 +8,7 @@ from backend.inference.capabilities.param_profiles import (
     resolve_param_profile_id,
     synthetic_entry_from_profile,
 )
-from backend.inference.catalog_loader import lookup
+from backend.inference.catalog.catalog_loader import lookup
 from backend.inference.reasoning import reasoning_effort_options
 from backend.inference.runtime_profile import resolve_runtime_profile
 

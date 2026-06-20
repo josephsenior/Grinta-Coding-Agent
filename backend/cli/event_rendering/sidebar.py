@@ -20,7 +20,7 @@ from backend.cli.theme import (
     STYLE_DEFAULT,
     STYLE_DIM,
 )
-from backend.core.task_status import TASK_STATUS_PANEL_STYLES
+from backend.core.tasks.task_status import TASK_STATUS_PANEL_STYLES
 
 
 def _create_sidebar_panel(title: str, content: Any, count: int | None = None) -> Panel:

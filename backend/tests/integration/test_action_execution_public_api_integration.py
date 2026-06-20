@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-import backend.execution.action_execution_server as aes
+import backend.execution.server.action_execution_server as aes
 
 
 @pytest.mark.integration

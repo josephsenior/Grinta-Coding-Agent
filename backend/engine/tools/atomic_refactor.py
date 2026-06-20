@@ -14,7 +14,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 
 
 def _ensure_parent_dir(file_path: str) -> None:

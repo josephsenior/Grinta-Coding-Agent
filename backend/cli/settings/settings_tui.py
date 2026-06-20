@@ -72,7 +72,7 @@ def _prompt_provider_model(console: Console, provider_key: str | None) -> str:
     options: list[str] = []
     if provider_key:
         try:
-            from backend.inference.registry import build_model_entries_by_provider
+            from backend.inference.catalog.provider_catalog import build_model_entries_by_provider
 
             entries = build_model_entries_by_provider(
                 provider=provider_key,

@@ -10,7 +10,7 @@ import time
 import unittest
 from unittest.mock import patch
 
-from backend.core.retry_queue import (
+from backend.orchestration.services.retry_queue import (
     BaseRetryBackend,
     InMemoryRetryBackend,
     RetryQueue,

@@ -516,7 +516,7 @@ def set_main_event_loop(loop: asyncio.AbstractEventLoop | None = None) -> None:
     # loop.  Deferred import keeps this low-level module free of heavier deps
     # and avoids import cycles.  Idempotent and never raises into callers.
     try:
-        from backend.core.loop_watchdog import start_loop_watchdog
+        from backend.core.timeouts.loop_watchdog import start_loop_watchdog
 
         start_loop_watchdog(loop)
     except Exception:
@@ -622,8 +622,8 @@ async def drain_step_barrier(
     Returns True when both the background task set and optional pending predicate
     report idle; False when *timeout* expires with pending work still outstanding.
     """
-    from backend.core.logger import app_logger as logger
-    from backend.core.suspend_aware_deadline import SuspendAwareDeadline
+    from backend.core.logging.logger import app_logger as logger
+    from backend.core.timeouts.suspend_aware_deadline import SuspendAwareDeadline
 
     deadline = SuspendAwareDeadline(timeout, poll_interval=poll_interval)
     try:

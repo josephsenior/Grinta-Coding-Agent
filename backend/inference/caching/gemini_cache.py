@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, cast
 if TYPE_CHECKING:
     from google import genai
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 
 
 class GeminiCacheManager:

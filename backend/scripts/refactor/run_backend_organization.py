@@ -204,19 +204,19 @@ COMPACTION_MOVES: dict[str, str] = {
 }
 
 COMPACTION_IMPORTS: list[tuple[str, str]] = [
-    ('backend.context.compact_boundary', 'backend.context.compaction.compact_boundary'),
-    ('backend.context.microcompact', 'backend.context.compaction.microcompact'),
+    ('backend.context.compact_boundary', 'backend.context.compactor.compact_boundary'),
+    ('backend.context.microcompact', 'backend.context.compactor.microcompact'),
     (
         'backend.context.compaction_finalizer',
-        'backend.context.compaction.compaction_finalizer',
+        'backend.context.compactor.compaction_finalizer',
     ),
     (
         'backend.context.condensed_history',
-        'backend.context.compaction.condensed_history',
+        'backend.context.compactor.condensed_history',
     ),
     (
         'backend.context.pre_condensation_snapshot',
-        'backend.context.compaction.pre_condensation_snapshot',
+        'backend.context.compactor.pre_condensation_snapshot',
     ),
 ]
 
@@ -340,7 +340,7 @@ EXECUTION_AES_IMPORTS: list[tuple[str, str]] = [
     ('backend.execution.file_operations', 'backend.execution.aes.file_operations'),
     (
         'backend.execution.structured_edit_errors',
-        'backend.execution.aes.structured_edit_errors',
+        'backend.core.errors.structured_edit_errors',
     ),
     (
         'backend.execution.security_enforcement',

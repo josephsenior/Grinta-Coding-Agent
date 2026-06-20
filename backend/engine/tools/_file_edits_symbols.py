@@ -13,7 +13,7 @@ from typing import Any, cast
 
 from backend.core.enums import FileEditSource, FileReadSource
 from backend.core.errors import FunctionCallValidationError
-from backend.engine.function_calling_helpers import (
+from backend.engine.function_calling.helpers import (
     parse_bool_argument,
     require_tool_argument,
 )
@@ -28,7 +28,7 @@ from backend.engine.tools._file_ops import (
     _safe_workspace_path,
     _sha256_text,
 )
-from backend.inference.tool_names import (
+from backend.core.tools.tool_names import (
     FIND_SYMBOLS_TOOL_NAME,
     READ_TOOL_NAME,
 )
@@ -238,7 +238,7 @@ def _build_read_symbol_final(
     display_target: str,
     symbol_name: str,
 ) -> dict[str, Any]:
-    from backend.execution.aes.structured_edit_errors import (
+    from backend.core.errors.structured_edit_errors import (
         compact_symbol_candidates,
         symbol_ambiguity_summary,
     )
@@ -415,7 +415,7 @@ def _build_read_symbols_tool_result(results: list[dict[str, Any]]) -> dict[str, 
 
 
 def execute_read_symbols(action: ReadSymbolsAction) -> Any:
-    from backend.execution.aes.structured_edit_errors import (
+    from backend.core.errors.structured_edit_errors import (
         build_read_symbols_error_observation,
         compact_symbol_read_result,
     )

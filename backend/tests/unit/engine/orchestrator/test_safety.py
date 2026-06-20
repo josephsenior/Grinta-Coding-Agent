@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from backend.engine.safety import OrchestratorSafetyManager
+from backend.engine.contracts import NoopSafetyManager
 from backend.ledger.action import MessageAction, ProposalAction
 
 
 def test_safety_blocks_explicit_file_claim_in_plain_message():
-    safety = OrchestratorSafetyManager()
+    safety = NoopSafetyManager()
 
     proceed, actions = safety.apply(
         "I've created grinta_feedback.md with the full write-up.",
@@ -21,7 +21,7 @@ def test_safety_blocks_explicit_file_claim_in_plain_message():
 
 
 def test_safety_blocks_explicit_command_claim_in_plain_message():
-    safety = OrchestratorSafetyManager()
+    safety = NoopSafetyManager()
 
     proceed, actions = safety.apply(
         "I've run the tests and they all passed.",
@@ -33,7 +33,7 @@ def test_safety_blocks_explicit_command_claim_in_plain_message():
 
 
 def test_safety_allows_conversational_plain_message_without_side_effect_claim():
-    safety = OrchestratorSafetyManager()
+    safety = NoopSafetyManager()
 
     proceed, actions = safety.apply(
         "I've prepared a rating of the system and the tools based on the transcript.",
@@ -49,7 +49,7 @@ def test_safety_allows_conversational_plain_message_without_side_effect_claim():
 
 
 def test_safety_allows_structured_non_runnable_actions():
-    safety = OrchestratorSafetyManager()
+    safety = NoopSafetyManager()
 
     proceed, actions = safety.apply(
         "I've prepared two approaches for your feedback.",

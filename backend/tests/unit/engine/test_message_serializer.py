@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from backend.core.message import ImageContent, Message, TextContent
-from backend.engine.message_serializer import (
+from backend.engine.llm_message_serializer import (
     MessageSerializationError,
     serialize_messages,
 )

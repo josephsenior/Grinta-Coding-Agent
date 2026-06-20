@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from backend.execution.base import Runtime
+from backend.execution.server.base import Runtime
 from backend.ledger.action import (
     CmdRunAction,
     FileEditAction,

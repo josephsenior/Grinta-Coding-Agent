@@ -7,13 +7,13 @@ import sys
 import textwrap
 from typing import Any
 
-from backend.execution import debugger as debugger_module
+from backend.execution.server import debugger as debugger_module
 from backend.execution.dap._dap_adapters import (
     _resolve_recipe,
     build_custom_adapter_spec,
     detect_debug_adapters,
 )
-from backend.execution.debugger import (
+from backend.execution.server.debugger import (
     DAPClient,
     DAPDebugManager,
     DAPError,

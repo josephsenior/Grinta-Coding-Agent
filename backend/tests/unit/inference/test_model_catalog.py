@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from backend.inference.model_catalog import get_supported_llm_models
+from backend.inference.catalog.model_catalog import get_supported_llm_models
 
 
 def test_get_supported_llm_models_uses_featured_models() -> None:

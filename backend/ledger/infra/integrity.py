@@ -13,7 +13,7 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
 from backend.core import json_compat as json
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 
 if TYPE_CHECKING:  # pragma: no cover
     from backend.ledger.event import Event

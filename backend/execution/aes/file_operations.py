@@ -14,9 +14,9 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from backend.core.enums import FileReadSource
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.core.os_capabilities import OS_CAPS
-from backend.execution.utils.files import (
+from backend.execution.utils.files.files import (
     read_lines,
 )
 from backend.execution.utils.test_output_summary import extract_test_summary
@@ -96,7 +96,7 @@ def _make_error_response(
 def _make_editor_error_response(
     result: Any, path: str, file_text: str | None, new_str: str | None, command: str
 ) -> tuple[str, tuple[None, None], dict[str, Any]]:
-    from backend.execution.aes.structured_edit_errors import (
+    from backend.core.errors.structured_edit_errors import (
         normalize_editor_error_response,
     )
 

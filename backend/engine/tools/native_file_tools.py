@@ -8,12 +8,12 @@ files/symbols, while editing existing content is limited to ``replace_string``,
 from __future__ import annotations
 
 from backend.engine.contracts import ChatCompletionToolParam
-from backend.engine.tools.common import (
+from backend.engine.tools.param_defs import (
     create_tool_definition,
     get_path_param,
     get_security_risk_param,
 )
-from backend.inference.tool_names import (
+from backend.core.tools.tool_names import (
     CREATE_TOOL_NAME,
     EDIT_SYMBOL_TOOL_NAME,
     FIND_SYMBOLS_TOOL_NAME,

@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from backend.inference.registry import (
+from backend.inference.catalog.provider_catalog import (
     build_model_entries_by_provider,
     list_model_names,
 )

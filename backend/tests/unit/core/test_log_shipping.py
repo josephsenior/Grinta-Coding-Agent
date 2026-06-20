@@ -1,4 +1,4 @@
-"""Unit tests for backend.core.log_shipping — LogShipper, LogShippingHandler."""
+"""Unit tests for backend.core.logging.log_shipping — LogShipper, LogShippingHandler."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 
 import pytest
 
-from backend.core.log_shipping import LogShipper, LogShippingHandler
+from backend.core.logging.log_shipping import LogShipper, LogShippingHandler
 
 # ---------------------------------------------------------------------------
 # LogShipper — basic queue & config
@@ -177,7 +177,7 @@ class TestLogShipper:
         async def fake_wait_for(*_args, **_kwargs):
             raise TimeoutError
 
-        monkeypatch.setattr('backend.core.log_shipping.asyncio.wait_for', fake_wait_for)
+        monkeypatch.setattr('backend.core.logging.log_shipping.asyncio.wait_for', fake_wait_for)
         result = await shipper._wait_for_batch_window()
         assert result is False
 
@@ -217,7 +217,7 @@ class TestLogShipper:
 
         cast(Any, shipper)._ship_logs = AsyncMock(side_effect=[False, True])
         with patch(
-            'backend.core.log_shipping.asyncio.sleep', new=AsyncMock()
+            'backend.core.logging.log_shipping.asyncio.sleep', new=AsyncMock()
         ) as sleep_mock:
             result = await shipper._attempt_ship_with_retries(logs)
 
@@ -242,7 +242,7 @@ class TestLogShipper:
             return MagicMock()
 
         monkeypatch.setattr(
-            'backend.core.log_shipping.asyncio.create_task', fake_create_task
+            'backend.core.logging.log_shipping.asyncio.create_task', fake_create_task
         )
 
         shipper.enqueue({'message': 'x'})
@@ -268,7 +268,7 @@ class TestLogShipper:
             return MagicMock()
 
         monkeypatch.setattr(
-            'backend.core.log_shipping.asyncio.create_task', fake_create_task
+            'backend.core.logging.log_shipping.asyncio.create_task', fake_create_task
         )
 
         await shipper.start()
@@ -296,7 +296,7 @@ class TestLogShipper:
         monkeypatch.setenv('LOG_SHIPPING_API_KEY', 'abc')
         monkeypatch.setenv('LOG_SHIPPING_ENABLED', 'true')
 
-        import backend.core.log_shipping as log_shipping
+        import backend.core.logging.log_shipping as log_shipping
 
         log_shipping._log_shipper = None
         shipper = log_shipping.get_log_shipper()
@@ -307,7 +307,7 @@ class TestLogShipper:
         monkeypatch.delenv('LOG_SHIPPING_ENDPOINT', raising=False)
         monkeypatch.setenv('LOG_SHIPPING_ENABLED', 'false')
 
-        import backend.core.log_shipping as log_shipping
+        import backend.core.logging.log_shipping as log_shipping
 
         log_shipping._log_shipper = None
         shipper = log_shipping.get_log_shipper()

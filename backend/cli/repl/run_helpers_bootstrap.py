@@ -81,7 +81,7 @@ async def _bootstrap_init_session(
     session: Any | None,
     engine_init_exc: list[BaseException | None],
 ) -> bool:
-    from backend.core.bootstrap.main import _initialize_session_components
+    from backend.app.main import _initialize_session_components
 
     try:
         bootstrap_state = await asyncio.to_thread(
@@ -114,7 +114,7 @@ async def _bootstrap_setup_runtime(
     chat_ready_done: asyncio.Event,
     engine_init_exc: list[BaseException | None],
 ) -> bool:
-    from backend.core.bootstrap.main import (
+    from backend.app.main import (
         _setup_memory,
         _setup_runtime_for_controller,
     )
@@ -177,7 +177,7 @@ async def _bootstrap_mcp_warmup(
     """Warm up MCP tools with per-server progress reporting."""
     import os
 
-    from backend.core.bootstrap.main import _setup_mcp_tools
+    from backend.app.main import _setup_mcp_tools
 
     verbose = os.environ.get('GRINTA_VERBOSE') == '1'
     server_count, server_names = _count_mcp_servers(agent)

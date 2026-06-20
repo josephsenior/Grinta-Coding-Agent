@@ -38,7 +38,7 @@ def needs_onboarding(config: AppConfig) -> bool:
 
 
 def _iter_api_key_prefixes() -> list[tuple[str, str]]:
-    from backend.core.providers import PROVIDER_CONFIGURATIONS
+    from backend.core.providers.configurations import PROVIDER_CONFIGURATIONS
 
     prefixes: list[tuple[str, str]] = []
     for provider, cfg in PROVIDER_CONFIGURATIONS.items():
@@ -71,7 +71,7 @@ def _default_model_for_api_key(api_key: str | None) -> str:
 
 def _default_model_from_environment() -> str | None:
     try:
-        from backend.core.providers import PROVIDER_CONFIGURATIONS
+        from backend.core.providers.configurations import PROVIDER_CONFIGURATIONS
     except Exception:
         logger.debug('Could not inspect provider configurations', exc_info=True)
         return None
@@ -97,7 +97,7 @@ def auto_detect_api_keys(config: AppConfig) -> str | None:
     try:
         from pydantic import SecretStr
 
-        from backend.core.providers import PROVIDER_CONFIGURATIONS
+        from backend.core.providers.configurations import PROVIDER_CONFIGURATIONS
     except Exception:
         logger.debug('Could not import provider configurations', exc_info=True)
         return None

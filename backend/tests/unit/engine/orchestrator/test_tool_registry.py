@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from backend.engine.function_calling import _create_tool_dispatch_map
+from backend.engine.function_calling.dispatch import _create_tool_dispatch_map
 from backend.engine.planner import OrchestratorPlanner
 from backend.engine.tool_registry import validate_internal_toolset
 

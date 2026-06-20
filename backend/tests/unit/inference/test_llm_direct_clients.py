@@ -1,4 +1,4 @@
-"""Tests for backend.inference.direct_clients — LLMResponse, httpx pool, get_direct_client."""
+"""Tests for backend.inference.clients — LLMResponse, httpx pool, get_direct_client."""
 
 # pylint: disable=protected-access,unsubscriptable-object,invalid-overridden-method
 
@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
-from backend.inference.direct_clients import (
+from backend.inference.clients import (
     LLMResponse,
     _pool_key,
     aclose_shared_http_clients,
@@ -177,7 +177,7 @@ class TestSharedHttpClients:
 
     def test_shared_pool_has_no_outer_step_cap_by_default(self, monkeypatch):
         from backend.core.constants import LLM_STREAM_CHUNK_TIMEOUT_SECONDS
-        from backend.inference.direct_clients import _shared_llm_pool_timeout
+        from backend.inference.clients.base import _shared_llm_pool_timeout
 
         monkeypatch.delenv('APP_LLM_STEP_TIMEOUT_SECONDS', raising=False)
 
@@ -207,12 +207,12 @@ class TestSharedHttpClients:
         await aclose_shared_http_clients()
 
     def test_openai_client_applies_default_timeout(self):
-        from backend.inference.direct_clients import OpenAIClient
+        from backend.inference.clients import OpenAIClient
 
         with (
-            patch('backend.inference.direct_clients.OpenAI'),
-            patch('backend.inference.direct_clients.AsyncOpenAI'),
-            patch('backend.inference.direct_clients._openai_completion') as completion,
+            patch('backend.inference.clients.OpenAI'),
+            patch('backend.inference.clients.AsyncOpenAI'),
+            patch('backend.inference.clients._openai_completion') as completion,
         ):
             client = OpenAIClient('gpt-4o', 'sk-test', timeout=12)
             client.completion(messages=[])
@@ -220,13 +220,13 @@ class TestSharedHttpClients:
         assert completion.call_args.kwargs['timeout'].read == 12.0
 
     def test_anthropic_client_applies_default_timeout(self):
-        from backend.inference.direct_clients import AnthropicClient
+        from backend.inference.clients import AnthropicClient
 
         with (
-            patch('backend.inference.direct_clients.Anthropic'),
-            patch('backend.inference.direct_clients.AsyncAnthropic'),
+            patch('backend.inference.clients.Anthropic'),
+            patch('backend.inference.clients.AsyncAnthropic'),
             patch(
-                'backend.inference.direct_clients._anthropic_completion'
+                'backend.inference.clients._anthropic_completion'
             ) as completion,
         ):
             client = AnthropicClient('claude-3', 'sk-test', timeout=9)
@@ -235,7 +235,7 @@ class TestSharedHttpClients:
         assert completion.call_args.kwargs['timeout'].read == 9.0
 
     def test_gemini_client_uses_configured_timeout_ms(self):
-        from backend.inference.direct_clients import GeminiClient
+        from backend.inference.clients import GeminiClient
 
         with (
             patch('google.genai.types.HttpOptions') as http_options,
@@ -257,10 +257,10 @@ class TestSharedHttpClients:
 class TestGetDirectClient:
     def test_anthropic_model(self):
         with (
-            patch('backend.inference.direct_clients.Anthropic'),
-            patch('backend.inference.direct_clients.AsyncAnthropic'),
+            patch('backend.inference.clients.Anthropic'),
+            patch('backend.inference.clients.AsyncAnthropic'),
         ):
-            from backend.inference.direct_clients import AnthropicClient
+            from backend.inference.clients import AnthropicClient
 
             client = get_direct_client('anthropic/claude-3', api_key='sk-test')
             assert isinstance(client, AnthropicClient)
@@ -271,27 +271,27 @@ class TestGetDirectClient:
 
     def test_gemini_model(self):
         with patch('backend.inference.providers.gemini_ops.genai'):
-            from backend.inference.direct_clients import GeminiClient
+            from backend.inference.clients import GeminiClient
 
             client = get_direct_client('google/gemini-pro', api_key='key')
             assert isinstance(client, GeminiClient)
 
     def test_xai_grok_model(self):
         with (
-            patch('backend.inference.direct_clients.OpenAI'),
-            patch('backend.inference.direct_clients.AsyncOpenAI'),
+            patch('backend.inference.clients.OpenAI'),
+            patch('backend.inference.clients.AsyncOpenAI'),
         ):
-            from backend.inference.direct_clients import OpenAIClient
+            from backend.inference.clients import OpenAIClient
 
             client = get_direct_client('xai/grok-1', api_key='key')
             assert isinstance(client, OpenAIClient)
 
     def test_ollama_model(self):
         with (
-            patch('backend.inference.direct_clients.OpenAI'),
-            patch('backend.inference.direct_clients.AsyncOpenAI'),
+            patch('backend.inference.clients.OpenAI'),
+            patch('backend.inference.clients.AsyncOpenAI'),
         ):
-            from backend.inference.direct_clients import OpenAIClient
+            from backend.inference.clients import OpenAIClient
 
             client = get_direct_client('ollama/llama3', api_key='')
             assert isinstance(client, OpenAIClient)
@@ -299,10 +299,10 @@ class TestGetDirectClient:
 
     def test_default_openai(self):
         with (
-            patch('backend.inference.direct_clients.OpenAI'),
-            patch('backend.inference.direct_clients.AsyncOpenAI'),
+            patch('backend.inference.clients.OpenAI'),
+            patch('backend.inference.clients.AsyncOpenAI'),
         ):
-            from backend.inference.direct_clients import OpenAIClient
+            from backend.inference.clients import OpenAIClient
 
             client = get_direct_client('openai/gpt-5', api_key='sk-key')
             assert isinstance(client, OpenAIClient)
@@ -652,7 +652,7 @@ class TestOpenAIClientHelpers:
         assert extract_tool_calls(msg) is None
 
     def test_sanitize_openai_metadata_values_to_strings(self):
-        from backend.inference.direct_clients import _sanitize_openai_compatible_kwargs
+        from backend.inference.clients.base import _sanitize_openai_compatible_kwargs
 
         kwargs = {
             'extra_body': {
@@ -929,7 +929,7 @@ class TestGeminiClientHelpers:
 # ---------------------------------------------------------------------------
 class TestDirectLLMClientModelName:
     def test_model_name_not_set(self):
-        from backend.inference.direct_clients import DirectLLMClient
+        from backend.inference.clients import DirectLLMClient
 
         class TestClient(DirectLLMClient):
             def completion(self, messages, **kwargs):
@@ -947,10 +947,10 @@ class TestDirectLLMClientModelName:
 
     def test_model_name_set(self):
         with (
-            patch('backend.inference.direct_clients.OpenAI'),
-            patch('backend.inference.direct_clients.AsyncOpenAI'),
+            patch('backend.inference.clients.OpenAI'),
+            patch('backend.inference.clients.AsyncOpenAI'),
         ):
-            from backend.inference.direct_clients import OpenAIClient
+            from backend.inference.clients import OpenAIClient
 
             c = OpenAIClient('gpt-4', 'key')
             assert c.model_name == 'gpt-4'
@@ -962,7 +962,7 @@ class TestDirectLLMClientModelName:
 class TestBoundedLlmHttpTimeout:
     def test_large_request_budget_caps_read_timeout(self):
         from backend.core.constants import LLM_HTTP_READ_TIMEOUT_SECONDS
-        from backend.inference.direct_clients import bounded_llm_http_timeout
+        from backend.inference.clients import bounded_llm_http_timeout
 
         timeout = bounded_llm_http_timeout(600.0)
         assert timeout.read == LLM_HTTP_READ_TIMEOUT_SECONDS
@@ -970,13 +970,13 @@ class TestBoundedLlmHttpTimeout:
 
     def test_streaming_read_timeout_aligns_with_chunk_budget(self):
         from backend.core.constants import LLM_STREAM_CHUNK_TIMEOUT_SECONDS
-        from backend.inference.direct_clients import bounded_llm_http_timeout
+        from backend.inference.clients import bounded_llm_http_timeout
 
         timeout = bounded_llm_http_timeout(600.0, streaming=True)
         assert timeout.read == LLM_STREAM_CHUNK_TIMEOUT_SECONDS
 
     def test_with_default_timeout_wraps_explicit_override(self):
-        from backend.inference.direct_clients import _with_default_timeout
+        from backend.inference.clients.base import _with_default_timeout
 
         kwargs = _with_default_timeout({'timeout': 900.0}, None)
         assert isinstance(kwargs['timeout'], httpx.Timeout)

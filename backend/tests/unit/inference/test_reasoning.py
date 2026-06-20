@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.inference.catalog_loader import (
+from backend.inference.catalog.catalog_loader import (
     ModelEntry,
     apply_model_param_overrides,
     lookup,
@@ -204,7 +204,7 @@ class TestGatewayReasoningOptions:
         }
 
     def test_vercel_deepseek_reasoning_tunneled_via_extra_body(self):
-        from backend.inference.catalog_loader import (
+        from backend.inference.catalog.catalog_loader import (
             apply_model_param_overrides,
             sanitize_call_kwargs_for_provider,
         )
@@ -226,7 +226,7 @@ class TestGatewayReasoningOptions:
         }
 
     def test_vercel_qwen37_plus_has_configurable_thinking(self):
-        from backend.inference.catalog_loader import (
+        from backend.inference.catalog.catalog_loader import (
             apply_model_param_overrides,
             sanitize_call_kwargs_for_provider,
         )

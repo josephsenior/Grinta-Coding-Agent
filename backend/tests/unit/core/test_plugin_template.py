@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from backend.core.plugin import PluginRegistry
-from backend.core.plugin_template import MyPlugin, register
+from backend.examples.plugin_template import MyPlugin, register
 
 
 class TestMyPlugin:

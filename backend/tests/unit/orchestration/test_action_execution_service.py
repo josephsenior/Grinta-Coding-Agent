@@ -223,7 +223,7 @@ class TestGetNextAction:
 
     @pytest.mark.asyncio
     async def test_common_function_call_validation_error_returns_none(self):
-        from backend.engine.common import FunctionCallValidationError
+        from backend.engine.response_processing import FunctionCallValidationError
 
         ctx = _make_context()
         ctx.agent.step.side_effect = FunctionCallValidationError('invalid common args')

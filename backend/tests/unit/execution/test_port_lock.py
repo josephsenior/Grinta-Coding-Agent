@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from backend.execution.utils.port_lock import (
+from backend.execution.utils.process.port_lock import (
     PortLock,
     _check_port_available,
     cleanup_stale_locks,
@@ -138,7 +138,7 @@ class TestCheckPortAvailable:
 class TestCleanupStaleLocks:
     def test_no_lock_dir(self, tmp_path):
         """Returns 0 when directory doesn't exist."""
-        with patch('backend.execution.utils.port_lock.tempfile') as mock_tmp:
+        with patch('backend.execution.utils.process.port_lock.tempfile') as mock_tmp:
             mock_tmp.gettempdir.return_value = str(tmp_path / 'nonexistent')
             assert cleanup_stale_locks() == 0
 
@@ -151,7 +151,7 @@ class TestCleanupStaleLocks:
         # Backdate modification time by 600 seconds
         old_time = time.time() - 600
         os.utime(str(stale), (old_time, old_time))
-        with patch('backend.execution.utils.port_lock.tempfile') as mock_tmp:
+        with patch('backend.execution.utils.process.port_lock.tempfile') as mock_tmp:
             mock_tmp.gettempdir.return_value = str(tmp_path)
             result = cleanup_stale_locks(max_age_seconds=300)
         assert result == 1
@@ -162,7 +162,7 @@ class TestCleanupStaleLocks:
         lock_dir.mkdir()
         fresh = lock_dir / 'port_5678.lock'
         fresh.write_text('5678')
-        with patch('backend.execution.utils.port_lock.tempfile') as mock_tmp:
+        with patch('backend.execution.utils.process.port_lock.tempfile') as mock_tmp:
             mock_tmp.gettempdir.return_value = str(tmp_path)
             result = cleanup_stale_locks(max_age_seconds=300)
         assert result == 0

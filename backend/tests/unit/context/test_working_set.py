@@ -53,7 +53,7 @@ def test_sync_snapshot_to_working_memory_updates_sections(tmp_path) -> None:
             'backend.engine.tools.working_memory._memory_path', return_value=memory_file
         ),
         patch(
-            'backend.context.compaction.pre_condensation_snapshot.format_snapshot_for_injection',
+            'backend.context.compactor.pre_condensation_snapshot.format_snapshot_for_injection',
             return_value='<RESTORED_CONTEXT>summary</RESTORED_CONTEXT>',
         ),
     ):
@@ -105,7 +105,7 @@ def test_failed_approaches_are_deduped_outside_hypothesis(tmp_path) -> None:
             'backend.engine.tools.working_memory._memory_path', return_value=memory_file
         ),
         patch(
-            'backend.context.compaction.pre_condensation_snapshot.format_snapshot_for_injection',
+            'backend.context.compactor.pre_condensation_snapshot.format_snapshot_for_injection',
             return_value='',
         ),
     ):
@@ -141,7 +141,7 @@ def test_sync_snapshot_preserves_background_task_as_blocker(tmp_path) -> None:
             'backend.engine.tools.working_memory._memory_path', return_value=memory_file
         ),
         patch(
-            'backend.context.compaction.pre_condensation_snapshot.format_snapshot_for_injection',
+            'backend.context.compactor.pre_condensation_snapshot.format_snapshot_for_injection',
             return_value='',
         ),
     ):

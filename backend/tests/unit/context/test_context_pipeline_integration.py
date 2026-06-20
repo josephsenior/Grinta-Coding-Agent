@@ -15,7 +15,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.context.compaction.compact_boundary import project_after_compact_boundary
+from backend.context.compactor.compact_boundary import project_after_compact_boundary
 from backend.context.context_pipeline import ContextPipeline
 from backend.context.tool_result_storage import extract_latest_pytest_summary
 from backend.core.config.compactor_config import ContextPipelineConfig
@@ -84,11 +84,11 @@ async def test_six_hundred_event_pytest_session_commits_boundary_and_preserves_p
     monkeypatch,
 ):
     monkeypatch.setattr(
-        'backend.context.compaction.pre_condensation_snapshot._snapshot_path',
+        'backend.context.compactor.pre_condensation_snapshot._snapshot_path',
         lambda state=None: tmp_path / 'pre_condensation_snapshot.json',
     )
     monkeypatch.setattr(
-        'backend.context.compaction.pre_condensation_snapshot._snapshot_staging_path',
+        'backend.context.compactor.pre_condensation_snapshot._snapshot_staging_path',
         lambda state=None: tmp_path / '.pre_condensation_snapshot.staging.json',
     )
     monkeypatch.setattr(
@@ -140,6 +140,6 @@ async def test_six_hundred_event_pytest_session_commits_boundary_and_preserves_p
     assert len(prompt_events) >= 15
     assert extract_latest_pytest_summary(synthetic_history) is not None
 
-    from backend.context.compaction.pre_condensation_snapshot import delete_snapshot
+    from backend.context.compactor.pre_condensation_snapshot import delete_snapshot
 
     delete_snapshot()

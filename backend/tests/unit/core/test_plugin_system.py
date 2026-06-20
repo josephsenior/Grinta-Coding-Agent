@@ -316,7 +316,7 @@ class TestPluginRegistryDispatch(unittest.IsolatedAsyncioTestCase):
 
 class TestPluginTemplate(unittest.IsolatedAsyncioTestCase):
     async def test_my_plugin_hooks(self):
-        from backend.core.plugin_template import MyPlugin
+        from backend.examples.plugin_template import MyPlugin
 
         p = MyPlugin()
         self.assertEqual(p.name, 'my-plugin')
@@ -335,14 +335,14 @@ class TestPluginTemplate(unittest.IsolatedAsyncioTestCase):
         await p.on_session_end('sess-1', {})
 
     def test_register_function(self):
-        from backend.core.plugin_template import register
+        from backend.examples.plugin_template import register
 
         reg = PluginRegistry()
         register(reg)
         self.assertIsNotNone(reg.get_plugin('my-plugin'))
 
     def test_validate(self):
-        from backend.core.plugin_template import MyPlugin
+        from backend.examples.plugin_template import MyPlugin
 
         warnings = MyPlugin().validate()
         self.assertEqual(warnings, [])

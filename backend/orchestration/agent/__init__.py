@@ -28,7 +28,7 @@ from backend.core.errors import (
     AgentAlreadyRegisteredError,
     AgentNotRegisteredError,
 )
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.ledger.event import EventSource
 from backend.orchestration.agent.tools import build_tool
 

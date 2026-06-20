@@ -11,7 +11,7 @@ import pytest
 from backend.ledger import EventSource
 from backend.ledger.observation.empty import NullObservation
 from backend.ledger.stream import EventStream
-from backend.persistence.local_file_store import LocalFileStore
+from backend.persistence.file_store.local_file_store import LocalFileStore
 
 pytestmark = pytest.mark.stress
 

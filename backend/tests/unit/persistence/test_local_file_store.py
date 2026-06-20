@@ -7,9 +7,9 @@ import time
 from unittest.mock import patch
 
 import pytest
+from backend.persistence.file_store.atomic_write import replace_file_with_retry
 
-from backend.persistence.atomic_write import replace_file_with_retry
-from backend.persistence.local_file_store import LocalFileStore
+from backend.persistence.file_store.local_file_store import LocalFileStore
 
 
 def _wait_until_removed(path: str, timeout: float = 1.0) -> bool:

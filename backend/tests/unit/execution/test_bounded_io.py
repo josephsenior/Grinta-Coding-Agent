@@ -7,7 +7,7 @@ import sys
 
 import pytest
 
-from backend.execution.utils.bounded_io import (
+from backend.execution.utils.files.bounded_io import (
     DEFAULT_MAX_BYTES_PER_STREAM,
     BoundedResult,
     _decoded_bounded_stream_text,

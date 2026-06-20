@@ -39,7 +39,7 @@ from backend.core.schemas.base import (
     EventSchemaV1,
     EventVersion,
 )
-from backend.core.schemas.enums import (
+from backend.core.enums import (
     ActionConfirmationStatus,
     ActionSecurityRisk,
     ActionType,

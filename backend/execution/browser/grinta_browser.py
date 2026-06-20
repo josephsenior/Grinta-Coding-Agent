@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from backend.core.constants import BROWSER_SESSION_START_TIMEOUT_SEC
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.execution.browser._browser_cdp import (
     _capture_via_cdp,
     _navigate_direct_cdp,

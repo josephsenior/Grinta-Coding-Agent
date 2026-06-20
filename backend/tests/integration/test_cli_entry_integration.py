@@ -46,7 +46,7 @@ def test_entry_main_launches_cli_repl_with_project_and_piped_input(
         with patch.object(sys, 'stdin', stdin):
             with patch('backend.cli.main._load_dotenv_early'):
                 with patch('backend.cli.main._setup_logging'):
-                    with patch('backend.core.logger.configure_file_logging'):
+                    with patch('backend.core.logging.logger.configure_file_logging'):
                         with patch(
                             'backend.core.config.load_app_config', return_value=config
                         ):
@@ -128,7 +128,7 @@ def test_action_execution_server_entrypoint_is_retired() -> None:
         [
             sys.executable,
             '-m',
-            'backend.execution.action_execution_server',
+            'backend.execution.server.action_execution_server',
             '3000',
             '--working-dir',
             str(_REPO_ROOT),

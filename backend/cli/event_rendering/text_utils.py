@@ -25,7 +25,7 @@ from backend.cli.event_rendering.constants import (
     VISIBLE_INTERNAL_SECTION_RE,
     VISIBLE_SUPPRESSED_LINE_RE,
 )
-from backend.engine import prompt_role_debug as _prompt_role_debug
+from backend.core import prompt_role_debug as _prompt_role_debug
 
 
 def show_reasoning_text() -> bool:

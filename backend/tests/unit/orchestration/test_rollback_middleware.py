@@ -173,7 +173,7 @@ class TestLazyManagerInit:
         mw = RollbackMiddleware(workspace_path=None)
         ctx = _make_ctx(workspace_path=str(tmp_path))
         # RollbackManager is imported inside _get_manager — patch at source
-        with patch('backend.core.rollback.rollback_manager.RollbackManager') as MockRM:
+        with patch('backend.execution.rollback.rollback_manager.RollbackManager') as MockRM:
             MockRM.return_value = MagicMock()
             result = mw._get_manager(ctx)
         assert result is not None
@@ -187,7 +187,7 @@ class TestLazyManagerInit:
         runtime.workspace_path = None
         runtime.workspace_root = str(tmp_path)
         ctx.controller.runtime = runtime
-        with patch('backend.core.rollback.rollback_manager.RollbackManager') as MockRM:
+        with patch('backend.execution.rollback.rollback_manager.RollbackManager') as MockRM:
             MockRM.return_value = MagicMock()
             result = mw._get_manager(ctx)
         assert result is not None

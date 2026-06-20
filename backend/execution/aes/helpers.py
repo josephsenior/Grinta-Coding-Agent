@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from backend.core.enums import FileEditSource, FileReadSource
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.core.os_capabilities import OS_CAPS
 from backend.execution.aes.security_enforcement import (
     evaluate_hardened_local_command_policy,
@@ -21,7 +21,7 @@ from backend.execution.sandboxing import (
 from backend.execution.sandboxing import (
     is_workspace_restricted_profile as _sandbox_is_workspace_restricted_profile,
 )
-from backend.execution.utils.diff import get_diff
+from backend.execution.utils.files.diff import get_diff
 from backend.ledger.action import CmdRunAction
 from backend.ledger.observation import (
     ErrorObservation,
@@ -986,7 +986,7 @@ def _execute_structured_file_edit_action(executor: Any, action: Any) -> Any:
 
 def _execute_multi_edit(executor: Any, action: Any, payload: dict) -> Any:
     from backend.core.errors import FunctionCallValidationError, ToolExecutionError
-    from backend.engine.function_calling import _handle_multi_edit_command
+    from backend.engine.function_calling.dispatch import _handle_multi_edit_command
 
     original_snapshots = _collect_edit_snapshots(executor, payload)
     try:
@@ -1024,7 +1024,7 @@ def _record_undo_snapshots(executor: Any, snapshots: dict) -> None:
 
 
 def _make_edit_error_obs(exc: Exception, payload: dict, command: str) -> Any:
-    from backend.execution.aes.structured_edit_errors import normalize_edit_exception
+    from backend.core.errors.structured_edit_errors import normalize_edit_exception
     from backend.ledger.observation import ErrorObservation
 
     message, tool_result = normalize_edit_exception(exc, payload, command=command)

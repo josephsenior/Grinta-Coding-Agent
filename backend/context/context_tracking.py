@@ -11,7 +11,7 @@ from typing import Any
 
 from backend.context.memory.types import ContextAnchor, Decision, DecisionType
 from backend.context.vector_store import EnhancedVectorStore
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 
 # Caps for text injected into the leading system message (token control).
 _CONTEXT_SUMMARY_MAX_ANCHORS = 5

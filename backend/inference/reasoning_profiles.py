@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from backend.inference.catalog_loader import ModelEntry
+from backend.inference.catalog.catalog_loader import ModelEntry
 
 TIER_ORDER: tuple[str, ...] = ('minimal', 'low', 'medium', 'high', 'xhigh', 'max')
 TIER_ALIASES: dict[str, str] = {'off': 'none', 'disabled': 'none'}

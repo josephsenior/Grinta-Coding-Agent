@@ -5,7 +5,7 @@ from functools import lru_cache
 from typing import Any
 
 from backend.core.config import LLMConfig
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.core.message import Message
 
 

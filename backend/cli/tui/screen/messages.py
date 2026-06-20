@@ -310,7 +310,7 @@ class ScreenMessagesMixin:
                     pass
 
             with contextlib.suppress(Exception):
-                from backend.execution.action_execution_server import (
+                from backend.execution.server.action_execution_server import (
                     client as runtime_client,
                 )
 
@@ -321,7 +321,7 @@ class ScreenMessagesMixin:
                 self._renderer._tui.add_system_message('Interrupted. Ready for input.')
 
             with contextlib.suppress(Exception):
-                from backend.core.logger import finalize_session_logging_audit
+                from backend.core.logging.logger import finalize_session_logging_audit
 
                 finalize_session_logging_audit()
 

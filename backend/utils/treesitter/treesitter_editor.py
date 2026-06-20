@@ -23,7 +23,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, cast
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.utils.treesitter._tse_errors import (  # noqa: F401
     _format_python_ast_syntax_error,
     _format_treesitter_error_block,

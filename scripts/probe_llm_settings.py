@@ -141,7 +141,7 @@ def _print_rate_limit_headers(client: Any) -> None:
 
 def _create_and_test_client(model: str, api_key: str) -> int:
     try:
-        from backend.inference.direct_clients import get_direct_client
+        from backend.inference.clients import get_direct_client
 
         client = get_direct_client(model, api_key)
         print('Client created:', type(client).__name__)

@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from backend.inference.catalog_loader import (
+from backend.inference.catalog.catalog_loader import (
     ModelEntry,
     _load_raw,
     _name_index,
@@ -533,12 +533,12 @@ class TestTransportSanitizationAndValidation:
         assert 'reasoning_effort' not in out
 
     def test_validate_model_transport_allows_opencode_responses(self):
-        from backend.inference.catalog_loader import validate_model_transport
+        from backend.inference.catalog.catalog_loader import validate_model_transport
 
         validate_model_transport('opencode/gpt-5')
 
     def test_validate_model_transport_allows_opencode_gemini_native_endpoint(self):
-        from backend.inference.catalog_loader import validate_model_transport
+        from backend.inference.catalog.catalog_loader import validate_model_transport
 
         validate_model_transport('opencode/gemini-3-flash')
 

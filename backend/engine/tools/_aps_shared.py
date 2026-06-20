@@ -21,7 +21,7 @@ from backend.engine.tools.ignore_filter import (
     is_ignored_file,
     prune_ignored_dirs,
 )
-from backend.execution.utils.bounded_io import BoundedResult
+from backend.core.bounded_result import BoundedResult
 from backend.utils.async_helpers.subprocess_bridge import run_bounded_subprocess_sync
 
 

@@ -2,7 +2,7 @@
 
 import pytest
 
-from backend.persistence.in_memory_file_store import InMemoryFileStore
+from backend.persistence.file_store.in_memory_file_store import InMemoryFileStore
 
 
 class TestInMemoryFileStoreInit:

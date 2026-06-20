@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from backend.context.compaction.pre_condensation_snapshot import (
+from backend.context.compactor.pre_condensation_snapshot import (
     _snapshot_path,
     load_snapshot,
 )
@@ -14,7 +14,7 @@ from backend.context.memory.session_memory import (
     load_session_memory,
     session_memory_exists,
 )
-from backend.engine.tools.note import _notes_path
+from backend.engine.tools.scratchpad import _notes_path
 from backend.engine.tools.working_memory import (
     _memory_path,
     get_current_session_id,

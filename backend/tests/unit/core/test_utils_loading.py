@@ -38,7 +38,7 @@ class TestConfigLoadSummary:
         summary.record('core', 'invalid', 'bad value')
         summary.record_missing('agent', 'section missing')
 
-        with patch('backend.core.logger.app_logger.warning') as mock_warn:
+        with patch('backend.core.logging.logger.app_logger.warning') as mock_warn:
             summary.emit()
             mock_warn.assert_called_once()
             # args[0] is fmt, args[1] is file, args[2] is issues
@@ -62,7 +62,7 @@ class TestConfigLoadSummary:
 
     def test_emit_empty(self):
         summary = ConfigLoadSummary('test.toml')
-        with patch('backend.core.logger.app_logger.warning') as mock_warn:
+        with patch('backend.core.logging.logger.app_logger.warning') as mock_warn:
             summary.emit()
             mock_warn.assert_not_called()
 
@@ -666,7 +666,7 @@ class TestLoadFromJson:
         json_file = tmp_path / 'bad.json'
         json_file.write_text('invalid } json { here')
         cfg = AppConfig()
-        with patch('backend.core.logger.app_logger.warning') as mock_warn:
+        with patch('backend.core.logging.logger.app_logger.warning') as mock_warn:
             load_from_json(cfg, str(json_file))
             mock_warn.assert_called()
 

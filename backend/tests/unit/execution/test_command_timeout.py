@@ -5,7 +5,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from backend.execution.command_timeout import _SAFETY_NET_TIMEOUT, CommandTimeoutMixin
+from backend.execution.runtime_mixins.command_timeout import _SAFETY_NET_TIMEOUT, CommandTimeoutMixin
 
 # ── helper: concrete class that uses the mixin ───────────────────────
 

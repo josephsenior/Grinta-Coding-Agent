@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 from backend.core.enums import RecallType
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.core.message import ImageContent, Message, TextContent
 from backend.ledger.event import Event
 from backend.ledger.observation.agent import PlaybookKnowledge, RecallObservation

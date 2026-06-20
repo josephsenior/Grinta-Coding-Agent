@@ -11,7 +11,7 @@ from typing import Any
 from pydantic import BaseModel, Field, SecretStr
 
 from backend._canonical import CanonicalModelMetaclass
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 
 from .provider_config import provider_config_manager
 

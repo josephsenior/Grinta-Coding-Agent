@@ -25,7 +25,7 @@ def main() -> None:
     stem = log_path.stem
     stripped_path = out_dir / f'{stem}.stripped.log'
     report_path = out_dir / f'{stem}.audit.txt'
-    from backend.core.session_log_audit import analyze_session
+    from backend.core.logging.session_log_audit import analyze_session
 
     result = analyze_session(log_path, stripped_path, report_path)
     print(f'Wrote stripped log: {stripped_path} ({result.kept_lines:,} lines)')

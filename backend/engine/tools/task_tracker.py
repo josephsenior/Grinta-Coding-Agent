@@ -2,17 +2,17 @@
 
 from typing import Any
 
-from backend.core.task_status import (
+from backend.core.tasks.task_status import (
     TASK_STATUS_BLOCKED,
     TASK_STATUS_DONE,
     TASK_STATUS_IN_PROGRESS,
     TASK_STATUS_SKIPPED,
     TASK_STATUS_TODO,
 )
-from backend.core.task_tracker import TaskTracker
+from backend.core.tasks.task_tracker import TaskTracker
 from backend.engine.contracts import ChatCompletionToolParam
-from backend.engine.tools.common import create_tool_definition, get_command_param
-from backend.inference.tool_names import TASK_TRACKER_TOOL_NAME
+from backend.engine.tools.param_defs import create_tool_definition, get_command_param
+from backend.core.tools.tool_names import TASK_TRACKER_TOOL_NAME
 
 _TASK_TRACKER_DESCRIPTION = (
     'Maintain a structured plan to track progress. '

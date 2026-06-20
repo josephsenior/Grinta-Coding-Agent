@@ -256,7 +256,7 @@ def extract_generation_config(
             gen_cfg[dst] = kwargs.pop(src)
     # Native Gemini SDK (ChatSession.send_message) does not support tool_choice.
     kwargs.pop('tool_choice', None)
-    from backend.inference.catalog_loader import (
+    from backend.inference.catalog.catalog_loader import (
         GEMINI_SDK_EXTRA_INCOMPATIBLE_KWARGS,
         TRANSPORT_CLIENT_GOOGLE,
         pop_incompatible_kwargs,

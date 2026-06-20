@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from backend.execution.git_setup import GitSetupMixin
+from backend.execution.runtime_mixins.git_setup import GitSetupMixin
 from backend.ledger.action import CmdRunAction, FileEditAction, FileReadAction
 from backend.ledger.observation import CmdOutputObservation, ErrorObservation
 
@@ -150,7 +150,7 @@ class TestPreserveExistingHook:
                 content='', command='chmod', exit_code=0
             ),  # chmod after shutil.move
         ]
-        with patch('backend.execution.git_setup.shutil.move'):
+        with patch('backend.execution.runtime_mixins.git_setup.shutil.move'):
             assert runtime._preserve_existing_hook('.git/hooks/pre-commit') is True
 
     def test_shutil_raises_oserror(self):
@@ -161,7 +161,7 @@ class TestPreserveExistingHook:
             ),  # Not a CmdOutputObservation -> triggers shutil
         ]
         with patch(
-            'backend.execution.git_setup.shutil.move', side_effect=OSError('fail')
+            'backend.execution.runtime_mixins.git_setup.shutil.move', side_effect=OSError('fail')
         ):
             assert runtime._preserve_existing_hook('.git/hooks/pre-commit') is False
 
@@ -350,7 +350,7 @@ class TestMaybeSetupGitHooks:
             ),  # mv fails
         ]
         with patch(
-            'backend.execution.git_setup.shutil.move', side_effect=OSError('fail')
+            'backend.execution.runtime_mixins.git_setup.shutil.move', side_effect=OSError('fail')
         ):
             runtime.maybe_setup_git_hooks()
         # Should return early if preserve fails

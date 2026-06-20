@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from backend.core.agent_protocol import (
+from backend.orchestration.agent.agent_protocol import (
     mark_tracker_created,
     reset_terminal_cycle,
     tracker_terminal,

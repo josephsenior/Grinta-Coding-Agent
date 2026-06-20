@@ -11,8 +11,8 @@ from backend.core.interaction_modes import (
     is_chat_mode,
     normalize_interaction_mode,
 )
-from backend.core.logger import app_logger as logger
-from backend.inference.catalog_loader import (
+from backend.core.logging.logger import app_logger as logger
+from backend.inference.catalog.catalog_loader import (
     supports_function_calling,
     supports_tool_choice,
 )
@@ -25,8 +25,8 @@ ChatCompletionToolParam = Any
 CODE_PAYLOAD_TOOLS: frozenset[str] = frozenset()
 
 if TYPE_CHECKING:
-    from backend.core.contracts.state import State
-    from backend.engine.safety import OrchestratorSafetyManager
+    from backend.orchestration.state.state import State
+    from backend.engine.contracts import NoopSafetyManager
     from backend.inference.llm import LLM
 
 
@@ -132,7 +132,7 @@ class OrchestratorPlanner:
         self,
         config,
         llm: LLM,
-        safety_manager: 'OrchestratorSafetyManager',
+        safety_manager: 'NoopSafetyManager',
         agent: Any = None,
     ) -> None:
         self._config = config

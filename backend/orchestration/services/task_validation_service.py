@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from backend.core.logger import app_logger as logger  # noqa: E402
+from backend.core.logging.logger import app_logger as logger  # noqa: E402
 from backend.ledger import EventSource  # noqa: E402
 from backend.ledger.action import MessageAction  # noqa: E402
 

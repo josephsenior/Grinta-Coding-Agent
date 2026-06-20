@@ -68,7 +68,7 @@ from backend.core.constants import (
     DEFAULT_AGENT_WEB_ENABLED,
 )
 from backend.core.interaction_modes import VALID_INTERACTION_MODES
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from backend.core.config.llm_config import LLMConfig

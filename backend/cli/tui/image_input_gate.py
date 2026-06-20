@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from backend.inference.catalog_loader import model_supports_vision
+from backend.inference.catalog.catalog_loader import model_supports_vision
 
 if TYPE_CHECKING:
     from backend.core.config.llm_config import LLMConfig

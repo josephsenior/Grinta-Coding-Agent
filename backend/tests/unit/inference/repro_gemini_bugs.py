@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock, patch
 
-from backend.inference.direct_clients import GeminiClient
+from backend.inference.clients import GeminiClient
 
 
 def test_gemini_client_concatenates_system_messages():

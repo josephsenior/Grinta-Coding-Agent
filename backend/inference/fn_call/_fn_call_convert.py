@@ -11,7 +11,7 @@ import logging
 from typing import Any
 
 from backend.core.errors import FunctionCallConversionError
-from backend.core.tool_arguments_json import parse_tool_arguments_object
+from backend.core.tools.tool_arguments_json import parse_tool_arguments_object
 from backend.inference.fn_call._fn_call_examples import (
     IN_CONTEXT_LEARNING_EXAMPLE_PREFIX,
 )

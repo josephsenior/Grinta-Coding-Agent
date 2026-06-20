@@ -31,8 +31,8 @@ from backend.core.constants import (
     DEFAULT_LLM_TEMPERATURE,
     DEFAULT_LLM_TOP_P,
 )
-from backend.core.logger import app_logger as logger
-from backend.core.logger import get_log_dir
+from backend.core.logging.logger import app_logger as logger
+from backend.core.logging.logger import get_log_dir
 
 
 @contextmanager
@@ -491,7 +491,7 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
 
         # Apply catalog default_temperature when still at the global default.
         if self.model and self.temperature == DEFAULT_LLM_TEMPERATURE:
-            from backend.inference.catalog_loader import lookup
+            from backend.inference.catalog.catalog_loader import lookup
 
             entry = lookup(self.model)
             if entry and entry.default_temperature is not None:
@@ -500,7 +500,7 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     @property
     def vision_is_active(self) -> bool:
         """True when catalog vision support is enabled and not explicitly disabled."""
-        from backend.inference.catalog_loader import vision_is_active_for_model
+        from backend.inference.catalog.catalog_loader import vision_is_active_for_model
 
         return vision_is_active_for_model(
             self.model,

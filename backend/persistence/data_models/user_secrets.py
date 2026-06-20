@@ -15,7 +15,7 @@ from pydantic import (
 )
 from pydantic.json import pydantic_encoder
 
-from backend.core.provider_types import (
+from backend.core.providers.provider_models import (
     CustomSecret,
     CustomSecretsType,
     CustomSecretsWithTypeSchema,

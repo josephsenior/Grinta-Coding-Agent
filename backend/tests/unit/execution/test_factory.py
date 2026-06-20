@@ -20,7 +20,7 @@ class TestLazyImport:
 
     def test_imports_module_and_gets_attribute(self):
         """Test importing a real module and getting an attribute."""
-        result = _lazy_import('backend.execution.base', 'Runtime')
+        result = _lazy_import('backend.execution.server.base', 'Runtime')
         assert result.__name__ == 'Runtime'
 
     def test_imports_function(self):
@@ -37,7 +37,7 @@ class TestLazyImport:
     def test_raises_on_missing_attribute(self):
         """Test raises when attribute doesn't exist in module."""
         with pytest.raises(AttributeError):
-            _lazy_import('backend.execution.base', 'NonExistentClass')
+            _lazy_import('backend.execution.server.base', 'NonExistentClass')
 
     @patch('backend.execution.runtime.factory.importlib.import_module')
     def test_calls_importlib(self, mock_import):
@@ -63,7 +63,7 @@ class TestGetRuntimeCls:
         cls = get_runtime_cls('local')
         assert cls.__name__ == 'LocalRuntimeInProcess'
         # Verify it's a runtime class
-        from backend.execution.base import Runtime
+        from backend.execution.server.base import Runtime
 
         assert issubclass(cls, Runtime)
 
@@ -91,7 +91,7 @@ class TestGetRuntimeCls:
     @patch('backend.execution.runtime.factory.get_impl')
     def test_falls_back_to_get_impl(self, mock_get_impl):
         """Test falls back to get_impl for custom runtime classes."""
-        from backend.execution.base import Runtime
+        from backend.execution.server.base import Runtime
 
         mock_runtime = MagicMock(spec=Runtime)
         mock_get_impl.return_value = mock_runtime

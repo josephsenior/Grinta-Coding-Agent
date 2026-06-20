@@ -5,7 +5,7 @@ import os
 import re
 from typing import TYPE_CHECKING, Any
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.ledger import EventSource
 from backend.ledger.observation import ErrorObservation, Observation
 from backend.ledger.serialization.event import truncate_content

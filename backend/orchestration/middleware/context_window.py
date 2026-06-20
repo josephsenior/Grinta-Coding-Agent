@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.orchestration.tool_pipeline import ToolInvocationMiddleware
 
 if TYPE_CHECKING:

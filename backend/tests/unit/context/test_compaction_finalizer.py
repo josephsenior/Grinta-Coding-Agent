@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from backend.context.compaction.compaction_finalizer import (
+from backend.context.compactor.compaction_finalizer import (
     finalize_compaction_artifacts,
 )
 
@@ -15,10 +15,10 @@ def test_finalize_compaction_artifacts_passes_state_to_snapshot_helpers() -> Non
 
     with (
         patch(
-            'backend.context.compaction.pre_condensation_snapshot.commit_snapshot'
+            'backend.context.compactor.pre_condensation_snapshot.commit_snapshot'
         ) as commit,
         patch(
-            'backend.context.compaction.pre_condensation_snapshot.load_snapshot',
+            'backend.context.compactor.pre_condensation_snapshot.load_snapshot',
             return_value=snapshot,
         ) as load,
         patch(

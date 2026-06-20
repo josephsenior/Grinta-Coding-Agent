@@ -5,7 +5,7 @@ import time
 
 import psutil
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 
 
 class LogStream:

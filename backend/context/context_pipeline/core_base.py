@@ -6,9 +6,9 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Self
 
 import backend.context.context_pipeline as _cp
-from backend.context.compaction.compact_boundary import project_after_compact_boundary
-from backend.context.compaction.microcompact import apply_microcompact
-from backend.context.compaction.pre_condensation_snapshot import (
+from backend.context.compactor.compact_boundary import project_after_compact_boundary
+from backend.context.compactor.microcompact import apply_microcompact
+from backend.context.compactor.pre_condensation_snapshot import (
     extract_snapshot,
     save_snapshot,
 )
@@ -23,7 +23,7 @@ from backend.core.constants import (
     DEFAULT_LLM_COMPACT_COOLDOWN_SECONDS,
     DEFAULT_MICROCOMPACT_PRESERVE_RECENT,
 )
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.inference.capabilities.context_limits import limits_from_config
 from backend.ledger.event import Event
 

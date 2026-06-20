@@ -22,7 +22,7 @@ from backend.core.constants import (
     MAX_MCP_CACHE_ENTRY_BYTES,
     MCP_CACHEABLE_TOOLS,
 )
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 
 DEFAULT_TTL_SECONDS = DEFAULT_MCP_CACHE_TTL_SECONDS
 try:

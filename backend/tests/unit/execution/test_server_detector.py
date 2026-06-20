@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from backend.execution.utils.server_detector import (
+from backend.execution.utils.process.server_detector import (
     DetectedServer,
     extract_port_from_output,
     is_port_listening,
@@ -132,7 +132,7 @@ class TestExtractPortFromOutput:
 class TestIsPortListening:
     """Tests for is_port_listening."""
 
-    @patch('backend.execution.utils.server_detector.socket.socket')
+    @patch('backend.execution.utils.process.server_detector.socket.socket')
     def test_port_listening(self, mock_socket_class):
         mock_sock = MagicMock()
         mock_socket_class.return_value = mock_sock
@@ -140,7 +140,7 @@ class TestIsPortListening:
         assert is_port_listening(8080) is True
         mock_sock.close.assert_called_once()
 
-    @patch('backend.execution.utils.server_detector.socket.socket')
+    @patch('backend.execution.utils.process.server_detector.socket.socket')
     def test_port_not_listening(self, mock_socket_class):
         mock_sock = MagicMock()
         mock_socket_class.return_value = mock_sock
@@ -148,7 +148,7 @@ class TestIsPortListening:
         assert is_port_listening(8080) is False
         mock_sock.close.assert_called_once()
 
-    @patch('backend.execution.utils.server_detector.socket.socket')
+    @patch('backend.execution.utils.process.server_detector.socket.socket')
     def test_port_os_error(self, mock_socket_class):
         mock_sock = MagicMock()
         mock_socket_class.return_value = mock_sock

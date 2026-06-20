@@ -13,7 +13,7 @@ from backend.core.errors import (
     LLMNoActionError,
     LLMNoResponseError,
 )
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.core.schemas import AgentState
 from backend.inference.exceptions import (
     APIConnectionError,
@@ -400,7 +400,7 @@ class RecoveryService:
 
             retry_after = getattr(exc, 'retry_after', None)
             if retry_after is not None:
-                from backend.core.retry_queue import get_retry_queue
+                from backend.orchestration.services.retry_queue import get_retry_queue
 
                 queue = get_retry_queue()
                 max_delay = getattr(queue, 'max_delay', 30.0) if queue else 30.0
@@ -630,7 +630,7 @@ class RecoveryService:
         forces the next turn to explicitly reconcile the plan via
         ``task_tracker update`` before doing any other work.
         """
-        from backend.core.task_status import TASK_STATUS_IN_PROGRESS
+        from backend.core.tasks.task_status import TASK_STATUS_IN_PROGRESS
 
         state = getattr(controller, 'state', None)
         if state is None or not hasattr(state, 'set_planning_directive'):
@@ -669,139 +669,42 @@ class RecoveryService:
 
     @staticmethod
     def _format_exception(exc: Exception) -> tuple[str, str, bool]:
-        notify_ui_only = (
-            isinstance(exc, _HARD_STOP_EXCEPTIONS)
-            or isinstance(exc, Timeout)
-            or isinstance(exc, _RATE_LIMITED_EXCEPTIONS)
-            or isinstance(exc, _TRANSIENT_LLM_INFRA_EXCEPTIONS)
+        from backend.orchestration.services.error_formatting import format_exception
+
+        return format_exception(
+            exc, _HARD_STOP_EXCEPTIONS, _RATE_LIMITED_EXCEPTIONS, _TRANSIENT_LLM_INFRA_EXCEPTIONS
         )
-        err_id = _resolve_error_id(exc)
-        text = _format_error_text(exc)
-        guidance = _format_error_guidance(exc)
-        if guidance:
-            text = f'{text}\n\n{guidance}'
-        return text, err_id, notify_ui_only
 
 
 def _resolve_error_id(exc: Exception) -> str:
-    if isinstance(exc, Timeout):
-        return 'LLM_TIMEOUT'
-    if isinstance(exc, BadRequestError):
-        return 'LLM_BAD_REQUEST'
-    if isinstance(exc, LLMContextWindowExceedError | ContextWindowExceededError):
-        return 'LLM_CONTEXT_WINDOW_EXCEEDED'
-    if isinstance(exc, AgentRuntimeDisconnectedError):
-        return 'AGENT_RUNTIME_DISCONNECTED'
-    if isinstance(exc, AgentRuntimeError):
-        return 'AGENT_RUNTIME_ERROR'
-    return 'AGENT_STEP_EXCEPTION'
+    from backend.orchestration.services.error_formatting import resolve_error_id
+
+    return resolve_error_id(exc)
 
 
 def _format_error_text(exc: Exception) -> str:
-    if isinstance(exc, AuthenticationError):
-        model = getattr(exc, 'model', None) or '?'
-        provider = getattr(exc, 'llm_provider', None) or '?'
-        return (
-            f'{exc}\n'
-            f'The LLM provider ({provider}) rejected access to model "{model}".\n'
-            f'Run /settings to update your model or API key.'
-        )
-    if isinstance(exc, BadRequestError):
-        model = getattr(exc, 'model', None) or '?'
-        provider = getattr(exc, 'llm_provider', None) or '?'
-        return (
-            f'{exc}\n'
-            f'The LLM provider ({provider}) rejected the request for model "{model}".\n'
-            f'Run /settings to review model parameters (temperature, max tokens, etc.).'
-        )
-    if isinstance(exc, _RATE_LIMITED_EXCEPTIONS):
-        return _format_rate_limit_text(
-            exc, getattr(exc, 'kind', None), getattr(exc, 'retry_after', None)
-        )
-    return f'{type(exc).__name__}: {exc}'
+    from backend.orchestration.services.error_formatting import format_error_text
+
+    return format_error_text(exc)
 
 
 def _format_error_guidance(exc: Exception) -> str:
-    if isinstance(exc, AgentRuntimeDisconnectedError):
-        return (
-            'The agent runtime has disconnected or failed to initialize. '
-            'This is a persistent state that requires a session reset or '
-            'infrastructure check. CONTROL IS RETURNED TO USER.'
-        )
-    if isinstance(exc, AuthenticationError):
-        return ''
-    if isinstance(exc, BadRequestError):
-        return (
-            'This error requires user intervention (check model settings and '
-            'provider-supported parameters). Wait for the user to fix the configuration.'
-        )
-    if isinstance(exc, _HARD_STOP_EXCEPTIONS):
-        return (
-            'This error requires user intervention (check credentials, model name, '
-            'or context window). Wait for the user to fix the configuration.'
-        )
-    if isinstance(exc, _RATE_LIMITED_EXCEPTIONS):
-        return _format_rate_limit_guidance(
-            getattr(exc, 'kind', None), getattr(exc, 'retry_after', None)
-        )
-    if isinstance(exc, Timeout):
-        return (
-            'The provider timed out on this step. Automatic backoff and retry '
-            'will run if the retry queue is available; otherwise the agent will '
-            'return to the prompt.'
-        )
-    if isinstance(exc, _TRANSIENT_LLM_INFRA_EXCEPTIONS):
-        return (
-            'Transient provider or network issue; the runtime retries automatically. '
-            'No change to your approach is required unless this keeps failing.'
-        )
-    return ''
+    from backend.orchestration.services.error_formatting import format_error_guidance
+
+    return format_error_guidance(exc)
 
 
 def _format_rate_limit_text(exc: Exception, rate_kind, retry_after) -> str:
-    """Format rate limit error text with specific kind info."""
-    import re
+    from backend.orchestration.services.error_formatting import (
+        _format_rate_limit_text as _impl,
+    )
 
-    from backend.inference.exceptions import RateLimitKind
-
-    kind_value = getattr(rate_kind, 'value', str(rate_kind)) if rate_kind else None
-    base_text = str(exc) if exc.args else 'Rate limit exceeded'
-    base_text = re.sub(r'https?://\S+', '[link]', base_text)
-
-    if kind_value == RateLimitKind.RPD.value:
-        return (
-            '⚠️ Daily quota exhausted. Your free-tier limit has been reached for today.'
-        )
-    elif kind_value == RateLimitKind.RPM.value:
-        return '⚠️ Too many requests per minute (RPM limit).'
-    elif kind_value == RateLimitKind.TPM.value:
-        return '⚠️ Too many tokens used per minute (TPM limit).'
-    else:
-        return f'⚠️ Rate limit ({base_text})'
+    return _impl(exc, rate_kind, retry_after)
 
 
 def _format_rate_limit_guidance(rate_kind, retry_after) -> str:
-    """Format actionable guidance for rate limit errors."""
-    from backend.inference.exceptions import RateLimitKind
+    from backend.orchestration.services.error_formatting import (
+        _format_rate_limit_guidance as _impl,
+    )
 
-    kind_value = getattr(rate_kind, 'value', str(rate_kind)) if rate_kind else None
-
-    if kind_value == RateLimitKind.RPD.value:
-        return (
-            '🎯 Next steps: '
-            '1) Wait until midnight UTC for quota to reset, OR '
-            '2) Add credits at https://openrouter.ai/credits to unlock 1000 requests/day, OR '
-            '3) Switch to a different model in /settings.'
-        )
-    elif kind_value == RateLimitKind.RPM.value:
-        if retry_after:
-            return f'Waiting {retry_after:.0f}s before automatic retry...'
-        return 'Waiting ~1 minute before retrying (per-minute limit).'
-    elif kind_value == RateLimitKind.TPM.value:
-        if retry_after:
-            return f'Waiting {retry_after:.0f}s for token quota to refresh...'
-        return 'Waiting for token quota to refresh...'
-    else:
-        return (
-            'Will retry automatically. If this persists, check your provider dashboard.'
-        )
+    return _impl(rate_kind, retry_after)

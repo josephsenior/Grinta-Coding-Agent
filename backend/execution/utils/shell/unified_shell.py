@@ -13,7 +13,7 @@ import time
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.core.os_capabilities import OS_CAPS
 from backend.execution.sandboxing import (
     is_sandboxed_local_profile,
@@ -22,8 +22,8 @@ from backend.execution.sandboxing import (
 from backend.execution.utils.tool_registry import resolve_windows_powershell_preference
 
 if TYPE_CHECKING:
-    from backend.execution.utils.process_registry import TaskCancellationService
-    from backend.execution.utils.server_detector import DetectedServer
+    from backend.execution.utils.process.process_registry import TaskCancellationService
+    from backend.execution.utils.process.server_detector import DetectedServer
     from backend.ledger.action import CmdRunAction
     from backend.ledger.observation import Observation
 
@@ -117,7 +117,7 @@ class BaseShellSession(UnifiedShellSession, ABC):
         self._bg_process: Any | None = None
         self._bg_stdout_capture: Any | None = None
         self._bg_stderr_capture: Any | None = None
-        from backend.execution.utils.process_registry import TaskCancellationService
+        from backend.execution.utils.process.process_registry import TaskCancellationService
 
         self._cancellation = cancellation_service or TaskCancellationService(
             label='runtime'
@@ -622,7 +622,7 @@ def create_shell_session(
     assert resolved_tools is not None
 
     if cancellation_service is None:
-        from backend.execution.utils.process_registry import TaskCancellationService
+        from backend.execution.utils.process.process_registry import TaskCancellationService
 
         cancellation_service = TaskCancellationService(label='runtime')
 

@@ -28,7 +28,7 @@ from backend.cli.tui.renderer.handlers.status import notify_ui_only_error
 from backend.cli.tui.widgets.small import (
     InputBar,
 )
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.ledger import EventStreamSubscriber
 from backend.ledger.observation.error import ERROR_CATEGORY_BAD_REQUEST
 

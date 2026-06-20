@@ -9,7 +9,7 @@ import pytest
 from backend.core.errors import (
     FunctionCallValidationError as CoreFunctionCallValidationError,
 )
-from backend.engine.common import (
+from backend.engine.response_processing import (
     FunctionCallNotExistsError,
     FunctionCallValidationError,
     extract_assistant_message,

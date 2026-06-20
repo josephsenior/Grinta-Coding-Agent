@@ -17,7 +17,7 @@ from mcp import McpError
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 from backend.core.config.mcp_config import MCPServerConfig
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.core.workspace_resolution import get_effective_workspace_root
 from backend.integrations.mcp.error_collector import mcp_error_collector
 from backend.integrations.mcp.tool import MCPClientTool
@@ -205,7 +205,7 @@ class MCPClient(BaseModel):
 
         # Merge MCP server stderr into the unified (session-scoped) app.log
         # instead of a scattered mcp_<name>_stderr.log file.
-        from backend.core.logger import mcp_log_stream
+        from backend.core.logging.logger import mcp_log_stream
 
         log_file = mcp_log_stream(cfg.name)
 
@@ -369,7 +369,7 @@ class MCPClient(BaseModel):
 
             # Merge MCP server stderr into the unified (session-scoped) app.log
             # instead of a scattered mcp_<name>_stderr.log file.
-            from backend.core.logger import mcp_log_stream
+            from backend.core.logging.logger import mcp_log_stream
 
             log_file = mcp_log_stream(server.name)
 

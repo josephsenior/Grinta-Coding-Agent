@@ -18,7 +18,7 @@ from backend.cli.tool_display.summarize import (
     format_tool_invocation_line,
     parse_tool_arguments_json,
 )
-from backend.inference.tool_history import (
+from backend.inference.tool_support.tool_history import (
     flatten_tool_call_for_history as _flatten_tool_call_plain,
 )
 

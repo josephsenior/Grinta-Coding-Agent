@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from backend.core.session_log_audit import (
+from backend.core.logging.session_log_audit import (
     analyze_session,
     generate_session_audit_artifacts,
 )

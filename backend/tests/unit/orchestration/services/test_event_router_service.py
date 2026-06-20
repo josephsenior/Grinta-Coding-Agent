@@ -493,10 +493,10 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_plan_mode_integration_smoke_read_clarify_resume_finish(self):
-        from backend.engine.function_calling import (
+        from backend.engine.function_calling.dispatch import (
             _process_single_tool_call,
         )
-        from backend.inference.tool_names import CREATE_TOOL_NAME, READ_TOOL_NAME
+        from backend.core.tools.tool_names import CREATE_TOOL_NAME, READ_TOOL_NAME
 
         self.mock_controller.agent = SimpleNamespace(
             config=SimpleNamespace(mode='plan')

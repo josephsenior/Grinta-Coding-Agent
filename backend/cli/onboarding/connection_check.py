@@ -58,7 +58,7 @@ def validate_connection(
 async def _test_llm_call(model: str, api_key: str, base_url: str | None) -> bool | str:
     """Make a minimal LLM call to verify credentials. Returns True or error string."""
     try:
-        from backend.inference.direct_clients import get_direct_client
+        from backend.inference.clients import get_direct_client
         from backend.inference.exceptions import (
             APIConnectionError,
             AuthenticationError,

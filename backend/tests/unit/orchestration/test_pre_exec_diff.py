@@ -157,7 +157,7 @@ class TestDiffForEdit:
             patch('os.path.isfile', return_value=True),
             patch.object(middleware, '_read_file', return_value='old content here'),
             patch(
-                'backend.execution.utils.diff.get_diff',
+                'backend.execution.utils.files.diff.get_diff',
                 return_value='- old content\\n+ new content',
             ),
         ):

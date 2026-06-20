@@ -14,13 +14,13 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from backend.core.constants import LLM_STREAM_CHUNK_TIMEOUT_SECONDS
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.engine.executor_mixins._executor_types import (
     _INLINE_CLOSE_THINK_RE,
     _INLINE_OPEN_THINK_RE,
     _AsyncStreamingState,
 )
-from backend.inference.tool_types import is_valid_tool_call_name
+from backend.inference.tool_support.tool_types import is_valid_tool_call_name
 
 if TYPE_CHECKING:
     from backend.engine.executor_mixins._executor_types import ModelResponse
@@ -165,7 +165,7 @@ class _ExecutorStreamingMixin:
         tool_calls_list: list[dict[str, Any]] | None,
         streamed_usage: dict[str, int] | None,
     ) -> Any:
-        from backend.inference.direct_clients import LLMResponse
+        from backend.inference.clients import LLMResponse
 
         model_name = self._llm_model_name(self._llm) or 'unknown'
         resolved_usage = self._resolve_stream_usage(
@@ -491,8 +491,8 @@ class _ExecutorStreamingMixin:
     def _emit_thought_chunks(
         self, response: ModelResponse, event_stream: EventStream, chunk_size: int = 80
     ) -> None:
-        from backend.core.tool_arguments_json import parse_tool_arguments_object
-        from backend.engine.common import extract_assistant_message
+        from backend.core.tools.tool_arguments_json import parse_tool_arguments_object
+        from backend.engine.response_processing import extract_assistant_message
         from backend.ledger.action.message import StreamingChunkAction
         from backend.ledger.event import EventSource
 

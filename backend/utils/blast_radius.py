@@ -13,7 +13,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.utils.lsp.lsp_client import get_lsp_client
 from backend.utils.treesitter.treesitter_editor import TreeSitterEditor
 

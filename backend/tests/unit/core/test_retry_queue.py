@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from backend.core.retry_queue import (
+from backend.orchestration.services.retry_queue import (
     InMemoryRetryBackend,
     RetryQueue,
     RetryTask,

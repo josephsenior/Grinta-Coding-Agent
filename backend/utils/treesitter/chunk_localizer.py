@@ -9,7 +9,7 @@ from __future__ import annotations
 from pydantic import BaseModel
 from rapidfuzz.distance import LCSseq
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 
 
 class Chunk(BaseModel):

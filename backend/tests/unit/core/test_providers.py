@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from backend.core.providers import (
+from backend.core.providers.configurations import (
     DEFAULT_API_KEY_MIN_LENGTH,
     PROVIDER_CONFIGURATIONS,
     PROVIDER_FALLBACK_PATTERNS,

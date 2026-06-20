@@ -6,14 +6,14 @@ import asyncio
 from typing import TYPE_CHECKING
 
 from backend.core.config import LLMConfig
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.ledger.event import EventSource
 from backend.ledger.event.event_store import EventStore
 
 if TYPE_CHECKING:
     from backend.inference.llm_registry import LLMRegistry
     from backend.persistence.data_models.settings import Settings
-    from backend.persistence.files import FileStore
+    from backend.persistence.file_store.files import FileStore
 
 
 async def generate_conversation_title(

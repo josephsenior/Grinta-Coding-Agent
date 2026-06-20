@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING, Any
 
-from backend.core.logger import app_logger as logger
-from backend.core.retry_queue import RetryQueue, RetryTask, get_retry_queue
+from backend.core.logging.logger import app_logger as logger
+from backend.orchestration.services.retry_queue import RetryQueue, RetryTask, get_retry_queue
 
 if TYPE_CHECKING:
     from backend.orchestration.services.orchestration_context import (

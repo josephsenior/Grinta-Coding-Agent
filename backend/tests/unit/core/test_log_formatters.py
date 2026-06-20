@@ -1,4 +1,4 @@
-"""Tests for backend.core.log_formatters — formatters, filters, and strip_ansi."""
+"""Tests for backend.core.logging.log_formatters — formatters, filters, and strip_ansi."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import sys
 import types
 from unittest.mock import patch
 
-from backend.core.log_formatters import (
+from backend.core.logging.log_formatters import (
     _TRACE_LOCAL,
     ColoredFormatter,
     EnhancedJSONFormatter,
@@ -159,8 +159,8 @@ class TestColoredFormatter:
         assert 'Step message' in output
 
     def test_step_message_with_all_events(self, monkeypatch):
-        monkeypatch.setattr('backend.core.log_formatters.LOG_ALL_EVENTS', True)
-        monkeypatch.setattr('backend.core.log_formatters.LOG_COLORS', {})
+        monkeypatch.setattr('backend.core.logging.log_formatters.LOG_ALL_EVENTS', True)
+        monkeypatch.setattr('backend.core.logging.log_formatters.LOG_COLORS', {})
         fmt = ColoredFormatter()
         rec = logging.LogRecord('n', logging.INFO, 'f', 1, 'Step message', (), None)
         rec.msg_type = 'STEP'
@@ -169,12 +169,12 @@ class TestColoredFormatter:
 
     def test_event_source_msg_type_resolution(self, monkeypatch):
         monkeypatch.setattr(
-            'backend.core.log_formatters.LOG_COLORS',
+            'backend.core.logging.log_formatters.LOG_COLORS',
             {'AGENT_START': 'cyan'},
         )
         monkeypatch.setattr('backend.core.constants.DISABLE_COLOR_PRINTING', False)
         monkeypatch.setattr(
-            'backend.core.log_formatters.colored', lambda text, _c: text
+            'backend.core.logging.log_formatters.colored', lambda text, _c: text
         )
         fmt = ColoredFormatter()
         rec = logging.LogRecord('n', logging.INFO, 'f', 1, 'Hello', (), None)
@@ -184,10 +184,10 @@ class TestColoredFormatter:
         assert 'AGENT_START' in output
 
     def test_error_format_includes_location(self, monkeypatch):
-        monkeypatch.setattr('backend.core.log_formatters.LOG_COLORS', {'ERROR': 'red'})
+        monkeypatch.setattr('backend.core.logging.log_formatters.LOG_COLORS', {'ERROR': 'red'})
         monkeypatch.setattr('backend.core.constants.DISABLE_COLOR_PRINTING', False)
         monkeypatch.setattr(
-            'backend.core.log_formatters.colored', lambda text, _c: text
+            'backend.core.logging.log_formatters.colored', lambda text, _c: text
         )
         monkeypatch.setattr('backend.core.constants.DEBUG', False)
         fmt = ColoredFormatter()

@@ -128,7 +128,7 @@ class ScreenStateMixin:
 
     @staticmethod
     def _visible_autonomy_level(value: object, *, default: str = '') -> str:
-        from backend.orchestration.agent.autonomy import normalize_autonomy_level
+        from backend.core.autonomy import normalize_autonomy_level
 
         level = normalize_autonomy_level(value)
         return level if level in {'conservative', 'balanced', 'full'} else default
@@ -249,7 +249,7 @@ class ScreenStateMixin:
         from backend.inference.capabilities.param_profiles import (
             resolve_model_entry_for_capabilities,
         )
-        from backend.inference.registry import build_model_entries_by_provider
+        from backend.inference.catalog.provider_catalog import build_model_entries_by_provider
 
         provider = self._current_llm_provider()
         model = (
@@ -439,7 +439,7 @@ class ScreenStateMixin:
             return
         self._last_session_audit_refresh_at = now
         try:
-            from backend.core.logger import finalize_session_logging_audit
+            from backend.core.logging.logger import finalize_session_logging_audit
 
             finalize_session_logging_audit()
         except Exception:

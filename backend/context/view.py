@@ -6,7 +6,7 @@ from typing import overload
 
 from pydantic import BaseModel
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.ledger.action.agent import CondensationAction, CondensationRequestAction
 from backend.ledger.event import Event
 from backend.ledger.observation.agent import AgentCondensationObservation

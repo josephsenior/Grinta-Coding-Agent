@@ -252,7 +252,7 @@ async def _run_task(
     prompt: str,
     project_root: Path,
 ) -> tuple[Any, str, float]:
-    from backend.core.bootstrap.main import auto_continue_response, run_controller
+    from backend.app.main import auto_continue_response, run_controller
     from backend.ledger.action import MessageAction
 
     config.project_root = str(project_root.resolve())

@@ -4,7 +4,7 @@ import pytest
 
 from backend.core.enums import ActionSecurityRisk
 from backend.core.errors import FunctionCallValidationError
-from backend.engine.function_calling import _handle_browser_tool
+from backend.engine.function_calling.dispatch import _handle_browser_tool
 from backend.engine.tools.browser_native import (
     BROWSER_TOOL_NAME,
     build_browser_tool_action,

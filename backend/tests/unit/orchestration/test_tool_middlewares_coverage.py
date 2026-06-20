@@ -156,7 +156,7 @@ async def test_destructive_command_middleware_creates_checkpoint() -> None:
     with (
         patch('os.path.isdir', return_value=True),
         patch(
-            'backend.core.rollback.rollback_manager.RollbackManager',
+            'backend.execution.rollback.rollback_manager.RollbackManager',
             return_value=manager,
         ),
     ):

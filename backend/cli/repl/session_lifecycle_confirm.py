@@ -45,7 +45,7 @@ async def _cancel_agent(
 
     # Hard kill underlying shells/processes
     with contextlib.suppress(Exception):
-        from backend.execution.action_execution_server import (
+        from backend.execution.server.action_execution_server import (
             client as runtime_client,
         )
 

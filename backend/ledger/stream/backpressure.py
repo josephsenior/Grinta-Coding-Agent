@@ -13,7 +13,7 @@ from collections import deque
 from collections.abc import Callable
 from typing import Any
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.ledger.event import Event
 from backend.ledger.infra.config import get_event_runtime_defaults
 

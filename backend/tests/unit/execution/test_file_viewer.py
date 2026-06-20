@@ -10,7 +10,7 @@ import tempfile
 
 import pytest
 
-from backend.execution.utils.file_viewer import generate_file_viewer_html
+from backend.execution.utils.files.file_viewer import generate_file_viewer_html
 
 
 def _write_temp(suffix: str, content: bytes) -> str:

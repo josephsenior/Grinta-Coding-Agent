@@ -33,7 +33,7 @@ from backend.inference.fn_call._fn_call_examples import (  # noqa: F401
     _increment_parse_counter,
     _log_xml_parser_diagnostics,
 )
-from backend.inference.tool_result_format import (
+from backend.inference.tool_support.tool_result_format import (
     TOOL_RESULT_BLOCK_PREFIX,
     TOOL_RESULT_BLOCK_SUFFIX,
     decode_tool_result_payload,

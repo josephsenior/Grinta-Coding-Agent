@@ -5,7 +5,7 @@ Ensures all Grinta competitive advantages are available at startup.
 
 from typing import TypedDict
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 
 
 class HealthCheckComponent(TypedDict):

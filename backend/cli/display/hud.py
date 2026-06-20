@@ -235,7 +235,7 @@ class HUDBar:
         if not raw or raw == '(not set)':
             return 1_000_000
         try:
-            from backend.inference.catalog_loader import get_context_window_tokens
+            from backend.inference.catalog.catalog_loader import get_context_window_tokens
 
             limit = int(get_context_window_tokens(raw) or 0)
             if limit > 0:

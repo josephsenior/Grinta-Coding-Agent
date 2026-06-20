@@ -8,7 +8,7 @@ from typing import Any, cast
 import pytest
 
 from backend.core.errors import FunctionCallNotExistsError, FunctionCallValidationError
-from backend.engine.function_calling import (
+from backend.engine.function_calling.dispatch import (
     _handle_cmd_run_tool,
     _process_single_tool_call,
     combine_thought,
@@ -64,7 +64,7 @@ class TestSetSecurityRisk:
 
     def test_valid_risk_level(self):
         action = CmdRunAction(command='ls')
-        from backend.engine.tools.security_utils import RISK_LEVELS
+        from backend.core.constants import RISK_LEVELS
 
         if RISK_LEVELS:
             level = list(RISK_LEVELS)[0]

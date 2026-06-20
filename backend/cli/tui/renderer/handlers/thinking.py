@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 def _handle_agent_think_action(
     orch: 'RendererEventProcessorMixin', event: AgentThinkAction
 ) -> None:
-    from backend.engine.common import arguments_from_tool_call_metadata
+    from backend.engine.response_processing import arguments_from_tool_call_metadata
 
     source_tool = getattr(event, 'source_tool', '') or ''
     thought = getattr(event, 'thought', '') or getattr(event, 'content', '')

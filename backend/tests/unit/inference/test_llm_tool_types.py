@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.inference.tool_types import (
+from backend.inference.tool_support.tool_types import (
     PromptTokensDetails,
     make_function_chunk,
     make_tool_param,

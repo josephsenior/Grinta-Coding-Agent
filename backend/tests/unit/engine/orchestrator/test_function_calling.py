@@ -13,7 +13,7 @@ from backend.core.errors import (
     FunctionCallNotExistsError,
     FunctionCallValidationError,
 )
-from backend.engine.function_calling import (
+from backend.engine.function_calling.dispatch import (
     _handle_cmd_run_tool,
     _handle_mcp_tool,
     _handle_task_tracker_tool,
@@ -87,7 +87,7 @@ class TestCombineThought:
         assert cast(Any, result).thought == 'prefix\nexisting thought'
 
     def test_grep_action_not_polluted_with_assistant_prose(self):
-        from backend.engine.common import process_tool_calls
+        from backend.engine.response_processing import process_tool_calls
         from backend.engine.tools._tool_handlers import _handle_grep_tool
         from backend.ledger.action.search import GrepAction
 
@@ -185,7 +185,7 @@ class TestSetSecurityRisk:
     def test_invalid_risk_level_logs_warning(self):
         action = CmdRunAction(command='ls')
         # Should not raise even with an invalid level
-        with patch('backend.engine.function_calling_helpers.logger') as mock_log:
+        with patch('backend.engine.function_calling.helpers.logger') as mock_log:
             set_security_risk(action, {'security_risk': 'NUCLEAR'})
         mock_log.warning.assert_called_once()
 
@@ -475,7 +475,7 @@ class TestProcessSingleToolCall:
 
 class TestMultiEditCommand:
     def test_multi_edit_edits_workspace_scoped_paths(self, tmp_path):
-        from backend.engine.function_calling import _handle_multi_edit_command
+        from backend.engine.function_calling.dispatch import _handle_multi_edit_command
 
         (tmp_path / 'src').mkdir()
         (tmp_path / 'src' / 'a.py').write_text('A = 0\n', encoding='utf-8')
@@ -506,7 +506,7 @@ class TestMultiEditCommand:
         assert (tmp_path / 'src' / 'b.py').read_text(encoding='utf-8') == 'B = 2\n'
 
     def test_multi_edit_rejects_path_traversal(self, tmp_path):
-        from backend.engine.function_calling import _handle_multi_edit_command
+        from backend.engine.function_calling.dispatch import _handle_multi_edit_command
 
         with pytest.raises(FunctionCallValidationError, match='invalid path'):
             _handle_multi_edit_command(
@@ -526,7 +526,7 @@ class TestMultiEditCommand:
         assert not (tmp_path.parent / 'outside.py').exists()
 
     def test_multi_edit_allows_sequential_duplicate_path_operations(self, tmp_path):
-        from backend.engine.function_calling import _handle_multi_edit_command
+        from backend.engine.function_calling.dispatch import _handle_multi_edit_command
 
         py = tmp_path / 'src' / 'a.py'
         py.parent.mkdir(parents=True, exist_ok=True)
@@ -559,7 +559,7 @@ class TestMultiEditCommand:
         ) == 'A = 1\nB = 99\n'
 
     def test_multi_edit_supports_symbol_body_edit(self, tmp_path):
-        from backend.engine.function_calling import _handle_multi_edit_command
+        from backend.engine.function_calling.dispatch import _handle_multi_edit_command
 
         py = tmp_path / 'src' / 'm.py'
         py.parent.mkdir(parents=True, exist_ok=True)
@@ -584,7 +584,7 @@ class TestMultiEditCommand:
         assert 'return 42' in py.read_text(encoding='utf-8')
 
     def test_multi_edit_resolves_edit_symbol_after_replace_string(self, tmp_path):
-        from backend.engine.function_calling import _handle_multi_edit_command
+        from backend.engine.function_calling.dispatch import _handle_multi_edit_command
 
         py = tmp_path / 'src' / 'mix.py'
         py.parent.mkdir(parents=True, exist_ok=True)
@@ -620,7 +620,7 @@ class TestMultiEditCommand:
         )
 
     def test_multi_edit_resolves_edit_symbol_before_replace_string(self, tmp_path):
-        from backend.engine.function_calling import _handle_multi_edit_command
+        from backend.engine.function_calling.dispatch import _handle_multi_edit_command
 
         py = tmp_path / 'src' / 'mix.py'
         py.parent.mkdir(parents=True, exist_ok=True)
@@ -656,7 +656,7 @@ class TestMultiEditCommand:
         )
 
     def test_multi_edit_replace_string_order_is_preserved(self, tmp_path):
-        from backend.engine.function_calling import _handle_multi_edit_command
+        from backend.engine.function_calling.dispatch import _handle_multi_edit_command
 
         py = tmp_path / 'src' / 'chain.py'
         py.parent.mkdir(parents=True, exist_ok=True)

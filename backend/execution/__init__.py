@@ -9,7 +9,7 @@ from __future__ import annotations
 import importlib
 from typing import TYPE_CHECKING, Any
 
-from backend.execution.base import Runtime
+from backend.execution.server.base import Runtime
 from backend.execution.runtime.factory import get_runtime_cls
 from backend.execution.runtime.orchestrator import (
     RuntimeAcquireResult,
@@ -63,7 +63,7 @@ def __getattr__(name: str) -> Any:  # Lazy access to runtime classes
         )
     if name == 'RuntimeExecutor':
         return _lazy_import(
-            'backend.execution.action_execution_server',
+            'backend.execution.server.action_execution_server',
             'RuntimeExecutor',
         )
     raise AttributeError(name)

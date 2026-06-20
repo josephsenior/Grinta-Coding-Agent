@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from backend.engine.contracts import ChatCompletionToolParam
-from backend.engine.tools.common import create_tool_definition
-from backend.inference.tool_names import MEMORY_TOOL_NAME
+from backend.engine.tools.param_defs import create_tool_definition
+from backend.core.tools.tool_names import MEMORY_TOOL_NAME
 
 _MEMORY_DESCRIPTION = (
     'Unified memory for this agent.\n\n'

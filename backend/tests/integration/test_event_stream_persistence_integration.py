@@ -9,7 +9,7 @@ from backend.ledger import EventSource
 from backend.ledger.observation.empty import NullObservation
 from backend.ledger.serialization.event import event_to_dict
 from backend.ledger.stream import EventStream
-from backend.persistence.local_file_store import LocalFileStore
+from backend.persistence.file_store.local_file_store import LocalFileStore
 from backend.persistence.locations import get_conversation_events_dir
 
 

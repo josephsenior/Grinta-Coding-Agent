@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import bashlex  # pyright: ignore[reportMissingTypeStubs]
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.execution.utils.shell.unified_shell import UnifiedShellSession
 from backend.ledger.observation import ErrorObservation
 

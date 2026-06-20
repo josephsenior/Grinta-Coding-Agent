@@ -7,7 +7,7 @@ import tempfile
 from backend.ledger import EventSource
 from backend.ledger.action.commands import CmdRunAction
 from backend.ledger.stream import EventStream, EventStreamSubscriber
-from backend.persistence.local_file_store import LocalFileStore
+from backend.persistence.file_store.local_file_store import LocalFileStore
 
 
 def test_prerunnable_hook_runs_before_inline_subscriber() -> None:

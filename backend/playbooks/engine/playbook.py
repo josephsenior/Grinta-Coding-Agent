@@ -13,7 +13,7 @@ import frontmatter
 from pydantic import BaseModel, ValidationError
 
 from backend.core.errors import PlaybookValidationError
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.core.os_capabilities import OS_CAPS
 from backend.playbooks.engine.types import InputMetadata, PlaybookMetadata, PlaybookType
 

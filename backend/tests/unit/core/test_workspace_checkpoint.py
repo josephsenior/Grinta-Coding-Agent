@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from backend.core.rollback.workspace_checkpoint import (
+from backend.execution.rollback.workspace_checkpoint import (
     restore_checkpoint,
     save_checkpoint,
 )

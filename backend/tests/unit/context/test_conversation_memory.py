@@ -20,7 +20,7 @@ from backend.context.prompt.message_formatting import (
     remove_duplicate_system_prompt_user,
 )
 from backend.core.message import Message, TextContent
-from backend.inference.tool_result_format import decode_tool_result_payload
+from backend.inference.tool_support.tool_result_format import decode_tool_result_payload
 from backend.integrations.mcp.mcp_utils import call_tool_mcp
 from backend.ledger.action import MessageAction
 from backend.ledger.action.browser_tool import BrowserToolAction

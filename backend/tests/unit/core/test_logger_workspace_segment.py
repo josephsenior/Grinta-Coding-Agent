@@ -1,4 +1,4 @@
-"""Tests for workspace log directory resolution in backend.core.logger."""
+"""Tests for workspace log directory resolution in backend.core.logging.logger."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import re
 
 import pytest
 
-from backend.core import logger as logger_mod
+from backend.core.logging import logger as logger_mod
 
 
 def test_workspace_logs_segment_uses_project_root(

@@ -5,7 +5,7 @@ import time
 from collections import Counter, deque
 from dataclasses import dataclass
 
-from backend.execution.base import Runtime
+from backend.execution.server.base import Runtime
 
 
 @dataclass(slots=True)
@@ -193,7 +193,7 @@ class WarmRuntimePool(RuntimePool):
 
 
 def call_async_disconnect(runtime: Runtime) -> None:
-    from backend.core.logger import app_logger as logger
+    from backend.core.logging.logger import app_logger as logger
 
     disconnect_fn = getattr(runtime, 'disconnect', None)
     try:

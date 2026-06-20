@@ -59,7 +59,7 @@ def test_get_file_store_call_uses_config_file_store_attribute():
 def test_event_stream_and_conversation_share_storage_path(tmp_path):
     """End-to-end: events.db must land where the conversation expects it."""
     from backend.ledger.stream import EventStream
-    from backend.persistence.local_file_store import LocalFileStore
+    from backend.persistence.file_store.local_file_store import LocalFileStore
     from backend.persistence.locations import (
         get_conversation_dir,
         get_conversation_events_dir,

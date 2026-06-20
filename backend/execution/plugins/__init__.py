@@ -35,12 +35,12 @@ import importlib.metadata
 import os
 from collections.abc import Callable
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.execution.plugins.agent_skills import (
     AgentSkillsPlugin,
     AgentSkillsRequirement,
 )
-from backend.execution.plugins.requirement import Plugin, PluginRequirement
+from backend.core.contracts.plugins import Plugin, PluginRequirement
 
 __all__ = [
     'AgentSkillsPlugin',

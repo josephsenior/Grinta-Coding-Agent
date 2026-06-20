@@ -9,10 +9,10 @@ import backend.context.context_pipeline as _cp
 from backend.context.canonical_state import (
     reduce_events_into_state,
 )
-from backend.context.compaction.condensed_history import CondensedHistory
+from backend.context.compactor.condensed_history import CondensedHistory
 from backend.context.compactor.compactor import Compaction
 from backend.context.memory.session_context import bind_session_context
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.ledger.action.agent import CondensationAction
 
 if TYPE_CHECKING:

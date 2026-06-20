@@ -1,10 +1,13 @@
-"""Unit tests for backend.inference.tool_names."""
+"""Unit tests for backend.core.tool_names."""
 
 from __future__ import annotations
 
 from unittest import TestCase
 
-from backend.inference import tool_names
+from backend.core import tools as _core_tools
+
+# Re-export for backward compat in tests that use `from backend.core import tool_names`
+tool_names = _core_tools.tool_names
 
 EXPECTED_EXPORTS = [
     'ANALYZE_PROJECT_STRUCTURE_TOOL_NAME',
@@ -56,7 +59,7 @@ class TestToolNames(TestCase):
 
     def test_import_from_tool_names(self):
         """Test that constants can be imported from tool_names."""
-        from backend.inference.tool_names import (
+        from backend.core.tools.tool_names import (
             CALL_MCP_TOOL_NAME,
             CREATE_TOOL_NAME,
             GREP_TOOL_NAME,

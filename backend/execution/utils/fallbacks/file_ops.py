@@ -9,7 +9,7 @@ import os
 import stat
 from pathlib import Path
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.core.os_capabilities import OS_CAPS
 
 

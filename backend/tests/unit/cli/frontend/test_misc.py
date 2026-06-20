@@ -797,7 +797,7 @@ async def test_repl_run_saves_controller_state_on_exit() -> None:
 
     with (
         patch(
-            'backend.core.bootstrap.main._initialize_session_components',
+            'backend.app.main._initialize_session_components',
             side_effect=RuntimeError('bootstrap failed'),
         ),
         patch('backend.cli.repl.session.get_current_model', return_value='test-model'),
@@ -969,7 +969,7 @@ async def test_repl_run_shows_ready_before_background_bootstrap() -> None:
         patch('backend.cli.repl.session._supports_prompt_session', return_value=False),
         patch.object(repl, '_read_non_interactive_input', side_effect=fake_read),
         patch(
-            'backend.core.bootstrap.main._initialize_session_components',
+            'backend.app.main._initialize_session_components',
             side_effect=fail_bootstrap,
         ),
     ):
@@ -1034,7 +1034,7 @@ async def test_repl_run_accepts_first_message_before_mcp_warmup_finishes() -> No
             new=AsyncMock(return_value=None),
         ),
         patch(
-            'backend.core.bootstrap.main._initialize_session_components',
+            'backend.app.main._initialize_session_components',
             return_value=(
                 'session-1',
                 llm_registry,
@@ -1044,15 +1044,15 @@ async def test_repl_run_accepts_first_message_before_mcp_warmup_finishes() -> No
             ),
         ),
         patch(
-            'backend.core.bootstrap.main._setup_runtime_for_controller',
+            'backend.app.main._setup_runtime_for_controller',
             return_value=(runtime, None, acquire_result),
         ),
         patch(
-            'backend.core.bootstrap.main._setup_memory',
+            'backend.app.main._setup_memory',
             new=AsyncMock(return_value=memory),
         ) as mock_setup_memory,
         patch(
-            'backend.core.bootstrap.main._setup_mcp_tools',
+            'backend.app.main._setup_mcp_tools',
             new=AsyncMock(side_effect=fake_setup_mcp),
         ) as mock_setup_mcp,
         patch('backend.execution.runtime_orchestrator.release') as mock_release,
@@ -1649,11 +1649,11 @@ async def test_resume_session_uses_persisted_session_index(
         await asyncio.sleep(0)
 
     with patch(
-        'backend.core.bootstrap.main._setup_runtime_for_controller',
+        'backend.app.main._setup_runtime_for_controller',
         return_value=(runtime, None, 'new-runtime-handle'),
     ) as mock_setup_runtime:
         with patch(
-            'backend.core.bootstrap.main._setup_memory_and_mcp',
+            'backend.app.main._setup_memory_and_mcp',
             new=AsyncMock(return_value=memory),
         ) as mock_setup_memory:
             with patch(

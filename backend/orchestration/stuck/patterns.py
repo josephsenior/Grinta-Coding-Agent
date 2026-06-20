@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.ledger.action.commands import CmdRunAction
 from backend.ledger.action.message import MessageAction
 from backend.ledger.event import Event, EventSource

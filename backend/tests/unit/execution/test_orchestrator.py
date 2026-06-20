@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 from pydantic import SecretStr
 
-from backend.core.provider_types import ProviderToken, ProviderType
+from backend.core.providers.provider_models import ProviderToken, ProviderType
 from backend.execution.runtime.orchestrator import (
     RuntimeAcquireResult,
     RuntimeOrchestrator,
@@ -99,7 +99,7 @@ class TestRuntimeOrchestrator(unittest.TestCase):
         mock_watchdog.watch_runtime.assert_called_once()
 
     @patch('backend.execution.runtime.orchestrator.runtime_watchdog')
-    @patch('backend.core.bootstrap.setup.create_runtime')
+    @patch('backend.app.setup.create_runtime')
     def test_acquire_creates_new_runtime(self, mock_create, mock_watchdog):
         """Test acquire creates new runtime when pool is empty."""
         self.mock_pool.acquire.return_value = None
@@ -137,7 +137,7 @@ class TestRuntimeOrchestrator(unittest.TestCase):
         )
 
     @patch('backend.execution.runtime.orchestrator.runtime_watchdog')
-    @patch('backend.core.bootstrap.setup.create_runtime')
+    @patch('backend.app.setup.create_runtime')
     def test_acquire_with_repo_initializer(self, mock_create, mock_watchdog):
         """Test acquire runs repo initializer when provided."""
         self.mock_pool.acquire.return_value = None

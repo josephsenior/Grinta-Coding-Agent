@@ -145,7 +145,7 @@ async def run_tui(
                 pass
 
         try:
-            from backend.core.logger import finalize_session_logging_audit
+            from backend.core.logging.logger import finalize_session_logging_audit
 
             finalize_session_logging_audit()
         except Exception:
