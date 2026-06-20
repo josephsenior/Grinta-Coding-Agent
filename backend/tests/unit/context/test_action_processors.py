@@ -74,6 +74,83 @@ class TestIsToolBasedAction:
         assert _is_tool_based_action(action) is True
 
 
+class TestToolReplayReasoningContent:
+    def test_replay_preserves_reasoning_content_from_model_response(self):
+        pending: dict[str, object] = {}
+        action = GlobAction(pattern='**/*.py')
+        action.tool_call_metadata = ToolCallMetadata(
+            function_name='glob',
+            tool_call_id='call_glob',
+            model_response={
+                'id': 'resp_glob',
+                'choices': [
+                    {
+                        'message': {
+                            'role': 'assistant',
+                            'content': 'Searching.',
+                            'reasoning_content': 'I should list Python files first.',
+                            'tool_calls': [
+                                {
+                                    'id': 'call_glob',
+                                    'type': 'function',
+                                    'function': {
+                                        'name': 'glob',
+                                        'arguments': '{"pattern":"**/*.py"}',
+                                    },
+                                }
+                            ],
+                        }
+                    }
+                ],
+            },
+            total_calls_in_response=1,
+        )
+
+        convert_action_to_messages(action, pending)
+
+        replayed = pending['resp_glob']
+        assert replayed.reasoning_content == 'I should list Python files first.'
+
+    def test_replay_falls_back_to_action_thought_when_reasoning_missing(self):
+        pending: dict[str, object] = {}
+        action = GlobAction(pattern='**/*.py')
+        action.thought = 'Recovered from action.thought after lite strip.'
+        action.tool_call_metadata = ToolCallMetadata(
+            function_name='glob',
+            tool_call_id='call_glob',
+            model_response={
+                'id': 'resp_glob',
+                'choices': [
+                    {
+                        'message': {
+                            'role': 'assistant',
+                            'content': '.',
+                            'tool_calls': [
+                                {
+                                    'id': 'call_glob',
+                                    'type': 'function',
+                                    'function': {
+                                        'name': 'glob',
+                                        'arguments': '{"pattern":"**/*.py"}',
+                                    },
+                                }
+                            ],
+                        }
+                    }
+                ],
+            },
+            total_calls_in_response=1,
+        )
+
+        convert_action_to_messages(action, pending)
+
+        replayed = pending['resp_glob']
+        assert (
+            replayed.reasoning_content
+            == 'Recovered from action.thought after lite strip.'
+        )
+
+
 # ── _handle_message_action ──────────────────────────────────────────
 
 

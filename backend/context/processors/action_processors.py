@@ -144,6 +144,7 @@ def _handle_tool_based_action(
 
     role = _role_from_assistant_message(assistant_msg)
     content_items = _content_from_assistant_message(assistant_msg)
+    reasoning_content = _reasoning_content_for_tool_replay(action, assistant_msg)
     response_id = getattr(llm_response, 'id', None)
     if response_id is None:
         return []
@@ -154,6 +155,7 @@ def _handle_tool_based_action(
         role=role,
         content=content_items,
         tool_calls=tool_calls_payload,
+        reasoning_content=reasoning_content,
     )
     return []
 
@@ -256,6 +258,17 @@ def _role_from_assistant_message(
     if role_value not in {'user', 'system', 'assistant', 'tool'}:
         role_value = 'assistant'
     return cast(Literal['user', 'system', 'assistant', 'tool'], role_value)
+
+
+def _reasoning_content_for_tool_replay(action: Action, assistant_msg: Any) -> str | None:
+    """Preserve reasoning traces when replaying tool-call assistant turns."""
+    reasoning = getattr(assistant_msg, 'reasoning_content', None)
+    if isinstance(reasoning, str) and reasoning.strip():
+        return reasoning.strip()
+    thought = getattr(action, 'thought', None)
+    if isinstance(thought, str) and thought.strip():
+        return thought.strip()
+    return None
 
 
 def _content_from_assistant_message(

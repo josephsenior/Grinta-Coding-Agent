@@ -462,6 +462,8 @@ OTEL_LOG_CORRELATION = _parse_bool_env(
 )
 LOG_TO_FILE = _parse_bool_env('LOG_TO_FILE', default='true')
 LOG_ALL_EVENTS = _parse_bool_env('LOG_ALL_EVENTS')
+APP_DEBUG_PROMPT_ROLES = _parse_bool_env('APP_DEBUG_PROMPT_ROLES', default='true')
+APP_DEBUG_REASONING_ASTEP = _parse_bool_env('APP_DEBUG_REASONING_ASTEP', default='false')
 
 LOG_COLORS = {
     'ACTION': 'green',
@@ -654,9 +656,10 @@ ENV_VAR_REGISTRY: dict[str, tuple[str, str]] = {
     ),
     'LOG_ALL_EVENTS': ('True', 'Log every event processed by the event stream'),
     'APP_DEBUG_PROMPT_ROLES': (
-        'false',
+        'true',
         'Per astep: log message role histogram after build_messages (condensed event count, '
-        'pending condensation, assistant tool-call presence); use with LOG_LEVEL=INFO or DEBUG',
+        'pending condensation, assistant tool-call presence); set false to disable; use with '
+        'LOG_LEVEL=INFO or DEBUG',
     ),
     'APP_DEBUG_REASONING_ASTEP': (
         'false',

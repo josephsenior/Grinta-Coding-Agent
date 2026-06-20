@@ -87,6 +87,31 @@ class TestModelResponseLiteModel:
         assert lite.choices[0].message.role == 'assistant'
         assert lite.choices[0].message.content == 'Hello'
 
+    def test_from_sdk_with_reasoning_content(self):
+        resp = SimpleNamespace(
+            id='resp-reason',
+            model='qwen',
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(
+                        role='assistant',
+                        content='.',
+                        reasoning_content='Plan the next file edit.',
+                        tool_calls=[
+                            SimpleNamespace(
+                                id='tc1',
+                                function={'name': 'create', 'arguments': '{}'},
+                            )
+                        ],
+                    )
+                )
+            ],
+        )
+        lite = ModelResponseLite.from_sdk(resp)
+        msg = lite.choices[0].message
+        assert msg is not None
+        assert msg.reasoning_content == 'Plan the next file edit.'
+
     def test_from_sdk_with_tool_calls(self):
         resp = SimpleNamespace(
             id='resp-2',

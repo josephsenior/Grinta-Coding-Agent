@@ -16,6 +16,7 @@ class AssistantMessageLite(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     role: str | None = None
     content: Any = None
+    reasoning_content: str | None = None
     tool_calls: list[AssistantToolCallLite] | None = None
 
 
@@ -81,6 +82,9 @@ class ModelResponseLite(BaseModel):
                 continue
             role = cls._getattr_or_get(raw_msg, 'role')
             content = cls._getattr_or_get(raw_msg, 'content')
+            reasoning_content = cls._getattr_or_get(raw_msg, 'reasoning_content')
+            if reasoning_content is not None and not isinstance(reasoning_content, str):
+                reasoning_content = str(reasoning_content)
             raw_tool_calls = cls._getattr_or_get(raw_msg, 'tool_calls')
             tool_calls: list[AssistantToolCallLite] | None = None
             if isinstance(raw_tool_calls, list):
@@ -94,7 +98,10 @@ class ModelResponseLite(BaseModel):
                         AssistantToolCallLite(id=tc_id, function=function)
                     )
             msg = AssistantMessageLite(
-                role=role, content=content, tool_calls=tool_calls
+                role=role,
+                content=content,
+                reasoning_content=reasoning_content,
+                tool_calls=tool_calls,
             )
             choices.append(ChoiceLite(message=msg))
         return cls(id=rid, model=rmodel, choices=choices)
