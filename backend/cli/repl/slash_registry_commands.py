@@ -273,7 +273,10 @@ _SLASH_COMMANDS = (
 def _load_known_models() -> tuple[tuple[str, str], ...]:
     """Load provider/model completions from the catalog."""
     try:
-        from backend.inference.catalog.catalog_loader import get_catalog, runtime_model_id
+        from backend.inference.catalog.catalog_loader import (
+            get_catalog,
+            runtime_model_id,
+        )
 
         return tuple(
             (f'{entry.provider}/{runtime_model_id(entry)}', entry.provider)

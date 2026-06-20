@@ -7,7 +7,6 @@ from typing import Any, ClassVar
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, SecretStr
 
 from backend._canonical import CanonicalModelMetaclass
-from backend.core.logging import logger
 from backend.core.config.agent_config import AgentConfig
 from backend.core.config.config_utils import (
     model_defaults_to_dict,
@@ -36,6 +35,7 @@ from backend.core.constants import (
     DEFAULT_VCS_USER_EMAIL,
     DEFAULT_VCS_USER_NAME,
 )
+from backend.core.logging import logger
 
 
 class GitIdentityConfig(BaseModel):

@@ -92,7 +92,9 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         self._model_list_request_id = 0
 
     def _fetch_model_entries_for_provider(self, provider: str) -> dict[str, list[Any]]:
-        from backend.inference.catalog.provider_catalog import build_model_entries_by_provider
+        from backend.inference.catalog.provider_catalog import (
+            build_model_entries_by_provider,
+        )
 
         return build_model_entries_by_provider(provider=provider)
 
@@ -138,7 +140,9 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         self._set_feedback('')
 
     def _load_catalog_entries_for_provider(self, provider: str) -> None:
-        from backend.inference.catalog.provider_catalog import build_model_entries_by_provider
+        from backend.inference.catalog.provider_catalog import (
+            build_model_entries_by_provider,
+        )
 
         self._entries_by_provider.update(
             build_model_entries_by_provider(provider=provider)
@@ -450,7 +454,9 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         entry = self._selected_entry(provider, model)
         if entry is None:
             if self._custom_model_enabled():
-                from backend.inference.catalog.provider_catalog import empty_model_picker_hint
+                from backend.inference.catalog.provider_catalog import (
+                    empty_model_picker_hint,
+                )
 
                 self.query_one('#settings-model-meta', Label).update(
                     f'[{NAVY_TEXT_MUTED}]{empty_model_picker_hint(provider)}[/]'

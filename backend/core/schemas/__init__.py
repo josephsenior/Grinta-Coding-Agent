@@ -4,6 +4,20 @@ This module provides versioned, type-safe schemas for all event types,
 enabling explicit contracts, versioning, testing, and multi-agent expansion.
 """
 
+from backend.core.enums import (
+    ActionConfirmationStatus,
+    ActionSecurityRisk,
+    ActionType,
+    AgentState,
+    AppMode,
+    EventSource,
+    ExitReason,
+    FileEditSource,
+    FileReadSource,
+    ObservationType,
+    RecallType,
+    RuntimeStatus,
+)
 from backend.core.schemas.actions import (
     ActionSchemaUnion,
     ActionSchemaV1,
@@ -38,20 +52,6 @@ from backend.core.schemas.base import (
     EventMetadata,
     EventSchemaV1,
     EventVersion,
-)
-from backend.core.enums import (
-    ActionConfirmationStatus,
-    ActionSecurityRisk,
-    ActionType,
-    AgentState,
-    AppMode,
-    EventSource,
-    ExitReason,
-    FileEditSource,
-    FileReadSource,
-    ObservationType,
-    RecallType,
-    RuntimeStatus,
 )
 from backend.core.schemas.observations import (
     CmdOutputObservationSchema,

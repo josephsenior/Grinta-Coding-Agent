@@ -6,6 +6,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from backend.context.compactor import Compactor
 from backend.context.compactor.compact_boundary import (
     boundary_info,
     project_after_compact_boundary,
@@ -21,7 +22,6 @@ from backend.context.compactor.pre_condensation_snapshot import (
     load_snapshot,
     save_snapshot,
 )
-from backend.context.compactor import Compactor
 from backend.context.memory.conversation_memory import ContextMemory
 from backend.context.prompt.prompt_window import event_fingerprint, select_prompt_events
 from backend.context.view import View
@@ -35,9 +35,9 @@ from backend.ledger.action.agent import CondensationAction
 
 if TYPE_CHECKING:
     from backend.core.config import AgentConfig
-    from backend.orchestration.state.state import State
     from backend.inference.llm_registry import LLMRegistry
     from backend.ledger.event import Event
+    from backend.orchestration.state.state import State
     from backend.utils.prompt import PromptManager
 
 

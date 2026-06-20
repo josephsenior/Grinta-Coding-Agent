@@ -25,9 +25,9 @@ ChatCompletionToolParam = Any
 CODE_PAYLOAD_TOOLS: frozenset[str] = frozenset()
 
 if TYPE_CHECKING:
-    from backend.orchestration.state.state import State
     from backend.engine.contracts import NoopSafetyManager
     from backend.inference.llm import LLM
+    from backend.orchestration.state.state import State
 
 
 def _external_discovery_hint(*, enable_web: bool, enable_docs: bool) -> str:

@@ -153,7 +153,10 @@ def get_default_base_url(provider: str | None) -> str | None:
 
 
 def get_provider_configuration(provider: str | None) -> dict[str, Any]:
-    from backend.core.providers.configurations import PROVIDER_CONFIGURATIONS, UNKNOWN_PROVIDER_CONFIG
+    from backend.core.providers.configurations import (
+        PROVIDER_CONFIGURATIONS,
+        UNKNOWN_PROVIDER_CONFIG,
+    )
 
     normalized = normalize_provider_name(provider)
     if normalized is None:

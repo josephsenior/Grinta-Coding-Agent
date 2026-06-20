@@ -21,7 +21,8 @@
           "xhigh",
           "max"
         ],
-        "reasoning_wire": "openai_reasoning_effort"
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_response_schema": true
       },
       "metadata": {
         "display_name": "Claude Sonnet 4 (via OpenRouter)"
@@ -36,7 +37,8 @@
         "featured": true,
         "supports_function_calling": true,
         "supports_parallel_tool_calls": true,
-        "supports_stop_words": true
+        "supports_stop_words": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "display_name": "GPT-4.1 (via OpenRouter)"
@@ -59,7 +61,8 @@
           "medium",
           "high"
         ],
-        "reasoning_wire": "gemini_openai_compat"
+        "reasoning_wire": "gemini_openai_compat",
+        "supports_response_schema": true
       },
       "metadata": {
         "display_name": "Gemini 2.5 Pro (via OpenRouter)"

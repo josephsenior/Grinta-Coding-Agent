@@ -26,7 +26,8 @@
           "xhigh",
           "max"
         ],
-        "reasoning_wire": "openai_reasoning_effort"
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_response_schema": true
       },
       "metadata": {
         "display_name": "Claude Sonnet 4.6 (Gradient AI)"
@@ -53,7 +54,8 @@
           "high",
           "max"
         ],
-        "reasoning_wire": "openai_reasoning_effort"
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_response_schema": true
       },
       "metadata": {
         "display_name": "Claude Haiku 4.5 (Gradient AI)"
@@ -81,7 +83,8 @@
           "high",
           "max"
         ],
-        "reasoning_wire": "openai_reasoning_effort"
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_response_schema": true
       },
       "metadata": {
         "display_name": "DeepSeek V4 Pro (Gradient AI)"
@@ -100,7 +103,8 @@
         "featured": true,
         "supports_function_calling": true,
         "supports_parallel_tool_calls": true,
-        "supports_stop_words": true
+        "supports_stop_words": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "display_name": "DeepSeek V3.2 (Gradient AI)"

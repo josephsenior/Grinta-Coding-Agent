@@ -15,7 +15,8 @@
         "featured": true,
         "supports_function_calling": true,
         "supports_parallel_tool_calls": true,
-        "supports_stop_words": true
+        "supports_stop_words": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "display_name": "Mistral Large"
@@ -34,7 +35,8 @@
         "featured": true,
         "supports_function_calling": true,
         "supports_parallel_tool_calls": true,
-        "supports_stop_words": true
+        "supports_stop_words": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "display_name": "Codestral"
@@ -53,7 +55,8 @@
         "featured": true,
         "supports_function_calling": true,
         "supports_parallel_tool_calls": true,
-        "supports_stop_words": true
+        "supports_stop_words": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "display_name": "Devstral Small"

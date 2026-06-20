@@ -29,7 +29,8 @@
           "high",
           "max"
         ],
-        "reasoning_wire": "openai_reasoning_effort"
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_response_schema": true
       },
       "metadata": {}
     },
@@ -59,7 +60,8 @@
           "high",
           "max"
         ],
-        "reasoning_wire": "openai_reasoning_effort"
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_response_schema": true
       },
       "metadata": {}
     }

@@ -237,10 +237,10 @@ class WindowsPowershellSession(BaseShellSession):
         process: subprocess.Popen,
         timeout: int | None,
         command: str,
-    ) -> tuple[str, str, int]:
+    ) -> tuple[str, str, int] | None:
         pending_bg_id = self._pending_bg_id
         if pending_bg_id is None:
-            return None  # type: ignore[return-value]
+            return None
         out, err, code = self._run_backgroundable(process, timeout, pending_bg_id)
         if code != -2:
             self._cancellation.unregister_process(process.pid)

@@ -311,7 +311,7 @@ def strip_unsupported_params(profile: Any, kwargs: dict[str, Any]) -> dict[str, 
 def clean_messages(
     profile: Any, messages: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
-    from backend.inference import direct_clients as dc
+    from backend.inference.clients.base import _normalize_cross_family_tool_messages
 
     cleaned = []
     for msg in messages:
@@ -319,7 +319,7 @@ def clean_messages(
             msg = {k: v for k, v in msg.items() if k != 'tool_ok'}
         cleaned.append(msg)
     if not profile.supports_tool_replay or profile.flatten_tool_history:
-        return dc._normalize_cross_family_tool_messages(cleaned)
+        return _normalize_cross_family_tool_messages(cleaned)
     return cleaned
 
 
@@ -349,7 +349,9 @@ def _message_content_to_text(content: Any) -> str:
 
 
 def _flatten_stale_deepseek_assistant_message(msg: dict[str, Any]) -> dict[str, Any]:
-    from backend.inference.tool_support.tool_history import flatten_tool_call_for_history
+    from backend.inference.tool_support.tool_history import (
+        flatten_tool_call_for_history,
+    )
 
     text = _message_content_to_text(msg.get('content')).strip()
     tool_lines: list[str] = []
@@ -426,13 +428,13 @@ def _prepare_openai_compatible_messages(
 
 
 def completion(client: Any, messages: list[dict[str, Any]], **kwargs) -> Any:
-    from backend.inference import direct_clients as dc
+    from backend.inference.clients.base import _sanitize_openai_compatible_kwargs
 
     _ensure_opencode_chat_completions_model_supported(client)
     messages = _prepare_openai_compatible_messages(client, messages, kwargs)
     messages = _recover_deepseek_thinking_history(client, messages)
     messages = client._clean_messages(messages)
-    kwargs = dc._sanitize_openai_compatible_kwargs(kwargs)
+    kwargs = _sanitize_openai_compatible_kwargs(kwargs)
     kwargs = client._strip_unsupported_params(kwargs)
     kwargs['model'] = client.model_name
 
@@ -449,7 +451,7 @@ def _call_openai_chat(client, messages, kwargs):
 
 
 def _warn_empty_response(response, model_name):
-    from backend.inference import direct_clients as dc
+    from backend.core.logging.logger import app_logger as logger
 
     if not getattr(response, 'choices', None) or len(response.choices) == 0:
         from backend.inference.exceptions import BadRequestError
@@ -469,7 +471,7 @@ def _warn_empty_response(response, model_name):
             msg_dump = msg.model_dump() if hasattr(msg, 'model_dump') else str(msg)
         except Exception:
             msg_dump = str(msg)
-        dc.logger.warning(
+        logger.warning(
             'OpenAI-compatible completion returned empty message (no tool calls). '
             'model=%s finish_reason=%s msg=%s',
             model_name,
@@ -479,11 +481,11 @@ def _warn_empty_response(response, model_name):
 
 
 def _build_llm_response(response, client):
-    from backend.inference import direct_clients as dc
+    from backend.inference.clients.base import LLMResponse
 
     first = response.choices[0]
     msg = first.message
-    return dc.LLMResponse(
+    return LLMResponse(
         content=msg.content or '',
         model=response.model,
         usage={
@@ -500,14 +502,14 @@ def _build_llm_response(response, client):
 
 
 async def acompletion(client: Any, messages: list[dict[str, Any]], **kwargs) -> Any:
-    from backend.inference import direct_clients as dc
+    from backend.inference.clients.base import LLMResponse, _sanitize_openai_compatible_kwargs
     from backend.inference.exceptions import BadRequestError
 
     _ensure_opencode_chat_completions_model_supported(client)
     messages = _prepare_openai_compatible_messages(client, messages, kwargs)
     messages = _recover_deepseek_thinking_history(client, messages)
     messages = client._clean_messages(messages)
-    kwargs = dc._sanitize_openai_compatible_kwargs(kwargs)
+    kwargs = _sanitize_openai_compatible_kwargs(kwargs)
     kwargs = client._strip_unsupported_params(kwargs)
     kwargs.pop('model', None)
     try:
@@ -527,7 +529,7 @@ async def acompletion(client: Any, messages: list[dict[str, Any]], **kwargs) -> 
     first = response.choices[0]
     msg = first.message
     tool_calls = client._extract_openai_tool_calls(msg)
-    return dc.LLMResponse(
+    return LLMResponse(
         content=msg.content or '',
         model=response.model,
         usage={
@@ -602,13 +604,13 @@ def _enrich_openai_stream_chunk(chunk: dict[str, Any]) -> dict[str, Any]:
 async def astream(
     client: Any, messages: list[dict[str, Any]], **kwargs
 ) -> AsyncIterator[dict[str, Any]]:
-    from backend.inference import direct_clients as dc
+    from backend.inference.clients.base import _sanitize_openai_compatible_kwargs
 
     _ensure_opencode_chat_completions_model_supported(client)
     messages = _prepare_openai_compatible_messages(client, messages, kwargs)
     messages = _recover_deepseek_thinking_history(client, messages)
     messages = client._clean_messages(messages)
-    kwargs = dc._sanitize_openai_compatible_kwargs(kwargs)
+    kwargs = _sanitize_openai_compatible_kwargs(kwargs)
     kwargs = client._strip_unsupported_params(kwargs)
     kwargs['stream'] = True
     kwargs.pop('model', None)

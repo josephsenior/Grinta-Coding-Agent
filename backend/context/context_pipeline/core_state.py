@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from backend.context.compactor.compact_boundary import project_after_compact_boundary
 from backend.context.context_budget import record_post_compact_baseline
+from backend.context.context_pipeline.core_base import ContextPipelineBaseMixin
 from backend.context.context_pipeline.helpers import (
     _synthetic_history_after_action,
     apply_ineffective_compaction_backoff,
@@ -29,7 +30,7 @@ if TYPE_CHECKING:
     from backend.orchestration.state.state import State
 
 
-class ContextPipelineStateMixin:
+class ContextPipelineStateMixin(ContextPipelineBaseMixin):
     """ContextPipeline methods (mixin)."""
 
     def _llm_cooldown_elapsed(self, state: State) -> bool:

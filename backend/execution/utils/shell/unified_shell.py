@@ -117,7 +117,9 @@ class BaseShellSession(UnifiedShellSession, ABC):
         self._bg_process: Any | None = None
         self._bg_stdout_capture: Any | None = None
         self._bg_stderr_capture: Any | None = None
-        from backend.execution.utils.process.process_registry import TaskCancellationService
+        from backend.execution.utils.process.process_registry import (
+            TaskCancellationService,
+        )
 
         self._cancellation = cancellation_service or TaskCancellationService(
             label='runtime'
@@ -622,7 +624,9 @@ def create_shell_session(
     assert resolved_tools is not None
 
     if cancellation_service is None:
-        from backend.execution.utils.process.process_registry import TaskCancellationService
+        from backend.execution.utils.process.process_registry import (
+            TaskCancellationService,
+        )
 
         cancellation_service = TaskCancellationService(label='runtime')
 

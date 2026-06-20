@@ -17,7 +17,8 @@
         "supports_function_calling": true,
         "supports_parallel_tool_calls": true,
         "supports_vision": true,
-        "supports_stop_words": true
+        "supports_stop_words": true,
+        "supports_response_schema": true
       },
       "metadata": {}
     },
@@ -45,7 +46,8 @@
           "high",
           "xhigh"
         ],
-        "reasoning_wire": "openai_reasoning_effort"
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_response_schema": true
       },
       "metadata": {
         "display_name": "Grok 4 Fast"
@@ -75,7 +77,8 @@
           "high",
           "xhigh"
         ],
-        "reasoning_wire": "openai_reasoning_effort"
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_response_schema": true
       },
       "metadata": {
         "display_name": "Grok 4"
@@ -95,7 +98,8 @@
         "featured": true,
         "supports_function_calling": true,
         "supports_parallel_tool_calls": true,
-        "supports_stop_words": true
+        "supports_stop_words": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "display_name": "Grok 3 Mini"

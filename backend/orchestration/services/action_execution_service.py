@@ -7,7 +7,6 @@ from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, cast
 from unittest.mock import Mock
 
-from backend.orchestration.agent.agent_protocol import ABANDONED_RETRY_PROMPT
 from backend.core.constants import (
     DEFAULT_AGENT_MAX_CONSECUTIVE_NULL_ACTIONS,
     DEFAULT_AGENT_MAX_IDENTICAL_RETRIES,
@@ -39,6 +38,7 @@ from backend.ledger.action.agent import CondensationAction, CondensationRequestA
 from backend.ledger.action.empty import NullActionReason
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.status import StatusObservation
+from backend.orchestration.agent.agent_protocol import ABANDONED_RETRY_PROMPT
 
 if TYPE_CHECKING:
     from backend.orchestration.services.orchestration_context import (
@@ -547,14 +547,7 @@ class ActionExecutionService:
                     use_confirmation_replay=use_confirmation_replay,
                 )
 
-            except (
-                LLMMalformedActionError,
-                LLMNoActionError,
-                LLMResponseError,
-                FunctionCallValidationError,
-                FunctionCallNotExistsError,
-                FunctionCallValidationError,
-            ) as exc:
+            except (LLMMalformedActionError, LLMNoActionError, LLMResponseError, FunctionCallValidationError, FunctionCallNotExistsError) as exc:
                 (
                     should_continue,
                     error_logged,

@@ -9,8 +9,9 @@ import backend.context.context_pipeline as _cp
 from backend.context.canonical_state import (
     reduce_events_into_state,
 )
-from backend.context.compactor.condensed_history import CondensedHistory
 from backend.context.compactor.compactor import Compaction
+from backend.context.compactor.condensed_history import CondensedHistory
+from backend.context.context_pipeline.core_compact import ContextPipelineCompactionMixin
 from backend.context.memory.session_context import bind_session_context
 from backend.core.logging.logger import app_logger as logger
 from backend.ledger.action.agent import CondensationAction
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
     from backend.orchestration.state.state import State
 
 
-class ContextPipelinePrepareMixin:
+class ContextPipelinePrepareMixin(ContextPipelineCompactionMixin):
     """ContextPipeline methods (mixin)."""
 
     async def prepare_step(self, state: State) -> CondensedHistory:

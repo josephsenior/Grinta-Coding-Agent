@@ -29,7 +29,8 @@
           "max",
           "medium"
         ],
-        "reasoning_wire": "openai_reasoning_effort"
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -111,7 +112,8 @@
           "max",
           "medium"
         ],
-        "reasoning_wire": "openai_reasoning_effort"
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -185,7 +187,8 @@
         "supports_parallel_tool_calls": true,
         "supports_vision": false,
         "inference_endpoint": "/chat/completions",
-        "supports_stop_words": true
+        "supports_stop_words": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -246,7 +249,8 @@
         "supports_parallel_tool_calls": true,
         "supports_vision": false,
         "inference_endpoint": "/chat/completions",
-        "supports_stop_words": true
+        "supports_stop_words": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -307,7 +311,8 @@
         "supports_parallel_tool_calls": true,
         "supports_vision": true,
         "inference_endpoint": "/chat/completions",
-        "supports_stop_words": true
+        "supports_stop_words": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -368,7 +373,8 @@
         "supports_parallel_tool_calls": true,
         "supports_vision": true,
         "inference_endpoint": "/chat/completions",
-        "supports_stop_words": true
+        "supports_stop_words": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -779,7 +785,8 @@
         "supports_parallel_tool_calls": true,
         "supports_vision": false,
         "inference_endpoint": "/messages",
-        "supports_stop_words": true
+        "supports_stop_words": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",
@@ -843,7 +850,8 @@
         "long_cached_write_price_per_m": 1.5,
         "long_output_price_per_m": 4.8,
         "inference_endpoint": "/messages",
-        "supports_stop_words": true
+        "supports_stop_words": true,
+        "supports_response_schema": true
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",

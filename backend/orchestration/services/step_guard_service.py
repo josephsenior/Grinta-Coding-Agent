@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from backend.orchestration.agent.agent_protocol import prepare_next_agent_step
 from backend.core.constants import DEFAULT_STUCK_COOLDOWN_TURNS
 from backend.core.interaction_modes import normalize_interaction_mode
 from backend.core.logging.logger import app_logger as logger
@@ -12,6 +11,7 @@ from backend.core.schemas import AgentState
 from backend.ledger import EventSource
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation_cause import attach_observation_cause
+from backend.orchestration.agent.agent_protocol import prepare_next_agent_step
 from backend.orchestration.services.guard_bus import (
     CIRCUIT_WARNING,
     STUCK,

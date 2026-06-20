@@ -89,7 +89,7 @@ def _extract_responses_text(response: Any) -> str:
 def _build_responses_kwargs(
     client: Any, messages: list[dict[str, Any]], kwargs: dict[str, Any]
 ) -> dict[str, Any]:
-    from backend.inference import direct_clients as dc
+    from backend.inference.clients.base import _sanitize_openai_compatible_kwargs
 
     payload = dict(kwargs)
     payload.pop('model', None)
@@ -102,7 +102,7 @@ def _build_responses_kwargs(
         payload['max_output_tokens'] = payload.pop('max_tokens')
     if 'max_completion_tokens' in payload and 'max_output_tokens' not in payload:
         payload['max_output_tokens'] = payload.pop('max_completion_tokens')
-    return dc._sanitize_openai_compatible_kwargs(payload)
+    return _sanitize_openai_compatible_kwargs(payload)
 
 
 def _responses_usage(response: Any) -> dict[str, int]:
@@ -127,9 +127,9 @@ def _responses_usage(response: Any) -> dict[str, int]:
 
 
 def _to_llm_response(client: Any, response: Any) -> Any:
-    from backend.inference import direct_clients as dc
+    from backend.inference.clients.base import LLMResponse
 
-    return dc.LLMResponse(
+    return LLMResponse(
         content=_extract_responses_text(response),
         model=getattr(response, 'model', client.model_name),
         usage=_responses_usage(response),
@@ -154,13 +154,13 @@ def _prepare_opencode_responses_messages(
 
 
 def completion(client: Any, messages: list[dict[str, Any]], **kwargs) -> Any:
-    from backend.inference import direct_clients as dc
+    from backend.inference.clients.base import _with_default_timeout
 
     messages = _prepare_opencode_responses_messages(client, messages, kwargs)
     messages = client._clean_messages(messages)
     request_kwargs = _build_responses_kwargs(client, messages, kwargs)
     request_kwargs = client._strip_unsupported_params(request_kwargs)
-    request_kwargs = dc._with_default_timeout(request_kwargs, client._request_timeout)
+    request_kwargs = _with_default_timeout(request_kwargs, client._request_timeout)
     try:
         response = client.client.responses.create(**request_kwargs)
     except Exception as exc:
@@ -169,13 +169,13 @@ def completion(client: Any, messages: list[dict[str, Any]], **kwargs) -> Any:
 
 
 async def acompletion(client: Any, messages: list[dict[str, Any]], **kwargs) -> Any:
-    from backend.inference import direct_clients as dc
+    from backend.inference.clients.base import _with_default_timeout
 
     messages = _prepare_opencode_responses_messages(client, messages, kwargs)
     messages = client._clean_messages(messages)
     request_kwargs = _build_responses_kwargs(client, messages, kwargs)
     request_kwargs = client._strip_unsupported_params(request_kwargs)
-    request_kwargs = dc._with_default_timeout(request_kwargs, client._request_timeout)
+    request_kwargs = _with_default_timeout(request_kwargs, client._request_timeout)
     try:
         response = await client.async_client.responses.create(**request_kwargs)
     except Exception as exc:
@@ -186,13 +186,13 @@ async def acompletion(client: Any, messages: list[dict[str, Any]], **kwargs) -> 
 async def astream(
     client: Any, messages: list[dict[str, Any]], **kwargs
 ) -> AsyncIterator[dict[str, Any]]:
-    from backend.inference import direct_clients as dc
+    from backend.inference.clients.base import _with_default_timeout
 
     messages = _prepare_opencode_responses_messages(client, messages, kwargs)
     messages = client._clean_messages(messages)
     request_kwargs = _build_responses_kwargs(client, messages, kwargs)
     request_kwargs = client._strip_unsupported_params(request_kwargs)
-    request_kwargs = dc._with_default_timeout(
+    request_kwargs = _with_default_timeout(
         request_kwargs,
         client._request_timeout,
         streaming=True,

@@ -183,8 +183,8 @@ def _attach_rollback_snapshot(
     normalized_files: list[str],
 ) -> None:
     try:
-        from backend.execution.rollback.rollback_manager import RollbackManager
         from backend.core.workspace_resolution import require_effective_workspace_root
+        from backend.execution.rollback.rollback_manager import RollbackManager
 
         manager = RollbackManager(
             workspace_path=str(require_effective_workspace_root()),
@@ -274,8 +274,8 @@ def _save_checkpoint(label: str, files_modified: str) -> CheckpointObservation:
 def _revert_checkpoint(checkpoint_id: str) -> CheckpointObservation:
     checkpoint_id = (checkpoint_id or '').strip()
 
-    from backend.execution.rollback.rollback_manager import RollbackManager
     from backend.core.workspace_resolution import require_effective_workspace_root
+    from backend.execution.rollback.rollback_manager import RollbackManager
 
     manager = RollbackManager(
         workspace_path=str(require_effective_workspace_root()),
@@ -399,10 +399,10 @@ def _view_checkpoints() -> CheckpointObservation:
         rollback_id = cp.get('rollback_id')
         if rollback_id:
             try:
-                from backend.execution.rollback.rollback_manager import RollbackManager
                 from backend.core.workspace_resolution import (
                     require_effective_workspace_root,
                 )
+                from backend.execution.rollback.rollback_manager import RollbackManager
 
                 manager = RollbackManager(
                     workspace_path=str(require_effective_workspace_root()),

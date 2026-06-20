@@ -6,8 +6,8 @@ from typing import Any, Literal, Self
 
 from pydantic import Field, field_validator, model_validator
 
-from backend.core.schemas.base import EventSchemaV1
 from backend.core.enums import ActionType
+from backend.core.schemas.base import EventSchemaV1
 
 
 class ActionSchemaV1(EventSchemaV1):

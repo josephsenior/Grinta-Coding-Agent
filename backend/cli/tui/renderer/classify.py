@@ -10,9 +10,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from backend.core.autonomy import normalize_autonomy_level
 from backend.ledger.action import AgentThinkAction, StreamingChunkAction
 from backend.ledger.observation import AgentThinkObservation
-from backend.core.autonomy import normalize_autonomy_level
 
 if TYPE_CHECKING:
     from backend.cli.tui.renderer.mixins.event_processor import (

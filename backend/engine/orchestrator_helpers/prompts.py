@@ -7,8 +7,8 @@ import os
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from backend.orchestration.state.state import State
     from backend.engine.orchestrator import Orchestrator
+    from backend.orchestration.state.state import State
     from backend.utils.prompt import PromptManager
 
 

@@ -16,6 +16,7 @@ from backend.inference.capabilities.model_features import (
     get_features,
     model_matches,
     normalize_model_name,
+    should_support_response_schema,
 )
 
 # ---------------------------------------------------------------------------
@@ -160,10 +161,31 @@ class TestPatternSanity:
 
     @pytest.mark.parametrize(
         'model',
-        ['gpt-4o', 'claude-sonnet-4-6', 'google/gemini-2.5-flash'],
+        [
+            'gpt-4o',
+            'claude-sonnet-4-6',
+            'google/gemini-2.5-flash',
+            'google/gemini-3-flash',
+            'mistral/mistral-large-latest',
+            'deepseek/deepseek-v4-pro',
+            'vercel/alibaba/qwen3.7-plus',
+            'xai/grok-4-fast',
+        ],
     )
     def test_response_schema_models(self, model):
         assert model_matches(model, RESPONSE_SCHEMA_PATTERNS)
+
+    def test_should_support_response_schema_excludes_minimax(self):
+        assert not should_support_response_schema(
+            'minimax-m2.5', provider='vercel'
+        )
+        assert should_support_response_schema(
+            'alibaba/qwen3.7-plus', provider='vercel'
+        )
+
+    def test_get_features_reports_catalog_response_schema(self):
+        features = get_features('anthropic/claude-sonnet-4-6')
+        assert features.supports_response_schema is True
 
     def test_unknown_model_matches_nothing(self):
         model = 'my-custom-local-model'
@@ -174,7 +196,7 @@ class TestPatternSanity:
 
 class TestGetFeatures:
     def test_prefers_catalog_entry_over_patterns(self, monkeypatch):
-        import backend.inference.catalog_loader as catalog_loader
+        import backend.inference.catalog.catalog_loader as catalog_loader
 
         # Deliberately contradict pattern defaults to verify catalog-first behavior.
         fake_entry = SimpleNamespace(
@@ -201,7 +223,7 @@ class TestGetFeatures:
         assert features.supports_response_schema is False
 
     def test_falls_back_to_conservative_defaults_when_model_unknown(self, monkeypatch):
-        import backend.inference.catalog_loader as catalog_loader
+        import backend.inference.catalog.catalog_loader as catalog_loader
 
         monkeypatch.setattr(catalog_loader, 'lookup', lambda _model: None)
         monkeypatch.setattr(

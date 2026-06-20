@@ -6,8 +6,8 @@ from typing import Literal
 
 from pydantic import Field, field_validator
 
-from backend.core.schemas.base import EventSchemaV1
 from backend.core.enums import ObservationType
+from backend.core.schemas.base import EventSchemaV1
 from backend.core.schemas.metadata import CmdOutputMetadataSchema
 
 

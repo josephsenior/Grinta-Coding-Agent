@@ -29,17 +29,17 @@ from pydantic import BaseModel
 
 from backend.core.logging.logger import app_logger as logger
 from backend.core.os_capabilities import OS_CAPS
-from backend.execution.server.action_execution_server_io import (
-    RuntimeExecutorIOAndTerminalMixin,
-)
 from backend.execution.aes.file_operations import (
     get_max_edit_observation_chars,
     truncate_large_text,
 )
-from backend.execution.server.debugger import DAPDebugManager
 from backend.execution.mcp.proxy import MCPProxyManager
 from backend.execution.plugin_loader import init_plugins
 from backend.execution.plugins import Plugin
+from backend.execution.server.action_execution_server_io import (
+    RuntimeExecutorIOAndTerminalMixin,
+)
+from backend.execution.server.debugger import DAPDebugManager
 from backend.execution.server.routes import (
     register_exception_handlers,
     register_routes,

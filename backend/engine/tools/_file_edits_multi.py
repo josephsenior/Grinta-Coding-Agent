@@ -11,7 +11,7 @@ import tempfile
 from collections.abc import Mapping
 from contextlib import ExitStack
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, NoReturn, cast
 
 from backend.core.errors import FunctionCallValidationError, ToolExecutionError
 from backend.engine.function_calling.helpers import (
@@ -530,7 +530,7 @@ def _format_multi_edit_success(parsed: list, result: Any) -> MessageAction:
     )
 
 
-def _format_multi_edit_failure(result: Any) -> None:
+def _format_multi_edit_failure(result: Any) -> NoReturn:
     errors = list(result.errors or [result.message])
     primary = str(errors[0] if errors else 'transaction failed')
     _multi_edit_raise(

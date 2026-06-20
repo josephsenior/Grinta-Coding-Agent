@@ -835,7 +835,7 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
         overwrite_existing=getattr(action, 'overwrite_existing', False),
     )
     if tool_result.get('ok') is False:
-        obs: ErrorObservation | FileEditObservation = ErrorObservation(result_str)
+        obs = ErrorObservation(result_str)
         obs.tool_result = tool_result
         obs.error_id = (tool_result or {}).get('error_code', '') or ''
         return obs
@@ -866,7 +866,7 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
         if isinstance(tool_result, dict)
         else command or None
     )
-    obs = FileEditObservation(
+    edit_obs = FileEditObservation(
         content=result_str,
         path=action.path,
         outcome=resolve_file_edit_outcome(operation, old_content),
@@ -875,8 +875,8 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
         impl_source=FileEditSource.FILE_EDITOR,
         new_content_hash=new_content_hash,
     )
-    obs.tool_result = tool_result
-    return obs
+    edit_obs.tool_result = tool_result
+    return edit_obs
 
 
 def _read_existing_text(path: Path) -> str | None:

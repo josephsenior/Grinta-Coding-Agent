@@ -249,7 +249,9 @@ class ScreenStateMixin:
         from backend.inference.capabilities.param_profiles import (
             resolve_model_entry_for_capabilities,
         )
-        from backend.inference.catalog.provider_catalog import build_model_entries_by_provider
+        from backend.inference.catalog.provider_catalog import (
+            build_model_entries_by_provider,
+        )
 
         provider = self._current_llm_provider()
         model = (

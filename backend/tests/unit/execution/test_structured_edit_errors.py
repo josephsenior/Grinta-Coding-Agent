@@ -7,7 +7,6 @@ from types import SimpleNamespace
 import pytest
 
 from backend.core.errors import FunctionCallValidationError, ToolExecutionError
-from backend.execution.aes import helpers as h
 from backend.core.errors.structured_edit_errors import (
     compact_symbol_candidates,
     compact_syntax_detail,
@@ -18,6 +17,7 @@ from backend.core.errors.structured_edit_errors import (
     summarize_editor_error,
     symbol_ambiguity_summary,
 )
+from backend.execution.aes import helpers as h
 from backend.ledger.observation import ErrorObservation
 
 

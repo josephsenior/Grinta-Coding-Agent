@@ -12,6 +12,7 @@ from backend.context.canonical_state import (
 )
 from backend.context.compactor.compact_boundary import project_after_compact_boundary
 from backend.context.context_budget import ContextBudget
+from backend.context.context_pipeline.core_state import ContextPipelineStateMixin
 from backend.context.context_pipeline.helpers import (
     _pruned_ids,
     _shrink_tail_for_token_reduction,
@@ -37,7 +38,7 @@ if TYPE_CHECKING:
     from backend.orchestration.state.state import State
 
 
-class ContextPipelineGatesMixin:
+class ContextPipelineGatesMixin(ContextPipelineStateMixin):
     """ContextPipeline methods (mixin)."""
 
     def _action_meets_effectiveness(

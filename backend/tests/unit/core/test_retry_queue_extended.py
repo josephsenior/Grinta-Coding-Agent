@@ -486,12 +486,12 @@ class TestGetRetryQueue(unittest.TestCase):
 
     def setUp(self):
         # Reset singleton before each test
-        import backend.core.retry_queue as rq_module
+        import backend.orchestration.services.retry_queue as rq_module
 
         rq_module._retry_queue = None
 
     def tearDown(self):
-        import backend.core.retry_queue as rq_module
+        import backend.orchestration.services.retry_queue as rq_module
 
         rq_module._retry_queue = None
 
@@ -549,9 +549,9 @@ class TestGetRetryQueue(unittest.TestCase):
             self.assertEqual(q.poll_interval, 10.0)
 
     def test_disabled_values(self):
-        for val in ('false', '0', 'no', 'anything'):
-            import backend.core.retry_queue as rq_module
+        import backend.orchestration.services.retry_queue as rq_module
 
+        for val in ('false', '0', 'no', 'anything'):
             rq_module._retry_queue = None
             with patch.dict('os.environ', {'RETRY_QUEUE_ENABLED': val}, clear=False):
                 result = get_retry_queue()

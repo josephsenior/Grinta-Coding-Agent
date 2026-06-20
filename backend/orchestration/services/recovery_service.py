@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 
 from backend.core.errors import (
     AgentRuntimeDisconnectedError,
-    AgentRuntimeError,
     LLMContextWindowExceedError,
     LLMNoActionError,
     LLMNoResponseError,

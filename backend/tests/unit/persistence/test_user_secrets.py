@@ -7,7 +7,11 @@ from types import MappingProxyType
 import pytest
 from pydantic import SecretStr
 
-from backend.core.providers.provider_models import CustomSecret, ProviderToken, ProviderType
+from backend.core.providers.provider_models import (
+    CustomSecret,
+    ProviderToken,
+    ProviderType,
+)
 from backend.core.pydantic_compat import model_dump_with_options
 from backend.persistence.data_models.user_secrets import UserSecrets
 

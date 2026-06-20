@@ -15,7 +15,6 @@ from backend.cli.tui.helpers import (
 )
 from backend.cli.tui.renderer.helpers.terminal import (
     sanitize_terminal_observation_content,
-    terminal_secondary_kind,
 )
 from backend.ledger.action import (
     TerminalInputAction,
@@ -84,8 +83,6 @@ def _handle_terminal_observation(
 ) -> None:
     content = event.content or ''
     session_id = getattr(event, 'session_id', '') or ''
-    exit_code = getattr(event, 'exit_code', None)
-    state = getattr(event, 'state', None)
     content = sanitize_terminal_observation_content(content)
 
     orch._accumulate_terminal_scrollback(session_id, content)

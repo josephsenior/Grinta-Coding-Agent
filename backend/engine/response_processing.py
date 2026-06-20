@@ -16,7 +16,10 @@ from backend.core.errors import (
 )
 from backend.core.logging.logger import app_logger as logger
 from backend.core.tools.tool_arguments_json import parse_tool_arguments_object
-from backend.inference.tool_support.tool_types import make_function_chunk, make_tool_param
+from backend.inference.tool_support.tool_types import (
+    make_function_chunk,
+    make_tool_param,
+)
 from backend.ledger.action import Action
 
 _LOGGER = logging.getLogger(__name__)

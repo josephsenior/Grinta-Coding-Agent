@@ -16,9 +16,9 @@ from backend.core.logging.logger import app_logger as logger
 from backend.ledger.observation.task_tracking import TaskTrackingObservation
 
 if TYPE_CHECKING:
-    from backend.orchestration.state.state import State
     from backend.engine.orchestrator import Orchestrator
     from backend.ledger.action import Action
+    from backend.orchestration.state.state import State
 
 
 def _consume_pending_action(orch: Orchestrator) -> Action | None:

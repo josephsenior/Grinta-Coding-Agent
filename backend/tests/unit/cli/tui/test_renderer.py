@@ -7,21 +7,15 @@ for _name in dir(_shared):
     if _name.startswith('_') and not _name.startswith('__'):
         globals()[_name] = getattr(_shared, _name)
 
+from backend.cli.tui.widgets.activity_card import OrientLine
+from backend.cli.tui.widgets.scan_line import (
+    EditCard,
+)
 from backend.tests.unit.cli.tui._shared import (
     _await_at_bottom,
     _file_change_cards,
     _fill_scrollable_transcript,
     _get_screen,
-)
-
-from backend.cli.tui.widgets.activity_card import OrientLine
-from backend.cli.tui.widgets.scan_line import (
-    AgentMessageCard,
-    BrowserCard,
-    DebuggerCard,
-    EditCard,
-    ShellCard,
-    TerminalCard,
 )
 
 
@@ -2249,7 +2243,7 @@ async def test_tui_file_edit_observation_uses_new_content_not_polluted_preview(
         # 1-line summary must not contain polluted content
         assert 'Stale preview' not in line
         assert 'File created successfully' not in line
-    
+
 
 @pytest.mark.asyncio
 async def test_tui_file_edit_create_uses_new_content_not_observation_body(mock_config):
@@ -2485,7 +2479,7 @@ async def test_tui_file_edit_action_and_observation_render_single_delta_card(
         assert 'demo.txt' in line
         delta = cards[0]._delta_text()
         assert '+1' in delta and '-1' in delta
-    
+
 
 @pytest.mark.asyncio
 async def test_tui_replace_string_observation_renders_edited_not_created(
@@ -2980,8 +2974,6 @@ async def test_tui_debugger_events_render_terminal_style_card(mock_config, monke
         s = _get_screen(app)
         from backend.cli.tui.app import TUIRenderer
         return
-        from backend.cli.tui.widgets.session_panel import SessionPanel
-        from backend.cli.tui.widgets.terminal_pane import TerminalPane
         from backend.ledger.action.debugger import DebuggerAction
         from backend.ledger.observation.debugger import DebuggerObservation
 

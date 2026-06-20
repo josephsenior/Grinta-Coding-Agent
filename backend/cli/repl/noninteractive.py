@@ -32,10 +32,10 @@ async def run_noninteractive(
     """Run non-interactive REPL: bootstrap agent, read lines, dispatch, print."""
     import time
 
-    from backend.cli.event_renderer import CLIEventRenderer
     from backend.app.main import (
         run_controller,
     )
+    from backend.cli.event_renderer import CLIEventRenderer
     from backend.ledger.action import MessageAction
 
     hud = HUDBar()

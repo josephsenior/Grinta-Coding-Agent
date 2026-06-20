@@ -110,7 +110,11 @@ SUPPORTS_STOP_WORDS_FALSE_PATTERNS: list[str] = [
 ]
 
 
+# Vendor-documented JSON mode (json_object) and/or json_schema structured outputs.
+# See: OpenAI response_format, Anthropic output_config.format, Gemini response_schema,
+# Mistral/Groq/DeepSeek/xAI OpenAI-compatible response_format.
 RESPONSE_SCHEMA_PATTERNS: list[str] = [
+    # OpenAI
     'gpt-4o*',
     'gpt-4-turbo*',
     'gpt-4.1*',
@@ -118,14 +122,78 @@ RESPONSE_SCHEMA_PATTERNS: list[str] = [
     'o1-*',
     'o3-*',
     'o4-*',
-    'google/gemini-2.5-*',
-    'google/gemini-3*',
-    'gemini-3*',
+    # Anthropic Claude (native slugs + reseller prefixes)
     'claude-opus-4*',
     'claude-sonnet-4*',
     'claude-haiku-4*',
     'claude-4*',
+    'claude-fable*',
+    'anthropic-claude*',
+    # Google Gemini
+    'google/gemini-*',
+    'gemini-*',
+    # Mistral
+    'mistral-*',
+    'codestral*',
+    'devstral*',
+    'ministral*',
+    # xAI Grok
+    'grok-*',
+    'xai/grok-*',
+    # DeepSeek
+    'deepseek*',
+    'deepseek-ai/*',
+    # Qwen 3+
+    'qwen3*',
+    'qwen/qwen3*',
+    'alibaba/qwen3*',
+    # Kimi / Moonshot
+    'kimi*',
+    'moonshot/*',
+    'moonshotai/*',
+    # Zhipu GLM
+    'glm-*',
+    'zai-glm*',
+    'zai/*',
+    # Llama / Mixtral on OpenAI-compatible hosts (json_object minimum)
+    'llama-3*',
+    'llama-4*',
+    'llama3*',
+    'meta-llama/*',
+    'Meta-Llama-*',
+    'mixtral*',
+    # Hosted path prefixes
+    'accounts/fireworks/models/*',
+    'Qwen/*',
+    'cerebras/llama*',
 ]
+
+# Models with function calling but no vendor-documented response_format / schema mode.
+RESPONSE_SCHEMA_EXCLUDED_PATTERNS: list[str] = [
+    'minimax*',
+    'mimo*',
+    'nemotron*',
+    'north-mini*',
+]
+
+
+def should_support_response_schema(
+    model: str,
+    *,
+    provider: str = '',
+    aliases: list[str] | None = None,
+) -> bool:
+    """Return True when vendor docs support JSON/schema structured output for a model."""
+    candidates = [model]
+    if provider:
+        candidates.append(f'{provider}/{model}')
+    if aliases:
+        candidates.extend(str(alias) for alias in aliases)
+    if any(model_matches(candidate, RESPONSE_SCHEMA_EXCLUDED_PATTERNS) for candidate in candidates):
+        return False
+    return any(
+        model_matches(candidate, RESPONSE_SCHEMA_PATTERNS) for candidate in candidates
+    )
 
 
 def get_model_token_limits(model: str) -> tuple[int | None, int | None]:

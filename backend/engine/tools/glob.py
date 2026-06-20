@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from backend.core.tools.tool_names import GLOB_TOOL_NAME
 from backend.engine.tools._search_helpers import (
     DEFAULT_SEARCH_HEAD_LIMIT,
     build_ripgrep_file_discovery_args,
@@ -27,7 +28,6 @@ from backend.engine.tools._search_helpers import (
     run_ripgrep_command,
 )
 from backend.engine.tools.param_defs import create_tool_definition
-from backend.core.tools.tool_names import GLOB_TOOL_NAME
 from backend.ledger.action.search import GlobAction
 from backend.ledger.observation import Observation
 

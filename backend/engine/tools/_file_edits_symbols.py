@@ -13,6 +13,10 @@ from typing import Any, cast
 
 from backend.core.enums import FileEditSource, FileReadSource
 from backend.core.errors import FunctionCallValidationError
+from backend.core.tools.tool_names import (
+    FIND_SYMBOLS_TOOL_NAME,
+    READ_TOOL_NAME,
+)
 from backend.engine.function_calling.helpers import (
     parse_bool_argument,
     require_tool_argument,
@@ -27,10 +31,6 @@ from backend.engine.tools._file_ops import (
     _resolve_symbol_candidates,
     _safe_workspace_path,
     _sha256_text,
-)
-from backend.core.tools.tool_names import (
-    FIND_SYMBOLS_TOOL_NAME,
-    READ_TOOL_NAME,
 )
 from backend.ledger.action import (
     Action,

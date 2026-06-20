@@ -13,6 +13,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from backend.core.tools.tool_names import GREP_TOOL_NAME
 from backend.engine.tools._search_helpers import (
     DEFAULT_GREP_OUTPUT_MODE,
     DEFAULT_SEARCH_HEAD_LIMIT,
@@ -32,7 +33,6 @@ from backend.engine.tools._search_helpers import (
     run_ripgrep_command,
 )
 from backend.engine.tools.param_defs import create_tool_definition
-from backend.core.tools.tool_names import GREP_TOOL_NAME
 from backend.ledger.action.search import GrepAction
 from backend.ledger.observation import Observation
 from backend.ledger.observation.search import GrepObservation

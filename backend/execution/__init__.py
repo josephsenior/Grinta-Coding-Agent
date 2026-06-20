@@ -9,7 +9,6 @@ from __future__ import annotations
 import importlib
 from typing import TYPE_CHECKING, Any
 
-from backend.execution.server.base import Runtime
 from backend.execution.runtime.factory import get_runtime_cls
 from backend.execution.runtime.orchestrator import (
     RuntimeAcquireResult,
@@ -23,6 +22,7 @@ from backend.execution.runtime.pool import (
     WarmPoolPolicy,
     WarmRuntimePool,
 )
+from backend.execution.server.base import Runtime
 from backend.execution.watchdog import runtime_watchdog
 from backend.utils.import_utils import get_impl
 

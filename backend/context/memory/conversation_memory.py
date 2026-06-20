@@ -43,7 +43,6 @@ from backend.core.config.agent_config import AgentConfig
 from backend.core.logging.logger import app_logger as logger
 from backend.core.message import ImageContent, Message, TextContent
 from backend.core.schemas import ActionType
-from backend.inference.tool_support.tool_result_format import encode_tool_result_payload
 from backend.ledger.action import (
     Action,
     MessageAction,
@@ -973,7 +972,7 @@ class ContextMemory:
             tool_result = getattr(obs, 'tool_result', None)
             if isinstance(tool_result, dict):
                 import json
-                
+
                 payload = json.dumps(
                     {
                         'message': _json_safe_tool_message_content(message),

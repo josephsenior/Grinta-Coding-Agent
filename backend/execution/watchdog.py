@@ -12,8 +12,8 @@ from backend.execution.runtime.pool import call_async_disconnect
 from backend.execution.telemetry import RuntimeTelemetry, runtime_telemetry
 
 if TYPE_CHECKING:
-    from backend.execution.server.base import Runtime
     from backend.execution.runtime.pool import RuntimePool
+    from backend.execution.server.base import Runtime
     from backend.ledger.stream import EventStream
 
 

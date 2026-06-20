@@ -10,9 +10,9 @@ from backend.ledger.action.agent import AgentThinkAction, CondensationAction
 from backend.ledger.event import EventSource
 
 if TYPE_CHECKING:
-    from backend.orchestration.state.state import State
     from backend.engine.orchestrator import Orchestrator
     from backend.ledger.action import Action
+    from backend.orchestration.state.state import State
 
 
 def _emit_compaction_status(orch: Orchestrator) -> None:

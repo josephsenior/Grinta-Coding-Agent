@@ -57,6 +57,22 @@ class ScreenMessagesMixin:
         widget = UserMessage(text, image_count=image_count)
         display.append_widget(widget)
 
+    def _remove_last_user_message_widget(self) -> bool:
+        """Drop the most recent user bubble when a turn aborts before the agent runs."""
+        try:
+            display = self._get_display()
+        except Exception:
+            return False
+        if type(display).__name__ == 'MagicMock':
+            return False
+        from backend.cli.tui.widgets.activity_card.message_widgets import UserMessage
+
+        for child in reversed(list(display.children)):
+            if isinstance(child, UserMessage):
+                child.remove()
+                return True
+        return False
+
     def add_agent_message(self, text: str) -> None:
         """Agent response."""
         self.finalize_thinking()

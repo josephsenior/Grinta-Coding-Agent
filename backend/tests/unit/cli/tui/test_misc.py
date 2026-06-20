@@ -80,7 +80,9 @@ async def test_tui_renderer_receives_queued_agent_message_events(mock_config):
         s = _get_screen(app)
         from backend.cli.tui.app import TUIRenderer
         from backend.ledger import EventStream
-        from backend.persistence.file_store.in_memory_file_store import InMemoryFileStore
+        from backend.persistence.file_store.in_memory_file_store import (
+            InMemoryFileStore,
+        )
         from backend.utils.async_helpers.async_utils import set_main_event_loop
 
         set_main_event_loop(loop)
@@ -208,6 +210,37 @@ async def test_tui_dispatch_enqueues_user_message_before_starting_agent(mock_con
         assert ensure_seen_counts == [1]
         assert event_stream.events[0][1] == EventSource.USER
         assert event_stream.events[0][0].content == 'hello'
+
+
+@pytest.mark.asyncio
+async def test_handle_input_skips_user_transcript_when_bootstrap_fails(
+    mock_config, monkeypatch
+):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    user_messages: list[str] = []
+
+    async def failing_bootstrap(self, session_id=None):
+        raise RuntimeError('bootstrap failed')
+
+    monkeypatch.setattr(GrintaScreen, '_bootstrap', failing_bootstrap)
+    monkeypatch.setattr(
+        GrintaScreen,
+        'add_user_message',
+        lambda self, text, image_count=0: user_messages.append(text),
+    )
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        s._bootstrapping = None
+        s._controller = None
+
+        await s._handle_input('do not show this in transcript')
+
+        assert user_messages == []
 
 
 @pytest.mark.asyncio

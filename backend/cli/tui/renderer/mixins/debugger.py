@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from backend.cli.tui.helpers import _join_secondary_parts
 from backend.cli.tui.widgets.session_panel import SessionPanel
 
 _ACTION_VERBS: dict[str, str] = {

@@ -27,7 +27,8 @@
           "high",
           "max"
         ],
-        "reasoning_wire": "anthropic_extended"
+        "reasoning_wire": "anthropic_extended",
+        "supports_response_schema": true
       },
       "metadata": {}
     },
@@ -60,7 +61,8 @@
           "xhigh",
           "max"
         ],
-        "reasoning_wire": "anthropic_extended"
+        "reasoning_wire": "anthropic_extended",
+        "supports_response_schema": true
       },
       "metadata": {}
     },
@@ -92,7 +94,8 @@
           "xhigh",
           "max"
         ],
-        "reasoning_wire": "anthropic_extended"
+        "reasoning_wire": "anthropic_extended",
+        "supports_response_schema": true
       },
       "metadata": {}
     },
@@ -124,7 +127,8 @@
           "xhigh",
           "max"
         ],
-        "reasoning_wire": "anthropic_extended"
+        "reasoning_wire": "anthropic_extended",
+        "supports_response_schema": true
       },
       "metadata": {}
     },
@@ -158,7 +162,8 @@
           "max"
         ],
         "reasoning_wire": "anthropic_extended",
-        "supports_reasoning_effort": true
+        "supports_reasoning_effort": true,
+        "supports_response_schema": true
       },
       "metadata": {}
     },
@@ -193,7 +198,8 @@
           "xhigh",
           "max"
         ],
-        "reasoning_wire": "anthropic_extended"
+        "reasoning_wire": "anthropic_extended",
+        "supports_response_schema": true
       },
       "metadata": {}
     },
@@ -225,7 +231,8 @@
           "xhigh",
           "max"
         ],
-        "reasoning_wire": "anthropic_extended"
+        "reasoning_wire": "anthropic_extended",
+        "supports_response_schema": true
       },
       "metadata": {}
     }

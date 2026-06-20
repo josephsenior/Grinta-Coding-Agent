@@ -363,7 +363,10 @@ def _task_description(task: dict[str, Any]) -> str:
 
 def _normalize_task_status(value: object) -> str:
     try:
-        from backend.core.tasks.task_status import TASK_STATUS_TODO, normalize_task_status
+        from backend.core.tasks.task_status import (
+            TASK_STATUS_TODO,
+            normalize_task_status,
+        )
 
         return normalize_task_status(value, default=TASK_STATUS_TODO)
     except Exception:

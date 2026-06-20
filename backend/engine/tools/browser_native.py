@@ -5,9 +5,12 @@ from __future__ import annotations
 from typing import Any
 
 from backend.core.enums import ActionSecurityRisk
-from backend.engine.contracts import ChatCompletionToolParam
-from backend.engine.tools.param_defs import create_tool_definition, get_security_risk_param
 from backend.core.tools.tool_names import BROWSER_TOOL_NAME
+from backend.engine.contracts import ChatCompletionToolParam
+from backend.engine.tools.param_defs import (
+    create_tool_definition,
+    get_security_risk_param,
+)
 from backend.ledger.action.browser_tool import BrowserToolAction
 
 _BROWSER_COMMANDS = (
