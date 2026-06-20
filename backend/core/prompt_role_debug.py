@@ -2,32 +2,25 @@
 
 from __future__ import annotations
 
-import os
 import time
 from collections import Counter
 from typing import Any
 
+from backend.core.constants import (
+    APP_DEBUG_PROMPT_ROLES,
+    APP_DEBUG_REASONING_ASTEP,
+)
 from backend.core.logging.logger import app_logger as logger
 
 _CURRENT_ASTEP_ID = 0
 
 
 def env_prompt_roles_debug() -> bool:
-    return os.environ.get('APP_DEBUG_PROMPT_ROLES', '').strip().lower() in (
-        '1',
-        'true',
-        'yes',
-        'on',
-    )
+    return APP_DEBUG_PROMPT_ROLES
 
 
 def env_reasoning_astep_debug() -> bool:
-    return os.environ.get('APP_DEBUG_REASONING_ASTEP', '').strip().lower() in (
-        '1',
-        'true',
-        'yes',
-        'on',
-    )
+    return APP_DEBUG_REASONING_ASTEP
 
 
 def any_prompt_or_reasoning_debug() -> bool:
