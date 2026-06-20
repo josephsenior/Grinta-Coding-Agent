@@ -352,7 +352,7 @@ def select_prompt_events(
     selected_chunks, _, _ = _select_causal_chunks(ctx, protected)
     result = _build_windowed_result(ctx, protected, selected_chunks, llm_config)
     if emergency_only and result.selected_events < DEFAULT_EMERGENCY_PROMPT_MIN_EVENTS:
-        from backend.core.logger import app_logger as logger
+        from backend.core.logging.logger import app_logger as logger
 
         logger.warning(
             'Emergency prompt window selected only %d/%d events (min=%d); '

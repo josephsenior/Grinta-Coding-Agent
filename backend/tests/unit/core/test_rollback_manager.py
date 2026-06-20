@@ -1,4 +1,4 @@
-"""Unit tests for backend.core.rollback.rollback_manager — checkpoint/rollback system."""
+"""Unit tests for backend.execution.rollback.rollback_manager — checkpoint/rollback system."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import time
 
 import pytest
 
-from backend.core.rollback.rollback_manager import Checkpoint, RollbackManager
+from backend.execution.rollback.rollback_manager import Checkpoint, RollbackManager
 
 # ---------------------------------------------------------------------------
 # Checkpoint dataclass
@@ -401,7 +401,7 @@ class TestRollbackManager:
         """Test exception handling when saving manifest."""
         rm = RollbackManager(str(workspace))
         monkeypatch.setattr(
-            'backend.core.rollback.rollback_manager.json.dump',
+            'backend.execution.rollback.rollback_manager.json.dump',
             lambda *_args, **_kwargs: (_ for _ in ()).throw(
                 PermissionError('simulated write failure')
             ),
@@ -605,7 +605,7 @@ class TestRollbackManager:
         rm = RollbackManager(str(workspace))
 
         # Manually create a fake checkpoint without creating snapshot
-        from backend.core.rollback.rollback_manager import Checkpoint
+        from backend.execution.rollback.rollback_manager import Checkpoint
 
         fake_cp = Checkpoint(
             id='fake_cp',

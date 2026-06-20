@@ -34,11 +34,11 @@ def is_recoverable_tool_call_error(exc: Exception) -> bool:
     from backend.core.errors import (
         FunctionCallValidationError as CoreFunctionCallValidationError,
     )
-    from backend.core.tool_arguments_json import TruncatedToolArgumentsError
-    from backend.engine.common import (
+    from backend.core.tools.tool_arguments_json import TruncatedToolArgumentsError
+    from backend.engine.response_processing import (
         FunctionCallNotExistsError as CommonFunctionCallNotExistsError,
     )
-    from backend.engine.common import (
+    from backend.engine.response_processing import (
         FunctionCallValidationError as CommonFunctionCallValidationError,
     )
 
@@ -59,7 +59,7 @@ def is_recoverable_tool_call_error(exc: Exception) -> bool:
 
 def build_recoverable_tool_call_error_action(exc: Exception) -> Action:
     """Create a recovery action that feeds precise correction guidance back to the LLM."""
-    from backend.core.tool_arguments_json import TruncatedToolArgumentsError
+    from backend.core.tools.tool_arguments_json import TruncatedToolArgumentsError
     from backend.ledger.action import AgentThinkAction
 
     if isinstance(exc, TruncatedToolArgumentsError):

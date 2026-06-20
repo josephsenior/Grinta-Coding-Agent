@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from backend.execution.action_execution_server import RuntimeExecutor
+from backend.execution.server.action_execution_server import RuntimeExecutor
 from backend.inference.provider_resolver import extract_provider_prefix
 from backend.ledger.action.code_nav import LspQueryAction
 from backend.ledger.action.files import FileReadAction
@@ -345,7 +345,7 @@ class TestModelDiscoveryEdgeCases:
 
     @pytest.mark.integration
     def test_get_supported_llm_models_returns_list(self) -> None:
-        from backend.inference.model_catalog import get_supported_llm_models
+        from backend.inference.catalog.model_catalog import get_supported_llm_models
 
         models = get_supported_llm_models(None)
         assert isinstance(models, list)
@@ -353,7 +353,7 @@ class TestModelDiscoveryEdgeCases:
 
     @pytest.mark.integration
     def test_get_supported_llm_models_includes_openai(self) -> None:
-        from backend.inference.model_catalog import get_supported_llm_models
+        from backend.inference.catalog.model_catalog import get_supported_llm_models
 
         models = get_supported_llm_models(None)
         openai_models = [m for m in models if m.startswith('openai/')]
@@ -361,7 +361,7 @@ class TestModelDiscoveryEdgeCases:
 
     @pytest.mark.integration
     def test_get_supported_llm_models_includes_anthropic(self) -> None:
-        from backend.inference.model_catalog import get_supported_llm_models
+        from backend.inference.catalog.model_catalog import get_supported_llm_models
 
         models = get_supported_llm_models(None)
         anthropic_models = [m for m in models if m.startswith('anthropic/')]
@@ -369,7 +369,7 @@ class TestModelDiscoveryEdgeCases:
 
     @pytest.mark.integration
     def test_get_supported_llm_models_includes_google(self) -> None:
-        from backend.inference.model_catalog import get_supported_llm_models
+        from backend.inference.catalog.model_catalog import get_supported_llm_models
 
         models = get_supported_llm_models(None)
         google_models = [m for m in models if m.startswith('google/')]
@@ -377,7 +377,7 @@ class TestModelDiscoveryEdgeCases:
 
     @pytest.mark.integration
     def test_get_supported_llm_models_includes_xai(self) -> None:
-        from backend.inference.model_catalog import get_supported_llm_models
+        from backend.inference.catalog.model_catalog import get_supported_llm_models
 
         models = get_supported_llm_models(None)
         xai_models = [m for m in models if m.startswith('xai/')]

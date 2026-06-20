@@ -18,8 +18,8 @@ from backend.core.config.compactor_config import (
     SmartCompactorConfig,
     StructuredSummaryCompactorConfig,
 )
-from backend.core.logger import app_logger as logger
-from backend.inference.catalog_loader import supports_function_calling
+from backend.core.logging.logger import app_logger as logger
+from backend.inference.catalog.catalog_loader import supports_function_calling
 
 
 class AutoCompactor(Compactor):

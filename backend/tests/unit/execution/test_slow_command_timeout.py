@@ -10,7 +10,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock
 
-from backend.execution.command_timeout import (
+from backend.execution.runtime_mixins.command_timeout import (
     _SAFETY_NET_TIMEOUT,
     CommandTimeoutMixin,
 )
@@ -94,7 +94,7 @@ class TestUniversalTimeout(unittest.TestCase):
 
     def test_no_pattern_lists_exported(self):
         """Pattern lists should no longer exist in the module."""
-        import backend.execution.command_timeout as mod
+        import backend.execution.runtime_mixins.command_timeout as mod
 
         self.assertFalse(hasattr(mod, '_LONG_RUNNING_PATTERNS'))
         self.assertFalse(hasattr(mod, '_SLOW_COMMAND_PATTERNS'))

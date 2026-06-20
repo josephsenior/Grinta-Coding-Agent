@@ -3,13 +3,10 @@
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING
 
-from backend.persistence.in_memory_file_store import InMemoryFileStore
-from backend.persistence.local_file_store import LocalFileStore
-
-if TYPE_CHECKING:
-    from backend.persistence.files import FileStore
+from backend.persistence.file_store.files import FileStore
+from backend.persistence.file_store.in_memory_file_store import InMemoryFileStore
+from backend.persistence.file_store.local_file_store import LocalFileStore
 
 
 def get_file_store(

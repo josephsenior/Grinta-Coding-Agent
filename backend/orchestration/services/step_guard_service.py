@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from backend.core.agent_protocol import prepare_next_agent_step
+from backend.orchestration.agent.agent_protocol import prepare_next_agent_step
 from backend.core.constants import DEFAULT_STUCK_COOLDOWN_TURNS
 from backend.core.interaction_modes import normalize_interaction_mode
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
 from backend.ledger.observation import ErrorObservation

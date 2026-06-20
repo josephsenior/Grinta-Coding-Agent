@@ -100,7 +100,7 @@ def _extract_embedded_diff_from_content(content: str) -> str | None:
 
 
 def _try_compute_diff_from_old_new(event: Any) -> str | None:
-    from backend.execution.utils.diff import get_diff
+    from backend.execution.utils.files.diff import get_diff
 
     old_content = getattr(event, 'old_content', None)
     new_content = getattr(event, 'new_content', None)

@@ -77,7 +77,7 @@ def _provider_parallel_tool_calls_supported(model_id: str) -> bool:
     if not model_id:
         return False
     try:
-        from backend.inference.catalog_loader import lookup as _catalog_lookup
+        from backend.inference.catalog.catalog_loader import lookup as _catalog_lookup
 
         entry = _catalog_lookup(model_id)
         if entry is not None:

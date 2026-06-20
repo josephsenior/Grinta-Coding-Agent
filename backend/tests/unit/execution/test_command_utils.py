@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from typing import cast
 from unittest.mock import MagicMock
 
-from backend.execution.plugins.requirement import PluginRequirement
+from backend.core.contracts.plugins import PluginRequirement
 from backend.execution.utils.shell.command import (
     _build_plugin_args,
     _validate_and_get_username,

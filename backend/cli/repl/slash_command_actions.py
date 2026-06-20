@@ -32,7 +32,7 @@ def cmd_exit(host: Any, parsed: Any) -> bool:
             host._renderer.add_system_message(summary, title='session')
         host._renderer.add_system_message('Goodbye.', title='grinta')
     try:
-        from backend.core.logger import finalize_session_logging_audit
+        from backend.core.logging.logger import finalize_session_logging_audit
 
         finalize_session_logging_audit()
     except Exception:

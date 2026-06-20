@@ -136,7 +136,7 @@ def _setup_resume_runtime(
     agent: Any,
     resolved_id: str,
 ) -> tuple[Any, Any, Any, Any] | None:
-    from backend.core.bootstrap.main import _setup_runtime_for_controller
+    from backend.app.main import _setup_runtime_for_controller
 
     try:
         runtime_state = _setup_runtime_for_controller(
@@ -187,7 +187,7 @@ async def _wire_resume_runtime_state(
     event_stream: Any,
 ) -> bool:
     """Wire up runtime state for resume. Returns True on success, False on failure."""
-    from backend.core.bootstrap.main import _setup_memory_and_mcp
+    from backend.app.main import _setup_memory_and_mcp
 
     if host._acquire_result is not None:
         from backend.execution import runtime_orchestrator

@@ -17,7 +17,7 @@ OpenAI-compatible proxy:
 
 from unittest.mock import MagicMock, patch
 
-from backend.inference.direct_clients import (
+from backend.inference.clients import (
     GeminiClient,
     OpenAIClient,
     TransportProfile,
@@ -37,14 +37,14 @@ GEMINI_MODEL = 'google/gemini-3-flash-preview'
 def _mock_patches():
     """Return the four patches needed to instantiate OpenAIClient without I/O."""
     return [
-        patch('backend.inference.direct_clients.AsyncOpenAI'),
-        patch('backend.inference.direct_clients.OpenAI'),
+        patch('backend.inference.clients.AsyncOpenAI'),
+        patch('backend.inference.clients.OpenAI'),
         patch(
-            'backend.inference.direct_clients.get_shared_async_http_client',
+            'backend.inference.clients.get_shared_async_http_client',
             return_value=MagicMock(),
         ),
         patch(
-            'backend.inference.direct_clients.get_shared_http_client',
+            'backend.inference.clients.get_shared_http_client',
             return_value=MagicMock(),
         ),
     ]
@@ -110,14 +110,14 @@ class TestTransportProfileResolution:
 
 
 class TestClientRouting:
-    @patch('backend.inference.direct_clients.AsyncOpenAI')
-    @patch('backend.inference.direct_clients.OpenAI')
+    @patch('backend.inference.clients.AsyncOpenAI')
+    @patch('backend.inference.clients.OpenAI')
     @patch(
-        'backend.inference.direct_clients.get_shared_async_http_client',
+        'backend.inference.clients.get_shared_async_http_client',
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client',
+        'backend.inference.clients.get_shared_http_client',
         return_value=MagicMock(),
     )
     def test_gemini_lightning_returns_openai_client(self, _h, _ah, _oai, _aoai):
@@ -125,14 +125,14 @@ class TestClientRouting:
         client = get_direct_client(GEMINI_MODEL, api_key='key', base_url=LIGHTNING_URL)
         assert isinstance(client, OpenAIClient)
 
-    @patch('backend.inference.direct_clients.AsyncOpenAI')
-    @patch('backend.inference.direct_clients.OpenAI')
+    @patch('backend.inference.clients.AsyncOpenAI')
+    @patch('backend.inference.clients.OpenAI')
     @patch(
-        'backend.inference.direct_clients.get_shared_async_http_client',
+        'backend.inference.clients.get_shared_async_http_client',
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client',
+        'backend.inference.clients.get_shared_http_client',
         return_value=MagicMock(),
     )
     def test_gemini_lightning_preserves_full_model_name(self, _h, _ah, _oai, _aoai):
@@ -150,14 +150,14 @@ class TestClientRouting:
         )
         assert isinstance(client, GeminiClient)
 
-    @patch('backend.inference.direct_clients.AsyncOpenAI')
-    @patch('backend.inference.direct_clients.OpenAI')
+    @patch('backend.inference.clients.AsyncOpenAI')
+    @patch('backend.inference.clients.OpenAI')
     @patch(
-        'backend.inference.direct_clients.get_shared_async_http_client',
+        'backend.inference.clients.get_shared_async_http_client',
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client',
+        'backend.inference.clients.get_shared_http_client',
         return_value=MagicMock(),
     )
     def test_gemini_lightning_with_transport_prefix_gets_cross_family_profile(
@@ -173,14 +173,14 @@ class TestClientRouting:
         assert client._profile.supports_request_metadata is False
         assert client._profile.supports_tool_replay is False
 
-    @patch('backend.inference.direct_clients.AsyncOpenAI')
-    @patch('backend.inference.direct_clients.OpenAI')
+    @patch('backend.inference.clients.AsyncOpenAI')
+    @patch('backend.inference.clients.OpenAI')
     @patch(
-        'backend.inference.direct_clients.get_shared_async_http_client',
+        'backend.inference.clients.get_shared_async_http_client',
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client',
+        'backend.inference.clients.get_shared_http_client',
         return_value=MagicMock(),
     )
     def test_gemini_lightning_transport_prefix_model_name_is_stripped(
@@ -515,14 +515,14 @@ class TestHistoryNormalization:
 
 
 class TestOpenAIOnLightningPreservesToolReplay:
-    @patch('backend.inference.direct_clients.AsyncOpenAI')
-    @patch('backend.inference.direct_clients.OpenAI')
+    @patch('backend.inference.clients.AsyncOpenAI')
+    @patch('backend.inference.clients.OpenAI')
     @patch(
-        'backend.inference.direct_clients.get_shared_async_http_client',
+        'backend.inference.clients.get_shared_async_http_client',
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client',
+        'backend.inference.clients.get_shared_http_client',
         return_value=MagicMock(),
     )
     def test_openai_model_on_lightning_keeps_tool_history(self, _h, _ah, _oai, _aoai):

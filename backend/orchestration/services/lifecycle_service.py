@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from backend.orchestration.agent import Agent
     from backend.orchestration.session_orchestrator import SessionOrchestrator
     from backend.orchestration.telemetry.conversation_stats import ConversationStats
-    from backend.persistence.files import FileStore
+    from backend.persistence.file_store.files import FileStore
 
 
 class LifecycleService:

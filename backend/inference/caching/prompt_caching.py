@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.inference.catalog_loader import (
+from backend.inference.catalog.catalog_loader import (
     ModelEntry,
     lookup,
     lookup_provider_model,

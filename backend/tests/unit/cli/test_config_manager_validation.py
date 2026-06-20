@@ -11,7 +11,7 @@ async def test_test_llm_call_routes_through_direct_client() -> None:
     client = AsyncMock()
 
     with patch(
-        'backend.inference.direct_clients.get_direct_client', return_value=client
+        'backend.inference.clients.get_direct_client', return_value=client
     ) as get_direct_client:
         result = await _test_llm_call('anthropic/claude-sonnet-4.6', 'key', None)
 
@@ -42,7 +42,7 @@ async def test_test_llm_call_maps_direct_client_errors(
     client.acompletion.side_effect = exc
 
     with patch(
-        'backend.inference.direct_clients.get_direct_client', return_value=client
+        'backend.inference.clients.get_direct_client', return_value=client
     ):
         result = await _test_llm_call('google/gemini-3-flash-preview', 'key', None)
 

@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from backend.execution.env_manager import EnvManagerMixin
+from backend.execution.runtime_mixins.env_manager import EnvManagerMixin
 
 # ── Helpers ──────────────────────────────────────────────────────────
 

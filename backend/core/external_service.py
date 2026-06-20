@@ -8,7 +8,7 @@ from urllib.parse import ParseResult, urlparse
 
 import aiohttp
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 
 
 class ExternalServiceBase:

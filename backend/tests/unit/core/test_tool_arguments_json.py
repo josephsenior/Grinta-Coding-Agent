@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-import backend.core.tool_arguments_json as tool_arguments_json
-from backend.core.tool_arguments_json import (
+import backend.core.tools.tool_arguments_json as tool_arguments_json
+from backend.core.tools.tool_arguments_json import (
     TruncatedToolArgumentsError,
     parse_tool_arguments_object,
 )

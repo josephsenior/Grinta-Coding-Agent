@@ -10,7 +10,7 @@ from backend.core.constants import (
     CMD_PENDING_ACTION_TIMEOUT_FLOOR,
     TOOL_BRIDGE_TIMEOUT_BUFFER,
 )
-from backend.core.timeout_policy import (
+from backend.core.timeouts.timeout_policy import (
     cmd_run_sync_bridge_timeout_seconds,
     cmd_run_timeout_candidates,
     effective_cmd_run_pending_timeout_seconds,

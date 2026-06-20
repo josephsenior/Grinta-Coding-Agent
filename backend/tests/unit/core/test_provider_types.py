@@ -3,7 +3,7 @@
 import pytest
 from pydantic import SecretStr
 
-from backend.core.provider_types import (
+from backend.core.providers.provider_models import (
     AuthenticationError,
     CreatePlaybook,
     CustomSecret,

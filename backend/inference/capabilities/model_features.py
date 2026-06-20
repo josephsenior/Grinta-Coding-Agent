@@ -130,7 +130,7 @@ RESPONSE_SCHEMA_PATTERNS: list[str] = [
 
 def get_model_token_limits(model: str) -> tuple[int | None, int | None]:
     """Get max input and output token limits for a model."""
-    from backend.inference.catalog_loader import get_token_limits
+    from backend.inference.catalog.catalog_loader import get_token_limits
 
     return get_token_limits(model)
 
@@ -142,7 +142,7 @@ def get_features(model: str) -> ModelFeatures:
     conservative defaults suitable for local/manual ids.
     """
     from backend.inference.capabilities.context_limits import derive_usable_input_tokens
-    from backend.inference.catalog_loader import lookup
+    from backend.inference.catalog.catalog_loader import lookup
 
     if entry := lookup(model):
         usable_input = derive_usable_input_tokens(

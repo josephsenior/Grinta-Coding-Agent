@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
 from backend.ledger.observation import AgentStateChangedObservation
@@ -171,7 +171,7 @@ class StateTransitionService:
         ):
             return
         try:
-            from backend.core.logger import finalize_session_logging_audit
+            from backend.core.logging.logger import finalize_session_logging_audit
 
             finalize_session_logging_audit()
         except Exception:

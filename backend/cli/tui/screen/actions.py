@@ -6,7 +6,7 @@ from typing import Any
 
 from backend.cli.tui.dialogs import ConfirmWidget
 from backend.cli.tui.widgets.small import Transcript
-from backend.orchestration.agent.autonomy import normalize_autonomy_level
+from backend.core.autonomy import normalize_autonomy_level
 
 
 class ScreenActionsMixin:

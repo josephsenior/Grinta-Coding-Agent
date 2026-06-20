@@ -14,7 +14,7 @@ from urllib.parse import quote
 
 if TYPE_CHECKING:
     from backend.context.memory.agent_memory import Memory
-    from backend.execution.base import Runtime
+    from backend.execution.server.base import Runtime
     from backend.ledger.action.mcp import MCPAction
     from backend.ledger.observation.observation import Observation
     from backend.orchestration.agent import Agent
@@ -25,7 +25,7 @@ from backend.core.config.mcp_config import (
     MCPConfig,
     MCPServerConfig,
 )
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.core.pydantic_compat import model_dump_with_options
 from backend.execution import LocalRuntimeInProcess
 from backend.integrations.mcp.cache import get_cached, set_cache

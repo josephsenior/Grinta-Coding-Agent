@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import SecretStr
 
-from backend.core import logger
+from backend.core.logging import logger
 from backend.core.app_paths import get_canonical_settings_path
 from backend.core.config.app_config import AppConfig
 from backend.core.config.llm_config import LLMConfig

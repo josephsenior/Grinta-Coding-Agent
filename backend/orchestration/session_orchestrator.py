@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from backend.core.config import AgentConfig, LLMConfig
     from backend.orchestration.replay import ReplayManager
     from backend.orchestration.state.state_tracker import StateTracker
-    from backend.persistence.files import FileStore
+    from backend.persistence.file_store.files import FileStore
     from backend.security.analyzer import SecurityAnalyzer
 
 from backend.core.constants import (
@@ -24,7 +24,7 @@ from backend.core.constants import (
     DEFAULT_PENDING_ACTION_TIMEOUT,
 )
 from backend.core.enums import LifecyclePhase
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.core.schemas import AgentState
 from backend.core.step_phase import clear_step_phase, set_step_phase
 from backend.ledger import EventSource, EventStreamSubscriber
@@ -42,22 +42,22 @@ from backend.orchestration.rate_governor import LLMRateGovernor
 from backend.orchestration.session_orchestrator_accessors import (
     SessionOrchestratorAccessorsMixin,
 )
-from backend.orchestration.session_orchestrator_mixins._session_orchestrator_action_mixin import (
+from backend.orchestration.mixins.action import (
     _SessionOrchestratorActionMixin,
 )
-from backend.orchestration.session_orchestrator_mixins._session_orchestrator_lifecycle_mixin import (
+from backend.orchestration.mixins.lifecycle import (
     _SessionOrchestratorLifecycleMixin,
 )
-from backend.orchestration.session_orchestrator_mixins._session_orchestrator_parallel_mixin import (
+from backend.orchestration.mixins.parallel import (
     _SessionOrchestratorParallelMixin,
 )
-from backend.orchestration.session_orchestrator_mixins._session_orchestrator_state_mixin import (
+from backend.orchestration.mixins.state import (
     _SessionOrchestratorStateMixin,
 )
-from backend.orchestration.session_orchestrator_mixins._session_orchestrator_step_mixin import (
+from backend.orchestration.mixins.step import (
     _SessionOrchestratorStepMixin,
 )
-from backend.orchestration.session_orchestrator_mixins._session_orchestrator_watchdog_mixin import (
+from backend.orchestration.mixins.watchdog import (
     _SessionOrchestratorWatchdogMixin,
 )
 from backend.orchestration.tool_pipeline import ToolInvocationContext
@@ -279,7 +279,7 @@ class SessionOrchestrator(
     async def _step(self) -> None:
         """Execute one agent step."""
         from backend.core.constants import DEFAULT_STEP_TASK_LIVENESS_SECONDS
-        from backend.core.llm_step_timeout import resolve_step_task_liveness_seconds
+        from backend.core.timeouts.llm_step_timeout import resolve_step_task_liveness_seconds
 
         self.services.retry.ensure_worker_started()
 

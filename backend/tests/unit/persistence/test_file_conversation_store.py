@@ -12,7 +12,7 @@ from backend.persistence.conversation.file_conversation_store import (
     _sort_key,
 )
 from backend.persistence.data_models.conversation_metadata import ConversationMetadata
-from backend.persistence.files import FileStore
+from backend.persistence.file_store.files import FileStore
 
 
 class _FS(FileStore):

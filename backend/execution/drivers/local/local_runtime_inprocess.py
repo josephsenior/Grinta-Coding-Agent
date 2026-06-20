@@ -27,10 +27,10 @@ from backend.core.constants import (
 )
 from backend.core.enums import RuntimeStatus
 from backend.core.errors import AgentRuntimeDisconnectedError
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.core.os_capabilities import OS_CAPS
-from backend.core.timeout_policy import cmd_run_sync_bridge_timeout_seconds
-from backend.execution.action_execution_server import RuntimeExecutor
+from backend.core.timeouts.timeout_policy import cmd_run_sync_bridge_timeout_seconds
+from backend.execution.server.action_execution_server import RuntimeExecutor
 from backend.execution.capabilities import detect_capabilities
 from backend.execution.drivers.action_execution.action_execution_client import (
     ActionExecutionClient,
@@ -63,7 +63,7 @@ from backend.utils.async_helpers.async_utils import call_async_from_sync
 
 if TYPE_CHECKING:
     from backend.core.config import AppConfig
-    from backend.core.provider_types import ProviderTokenType
+    from backend.core.providers.provider_models import ProviderTokenType
     from backend.execution.plugins import PluginRequirement
     from backend.inference.llm_registry import LLMRegistry
     from backend.ledger import EventStream

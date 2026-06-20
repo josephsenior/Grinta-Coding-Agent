@@ -13,7 +13,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.orchestration.tool_pipeline import ToolInvocationMiddleware
 from backend.utils.async_helpers.async_utils import call_sync_from_async
 

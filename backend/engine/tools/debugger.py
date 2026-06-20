@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from backend.inference.tool_names import DEBUGGER_TOOL_NAME
+from backend.core.tools.tool_names import DEBUGGER_TOOL_NAME
 from backend.ledger.action.debugger import DebuggerAction
 
 

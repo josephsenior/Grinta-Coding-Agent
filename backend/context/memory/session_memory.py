@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from backend.context.compaction.pre_condensation_snapshot import (
+from backend.context.compactor.pre_condensation_snapshot import (
     extract_snapshot,
     format_snapshot_for_injection,
 )
@@ -16,7 +16,7 @@ from backend.core.constants import (
     DEFAULT_SESSION_MEMORY_UPDATE_TOKENS,
     DEFAULT_SESSION_MEMORY_UPDATE_TOOL_CALLS,
 )
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.ledger.observation import Observation
 
 if TYPE_CHECKING:
@@ -233,7 +233,7 @@ def build_compaction_summary(
         parts.append(memory)
     if include_snapshot:
         try:
-            from backend.context.compaction.pre_condensation_snapshot import (
+            from backend.context.compactor.pre_condensation_snapshot import (
                 load_snapshot,
             )
 

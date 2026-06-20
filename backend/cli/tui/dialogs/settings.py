@@ -92,7 +92,7 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         self._model_list_request_id = 0
 
     def _fetch_model_entries_for_provider(self, provider: str) -> dict[str, list[Any]]:
-        from backend.inference.registry import build_model_entries_by_provider
+        from backend.inference.catalog.provider_catalog import build_model_entries_by_provider
 
         return build_model_entries_by_provider(provider=provider)
 
@@ -138,7 +138,7 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         self._set_feedback('')
 
     def _load_catalog_entries_for_provider(self, provider: str) -> None:
-        from backend.inference.registry import build_model_entries_by_provider
+        from backend.inference.catalog.provider_catalog import build_model_entries_by_provider
 
         self._entries_by_provider.update(
             build_model_entries_by_provider(provider=provider)
@@ -253,7 +253,7 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
     @staticmethod
     def _load_catalog_entries(config: AppConfig) -> dict[str, list[Any]]:
         from backend.cli.settings import get_current_provider
-        from backend.inference.registry import (
+        from backend.inference.catalog.provider_catalog import (
             build_model_entries_by_provider,
             get_listable_providers,
         )
@@ -268,7 +268,7 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
 
     @staticmethod
     def _provider_label(provider: str | None) -> str:
-        from backend.inference.registry import provider_label
+        from backend.inference.catalog.provider_catalog import provider_label
 
         return provider_label(provider)
 
@@ -295,7 +295,7 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         if options:
             options.append(('Custom model id', '__custom__'))
             return options
-        from backend.inference.registry import empty_model_picker_hint
+        from backend.inference.catalog.provider_catalog import empty_model_picker_hint
 
         hint = empty_model_picker_hint(provider)
         return [(hint, '__custom__')]
@@ -309,7 +309,7 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         return next(iter(self._entries_by_provider), 'openai')
 
     def _current_model_for_provider(self, provider: str | None) -> str:
-        from backend.inference.catalog_loader import (
+        from backend.inference.catalog.catalog_loader import (
             lookup_provider_model,
             runtime_model_id,
         )
@@ -450,7 +450,7 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         entry = self._selected_entry(provider, model)
         if entry is None:
             if self._custom_model_enabled():
-                from backend.inference.registry import empty_model_picker_hint
+                from backend.inference.catalog.provider_catalog import empty_model_picker_hint
 
                 self.query_one('#settings-model-meta', Label).update(
                     f'[{NAVY_TEXT_MUTED}]{empty_model_picker_hint(provider)}[/]'
@@ -500,7 +500,7 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         return selected
 
     def _submit(self) -> None:
-        from backend.inference.catalog_loader import runtime_model_id
+        from backend.inference.catalog.catalog_loader import runtime_model_id
 
         provider = self._selected_provider()
         model = self._resolve_submit_model()

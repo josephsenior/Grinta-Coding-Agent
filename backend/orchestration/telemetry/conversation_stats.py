@@ -8,13 +8,13 @@ from dataclasses import dataclass
 from threading import Lock
 from typing import TYPE_CHECKING, Any, cast
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.inference.metrics import Metrics
 from backend.persistence.locations import get_conversation_stats_filename
 
 if TYPE_CHECKING:
     from backend.inference.llm_registry import RegistryEvent
-    from backend.persistence.files import FileStore
+    from backend.persistence.file_store.files import FileStore
 
 
 @dataclass

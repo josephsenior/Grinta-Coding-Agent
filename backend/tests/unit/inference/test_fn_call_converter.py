@@ -36,7 +36,7 @@ from backend.inference.fn_call import (
     get_fn_call_parse_telemetry_counters,
     reset_fn_call_parse_telemetry_counters,
 )
-from backend.inference.tool_result_format import (
+from backend.inference.tool_support.tool_result_format import (
     decode_tool_result_payload,
 )
 

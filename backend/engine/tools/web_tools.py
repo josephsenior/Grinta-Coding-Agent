@@ -7,8 +7,8 @@ from typing import Any
 
 from backend.core.enums import ActionSecurityRisk
 from backend.engine.contracts import ChatCompletionToolParam
-from backend.engine.tools.common import create_tool_definition
-from backend.inference.tool_names import WEB_FETCH_TOOL_NAME, WEB_SEARCH_TOOL_NAME
+from backend.engine.tools.param_defs import create_tool_definition
+from backend.core.tools.tool_names import WEB_FETCH_TOOL_NAME, WEB_SEARCH_TOOL_NAME
 from backend.integrations.mcp.native_backends import (
     EXA_WEB_FETCH_MCP_TOOL,
     EXA_WEB_SEARCH_MCP_TOOL,

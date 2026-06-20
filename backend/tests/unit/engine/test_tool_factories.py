@@ -6,7 +6,7 @@ from backend.engine.tools.meta_cognition import ASK_USER_TOOL_NAME, create_ask_u
 from backend.engine.tools.task_tracker import (
     create_task_tracker_tool,
 )
-from backend.inference.tool_names import (
+from backend.core.tools.tool_names import (
     TASK_TRACKER_TOOL_NAME,
 )
 

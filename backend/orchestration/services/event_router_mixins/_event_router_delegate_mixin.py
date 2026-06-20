@@ -251,7 +251,7 @@ class _EventRouterDelegateMixin:
 
                 # --- inherit parent notes ---
                 try:
-                    from backend.engine.tools.note import (
+                    from backend.engine.tools.scratchpad import (
                         _load_notes,
                     )
 
@@ -268,11 +268,11 @@ class _EventRouterDelegateMixin:
 
                 # --- inherit parent task plan ---
                 try:
-                    from backend.core.task_status import (
+                    from backend.core.tasks.task_status import (
                         TASK_STATUS_PLAN_ICONS,
                         TASK_STATUS_TODO,
                     )
-                    from backend.core.task_tracker import TaskTracker
+                    from backend.core.tasks.task_tracker import TaskTracker
 
                     tasks = TaskTracker().load_from_file()
                     if tasks:

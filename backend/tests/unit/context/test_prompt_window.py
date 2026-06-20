@@ -21,7 +21,7 @@ from backend.ledger.observation.agent import AgentCondensationObservation
 @pytest.fixture(autouse=True)
 def _isolate_durable_context(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        'backend.context.compaction.pre_condensation_snapshot.load_snapshot',
+        'backend.context.compactor.pre_condensation_snapshot.load_snapshot',
         lambda: None,
     )
     monkeypatch.setattr(

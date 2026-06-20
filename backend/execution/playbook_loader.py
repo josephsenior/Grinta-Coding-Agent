@@ -233,7 +233,7 @@ class PlaybookLoaderMixin:
                 org_config_repo,
             )
         except Exception as e:
-            from backend.core.provider_types import AuthenticationError
+            from backend.core.providers.provider_models import AuthenticationError
 
             if isinstance(e, AuthenticationError):
                 self.log(

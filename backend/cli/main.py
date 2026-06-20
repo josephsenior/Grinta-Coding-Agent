@@ -377,7 +377,7 @@ async def _async_main(
     verbose: bool = False,
 ) -> None:
     from backend.core.config import load_app_config
-    from backend.core.logger import configure_file_logging
+    from backend.core.logging.logger import configure_file_logging
     from backend.persistence.locations import get_project_local_data_root
 
     resolved_project = (
@@ -457,7 +457,7 @@ async def _async_main(
                 verbose=verbose,
             )
     finally:
-        from backend.inference.direct_clients import aclose_shared_http_clients
+        from backend.inference.clients import aclose_shared_http_clients
 
         await aclose_shared_http_clients()
 
@@ -581,7 +581,7 @@ def main(
         str(Path(project).resolve()) if project else str(Path.cwd().resolve())
     )
     os.environ['PROJECT_ROOT'] = resolved_project
-    from backend.core.logger import configure_file_logging
+    from backend.core.logging.logger import configure_file_logging
 
     configure_file_logging()
 

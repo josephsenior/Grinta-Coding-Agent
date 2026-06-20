@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from backend.context.compaction.pre_condensation_snapshot import save_snapshot
+from backend.context.compactor.pre_condensation_snapshot import save_snapshot
 from backend.context.processors.observation_processors import (
     _get_observation_content,
     _handle_simple_observation,

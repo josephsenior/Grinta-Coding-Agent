@@ -19,7 +19,7 @@ import time
 from typing import Any
 
 from backend.core.constants import BROWSER_NAVIGATE_TOTAL_TIMEOUT_SEC
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.execution.browser._browser_cdp import _navigate_direct_cdp
 from backend.execution.browser._browser_shared import (
     _await_nav_event,

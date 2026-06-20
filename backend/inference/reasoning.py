@@ -13,7 +13,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from backend.inference.catalog_loader import (
+from backend.inference.catalog.catalog_loader import (
     TRANSPORT_CLIENT_OPENAI,
     ModelEntry,
     _transport_client_for_entry,

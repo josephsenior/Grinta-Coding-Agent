@@ -5,8 +5,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from backend.core.logger import app_logger as logger
-from backend.core.logger import llm_prompt_logger, llm_response_logger
+from backend.core.logging.logger import app_logger as logger
+from backend.core.logging.logger import llm_prompt_logger, llm_response_logger
 
 MESSAGE_SEPARATOR = '\n\n----------\n\n'
 

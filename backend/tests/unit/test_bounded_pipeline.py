@@ -19,7 +19,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from backend.core.llm_step_timeout import (
+from backend.core.timeouts.llm_step_timeout import (
     DEFAULT_LLM_STEP_TIMEOUT_SECONDS,
     llm_step_timeout_seconds_from_env,
 )

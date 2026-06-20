@@ -19,7 +19,7 @@ from backend.core.constants import (
     TERMINAL_EMPTY_READ_CLOSE_THRESHOLD,
     TERMINAL_RUN_EXECUTION_TIMEOUT_SECONDS,
 )
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.execution.aes.helpers import (
     advance_terminal_read_cursor as _advance_terminal_read_cursor_impl,
 )

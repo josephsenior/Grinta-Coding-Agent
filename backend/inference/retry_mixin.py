@@ -13,7 +13,7 @@ from tenacity import (
 from tenacity.stop import stop_base
 
 from backend.core.errors import LLMNoResponseError
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.inference.exceptions import RateLimitError, RateLimitKind
 from backend.utils.async_helpers.tenacity_metrics import (
     tenacity_after_factory,

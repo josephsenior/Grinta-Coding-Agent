@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from backend.context.compaction.compaction_finalizer import (
+from backend.context.compactor.compaction_finalizer import (
     finalize_compaction_artifacts,
 )
-from backend.context.compaction.pre_condensation_snapshot import delete_staging_snapshot
+from backend.context.compactor.pre_condensation_snapshot import delete_staging_snapshot
 from backend.context.context_budget import ContextBudget, record_post_compact_baseline
 from backend.context.context_pipeline.core import ContextPipeline
 from backend.context.context_pipeline.helpers import (

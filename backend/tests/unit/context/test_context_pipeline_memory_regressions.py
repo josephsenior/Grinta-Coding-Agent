@@ -11,7 +11,7 @@ from backend.context.canonical_state import (
     reduce_events_into_state,
     render_canonical_state_for_prompt,
 )
-from backend.context.compaction.pre_condensation_snapshot import extract_snapshot
+from backend.context.compactor.pre_condensation_snapshot import extract_snapshot
 from backend.context.context_budget import ContextBudget
 from backend.context.context_pipeline import (
     ContextPipeline,

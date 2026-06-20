@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from backend.tools.tools.build_tree_sitter_lang import _default_out_file, main
+from backend.scripts.build_tree_sitter_lang import _default_out_file, main
 
 
 def _make_tree_sitter_module():

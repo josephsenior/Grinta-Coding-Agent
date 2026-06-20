@@ -132,7 +132,7 @@ async def execute_snapshot_impl(self, cmd: str, params: dict[str, Any]) -> Obser
 
     elapsed_ms = (time.monotonic() - t_snap) * 1000
     _browser_trace(f'snapshot done in {elapsed_ms:.0f}ms')
-    from backend.core.logger import app_logger as logger
+    from backend.core.logging.logger import app_logger as logger
 
     logger.info('browser snapshot chain in %.0fms', elapsed_ms)
     return _finalize_observation(

@@ -7,7 +7,7 @@ from typing import Any, ClassVar
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, SecretStr
 
 from backend._canonical import CanonicalModelMetaclass
-from backend.core import logger
+from backend.core.logging import logger
 from backend.core.config.agent_config import AgentConfig
 from backend.core.config.config_utils import (
     model_defaults_to_dict,

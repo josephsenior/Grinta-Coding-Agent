@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from backend._canonical import CanonicalModelMetaclass
-from backend.core import logger
+from backend.core.logging import logger
 from backend.core.constants import (
     DEFAULT_COMPACTOR_ATTENTION_WINDOW,
     DEFAULT_COMPACTOR_KEEP_FIRST,

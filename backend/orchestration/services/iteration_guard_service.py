@@ -7,7 +7,7 @@ import os
 from typing import TYPE_CHECKING
 
 from backend.core.errors import AgentLimitExceededError
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
 from backend.ledger.action import MessageAction

@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from backend.core.interaction_modes import normalize_interaction_mode
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.engine.executor_mixins._executor_types import (
     ModelResponse,
     orchestrator_function_calling,

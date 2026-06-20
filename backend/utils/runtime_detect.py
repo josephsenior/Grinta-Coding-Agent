@@ -35,7 +35,7 @@ import threading
 from dataclasses import dataclass, field
 from typing import Sequence
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.utils.lsp.language_tool_aliases import normalize_debug_adapter_name
 
 # Probe timeout — kept tight; missing tools should fail-fast.
@@ -444,7 +444,7 @@ def detect_debug_adapters_summary() -> list[dict]:
     so callers don't need to know which module owns the registry.
     """
     try:
-        from backend.execution.debugger import detect_debug_adapters
+        from backend.execution.server.debugger import detect_debug_adapters
 
         return detect_debug_adapters()
     except Exception as exc:

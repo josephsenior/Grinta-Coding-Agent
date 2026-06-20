@@ -8,7 +8,7 @@ the loop thread.
 
 from __future__ import annotations
 
-from backend.execution.utils.bounded_io import (
+from backend.execution.utils.files.bounded_io import (
     BoundedResult,
     async_bounded_subprocess_exec,
 )

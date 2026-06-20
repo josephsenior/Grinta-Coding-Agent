@@ -1,4 +1,4 @@
-"""Unit tests for backend.execution.supervisor."""
+"""Unit tests for backend.execution.server.supervisor."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import asyncio
 from unittest import IsolatedAsyncioTestCase
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from backend.execution.supervisor import RuntimeSupervisor, RuntimeSupervisorConfig
+from backend.execution.server.supervisor import RuntimeSupervisor, RuntimeSupervisorConfig
 
 
 class TestRuntimeSupervisorConfig(IsolatedAsyncioTestCase):
@@ -128,7 +128,7 @@ class TestRuntimeSupervisor(IsolatedAsyncioTestCase):
         conversation.runtime = runtime
         conversation.sid = 'test-sid'
 
-        with patch('backend.execution.supervisor.logger') as mock_logger:
+        with patch('backend.execution.server.supervisor.logger') as mock_logger:
             await self.supervisor.ensure_connected(conversation)
             mock_logger.warning.assert_called_once()
             self.assertIn('timed out', mock_logger.warning.call_args[0][0])
@@ -141,7 +141,7 @@ class TestRuntimeSupervisor(IsolatedAsyncioTestCase):
         conversation.runtime = runtime
         conversation.sid = 'test-sid'
 
-        with patch('backend.execution.supervisor.logger') as mock_logger:
+        with patch('backend.execution.server.supervisor.logger') as mock_logger:
             await self.supervisor.ensure_connected(conversation)
             mock_logger.error.assert_called_once()
             self.assertIn('connect failed', mock_logger.error.call_args[0][0])
@@ -155,7 +155,7 @@ class TestRuntimeSupervisor(IsolatedAsyncioTestCase):
         conversation.runtime = runtime
         conversation.sid = 'test-sid'
 
-        with patch('backend.execution.supervisor.logger') as mock_logger:
+        with patch('backend.execution.server.supervisor.logger') as mock_logger:
             await self.supervisor.ensure_connected(conversation)
             mock_logger.warning.assert_called()
             # Should have warning about not initializing
@@ -252,7 +252,7 @@ class TestRuntimeSupervisor(IsolatedAsyncioTestCase):
         conversation.runtime = runtime
         conversation.sid = 'test-sid'
 
-        with patch('backend.execution.supervisor.logger') as mock_logger:
+        with patch('backend.execution.server.supervisor.logger') as mock_logger:
             # Should not raise
             await self.supervisor.close(conversation)
             mock_logger.debug.assert_called_once()
@@ -266,7 +266,7 @@ class TestRuntimeSupervisor(IsolatedAsyncioTestCase):
         conversation.runtime = runtime
         conversation.sid = 'test-sid'
 
-        with patch('backend.execution.supervisor.logger') as mock_logger:
+        with patch('backend.execution.server.supervisor.logger') as mock_logger:
             # Should not raise
             await self.supervisor.close(conversation)
             mock_logger.debug.assert_called_once()
@@ -297,6 +297,6 @@ class TestRuntimeSupervisor(IsolatedAsyncioTestCase):
 
     async def test_global_runtime_supervisor_singleton(self):
         """Test that global runtime_supervisor is created."""
-        from backend.execution.supervisor import runtime_supervisor
+        from backend.execution.server.supervisor import runtime_supervisor
 
         self.assertIsInstance(runtime_supervisor, RuntimeSupervisor)

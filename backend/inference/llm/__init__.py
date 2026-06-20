@@ -12,7 +12,7 @@ from __future__ import annotations
 import copy
 
 from backend.inference.capabilities.model_features import get_features
-from backend.inference.direct_clients import get_direct_client
+from backend.inference.clients import get_direct_client
 from backend.inference.llm.config import (
     _apply_base_url_discovery,
     _apply_custom_tokenizer,

@@ -1,4 +1,4 @@
-"""Tests for backend.core.logger initialization logic."""
+"""Tests for backend.core.logging.logger initialization logic."""
 
 from __future__ import annotations
 
@@ -26,11 +26,11 @@ def test_logger_init_json_and_file(tmp_path):
         # Mock dependencies for log shipping
         mock_shipper = MagicMock()
         with patch(
-            'backend.core.log_shipping.get_log_shipper', return_value=mock_shipper
+            'backend.core.logging.log_shipping.get_log_shipper', return_value=mock_shipper
         ):
-            with patch('backend.core.logger.LOG_DIR', log_dir):
+            with patch('backend.core.logging.logger.LOG_DIR', log_dir):
                 import backend.core.constants as constants_mod
-                import backend.core.logger as logger_mod
+                import backend.core.logging.logger as logger_mod
 
                 importlib.reload(constants_mod)
                 importlib.reload(logger_mod)
@@ -55,11 +55,11 @@ def test_logger_init_shipping_failure(tmp_path):
     """Test logger initialization when log shipping fails."""
     with patch.dict(os.environ, {'LOG_SHIPPING_ENABLED': 'true'}):
         with patch(
-            'backend.core.log_shipping.get_log_shipper',
+            'backend.core.logging.log_shipping.get_log_shipper',
             side_effect=Exception('shipping fail'),
         ):
             import backend.core.constants as constants_mod
-            import backend.core.logger as logger_mod
+            import backend.core.logging.logger as logger_mod
 
             importlib.reload(constants_mod)
             importlib.reload(logger_mod)
@@ -71,7 +71,7 @@ def test_logger_init_no_debug_tty(tmp_path):
     with patch.dict(os.environ, {'DEBUG': 'false', 'LOG_LEVEL': 'INFO'}):
         with patch('sys.stdout.isatty', return_value=False):
             import backend.core.constants as constants_mod
-            import backend.core.logger as logger_mod
+            import backend.core.logging.logger as logger_mod
 
             importlib.reload(constants_mod)
             importlib.reload(logger_mod)

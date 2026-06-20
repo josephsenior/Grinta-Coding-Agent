@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.ledger import EventSource
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation_cause import attach_observation_cause

@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from backend.core.provider_types import ProviderType
+from backend.core.providers.provider_models import ProviderType
 
 if TYPE_CHECKING:
     pass

@@ -238,7 +238,7 @@ class TestCLIIntegrationE2E:
             [
                 sys.executable,
                 '-m',
-                'backend.execution.action_execution_server',
+                'backend.execution.server.action_execution_server',
                 '3000',
                 '--working-dir',
                 str(_REPO_ROOT),

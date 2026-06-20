@@ -8,7 +8,7 @@ import pytest
 
 from backend.inference.metrics import Metrics
 from backend.orchestration.telemetry.conversation_stats import ConversationStats
-from backend.persistence.files import FileStore
+from backend.persistence.file_store.files import FileStore
 
 
 class _FileStore(FileStore):

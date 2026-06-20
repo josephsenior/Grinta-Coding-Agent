@@ -7,7 +7,7 @@ from dataclasses import replace
 from unittest.mock import MagicMock, patch
 
 from backend.core.os_capabilities import OS_CAPS, override_os_capabilities
-from backend.execution.utils.process_registry import TaskCancellationService
+from backend.execution.utils.process.process_registry import TaskCancellationService
 
 # ===================================================================
 # Init
@@ -177,7 +177,7 @@ class TestCancelAll:
         with (
             override_os_capabilities(replace(OS_CAPS, is_windows=True)),
             patch(
-                'backend.execution.utils.process_registry.subprocess.run'
+                'backend.execution.utils.process.process_registry.subprocess.run'
             ) as mock_run,
         ):
             svc.cancel_all()

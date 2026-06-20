@@ -45,7 +45,7 @@ from backend.context.canonical_state.types import (
     CanonicalValidationResult,
     clip_with_marker,
 )
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from backend.ledger.event import Event
@@ -103,7 +103,7 @@ def reduce_events_into_state(
     persist: bool = True,
     source: str = 'events',
 ) -> CanonicalTaskState:
-    from backend.context.compaction.pre_condensation_snapshot import extract_snapshot
+    from backend.context.compactor.pre_condensation_snapshot import extract_snapshot
 
     canonical = previous or load_canonical_state(state=state)
     if not events:
@@ -330,7 +330,7 @@ def validate_canonical_state_for_compaction(
     canonical: CanonicalTaskState,
     events: list[Event],
 ) -> CanonicalValidationResult:
-    from backend.context.compaction.pre_condensation_snapshot import extract_snapshot
+    from backend.context.compactor.pre_condensation_snapshot import extract_snapshot
 
     snapshot = extract_snapshot(events)
     missing: list[str] = []

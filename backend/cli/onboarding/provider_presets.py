@@ -6,8 +6,8 @@ from backend.cli.settings.constants import (
     _PROVIDERS,
     DEFAULT_MODEL_BY_PROVIDER,
 )
-from backend.core.providers import PROVIDER_CONFIGURATIONS
-from backend.inference.registry import PROVIDER_DEFAULT_URLS
+from backend.core.providers.configurations import PROVIDER_CONFIGURATIONS
+from backend.inference.catalog.provider_catalog import PROVIDER_DEFAULT_URLS
 
 _LOCAL_BASE_URLS: dict[str, str] = {
     'ollama': 'http://localhost:11434',

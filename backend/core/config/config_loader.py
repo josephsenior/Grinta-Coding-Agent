@@ -21,7 +21,7 @@ from uuid import uuid4
 
 from pydantic import SecretStr
 
-from backend.core import logger
+from backend.core.logging import logger
 from backend.core.app_paths import get_canonical_settings_path
 from backend.core.config.agent_config import AgentConfig
 from backend.core.config.app_config import AppConfig
@@ -37,14 +37,12 @@ from backend.core.config.llm_config import LLMConfig
 from backend.core.config.model_rebuild import rebuild_config_models
 from backend.core.config.security_config import SecurityConfig
 from backend.core.constants import JWT_SECRET_FILE as JWT_SECRET
-from backend.persistence import get_file_store
-from backend.persistence.locations import get_local_data_root
 from backend.utils.import_utils import get_impl
 
 if TYPE_CHECKING:
     import argparse
 
-    from backend.persistence.files import FileStore
+    from backend.persistence.file_store.files import FileStore
 
 
 # ---------------------------------------------------------------------------
@@ -530,6 +528,8 @@ def finalize_config(cfg: AppConfig) -> None:
     _configure_jwt_secret(cfg)
     # Persist the effective store root on the config object so reload paths (e.g.
     # /settings) match get_local_data_root() and never leave legacy "." / sessions.
+    from backend.persistence.locations import get_local_data_root
+
     cfg.local_data_root = get_local_data_root(cfg)
 
 
@@ -545,6 +545,9 @@ def _ensure_cache_directory(cfg: AppConfig) -> None:
 
 def _configure_jwt_secret(cfg: AppConfig) -> None:
     if not cfg.jwt_secret:
+        from backend.persistence import get_file_store
+        from backend.persistence.locations import get_local_data_root
+
         cfg.jwt_secret = SecretStr(
             get_or_create_jwt_secret(
                 get_file_store(cfg.file_store, get_local_data_root(cfg))

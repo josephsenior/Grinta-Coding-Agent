@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.core.workspace_resolution import get_effective_workspace_root
 
 # Same shape as @rigour-labs/mcp's own supervisor tests (ConfigSchema-compatible).

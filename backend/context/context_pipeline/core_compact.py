@@ -25,7 +25,7 @@ from backend.core.constants import (
     DEFAULT_DEGRADED_COMPACT_TAIL_RATIO,
     DEFAULT_PROMPT_MIN_TOOL_LOOPS,
 )
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.ledger.action.agent import CondensationAction
 from backend.ledger.event import Event
 

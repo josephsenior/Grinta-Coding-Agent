@@ -8,7 +8,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.ledger.event.event_store_abc import EventStoreABC
 from backend.ledger.serialization.event import event_from_dict
 from backend.persistence.locations import (
@@ -20,7 +20,7 @@ from backend.persistence.locations import (
 if TYPE_CHECKING:
     from backend.ledger.event import Event, EventSource
     from backend.ledger.event.event_filter import EventFilter
-    from backend.persistence.files import FileStore
+    from backend.persistence.file_store.files import FileStore
 
 _SEARCH_ABORT = object()
 

@@ -43,7 +43,7 @@ from backend.cli.theme import (
     STYLE_SYSTEM_TAG_WARNING,
     get_grinta_pygments_style,
 )
-from backend.core.task_status import (
+from backend.core.tasks.task_status import (
     TASK_STATUS_PANEL_STYLES,
     TASK_STATUS_TODO,
     normalize_task_status,

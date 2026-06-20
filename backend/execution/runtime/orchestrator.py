@@ -8,7 +8,7 @@ from backend.core.constants import (
     EVICTION_SPIKE_THRESHOLD,
     IDLE_RECLAIM_SPIKE_THRESHOLD,
 )
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.execution.runtime.pool import (
     PooledRuntime,
     RuntimePool,
@@ -20,8 +20,8 @@ from backend.execution.watchdog import runtime_watchdog
 
 if TYPE_CHECKING:
     from backend.core.config import AppConfig
-    from backend.core.provider_types import ProviderTokenType
-    from backend.execution.base import Runtime
+    from backend.core.providers.provider_models import ProviderTokenType
+    from backend.execution.server.base import Runtime
     from backend.inference.llm_registry import LLMRegistry
     from backend.ledger.stream import EventStream
     from backend.orchestration.agent import Agent
@@ -69,7 +69,7 @@ class RuntimeOrchestrator:
         user_id: str | None = None,
         inline_event_delivery: bool = False,
     ) -> RuntimeAcquireResult:
-        from backend.core.bootstrap.setup import (
+        from backend.app.setup import (
             create_runtime,  # lazy import to avoid cycles
         )
 

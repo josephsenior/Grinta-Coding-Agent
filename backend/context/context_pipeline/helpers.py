@@ -6,7 +6,7 @@ import time
 from typing import TYPE_CHECKING
 
 import backend.context.context_pipeline as _cp
-from backend.context.compaction.compact_boundary import project_after_compact_boundary
+from backend.context.compactor.compact_boundary import project_after_compact_boundary
 from backend.context.context_budget import ContextBudget
 from backend.context.context_pipeline.types import (
     _COMPACTION_TARGET_RATIO,
@@ -26,7 +26,7 @@ from backend.core.constants import (
     DEFAULT_PROMPT_MIN_TAIL_TOKENS,
     DEFAULT_PROMPT_MIN_TOOL_LOOPS,
 )
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.ledger.action.agent import CondensationAction
 from backend.ledger.event import Event
 

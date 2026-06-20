@@ -1,11 +1,11 @@
 from typing import Any
 
 from backend.core.errors import FunctionCallValidationError
-from backend.engine.function_calling_helpers import (
+from backend.engine.function_calling.helpers import (
     set_security_risk,
     validate_security_risk,
 )
-from backend.inference.tool_names import TERMINAL_MANAGER_TOOL_NAME
+from backend.core.tools.tool_names import TERMINAL_MANAGER_TOOL_NAME
 from backend.ledger.action.terminal import (
     TerminalInputAction,
     TerminalReadAction,

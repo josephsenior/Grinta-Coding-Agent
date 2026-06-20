@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from backend.core.errors import ResourceLimitExceededError
-from backend.execution.utils.resource_limits import (
+from backend.execution.utils.process.resource_limits import (
     ResourceLimiter,
     ResourceLimits,
     ResourceStats,

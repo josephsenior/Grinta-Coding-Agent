@@ -173,7 +173,7 @@ def _is_runtime_test(item) -> bool:
 @pytest.fixture(autouse=True)
 def _disable_file_logging_during_tests(monkeypatch):
     """Keep pytest runs from creating logs/workspaces/*/sessions/* directories."""
-    monkeypatch.setattr('backend.core.logger.LOG_TO_FILE', False)
+    monkeypatch.setattr('backend.core.logging.logger.LOG_TO_FILE', False)
 
 
 @pytest.fixture(autouse=True)

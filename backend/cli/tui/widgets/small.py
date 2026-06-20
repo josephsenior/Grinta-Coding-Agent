@@ -229,11 +229,11 @@ class Transcript(VerticalScroll):
         if len(widgets) <= max_mounted:
             return
 
+        if not self.should_follow_tail():
+            return
+
         overflow = len(widgets) - max_mounted
-        if self.should_follow_tail():
-            to_unmount = widgets[:overflow]
-        else:
-            to_unmount = widgets[-overflow:]
+        to_unmount = widgets[:overflow]
 
         cache = getattr(renderer, '_render_cache', None)
         for widget in to_unmount:

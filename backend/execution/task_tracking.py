@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from backend.core.task_status import (
+from backend.core.tasks.task_status import (
     TASK_STATUS_MARKDOWN_ICONS,
     TASK_STATUS_TODO,
     normalize_task_status,
@@ -188,7 +188,7 @@ class TaskTrackingMixin:
             )
 
         try:
-            from backend.core.task_tracker import TaskTracker
+            from backend.core.tasks.task_tracker import TaskTracker
 
             TaskTracker().save_to_file(list(action.task_list))
         except Exception as e:

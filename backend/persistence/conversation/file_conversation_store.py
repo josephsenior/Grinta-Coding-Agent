@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import TypeAdapter
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.persistence import get_file_store
 from backend.persistence.conversation.conversation_store import ConversationStore
 from backend.persistence.data_models.conversation_metadata import ConversationMetadata
@@ -27,7 +27,7 @@ from backend.utils.search_utils import offset_to_page_id, page_id_to_offset
 
 if TYPE_CHECKING:
     from backend.core.config.app_config import AppConfig
-    from backend.persistence.files import FileStore
+    from backend.persistence.file_store.files import FileStore
 
 conversation_metadata_type_adapter = TypeAdapter(ConversationMetadata)
 

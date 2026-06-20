@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from backend.core.file_history import global_undo_manager
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.engine.tools.atomic_refactor import (
     AtomicRefactor,
     RefactorResult,

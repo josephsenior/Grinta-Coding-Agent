@@ -10,7 +10,7 @@ import time
 from typing import Any
 
 from backend.core.constants import DEFAULT_DURABLE_CONTEXT_CHAR_BUDGET
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.ledger.action import MessageAction
 from backend.ledger.event import Event, EventSource
 from backend.ledger.observation.agent import AgentCondensationObservation
@@ -24,7 +24,7 @@ _MAX_CURRENT_STATE_FILES = 12
 def _sync_findings_block(
     memory: dict[str, Any], snapshot: dict[str, Any]
 ) -> str | None:
-    from backend.context.compaction.pre_condensation_snapshot import (
+    from backend.context.compactor.pre_condensation_snapshot import (
         format_snapshot_for_injection,
     )
 
@@ -315,7 +315,7 @@ def sync_snapshot_to_working_memory(
             reduce_snapshot_into_state,
             save_canonical_state,
         )
-        from backend.context.compaction.pre_condensation_snapshot import (
+        from backend.context.compactor.pre_condensation_snapshot import (
             format_snapshot_for_injection,  # noqa: F401
         )
         from backend.context.memory.session_context import bind_session_context
@@ -360,7 +360,7 @@ def sync_snapshot_to_working_memory(
 def _session_has_durable_artifacts(*, state: object | None = None) -> bool:
     """True when this session has persisted snapshot or working-memory data on disk."""
     try:
-        from backend.context.compaction.pre_condensation_snapshot import load_snapshot
+        from backend.context.compactor.pre_condensation_snapshot import load_snapshot
         from backend.engine.tools.working_memory import _load_memory
 
         if load_snapshot(state=state):  # type: ignore[arg-type]
@@ -425,7 +425,7 @@ def get_durable_context_block(
         logger.debug('Canonical durable context assembly failed', exc_info=True)
 
     try:
-        from backend.context.compaction.pre_condensation_snapshot import (
+        from backend.context.compactor.pre_condensation_snapshot import (
             format_snapshot_for_injection,
             load_snapshot,
         )
@@ -466,7 +466,7 @@ def build_working_set_observation(
     not inject this — it is rendered through the condensation observation path
     and would falsely tell the model that context was already condensed.
     """
-    from backend.context.compaction.compact_boundary import (
+    from backend.context.compactor.compact_boundary import (
         find_last_condensation_action,
     )
 

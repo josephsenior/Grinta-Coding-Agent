@@ -9,7 +9,7 @@ _DEFAULT_ANTHROPIC_MAX_TOKENS = 4096
 
 
 def _sanitize_anthropic_request_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
-    from backend.inference.catalog_loader import (
+    from backend.inference.catalog.catalog_loader import (
         TRANSPORT_CLIENT_ANTHROPIC,
         pop_incompatible_kwargs,
     )
@@ -27,7 +27,7 @@ def _resolve_anthropic_max_tokens(client: Any, kwargs: dict[str, Any]) -> int:
     if raw_max_tokens is not None:
         return max(int(raw_max_tokens), 1)
 
-    from backend.inference.catalog_loader import lookup, lookup_provider_model
+    from backend.inference.catalog.catalog_loader import lookup, lookup_provider_model
 
     entry = lookup(client.model_name)
     if entry is None:

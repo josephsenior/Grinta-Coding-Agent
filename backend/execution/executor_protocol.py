@@ -6,7 +6,7 @@ concrete ``RuntimeExecutor`` class. Drivers should depend on
 dependency injection or a factory callable.
 
 The protocol mirrors the public surface of
-:class:`backend.execution.action_execution_server.RuntimeExecutor` that is
+:class:`backend.execution.server.action_execution_server.RuntimeExecutor` that is
 actually exercised by runtime drivers.
 """
 
@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable
 
-from backend.execution.debugger import DAPDebugManager
+from backend.execution.server.debugger import DAPDebugManager
 from backend.ledger.action import (
     CmdRunAction,
     DebuggerAction,

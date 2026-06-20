@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from backend.core.os_capabilities import OS_CAPS, override_os_capabilities
-from backend.execution.action_execution_server import RuntimeExecutor
+from backend.execution.server.action_execution_server import RuntimeExecutor
 from backend.execution.utils.shell.unified_shell import BaseShellSession
 from backend.ledger.action import CmdRunAction, FileReadAction
 from backend.ledger.action.terminal import (
@@ -28,7 +28,7 @@ def mock_executor(tmp_path: Path):
     """Create a minimal mocked RuntimeExecutor to avoid full initialization."""
     with (
         patch('os.makedirs'),
-        patch('backend.execution.action_execution_server.SessionManager'),
+        patch('backend.execution.server.action_execution_server.SessionManager'),
     ):
         executor = RuntimeExecutor(
             plugins_to_load=[],
@@ -610,7 +610,7 @@ async def test_terminal_input_allows_cd_within_workspace_and_tracks_cwd(
     mock_executor.session_manager.get_session.return_value = session
 
     with patch(
-        'backend.execution.action_execution_server.asyncio.sleep', return_value=None
+        'backend.execution.server.action_execution_server.asyncio.sleep', return_value=None
     ):
         obs = await mock_executor.terminal_input(
             TerminalInputAction(session_id='term-3', input=f'cd {target}')
@@ -657,7 +657,7 @@ async def test_terminal_input_submit_false_does_not_append_newline(
     mock_executor.session_manager.get_session.return_value = session
 
     with patch(
-        'backend.execution.action_execution_server.asyncio.sleep', return_value=None
+        'backend.execution.server.action_execution_server.asyncio.sleep', return_value=None
     ):
         obs = await mock_executor.terminal_input(
             TerminalInputAction(session_id='t-sub', input='partial', submit=False)
@@ -704,7 +704,7 @@ async def test_terminal_input_applies_resize_and_control_field(
     mock_executor.session_manager.get_session.return_value = session
 
     with patch(
-        'backend.execution.action_execution_server.asyncio.sleep', return_value=None
+        'backend.execution.server.action_execution_server.asyncio.sleep', return_value=None
     ):
         obs = await mock_executor.terminal_input(
             TerminalInputAction(
@@ -933,7 +933,7 @@ async def test_terminal_input_post_read_uses_stored_cursor(mock_executor, tmp_pa
     mock_executor._terminal_read_cursor['t-cursor'] = 250
 
     with patch(
-        'backend.execution.action_execution_server.asyncio.sleep', return_value=None
+        'backend.execution.server.action_execution_server.asyncio.sleep', return_value=None
     ):
         obs = await mock_executor.terminal_input(
             TerminalInputAction(session_id='t-cursor', control='enter')
@@ -980,7 +980,7 @@ async def test_terminal_input_polls_pty_delta_after_existing_cursor(
     mock_executor._terminal_read_cursor['t-pty'] = 250
 
     with patch(
-        'backend.execution.action_execution_server.asyncio.sleep', return_value=None
+        'backend.execution.server.action_execution_server.asyncio.sleep', return_value=None
     ):
         obs = await mock_executor.terminal_input(
             TerminalInputAction(session_id='t-pty', input='echo ok')

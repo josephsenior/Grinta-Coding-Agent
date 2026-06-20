@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from backend.execution.action_execution_server import RuntimeExecutor
+from backend.execution.server.action_execution_server import RuntimeExecutor
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.code_nav import LspQueryAction
 from backend.ledger.action.mcp import MCPAction
@@ -17,7 +17,7 @@ from backend.ledger.observation import ErrorObservation
 def mock_executor(tmp_path: Path):
     with (
         patch('os.makedirs'),
-        patch('backend.execution.action_execution_server.SessionManager'),
+        patch('backend.execution.server.action_execution_server.SessionManager'),
     ):
         ex = RuntimeExecutor(
             plugins_to_load=[],
@@ -68,11 +68,11 @@ async def test_call_tool_mcp_success_truncates_content(mock_executor) -> None:
             AsyncMock(return_value=fake_obs),
         ),
         patch(
-            'backend.execution.action_execution_server.get_max_edit_observation_chars',
+            'backend.execution.server.action_execution_server.get_max_edit_observation_chars',
             return_value=5,
         ),
         patch(
-            'backend.execution.action_execution_server.truncate_large_text',
+            'backend.execution.server.action_execution_server.truncate_large_text',
             side_effect=lambda t, m, label='': t[:m],
         ),
     ):

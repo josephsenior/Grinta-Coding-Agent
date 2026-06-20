@@ -1,0 +1,569 @@
+"""Bootstrap factory functions for creating agents, controllers, memory, and runtimes.
+
+Functions:
+    create_runtime
+    get_provider_tokens
+    initialize_repository_for_runtime
+    create_memory
+    create_agent
+"""
+
+from __future__ import annotations
+
+import contextlib
+import hashlib
+import importlib
+import uuid
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, cast
+
+from backend.context.memory.agent_memory import Memory
+from backend.core.constants import GENERAL_TIMEOUT
+from backend.core.enums import RuntimeStatus
+from backend.core.errors import AgentNotRegisteredError
+from backend.core.logging.logger import app_logger as logger
+from backend.execution.plugins import PluginRequirement
+from backend.inference.llm_registry import LLMRegistry
+from backend.ledger import EventStream
+from backend.orchestration import SessionOrchestrator
+from backend.orchestration.agent import Agent
+from backend.orchestration.state.state import State
+from backend.persistence import get_file_store
+from backend.persistence.data_models.user_secrets import UserSecrets
+from backend.persistence.locations import get_local_data_root
+from backend.utils.async_helpers.async_utils import call_async_from_sync
+
+if TYPE_CHECKING:
+    from backend.core.config import AgentConfig, AppConfig
+    from backend.core.providers.provider_models import (
+        ProviderToken,
+        ProviderTokenType,
+        ProviderType,
+    )
+    from backend.execution.server.base import Runtime
+    from backend.ledger.event import Event
+    from backend.orchestration.telemetry.conversation_stats import ConversationStats
+    from backend.playbooks.engine.playbook import BasePlaybook
+
+
+StatusCallback = Callable[[str, RuntimeStatus, str], None]
+
+
+def _instantiate_runtime(runtime_cls: type[object], **kwargs: Any) -> Runtime:
+    """Instantiate a runtime class and return it as Runtime protocol type."""
+    return cast('Runtime', runtime_cls(**kwargs))
+
+
+def _resolve_agent_config(
+    agent: Agent | None,
+    config: AppConfig | None,
+    agent_cls_name: str | None,
+) -> AgentConfig | None:
+    """Resolve AgentConfig from agent or config + agent_cls_name."""
+    if agent is not None:
+        return getattr(agent, 'config', None)
+    if config is not None and agent_cls_name:
+        try:
+            return config.get_agent_config(agent_cls_name)
+        except Exception:
+            pass
+    return None
+
+
+def _apply_agent_disabled_plugins(
+    filtered: list[PluginRequirement], agent_config: AgentConfig | None
+) -> list[PluginRequirement]:
+    """Apply agent config disabled_plugins denylist."""
+    if agent_config is None:
+        return filtered
+    disabled = set(getattr(agent_config, 'disabled_plugins', None) or [])
+    if not disabled:
+        return filtered
+    result = [p for p in filtered if p.name not in disabled]
+    if len(result) < len(filtered):
+        logger.info(
+            'Plugins disabled by agent config: %s',
+            ', '.join(sorted(disabled)),
+        )
+    return result
+
+
+def filter_plugins_by_config(
+    plugins: list[PluginRequirement],
+    agent: Agent | None = None,
+    config: AppConfig | None = None,
+    agent_cls_name: str | None = None,
+) -> list[PluginRequirement]:
+    """Filter plugins through two layers using allowlists.
+
+    Process plugins with an environment allowlist and agent denylist.
+
+    1. **Environment allowlist** — delegates to
+       ``backend.execution.plugins.filter_plugins_by_config`` which honours the
+         ``APP_PLUGINS`` env-var (comma-separated allowlist).  When the var is
+       unset every plugin passes through.
+    2. **Agent-config denylist** — if an ``AgentConfig`` is reachable (via
+       *agent* or *config* + *agent_cls_name*), its ``disabled_plugins``
+       attribute (if present) is respected.
+
+    Args:
+        plugins: List of plugin requirements to filter.
+        agent: Optional agent instance to derive config from.
+        config: Optional AppConfig to look up per-agent config.
+        agent_cls_name: Agent class name used to resolve config.
+
+    Returns:
+        Filtered list of plugin requirements.
+    """
+    from backend.execution.plugins import (
+        filter_plugins_by_config as _env_filter,
+    )
+
+    filtered = _env_filter(plugins)
+    agent_config = _resolve_agent_config(agent, config, agent_cls_name)
+    return _apply_agent_disabled_plugins(filtered, agent_config)
+
+
+def _acquire_event_stream(
+    config: AppConfig,
+    sid: str | None,
+    event_stream: EventStream | None,
+    inline_event_delivery: bool,
+    user_id: str | None = None,
+) -> tuple[EventStream, bool, str]:
+    if event_stream is not None:
+        session_id = sid or event_stream.sid
+        try:
+            from backend.context.memory.session_context import bind_session_context
+
+            bind_session_context(session_id=session_id)
+        except Exception:
+            pass
+        return event_stream, False, session_id
+
+    session_id = sid or generate_sid(config)
+    try:
+        from backend.context.memory.session_context import bind_session_context
+
+        bind_session_context(session_id=session_id)
+    except Exception:
+        pass
+    file_store = get_file_store(config.file_store, get_local_data_root(config))
+    created_event_stream = EventStream(
+        session_id,
+        file_store,
+        user_id=user_id,
+        worker_count=0 if inline_event_delivery else None,
+    )
+    return created_event_stream, True, session_id
+
+
+def _resolve_runtime_project_root(
+    config: AppConfig, project_root: str | None
+) -> str | None:
+    if project_root is not None:
+        return project_root
+
+    from pathlib import Path
+
+    workspace_root = (getattr(config, 'project_root', None) or '').strip()
+    if not workspace_root:
+        return None
+    return str(Path(workspace_root).expanduser().resolve())
+
+
+def _build_runtime_plugins(
+    agent_cls: type[Agent],
+    agent: Agent | None,
+    config: AppConfig,
+) -> list[PluginRequirement]:
+    return filter_plugins_by_config(
+        plugins=list(agent_cls.runtime_plugins),
+        agent=agent,
+        config=config,
+        agent_cls_name=agent_cls.__name__,
+    )
+
+
+def _close_owned_event_stream_on_init_error(event_stream: EventStream) -> None:
+    try:
+        event_stream.close()
+    except Exception:
+        logger.debug(
+            'Failed to close event stream after runtime init error',
+            exc_info=True,
+        )
+
+
+def _instantiate_runtime_with_cleanup(
+    runtime_cls: type[object],
+    *,
+    owns_event_stream: bool,
+    event_stream: EventStream,
+    kwargs: dict[str, Any],
+) -> Runtime:
+    try:
+        return _instantiate_runtime(runtime_cls, **kwargs)
+    except Exception:
+        if owns_event_stream:
+            _close_owned_event_stream_on_init_error(event_stream)
+        raise
+
+
+def create_runtime(
+    config: AppConfig,
+    llm_registry: LLMRegistry | None = None,
+    sid: str | None = None,
+    headless_mode: bool = True,
+    agent: Agent | None = None,
+    vcs_provider_tokens: ProviderTokenType | None = None,
+    *,
+    event_stream: EventStream | None = None,
+    env_vars: dict[str, str] | None = None,
+    user_id: str | None = None,
+    project_root: str | None = None,
+    inline_event_delivery: bool = False,
+) -> Runtime:
+    """Create a runtime for the agent to run on.
+
+    Args:
+        config: The app config.
+        llm_registry: Optional LLM registry to use.
+        sid: (optional) The session id. IMPORTANT: please don't set this unless you know what you're doing.
+        headless_mode: Whether the agent is run in headless mode.
+            `create_runtime` is typically called within evaluation scripts, so it defaults to True.
+        agent: (optional) The agent instance to use for configuring the runtime.
+        vcs_provider_tokens: Optional git provider tokens for authentication.
+        event_stream: Optional event stream for real-time monitoring.
+        env_vars: Optional environment variables for the runtime.
+        user_id: Optional user ID for ownership and quotas.
+        project_root: Optional open-project directory (overrides config.project_root).
+        inline_event_delivery: When True, all events are delivered inline (same call chain)
+            instead of via background thread pool. Eliminates threading races in CLI mode.
+
+    Returns:
+        The created Runtime instance (not yet connected or initialized).
+
+    """
+    event_stream, owns_event_stream, session_id = _acquire_event_stream(
+        config,
+        sid,
+        event_stream,
+        inline_event_delivery,
+        user_id=user_id,
+    )
+    # Re-point file logging into this session's own directory so app.log (and
+    # MCP server output) is session-scoped rather than a single ever-growing
+    # workspace file shared across runs.
+    with contextlib.suppress(Exception):
+        from backend.core.logging.logger import bind_session_logging
+
+        bind_session_logging(session_id)
+    agent_cls = type(agent) if agent else Agent.get_cls(config.default_agent)
+
+    from backend.execution.runtime.factory import get_runtime_cls
+
+    plugins = _build_runtime_plugins(agent_cls, agent, config)
+    resolved_ws = _resolve_runtime_project_root(config, project_root)
+    runtime_cls = get_runtime_cls(config.runtime)
+    logger.debug('Initializing runtime: %s', runtime_cls.__name__)
+    runtime = _instantiate_runtime_with_cleanup(
+        runtime_cls,
+        owns_event_stream=owns_event_stream,
+        event_stream=event_stream,
+        kwargs={
+            'config': config,
+            'event_stream': event_stream,
+            'sid': session_id,
+            'plugins': plugins,
+            'headless_mode': headless_mode,
+            'llm_registry': llm_registry or LLMRegistry(config),
+            'vcs_provider_tokens': vcs_provider_tokens,
+            'env_vars': env_vars,
+            'user_id': user_id,
+            'project_root': resolved_ws,
+        },
+    )
+    logger.debug(
+        'Runtime created with plugins: %s', [plugin.name for plugin in runtime.plugins]
+    )
+    return runtime
+
+
+def _create_secret_store(provider_tokens: dict) -> UserSecrets | None:
+    """Create UserSecrets instance if tokens are available."""
+    return UserSecrets(provider_tokens=provider_tokens) if provider_tokens else None
+
+
+def get_provider_tokens() -> ProviderTokenType | None:
+    """Retrieve provider tokens from environment variables and return them as a dictionary.
+
+    Returns:
+        A dictionary mapping ProviderType to ProviderToken if tokens are found, otherwise None.
+
+    """
+    provider_tokens: dict[ProviderType, ProviderToken] = {}
+
+    secret_store = _create_secret_store(provider_tokens)
+    return secret_store.provider_tokens if secret_store else None
+
+
+def initialize_repository_for_runtime(
+    runtime: Runtime,
+    immutable_provider_tokens: ProviderTokenType | None = None,
+    selected_repository: str | None = None,
+    selected_branch: str | None = None,
+) -> str | None:
+    """Initialize the repository for the runtime.
+
+    Clones or initializes the repo, runs setup scripts, and sets up git hooks if present.
+
+    Args:
+        runtime: The runtime to initialize the repository for.
+        immutable_provider_tokens: (optional) Provider tokens to use for authentication.
+        selected_repository: (optional) The repository to use.
+        selected_branch: (optional) Branch ref to checkout.
+
+    Returns:
+        The repository directory path if a repository was cloned, None otherwise.
+
+    """
+    if not immutable_provider_tokens:
+        immutable_provider_tokens = get_provider_tokens()
+    logger.debug('Selected repository %s.', selected_repository)
+    repo_directory = call_async_from_sync(
+        runtime.clone_or_init_repo,
+        GENERAL_TIMEOUT,
+        immutable_provider_tokens,
+        selected_repository,
+        selected_branch,
+    )
+    runtime.maybe_run_setup_script()
+    runtime.maybe_setup_git_hooks()
+    return repo_directory
+
+
+def create_memory(
+    runtime: Runtime,
+    event_stream: EventStream,
+    sid: str,
+    selected_repository: str | None = None,
+    repo_directory: str | None = None,
+    status_callback: StatusCallback | None = None,
+    conversation_instructions: str | None = None,
+    working_dir: str | None = None,
+) -> Memory:
+    """Create a memory for the agent to use.
+
+    Args:
+        runtime: The runtime to use.
+        event_stream: The event stream it will subscribe to.
+        sid: The session id.
+        selected_repository: The repository to clone and start with, if any.
+        repo_directory: The repository directory, if any.
+        status_callback: Optional callback function to handle status updates.
+        conversation_instructions: Optional instructions that are passed to the agent
+        working_dir: The working directory for the memory. If not provided, uses runtime.workspace_root.
+
+    """
+    memory = Memory(event_stream=event_stream, sid=sid, status_callback=status_callback)
+    memory.set_conversation_instructions(conversation_instructions)
+    if runtime:
+        if working_dir is None:
+            working_dir = str(runtime.workspace_root)
+        memory.set_runtime_info(runtime, {}, working_dir)
+        playbooks: list[BasePlaybook] = runtime.get_playbooks_from_selected_repo(
+            selected_repository
+        )
+        memory.load_user_workspace_playbooks(playbooks)
+        if selected_repository and repo_directory:
+            memory.set_repository_info(selected_repository, repo_directory)
+    return memory
+
+
+def _ensure_agent_class_available(agent_name: str) -> None:
+    """Ensure the requested agent class has been registered.
+
+    Attempts to import the built-in engine package lazily so that the built-in
+    agents are registered even when the CLI is exercised in isolation, such as
+    during unit tests.
+    """
+    try:
+        Agent.get_cls(agent_name)
+        return
+    except AgentNotRegisteredError:
+        pass
+
+    for module_name in ('backend.engine', 'app.engine'):
+        try:
+            importlib.import_module(module_name)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.debug('Failed to auto-import %s: %s', module_name, exc)
+    try:
+        Agent.get_cls(agent_name)
+    except AgentNotRegisteredError as exc:
+        raise AgentNotRegisteredError(agent_name) from exc
+
+
+def create_agent(config: AppConfig, llm_registry: LLMRegistry) -> Agent:
+    """Create agent instance from configuration.
+
+    Args:
+        config: Configuration for composite score weights
+        llm_registry: LLM registry for model access
+
+    Returns:
+        Initialized agent instance
+
+    """
+    try:
+        agent_cls: type[Agent] = Agent.get_cls(config.default_agent)
+    except AgentNotRegisteredError:
+        _ensure_agent_class_available(config.default_agent)
+        agent_cls = Agent.get_cls(config.default_agent)
+    agent_config = config.get_agent_config(config.default_agent)
+    config.get_llm_config_from_agent(config.default_agent)
+    return agent_cls(config=agent_config, llm_registry=llm_registry)
+
+
+def create_controller(
+    agent: Agent,
+    runtime: Runtime,
+    config: AppConfig,
+    conversation_stats: ConversationStats,
+    headless_mode: bool = True,
+    replay_events: list[Event] | None = None,
+) -> tuple[SessionOrchestrator, State | None]:
+    """Create agent controller with optional state restoration.
+
+    Attempts to restore previous agent state from session if available.
+
+    Args:
+        agent: Agent instance
+        runtime: Runtime environment
+        config: Grinta configuration
+        conversation_stats: Conversation statistics tracker
+        headless_mode: Whether running in headless mode
+        replay_events: Optional events to replay
+
+    Returns:
+        Tuple of (controller, initial_state)
+
+    """
+    event_stream = runtime.event_stream
+    if event_stream is None:
+        raise RuntimeError('Runtime does not have an initialized event stream')
+    initial_state = None
+    try:
+        logger.debug(
+            'Trying to restore agent state from session %s if available',
+            event_stream.sid,
+        )
+        initial_state = State.restore_from_session(
+            event_stream.sid, event_stream.file_store
+        )
+        provenance = getattr(initial_state, 'restore_provenance', None)
+        if provenance is not None:
+            logger.info(
+                'Restored controller state for %s from %s (%s)',
+                event_stream.sid,
+                provenance.source,
+                provenance.path,
+            )
+    except Exception as e:
+        logger.debug('Cannot restore agent state: %s', e)
+    from backend.orchestration.orchestration_config import OrchestrationConfig
+
+    controller = SessionOrchestrator(
+        config=OrchestrationConfig(
+            agent=agent,
+            conversation_stats=conversation_stats,
+            iteration_delta=config.max_iterations,
+            budget_per_task_delta=config.max_budget_per_task,
+            agent_to_llm_config=config.get_agent_to_llm_config_map(),
+            event_stream=event_stream,
+            initial_state=initial_state,
+            headless_mode=headless_mode,
+            replay_events=replay_events,
+            security_analyzer=runtime.security_analyzer,
+            pending_action_timeout=config.pending_action_timeout,
+            enable_parallel_tool_scheduling=bool(
+                getattr(agent.config, 'enable_parallel_tool_scheduling', False)
+            ),
+        )
+    )
+    # Store the runtime so downstream code (worker delegation, middleware)
+    # can access it via controller.runtime.
+    controller.runtime = runtime
+    # Snapshot post-init state once the rollback middleware can resolve the
+    # runtime workspace. Doing this in SessionOrchestrator.__init__ is too
+    # early because controller.runtime is assigned here.
+    controller._create_phase_boundary_checkpoint('init_to_active')
+    try:
+        from backend.execution.drivers.local.local_runtime_inprocess import (
+            LocalRuntimeInProcess,
+        )
+
+        if isinstance(runtime, LocalRuntimeInProcess):
+
+            async def _browser_structured_extract(
+                page_text: str,
+                schema: dict[str, Any],
+                instruction: str | None,
+            ) -> str:
+                import json as _json
+
+                from backend.core.message import Message, TextContent
+
+                llm = agent.llm
+                schema_s = _json.dumps(schema, ensure_ascii=False)
+                chunks = [
+                    'Extract structured data from the web page text below.',
+                    'Respond with ONLY valid JSON matching this JSON Schema '
+                    '(no markdown fences):',
+                    schema_s,
+                ]
+                if instruction:
+                    chunks.append(f'Additional instructions: {instruction}')
+                chunks.append('--- Page text ---')
+                chunks.append(page_text[:120000])
+                resp = await llm.acompletion(
+                    [
+                        Message(
+                            role='user',
+                            content=[TextContent(text='\n'.join(chunks))],
+                        )
+                    ],
+                    temperature=0,
+                    max_tokens=8192,
+                )
+                text = ''
+                choices = getattr(resp, 'choices', None) or []
+                if choices:
+                    msg = getattr(choices[0], 'message', None)
+                    if msg is not None:
+                        text = str(getattr(msg, 'content', '') or '')
+                return text.strip()
+
+            runtime.set_browser_structured_extract(_browser_structured_extract)
+    except Exception:
+        logger.debug(
+            'Could not wire browser structured extract on runtime', exc_info=True
+        )
+    return (controller, initial_state)
+
+
+def generate_sid(config: AppConfig, session_name: str | None = None) -> str:
+    """Generate a unique session id.
+
+    The session ID is kept short to ensure it's easy to manage.
+    """
+    session_name = session_name or str(uuid.uuid4())
+    # Use a simple hash of the session name
+    hash_str = hashlib.sha256(session_name.encode()).hexdigest()
+    if len(session_name) > 16:
+        session_id = f'{session_name[:16]}-{hash_str[:15]}'
+    else:
+        remaining_chars = 32 - len(session_name) - 1
+        session_id = f'{session_name}-{hash_str[:remaining_chars]}'
+    return session_id[:32]

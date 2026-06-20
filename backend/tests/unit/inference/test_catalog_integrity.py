@@ -7,18 +7,18 @@ from pathlib import Path
 
 import pytest
 
-from backend.inference.catalog_loader import (
+from backend.inference.catalog.catalog_loader import (
     get_catalog,
     get_models_for_provider,
     lookup,
     lookup_provider_model,
 )
-from backend.inference.catalog_validator import (
+from backend.inference.catalog.catalog_validator import (
     validate_all_catalogs,
     validate_catalog_file,
     validate_loaded_catalog,
 )
-from backend.inference.registry import (
+from backend.inference.catalog.provider_catalog import (
     LOCAL_PROVIDERS,
     build_model_entries_by_provider,
     get_listable_providers,
@@ -156,7 +156,7 @@ def test_build_model_entries_includes_all_catalog_models() -> None:
 
 
 def test_all_opencode_catalog_models_have_grinta_transport() -> None:
-    from backend.inference.catalog_loader import validate_model_transport
+    from backend.inference.catalog.catalog_loader import validate_model_transport
 
     blocked: list[str] = []
     for entry in get_catalog():

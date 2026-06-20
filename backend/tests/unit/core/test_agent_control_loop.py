@@ -1,10 +1,10 @@
-"""Tests for backend.core.bootstrap.agent_control_loop."""
+"""Tests for backend.app.agent_control_loop."""
 
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from backend.core.bootstrap.agent_control_loop import (
+from backend.app.agent_control_loop import (
     _create_status_callback,
     _handle_error_status,
     _set_status_callbacks,
@@ -22,7 +22,7 @@ class TestHandleErrorStatus:
         controller.state.iteration_flag.current_value = 5
 
         with patch(
-            'backend.core.bootstrap.agent_control_loop.run_or_schedule'
+            'backend.app.agent_control_loop.run_or_schedule'
         ) as mock_run_or_schedule:
             _handle_error_status(controller, RuntimeStatus.ERROR, 'something broke')
 
@@ -37,7 +37,7 @@ class TestHandleErrorStatus:
         controller.set_agent_state_to = MagicMock(return_value='error-coro')
         controller.state.iteration_flag.current_value = 7
 
-        with patch('backend.core.bootstrap.agent_control_loop.run_or_schedule'):
+        with patch('backend.app.agent_control_loop.run_or_schedule'):
             _handle_error_status(controller, RuntimeStatus.ERROR_MEMORY, 'OOM')
 
         assert controller.state._memory_error_boundary == 7
@@ -47,7 +47,7 @@ class TestHandleErrorStatus:
         controller.set_agent_state_to = MagicMock(return_value='error-coro')
 
         with patch(
-            'backend.core.bootstrap.agent_control_loop.run_or_schedule',
+            'backend.app.agent_control_loop.run_or_schedule',
             side_effect=Exception('run_or_schedule failed'),
         ):
             with patch(
@@ -65,7 +65,7 @@ class TestHandleErrorStatus:
         controller.set_agent_state_to = MagicMock(return_value='error-coro')
 
         with patch(
-            'backend.core.bootstrap.agent_control_loop.run_or_schedule',
+            'backend.app.agent_control_loop.run_or_schedule',
             side_effect=Exception('run_or_schedule failed'),
         ):
             with patch(
@@ -81,7 +81,7 @@ class TestCreateStatusCallback:
         callback = _create_status_callback(controller)
 
         with patch(
-            'backend.core.bootstrap.agent_control_loop._handle_error_status'
+            'backend.app.agent_control_loop._handle_error_status'
         ) as mock_handle:
             callback('error', RuntimeStatus.ERROR, 'bad')
 
@@ -92,7 +92,7 @@ class TestCreateStatusCallback:
         callback = _create_status_callback(controller)
 
         with patch(
-            'backend.core.bootstrap.agent_control_loop._handle_error_status'
+            'backend.app.agent_control_loop._handle_error_status'
         ) as mock_handle:
             callback('info', RuntimeStatus.READY, 'all good')
 
@@ -105,7 +105,7 @@ class TestValidateStatusCallbacks:
         controller = MagicMock(spec=[])
 
         with patch(
-            'backend.core.bootstrap.agent_control_loop.logger.warning'
+            'backend.app.agent_control_loop.logger.warning'
         ) as warning:
             _validate_status_callbacks(runtime, controller)
 
@@ -117,7 +117,7 @@ class TestValidateStatusCallbacks:
         controller = MagicMock()
         controller.status_callback = lambda *args: None
 
-        with patch('backend.core.bootstrap.agent_control_loop.logger.debug') as debug:
+        with patch('backend.app.agent_control_loop.logger.debug') as debug:
             _validate_status_callbacks(runtime, controller)
 
         assert debug.call_count == 2
@@ -141,7 +141,7 @@ class TestSetStatusCallbacks:
 
 class TestRunAgentUntilDone:
     @patch(
-        'backend.core.bootstrap.agent_control_loop.asyncio.sleep',
+        'backend.app.agent_control_loop.asyncio.sleep',
         new_callable=AsyncMock,
     )
     async def test_sets_callbacks_and_exits_when_already_terminal(
@@ -163,7 +163,7 @@ class TestRunAgentUntilDone:
         mock_sleep.assert_not_awaited()
 
     @patch(
-        'backend.core.bootstrap.agent_control_loop.asyncio.sleep',
+        'backend.app.agent_control_loop.asyncio.sleep',
         new_callable=AsyncMock,
     )
     async def test_waits_for_event_driven_state_changes(self, mock_sleep) -> None:
@@ -188,7 +188,7 @@ class TestRunAgentUntilDone:
         assert mock_sleep.await_count == 2
 
     @patch(
-        'backend.core.bootstrap.agent_control_loop.asyncio.sleep',
+        'backend.app.agent_control_loop.asyncio.sleep',
         new_callable=AsyncMock,
     )
     async def test_initial_step_failure_is_logged_but_not_raised(

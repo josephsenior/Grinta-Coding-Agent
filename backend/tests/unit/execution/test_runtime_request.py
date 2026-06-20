@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import httpx
 import pytest
 
-from backend.execution.utils.request import (
+from backend.execution.utils.files.request import (
     RequestHTTPError,
     is_retryable_error,
 )
@@ -72,7 +72,7 @@ class TestIsRetryableError:
 
 class TestSendRequest:
     def test_successful_request(self):
-        from backend.execution.utils.request import send_request
+        from backend.execution.utils.files.request import send_request
 
         mock_session = MagicMock()
         mock_response = MagicMock(spec=httpx.Response)
@@ -86,7 +86,7 @@ class TestSendRequest:
         )
 
     def test_custom_timeout(self):
-        from backend.execution.utils.request import send_request
+        from backend.execution.utils.files.request import send_request
 
         mock_session = MagicMock()
         mock_response = MagicMock(spec=httpx.Response)
@@ -99,7 +99,7 @@ class TestSendRequest:
         )
 
     def test_http_error_raises_request_http_error(self):
-        from backend.execution.utils.request import send_request
+        from backend.execution.utils.files.request import send_request
 
         mock_session = MagicMock()
         request = httpx.Request('GET', 'http://example.com')
@@ -111,7 +111,7 @@ class TestSendRequest:
         assert exc_info.value.detail == 'bad input'
 
     def test_http_error_non_json_response(self):
-        from backend.execution.utils.request import send_request
+        from backend.execution.utils.files.request import send_request
 
         mock_session = MagicMock()
         request = httpx.Request('GET', 'http://example.com')

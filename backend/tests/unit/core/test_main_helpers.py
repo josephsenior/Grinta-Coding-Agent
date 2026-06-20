@@ -1,4 +1,4 @@
-"""Tests for backend.core.bootstrap.main — entry point helpers."""
+"""Tests for backend.app.main — entry point helpers."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from backend.core.bootstrap.main import (
+from backend.app.main import (
     _create_early_status_callback,
     _create_event_handler,
     _detach_and_close_event_stream,
@@ -57,7 +57,7 @@ def test_setup_replay_events_none():
     assert act is action
 
 
-@patch('backend.core.bootstrap.main.load_replay_log')
+@patch('backend.app.main.load_replay_log')
 def test_setup_replay_events_enabled(mock_load):
     config = MagicMock(spec=AppConfig)
     config.replay_trajectory_path = 'path.json'
@@ -129,8 +129,8 @@ def test_detach_and_close_event_stream_prefers_runtime_rebind() -> None:
     event_stream.close.assert_called_once_with()
 
 
-@patch('backend.core.bootstrap.main.create_registry_and_conversation_stats')
-@patch('backend.core.bootstrap.main.create_agent')
+@patch('backend.app.main.create_registry_and_conversation_stats')
+@patch('backend.app.main.create_agent')
 def test_initialize_session_components(mock_create_agent, mock_registry):
     config = AppConfig()
     mock_registry.return_value = (MagicMock(), MagicMock(), config)
@@ -147,8 +147,8 @@ def test_auto_continue_response():
     assert 'NEVER ASK' in resp
 
 
-@patch('backend.core.bootstrap.main.create_memory')
-@patch('backend.core.bootstrap.main.add_mcp_tools_to_agent')
+@patch('backend.app.main.create_memory')
+@patch('backend.app.main.add_mcp_tools_to_agent')
 @pytest.mark.asyncio
 async def test_setup_memory_and_mcp_with_mcp(mock_add_mcp, mock_create_mem):
     config = AppConfig()
@@ -172,7 +172,7 @@ def test_create_early_status_callback():
     callback = _create_early_status_callback(mock_controller)
 
     # Test error
-    with patch('backend.core.bootstrap.main.logger.error') as mock_err:
+    with patch('backend.app.main.logger.error') as mock_err:
         callback('error', RuntimeStatus.ERROR_MEMORY, 'bad thing')
         assert mock_err.called
         mock_controller.state.set_last_error.assert_called_with(
@@ -180,7 +180,7 @@ def test_create_early_status_callback():
         )
 
 
-@patch('backend.core.bootstrap.main.read_input')
+@patch('backend.app.main.read_input')
 def test_create_event_handler(mock_read_input):
     config = AppConfig()
     mock_event_stream = MagicMock()
@@ -197,9 +197,9 @@ def test_create_event_handler(mock_read_input):
     assert 'hello' in mock_event_stream.add_event.call_args[0][0].content
 
 
-@patch('backend.core.bootstrap.main.os.makedirs')
-@patch('backend.core.bootstrap.main.open', create=True)
-@patch('backend.core.bootstrap.main.json.dump')
+@patch('backend.app.main.os.makedirs')
+@patch('backend.app.main.open', create=True)
+@patch('backend.app.main.json.dump')
 def test_save_trajectory(mock_json, mock_open, mock_mkdir):
     config = AppConfig()
     config.save_trajectory_path = '/tmp/trajectories'
@@ -213,10 +213,10 @@ def test_save_trajectory(mock_json, mock_open, mock_mkdir):
     mock_json.assert_called()
 
 
-@patch('backend.core.bootstrap.main.ReplayManager.get_replay_events')
-@patch('backend.core.bootstrap.main.Path.exists', return_value=True)
-@patch('backend.core.bootstrap.main.Path.is_file', return_value=True)
-@patch('backend.core.bootstrap.main.open', create=True)
+@patch('backend.app.main.ReplayManager.get_replay_events')
+@patch('backend.app.main.Path.exists', return_value=True)
+@patch('backend.app.main.Path.is_file', return_value=True)
+@patch('backend.app.main.open', create=True)
 def test_load_replay_log(mock_open, mock_is_file, mock_exists, mock_get_events):
     mock_get_events.return_value = [
         MessageAction(content='task'),
@@ -234,10 +234,10 @@ def test_load_replay_log(mock_open, mock_is_file, mock_exists, mock_get_events):
     assert cast(Any, events[0]).content == 'next'
 
 
-@patch('backend.core.bootstrap.main._initialize_session_components')
-@patch('backend.core.bootstrap.main._setup_runtime_for_controller')
-@patch('backend.core.bootstrap.main._execute_controller_lifecycle')
-@patch('backend.core.bootstrap.main._save_trajectory')
+@patch('backend.app.main._initialize_session_components')
+@patch('backend.app.main._setup_runtime_for_controller')
+@patch('backend.app.main._execute_controller_lifecycle')
+@patch('backend.app.main._save_trajectory')
 @pytest.mark.asyncio
 async def test_run_controller_full(mock_save, mock_exec, mock_setup, mock_init):
     config = AppConfig()
@@ -253,7 +253,7 @@ async def test_run_controller_full(mock_save, mock_exec, mock_setup, mock_init):
     mock_exec.assert_called()
 
 
-@patch('backend.core.bootstrap.main.run_agent_until_done', new_callable=AsyncMock)
+@patch('backend.app.main.run_agent_until_done', new_callable=AsyncMock)
 @pytest.mark.asyncio
 async def test_run_agent_loop_basic(mock_until_done):
     mock_runtime = AsyncMock()
@@ -264,7 +264,7 @@ async def test_run_agent_loop_basic(mock_until_done):
     mock_until_done.assert_called_once()
 
 
-@patch('backend.core.bootstrap.main._setup_runtime_and_repo')
+@patch('backend.app.main._setup_runtime_and_repo')
 def test_setup_runtime_for_controller(mock_setup_repo):
     config = AppConfig()
     mock_runtime = MagicMock()
@@ -289,13 +289,13 @@ def test_setup_runtime_for_controller(mock_setup_repo):
     assert repo2 is None
 
 
-@patch('backend.core.bootstrap.main._setup_memory_and_mcp')
-@patch('backend.core.bootstrap.main._setup_replay_events')
-@patch('backend.core.bootstrap.main.create_controller')
-@patch('backend.core.bootstrap.main._attach_status_callback')
-@patch('backend.core.bootstrap.main._setup_initial_events')
-@patch('backend.core.bootstrap.main._run_agent_loop')
-@patch('backend.core.bootstrap.main._persist_controller_state', new_callable=AsyncMock)
+@patch('backend.app.main._setup_memory_and_mcp')
+@patch('backend.app.main._setup_replay_events')
+@patch('backend.app.main.create_controller')
+@patch('backend.app.main._attach_status_callback')
+@patch('backend.app.main._setup_initial_events')
+@patch('backend.app.main._run_agent_loop')
+@patch('backend.app.main._persist_controller_state', new_callable=AsyncMock)
 @pytest.mark.asyncio
 async def test_execute_controller_lifecycle(
     mock_persist,

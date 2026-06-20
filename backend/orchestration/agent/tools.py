@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, NotRequired, TypedDict
 
-from backend.core.logger import app_logger as logger
-from backend.inference.tool_types import make_function_chunk, make_tool_param
+from backend.core.logging.logger import app_logger as logger
+from backend.inference.tool_support.tool_types import make_function_chunk, make_tool_param
 
 if TYPE_CHECKING:
     pass

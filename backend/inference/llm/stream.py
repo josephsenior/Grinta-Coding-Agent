@@ -77,7 +77,7 @@ async def _stream_with_chunk_timeout(
         except StopAsyncIteration:
             return
         except _asyncio.TimeoutError:
-            from backend.core.logger import app_logger as logger
+            from backend.core.logging.logger import app_logger as logger
             from backend.inference.exceptions import Timeout as LLMTimeout
 
             logger.warning(

@@ -46,7 +46,7 @@ class TestCreateTaskTrackerTool:
         assert self.tool.get('type') == 'function'
 
     def test_name_matches_constant(self):
-        from backend.inference.tool_names import TASK_TRACKER_TOOL_NAME
+        from backend.core.tools.tool_names import TASK_TRACKER_TOOL_NAME
 
         assert _func(self.tool)['name'] == TASK_TRACKER_TOOL_NAME
 

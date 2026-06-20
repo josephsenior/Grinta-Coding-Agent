@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from backend.core.config.mcp_config import MCPConfig, MCPServerConfig
-from backend.execution.action_execution_server import (
+from backend.execution.server.action_execution_server import (
     RuntimeExecutor,
     resolve_workspace_path,
 )

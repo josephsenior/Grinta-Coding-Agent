@@ -7,7 +7,7 @@ from typing import (
     Any,
 )
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.inference.capabilities.model_features import ModelFeatures
 from backend.inference.exceptions import (
     AuthenticationError,
@@ -161,7 +161,7 @@ def _safe_call_kwargs_for_log(call_kwargs: dict[str, Any]) -> dict[str, Any]:
 def _llm_model_metadata_for_log(config: Any, resolver: Any) -> dict[str, Any]:
     """Return visible active model metadata for run logs."""
     from backend.inference.capabilities.context_limits import limits_from_config
-    from backend.inference.catalog_loader import (
+    from backend.inference.catalog.catalog_loader import (
         compact_metadata_for_log,
         lookup,
         runtime_model_id,

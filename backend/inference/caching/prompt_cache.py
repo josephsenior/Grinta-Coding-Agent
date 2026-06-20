@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 
 
 @runtime_checkable

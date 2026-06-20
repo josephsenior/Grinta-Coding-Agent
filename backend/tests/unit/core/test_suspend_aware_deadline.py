@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.core.suspend_aware_deadline import (
+from backend.core.timeouts.suspend_aware_deadline import (
     SuspendAwareDeadline,
     credit_active_deadlines_process_suspend,
 )

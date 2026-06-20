@@ -8,7 +8,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from backend.core.errors import ModelProviderError
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.engine import function_calling as _function_calling_module  # noqa: F401
 from backend.engine.streaming_checkpoint import StreamingCheckpoint
 
@@ -17,7 +17,8 @@ if TYPE_CHECKING:
     from backend.ledger.stream import EventStream
 
     from .planner import OrchestratorPlanner
-    from .safety import OrchestratorSafetyManager
+
+    from .contracts import NoopSafetyManager
 
 from backend.engine.executor_mixins._executor_lifecycle_mixin import (
     _ExecutorLifecycleMixin,
@@ -42,7 +43,7 @@ class OrchestratorExecutor(
     def __init__(
         self,
         llm: LLM,
-        safety_manager: OrchestratorSafetyManager,
+        safety_manager: NoopSafetyManager,
         planner: OrchestratorPlanner,
         mcp_tools_provider: Callable[[], dict[str, Any]],
     ) -> None:

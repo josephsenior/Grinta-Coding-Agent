@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from backend.execution.action_execution_server import RuntimeExecutor
+from backend.execution.server.action_execution_server import RuntimeExecutor
 from backend.execution.utils.shell.unified_shell import BaseShellSession
 from backend.ledger.action import (
     CmdRunAction,
@@ -24,7 +24,7 @@ from backend.ledger.observation import (
 def mock_executor(tmp_path: Path):
     with (
         patch('os.makedirs'),
-        patch('backend.execution.action_execution_server.SessionManager'),
+        patch('backend.execution.server.action_execution_server.SessionManager'),
     ):
         executor = RuntimeExecutor(
             plugins_to_load=[],

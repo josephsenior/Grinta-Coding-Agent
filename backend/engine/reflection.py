@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from backend.core.contracts.state import State
+    from backend.orchestration.state.state import State
 
 
 def format_reflection_progress(state: State) -> str:

@@ -16,10 +16,10 @@ from backend.ledger.observation.empty import NullObservation
 from backend.ledger.stream import EventStream
 from backend.orchestration.health import collect_orchestration_health
 from backend.orchestration.services.pending_action_service import PendingActionService
-from backend.orchestration.session_orchestrator_mixins._session_orchestrator_parallel_mixin import (
+from backend.orchestration.mixins.parallel import (
     _SessionOrchestratorParallelMixin,
 )
-from backend.persistence.local_file_store import LocalFileStore
+from backend.persistence.file_store.local_file_store import LocalFileStore
 from backend.utils.async_helpers.async_utils import drain_step_barrier, run_or_schedule
 
 pytestmark = pytest.mark.integration

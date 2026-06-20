@@ -11,7 +11,7 @@ from typing import (
 
 from backend.core import json_compat as json
 from backend.core.errors import LLMNoResponseError
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.core.message import Message
 from backend.inference.capabilities.model_features import ModelFeatures
 from backend.inference.debug_mixin import DebugMixin
@@ -114,7 +114,7 @@ class LLM(RetryMixin, DebugMixin):
         api_key_value = self._extract_api_key()
         _validate_api_key_or_local(api_key_value, self.config, resolver)
 
-        from backend.inference.catalog_loader import validate_model_transport
+        from backend.inference.catalog.catalog_loader import validate_model_transport
 
         validate_model_transport(
             self.config.model,
@@ -250,7 +250,7 @@ class LLM(RetryMixin, DebugMixin):
         if timeout is not None:
             call_kwargs['timeout'] = float(timeout)
 
-        from backend.inference.catalog_loader import (
+        from backend.inference.catalog.catalog_loader import (
             apply_model_param_overrides,
             sanitize_call_kwargs_for_provider,
         )

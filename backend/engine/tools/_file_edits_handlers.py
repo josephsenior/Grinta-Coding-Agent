@@ -12,7 +12,7 @@ from typing import Any, cast
 
 from backend.core.enums import FileEditSource
 from backend.core.errors import FunctionCallValidationError
-from backend.engine.function_calling_helpers import (
+from backend.engine.function_calling.helpers import (
     parse_bool_argument,
     require_tool_argument,
     set_security_risk,
@@ -36,7 +36,7 @@ from backend.engine.tools._file_ops import (
     _safe_workspace_path,
     _single_symbol_candidate,
 )
-from backend.inference.tool_names import (
+from backend.core.tools.tool_names import (
     CREATE_TOOL_NAME,
     EDIT_SYMBOL_TOOL_NAME,
     MULTIEDIT_TOOL_NAME,
@@ -262,7 +262,7 @@ def _select_and_validate_symbol(
             retryable=True,
         )
     if len(candidates) > 1:
-        from backend.execution.aes.structured_edit_errors import (
+        from backend.core.errors.structured_edit_errors import (
             symbol_ambiguity_summary,
         )
 

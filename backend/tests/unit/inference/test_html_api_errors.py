@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from backend.inference.direct_clients import OpenAIClient, TransportProfile
+from backend.inference.clients import OpenAIClient, TransportProfile
 from backend.inference.exceptions import (
     AuthenticationError,
     BadRequestError,
@@ -32,14 +32,14 @@ def test_format_html_api_error_response_includes_hints() -> None:
 
 
 def test_openai_client_maps_html_to_bad_request() -> None:
-    @patch('backend.inference.direct_clients.AsyncOpenAI')
-    @patch('backend.inference.direct_clients.OpenAI')
+    @patch('backend.inference.clients.AsyncOpenAI')
+    @patch('backend.inference.clients.OpenAI')
     @patch(
-        'backend.inference.direct_clients.get_shared_async_http_client',
+        'backend.inference.clients.get_shared_async_http_client',
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client',
+        'backend.inference.clients.get_shared_http_client',
         return_value=MagicMock(),
     )
     def _run(_h, _ah, _oai, _aoai):
@@ -59,14 +59,14 @@ def test_openai_client_maps_html_to_bad_request() -> None:
 
 
 def test_openai_client_maps_html_401_to_auth() -> None:
-    @patch('backend.inference.direct_clients.AsyncOpenAI')
-    @patch('backend.inference.direct_clients.OpenAI')
+    @patch('backend.inference.clients.AsyncOpenAI')
+    @patch('backend.inference.clients.OpenAI')
     @patch(
-        'backend.inference.direct_clients.get_shared_async_http_client',
+        'backend.inference.clients.get_shared_async_http_client',
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client',
+        'backend.inference.clients.get_shared_http_client',
         return_value=MagicMock(),
     )
     def _run(_h, _ah, _oai, _aoai):
@@ -95,14 +95,14 @@ def test_openai_client_maps_plain_text_401_body_to_authentication_error() -> Non
     """401 with non-JSON body used to map to InternalServerError and retried; should be auth."""
     from backend.inference.exceptions import AuthenticationError, InternalServerError
 
-    @patch('backend.inference.direct_clients.AsyncOpenAI')
-    @patch('backend.inference.direct_clients.OpenAI')
+    @patch('backend.inference.clients.AsyncOpenAI')
+    @patch('backend.inference.clients.OpenAI')
     @patch(
-        'backend.inference.direct_clients.get_shared_async_http_client',
+        'backend.inference.clients.get_shared_async_http_client',
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client',
+        'backend.inference.clients.get_shared_http_client',
         return_value=MagicMock(),
     )
     def _run(_h, _ah, _oai, _aoai):

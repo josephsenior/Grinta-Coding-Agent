@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, cast
 
-from backend.tools.sanitize_trajectories import (
+from backend.scripts.sanitize_trajectories import (
     _is_jsonl_file,
     _is_null_event,
     _process_dict_contents,

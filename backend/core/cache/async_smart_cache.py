@@ -7,7 +7,7 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from backend.core.cache.cache_utils import merge_settings_with_cache
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from backend.core.config.app_config import AppConfig

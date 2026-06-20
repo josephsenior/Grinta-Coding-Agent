@@ -6,8 +6,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from backend.core.logger import app_logger as logger
-from backend.core.providers import (
+from backend.core.logging.logger import app_logger as logger
+from backend.core.providers.configurations import (
     DEFAULT_API_KEY_MIN_LENGTH,
     PROVIDER_CONFIGURATIONS,
     UNKNOWN_PROVIDER_CONFIG,

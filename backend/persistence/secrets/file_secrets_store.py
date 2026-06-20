@@ -14,7 +14,7 @@ from backend.utils.async_helpers.async_utils import call_sync_from_async
 
 if TYPE_CHECKING:
     from backend.core.config.app_config import AppConfig
-    from backend.persistence.files import FileStore
+    from backend.persistence.file_store.files import FileStore
 
 
 class FileSecretsStore(SecretsStore):

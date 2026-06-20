@@ -1,4 +1,4 @@
-"""Tests for backend.core.bootstrap.setup — framework initialization helpers."""
+"""Tests for backend.app.setup — framework initialization helpers."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.core.bootstrap.setup import (
+from backend.app.setup import (
     create_agent,
     create_controller,
     create_memory,
@@ -17,7 +17,7 @@ from backend.core.bootstrap.setup import (
     initialize_repository_for_runtime,
 )
 from backend.core.config.app_config import AppConfig
-from backend.execution.plugins.requirement import PluginRequirement
+from backend.core.contracts.plugins import PluginRequirement
 
 
 def test_generate_sid():
@@ -42,7 +42,7 @@ def test_filter_plugins_by_config():
     mock_agent = MagicMock()
     mock_agent.config.disabled_plugins = ['plugin1']
     # Patch the logger in the core module to ensure it's captured
-    with patch('backend.core.logger.app_logger.info') as mock_info:
+    with patch('backend.core.logging.logger.app_logger.info') as mock_info:
         assert filter_plugins_by_config(plugins, agent=mock_agent) == []
         mock_info.assert_called()
 
@@ -70,14 +70,14 @@ def test_filter_plugins_by_config_honors_app_plugins_env():
 
 @patch('backend.orchestration.agent.Agent.get_cls')
 def test_ensure_agent_class_available_success(mock_get_cls):
-    from backend.core.bootstrap.setup import _ensure_agent_class_available
+    from backend.app.setup import _ensure_agent_class_available
 
     _ensure_agent_class_available('any')
     mock_get_cls.assert_called_with('any')
 
 
-@patch('backend.core.bootstrap.setup.get_file_store')
-@patch('backend.core.bootstrap.setup.EventStream')
+@patch('backend.app.setup.get_file_store')
+@patch('backend.app.setup.EventStream')
 @patch('backend.execution.runtime.factory.get_runtime_cls')
 def test_create_runtime_sid_from_stream(
     mock_get_runtime_cls, mock_event_stream_cls, mock_get_file_store
@@ -107,8 +107,8 @@ def test_create_runtime_sid_from_stream(
     assert mock_runtime_cls.call_args[1]['sid'] == 'stream_sid'
 
 
-@patch('backend.core.bootstrap.setup.get_file_store')
-@patch('backend.core.bootstrap.setup.EventStream')
+@patch('backend.app.setup.get_file_store')
+@patch('backend.app.setup.EventStream')
 @patch('backend.execution.runtime.factory.get_runtime_cls')
 def test_create_runtime(
     mock_get_runtime_cls, mock_event_stream_cls, mock_get_file_store
@@ -143,8 +143,8 @@ def test_create_runtime(
     mock_runtime_cls.assert_called()
 
 
-@patch('backend.core.bootstrap.setup.get_file_store')
-@patch('backend.core.bootstrap.setup.EventStream')
+@patch('backend.app.setup.get_file_store')
+@patch('backend.app.setup.EventStream')
 @patch('backend.execution.runtime.factory.get_runtime_cls')
 def test_create_runtime_closes_owned_event_stream_on_init_error(
     mock_get_runtime_cls, mock_event_stream_cls, mock_get_file_store
@@ -174,8 +174,8 @@ def test_create_runtime_closes_owned_event_stream_on_init_error(
     mock_event_stream.close.assert_called_once()
 
 
-@patch('backend.core.bootstrap.setup.State.restore_from_session')
-@patch('backend.core.bootstrap.setup.SessionOrchestrator')
+@patch('backend.app.setup.State.restore_from_session')
+@patch('backend.app.setup.SessionOrchestrator')
 def test_create_controller(mock_controller_cls, mock_restore):
     mock_agent = MagicMock()
     mock_runtime = MagicMock()
@@ -217,7 +217,7 @@ def test_create_memory_extended():
     assert memory.sid == 'sid'
 
 
-@patch('backend.core.bootstrap.setup.importlib.import_module')
+@patch('backend.app.setup.importlib.import_module')
 @patch('backend.orchestration.agent.Agent.get_cls')
 def test_create_agent_retry(mock_get_cls, mock_import):
     mock_config = MagicMock(spec=AppConfig)
@@ -245,7 +245,7 @@ def test_create_agent_retry(mock_get_cls, mock_import):
 
 @patch('backend.orchestration.agent.Agent.get_cls')
 def test_ensure_agent_class_available_fatal(mock_get_cls):
-    from backend.core.bootstrap.setup import _ensure_agent_class_available
+    from backend.app.setup import _ensure_agent_class_available
     from backend.core.errors import AgentNotRegisteredError
 
     mock_get_cls.side_effect = AgentNotRegisteredError('any')
@@ -264,23 +264,23 @@ def test_create_controller_no_stream():
         create_controller(mock_agent, mock_runtime, MagicMock(), MagicMock())
 
 
-@patch('backend.core.bootstrap.setup.UserSecrets')
+@patch('backend.app.setup.UserSecrets')
 def test_create_secret_store_logic(mock_user_secrets):
-    from backend.core.bootstrap.setup import _create_secret_store
+    from backend.app.setup import _create_secret_store
 
     assert _create_secret_store({}) is None
     _create_secret_store({'a': 1})
     mock_user_secrets.assert_called_once()
 
 
-@patch('backend.core.bootstrap.setup._create_secret_store')
+@patch('backend.app.setup._create_secret_store')
 def test_get_provider_tokens_none(mock_create):
     mock_create.return_value = None
     assert get_provider_tokens() is None
 
 
-@patch('backend.core.bootstrap.setup.get_provider_tokens')
-@patch('backend.core.bootstrap.setup.call_async_from_sync')
+@patch('backend.app.setup.get_provider_tokens')
+@patch('backend.app.setup.call_async_from_sync')
 def test_initialize_repository_for_runtime_no_tokens(mock_call_async, mock_get_tokens):
     mock_runtime = MagicMock()
     mock_call_async.return_value = '/path'

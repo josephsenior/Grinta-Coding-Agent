@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.engine.tools.common import (
+from backend.engine.tools.param_defs import (
     create_tool_definition,
     get_command_param,
     get_is_input_param,

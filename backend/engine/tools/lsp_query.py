@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from backend.inference.tool_names import CODE_INTELLIGENCE_TOOL_NAME, LSP_TOOL_NAME
+from backend.core.tools.tool_names import CODE_INTELLIGENCE_TOOL_NAME, LSP_TOOL_NAME
 from backend.ledger.action.code_nav import LspQueryAction
 
 

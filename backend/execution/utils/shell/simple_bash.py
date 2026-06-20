@@ -11,8 +11,8 @@ import subprocess
 import sys
 from typing import TYPE_CHECKING
 
-from backend.core.logger import app_logger as logger
-from backend.execution.utils.bounded_io import bounded_communicate
+from backend.core.logging.logger import app_logger as logger
+from backend.execution.utils.files.bounded_io import bounded_communicate
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.commands import (
     CmdOutputMetadata,

@@ -25,7 +25,7 @@ from backend.engine.prompts.prompt_builder import (
     _provider_parallel_tool_calls_supported,
 )
 from backend.engine.prompts.section_renderers import _render_system_capabilities
-from backend.inference.catalog_loader import (
+from backend.inference.catalog.catalog_loader import (
     apply_model_param_overrides,
     sanitize_call_kwargs_for_provider,
 )

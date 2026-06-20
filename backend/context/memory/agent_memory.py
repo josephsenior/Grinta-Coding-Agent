@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any
 import backend
 from backend.core.constants import RECALL_PIPELINE_TIMEOUT_SECONDS
 from backend.core.enums import RecallType, RuntimeStatus
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 
 try:
     from backend.knowledge import KnowledgeBaseManager
@@ -38,7 +38,7 @@ from backend.utils.prompt import ConversationInstructions, RepositoryInfo, Runti
 
 if TYPE_CHECKING:
     from backend.core.config.mcp_config import MCPConfig
-    from backend.execution.base import Runtime
+    from backend.execution.server.base import Runtime
     from backend.persistence.data_models.knowledge_base import KnowledgeBaseSettings
     from backend.playbooks.engine import (
         BasePlaybook,

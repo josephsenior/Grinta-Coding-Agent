@@ -13,7 +13,7 @@ import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.execution.aes.file_operations import (
     truncate_cmd_output,
 )

@@ -7,7 +7,7 @@ import json
 import pytest
 
 from backend.core.errors import FunctionCallValidationError, ToolExecutionError
-from backend.engine.function_calling import (
+from backend.engine.function_calling.dispatch import (
     _handle_create_tool,
     _handle_edit_symbol_tool,
     _handle_find_symbols_tool,

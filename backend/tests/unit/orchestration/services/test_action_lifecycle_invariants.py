@@ -15,7 +15,7 @@ from backend.ledger.stream import EventStream, EventStreamSubscriber
 from backend.orchestration.services.action_service import ActionService
 from backend.orchestration.services.observation_service import ObservationService
 from backend.orchestration.services.pending_action_service import PendingActionService
-from backend.persistence.local_file_store import LocalFileStore
+from backend.persistence.file_store.local_file_store import LocalFileStore
 
 
 class TestActionLifecycleInvariant(unittest.IsolatedAsyncioTestCase):

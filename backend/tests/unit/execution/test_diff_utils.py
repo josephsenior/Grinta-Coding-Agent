@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.execution.utils.diff import (
+from backend.execution.utils.files.diff import (
     _is_binary,
     _normalize_whitespace,
     get_diff,

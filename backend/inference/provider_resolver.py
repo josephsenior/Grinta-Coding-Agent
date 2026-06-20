@@ -12,20 +12,20 @@ import time
 
 import httpx
 
-from backend.core.logger import app_logger as logger
-from backend.inference.catalog_loader import (
+from backend.core.logging.logger import app_logger as logger
+from backend.inference.catalog.catalog_loader import (
     ModelEntry,
     lookup,
     lookup_provider_model,
     runtime_model_id,
 )
-from backend.inference.registry import (
+from backend.inference.catalog.provider_catalog import (
     KNOWN_PROVIDER_PREFIXES as _KNOWN_PREFIXES,
 )
-from backend.inference.registry import (
+from backend.inference.catalog.provider_catalog import (
     PROVIDER_DEFAULT_URLS as _PROVIDER_DEFAULT_URLS,
 )
-from backend.inference.registry import (
+from backend.inference.catalog.provider_catalog import (
     normalize_provider_name,
 )
 

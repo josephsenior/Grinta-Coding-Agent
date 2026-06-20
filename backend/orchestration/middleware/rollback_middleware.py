@@ -14,11 +14,11 @@ import os
 import re
 from typing import TYPE_CHECKING
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.orchestration.tool_pipeline import ToolInvocationMiddleware
 
 if TYPE_CHECKING:
-    from backend.core.rollback.rollback_manager import RollbackManager
+    from backend.execution.rollback.rollback_manager import RollbackManager
     from backend.orchestration.tool_pipeline import ToolInvocationContext
 
 # Action types that warrant a pre-execution checkpoint.
@@ -119,7 +119,7 @@ class RollbackMiddleware(ToolInvocationMiddleware):
             return None
 
         try:
-            from backend.core.rollback.rollback_manager import RollbackManager
+            from backend.execution.rollback.rollback_manager import RollbackManager
 
             self._manager = RollbackManager(
                 workspace_path=workspace,

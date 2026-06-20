@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from fastapi import Request
 
-    from backend.execution.action_execution_server import RuntimeExecutor
+    from backend.execution.server.action_execution_server import RuntimeExecutor
 
 
 async def _resolve_list_path(request: Request, client: RuntimeExecutor) -> str:

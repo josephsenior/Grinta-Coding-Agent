@@ -30,7 +30,7 @@ from backend.core.constants import (
     DEFAULT_TEXT_EDITOR_SYNTAX_PAUSE,
     DEFAULT_TEXT_EDITOR_SYNTAX_SWITCH,
 )
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.ledger.action import ActionSecurityRisk
 from backend.ledger.observation import ErrorObservation
 

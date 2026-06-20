@@ -10,7 +10,7 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Any
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.execution.utils.shell.bash_support import split_bash_commands
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.commands import (

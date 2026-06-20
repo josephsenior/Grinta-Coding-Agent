@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from backend.inference.catalog_loader import ModelEntry, lookup, lookup_provider_model
-from backend.inference.registry import normalize_provider_name
+from backend.inference.catalog.catalog_loader import ModelEntry, lookup, lookup_provider_model
+from backend.inference.catalog.provider_catalog import normalize_provider_name
 
 
 def _conservative_unknown_entry(model: str, provider: str | None) -> ModelEntry:

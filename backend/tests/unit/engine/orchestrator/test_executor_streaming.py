@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.engine.safety import OrchestratorSafetyManager
+from backend.engine.contracts import NoopSafetyManager
 from backend.inference.exceptions import ContextWindowExceededError
 
 
@@ -161,7 +161,7 @@ def test_executor_emits_streaming_chunk_actions(monkeypatch):
 
     executor = OrchestratorExecutor(
         llm=llm,
-        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        safety_manager=cast(NoopSafetyManager, _Safety()),
         planner=planner,
         mcp_tools_provider=lambda: {},
     )
@@ -177,7 +177,7 @@ def test_executor_content_to_str_supports_output_text_parts():
 
     executor = OrchestratorExecutor(
         llm=MagicMock(),
-        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        safety_manager=cast(NoopSafetyManager, _Safety()),
         planner=MagicMock(),
         mcp_tools_provider=lambda: {},
     )
@@ -194,7 +194,7 @@ def test_executor_extract_last_user_text_supports_object_messages():
 
     executor = OrchestratorExecutor(
         llm=MagicMock(),
-        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        safety_manager=cast(NoopSafetyManager, _Safety()),
         planner=MagicMock(),
         mcp_tools_provider=lambda: {},
     )
@@ -254,7 +254,7 @@ def test_async_execute_emits_real_streaming_chunks(monkeypatch):
 
     executor = OrchestratorExecutor(
         llm=llm,
-        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        safety_manager=cast(NoopSafetyManager, _Safety()),
         planner=MagicMock(),
         mcp_tools_provider=lambda: {},
     )
@@ -324,7 +324,7 @@ def test_async_execute_preserves_streamed_reasoning_content(monkeypatch):
 
     executor = OrchestratorExecutor(
         llm=llm,
-        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        safety_manager=cast(NoopSafetyManager, _Safety()),
         planner=MagicMock(),
         mcp_tools_provider=lambda: {},
     )
@@ -399,7 +399,7 @@ def test_async_execute_preserves_vercel_gateway_reasoning_delta(monkeypatch):
 
     executor = OrchestratorExecutor(
         llm=llm,
-        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        safety_manager=cast(NoopSafetyManager, _Safety()),
         planner=MagicMock(),
         mcp_tools_provider=lambda: {},
     )
@@ -477,7 +477,7 @@ def test_async_execute_preserves_reasoning_details_delta(monkeypatch):
 
     executor = OrchestratorExecutor(
         llm=llm,
-        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        safety_manager=cast(NoopSafetyManager, _Safety()),
         planner=MagicMock(),
         mcp_tools_provider=lambda: {},
     )
@@ -546,7 +546,7 @@ def test_async_execute_preserves_redacted_thinking_in_content(monkeypatch):
 
     executor = OrchestratorExecutor(
         llm=llm,
-        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        safety_manager=cast(NoopSafetyManager, _Safety()),
         planner=MagicMock(),
         mcp_tools_provider=lambda: {},
     )
@@ -608,7 +608,7 @@ def test_async_execute_clamps_completion_budget_before_stream_call(monkeypatch):
 
     executor = OrchestratorExecutor(
         llm=llm,
-        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        safety_manager=cast(NoopSafetyManager, _Safety()),
         planner=MagicMock(),
         mcp_tools_provider=lambda: {},
     )
@@ -658,7 +658,7 @@ def test_async_execute_raises_preflight_context_error_before_provider_call(
 
     executor = OrchestratorExecutor(
         llm=llm,
-        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        safety_manager=cast(NoopSafetyManager, _Safety()),
         planner=MagicMock(),
         mcp_tools_provider=lambda: {},
     )
@@ -723,7 +723,7 @@ def test_async_execute_does_not_timeout_active_reasoning_stream(monkeypatch, tmp
 
     executor = OrchestratorExecutor(
         llm=llm,
-        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        safety_manager=cast(NoopSafetyManager, _Safety()),
         planner=MagicMock(),
         mcp_tools_provider=lambda: {},
     )
@@ -783,7 +783,7 @@ def test_cancel_step_cancels_active_stream_and_discards_checkpoint(
 
         executor = OrchestratorExecutor(
             llm=llm,
-            safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+            safety_manager=cast(NoopSafetyManager, _Safety()),
             planner=MagicMock(),
             mcp_tools_provider=lambda: {},
         )
@@ -868,7 +868,7 @@ def test_async_execute_accumulates_tool_calls(monkeypatch):
 
     executor = OrchestratorExecutor(
         llm=llm,
-        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        safety_manager=cast(NoopSafetyManager, _Safety()),
         planner=MagicMock(),
         mcp_tools_provider=lambda: {},
     )
@@ -955,7 +955,7 @@ def test_async_execute_handles_cumulative_tool_call_name_and_args(monkeypatch):
 
     executor = OrchestratorExecutor(
         llm=llm,
-        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        safety_manager=cast(NoopSafetyManager, _Safety()),
         planner=MagicMock(),
         mcp_tools_provider=lambda: {},
     )
@@ -1023,7 +1023,7 @@ def _stream_chunks_to_tool_args(chunks: list[str]) -> str:
 
     executor = OrchestratorExecutor(
         llm=llm,
-        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        safety_manager=cast(NoopSafetyManager, _Safety()),
         planner=MagicMock(),
         mcp_tools_provider=lambda: {},
     )
@@ -1130,7 +1130,7 @@ def test_get_checkpoint_clears_stale_wal_when_persisted_control_event_proves_pro
 
     executor = OrchestratorExecutor(
         llm=MagicMock(),
-        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        safety_manager=cast(NoopSafetyManager, _Safety()),
         planner=MagicMock(),
         mcp_tools_provider=lambda: {},
     )
@@ -1160,7 +1160,7 @@ def test_get_checkpoint_blocks_when_no_persisted_control_event_supersedes_wal(
 
     executor = OrchestratorExecutor(
         llm=MagicMock(),
-        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        safety_manager=cast(NoopSafetyManager, _Safety()),
         planner=MagicMock(),
         mcp_tools_provider=lambda: {},
     )
@@ -1191,7 +1191,7 @@ def test_get_checkpoint_blocks_stale_wal_when_auto_discard_disabled(
 
     executor = OrchestratorExecutor(
         llm=MagicMock(),
-        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        safety_manager=cast(NoopSafetyManager, _Safety()),
         planner=_planner_with_checkpoint_policy(
             max_age=1.0,
             discard_stale_on_recovery=False,
@@ -1226,7 +1226,7 @@ def test_get_checkpoint_clears_stale_wal_for_resumed_session_with_persisted_cont
         NullObservation,
     )
     from backend.ledger.stream import EventStream
-    from backend.persistence.local_file_store import LocalFileStore
+    from backend.persistence.file_store.local_file_store import LocalFileStore
 
     monkeypatch.setenv('APP_DATA_DIR', str(tmp_path / 'appdata'))
     monkeypatch.setenv('APP_SQLITE_EVENTS', '0')
@@ -1264,7 +1264,7 @@ def test_get_checkpoint_clears_stale_wal_for_resumed_session_with_persisted_cont
     try:
         executor = OrchestratorExecutor(
             llm=MagicMock(),
-            safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+            safety_manager=cast(NoopSafetyManager, _Safety()),
             planner=_planner_with_checkpoint_policy(
                 max_age=1.0,
                 discard_stale_on_recovery=False,
@@ -1291,7 +1291,7 @@ def test_get_checkpoint_blocks_resumed_session_without_superseding_control_event
     from backend.ledger import EventSource
     from backend.ledger.observation import NullObservation
     from backend.ledger.stream import EventStream
-    from backend.persistence.local_file_store import LocalFileStore
+    from backend.persistence.file_store.local_file_store import LocalFileStore
 
     monkeypatch.setenv('APP_DATA_DIR', str(tmp_path / 'appdata'))
     monkeypatch.setenv('APP_SQLITE_EVENTS', '0')
@@ -1325,7 +1325,7 @@ def test_get_checkpoint_blocks_resumed_session_without_superseding_control_event
     try:
         executor = OrchestratorExecutor(
             llm=MagicMock(),
-            safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+            safety_manager=cast(NoopSafetyManager, _Safety()),
             planner=_planner_with_checkpoint_policy(
                 max_age=1.0,
                 discard_stale_on_recovery=False,
@@ -1359,7 +1359,7 @@ def test_response_to_actions_gates_plain_message_in_agent_mode(
 
     executor = OrchestratorExecutor(
         llm=MagicMock(),
-        safety_manager=OrchestratorSafetyManager(),
+        safety_manager=NoopSafetyManager(),
         planner=MagicMock(),
         mcp_tools_provider=lambda: {},
     )
@@ -1398,7 +1398,7 @@ def test_response_to_actions_gates_conversational_plain_message(monkeypatch):
 
     executor = OrchestratorExecutor(
         llm=MagicMock(),
-        safety_manager=OrchestratorSafetyManager(),
+        safety_manager=NoopSafetyManager(),
         planner=MagicMock(),
         mcp_tools_provider=lambda: {},
     )
@@ -1441,7 +1441,7 @@ def test_response_to_actions_allows_structured_non_runnable_action(monkeypatch):
 
     executor = OrchestratorExecutor(
         llm=MagicMock(),
-        safety_manager=OrchestratorSafetyManager(),
+        safety_manager=NoopSafetyManager(),
         planner=MagicMock(),
         mcp_tools_provider=lambda: {},
     )
@@ -1479,7 +1479,7 @@ def test_response_to_actions_converts_core_tool_call_validation_error_to_recover
 
     executor = OrchestratorExecutor(
         llm=MagicMock(),
-        safety_manager=OrchestratorSafetyManager(),
+        safety_manager=NoopSafetyManager(),
         planner=MagicMock(),
         mcp_tools_provider=lambda: {},
     )
@@ -1514,7 +1514,7 @@ def test_response_to_actions_adds_task_status_alias_hint(monkeypatch):
 
     executor = OrchestratorExecutor(
         llm=MagicMock(),
-        safety_manager=OrchestratorSafetyManager(),
+        safety_manager=NoopSafetyManager(),
         planner=MagicMock(),
         mcp_tools_provider=lambda: {},
     )
@@ -1534,7 +1534,7 @@ def test_response_to_actions_converts_common_tool_call_validation_error_to_recov
     monkeypatch,
 ):
     from backend.engine import executor as executor_module
-    from backend.engine.common import FunctionCallValidationError
+    from backend.engine.response_processing import FunctionCallValidationError
     from backend.engine.executor import OrchestratorExecutor
     from backend.ledger.action import AgentThinkAction
 
@@ -1548,7 +1548,7 @@ def test_response_to_actions_converts_common_tool_call_validation_error_to_recov
 
     executor = OrchestratorExecutor(
         llm=MagicMock(),
-        safety_manager=OrchestratorSafetyManager(),
+        safety_manager=NoopSafetyManager(),
         planner=MagicMock(),
         mcp_tools_provider=lambda: {},
     )

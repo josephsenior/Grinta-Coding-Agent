@@ -193,7 +193,7 @@ def attach_search_error_tool_result(
     path: str,
     output_mode: str | None = None,
 ) -> None:
-    from backend.execution.aes.structured_edit_errors import (
+    from backend.core.errors.structured_edit_errors import (
         build_search_error_tool_result,
     )
 

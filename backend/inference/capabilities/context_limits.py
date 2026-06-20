@@ -53,7 +53,7 @@ def derive_usable_input_tokens(
 
 
 def limits_from_catalog(model: str | None) -> ModelContextLimits:
-    from backend.inference.catalog_loader import lookup
+    from backend.inference.catalog.catalog_loader import lookup
 
     if not model:
         return ModelContextLimits(None, None, None, 'unknown_model')

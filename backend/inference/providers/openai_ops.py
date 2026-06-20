@@ -349,7 +349,7 @@ def _message_content_to_text(content: Any) -> str:
 
 
 def _flatten_stale_deepseek_assistant_message(msg: dict[str, Any]) -> dict[str, Any]:
-    from backend.inference.tool_history import flatten_tool_call_for_history
+    from backend.inference.tool_support.tool_history import flatten_tool_call_for_history
 
     text = _message_content_to_text(msg.get('content')).strip()
     tool_lines: list[str] = []

@@ -6,8 +6,8 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from backend.engine.contracts import ChatCompletionToolParam
-from backend.engine.tools.common import create_tool_definition
-from backend.inference.tool_names import ASK_USER_TOOL_NAME
+from backend.engine.tools.param_defs import create_tool_definition
+from backend.core.tools.tool_names import ASK_USER_TOOL_NAME
 from backend.ledger.action import MessageAction
 
 

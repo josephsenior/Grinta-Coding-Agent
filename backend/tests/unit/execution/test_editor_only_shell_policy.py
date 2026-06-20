@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from backend.core.config.security_config import SecurityConfig
-from backend.execution.editor_only_shell_policy import evaluate_editor_only_shell_block
+from backend.execution.runtime_mixins.editor_only_shell_policy import evaluate_editor_only_shell_block
 
 
 def _cfg() -> SecurityConfig:

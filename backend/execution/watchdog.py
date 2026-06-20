@@ -7,12 +7,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.execution.runtime.pool import call_async_disconnect
 from backend.execution.telemetry import RuntimeTelemetry, runtime_telemetry
 
 if TYPE_CHECKING:
-    from backend.execution.base import Runtime
+    from backend.execution.server.base import Runtime
     from backend.execution.runtime.pool import RuntimePool
     from backend.ledger.stream import EventStream
 

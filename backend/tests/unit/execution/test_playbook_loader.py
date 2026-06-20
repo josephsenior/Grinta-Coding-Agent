@@ -186,7 +186,7 @@ class TestGetPlaybooksFromOrgOrUser:
 
 class TestCloneAndLoadOrgPlaybooks:
     def test_auth_error_returns_empty(self, rt: _FakeRuntime):
-        from backend.core.provider_types import AuthenticationError
+        from backend.core.providers.provider_models import AuthenticationError
 
         rt.provider_handler.get_authenticated_git_url = MagicMock()
         with patch(

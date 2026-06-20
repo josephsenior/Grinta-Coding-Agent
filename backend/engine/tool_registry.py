@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 
 
 def _extract_tool_names(tools: Iterable[dict[str, Any]] | None) -> set[str]:
@@ -33,7 +33,7 @@ def validate_internal_toolset(
 
     strict=True raises RuntimeError to fail fast in production/dev.
     """
-    from backend.engine.function_calling import _create_tool_dispatch_map
+    from backend.engine.function_calling.dispatch import _create_tool_dispatch_map
 
     exposed = _extract_tool_names(tools)
     dispatchable = set(_create_tool_dispatch_map().keys())

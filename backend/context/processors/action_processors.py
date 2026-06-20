@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal, cast
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.core.message import (
     ImageContent,
     Message,
@@ -289,7 +289,7 @@ def _canonicalize_tool_call_arguments_dict(call_dict: dict[str, Any]) -> None:
     if not isinstance(raw_arguments, str) or not raw_arguments.strip():
         return
     try:
-        from backend.core.tool_arguments_json import parse_tool_arguments_object
+        from backend.core.tools.tool_arguments_json import parse_tool_arguments_object
 
         parsed = parse_tool_arguments_object(raw_arguments)
     except Exception:

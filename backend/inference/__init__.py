@@ -1,4 +1,4 @@
-"""Llm module public API."""
+"""LLM inference public API."""
 
 from __future__ import annotations
 

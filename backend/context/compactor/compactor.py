@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 from backend.context.view import View
 from backend.core.constants import DEFAULT_COMPACTION_RESERVED_SUMMARY_TOKENS
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.ledger.action.agent import CondensationAction
 from backend.ledger.serialization.event import event_to_dict
 from backend.ledger.stream.compaction import EventCompactor

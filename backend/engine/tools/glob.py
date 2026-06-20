@@ -26,8 +26,8 @@ from backend.engine.tools._search_helpers import (
     resolve_search_pagination,
     run_ripgrep_command,
 )
-from backend.engine.tools.common import create_tool_definition
-from backend.inference.tool_names import GLOB_TOOL_NAME
+from backend.engine.tools.param_defs import create_tool_definition
+from backend.core.tools.tool_names import GLOB_TOOL_NAME
 from backend.ledger.action.search import GlobAction
 from backend.ledger.observation import Observation
 
@@ -102,7 +102,7 @@ def build_glob_action(
 
 
 def _glob_failure(*, message: str, pattern: str, path: str) -> Observation:
-    from backend.execution.aes.structured_edit_errors import (
+    from backend.core.errors.structured_edit_errors import (
         build_search_error_observation,
     )
 

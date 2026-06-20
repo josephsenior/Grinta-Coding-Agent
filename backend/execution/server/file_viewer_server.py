@@ -10,8 +10,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from uvicorn import Config, Server
 
-from backend.core.logger import app_logger as logger
-from backend.execution.utils.file_viewer import generate_file_viewer_html
+from backend.core.logging.logger import app_logger as logger
+from backend.execution.utils.files.file_viewer import generate_file_viewer_html
 
 
 def create_app() -> FastAPI:

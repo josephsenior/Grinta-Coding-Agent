@@ -6,7 +6,7 @@ import time
 
 import pytest
 
-from backend.execution.utils.process_manager import (
+from backend.execution.utils.process.process_manager import (
     ManagedProcess,
     ProcessManager,
     _assess_pm_severity,

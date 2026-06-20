@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.core.type_safety.path_validation import PathValidationError, SafePath
 from backend.ledger import EventSource
 from backend.ledger.action import FileEditAction

@@ -13,9 +13,9 @@ import backend.engine.tools.analyze_project_structure as analyze_project_structu
 import backend.engine.tools.checkpoint as checkpoint_tools
 from backend.core.enums import FileEditSource
 from backend.core.errors import FunctionCallValidationError
-from backend.core.logger import app_logger as logger
-from backend.core.task_tracker import TaskTracker
-from backend.engine.function_calling_helpers import (
+from backend.core.logging.logger import app_logger as logger
+from backend.core.tasks.task_tracker import TaskTracker
+from backend.engine.function_calling.helpers import (
     parse_bool_argument,
     require_tool_argument,
     set_security_risk,
@@ -32,7 +32,7 @@ from backend.engine.tools.browser_native import (
 )
 from backend.engine.tools.glob import build_glob_action
 from backend.engine.tools.grep import build_grep_action
-from backend.inference.tool_names import (
+from backend.core.tools.tool_names import (
     TASK_TRACKER_TOOL_NAME,
     UNDO_LAST_EDIT_TOOL_NAME,
 )
@@ -300,7 +300,7 @@ def _handle_analyze_project_structure_tool(
 
 def _normalize_task_tracker_step(s: Mapping[str, Any], idx: int) -> dict[str, Any]:
     """Normalize a single task step dict. Raises FunctionCallValidationError on invalid input."""
-    from backend.core.contracts.state import normalize_plan_step_payload
+    from backend.core.tasks.plan_step import normalize_plan_step_payload
 
     if not isinstance(s, dict):
         raise FunctionCallValidationError(

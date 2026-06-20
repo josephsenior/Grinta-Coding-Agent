@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.engine.function_calling import _handle_execute_mcp_tool_tool
+from backend.engine.function_calling.dispatch import _handle_execute_mcp_tool_tool
 
 
 def test_gateway_hoists_top_level_keys_into_arguments() -> None:

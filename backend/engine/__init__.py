@@ -13,6 +13,12 @@ from backend.engine.contracts import (
     SafetyManagerProtocol as SafetyManagerProtocol,
 )
 from backend.engine.orchestrator import Orchestrator
-from backend.orchestration.agent import Agent
 
-Agent.register('Orchestrator', Orchestrator)
+
+def _register_orchestrator() -> None:
+    from backend.orchestration.agent import Agent
+
+    Agent.register('Orchestrator', Orchestrator)
+
+
+_register_orchestrator()

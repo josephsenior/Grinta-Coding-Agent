@@ -10,7 +10,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, cast
 
-from backend.context.compaction.pre_condensation_snapshot import (
+from backend.context.compactor.pre_condensation_snapshot import (
     is_durable_decision_text,
 )
 from backend.context.context_tracking import ContextTracker
@@ -40,10 +40,10 @@ from backend.context.tool_call_tracker import (
 )
 from backend.context.vector_store import EnhancedVectorStore
 from backend.core.config.agent_config import AgentConfig
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.core.message import ImageContent, Message, TextContent
 from backend.core.schemas import ActionType
-from backend.inference.tool_result_format import encode_tool_result_payload
+from backend.inference.tool_support.tool_result_format import encode_tool_result_payload
 from backend.ledger.action import (
     Action,
     MessageAction,
@@ -972,16 +972,18 @@ class ContextMemory:
             encoded_content: list[TextContent | ImageContent]
             tool_result = getattr(obs, 'tool_result', None)
             if isinstance(tool_result, dict):
+                import json
+                
+                payload = json.dumps(
+                    {
+                        'message': _json_safe_tool_message_content(message),
+                        'tool_result': tool_result,
+                    },
+                    ensure_ascii=False,
+                    separators=(',', ':'),
+                )
                 encoded_content = [
-                    TextContent(
-                        text=encode_tool_result_payload(
-                            tool_name,
-                            {
-                                'message': _json_safe_tool_message_content(message),
-                                'tool_result': tool_result,
-                            },
-                        )
-                    )
+                    TextContent(text=payload)
                 ]
             else:
                 encoded_content = message.content

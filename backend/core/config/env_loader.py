@@ -13,7 +13,7 @@ from typing import Any, get_args, get_origin
 
 from pydantic import BaseModel, SecretStr
 
-from backend.core import logger
+from backend.core.logging import logger
 from backend.core.config.app_config import AppConfig
 from backend.core.config.llm_config import LLMConfig
 

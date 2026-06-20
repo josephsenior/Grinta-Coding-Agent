@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from backend.security.safety_config import SafetyConfig
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.ledger.action import Action, ActionSecurityRisk
 from backend.security.command_analyzer import CommandAnalyzer, RiskCategory
 

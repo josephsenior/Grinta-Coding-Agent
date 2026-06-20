@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from backend.ledger.stream import (
-    EventStreamSubscriber,
-    get_aggregated_event_stream_stats,
-)
+from backend.ledger.stream import EventStreamSubscriber
+from backend.ledger.stream.stream_stats import get_aggregated_event_stream_stats
 
 # ---------------------------------------------------------------------------
 # EventStreamSubscriber enum

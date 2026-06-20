@@ -21,7 +21,7 @@ from backend.core.config.compactor_config import (
     SmartCompactorConfig,
     StructuredSummaryCompactorConfig,
 )
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from backend.ledger.event import Event

@@ -1,4 +1,4 @@
-"""Tests for backend.core.logger — RollingLogger, trace context, AppLoggerAdapter, etc."""
+"""Tests for backend.core.logging.logger — RollingLogger, trace context, AppLoggerAdapter, etc."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import os
 from typing import Any, cast
 from unittest.mock import patch
 
-from backend.core.logger import (
+from backend.core.logging.logger import (
     AppLoggerAdapter,
     LlmFileHandler,
     RollingLogger,
@@ -33,12 +33,12 @@ class TestRollingLogger:
         assert len(rl.log_lines) == 5
         assert rl.all_lines == ''
 
-    @patch('backend.core.logger.DEBUG', False)
+    @patch('backend.core.logging.logger.DEBUG', False)
     def test_is_enabled_false_when_no_debug(self):
         rl = RollingLogger()
         assert rl.is_enabled() is False
 
-    @patch('backend.core.logger.DEBUG', True)
+    @patch('backend.core.logging.logger.DEBUG', True)
     @patch('sys.stdout')
     def test_is_enabled_requires_tty(self, mock_stdout):
         mock_stdout.isatty.return_value = False
@@ -66,7 +66,7 @@ class TestRollingLogger:
             rl.add_line('third')
         assert rl.log_lines == ['second', 'third']
 
-    @patch('backend.core.logger.DEBUG', True)
+    @patch('backend.core.logging.logger.DEBUG', True)
     @patch('sys.stdout')
     def test_rolling_logger_display_logic(self, mock_stdout):
         mock_stdout.isatty.return_value = True
@@ -91,7 +91,7 @@ class TestRollingLogger:
         )
         assert any('test' in call.args[0] for call in mock_stdout.write.call_args_list)
 
-    @patch('backend.core.logger.DEBUG', True)
+    @patch('backend.core.logging.logger.DEBUG', True)
     @patch('sys.stdout')
     def test_write_immediately(self, mock_stdout):
         mock_stdout.isatty.return_value = True
@@ -100,7 +100,7 @@ class TestRollingLogger:
         mock_stdout.write.assert_called_with('immediate')
         mock_stdout.flush.assert_called()
 
-    @patch('backend.core.logger.DEBUG', False)
+    @patch('backend.core.logging.logger.DEBUG', False)
     @patch('sys.stdout')
     def test_is_disabled_no_write(self, mock_stdout):
         mock_stdout.isatty.return_value = True
@@ -225,7 +225,7 @@ class TestHandlerFactories:
 
 
 class TestLogUncaughtExceptions:
-    @patch('backend.core.logger.logging')
+    @patch('backend.core.logging.logger.logging')
     def test_logs_exception(self, mock_logging):
         try:
             raise ValueError('test error')
@@ -243,7 +243,7 @@ class TestLogUncaughtExceptions:
 
 class TestLlmFileHandler:
     def test_message_counter_increments(self, tmp_path):
-        with patch('backend.core.logger.LOG_DIR', str(tmp_path)):
+        with patch('backend.core.logging.logger.LOG_DIR', str(tmp_path)):
             handler = LlmFileHandler('prompt', delay=True)
             assert handler.message_counter == 1
             record = logging.LogRecord(
@@ -268,18 +268,18 @@ class TestLlmFileHandler:
 class TestTraceContextErrors:
     def test_set_context_exception_handled(self):
         with patch(
-            'backend.core.logger.TRACE_LOCAL', spec=[]
+            'backend.core.logging.logger.TRACE_LOCAL', spec=[]
         ):  # Triggers AttributeError/Exception
             # Should not raise
             set_trace_context({'a': 1})
 
     def test_clear_context_exception_handled(self):
-        with patch('backend.core.logger.TRACE_LOCAL', spec=[]):
+        with patch('backend.core.logging.logger.TRACE_LOCAL', spec=[]):
             # Should not raise
             clear_trace_context()
 
     def test_get_context_exception_handled(self):
-        with patch('backend.core.logger.TRACE_LOCAL', spec=[]):
+        with patch('backend.core.logging.logger.TRACE_LOCAL', spec=[]):
             # Should return empty dict
             assert get_trace_context() == {}
 
@@ -288,7 +288,7 @@ class TestTraceContextErrors:
 
 
 class TestLlmFileHandlerExtra:
-    @patch('backend.core.logger.DEBUG', False)
+    @patch('backend.core.logging.logger.DEBUG', False)
     def test_initialization_no_debug(self, tmp_path):
         # Create a dummy file in the directory to test unlinking
         session_dir = os.path.join(tmp_path, 'llm', 'default')
@@ -297,13 +297,13 @@ class TestLlmFileHandlerExtra:
         with open(dummy_file, 'w', encoding='utf-8') as f:
             f.write('old content')
 
-        with patch('backend.core.logger.LOG_DIR', str(tmp_path)):
+        with patch('backend.core.logging.logger.LOG_DIR', str(tmp_path)):
             handler = LlmFileHandler('prompt', delay=True)
             assert handler.session == 'default'
             # Should have unlinked the file
             assert not os.path.exists(dummy_file)
 
-    @patch('backend.core.logger.DEBUG', False)
+    @patch('backend.core.logging.logger.DEBUG', False)
     @patch('os.unlink', side_effect=Exception('unlink failed'))
     def test_initialization_unlink_failure_handled(self, mock_unlink, tmp_path):
         session_dir = os.path.join(tmp_path, 'llm', 'default')
@@ -312,20 +312,20 @@ class TestLlmFileHandlerExtra:
         with open(dummy_file, 'w', encoding='utf-8') as f:
             f.write('old content')
 
-        with patch('backend.core.logger.LOG_DIR', str(tmp_path)):
+        with patch('backend.core.logging.logger.LOG_DIR', str(tmp_path)):
             # Should not raise
             LlmFileHandler('prompt', delay=True)
             assert os.path.exists(dummy_file)
 
-    @patch('backend.core.logger.DEBUG', True)
+    @patch('backend.core.logging.logger.DEBUG', True)
     def test_initialization_debug(self, tmp_path):
-        with patch('backend.core.logger.LOG_DIR', str(tmp_path)):
+        with patch('backend.core.logging.logger.LOG_DIR', str(tmp_path)):
             handler = LlmFileHandler('prompt', delay=True)
             assert handler.session != 'default'
             assert handler.session
 
     def test_emit_logic(self, tmp_path):
-        with patch('backend.core.logger.LOG_DIR', str(tmp_path)):
+        with patch('backend.core.logging.logger.LOG_DIR', str(tmp_path)):
             handler = LlmFileHandler('prompt', delay=True)
             record = logging.LogRecord(
                 name='test',
@@ -350,7 +350,7 @@ class TestLlmFileHandlerExtra:
 
 class TestLoggerExtraCoverage:
     def test_get_file_handler_json(self, tmp_path):
-        with patch('backend.core.logger.LOG_JSON', True):
+        with patch('backend.core.logging.logger.LOG_JSON', True):
             handler = get_file_handler(str(tmp_path), logging.INFO)
             from pythonjsonlogger.json import JsonFormatter
 
@@ -358,7 +358,7 @@ class TestLoggerExtraCoverage:
             handler.close()
 
     def test_log_uncaught_exceptions_no_tb(self):
-        with patch('backend.core.logger.logging') as mock_logging:
+        with patch('backend.core.logging.logger.logging') as mock_logging:
             err = ValueError('test')
             log_uncaught_exceptions(ValueError, err, None)
             mock_logging.error.assert_called_with('%s: %s', ValueError, err)

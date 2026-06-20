@@ -3,7 +3,7 @@ from __future__ import annotations
 import importlib
 from typing import Any
 
-from backend.execution.base import Runtime
+from backend.execution.server.base import Runtime
 from backend.utils.import_utils import get_impl
 
 

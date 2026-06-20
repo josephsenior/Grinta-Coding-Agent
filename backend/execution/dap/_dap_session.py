@@ -13,7 +13,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.execution.dap._dap_client import DAPClient
 from backend.execution.dap._dap_errors import DAPError, DAPStartPhaseError
 from backend.execution.dap._dap_logging import _dap_log

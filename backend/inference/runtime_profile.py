@@ -13,8 +13,8 @@ from backend.inference.capabilities.context_limits import (
     limits_from_catalog,
 )
 from backend.inference.capabilities.param_profiles import resolve_param_profile_id
-from backend.inference.catalog_loader import lookup
-from backend.inference.registry import normalize_provider_name
+from backend.inference.catalog.catalog_loader import lookup
+from backend.inference.catalog.provider_catalog import normalize_provider_name
 
 _RUNTIME_PROFILE_KEY = '_grinta_runtime_profile'
 

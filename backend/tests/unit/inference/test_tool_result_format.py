@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.inference.tool_result_format import (
+from backend.inference.tool_support.tool_result_format import (
     decode_tool_result_payload,
     encode_tool_result_payload,
 )

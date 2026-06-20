@@ -67,7 +67,7 @@ def _resolve_api_key(spec: _ProviderSpec) -> str:
 
 
 def _send_sync(spec: _ProviderSpec, api_key: str) -> int:
-    from backend.inference.direct_clients import get_direct_client
+    from backend.inference.clients import get_direct_client
 
     client = get_direct_client(
         spec.model,
@@ -92,7 +92,7 @@ def _send_sync(spec: _ProviderSpec, api_key: str) -> int:
 
 
 async def _send_async(spec: _ProviderSpec, api_key: str) -> int:
-    from backend.inference.direct_clients import get_direct_client
+    from backend.inference.clients import get_direct_client
 
     client = get_direct_client(
         spec.model,

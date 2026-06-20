@@ -33,7 +33,7 @@ async def run_noninteractive(
     import time
 
     from backend.cli.event_renderer import CLIEventRenderer
-    from backend.core.bootstrap.main import (
+    from backend.app.main import (
         run_controller,
     )
     from backend.ledger.action import MessageAction
@@ -95,7 +95,7 @@ async def run_noninteractive(
 
         traceback.print_exc()
     finally:
-        from backend.inference.direct_clients import aclose_shared_http_clients
+        from backend.inference.clients import aclose_shared_http_clients
 
         await aclose_shared_http_clients()
 

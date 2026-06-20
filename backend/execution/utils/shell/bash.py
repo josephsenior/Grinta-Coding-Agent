@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 import libtmux
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.execution.utils.shell._bash_command import (
     _check_command_completion,
     _combine_outputs_between_matches,
@@ -83,7 +83,7 @@ if TYPE_CHECKING:
     from libtmux.session import Session
     from libtmux.window import Window
 
-    from backend.execution.utils.process_registry import TaskCancellationService
+    from backend.execution.utils.process.process_registry import TaskCancellationService
     from backend.ledger.action import CmdRunAction
 
 Ps1Match = re.Match[str]

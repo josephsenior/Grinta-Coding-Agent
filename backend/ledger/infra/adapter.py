@@ -6,7 +6,7 @@ from typing import Any
 
 from backend.ledger.serialization.event import event_from_dict
 from backend.ledger.stream import EventStream
-from backend.persistence.files import FileStore
+from backend.persistence.file_store.files import FileStore
 
 
 class EventServiceAdapter:

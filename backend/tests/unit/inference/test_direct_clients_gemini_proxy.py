@@ -1,17 +1,17 @@
 from unittest.mock import MagicMock, patch
 
-from backend.inference.direct_clients import OpenAIClient, TransportProfile
+from backend.inference.clients import OpenAIClient, TransportProfile
 
 
 class TestCrossFamilyMessageNormalization:
-    @patch('backend.inference.direct_clients.AsyncOpenAI')
-    @patch('backend.inference.direct_clients.OpenAI')
+    @patch('backend.inference.clients.AsyncOpenAI')
+    @patch('backend.inference.clients.OpenAI')
     @patch(
-        'backend.inference.direct_clients.get_shared_async_http_client',
+        'backend.inference.clients.get_shared_async_http_client',
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client',
+        'backend.inference.clients.get_shared_http_client',
         return_value=MagicMock(),
     )
     def test_cross_family_proxy_flattens_tool_history(self, _h, _ah, _oai, _aoai):
@@ -64,14 +64,14 @@ class TestCrossFamilyMessageNormalization:
             },
         ]
 
-    @patch('backend.inference.direct_clients.AsyncOpenAI')
-    @patch('backend.inference.direct_clients.OpenAI')
+    @patch('backend.inference.clients.AsyncOpenAI')
+    @patch('backend.inference.clients.OpenAI')
     @patch(
-        'backend.inference.direct_clients.get_shared_async_http_client',
+        'backend.inference.clients.get_shared_async_http_client',
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client',
+        'backend.inference.clients.get_shared_http_client',
         return_value=MagicMock(),
     )
     def test_same_family_proxy_keeps_tool_history(self, _h, _ah, _oai, _aoai):

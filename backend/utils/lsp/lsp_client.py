@@ -14,8 +14,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
-from backend.core.logger import app_logger as logger
-from backend.execution.utils.bounded_io import (
+from backend.core.logging.logger import app_logger as logger
+from backend.execution.utils.files.bounded_io import (
     BoundedResult,
     async_bounded_subprocess_exec,
 )

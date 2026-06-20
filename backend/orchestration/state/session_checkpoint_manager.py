@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.persistence.locations import get_conversation_checkpoints_dir
 
 if TYPE_CHECKING:
     from backend.orchestration.state.state import State
-    from backend.persistence.files import FileStore
+    from backend.persistence.file_store.files import FileStore
 
 
 class SessionCheckpointManager:

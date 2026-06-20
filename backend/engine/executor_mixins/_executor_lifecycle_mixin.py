@@ -16,7 +16,7 @@ from backend.core.constants import (
     DEFAULT_AGENT_STREAMING_CHECKPOINT_DISCARD_STALE_ON_RECOVERY,
     DEFAULT_AGENT_STREAMING_CHECKPOINT_MAX_AGE_SECONDS,
 )
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 from backend.engine.executor_mixins._executor_types import _MAX_CHECKPOINT_CACHE_SIZE
 from backend.engine.streaming_checkpoint import (
     StreamingCheckpoint,

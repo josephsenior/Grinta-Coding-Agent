@@ -3,7 +3,7 @@
 import json
 from typing import Any
 
-from backend.core.logger import app_logger as logger
+from backend.core.logging.logger import app_logger as logger
 
 
 def extract_tool_calls(
@@ -252,7 +252,7 @@ def model_requires_anthropic_tool_schema(model: str) -> bool:
     if not model:
         return False
 
-    from backend.inference.catalog_loader import (
+    from backend.inference.catalog.catalog_loader import (
         TRANSPORT_CLIENT_ANTHROPIC,
         resolve_transport_client,
     )

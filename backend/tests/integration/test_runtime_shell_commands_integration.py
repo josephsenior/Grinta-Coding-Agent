@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.execution.action_execution_server import RuntimeExecutor
+from backend.execution.server.action_execution_server import RuntimeExecutor
 
 
 @pytest.mark.integration
