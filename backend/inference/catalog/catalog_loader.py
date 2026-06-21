@@ -1063,8 +1063,6 @@ def apply_model_param_overrides(
     caching_prompt: bool = True,
 ) -> dict:
     """Apply data-driven model-specific parameter overrides from the catalog."""
-    from backend.inference.catalog.catalog_loader import lookup, lookup_provider_model
-
     entry = lookup(model)
     if entry is None and provider:
         bare = model.split('/')[-1] if '/' in model else model

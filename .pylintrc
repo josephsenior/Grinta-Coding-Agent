@@ -66,7 +66,23 @@ disable=C0114,  # missing-module-docstring
         W1113,  # keyword-arg-before-vararg
         W1309,  # f-string-without-interpolation
         W1510,  # subprocess-run-check
-        W2301   # unnecessary-ellipsis
+        W2301,  # unnecessary-ellipsis
+        E1101,  # no-member (Textual/Rich mixin false positives)
+        E1102,  # not-callable (stored callables and protocol hooks)
+        E0704,  # misplaced-bare-raise (valid `raise exc` after isinstance checks)
+        W1203,  # logging-fstring-interpolation (structured logging preference)
+        R0205,  # useless-object-inheritance (explicit mixin bases)
+        W0231,  # super-init-not-called (mixin composition)
+        W0221,  # arguments-differ (mixin/protocol overrides)
+        W0236,  # invalid-overridden-method (Textual async action symmetry)
+        C0123,  # unidiomatic-typecheck (runtime type comparisons)
+        W0104,  # pointless-statement (Textual compose patterns)
+        W0401,  # wildcard-import (settings constants re-export)
+        W0614,  # unused-wildcard-import
+        R0402,  # consider-using-from-import (theme token modules)
+        R1721,  # unnecessary-comprehension
+        R1731,  # consider-using-max-builtin
+        R1737   # use-yield-from
 
 [DESIGN]
 # Relaxed thresholds for large orchestration/service modules

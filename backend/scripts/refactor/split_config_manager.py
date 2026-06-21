@@ -210,7 +210,7 @@ __all__ = [
     if existing_init.exists():
         doc = existing_init.read_text(encoding='utf-8').split('\n')[0]
         if doc.startswith('"""'):
-            init = doc + '\n\n' + init.split('\n', 2)[2] if False else init
+            init = doc + '\n\n' + init.split('\n', 2)[2]
 
     (TARGET / '__init__.py').write_text(init, encoding='utf-8')
     SOURCE.unlink()

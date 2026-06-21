@@ -98,24 +98,26 @@ def _invoke_pre_dispatch_hook(hook: Callable[[Any], None], event: Event) -> None
 def _acquire_session_lock(lock_path: str, lock_data: str) -> Any:
     """Acquire an OS-level exclusive session lock or raise immediately."""
     if not OS_CAPS.is_windows:
-        import fcntl
+        import fcntl  # type: ignore[import-not-found]
 
         handle = open(lock_path, 'w', encoding='utf-8')
         try:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(  # type: ignore[attr-defined]
+                handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB  # type: ignore[attr-defined]
+            )
             handle.write(lock_data)
             handle.flush()
             os.fsync(handle.fileno())
             return handle
         except Exception:
             with contextlib.suppress(Exception):
-                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)  # type: ignore[attr-defined]
             handle.close()
             raise
 
     import msvcrt
 
-    handle = open(lock_path, 'w+b')
+    handle = open(lock_path, 'w+b')  # type: ignore[assignment]
     try:
         handle.write(lock_data.encode('utf-8'))
         handle.flush()
@@ -399,9 +401,11 @@ class EventStream(EventStore):
         if self._session_lock_handle is not None:
             try:
                 if not OS_CAPS.is_windows:
-                    import fcntl
+                    import fcntl  # type: ignore[import-not-found]
 
-                    fcntl.flock(self._session_lock_handle.fileno(), fcntl.LOCK_UN)
+                    fcntl.flock(  # type: ignore[attr-defined]
+                        self._session_lock_handle.fileno(), fcntl.LOCK_UN  # type: ignore[attr-defined]
+                    )
                 else:
                     import msvcrt
 

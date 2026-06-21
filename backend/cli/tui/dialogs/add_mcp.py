@@ -1,4 +1,4 @@
-"""Add MCP server dialog."""
+"""Add or edit MCP server dialog."""
 
 from __future__ import annotations
 
@@ -11,20 +11,29 @@ from backend.cli.tui.widgets.dialogs import ModalDialog
 
 
 class GrintaAddMCPDialog(ModalDialog[dict[str, str] | None]):
-    """Dialog to add an MCP Server."""
+    """Dialog to add or edit an MCP server."""
 
     BINDINGS = [
         *ModalDialog.BINDINGS,
         Binding('ctrl+s', 'save', 'Save', show=False),
     ]
 
-    def __init__(self, existing_names: set[str] | None = None) -> None:
+    def __init__(
+        self,
+        existing_names: set[str] | None = None,
+        *,
+        edit_name: str | None = None,
+        edit_command: str | None = None,
+    ) -> None:
         super().__init__()
         self._existing_names = {name.lower() for name in (existing_names or set())}
+        self._edit_name = (edit_name or '').strip() or None
+        self._edit_command = edit_command
 
     def compose(self) -> ComposeResult:
+        title = 'Edit MCP Server' if self._edit_name else 'Add MCP Server'
         with Vertical(id='dialog-container'):
-            yield Label('Add MCP Server', id='dialog-title')
+            yield Label(title, id='dialog-title')
             yield Static(
                 'Register a local command or remote endpoint for tool access.',
                 id='dialog-subtitle',
@@ -46,7 +55,17 @@ class GrintaAddMCPDialog(ModalDialog[dict[str, str] | None]):
                 yield Button('Cancel', id='settings-cancel')
 
     def on_mount(self) -> None:
-        self.query_one('#mcp-name', Input).focus()
+        name_input = self.query_one('#mcp-name', Input)
+        command_input = self.query_one('#mcp-command', Input)
+        if self._edit_name:
+            name_input.value = self._edit_name
+            name_input.disabled = True
+            if self._edit_command:
+                command_input.value = self._edit_command
+                self._update_mcp_type_hint(self._edit_command)
+            command_input.focus()
+        else:
+            name_input.focus()
 
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == 'mcp-command':
@@ -78,7 +97,7 @@ class GrintaAddMCPDialog(ModalDialog[dict[str, str] | None]):
         if not name or not cmd:
             feedback.update('[#f05757]Name and command required.[/]')
             return
-        if name.lower() in self._existing_names:
+        if not self._edit_name and name.lower() in self._existing_names:
             feedback.update(f'[#f05757]Server name already exists: {name}[/]')
             return
         self.dismiss({'name': name, 'command': cmd})

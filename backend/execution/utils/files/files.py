@@ -175,7 +175,7 @@ async def write_file(
     insert = split_content_lines(content)
     try:
         whole_path = resolve_path(path, workdir, workspace_root)
-        if not os.path.exists(os.path.dirname(whole_path)):
+        if not os.path.exists(os.path.dirname(whole_path)):  # noqa: ASYNC240
             os.makedirs(os.path.dirname(whole_path))
         file_existed = whole_path.exists()
         old_content: str | None = None

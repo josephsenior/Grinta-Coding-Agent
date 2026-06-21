@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING, Any
 from backend.core.logging.logger import app_logger as logger
 from backend.execution.aes.policy_block_messages import (
     hardened_local_block_message,
-    hardened_local_session_closed_message,
 )
 from backend.execution.runtime_mixins.editor_only_shell_policy import (
     evaluate_editor_only_shell_block,

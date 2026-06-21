@@ -48,11 +48,11 @@ def create_app() -> FastAPI:
                 content=f'<h1>Error: Path must be absolute</h1><p>{path}</p>',
                 status_code=400,
             )
-        if not os.path.exists(path):
+        if not os.path.exists(path):  # noqa: ASYNC240
             return HTMLResponse(
                 content=f'<h1>Error: File not found</h1><p>{path}</p>', status_code=404
             )
-        if os.path.isdir(path):
+        if os.path.isdir(path):  # noqa: ASYNC240
             return HTMLResponse(
                 content=f'<h1>Error: Path is a directory</h1><p>{path}</p>',
                 status_code=400,

@@ -29,7 +29,6 @@ from backend.inference.catalog.provider_catalog import (
     normalize_provider_name,
 )
 
-_PROVIDER_DEFAULT_URLS = _PROVIDER_DEFAULT_URLS
 KNOWN_PROVIDER_PREFIXES: set[str] = set(_KNOWN_PREFIXES)
 
 

@@ -377,7 +377,9 @@ def _checkpoint_files_for_entry(cp: dict[str, Any]) -> list[str]:
     rollback_id = cp.get('rollback_id')
     if rollback_id:
         try:
-            from backend.core.workspace_resolution import require_effective_workspace_root
+            from backend.core.workspace_resolution import (
+                require_effective_workspace_root,
+            )
             from backend.execution.rollback.rollback_manager import RollbackManager
 
             manager = RollbackManager(

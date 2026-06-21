@@ -48,7 +48,6 @@ from backend.orchestration.mixins.state import (
 )
 from backend.orchestration.mixins.step import (
     _SessionOrchestratorStepMixin,
-
 )
 from backend.orchestration.mixins.watchdog import (
     _SessionOrchestratorWatchdogMixin,

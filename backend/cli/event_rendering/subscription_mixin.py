@@ -93,7 +93,7 @@ class _EventRendererSubscriptionMixin(CLIEventRenderer if TYPE_CHECKING else obj
                 self._process_event_data(event)
             except Exception:
                 logger.debug(
-                    'Error processing event %s: %s',
+                    'Error processing event %s',
                     type(event).__name__,
                     exc_info=True,
                 )

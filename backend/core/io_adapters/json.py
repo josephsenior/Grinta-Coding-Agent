@@ -36,11 +36,12 @@ def _try_serialize_app_object(obj: Any) -> Any:
         (datetime, lambda o: o.isoformat()),
         (Event, event_to_dict),
         (Metrics, lambda o: o.get()),
-        ((BaseModel, CmdOutputMetadata), model_dump_with_options),
+        (CmdOutputMetadata, model_dump_with_options),
+        (BaseModel, model_dump_with_options),
     )
     for types_or_type, fn in handlers:
         if isinstance(obj, types_or_type):
-            return fn(obj)
+            return fn(obj)  # type: ignore[arg-type]
     if hasattr(obj, 'model_dump'):
         return obj.model_dump()
     return _NOT_SERIALIZED

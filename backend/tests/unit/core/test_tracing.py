@@ -9,7 +9,7 @@ import unittest
 from types import ModuleType
 from unittest.mock import MagicMock, patch
 
-import backend.core.tracing as tracing_mod  # type: ignore[import-untyped]
+import backend.core.tracing as tracing_mod  # type: ignore[import-not-found]
 
 
 def _package(name: str) -> ModuleType:

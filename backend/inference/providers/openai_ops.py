@@ -502,7 +502,10 @@ def _build_llm_response(response, client):
 
 
 async def acompletion(client: Any, messages: list[dict[str, Any]], **kwargs) -> Any:
-    from backend.inference.clients.base import LLMResponse, _sanitize_openai_compatible_kwargs
+    from backend.inference.clients.base import (
+        LLMResponse,
+        _sanitize_openai_compatible_kwargs,
+    )
     from backend.inference.exceptions import BadRequestError
 
     _ensure_opencode_chat_completions_model_supported(client)

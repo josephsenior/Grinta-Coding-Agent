@@ -136,13 +136,12 @@ def get_provider_tier(provider: str | None) -> int:
 
 
 def get_listable_providers() -> list[str]:
-    """Providers shown in settings / onboarding pickers (Tier 1 + Tier 2 + local)."""
+    """Providers shown in settings / onboarding pickers (all configured + local)."""
     hosted = get_provider_ids()
-    tier12 = [provider for provider in hosted if get_provider_tier(provider) <= 2]
     extras = [
-        provider for provider in sorted(LOCAL_PROVIDERS) if provider not in tier12
+        provider for provider in sorted(LOCAL_PROVIDERS) if provider not in hosted
     ]
-    return tier12 + extras
+    return hosted + extras
 
 
 def get_default_base_url(provider: str | None) -> str | None:

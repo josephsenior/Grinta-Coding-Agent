@@ -176,7 +176,7 @@ def execute_analyze_project_structure(
         'imports': lambda: _build_imports_action(path),
         'symbols': lambda: _build_symbols_action(path),
         'file_outline': lambda: _build_file_outline_action(path),
-        'recent': lambda: _build_recent_action(),
+        'recent': _build_recent_action,
         'dependencies': lambda: _build_dependencies_action(
             path,
             depth=depth,

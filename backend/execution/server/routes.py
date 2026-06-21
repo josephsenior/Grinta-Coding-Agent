@@ -295,8 +295,8 @@ def register_routes(
             full_path = await _resolve_list_path(request, client)
             if (
                 not full_path
-                or not os.path.exists(full_path)
-                or not os.path.isdir(full_path)
+                or not os.path.exists(full_path)  # noqa: ASYNC240
+                or not os.path.isdir(full_path)  # noqa: ASYNC240
             ):
                 return JSONResponse(content=[])
             full_path = _ensure_path_in_workspace(full_path, workspace_root)

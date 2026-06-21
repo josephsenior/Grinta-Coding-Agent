@@ -478,12 +478,13 @@ async def fetch_mcp_tools_from_config(
         return []
 
     # Filter servers: only include stdio if use_stdio is True
+    active_servers = [s for s in mcp_config.servers if getattr(s, 'enabled', True)]
     servers_to_connect = (
-        mcp_config.servers
+        active_servers
         if use_stdio
-        else [s for s in mcp_config.servers if s.type != 'stdio']
+        else [s for s in active_servers if s.type != 'stdio']
     )
-    configured_n = len(mcp_config.servers or [])
+    configured_n = len(active_servers)
     attempted_n = len(servers_to_connect)
 
     if configured_n == 0:

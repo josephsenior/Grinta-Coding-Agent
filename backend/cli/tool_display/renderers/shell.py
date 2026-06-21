@@ -199,7 +199,7 @@ def _build_meta_line(duration: str, exit_code: int | None) -> Text | None:
 
 def _build_output_preview(output: str) -> list[Text]:
     lines: list[Text] = []
-    raw_lines = [ln for ln in output.splitlines()]
+    raw_lines = list(output.splitlines())
     preview = raw_lines[:8]
     if not preview:
         return lines

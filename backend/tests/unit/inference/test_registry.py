@@ -7,6 +7,7 @@ from unittest.mock import patch
 from backend.inference.catalog.provider_catalog import (
     build_model_entries_by_provider,
     get_listable_providers,
+    get_provider_ids,
     get_static_model_names,
     list_model_names,
     normalize_provider_name,
@@ -24,7 +25,8 @@ def test_get_listable_providers_includes_local() -> None:
     providers = get_listable_providers()
     assert 'openai' in providers
     assert 'ollama' in providers
-    assert 'digitalocean' not in providers
+    assert 'digitalocean' in providers
+    assert set(get_provider_ids()).issubset(set(providers))
 
 
 def test_groq_static_catalog() -> None:

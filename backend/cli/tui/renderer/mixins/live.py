@@ -14,10 +14,10 @@ from textual.widgets import (
 )
 
 from backend.cli.theme import CLR_REASONING_SNAP
-from backend.cli.tui.transcript_typography import THINKING_LABEL
 from backend.cli.tui.constants import (
     _TUI_HISTORY_RENDER_LIMIT,
 )
+from backend.cli.tui.transcript_typography import THINKING_LABEL
 from backend.ledger import (
     EventStreamSubscriber,
 )
