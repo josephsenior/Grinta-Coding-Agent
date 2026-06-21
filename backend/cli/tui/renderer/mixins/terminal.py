@@ -114,6 +114,8 @@ class RendererTerminalMixin:
         from backend.cli.tui.widgets.scan_line import TerminalCard
 
         self.commit_live_thinking()
+        if not hasattr(self, '_pending_terminal_scan_cards'):
+            self._init_terminal_state(self)
         card = TerminalCard(
             session_id=session_id,
             session_label=session_label,

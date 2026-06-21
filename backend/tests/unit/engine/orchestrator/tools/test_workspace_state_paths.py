@@ -144,12 +144,42 @@ def test_task_tracker_save_retries_transient_replace_error(
         return real_replace(src, dst)
 
     with patch(
-        'backend.persistence.atomic_write.os.replace', side_effect=flaky_replace
+        'backend.persistence.file_store.atomic_write.os.replace',
+        side_effect=flaky_replace,
     ):
         tracker.save_to_file(task_list)
 
     assert calls['count'] >= 2
     assert tracker.load_from_file()[0]['description'] == 'Do it'
+
+
+def test_task_tracker_concurrent_save_uses_unique_temp_files(
+    tmp_path, monkeypatch
+) -> None:
+    """Concurrent saves must not share one fixed .tmp path (WinError 2 on replace)."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    monkeypatch.setattr(
+        'backend.core.workspace_resolution.workspace_agent_state_dir',
+        lambda project_root=None: tmp_path,
+    )
+    tracker = TaskTracker(tmp_path)
+    errors: list[Exception] = []
+
+    def save(i: int) -> None:
+        try:
+            tracker.save_to_file(
+                [{'id': '1', 'description': f'task {i}', 'status': 'todo'}]
+            )
+        except Exception as exc:
+            errors.append(exc)
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(save, range(24)))
+
+    assert not errors
+    assert tracker.path.exists()
+    assert tracker.load_from_file()[0]['description'].startswith('task ')
 
 
 def test_smart_compactor_reads_in_progress_ids_from_app_plan(
