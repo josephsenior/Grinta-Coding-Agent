@@ -2,7 +2,7 @@
 
 This document describes what runs in GitHub Actions and how it relates to local `pytest` ([`pytest.ini`](../pytest.ini)).
 
-**Linux PR gates** shard the full **unit** corpus (`backend/tests/unit`) across seven coverage jobs, enforce **75%** in `gates-on-linux-coverage-report`, then run integration, e2e, and stress in `gates-on-linux-extended`. **Windows** gates run the same unit corpus on 3.12 and 3.13 for cross-platform smoke.
+**Linux PR gates** shard the full **unit** corpus (`backend/tests/unit`) across seven coverage jobs, enforce **75%** in `gates-on-linux-coverage-report`, then run integration, e2e, and stress in `gates-on-linux-extended`. **Windows** and **macOS** gates run the full unit corpus for required cross-platform release coverage, while Linux remains the only platform with the extended integration/e2e/stress tier.
 
 For release tagging and GA promotion, see [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
 
@@ -13,6 +13,7 @@ For release tagging and GA promotion, see [RELEASE_CHECKLIST.md](RELEASE_CHECKLI
 | **Run Python Tests** | `gates-on-linux-coverage-{a,b,c,d,f,g,e}` + `report` | Full unit corpus on Linux with sharded coverage; combined report enforces **75%** (`--fail-under=75`). Execution shards (D/F/G) skip `compileall`; syntax is gated on other shards. |
 | **Run Python Tests** | `gates-on-linux-extended` | Integration, e2e, and stress suites on Linux (runs after the coverage report job passes). |
 | **Run Python Tests** | `gates-on-windows` (3.12 + 3.13) | Full unit corpus cross-platform smoke. |
+| **Run Python Tests** | `gates-on-macos` | Full unit corpus on macOS. This is the required macOS certification depth today; Linux remains the only platform with the extended integration/e2e/stress tier. |
 | **Lint** | pre-commit, mypy, version check | See [`.github/workflows/lint.yml`](../.github/workflows/lint.yml). |
 | **CodeQL** | `analyze` | Static security analysis for Python on PRs and main. |
 | **Security Scan (Bandit)** | Bandit | Python SAST; fails on medium/high findings. See [`.github/workflows/bandit.yml`](../.github/workflows/bandit.yml). |
@@ -24,7 +25,6 @@ For release tagging and GA promotion, see [RELEASE_CHECKLIST.md](RELEASE_CHECKLI
 
 | Job | Notes |
 | --- | --- |
-| `gates-on-macos` | Same unit corpus as Linux; `continue-on-error: true` until promoted to required. |
 | `gates-on-linux-py313` | Full unit corpus on Python 3.13; `continue-on-error: true`. |
 | **Heavy / Integration Tests** | Marker-filtered `heavy \| integration \| benchmark` slice; runs on `main`, schedule, and manual dispatch only. |
 
@@ -63,5 +63,5 @@ See [Contributing — testing](../CONTRIBUTING.md#testing-before-a-pull-request)
 
 For public release messaging, align claims with [Support Matrix](SUPPORT_MATRIX.md):
 
-- Linux and Windows are officially supported (required CI gates).
-- macOS is best-effort until promoted from advisory to required.
+- Linux and Windows are officially supported.
+- macOS is also a supported release platform with required unit-gate coverage; its current certification depth is unit-only rather than Linux-equivalent extended coverage.

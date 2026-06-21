@@ -1,6 +1,6 @@
 # Fresh-machine onboarding checklist
 
-Use this checklist before GA promotion and when validating onboarding changes.
+Use this checklist before GA promotion, when refreshing onboarding evidence, and whenever onboarding-affecting changes land.
 It implements the **CLI onboarding confidence** gate in
 [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
 
@@ -36,11 +36,9 @@ $env:WHEEL_DIR = '.\dist'
 .\scripts\smoke_source_onboarding.ps1
 ```
 
-## What you must run manually (GA gate)
+## What you must run manually (GA evidence and refresh)
 
-Before **1.0.0 GA**, collect **at least three successful reports** for each
-required path below. Use a machine or VM that has **never** run Grinta before (no
-`~/.grinta`, no prior `settings.json` in the target directory).
+Before **1.0.0 GA**, and again after onboarding-affecting changes, keep **at least three successful reports** current for each required path below. If the current release line already has passing reports, refresh that evidence rather than starting the process definition from zero. Use a machine or VM that has **never** run Grinta before for each new report (no `~/.grinta`, no prior `settings.json` in the target directory).
 
 ### A. `pipx` install (required ×3)
 
@@ -111,7 +109,7 @@ Copy into a release issue, RC feedback issue, or internal GA doc:
 | 6 | source uv | | | | | | | | | |
 | 7 | docker (opt.) | | | | | | | | | |
 
-**GA criteria:** rows 1–6 all pass with no P0 friction; row 7 optional.
+**GA criteria:** the current evidence set has rows 1–6 passing with no P0 friction; row 7 optional. Refresh the table whenever onboarding-relevant behavior changes.
 
 ## When something fails
 

@@ -154,7 +154,7 @@ Example:
 Add tests for backend/inference/provider_resolver.py and run them.
 ```
 
-The agent will plan, execute tools, validate progress, and only finish when completion checks pass.
+The agent will plan, execute tools, validate progress, and surface completion-quality signals before finishing. In the current release line, completion validation is advisory guidance rather than a hard finish blocker.
 
 ### Runtime state
 

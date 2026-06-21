@@ -86,9 +86,10 @@ with `backend/engine/tool_registry.py` (LLM tool name validation).
 2. Run the matching unit test directory before and after your edit.
 3. For user-visible behavior, update `docs/USER_GUIDE.md` or `docs/TROUBLESHOOTING.md`.
 4. For bugfixes, add a regression test per [REGRESSION_TESTS.md](REGRESSION_TESTS.md).
-5. PR gates: Linux runs full `backend/tests` with coverage; Windows and advisory macOS run `backend/tests/unit` — see [CI.md](CI.md).
+5. PR gates: Linux runs the full coverage + extended suite; Windows and macOS run required unit gates — see [CI.md](CI.md).
 
 ## Platform expectations
 
-Linux and Windows are **required** CI platforms. macOS is **best effort** until
-promoted — see [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md#macos-platform-policy).
+Linux, Windows, and macOS are current CI platforms. Linux carries the deepest
+certification tier; Windows and macOS currently use required unit-test gates —
+see [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md#macos-platform-policy).

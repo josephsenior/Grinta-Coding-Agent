@@ -61,7 +61,11 @@ The challenge is not just whether the model can keep going. It is whether it can
 - without losing task coherence
 - without mistaking movement for progress
 
-The current architecture fights that with explicit state transitions, retry queues, warning-first circuit breakers, task validation before finish, and stuck detection limited to patterns it can prove. But I do not want to oversell it. Long-horizon autonomy is still where good architecture meets the hard limits of current models.
+The current architecture fights that with explicit state transitions, retry
+queues, warning-first circuit breakers, task tracking, completion-quality
+validation signals, and stuck detection limited to patterns it can prove. But I
+do not want to oversell it. Long-horizon autonomy is still where good
+architecture meets the hard limits of current models.
 
 This is an active frontier, not a solved problem.
 

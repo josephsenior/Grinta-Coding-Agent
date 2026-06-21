@@ -8,13 +8,14 @@ This matrix defines what Grinta currently supports for official OSS releases.
 | --- | --- | --- |
 | Linux | Supported | Required CI gate runs full `backend/tests` with coverage (`gates-on-linux`). |
 | Windows | Supported | Required CI gate runs `backend/tests/unit` (`gates-on-windows`). |
-| macOS | Supported | Required CI gate runs `backend/tests/unit` (`gates-on-macos`). |
+| macOS | Supported | Required macOS unit gate runs `backend/tests/unit` (`gates-on-macos`); Linux remains the only platform with the full extended integration/e2e/stress tier. |
 
 ### macOS platform policy
 
-macOS is a **required release platform** alongside Linux and Windows. The
+macOS is a supported release platform with a required unit-test gate. The
 `gates-on-macos` job in [`.github/workflows/py-tests.yml`](../.github/workflows/py-tests.yml)
-runs the full unit corpus on every PR and on `main`.
+runs the full unit corpus on every PR and on `main`, but macOS does not yet
+carry the Linux extended integration/e2e/stress tier.
 
 Contributors on Mac should still run `pytest backend/tests/unit` locally before
 opening PRs that touch shell, terminal, or path handling.
@@ -27,7 +28,7 @@ by host OS. Treat this table as the honest parity contract.
 
 | Area | Linux | Windows | macOS |
 | --- | --- | --- | --- |
-| Core agent loop (read/edit/run/git) | Full | Full | Full (best effort) |
+| Core agent loop (read/edit/run/git) | Full | Full | Full (with parity caveats) |
 | Interactive terminal (tmux-backed) | Full | Not available natively | Full |
 | Interactive terminal (PTY / subprocess fallback) | Available | Limited interactivity | Available |
 | Workspace setup scripts | `.grinta/setup.sh` | `.grinta/setup.ps1` preferred; `.grinta/setup.sh` via Git Bash | `.grinta/setup.sh` |
@@ -36,7 +37,7 @@ by host OS. Treat this table as the honest parity contract.
 | MCP (local runtime / action client) | Full | Full (HTTP/SSE + allowlisted stdio) | Full |
 | MCP (remote action-execution client) | Full | Full when server exposes MCP | Full |
 | Default cache directory | System temp (`<temp>/grinta/cache`) | Same | Same |
-| CI certification depth | Full tests + coverage + integration | Unit tests | Unit tests (required) |
+| CI certification depth | Full tests + coverage + integration | Required unit gate | Required unit gate |
 
 When a feature is **limited** rather than **absent**, the runtime logs a warning
 and the agent prompt layer (`terminal_contract`) steers the model toward the

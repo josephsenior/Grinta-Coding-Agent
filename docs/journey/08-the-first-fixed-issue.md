@@ -28,7 +28,12 @@ Working means the agent:
 6. Updated its own plan to reflect what was done.
 7. Finished cleanly — not because it ran out of tokens or hit a timeout, but because it decided the work was complete.
 
-That seventh step is harder than it sounds. The agent is not allowed to declare "done" unless its plan is terminal. Every step in the task tracker must be marked as completed or explicitly marked as blocked with a reason. If the agent tries to finish while work is still outstanding, the system blocks it and tells it to go back and either finish the remaining steps or update the plan honestly.
+That seventh step is harder than it sounds. In the harder-gated phase described
+here, the agent was not allowed to declare "done" unless its plan was terminal.
+Every step in the task tracker had to be marked as completed or explicitly
+marked as blocked with a reason. If the agent tried to finish while work was
+still outstanding, the system blocked it and told it to go back and either
+finish the remaining steps or update the plan honestly.
 
 That constraint was not there from the beginning. I added it because early versions of the agent had a nasty habit of declaring victory prematurely — finishing with a confident summary while quietly leaving behind half-broken code. The validation service exists because I learned that an agent's self-assessment cannot be trusted without structural enforcement.
 
@@ -74,13 +79,18 @@ This graduated response was essential. Early versions of the stuck detector were
 
 ## The Finish Protocol
 
-The finishing flow deserves its own explanation because it reveals something about how I think about trust.
+The finishing flow in that phase deserves its own explanation because it reveals
+something about how I think about trust.
 
 When the agent calls the finish tool, it must provide a summary message, a completion status, any blockers that prevented full completion, suggested next steps, and optionally lessons learned — observations about the task that might be useful for future runs. The lessons learned field is not cosmetic. If the agent discovers something genuinely useful during a task — a quirk of the codebase, a pattern that worked, a dependency that behaved unexpectedly — that information gets stored and can be injected into the debug prompt tier for future sessions.
 
 That is where this chapter starts leaning on two later ones. [13. The Hidden Playbooks](13-the-hidden-playbooks.md) is about where reusable scar tissue and repository knowledge should live once the task is over. [15. Prompts Are Programs](15-prompts-are-programs.md) is about how those lessons can be surfaced without turning the base prompt into a landfill.
 
-But providing that information is not enough. The task validation service independently checks the plan state. It walks the task tracker, recursively finds every step that is not marked as done, and if any remain active, it blocks the finish with a specific error. The agent then has to go back, actually complete the work, update the tracker, and try again.
+But providing that information was not enough. The task validation service
+independently checked the plan state. It walked the task tracker, recursively
+found every step that was not marked as done, and if any remained active, it
+blocked the finish with a specific error. The agent then had to go back,
+actually complete the work, update the tracker, and try again.
 
 The task tracker itself is more than a checklist. It is a persistent JSON file (`active_plan.json`) that the agent maintains throughout the session with `update` and `view` operations. Each step has three states — `todo`, `in_progress`, and `done` — and the tracker enforces ordering. The validation service reads this file and performs recursive descent through nested steps, because a parent step with three child steps is only "done" when all three children are done. That recursive check matters because the agent sometimes marks a high-level step as complete while leaving sub-steps unfinished.
 
@@ -92,7 +102,11 @@ The validation service supports different validator types. A `TestPassingValidat
 
 The full philosophical argument behind that stack lives in [14. The Verification Tax](14-the-verification-tax.md). This chapter is the first time the loop worked in practice. That chapter is why I no longer think the model should be allowed to grade its own homework.
 
-The validation service makes false completion structurally difficult. Not impossible — the agent could theoretically mark all steps as done without actually doing them — but difficult enough that the failure mode shifts from "silent incompletion" to "deliberate dishonesty," which is a much harder failure for a well-prompted model to produce.
+The validation service made false completion structurally difficult. Not
+impossible — the agent could theoretically mark all steps as done without
+actually doing them — but difficult enough that the failure mode shifted from
+"silent incompletion" to "deliberate dishonesty," which is a much harder
+failure for a well-prompted model to produce.
 
 That distinction — between making failure visible versus making failure impossible — runs through a lot of Grinta's design. I do not trust the model to be perfect. I trust the system to make imperfection obvious.
 
