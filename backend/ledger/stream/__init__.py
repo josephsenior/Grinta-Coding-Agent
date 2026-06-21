@@ -14,6 +14,7 @@ from backend.ledger.stream.event_stream import (  # noqa: F401
     session_exists,
 )
 from backend.utils.async_helpers.async_utils import call_sync_from_async  # noqa: F401
+from backend.core.workspace_resolution import workspace_agent_state_dir  # noqa: F401
 
 
 class EventStreamSubscriber(str, Enum):
@@ -33,5 +34,6 @@ __all__ = [
     'EventStreamSubscriber',
     '_warn_unclosed_stream',
     'call_sync_from_async',
+    'workspace_agent_state_dir',
     'session_exists',
 ]
