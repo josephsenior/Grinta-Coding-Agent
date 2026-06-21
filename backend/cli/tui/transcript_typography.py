@@ -36,5 +36,7 @@ ERROR_PIPE = '#5a2d2d'
 # Domain pipes for orient / artifact rows
 ORIENT_PIPE_DEFAULT = '#2d4a6a'
 ORIENT_PREFIX_DEFAULT = '#5a7a9a'
+# File-edit scan-line label + left pipe (paired with read ↳ / orient blue)
+EDIT_CARD_ACCENT = '#91abec'
 WORKER_PIPE = '#3d5a4a'
 MCP_PIPE = '#3a3d5a'

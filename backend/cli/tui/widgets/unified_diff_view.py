@@ -540,6 +540,10 @@ class UnifiedDiffView(VerticalScroll):
         height: 10;
         overflow-y: auto;
     }
+    UnifiedDiffView.-detail {
+        height: 1fr;
+        overflow-y: auto;
+    }
     UnifiedDiffView .diff-truncated {
         width: 100%;
         height: 1;
@@ -556,6 +560,7 @@ class UnifiedDiffView(VerticalScroll):
         patch: str | None = None,
         max_lines: int = 200,
         n_context: int = DIFF_VIEW_CONTEXT_LINES,
+        fill: bool = False,
         id: str | None = None,
     ) -> None:
         rows = build_diff_view_rows(
@@ -566,9 +571,12 @@ class UnifiedDiffView(VerticalScroll):
             max_lines=max_lines,
             n_context=n_context,
         )
-        scroll_class = (
-            '-scrollable' if len(rows) > DIFF_VIEW_VISIBLE_LINES else '-compact'
-        )
+        if fill:
+            scroll_class = '-detail'
+        else:
+            scroll_class = (
+                '-scrollable' if len(rows) > DIFF_VIEW_VISIBLE_LINES else '-compact'
+            )
         super().__init__(id=id, classes=scroll_class)
         self._path = path
         self._old_content = old_content
@@ -580,6 +588,8 @@ class UnifiedDiffView(VerticalScroll):
 
     @property
     def allow_vertical_scroll(self) -> bool:
+        if self.has_class('-detail'):
+            return super().allow_vertical_scroll
         if not self.has_class('-scrollable'):
             return False
         return super().allow_vertical_scroll

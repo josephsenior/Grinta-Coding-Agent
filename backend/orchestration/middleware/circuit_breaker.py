@@ -117,6 +117,12 @@ class CircuitBreakerMiddleware(ToolInvocationMiddleware):
         tool_name = _tool_name_for_action(ctx.action)
 
         if isinstance(observation, ErrorObservation):
+            from backend.orchestration.services.error_formatting import (
+                observation_skips_circuit_breaker,
+            )
+
+            if observation_skips_circuit_breaker(observation):
+                return
             effective_tool = _effective_error_tool_name(
                 tool_name, observation.content or ''
             )

@@ -7,6 +7,7 @@ from collections import OrderedDict
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
+from backend.core.constants import APP_DEBUG_MODE
 from backend.core.errors import ModelProviderError
 from backend.core.logging.logger import app_logger as logger
 from backend.engine.streaming_checkpoint import StreamingCheckpoint
@@ -97,13 +98,8 @@ class OrchestratorExecutor(
         call_params = dict(params)
         call_params = self._apply_context_window_preflight(call_params)
 
-        # APP_DEBUG_MODE=1: log tools sent to LLM
-        if os.environ.get('APP_DEBUG_MODE', '').strip().lower() in (
-            '1',
-            'true',
-            'yes',
-            'on',
-        ):
+        # Log tools sent to LLM when APP_DEBUG_MODE is enabled (default on).
+        if APP_DEBUG_MODE:
             tool_list = call_params.get('tools', [])
             tool_names = (
                 [t.get('function', {}).get('name', '?') for t in tool_list]
@@ -221,12 +217,7 @@ class OrchestratorExecutor(
         return self._apply_context_window_preflight(call_params)
 
     def _log_debug_mode_tools(self, call_params: dict) -> None:
-        if os.environ.get('APP_DEBUG_MODE', '').strip().lower() not in (
-            '1',
-            'true',
-            'yes',
-            'on',
-        ):
+        if not APP_DEBUG_MODE:
             return
         tool_list = call_params.get('tools', [])
         tool_names = (

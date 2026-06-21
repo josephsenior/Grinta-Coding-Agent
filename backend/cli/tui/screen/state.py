@@ -425,9 +425,59 @@ class ScreenStateMixin:
             self.apply_slash_command_from_palette(self._suggestion_matches[selected])
 
     def _refresh_runtime_feedback(self) -> None:
+        self._tick_retry_countdown()
         if not self._is_unmounted:
             self._render_hud_bar()
             self._maybe_refresh_session_audit()
+
+    def arm_retry_countdown(
+        self,
+        *,
+        attempt: int,
+        max_attempts: int,
+        delay_seconds: float,
+        reason: str = '',
+        source: str = '',
+    ) -> None:
+        """Arm a live HUD countdown for an in-flight retry/backoff wait."""
+        self._retry_countdown_attempt = max(1, int(attempt))
+        self._retry_countdown_max_attempts = max(
+            self._retry_countdown_attempt, int(max_attempts)
+        )
+        self._retry_countdown_reason = str(reason or 'transient failure').strip()
+        self._retry_countdown_source = str(source or '').strip().lower()
+        delay = max(0.0, float(delay_seconds))
+        self._retry_countdown_deadline = time.monotonic() + delay
+
+    def _clear_retry_countdown(self) -> None:
+        self._retry_countdown_deadline = None
+
+    def _tick_retry_countdown(self) -> None:
+        deadline = getattr(self, '_retry_countdown_deadline', None)
+        if deadline is None:
+            return
+
+        remaining = float(deadline) - time.monotonic()
+        attempt = int(getattr(self, '_retry_countdown_attempt', 1) or 1)
+        max_attempts = int(
+            getattr(self, '_retry_countdown_max_attempts', attempt) or attempt
+        )
+        reason = str(getattr(self, '_retry_countdown_reason', '') or 'transient failure')
+        source = str(getattr(self, '_retry_countdown_source', '') or '')
+        retry_target = 'provider stream' if source == 'llm_stream' else 'provider'
+
+        if remaining > 0:
+            delay_str = f'{int(remaining + 0.999)}s' if remaining >= 1 else '<1s'
+            label = f'Backoff {attempt}/{max_attempts} (retrying in {delay_str})'
+            meta = f'Waiting {delay_str} to retry after {reason}'
+        else:
+            label = f'Backoff {attempt}/{max_attempts} (retrying now)'
+            meta = f'Resuming {retry_target} after {reason}'
+
+        self._hud.update_agent_state(label)
+        self._retry_summary = label
+        self._retry_meta = meta
+        self._retry_active = True
 
     def _maybe_refresh_session_audit(self) -> None:
         """Keep ``app.stripped.log`` / ``app.audit.txt`` current during long runs."""
@@ -482,8 +532,11 @@ class ScreenStateMixin:
         self._retry_summary = summary_text
         self._retry_meta = meta_text
         self._retry_active = active
+        if not active:
+            self._clear_retry_countdown()
 
     def clear_retry_status(self, meta: str = 'Idle') -> None:
+        self._clear_retry_countdown()
         self.set_retry_status('No retry activity', meta=meta, active=False)
 
     def set_runtime_status(

@@ -210,6 +210,11 @@ class GrintaScreen(
         self._retry_summary = 'No retry activity'
         self._retry_meta = 'Idle'
         self._retry_active = False
+        self._retry_countdown_deadline: float | None = None
+        self._retry_countdown_attempt = 1
+        self._retry_countdown_max_attempts = 1
+        self._retry_countdown_reason = ''
+        self._retry_countdown_source = ''
         self._runtime_summary = 'No runtime notices'
         self._runtime_meta = 'Idle'
         self._runtime_active = False

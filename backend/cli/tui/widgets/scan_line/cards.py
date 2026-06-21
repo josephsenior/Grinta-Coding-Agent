@@ -84,8 +84,8 @@ def _status_indicator_markup(
 # One unique icon per scan-line verb — no sharing between card kinds.
 _SCAN_LINE_ICONS: dict[str, str] = {
     'Agent': '◎',
-    'Created': '⊕',
-    'Edited': '←',
+    'Created': '+',
+    'Edited': '↲',
     'Shell': '$',
     'Terminal': '▸',
     'Browser': '⌁',
@@ -147,6 +147,15 @@ class EditCard(ScanLineCard):
     in the 1-line summary.
     """
 
+    DEFAULT_CSS = """
+    EditCard.-edited {
+        border-left: solid #91abec;
+    }
+    EditCard.-edited.failed {
+        border-left: solid #E24B4A;
+    }
+    """
+
     def __init__(
         self,
         display_path: str,
@@ -167,7 +176,20 @@ class EditCard(ScanLineCard):
         self._encoded_diff = encoded_diff
         self._syntax_pass = syntax_pass
         self._syntax_error = syntax_error
+        self.add_class('-created' if is_create else '-edited')
         self._finalize_state()
+
+    @property
+    def state_border_color(self) -> str:
+        if not self._is_create and self._state != 'failed':
+            from backend.cli.tui.transcript_typography import EDIT_CARD_ACCENT
+
+            return EDIT_CARD_ACCENT
+        from backend.cli.tui.widgets.scan_line.card import SCAN_LINE_BORDER_COLORS
+
+        return SCAN_LINE_BORDER_COLORS.get(
+            self._state, SCAN_LINE_BORDER_COLORS['queued']
+        )
 
     def _finalize_state(self) -> None:
         if self._syntax_pass is False:

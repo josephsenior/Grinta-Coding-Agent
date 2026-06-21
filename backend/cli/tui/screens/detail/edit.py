@@ -11,13 +11,29 @@ class EditDetailScreen(DetailScreen):
     """Full file-edit diff or new-file content with syntax error display."""
 
     DEFAULT_CSS = """
-    EditDetailScreen UnifiedDiffView {
+    EditDetailScreen #detail-body {
+        height: 1fr;
+        padding: 0 0 1 0;
+    }
+    EditDetailScreen UnifiedDiffView.-detail {
         width: 100%;
-        height: auto;
+        height: 1fr;
         border: none;
-        background: transparent;
+        background: #060a14;
+    }
+    EditDetailScreen .detail-syntax-error {
+        height: auto;
+        margin: 0 1 0 1;
     }
     """
+
+    @property
+    def _wrap_content_in_panel(self) -> bool:
+        return False
+
+    @property
+    def _use_scroll_body(self) -> bool:
+        return False
 
     def __init__(
         self,
@@ -50,15 +66,16 @@ class EditDetailScreen(DetailScreen):
             payload = decode_diff_view_payload(self._encoded_diff)
             if payload is not None:
                 path = str(payload.get('path') or '')
-                view = UnifiedDiffView(
-                    path=path,
-                    old_content=payload.get('old'),
-                    new_content=payload.get('new'),
-                    patch=payload.get('patch'),
-                    max_lines=1_000_000,
+                widgets.append(
+                    UnifiedDiffView(
+                        path=path,
+                        old_content=payload.get('old'),
+                        new_content=payload.get('new'),
+                        patch=payload.get('patch'),
+                        max_lines=1_000_000,
+                        fill=True,
+                    )
                 )
-                frame_title = path.rsplit('/', 1)[-1] if path else 'diff'
-                widgets.append(self.terminal_frame(view, title=frame_title))
             else:
                 widgets.extend(
                     self.section(

@@ -194,6 +194,43 @@ class TestCircuitBreakerMiddlewarePipeline:
         service.record_error.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_observe_skips_notify_ui_only_error_obs(self):
+        from backend.ledger.observation import ErrorObservation
+
+        controller = MagicMock()
+        service = MagicMock()
+        controller.circuit_breaker_service = service
+        mw = CircuitBreakerMiddleware(controller)
+        ctx = ToolInvocationContext(
+            controller=controller, action=MagicMock(), state=MagicMock()
+        )
+        obs = ErrorObservation(
+            content='Timeout: provider timed out',
+            notify_ui_only=True,
+            error_id='LLM_TIMEOUT',
+        )
+        await mw.observe(ctx, obs)
+        service.record_error.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_observe_skips_circuit_breaker_warning_obs(self):
+        from backend.ledger.observation import ErrorObservation
+
+        controller = MagicMock()
+        service = MagicMock()
+        controller.circuit_breaker_service = service
+        mw = CircuitBreakerMiddleware(controller)
+        ctx = ToolInvocationContext(
+            controller=controller, action=MagicMock(), state=MagicMock()
+        )
+        obs = ErrorObservation(
+            content='CIRCUIT_BREAKER_WARNING: Too many consecutive errors (5).',
+            error_id='CIRCUIT_BREAKER_WARNING',
+        )
+        await mw.observe(ctx, obs)
+        service.record_error.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_observe_str_replace_syntax_uses_syntax_bucket(self):
         from backend.ledger.observation import ErrorObservation
         from backend.orchestration.agent.circuit_breaker import (
