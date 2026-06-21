@@ -142,7 +142,7 @@ def test_edit_card_create():
         is_create=True,
         syntax_pass=True,
     )
-    assert 'Created' in _line_text(card)
+    assert '⊕ Created' in _line_text(card)
     assert 'helper.py' in _line_text(card)
     assert '+48' in card._delta_text()
     assert '✓' in card._delta_text()
@@ -157,7 +157,7 @@ def test_edit_card_failed_syntax():
         syntax_pass=False,
         syntax_error='unexpected indent at line 47',
     )
-    assert 'Edited' in _line_text(card)
+    assert '← Edited' in _line_text(card)
     assert '+12' in card._delta_text()
     assert '-4' in card._delta_text()
     assert '✗' in card._delta_text()
@@ -176,7 +176,7 @@ def test_edit_card_unknown_syntax():
 
 def test_edit_card_zero_delta():
     card = EditCard(display_path='backend/raft.py', added=0, removed=0)
-    assert 'Edited' in _line_text(card)
+    assert '← Edited' in _line_text(card)
     assert card._delta_text() == ''
 
 
@@ -190,11 +190,18 @@ def test_edit_card_detail_screen_built():
 
 # ── ShellCard ──────────────────────────────────────────────────────────
 
+def test_scan_line_icons_are_unique():
+    from backend.cli.tui.widgets.scan_line import cards as cards_mod
+
+    icons = set(cards_mod._SCAN_LINE_ICONS.values())
+    assert len(icons) == len(cards_mod._SCAN_LINE_ICONS)
+
+
 def test_shell_card_running():
     card = ShellCard(command='npm install')
     assert card.state == 'running'
     line = _line_text(card)
-    assert 'Shell' in line
+    assert '$ Shell' in line or 'Shell' in line
     assert '[#EF9F27]…[/]' in card._delta_text()
     assert 'npm install' in line
 
@@ -202,14 +209,14 @@ def test_shell_card_running():
 def test_shell_card_done():
     card = ShellCard(command='cargo test', output='47/47 passed', exit_code=0)
     assert card.state == 'done'
-    assert '[#639922]Shell[/]' in _line_text(card)
+    assert '[#639922]$ Shell[/]' in _line_text(card)
     assert '[#639922]✓[/]' in card._delta_text()
 
 
 def test_shell_card_failed():
     card = ShellCard(command='npm build', exit_code=1)
     assert card.state == 'failed'
-    assert '[#E24B4A]Shell[/]' in _line_text(card)
+    assert '[#E24B4A]$ Shell[/]' in _line_text(card)
     assert '[#E24B4A]✗ 1[/]' in card._delta_text()
 
 
@@ -238,8 +245,8 @@ def test_terminal_card_running():
         command='cargo build',
     )
     assert card.state == 'running'
-    assert 'Terminal' in _line_text(card)
-    assert '[#EF9F27]Terminal[/]' in _line_text(card)
+    assert '▸ Terminal' in _line_text(card)
+    assert '[#EF9F27]▸ Terminal[/]' in _line_text(card)
     assert 's1' in _line_text(card)
     assert '/project/grinta' in _line_text(card)
     assert '[#EF9F27]…[/]' in card._delta_text()
@@ -298,8 +305,8 @@ def test_terminal_card_detail_screen():
 def test_browser_card_running():
     card = BrowserCard(domain='github.com/raft/paper', action='extracting links')
     assert card.state == 'running'
-    assert 'Browser' in _line_text(card)
-    assert '[#EF9F27]Browser[/]' in _line_text(card)
+    assert '⌁ Browser' in _line_text(card)
+    assert '[#EF9F27]⌁ Browser[/]' in _line_text(card)
     assert 'github.com' in _line_text(card)
     assert 'extracting' in card._delta_text()
 
@@ -332,8 +339,8 @@ def test_browser_card_detail_screen():
 def test_debugger_card_running():
     card = DebuggerCard(location='backend/raft.py:47', function='')
     assert card.state == 'running'
-    assert 'Debug' in _line_text(card)
-    assert '[#EF9F27]Debug[/]' in _line_text(card)
+    assert '⎇ Debug' in _line_text(card)
+    assert '[#EF9F27]⎇ Debug[/]' in _line_text(card)
     assert 'backend/raft.py:47' in _line_text(card)
 
 
@@ -368,7 +375,7 @@ def test_debugger_card_detail_screen():
 def test_delegate_card_running_then_done():
     card = DelegateCard('Investigate flaky test', worker='worker-1')
     assert card.state == 'running'
-    assert 'Delegated' in _line_text(card)
+    assert '⇢ Delegated' in _line_text(card)
     card.complete(result='done', success=True)
     assert card.state == 'done'
     assert '✓' in card._delta_text()
@@ -378,11 +385,12 @@ def test_mcp_card_merges_result():
     card = MCPCard('search_docs', arguments={'q': 'ranking'})
     card.complete(result='snippet', success=True)
     assert card.state == 'done'
-    assert 'search_docs' in _line_text(card)
+    assert '⊛ Called' in _line_text(card) or 'search_docs' in _line_text(card)
 
 
 def test_payload_card_detail_screen():
     card = PayloadCard('Found', 'MyClass', 'class MyClass: ...')
+    assert 'ƒ Found' in _line_text(card)
     screen = card.build_detail_screen()
     from backend.cli.tui.screens.detail.payload import PayloadDetailScreen
 

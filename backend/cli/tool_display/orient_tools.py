@@ -580,7 +580,7 @@ def checkpoint_action_model(action: Any) -> OrientLineModel:
     verb = _CHECKPOINT_VERBS.get(command, 'Checkpoint')
     return OrientLineModel(
         tool='checkpoint',
-        icon='',
+        icon='├',
         verb=verb,
         target=checkpoint_target(action),
         result='…',
@@ -648,7 +648,7 @@ def checkpoint_think_orient_model(
     )
     return OrientLineModel(
         tool='checkpoint',
-        icon='',
+        icon='├' if verb != 'Reverted' else '↩',
         verb=verb,
         target=target,
         result='completed',

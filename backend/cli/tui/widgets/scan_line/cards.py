@@ -81,6 +81,33 @@ def _status_indicator_markup(
     return ''
 
 
+# One unique icon per scan-line verb — no sharing between card kinds.
+_SCAN_LINE_ICONS: dict[str, str] = {
+    'Agent': '◎',
+    'Created': '⊕',
+    'Edited': '←',
+    'Shell': '$',
+    'Terminal': '▸',
+    'Browser': '⌁',
+    'Debug': '⎇',
+    'Delegated': '⇢',
+    'Called': '⊛',
+    'Found': 'ƒ',
+    'Read': '↳',
+    'Verified': '⊢',
+    'Analyzed': '≡',
+    'Shared Board': '⊞',
+}
+
+
+def _scan_label_with_icon(label: str) -> str:
+    """Prefix a scan-line verb with its icon when one is defined."""
+    icon = _SCAN_LINE_ICONS.get(label, '')
+    if not icon:
+        return label
+    return f'{icon} {label}'
+
+
 # ── AgentMessageCard ───────────────────────────────────────────────────
 
 class AgentMessageCard(ScanLineCard):
@@ -99,7 +126,7 @@ class AgentMessageCard(ScanLineCard):
     def _line_text(self) -> str:
         from backend.cli.tui.transcript_typography import TX_BODY, TX_LABEL
 
-        return f'[{TX_LABEL}]Agent[/]  [{TX_BODY}]{_truncate(self._text, 80)}[/]'
+        return f'[{TX_LABEL}]{_scan_label_with_icon("Agent")}[/]  [{TX_BODY}]{_truncate(self._text, 80)}[/]'
 
     def build_detail_screen(self) -> DetailScreen:
         from backend.cli.tui.screens.detail import MessageDetailScreen
@@ -153,7 +180,9 @@ class EditCard(ScanLineCard):
     def _line_text(self) -> str:
         verb = 'Created' if self._is_create else 'Edited'
         path = _compact_path(self._display_path)
-        return self._scan_summary_line(verb, path, detail_max=40)
+        return self._scan_summary_line(
+            _scan_label_with_icon(verb), path, detail_max=40
+        )
 
     def _delta_text(self) -> str:
         parts: list[str] = []
@@ -229,7 +258,9 @@ class ShellCard(ScanLineCard):
         return self._latest_line()
 
     def _line_text(self) -> str:
-        return self._scan_summary_line('Shell', self.command, detail_max=50)
+        return self._scan_summary_line(
+            _scan_label_with_icon('Shell'), self.command, detail_max=50
+        )
 
     def _delta_text(self) -> str:
         return _status_indicator_markup(
@@ -302,7 +333,9 @@ class TerminalCard(ScanLineCard):
 
     def _line_text(self) -> str:
         loc = f'{self.session_label} @ {self.cwd}' if self.cwd else self.session_label
-        return self._scan_summary_line('Terminal', loc, detail_max=55)
+        return self._scan_summary_line(
+            _scan_label_with_icon('Terminal'), loc, detail_max=55
+        )
 
     def _delta_text(self) -> str:
         return _status_indicator_markup(
@@ -365,7 +398,9 @@ class BrowserCard(ScanLineCard):
 
     def _line_text(self) -> str:
         dom = self.domain or '…'
-        return self._scan_summary_line('Browser', dom, detail_max=40)
+        return self._scan_summary_line(
+            _scan_label_with_icon('Browser'), dom, detail_max=40
+        )
 
     def _delta_text(self) -> str:
         if self._state == 'running':
@@ -430,7 +465,9 @@ class DebuggerCard(ScanLineCard):
 
     def _line_text(self) -> str:
         loc = self.location or '…'
-        return self._scan_summary_line('Debug', loc, detail_max=80)
+        return self._scan_summary_line(
+            _scan_label_with_icon('Debug'), loc, detail_max=80
+        )
 
     def _delta_text(self) -> str:
         fn = self.function or '…'
@@ -496,7 +533,9 @@ class DelegateCard(ScanLineCard):
         self._apply_state(success)
 
     def _line_text(self) -> str:
-        return self._scan_summary_line('Delegated', self._delegate_task, detail_max=70)
+        return self._scan_summary_line(
+            _scan_label_with_icon('Delegated'), self._delegate_task, detail_max=70
+        )
 
     def _delta_text(self) -> str:
         if self._state == 'running':
@@ -576,7 +615,9 @@ class MCPCard(ScanLineCard):
         self._apply_state(success)
 
     def _line_text(self) -> str:
-        return self._scan_summary_line('Called', self._args_summary(), detail_max=70)
+        return self._scan_summary_line(
+            _scan_label_with_icon('Called'), self._args_summary(), detail_max=70
+        )
 
     def _delta_text(self) -> str:
         if self._state == 'running':
@@ -623,7 +664,9 @@ class PayloadCard(ScanLineCard):
         self.set_state('done' if success else 'failed')
 
     def _line_text(self) -> str:
-        return self._scan_summary_line(self._label, self._detail, detail_max=70)
+        return self._scan_summary_line(
+            _scan_label_with_icon(self._label), self._detail, detail_max=70
+        )
 
     def _delta_text(self) -> str:
         return _status_indicator_markup(self._state)

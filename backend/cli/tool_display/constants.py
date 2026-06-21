@@ -63,7 +63,7 @@ _TOOL_HEADLINE: dict[str, tuple[str, str]] = {
     'debugger': ('', 'Debugger'),
     'ask_user': ('', 'Ask user'),
     'call_mcp_tool': ('', 'MCP'),
-    'checkpoint': ('', 'Checkpoint'),
+    'checkpoint': ('├', 'Checkpoint'),
 }
 
 # Vague placeholder summaries — when a per-tool summarizer falls back to one of
