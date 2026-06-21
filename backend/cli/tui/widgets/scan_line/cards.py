@@ -302,7 +302,7 @@ class TerminalCard(ScanLineCard):
 
     def _line_text(self) -> str:
         loc = f'{self.session_label} @ {self.cwd}' if self.cwd else self.session_label
-        return self._scan_summary_line('Term', loc, detail_max=55)
+        return self._scan_summary_line('Terminal', loc, detail_max=55)
 
     def _delta_text(self) -> str:
         return _status_indicator_markup(

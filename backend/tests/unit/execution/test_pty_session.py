@@ -15,7 +15,9 @@ from backend.execution.utils.shell.pty_session import (
     InteractiveSessionConfig,
     InteractiveSessionError,
     PtyUnavailableError,
+    _needs_parent_console_ctrl_guard,
     _sanitize_terminal_text_chunk,
+    _suppress_parent_console_ctrl_events,
     create_interactive_session,
 )
 
@@ -77,6 +79,74 @@ class TestControlSequences:
     )
     def test_known_aliases(self, alias: str, expected: str) -> None:
         assert CONTROL_SEQUENCES[alias] == expected
+
+
+class TestWindowsConPtyCtrlGuard:
+    def test_needs_guard_only_for_ctrl_c_on_windows(self, monkeypatch) -> None:
+        monkeypatch.setattr(
+            'backend.execution.utils.shell.pty_session.IS_WINDOWS', True
+        )
+        assert _needs_parent_console_ctrl_guard('\x03') is True
+        assert _needs_parent_console_ctrl_guard('hello\x03world') is True
+        assert _needs_parent_console_ctrl_guard('hello') is False
+        assert _needs_parent_console_ctrl_guard('\x04') is False
+
+    def test_needs_guard_disabled_off_windows(self, monkeypatch) -> None:
+        monkeypatch.setattr(
+            'backend.execution.utils.shell.pty_session.IS_WINDOWS', False
+        )
+        assert _needs_parent_console_ctrl_guard('\x03') is False
+
+    def test_write_uses_guard_for_ctrl_c_on_windows(self, monkeypatch) -> None:
+        monkeypatch.setattr(
+            'backend.execution.utils.shell.pty_session.IS_WINDOWS', True
+        )
+        session = InteractiveSession(InteractiveSessionConfig(argv=['noop']))
+        session._started = True
+        session._closed = False
+        backend = MagicMock()
+        backend.write.return_value = 1
+        session._backend = backend
+
+        guard = MagicMock()
+        guard.__enter__ = MagicMock(return_value=None)
+        guard.__exit__ = MagicMock(return_value=False)
+        monkeypatch.setattr(
+            'backend.execution.utils.shell.pty_session._suppress_parent_console_ctrl_events',
+            lambda: guard,
+        )
+
+        assert session.write('\x03') == 1
+        guard.__enter__.assert_called_once()
+        backend.write.assert_called_once_with('\x03')
+
+    def test_write_skips_guard_for_plain_text(self, monkeypatch) -> None:
+        monkeypatch.setattr(
+            'backend.execution.utils.shell.pty_session.IS_WINDOWS', True
+        )
+        session = InteractiveSession(InteractiveSessionConfig(argv=['noop']))
+        session._started = True
+        session._closed = False
+        backend = MagicMock()
+        backend.write.return_value = 5
+        session._backend = backend
+
+        guard = MagicMock()
+        monkeypatch.setattr(
+            'backend.execution.utils.shell.pty_session._suppress_parent_console_ctrl_events',
+            lambda: guard,
+        )
+
+        assert session.write('hello') == 5
+        guard.__enter__.assert_not_called()
+        backend.write.assert_called_once_with('hello')
+
+    def test_suppress_parent_noop_off_windows(self, monkeypatch) -> None:
+        monkeypatch.setattr(
+            'backend.execution.utils.shell.pty_session.IS_WINDOWS', False
+        )
+        with _suppress_parent_console_ctrl_events():
+            pass
 
 
 class TestBufferSemantics:
