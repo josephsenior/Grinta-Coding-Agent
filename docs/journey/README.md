@@ -68,7 +68,7 @@ The file names stay stable for repository sanity, but the strongest reading arc 
 - **Act V — Hidden Systems:** [13](13-the-hidden-playbooks.md), [14](14-the-verification-tax.md), [15](15-prompts-are-programs.md), [16](17-the-pragmatic-stack.md), [17](18-the-mind-of-the-agent.md)
 - **Act VI — Reliability Under Fire:** [18](19-surviving-the-crash.md), [19](20-circuit-breakers-and-hallucinations.md), [20](21-the-safety-sandbox-is-not-optional.md), [21](22-who-grades-the-agent.md), [22](23-the-middleware-contract.md), [23](24-the-identity-and-execution-crisis.md)
 - **Act VII — Incident Addenda and Prompt Discipline:** [24](25-the-parallelization-trap.md)
-- **Act VIII — Operational Reality & Production:** [25](27-the-observability-black-hole.md), [26](30-the-weight-divide-local-vs-hosted.md), [27](31-the-myth-of-the-committee.md)
+- **Act VIII — Operational Reality & Production:** [25](27-the-observability-black-hole.md), [26](30-the-weight-divide-local-vs-hosted.md), [27](31-the-myth-of-the-committee.md) *(merged)*
 - **Act IX — Addendum (The Terminal, Revisited):** [28](32-the-two-lives-of-the-terminal.md)
 - **Act X — Reliability Receipts and Editor Honesty:** [29](33-the-small-async-wars.md), [30](34-the-fuzzy-match-heresy.md), [31](35-the-self-knowing-agent.md), [32](36-the-required-risk.md), [33](37-the-verbose-status.md), [34](38-the-vendor-neutral-bench.md)
 - **Act XI — Memory and Retrieval Honesty:** [39](39-the-semantic-memory-that-survived.md)
@@ -112,7 +112,7 @@ Chapter 07 was written earlier in the repo's life, but it now reads best as the 
 | [24](25-the-parallelization-trap.md) | **The Parallelization Trap** | Why aggressive parallelization breaks autonomous agents, how global states decouple, and why safe-subset scheduling won out over unlimited throughput. |
 | [25](27-the-observability-black-hole.md) | **The Observability, Cost, and Latency Triad** | Tracing tool calls, token cost economics, budget middleware guards, real-time HUD displays, context compaction, and human-in-the-loop confirmation systems. |
 | [26](30-the-weight-divide-local-vs-hosted.md) | **The Weight Divide: Local vs Hosted** | The operational realities of deploying heavy local weights vs. depending on frontier AI API latency. |
-| [27](31-the-myth-of-the-committee.md) | **The Myth of the Committee** | Why we killed the multi-agent swarm in favor of a single orchestrator with execution modes. |
+| [27](31-the-myth-of-the-committee.md) | **The Myth of the Committee** | *(merged into 02-the-killed-darlings.md)* — historical snapshot only. |
 | [28](32-the-two-lives-of-the-terminal.md) | **The Two Lives of the Terminal** | Native PTY for opt-in interactive shells without Docker; why the default session stayed “batch first”; and how that decision sits on top of the Console Wars chapter instead of deleting it. |
 | [29](33-the-small-async-wars.md) | **The Small Async Wars** | Five reliability fights from the async / state-machine layer: the `NULL_ACTION_LOOP` cap, the `StepGuardService` grounding gate, overlap-aware streamed tool-call merging, the `_step_inner` tail-call race, and routing checkpoint handoffs through planning directives instead of error panels. With an honest note on what `sandboxed_local` does (and does not) claim on Windows. |
 | [30](34-the-fuzzy-match-heresy.md) | **The Fuzzy Match Heresy and the Death of Unified Diffs** | Why exact-match purity was a lie on real files, the three match modes (`exact` / `normalize_ws` / `fuzzy_safe`), the tree-sitter syntax check that is the receipt, and the lines I refuse to cross. |
@@ -135,7 +135,7 @@ Chapter 07 was written earlier in the repo's life, but it now reads best as the 
 If you will not read linearly, three curated arcs:
 
 - **Reliability and proof:** [18 · Surviving the Crash](19-surviving-the-crash.md) → [19 · Circuit Breakers](20-circuit-breakers-and-hallucinations.md) → [20 · Safety Sandbox](21-the-safety-sandbox-is-not-optional.md) → [21 · Who Grades the Agent](22-who-grades-the-agent.md) → [22 · Middleware Contract](23-the-middleware-contract.md).
-- **Pivot and subtraction:** [02 · Killed Darlings](02-the-killed-darlings.md) → [12 · Open Source Was the Better Business](12-open-source-was-the-better-business.md) → [27 · Myth of the Committee](31-the-myth-of-the-committee.md).
+- **Pivot and subtraction:** [02 · Killed Darlings](02-the-killed-darlings.md) → [12 · Open Source Was the Better Business](12-open-source-was-the-better-business.md) (the multi-agent committee material now lives inside chapter 02).
 - **Terminal and execution:** [11 · Console Wars](11-the-console-wars.md) → [28 · Two Lives of the Terminal](32-the-two-lives-of-the-terminal.md) → [29 · Small Async Wars](33-the-small-async-wars.md) → [30 · Fuzzy Match Heresy](34-the-fuzzy-match-heresy.md).
 - **Memory and retrieval:** [04 · Context War](04-the-context-war.md) → [17 · Mind of the Agent](18-the-mind-of-the-agent.md) → [39 · Semantic Memory That Survived](39-the-semantic-memory-that-survived.md).
 - **Productization and maintainability:** [45 · Product Surface](45-the-product-surface-became-real.md) → [46 · Decomposition Wave](46-the-decomposition-wave.md) → [07 · Road Ahead](07-the-road-ahead.md).
