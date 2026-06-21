@@ -1,7 +1,7 @@
 from textual.app import App, ComposeResult
 
 from backend.cli.tui.app import _encode_unified_diff_text
-from backend.cli.tui.widgets.activity_card import ActivityCard
+from backend.cli.tui.widgets.scan_line import EditCard
 
 
 class TestApp(App):
@@ -14,7 +14,12 @@ class TestApp(App):
 +print('world')
 """
         encoded = _encode_unified_diff_text(diff_text)
-        yield ActivityCard(verb='Edited', detail='main.py', extra_content=encoded)
+        yield EditCard(
+            'main.py',
+            added=1,
+            removed=1,
+            encoded_diff=encoded,
+        )
 
 
 if __name__ == '__main__':

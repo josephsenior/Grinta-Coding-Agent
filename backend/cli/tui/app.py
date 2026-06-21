@@ -99,10 +99,6 @@ class GrintaScreen(
         Binding('f1', 'show_help', 'Help', show=True),
         Binding('ctrl+j', 'focus_next_card', 'Next Card', show=False, priority=True),
         Binding('ctrl+k', 'focus_prev_card', 'Prev Card', show=False, priority=True),
-        Binding(
-            'ctrl+shift+]', 'collapse_activity_cards', 'Collapse Cards', show=False
-        ),
-        Binding('ctrl+shift+[', 'expand_activity_cards', 'Expand Cards', show=False),
         Binding('ctrl+p', 'history_prev', 'History Prev', show=False),
         Binding('ctrl+n', 'history_next', 'History Next', show=False),
     ]
@@ -229,6 +225,7 @@ class GrintaScreen(
         self._hud_controls_ready = False
         self._hud_select_sync_values: dict[str, tuple[set[str], float]] = {}
         self._pending_image_urls: list[str] = []
+        self._last_turn_duration: str | None = None
 
 
 class TUIRenderer(
@@ -314,8 +311,6 @@ class TUIRenderer(
         self._worker_failed: int = 0
         self._condensation_count: int = 0
         self._compaction_transcript_active: bool = False
-        self._last_active_card: Any | None = None
-        self._last_streaming_card: Any | None = None
         self._last_browser_action_card: Any | None = None
         self._last_browser_cmd: str = ''
         self._pending_lsp_card: Any | None = None

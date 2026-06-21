@@ -88,12 +88,24 @@ class ScanLineCard(Container):
         color: #e2e8f0;
         padding: 0 1 0 0;
     }
+    ScanLineCard:focus {
+        background: #10192e;
+    }
+    ScanLineCard:focus #scan-expand {
+        color: #91abec;
+    }
     """
+
+    BINDINGS = [
+        ('enter', 'open_detail', 'Open'),
+        ('space', 'open_detail', 'Open'),
+    ]
 
     _state: str = 'queued'
 
     def __init__(self, *, id: str | None = None) -> None:
         super().__init__(id=id)
+        self.can_focus = True
         self.set_state('queued')
 
     # ── state management ────────────────────────────────────────────
@@ -173,6 +185,10 @@ class ScanLineCard(Container):
         if self.app is None:
             return
         self.app.push_screen(self.build_detail_screen())
+
+    def action_open_detail(self) -> None:
+        """Keyboard action — open the detail screen for the focused card."""
+        self._open_detail()
 
     # ── compose / mount ─────────────────────────────────────────────
 

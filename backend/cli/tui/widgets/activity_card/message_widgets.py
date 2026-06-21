@@ -14,41 +14,6 @@ from backend.cli.tui.transcript_typography import THINKING_LABEL
 from backend.cli.tui.image_attachments import image_attachment_status_text
 
 
-class TurnCompletion(Static):
-    """Thin turn separator — matches OrientLine / ThinkingIndicator chrome."""
-
-    _PIPE = '#3d5a4a'
-    _LABEL = '#5a7a6a'
-    _DURATION = '#9aa8b8'
-
-    DEFAULT_CSS = """
-    TurnCompletion {
-        width: 100%;
-        height: auto;
-        margin: 1 0 2 0;
-        padding: 0 1 0 2;
-        border: transparent;
-        border-left: solid #3d5a4a;
-        background: #090d18;
-    }
-    """
-
-    def __init__(
-        self,
-        duration: str,
-        *,
-        id: str | None = None,
-    ) -> None:
-        super().__init__(id=id)
-        self.styles.border_left = ('solid', self._PIPE)
-        self.update(
-            Text.assemble(
-                ('Finished in: ', self._LABEL),
-                (duration, self._DURATION),
-            )
-        )
-
-
 class UserMessage(Static):
     """User message display in the transcript."""
 

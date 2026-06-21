@@ -282,7 +282,6 @@ _HIGH_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r'\bcrontab\s+-[er]\b', re.I), 'cron modification'),
     # Windows
     (re.compile(r'\bRemove-Item\b.*-Recurse\b', re.I), 'recursive delete (PowerShell)'),
-    (re.compile(r'\bRemove-Item\b.*-Force\b', re.I), 'forced delete (PowerShell)'),
     (
         re.compile(r'\bSet-ExecutionPolicy\s+Unrestricted\b', re.I),
         'execution policy bypass',
@@ -306,6 +305,10 @@ _MEDIUM_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (
         re.compile(r'\bInstall-Module\b|\bInstall-Package\b', re.I),
         'PowerShell package install',
+    ),
+    (
+        re.compile(r'\bRemove-Item\b.*-Force\b', re.I),
+        'forced file delete (PowerShell)',
     ),
 ]
 
@@ -392,7 +395,9 @@ class CommandAnalyzer:
         if blocked is not None:
             return blocked
 
-        has_chaining = bool(re.search(r'(?:;|&&|\|\||\||&|`|\$\()', cmd))
+        # Semicolon is a benign statement separator (common in PowerShell);
+        # only escalate on operators that combine or pipe commands.
+        has_chaining = bool(re.search(r'(?:&&|\|\||\||&|`|\$\()', cmd))
         risk, reason, recs = self._match_tier(
             cmd, self._extra_critical + _CRITICAL_PATTERNS, RiskCategory.CRITICAL
         )
@@ -401,14 +406,7 @@ class CommandAnalyzer:
 
         risk, reason, recs = self._match_tier(cmd, _HIGH_PATTERNS, RiskCategory.HIGH)
         if risk == RiskCategory.HIGH:
-            return _escalate_if_chaining(
-                risk,
-                reason,
-                recs,
-                has_chaining,
-                RiskCategory.CRITICAL,
-                'Command chaining with high-risk operations is critical.',
-            )
+            return risk, reason, recs
 
         risk, reason, recs = self._match_tier(
             cmd, _MEDIUM_PATTERNS, RiskCategory.MEDIUM

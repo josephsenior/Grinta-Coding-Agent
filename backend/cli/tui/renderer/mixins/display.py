@@ -19,10 +19,6 @@ from textual.css.query import (
 from backend.cli.event_rendering.panels import (
     task_panel_signature,
 )
-from backend.cli.event_rendering.unified_renderer import (
-    ActivityCard,
-    ActivityRenderer,
-)
 from backend.cli.tool_display.orient_tools import OrientLineModel
 from backend.cli.tui.renderer.mixins.terminal import RendererTerminalMixin
 
@@ -487,43 +483,6 @@ class RendererDisplayMixin:
                 items.append(line)
         self.add_to_history(Group(*items))
 
-    def _deactivate_last_streaming_card(self, *, except_widget: Any = None) -> None:
-        """Collapse the previous streaming card when a new action starts."""
-        prev = getattr(self, '_last_streaming_card', None)
-        if prev is None or prev is except_widget:
-            return
-        try:
-            prev.set_processing(False)
-            if not getattr(prev, 'is_pinned', False):
-                prev.collapse()
-        except Exception:
-            pass
-        self._last_streaming_card = None
-
-    def _activate_activity_card(self, widget: Any) -> None:
-        """Mark a card as the current streaming target and expand it."""
-        if widget is None:
-            return
-        self._deactivate_last_streaming_card(except_widget=widget)
-        self._last_streaming_card = widget
-        self._last_active_card = widget
-        try:
-            widget.set_processing(True)
-            if getattr(widget, 'should_auto_expand', lambda: False)():
-                widget.expand()
-        except Exception:
-            pass
-
-    def _clear_last_active_card_processing(self) -> None:
-        """Clear the pulsing processing indicator on the last active card."""
-        prev = getattr(self, '_last_active_card', None)
-        if prev:
-            try:
-                prev.set_processing(False)
-            except Exception:
-                pass
-            self._last_active_card = None
-
     def _update_retry_strip(self, summary: str, meta: str) -> None:
         self._tui.set_retry_status(summary, meta=meta, active=True)
 
@@ -582,74 +541,6 @@ class RendererDisplayMixin:
             'No delegated work', meta='Idle', active=False, has_error=False
         )
 
-    def _write_card(
-        self,
-        card: ActivityCard,
-        *,
-        collapsed: bool | None = None,
-    ) -> Any:
-        """Write an activity card to the transcript using native ActivityCard widget.
-
-        ``collapsed`` defaults to compact so expandable tool cards never open
-        unsolicited. Callers may still opt into an expanded state explicitly.
-        """
-        if collapsed is None:
-            collapsed = True
-        self._flush_orient_burst()
-        self.commit_live_thinking()
-        self._clear_last_active_card_processing()
-
-        extra_content = ActivityRenderer.format_extra_lines(card.extra_lines)
-
-        from backend.cli.tui.widgets.activity_card import (
-            ActivityCard as TUIActivityCard,
-        )
-
-        status_map = {
-            'ok': 'ok',
-            'err': 'err',
-            'warn': 'warn',
-            'neutral': 'neutral',
-        }
-        status = status_map.get(card.secondary_kind, 'neutral')
-        widget = TUIActivityCard(
-            verb=card.verb,
-            detail=card.detail,
-            badge_category=card.badge_category,
-            status=status,
-            outcome=card.secondary,
-            extra_content=extra_content,
-            collapsed=collapsed,
-            collapsible=card.is_collapsible,
-            syntax_language=card.syntax_language,
-            show_meta=bool(card.meta_lines),
-        )
-        if card.meta_lines:
-            widget.set_meta(*card.meta_lines)
-
-        is_tool = card.badge_category in (
-            'tool',
-            'files',
-            'browser',
-            'mcp',
-            'workers',
-            'code',
-        )
-        is_active = is_tool and card.secondary_kind == 'neutral'
-        if is_active:
-            self._activate_activity_card(widget)
-        elif self._last_active_card is widget:
-            self._last_active_card = None
-
-        display = self._tui._get_display()
-        self._register_widget_event_id(widget)
-        if getattr(self, '_prepend_mode', False):
-            display.prepend_widget(widget)
-        else:
-            display.append_widget(widget)
-        self._sync_transcript_viewport()
-        return widget
-
     def _append_transcript_widget(self, widget: Any) -> None:
         display = self._tui._get_display()
         self._register_widget_event_id(widget)
@@ -663,7 +554,6 @@ class RendererDisplayMixin:
         """Append a 1-line :class:`ScanLineCard` to the transcript feed."""
         self._flush_orient_burst()
         self.commit_live_thinking()
-        self._clear_last_active_card_processing()
         self._register_widget_event_id(card)
         display = self._tui._get_display()
         display.append_widget(card)
@@ -674,160 +564,15 @@ class RendererDisplayMixin:
         from backend.cli.tui.widgets.activity_card import OrientLine
 
         self.commit_live_thinking()
-        self._clear_last_active_card_processing()
         widget = OrientLine(model)
         self._append_transcript_widget(widget)
         return widget
-
-    def _write_record_card(
-        self,
-        card: ActivityCard,
-        *,
-        processing: bool = False,
-    ) -> Any:
-        """Mount a record-tier panel (collapsed body until user expands)."""
-        from backend.cli.tui.widgets.record_panel import RecordPanel
-
-        self._flush_orient_burst()
-        self.commit_live_thinking()
-        self._clear_last_active_card_processing()
-        panel = RecordPanel.from_activity_card(
-            card,
-            processing=processing,
-            collapsed=True,
-        )
-        if processing:
-            self._activate_activity_card(panel)
-        self._append_transcript_widget(panel)
-        return panel
-
-    def _update_record_panel_outcome(
-        self,
-        widget: Any,
-        *,
-        status: str,
-        outcome: str | None = None,
-        extra_content: str | None = None,
-        meta_lines: list[str] | None = None,
-    ) -> None:
-        """Finalize a record-tier panel in place; always leave body collapsed."""
-        if widget is None:
-            return
-        if self._last_active_card is widget:
-            self._last_active_card = None
-        try:
-            widget.set_processing(False)
-        except Exception:
-            pass
-        try:
-            widget.set_status(status, outcome=outcome)
-        except Exception:
-            pass
-        if extra_content is not None:
-            try:
-                widget.update_content(extra_content)
-            except Exception:
-                pass
-        if meta_lines:
-            try:
-                widget.set_meta(*meta_lines)
-            except Exception:
-                pass
-        try:
-            widget.collapse()
-        except Exception:
-            pass
 
     def _flush_orient_burst(self) -> None:
         """No-op — orient lines stay as individual transcript rows."""
         self._orient_burst_lines = []
         self._orient_burst_widgets = []
         self._orient_burst_area = 'codebase'
-
-    def _apply_card_final_state(
-        self,
-        widget: Any,
-        *,
-        status: str,
-        outcome: str | None,
-        extra_content: str | None,
-        collapse: bool,
-        syntax_language: str | None,
-        meta_lines: list[str] | None = None,
-        diff_encoded: bool | None = None,
-    ) -> None:
-        try:
-            widget.set_processing(False)
-        except Exception:
-            pass
-        try:
-            widget.set_status(status, outcome=outcome)
-        except Exception:
-            pass
-        if syntax_language is not None:
-            try:
-                widget.set_syntax_language(syntax_language)
-            except Exception:
-                pass
-        if extra_content is not None:
-            try:
-                widget.update_content(extra_content)
-            except Exception:
-                pass
-        if diff_encoded is not None:
-            try:
-                widget.set_diff_encoded(diff_encoded)
-            except Exception:
-                pass
-        if meta_lines:
-            try:
-                widget.set_meta(*meta_lines)
-            except Exception:
-                pass
-        if status in {'err', 'warn'}:
-            try:
-                widget.expand()
-            except Exception:
-                pass
-        if collapse and status not in {'err', 'warn'}:
-            try:
-                if not getattr(widget, 'is_pinned', False):
-                    widget.collapse()
-            except Exception:
-                pass
-
-    def _update_activity_card_outcome(
-        self,
-        widget: Any,
-        *,
-        status: str,
-        outcome: str | None = None,
-        extra_content: str | None = None,
-        collapse: bool = False,
-        syntax_language: str | None = None,
-        meta_lines: list[str] | None = None,
-        diff_encoded: bool | None = None,
-    ) -> None:
-        """Update an in-flight activity card to its final state in-place.
-
-        Used to merge an action card with its observation card so the user only
-        sees a single transition (e.g. ``• Analyzed`` → ``✓ Analyzed completed``)
-        instead of two separate cards.
-        """
-        if widget is None:
-            return
-        if self._last_active_card is widget:
-            self._last_active_card = None
-        self._apply_card_final_state(
-            widget,
-            status=status,
-            outcome=outcome,
-            extra_content=extra_content,
-            collapse=collapse,
-            syntax_language=syntax_language,
-            meta_lines=meta_lines,
-            diff_encoded=diff_encoded,
-        )
 
     def _sync_transcript_viewport(self) -> None:
         """Keep mounted transcript widgets within the viewport budget."""

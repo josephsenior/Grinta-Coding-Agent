@@ -379,6 +379,12 @@ class ScreenInputMixin:
             )
 
     def action_submit_input(self) -> None:
+        from backend.cli.tui.widgets.scan_line import ScanLineCard
+
+        focused = self.screen.focused
+        if isinstance(focused, ScanLineCard):
+            focused.action_open_detail()
+            return
         _tui_logger.debug(
             f'action_submit_input: lock_locked={self._input_lock.locked()}'
         )

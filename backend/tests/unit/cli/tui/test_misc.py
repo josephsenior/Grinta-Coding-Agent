@@ -150,7 +150,7 @@ async def test_tui_renderer_receives_queued_agent_message_events(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_tui_turn_completion_uses_full_width_thin_widget(mock_config):
+async def test_tui_turn_duration_shown_in_hud_not_transcript(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -163,7 +163,7 @@ async def test_tui_turn_completion_uses_full_width_thin_widget(mock_config):
 
         renderer = TUIRenderer(
             console=console,
-            hud=HUDBar(),
+            hud=s._hud,
             reasoning=ReasoningDisplay(),
             tui=s,
             loop=loop,
@@ -175,13 +175,14 @@ async def test_tui_turn_completion_uses_full_width_thin_widget(mock_config):
             AgentStateChangedObservation(content='', agent_state='awaiting_user_input')
         )
 
-        completion = next(
-            item for item in renderer._history if isinstance(item, TurnCompletion)
+        assert s._last_turn_duration is not None
+        assert not any(
+            type(item).__name__ == 'TurnCompletion' for item in renderer._history
         )
-        assert completion is not None
-        rendered = str(completion.renderable)
-        assert 'Finished in:' in rendered
-        assert 'tool' not in rendered.lower()
+        s._render_hud_bar()
+        line1 = str(s.query_one('#hud-line-1', Label).renderable)
+        assert s._last_turn_duration in line1
+        assert 'Ready' in line1
 
 
 def test_activity_renderer_keeps_failed_delegation_open() -> None:

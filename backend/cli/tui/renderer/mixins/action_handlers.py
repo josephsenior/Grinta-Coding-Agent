@@ -9,10 +9,6 @@ from backend.cli.event_rendering.text_utils import (
     sanitize_streaming_thinking_text,
     sanitize_visible_transcript_text,
 )
-from backend.cli.event_rendering.unified_renderer import (
-    ActivityCard,
-    ActivityRenderer,
-)
 from backend.core.enums import (
     AgentState,
     EventSource,
@@ -62,74 +58,6 @@ class RendererActionHandlersMixin:
                 self._commit_final_response(text)
             else:
                 self.clear_live_response()
-
-    def _render_exploration_card(
-        self,
-        card: ActivityCard,
-        *,
-        content: str = '',
-        pending_attr: str | None = None,
-        force_err: bool = False,
-    ) -> None:
-        """Render or finalize a record-tier card in-place."""
-        if pending_attr is not None:
-            pending = getattr(self, pending_attr, None)
-            if pending is not None:
-                status = (
-                    'err'
-                    if force_err
-                    or content.startswith('Error')
-                    or 'does not exist' in content
-                    else 'ok'
-                )
-                extra_content = ActivityRenderer.format_extra_lines(card.extra_lines)
-                if extra_content is None and content:
-                    extra_content = content[:200]
-                self._update_record_panel_outcome(
-                    pending,
-                    status=status,
-                    outcome=card.secondary or 'completed',
-                    extra_content=extra_content,
-                    meta_lines=card.meta_lines or None,
-                )
-                setattr(self, pending_attr, None)
-                return
-        self._write_record_card(card)
-
-    def _render_search_card(
-        self,
-        *,
-        query: str,
-        content: str,
-        match_count: int = 0,
-        file_count: int = 0,
-        file_list: list[tuple[str, int]] | None = None,
-        result_lines: list[str] | None = None,
-        source_tool: str = 'search',
-        scope: str = '',
-        pending_attr: str | None = None,
-        detail: str | None = None,
-        meta_lines: list[str] | None = None,
-        output_mode: str | None = None,
-    ) -> None:
-        """Render a grep/glob/search activity card from structured fields."""
-        card = ActivityRenderer.search_results(
-            query=query,
-            match_count=match_count,
-            file_count=file_count,
-            file_list=file_list,
-            result_lines=result_lines,
-            scope=scope,
-            source_tool=source_tool,
-            detail=detail,
-            meta_lines=meta_lines,
-            output_mode=output_mode,
-        )
-        self._render_exploration_card(
-            card,
-            content=content,
-            pending_attr=pending_attr,
-        )
 
     @staticmethod
     def _is_user_source(source: Any) -> bool:
@@ -402,10 +330,11 @@ class RendererActionHandlersMixin:
             self._in_agent_turn = False
             if self._tools_in_turn > 0:
                 elapsed = time.monotonic() - self._turn_start_time
-                duration_str = self._format_turn_duration(int(elapsed))
-                from backend.cli.tui.widgets.activity_card import TurnCompletion
-
-                self._tui._write_log(TurnCompletion(duration_str))
+                self._tui._last_turn_duration = self._format_turn_duration(
+                    int(elapsed)
+                )
+            else:
+                self._tui._last_turn_duration = None
 
         if state in (AgentState.FINISHED, AgentState.ERROR, AgentState.STOPPED):
             self._tui._agent_running = False

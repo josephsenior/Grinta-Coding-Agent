@@ -1,18 +1,30 @@
 """Transcript display tiers for TUI tool rendering.
 
-Each tool belongs to exactly one tier with a single display rule:
+The live TUI renders tool activity in exactly two tiers:
 
-- **Orient** — flat scan line, no body, no toggle
-- **Artifact** — specialized body always visible (e.g. file diffs)
-- **Session** — scan header + body always open (shell, terminal, debugger)
-- **Record** — scan header + body collapsed by default, user expands
+- **Orient** — a flat single-line :class:`OrientLine` row (no body, no
+  expansion). Used for lightweight reads / lookups. See
+  :data:`ORIENT_TOOL_NAMES`.
+- **Action** — a single-line :class:`ScanLineCard` summary with a state-colored
+  left pipe and a ``⤢`` affordance. The full payload (diff, output, scrollback,
+  stack, result) lives in a pushed full-screen ``DetailScreen``; the feed row
+  itself never grows. Used for everything heavier than an orient read. See
+  :data:`ACTION_TOOL_NAMES`.
+
+There is no inline collapsed/expanded body in the live feed — expansion always
+means a detail screen on the screen stack (open with Enter/Space on a focused
+card, the ``⤢`` button, or a click; ``failed`` cards auto-open).
+
+These name sets are a reference for which tier a tool belongs to. They are not
+imported by the render pipeline (which keys off event/observation types in
+``renderer/handlers``); keep them in sync as a documentation aid.
 """
 
 from __future__ import annotations
 
 from typing import Final
 
-# Orient: read / lookup / lightweight workspace actions
+# Orient: read / lookup / lightweight workspace actions → OrientLine
 ORIENT_TOOL_NAMES: Final[frozenset[str]] = frozenset(
     {
         'grep',
@@ -31,18 +43,12 @@ ORIENT_TOOL_NAMES: Final[frozenset[str]] = frozenset(
     }
 )
 
-# Session: exec streams with always-open output pane
-SESSION_TOOL_NAMES: Final[frozenset[str]] = frozenset(
+# Action: everything heavier → ScanLineCard (1-line summary) + DetailScreen
+ACTION_TOOL_NAMES: Final[frozenset[str]] = frozenset(
     {
         'shell',
         'terminal',
         'debugger',
-    }
-)
-
-# Record: payload stored in a collapsed body; user expands explicitly
-RECORD_TOOL_NAMES: Final[frozenset[str]] = frozenset(
-    {
         'browser',
         'mcp',
         'workers',

@@ -52,7 +52,7 @@ def encode_diff_view_payload(
     max_lines: int = 200,
     n_context: int = DIFF_VIEW_CONTEXT_LINES,
 ) -> str | None:
-    """Encode diff preview payload for ActivityCard expansion."""
+    """Encode diff preview payload for detail-screen / EditCard expansion."""
     if old_content is None and new_content is None and not (patch or '').strip():
         return None
     payload = {

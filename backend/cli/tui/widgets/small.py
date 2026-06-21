@@ -355,7 +355,10 @@ class Transcript(VerticalScroll):
 
     def sync_viewport(self, renderer: Any) -> None:
         """Unmount off-viewport widgets while retaining render cache for replay."""
-        from backend.cli.tui.constants import _TUI_VIEWPORT_MAX_MOUNTED
+        from backend.cli.tui.constants import (
+            _TUI_VIEWPORT_MAX_MOUNTED,
+            _TUI_VIEWPORT_OVERSCAN,
+        )
         from backend.cli.tui.renderer.prep import RenderArtifact
 
         widgets = self._content_widgets()
@@ -363,26 +366,23 @@ class Transcript(VerticalScroll):
         if len(widgets) <= max_mounted:
             return
 
+        overflow = len(widgets) - max_mounted
+
         if not self.should_follow_tail():
-            #region agent log
-            _agent_debug_log(
-                run_id='pre-fix',
-                hypothesis_id='H1',
-                location='widgets/small.py:sync_viewport',
-                message='viewport prune skipped while away from tail',
-                data={
-                    'widgetCount': len(widgets),
-                    'maxMounted': max_mounted,
-                    'scrollY': round(float(self.scroll_y), 2),
-                    'maxScrollY': round(float(self.max_scroll_y), 2),
-                    'userScrolledAway': bool(self._user_scrolled_away),
-                    'tailUnread': int(self._tail_unread_count),
-                },
+            # Bound mounted-widget growth even while the user is scrolled away.
+            # New content keeps mounting at the tail; skipping pruning here lets
+            # the mounted set grow without limit (the confirmed freeze cause).
+            # Prune the oldest widgets sitting fully ABOVE the viewport, then
+            # re-anchor the scroll so the visible content does not jump. Pruned
+            # top widgets are replayable via the existing load-earlier path.
+            self._prune_above_viewport(
+                renderer,
+                overflow,
+                overscan=_TUI_VIEWPORT_OVERSCAN,
+                max_mounted=max_mounted,
             )
-            #endregion
             return
 
-        overflow = len(widgets) - max_mounted
         to_unmount = widgets[:overflow]
         #region agent log
         _agent_debug_log(
@@ -416,6 +416,117 @@ class Transcript(VerticalScroll):
                 widget.remove()
             except Exception:
                 pass
+
+    def _prune_above_viewport(
+        self,
+        renderer: Any,
+        overflow: int,
+        *,
+        overscan: int,
+        max_mounted: int,
+    ) -> None:
+        """Prune oldest widgets fully above the viewport while scrolled away.
+
+        Keeps an ``overscan`` margin of widgets above the viewport for smooth
+        upward scrolling, caches removed widgets for replay, and re-anchors the
+        scroll position so the user's visible content does not shift.
+        """
+        from backend.cli.tui.renderer.prep import RenderArtifact
+
+        scroll_y = float(self.scroll_y)
+        widgets = self._content_widgets()
+
+        # Locate the first widget intersecting (or below) the viewport top.
+        anchor_index: int | None = None
+        for idx, widget in enumerate(widgets):
+            region = getattr(widget, 'virtual_region', None)
+            if region is None:
+                return
+            if float(region.y) + float(region.height) > scroll_y:
+                anchor_index = idx
+                break
+        if anchor_index is None:
+            return
+
+        prunable_end = max(0, anchor_index - max(0, overscan))
+        prunable = widgets[:prunable_end][:overflow]
+        if not prunable:
+            #region agent log
+            _agent_debug_log(
+                run_id='post-fix',
+                hypothesis_id='H1',
+                location='widgets/small.py:_prune_above_viewport',
+                message='away prune skipped: no off-screen room above viewport',
+                data={
+                    'widgetCount': len(widgets),
+                    'maxMounted': max_mounted,
+                    'overflow': overflow,
+                    'anchorIndex': anchor_index,
+                    'scrollY': round(scroll_y, 2),
+                },
+            )
+            #endregion
+            return
+
+        anchor = widgets[anchor_index]
+        anchor_region = getattr(anchor, 'virtual_region', None)
+        anchor_offset = (
+            float(anchor_region.y) - scroll_y if anchor_region is not None else 0.0
+        )
+
+        cache = getattr(renderer, '_render_cache', None)
+        removed = 0
+        for widget in prunable:
+            setattr(widget, '_tui_removing', True)
+            event_id = getattr(widget, '_ledger_event_id', None)
+            if cache is not None and event_id is not None:
+                size = getattr(widget, 'size', None)
+                cache[event_id] = RenderArtifact(
+                    event_id,
+                    widget,
+                    measured_height=max(size.height, 1) if size else 1,
+                )
+            try:
+                widget.remove()
+                removed += 1
+            except Exception:
+                pass
+
+        if not removed:
+            return
+
+        #region agent log
+        _agent_debug_log(
+            run_id='post-fix',
+            hypothesis_id='H1',
+            location='widgets/small.py:_prune_above_viewport',
+            message='viewport pruned above-viewport widgets while away from tail',
+            data={
+                'widgetCountBefore': len(widgets),
+                'removed': removed,
+                'widgetCountAfter': len(widgets) - removed,
+                'maxMounted': max_mounted,
+                'anchorIndex': anchor_index,
+                'scrollY': round(scroll_y, 2),
+            },
+        )
+        #endregion
+
+        # Re-anchor after the removal relayout so the visible content stays put.
+        self._suppress_scroll_sync = True
+
+        def _reanchor() -> None:
+            try:
+                region = getattr(anchor, 'virtual_region', None)
+                if region is not None:
+                    new_y = max(0.0, float(region.y) - anchor_offset)
+                    self.scroll_to(y=new_y, animate=False, immediate=True)
+            except Exception:
+                pass
+            finally:
+                self.call_after_refresh(self._release_programmatic_scroll)
+
+        self.call_after_refresh(_reanchor)
 
     def _maybe_prefetch_earlier(self) -> None:
         if not self._user_scrolled_away:

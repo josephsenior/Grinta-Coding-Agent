@@ -13,7 +13,6 @@ from backend.cli.tui.widgets.scan_line import (
 )
 from backend.tests.unit.cli.tui._shared import (
     _await_at_bottom,
-    _file_change_cards,
     _fill_scrollable_transcript,
     _get_screen,
 )
@@ -35,182 +34,6 @@ async def test_tui_input_and_transcript(mock_config):
 
         input_bar = s.query_one('#input-bar', InputBar)
         assert 'processing' not in input_bar.classes
-
-
-@pytest.mark.asyncio
-async def test_tui_activity_card_processing_and_mount(mock_config):
-    console = RichConsole()
-    loop = asyncio.get_running_loop()
-    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
-
-    async with app.run_test(size=(120, 36)) as pilot:
-        await pilot.pause()
-
-        s = _get_screen(app)
-        data = ActivityRenderer.shell_command('git status')
-        mounted = TUIActivityCard(
-            verb=data.verb,
-            detail=data.detail,
-            badge_category=data.badge_category,
-            status='running',
-            outcome=data.secondary,
-            extra_content=None,
-            collapsed=True,
-        )
-        mounted.set_processing(True)
-        s.query_one('#main-display').mount(mounted)
-        await pilot.pause()
-
-        found = s.query_one(TUIActivityCard)
-        assert found is not None
-
-        from backend.cli.tui.widgets.terminal_pane import TerminalPane
-
-        pane = found.query_one('#terminal-pane', TerminalPane)
-        assert 'git status' in pane._prompt_markup()
-        assert pane._running is True
-        body = found.query_one('#expanded-body', Container)
-        assert body.display is True
-
-
-@pytest.mark.asyncio
-async def test_tui_shell_card_terminal_pane_before_output(mock_config):
-    console = RichConsole()
-    loop = asyncio.get_running_loop()
-    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
-
-    async with app.run_test(size=(120, 36)) as pilot:
-        await pilot.pause()
-
-        s = _get_screen(app)
-        from backend.cli.tui.widgets.terminal_pane import TerminalPane
-
-        mounted = TUIActivityCard(
-            verb='Ran',
-            detail='$ pytest -q',
-            badge_category='shell',
-            status='running',
-            terminal_command='pytest -q',
-            shell_kind='bash',
-            extra_content=None,
-            collapsed=True,
-        )
-        mounted.set_processing(True)
-        s.query_one('#main-display').mount(mounted)
-        await pilot.pause()
-
-        pane = mounted.query_one('#terminal-pane', TerminalPane)
-        assert 'pytest -q' in pane._prompt_markup()
-        assert pane._running is True
-        body = mounted.query_one('#expanded-body', Container)
-        assert body.display is True
-
-
-@pytest.mark.asyncio
-async def test_tui_activity_card_expanded_output_wraps_in_extra_frame(mock_config):
-    console = RichConsole()
-    loop = asyncio.get_running_loop()
-    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
-
-    async with app.run_test(size=(120, 36)) as pilot:
-        await pilot.pause()
-
-        s = _get_screen(app)
-        data = ActivityRenderer.terminal_output('line1\nline2', session_id='term-1')
-        mounted = TUIActivityCard(
-            verb=data.verb,
-            detail=data.detail,
-            badge_category=data.badge_category,
-            status='ok',
-            outcome=data.secondary,
-            extra_content='line1\nline2',
-            collapsed=False,
-        )
-        s.query_one('#main-display').mount(mounted)
-        await pilot.pause()
-
-        found = s.query_one(TUIActivityCard)
-        body = found.query_one('#expanded-body', Container)
-        assert body is not None
-        assert body.display is True
-
-
-@pytest.mark.asyncio
-async def test_tui_activity_card_body_click_collapses(mock_config):
-    console = RichConsole()
-    loop = asyncio.get_running_loop()
-    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
-
-    async with app.run_test(size=(120, 36)) as pilot:
-        await pilot.pause()
-
-        s = _get_screen(app)
-        data = ActivityRenderer.terminal_output('line1\nline2', session_id='term-1')
-        mounted = TUIActivityCard(
-            verb=data.verb,
-            detail=data.detail,
-            badge_category=data.badge_category,
-            status='ok',
-            outcome=data.secondary,
-            extra_content='line1\nline2',
-            collapsed=False,
-        )
-        s.query_one('#main-display').mount(mounted)
-        await pilot.pause()
-
-        found = s.query_one(TUIActivityCard)
-        extra = found.query_one('#terminal-output', Static)
-
-        event = SimpleNamespace(
-            widget=extra,
-            prevented=False,
-            stopped=False,
-            prevent_default=lambda: setattr(event, 'prevented', True),
-            stop=lambda: setattr(event, 'stopped', True),
-        )
-        found.on_click(event)
-
-        body = found.query_one('#expanded-body', Container)
-        assert found._collapsed is True
-        assert body.display is False
-        assert event.prevented is True
-        assert event.stopped is True
-
-
-@pytest.mark.asyncio
-async def test_tui_renderer_writes_expandable_cards_collapsed_by_default(
-    mock_config, monkeypatch
-):
-    console = RichConsole()
-    loop = asyncio.get_running_loop()
-    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
-    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
-
-    async with app.run_test(size=(120, 36)) as pilot:
-        await pilot.pause()
-
-        s = _get_screen(app)
-        renderer = TUIRenderer(
-            console=console,
-            hud=HUDBar(),
-            reasoning=ReasoningDisplay(),
-            tui=s,
-            loop=loop,
-        )
-        card = ActivityRenderer.shell_command(
-            'python fail.py',
-            output='Traceback\nboom',
-            exit_code=1,
-        )
-        assert card.is_collapsible is True
-        assert card.start_collapsed is False
-
-        widget = renderer._write_card(card)
-        await pilot.pause()
-
-        body = widget.query_one('#expanded-body', Container)
-        assert widget._collapsed is True
-        assert body.display is False
 
 
 @pytest.mark.asyncio
@@ -1905,7 +1728,6 @@ async def test_tui_orient_lines_stay_individual_for_consecutive_lookups(mock_con
 
         lines = list(s.query(OrientLine).results())
         assert len(lines) == 3
-        assert list(s.query(OrientBurst).results()) == []
         assert lines[0].model.verb == 'Grepped'
         assert lines[1].model.verb == 'Globbed'
         assert lines[2].model.verb == 'Found'
@@ -1988,10 +1810,6 @@ async def test_tui_recoverable_error_renders_as_plain_error_message(mock_config)
         await asyncio.sleep(0.3)
 
         assert list(s.query(ThinkingIndicator).results()) == []
-        # Recoverable errors render as inline ErrorBlock rows — not ActivityCards.
-        cards = list(s.query(TUIActivityCard).results())
-        error_cards = [card for card in cards if 'category-error' in card.classes]
-        assert error_cards == []
 
         # The error must be in the renderer's history (the source of truth).
         from backend.cli.tui.widgets.error_block import ErrorBlock
@@ -2038,8 +1856,6 @@ async def test_tui_compaction_status_renders_persistent_card(mock_config):
         renderer._process_event(status)
         await pilot.pause()
 
-        cards = s.query(TUIActivityCard).results()
-        compaction_cards = [card for card in cards if 'category-tool' in card.classes]
         orient_lines = s.query(OrientLine).results()
         compaction_orient = [
             line for line in orient_lines
@@ -2174,7 +1990,6 @@ async def test_tui_file_edit_create_renders_compact_create_card(mock_config):
             )
         )
         await pilot.pause()
-        assert not _file_change_cards(s)
 
         renderer._process_event(
             FileEditObservation(
@@ -2235,8 +2050,9 @@ async def test_tui_file_edit_observation_uses_new_content_not_polluted_preview(
         cards = list(s.query(EditCard).results())
         assert len(cards) == 1
         line = str(cards[0]._line_text())
+        delta = str(cards[0]._delta_text())
         assert 'demo_file.md' in line
-        assert '✓' in line  # SYNTAX_CHECK_PASSED
+        assert '✓' in delta  # SYNTAX_CHECK_PASSED
         # 1-line summary must not contain polluted content
         assert 'Stale preview' not in line
         assert 'File created successfully' not in line
@@ -2270,7 +2086,6 @@ async def test_tui_file_edit_create_uses_new_content_not_observation_body(mock_c
         renderer._process_event(create_action)
         renderer._process_event(create_action)
         await pilot.pause()
-        assert not _file_change_cards(s)
 
         obs = FileEditObservation(
             path='created.txt',
@@ -2319,7 +2134,6 @@ async def test_tui_file_read_renders_flat_orient_line(mock_config):
         assert lines[0].model.verb == 'Read'
         assert lines[0].model.target.endswith('read_card.py')
         assert lines[0].model.result == 'lines 1–EOF'
-        assert not list(s.query(TUIActivityCard).results())
 
 
 @pytest.mark.asyncio
@@ -2458,7 +2272,6 @@ async def test_tui_file_edit_action_and_observation_render_single_delta_card(
             FileEditAction(path='demo.txt', command='edit', new_str='gamma\n')
         )
         await pilot.pause()
-        assert not _file_change_cards(s)
 
         renderer._process_event(
             FileEditObservation(
@@ -2899,64 +2712,6 @@ async def test_transcript_skips_mount_animation_during_streaming(mock_config):
         widget = Static('quiet mount')
         display.append_widget(widget)
         assert float(widget.styles.offset.y.value) == 0.0
-
-
-@pytest.mark.asyncio
-async def test_terminal_append_does_not_remount_all_children(mock_config):
-    """Incremental terminal append keeps a single tail widget."""
-    console = RichConsole()
-    loop = asyncio.get_running_loop()
-    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
-
-    async with app.run_test(size=(120, 36)) as pilot:
-        await pilot.pause()
-        card = TUIActivityCard(
-            verb='Terminal',
-            detail='session s1',
-            badge_category='terminal',
-            collapsed=True,
-            shell_kind='terminal',
-            terminal_session_id='s1',
-        )
-        card.enable_incremental_mode()
-        await pilot.app.mount(card)
-        card.append_content_incremental('first line')
-        card.append_content_incremental('second line')
-        await pilot.pause()
-        body = card.query_one('#expanded-body', Container)
-        children = list(body.children)
-        assert len(children) == 1
-        assert children[0].id == 'terminal-pane'
-        output = children[0].query_one('#terminal-output', Static)
-        assert 'first line' in str(output.renderable)
-        assert 'second line' in str(output.renderable)
-
-
-@pytest.mark.asyncio
-async def test_incremental_tail_highlights_partial_json(mock_config):
-    """Incremental non-terminal cards should syntax-highlight as content arrives."""
-    from rich.syntax import Syntax
-
-    console = RichConsole()
-    loop = asyncio.get_running_loop()
-    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
-
-    async with app.run_test(size=(120, 36)) as pilot:
-        await pilot.pause()
-        card = TUIActivityCard(
-            verb='Read',
-            detail='data.json',
-            badge_category='code',
-            collapsed=False,
-        )
-        card.enable_incremental_mode()
-        await pilot.app.mount(card)
-        card.append_content_incremental('{"name": "gr')
-        await pilot.pause()
-
-        tail = card.query_one('#incremental-tail', Static)
-        assert isinstance(tail.renderable, Syntax)
-        assert tail.renderable.lexer.name.lower() == 'json'
 
 
 @pytest.mark.asyncio

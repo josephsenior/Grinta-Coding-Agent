@@ -48,35 +48,6 @@ class ScreenActionsMixin:
         """Show help information."""
         self.show_help()
 
-    def _iter_activity_cards(self) -> list[Any]:
-        from backend.cli.tui.widgets.activity_card import ActivityCard
-        from backend.cli.tui.widgets.record_panel import RecordPanel
-
-        try:
-            display = self._get_display()
-        except Exception:
-            return []
-        cards = list(display.query(ActivityCard))
-        cards.extend(display.query(RecordPanel))
-        return cards
-
-    def action_collapse_activity_cards(self) -> None:
-        """Collapse all unpinned activity cards in the transcript."""
-        for card in self._iter_activity_cards():
-            try:
-                card.collapse()
-            except Exception:
-                pass
-
-    def action_expand_activity_cards(self) -> None:
-        """Expand all collapsible activity cards in the transcript."""
-        for card in self._iter_activity_cards():
-            try:
-                if getattr(card, '_collapsible', False):
-                    card.expand()
-            except Exception:
-                pass
-
     def _scroll_to_bottom(self) -> None:
         self._get_display().user_scroll_end()
 
