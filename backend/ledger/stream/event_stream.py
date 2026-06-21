@@ -409,12 +409,14 @@ class EventStream(EventStore):
                         fcntl.LOCK_UN,  # type: ignore[attr-defined]
                     )
                 else:
-                    import msvcrt
+                    import msvcrt  # type: ignore[import-not-found]
 
                     try:
                         self._session_lock_handle.seek(0)
-                        msvcrt.locking(
-                            self._session_lock_handle.fileno(), msvcrt.LK_UNLCK, 1
+                        msvcrt.locking(  # type: ignore[attr-defined]
+                            self._session_lock_handle.fileno(),
+                            msvcrt.LK_UNLCK,  # type: ignore[attr-defined]
+                            1,
                         )
                     except OSError:
                         pass
