@@ -17,6 +17,7 @@ For CI gates and layer-boundary checks, see [`backend/scripts/`](../backend/scri
 | Script | Purpose |
 | --- | --- |
 | [`launch/start_here.ps1`](launch/start_here.ps1) / [`launch/start_here.sh`](launch/start_here.sh) | First-run onboarding: sync deps, optional init wizard, launch CLI. Root `START_HERE.ps1` / `start_here.sh` are thin stubs. |
+| [`launch/start_here_pipx.ps1`](launch/start_here_pipx.ps1) / [`launch/start_here_pipx.sh`](launch/start_here_pipx.sh) | Same flow for **pipx-installed** `grinta` (no `uv`/bootstrap). Root `START_HERE_PIPX.ps1` / `start_here_pipx.sh` are thin stubs. |
 | [`docker/docker_start.ps1`](docker/docker_start.ps1) / [`docker/docker_start.sh`](docker/docker_start.sh) | Docker Compose quick start. Root `DOCKER_START.ps1` / `docker_start.sh` are thin stubs. |
 | [`build.sh`](build.sh) | `uv build -v` wrapper. Root `build.sh` is a thin stub. |
 

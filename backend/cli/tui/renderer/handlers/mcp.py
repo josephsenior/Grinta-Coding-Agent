@@ -27,10 +27,12 @@ def _handle_mcp_action(orch: 'RendererEventProcessorMixin', event: MCPAction) ->
         orch._pending_mcp_card = orient
         orch._pending_exploration_meta = None
         return
-    card = ActivityRenderer.mcp_activity_card(event.name, event.arguments)
-    widget = orch._write_record_card(card, processing=True)
+    from backend.cli.tui.widgets.scan_line import MCPCard
+
+    widget = MCPCard(event.name, arguments=event.arguments)
+    orch._append_scan_line_card(widget)
     orch._pending_mcp_card = widget
-    orch._pending_exploration_meta = card.meta_lines or None
+    orch._pending_exploration_meta = None
 
 
 def _handle_mcp_observation(
@@ -57,17 +59,28 @@ def _handle_mcp_observation(
         success=not is_error,
         error=content if is_error else None,
     )
-    if card.meta_lines:
-        meta = list(card.meta_lines)
-    else:
-        meta = getattr(orch, '_pending_exploration_meta', None)
-    if meta:
-        card.meta_lines = meta
-    orch._render_exploration_card(
-        card,
-        content=content,
-        pending_attr='_pending_mcp_card',
-        force_err=is_error,
+    meta = list(card.meta_lines) if card.meta_lines else None
+    pending = orch._pending_mcp_card
+    from backend.cli.tui.widgets.scan_line import MCPCard
+
+    if isinstance(pending, MCPCard):
+        pending.complete(
+            result=content,
+            success=not is_error,
+            meta_lines=meta,
+        )
+        orch._pending_mcp_card = None
+        orch._pending_exploration_meta = None
+        return
+
+    orch._append_scan_line_card(
+        MCPCard(
+            event.name,
+            arguments=event.arguments,
+            result=content,
+            success=not is_error,
+            meta_lines=meta,
+        )
     )
     orch._pending_mcp_card = None
     orch._pending_exploration_meta = None

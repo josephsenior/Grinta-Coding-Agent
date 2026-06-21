@@ -60,6 +60,27 @@ def _format_diff_delta(added: int, removed: int) -> str:
     return ' '.join(parts) if parts else '0'
 
 
+def _status_indicator_markup(
+    state: str,
+    *,
+    exit_code: int | None = None,
+    running_tail: str = '',
+) -> str:
+    """Right-slot status glyph for shell/terminal scan rows."""
+    if state == 'running':
+        tail = (running_tail or '').strip()
+        if tail and tail != '…':
+            return f'[#EF9F27]{_truncate(tail, 40)}[/]'
+        return '[#EF9F27]…[/]'
+    if state == 'done':
+        return '[#639922]✓[/]'
+    if state == 'failed':
+        if exit_code is not None:
+            return f'[#E24B4A]✗ {exit_code}[/]'
+        return '[#E24B4A]✗[/]'
+    return ''
+
+
 # ── AgentMessageCard ───────────────────────────────────────────────────
 
 class AgentMessageCard(ScanLineCard):
@@ -76,12 +97,17 @@ class AgentMessageCard(ScanLineCard):
         self._text = text
 
     def _line_text(self) -> str:
-        return f'[#5eead4]Agent[/]  [#c8d4e8]{_truncate(self._text, 80)}[/]'
+        from backend.cli.tui.transcript_typography import TX_BODY, TX_LABEL
+
+        return f'[{TX_LABEL}]Agent[/]  [{TX_BODY}]{_truncate(self._text, 80)}[/]'
 
     def build_detail_screen(self) -> DetailScreen:
         from backend.cli.tui.screens.detail import MessageDetailScreen
 
-        return MessageDetailScreen(message_text=self._text)
+        return MessageDetailScreen(
+            message_text=self._text,
+            accent=self.state_border_color,
+        )
 
 
 # ── EditCard ───────────────────────────────────────────────────────────
@@ -127,18 +153,7 @@ class EditCard(ScanLineCard):
     def _line_text(self) -> str:
         verb = 'Created' if self._is_create else 'Edited'
         path = _compact_path(self._display_path)
-        badge = ''
-        pipe_color = {
-            'queued': '#2d4a6a',
-            'running': '#EF9F27',
-            'done': '#639922',
-            'failed': '#E24B4A',
-        }.get(self._state, '#2d4a6a')
-        if self._syntax_pass is True:
-            badge = ' [#639922]✓[/]'
-        elif self._syntax_pass is False:
-            badge = ' [#E24B4A]✗[/]'
-        return f'[{pipe_color}]{verb}[/]  [#c8d4e8]{path}[/]{badge}'
+        return self._scan_summary_line(verb, path, detail_max=40)
 
     def _delta_text(self) -> str:
         parts: list[str] = []
@@ -146,7 +161,16 @@ class EditCard(ScanLineCard):
             parts.append(f'[#639922]+{self._added}[/]')
         if self._removed:
             parts.append(f'[#E24B4A]-{self._removed}[/]')
-        return ' '.join(parts)
+        delta = ' '.join(parts)
+        if self._syntax_pass is True:
+            status = _status_indicator_markup('done')
+        elif self._syntax_pass is False:
+            status = _status_indicator_markup('failed')
+        else:
+            status = ''
+        if delta and status:
+            return f'{delta}  {status}'
+        return delta or status
 
     def build_detail_screen(self) -> DetailScreen:
         from backend.cli.tui.screens.detail import EditDetailScreen
@@ -154,6 +178,9 @@ class EditCard(ScanLineCard):
         verb = 'Created' if self._is_create else 'Edited'
         return EditDetailScreen(
             title=f'{verb}  {self._display_path}',
+            kind=verb,
+            heading=_compact_path(self._display_path),
+            accent=self.state_border_color,
             encoded_diff=self._encoded_diff,
             syntax_error=self._syntax_error,
         )
@@ -202,16 +229,14 @@ class ShellCard(ScanLineCard):
         return self._latest_line()
 
     def _line_text(self) -> str:
-        cmd = _truncate(self.command, 50)
-        label_color = self.state_border_color
-        return f'[{label_color}]Shell[/]  [#c8d4e8]{cmd}[/]'
+        return self._scan_summary_line('Shell', self.command, detail_max=50)
 
     def _delta_text(self) -> str:
-        if self.exit_code == 0:
-            return '[#639922]✓[/]'
-        if self.exit_code is not None:
-            return f'[#E24B4A]exit {self.exit_code}[/]'
-        return f'[#EF9F27]{self._latest_line()}[/]'
+        return _status_indicator_markup(
+            self._state,
+            exit_code=self.exit_code,
+            running_tail=self._latest_line() if self._state == 'running' else '',
+        )
 
     def build_detail_screen(self) -> DetailScreen:
         from backend.cli.tui.screens.detail import ShellDetailScreen
@@ -221,6 +246,9 @@ class ShellCard(ScanLineCard):
             output=self.output,
             exit_code=self.exit_code,
             cwd=self.cwd,
+            kind='Shell',
+            heading=_truncate(self.command, 80),
+            accent=self.state_border_color,
             title=f'Shell  {_truncate(self.command, 60)}',
         )
 
@@ -246,6 +274,7 @@ class TerminalCard(ScanLineCard):
         command: str = '',
         scrollback: str = '',
         *,
+        exit_code: int | None = None,
         id: str | None = None,
     ) -> None:
         super().__init__(id=id)
@@ -254,10 +283,16 @@ class TerminalCard(ScanLineCard):
         self.cwd = cwd
         self.command = command
         self.scrollback = scrollback
+        self.exit_code = exit_code
         self._apply_initial_state()
 
     def _apply_initial_state(self) -> None:
-        self.set_state('running')
+        if self.exit_code == 0:
+            self.set_state('done')
+        elif self.exit_code is not None:
+            self.set_state('failed')
+        else:
+            self.set_state('running')
 
     def _latest_line(self) -> str:
         if not self.scrollback:
@@ -267,20 +302,28 @@ class TerminalCard(ScanLineCard):
 
     def _line_text(self) -> str:
         loc = f'{self.session_label} @ {self.cwd}' if self.cwd else self.session_label
-        return f'[#5eead4]Term[/]  [#c8d4e8]{loc}[/]'
+        return self._scan_summary_line('Term', loc, detail_max=55)
 
     def _delta_text(self) -> str:
-        tail = self._latest_line()
-        return f'[#e2e8f0]{tail}[/]'
+        return _status_indicator_markup(
+            self._state,
+            exit_code=self.exit_code,
+            running_tail=self._latest_line() if self._state == 'running' else '',
+        )
 
     def build_detail_screen(self) -> DetailScreen:
         from backend.cli.tui.screens.detail import TerminalDetailScreen
 
+        loc = f'{self.session_label} @ {self.cwd}' if self.cwd else self.session_label
         return TerminalDetailScreen(
             session_id=self.session_id,
             command=self.command,
             scrollback=self.scrollback,
             cwd=self.cwd,
+            exit_code=self.exit_code,
+            kind='Term',
+            heading=_truncate(loc, 80),
+            accent=self.state_border_color,
             title=f'Terminal  {self.session_label}',
         )
 
@@ -322,11 +365,20 @@ class BrowserCard(ScanLineCard):
 
     def _line_text(self) -> str:
         dom = self.domain or '…'
-        return f'[#5eead4]Browser[/]  [#c8d4e8]{dom}[/]'
+        return self._scan_summary_line('Browser', dom, detail_max=40)
 
     def _delta_text(self) -> str:
-        act = _truncate(self.action or '…', 40)
-        return f'[#e2e8f0]{act}[/]'
+        if self._state == 'running':
+            return _status_indicator_markup(
+                'running',
+                running_tail=self.action or '…',
+            )
+        if self._state == 'done':
+            tail = _truncate(self.action or '', 40)
+            if tail:
+                return f'[#e2e8f0]{tail}[/]  {_status_indicator_markup("done")}'
+            return _status_indicator_markup('done')
+        return _status_indicator_markup(self._state)
 
     def build_detail_screen(self) -> DetailScreen:
         from backend.cli.tui.screens.detail import BrowserDetailScreen
@@ -336,6 +388,9 @@ class BrowserCard(ScanLineCard):
             actions=self._actions,
             extracted=self.extracted,
             links=self.links,
+            kind='Browser',
+            heading=self.domain or '…',
+            accent=self.state_border_color,
             title=f'Browser  {self.domain}',
         )
 
@@ -375,11 +430,18 @@ class DebuggerCard(ScanLineCard):
 
     def _line_text(self) -> str:
         loc = self.location or '…'
-        return f'[#5eead4]Debug[/]  [#c8d4e8]{loc}[/]'
+        return self._scan_summary_line('Debug', loc, detail_max=80)
 
     def _delta_text(self) -> str:
-        fn = _truncate(self.function or '…', 30)
-        return f'[#e2e8f0]{fn}[/]'
+        fn = self.function or '…'
+        if self._state == 'running':
+            return _status_indicator_markup('running', running_tail=fn)
+        if self._state == 'done':
+            tail = _truncate(fn, 30)
+            if tail and tail != '…':
+                return f'[#e2e8f0]{tail}[/]  {_status_indicator_markup("done")}'
+            return _status_indicator_markup('done')
+        return _status_indicator_markup(self._state)
 
     def build_detail_screen(self) -> DetailScreen:
         from backend.cli.tui.screens.detail import DebuggerDetailScreen
@@ -388,9 +450,191 @@ class DebuggerCard(ScanLineCard):
             stack=self._stack,
             variables=self._variables,
             current_frame_index=self._current_frame_index,
+            kind='Debug',
+            heading=self.location or '…',
+            accent=self.state_border_color,
             title=f'Debugger  {self.location}',
         )
 
     def refresh_summary(self) -> None:
         if self._state == 'running':
             self._refresh_line()
+
+
+# ── DelegateCard ───────────────────────────────────────────────────────
+
+class DelegateCard(ScanLineCard):
+    """1-line delegated worker summary — full result in detail screen."""
+
+    def __init__(
+        self,
+        task: str,
+        *,
+        worker: str = '',
+        result: str = '',
+        success: bool | None = None,
+        id: str | None = None,
+    ) -> None:
+        super().__init__(id=id)
+        self._delegate_task = task
+        self._worker = worker
+        self._result = result
+        self._apply_state(success)
+
+    def _apply_state(self, success: bool | None) -> None:
+        if success is None:
+            self.set_state('running')
+        elif success:
+            self.set_state('done')
+        else:
+            self.set_state('failed')
+
+    def complete(self, *, result: str, success: bool, worker: str = '') -> None:
+        self._result = result
+        if worker:
+            self._worker = worker
+        self._apply_state(success)
+
+    def _line_text(self) -> str:
+        return self._scan_summary_line('Delegated', self._delegate_task, detail_max=70)
+
+    def _delta_text(self) -> str:
+        if self._state == 'running':
+            tail = self._worker or 'worker'
+            return _status_indicator_markup('running', running_tail=tail)
+        if self._state == 'done':
+            return _status_indicator_markup('done')
+        return _status_indicator_markup('failed')
+
+    def build_detail_screen(self) -> DetailScreen:
+        from backend.cli.tui.screens.detail.payload import PayloadDetailScreen
+
+        meta: list[str] = []
+        if self._worker:
+            meta.append(f'[#6f83aa]worker: {self._worker}[/]')
+        return PayloadDetailScreen(
+            kind='Delegate',
+            heading=_truncate(self._delegate_task, 80),
+            body=self._result,
+            meta_parts=meta,
+            accent=self.state_border_color,
+            title=f'Delegate  {_truncate(self._delegate_task, 60)}',
+        )
+
+
+# ── MCPCard ────────────────────────────────────────────────────────────
+
+class MCPCard(ScanLineCard):
+    """1-line MCP tool call — arguments + result in detail screen."""
+
+    def __init__(
+        self,
+        name: str,
+        *,
+        arguments: dict | None = None,
+        result: str = '',
+        success: bool | None = None,
+        meta_lines: list[str] | None = None,
+        id: str | None = None,
+    ) -> None:
+        super().__init__(id=id)
+        self._name = name
+        self._arguments = dict(arguments or {})
+        self._result = result
+        self._meta_lines = list(meta_lines or [])
+        self._apply_state(success)
+
+    def _args_summary(self) -> str:
+        if not self._arguments:
+            return self._name
+        args_preview = ', '.join(
+            f'{key}={repr(value)[:30]}'
+            for key, value in list(self._arguments.items())[:2]
+        )
+        if len(args_preview) > 60:
+            args_preview = args_preview[:57] + '...'
+        return f'{self._name}({args_preview})' if args_preview else self._name
+
+    def _apply_state(self, success: bool | None) -> None:
+        if success is None:
+            self.set_state('running')
+        elif success:
+            self.set_state('done')
+        else:
+            self.set_state('failed')
+
+    def complete(
+        self,
+        *,
+        result: str,
+        success: bool,
+        meta_lines: list[str] | None = None,
+    ) -> None:
+        self._result = result
+        if meta_lines:
+            self._meta_lines = list(meta_lines)
+        self._apply_state(success)
+
+    def _line_text(self) -> str:
+        return self._scan_summary_line('Called', self._args_summary(), detail_max=70)
+
+    def _delta_text(self) -> str:
+        if self._state == 'running':
+            return _status_indicator_markup('running', running_tail=self._name)
+        if self._state == 'done':
+            preview = _truncate(self._result.replace('\n', ' '), 36)
+            if preview:
+                return f'[#9aa8b8]{preview}[/]  {_status_indicator_markup("done")}'
+            return _status_indicator_markup('done')
+        return _status_indicator_markup('failed')
+
+    def build_detail_screen(self) -> DetailScreen:
+        from backend.cli.tui.screens.detail.payload import PayloadDetailScreen
+
+        meta = [f'[#6f83aa]{line}[/]' for line in self._meta_lines if line]
+        return PayloadDetailScreen(
+            kind='MCP',
+            heading=self._name,
+            body=self._result,
+            meta_parts=meta,
+            accent=self.state_border_color,
+            title=f'MCP  {self._name}',
+        )
+
+
+# ── PayloadCard ────────────────────────────────────────────────────────
+
+class PayloadCard(ScanLineCard):
+    """Generic artifact row (thinking code/tool/shared payloads)."""
+
+    def __init__(
+        self,
+        label: str,
+        detail: str,
+        body: str,
+        *,
+        success: bool = True,
+        id: str | None = None,
+    ) -> None:
+        super().__init__(id=id)
+        self._label = label
+        self._detail = detail
+        self._body = body
+        self.set_state('done' if success else 'failed')
+
+    def _line_text(self) -> str:
+        return self._scan_summary_line(self._label, self._detail, detail_max=70)
+
+    def _delta_text(self) -> str:
+        return _status_indicator_markup(self._state)
+
+    def build_detail_screen(self) -> DetailScreen:
+        from backend.cli.tui.screens.detail.payload import PayloadDetailScreen
+
+        return PayloadDetailScreen(
+            kind=self._label,
+            heading=_truncate(self._detail, 80),
+            body=self._body,
+            accent=self.state_border_color,
+            title=f'{self._label}  {_truncate(self._detail, 60)}',
+        )

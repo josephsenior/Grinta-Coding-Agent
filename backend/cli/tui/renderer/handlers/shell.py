@@ -1,7 +1,6 @@
 """Shell / CmdRun event handlers for the TUI renderer.
 
-Now mounts :class:`ShellCard` (1-line scan row with ⤢ detail) instead of
-the legacy :class:`SessionPanel`.
+Mounts :class:`ShellCard` scan-line rows with ⤢ detail screens.
 """
 
 from __future__ import annotations

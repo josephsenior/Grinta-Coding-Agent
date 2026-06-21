@@ -2,44 +2,17 @@
 
 from __future__ import annotations
 
-from textual.widgets import Static
-
 from backend.cli.tui.screens.detail.base import DetailScreen
+from backend.cli.tui.screens.detail.helpers import (
+    format_exit_chip,
+    format_meta_chips,
+    render_command_syntax,
+    render_terminal_output,
+)
 
 
 class TerminalDetailScreen(DetailScreen):
-    """Full session scrollback with ``$``-prefixed commands."""
-
-    DEFAULT_CSS = """
-    TerminalDetailScreen #terminal-session {
-        width: 100%;
-        height: auto;
-        padding: 1 2 0 2;
-        color: #91abec;
-        background: #080c18;
-        border-bottom: solid #1e293b;
-    }
-    TerminalDetailScreen #terminal-cmd-row {
-        width: 100%;
-        height: auto;
-        padding: 1 2 0 2;
-        color: #e2e8f0;
-    }
-    TerminalDetailScreen #terminal-scrollback {
-        width: 100%;
-        height: auto;
-        padding: 0;
-        background: #060a14;
-        color: #6b7280;
-    }
-    TerminalDetailScreen #terminal-empty {
-        width: 100%;
-        height: auto;
-        padding: 2;
-        color: #54597b;
-        text-align: center;
-    }
-    """
+    """Full session scrollback with traffic-light terminal chrome."""
 
     def __init__(
         self,
@@ -49,12 +22,22 @@ class TerminalDetailScreen(DetailScreen):
         cwd: str = '',
         *,
         title: str = 'Terminal',
+        kind: str = 'Term',
+        heading: str = '',
+        accent: str | None = None,
+        exit_code: int | None = None,
     ) -> None:
-        super().__init__(title=title)
+        super().__init__(
+            title=title,
+            kind=kind,
+            heading=heading or session_id,
+            accent=accent,
+        )
         self._session_id = session_id
         self._command = command
         self._scrollback = scrollback
         self._cwd = cwd
+        self._exit_code = exit_code
 
     def build_content(self) -> list:
         widgets: list = []
@@ -64,34 +47,33 @@ class TerminalDetailScreen(DetailScreen):
             meta_parts.append(f'[#91abec]{self._session_id}[/]')
         if self._cwd:
             meta_parts.append(f'[#969aad]{self._cwd}[/]')
+        exit_chip = format_exit_chip(self._exit_code)
+        if exit_chip:
+            meta_parts.append(exit_chip)
         if meta_parts:
             widgets.append(
-                Static(' · '.join(meta_parts), id='terminal-session')
+                self.meta_row(format_meta_chips(meta_parts), widget_id='terminal-session')
             )
 
+        frame_parts: list = []
         if self._command and not self._scrollback:
-            prompt = '[#5eead4]$[/]'
-            cmd_text = f'[bold #e2e8f0]{self._command}[/]'
-            widgets.append(
-                Static(f'{prompt} {cmd_text}', id='terminal-cmd-row')
+            frame_parts.append(
+                self.syntax_block(
+                    render_command_syntax(self._command),
+                    widget_id='terminal-cmd-row',
+                )
             )
-
         if self._scrollback:
-            display = self._format_scrollback(self._scrollback)
-            widgets.append(Static(display, id='terminal-scrollback'))
+            frame_parts.append(
+                self.syntax_block(
+                    render_terminal_output(self._scrollback, language='text'),
+                    widget_id='terminal-scrollback',
+                )
+            )
+        if frame_parts:
+            frame_title = (self._session_id or self._heading or 'terminal')[:48]
+            widgets.append(self.terminal_frame(*frame_parts, title=frame_title))
         elif not self._command:
-            widgets.append(Static('(no terminal content)', id='terminal-empty'))
+            widgets.append(self.empty_state('(no terminal content)', widget_id='terminal-empty'))
 
         return widgets
-
-    @staticmethod
-    def _format_scrollback(scrollback: str) -> str:
-        lines = scrollback.splitlines()
-        if not lines:
-            return scrollback
-        max_width = len(str(len(lines)))
-        numbered: list[str] = []
-        for i, line in enumerate(lines, 1):
-            gutter = f'[#374151]{i:>{max_width}} │[/] '
-            numbered.append(gutter + line)
-        return '\n'.join(numbered)

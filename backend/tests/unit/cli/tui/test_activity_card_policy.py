@@ -9,8 +9,7 @@ from backend.cli.display.hud import HUDBar
 from backend.cli.display.reasoning_display import ReasoningDisplay
 from backend.cli.tui.app import TUIRenderer
 from backend.cli.tui.main import GrintaTUIApp
-from backend.cli.tui.widgets.record_panel import RecordPanel
-from backend.cli.tui.widgets.scan_line import ShellCard
+from backend.cli.tui.widgets.scan_line import MCPCard, ShellCard
 from backend.ledger.action import CmdRunAction, MCPAction
 from backend.ledger.observation import CmdOutputObservation, MCPObservation
 from backend.tests.unit.cli.tui._shared import _get_screen
@@ -115,13 +114,9 @@ async def test_record_panel_stays_collapsed_until_user_expands(mock_config) -> N
         )
         await pilot.pause()
 
-        panel = next(
-            p
-            for p in screen.query(RecordPanel).results()
-            if 'category-mcp' in p.classes
-        )
-        assert '-collapsed' in panel.classes
-        panel.expand()
-        assert '-expanded' in panel.classes
-        panel.collapse()
-        assert '-collapsed' in panel.classes
+        mcp_cards = list(screen.query(MCPCard).results())
+        assert len(mcp_cards) == 1
+        assert mcp_cards[0].state == 'done'
+        detail = mcp_cards[0].build_detail_screen()
+        assert detail._heading == 'docs_tool'
+        assert 'long result payload' in detail._body

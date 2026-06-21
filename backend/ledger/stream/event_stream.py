@@ -24,6 +24,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 from backend.core.logging.logger import app_logger as logger
+from backend.core.os_capabilities import OS_CAPS
 from backend.core.workspace_resolution import workspace_agent_state_dir
 from backend.ledger.event import Event, EventSource
 from backend.ledger.event.event_store import EventStore
@@ -96,9 +97,7 @@ def _invoke_pre_dispatch_hook(hook: Callable[[Any], None], event: Event) -> None
 
 def _acquire_session_lock(lock_path: str, lock_data: str) -> Any:
     """Acquire an OS-level exclusive session lock or raise immediately."""
-    import sys
-
-    if sys.platform != 'win32':
+    if not OS_CAPS.is_windows:
         import fcntl
 
         handle = open(lock_path, 'w', encoding='utf-8')
@@ -399,9 +398,7 @@ class EventStream(EventStore):
             self._activity_listeners.clear()
         if self._session_lock_handle is not None:
             try:
-                import sys
-
-                if sys.platform != 'win32':
+                if not OS_CAPS.is_windows:
                     import fcntl
 
                     fcntl.flock(self._session_lock_handle.fileno(), fcntl.LOCK_UN)

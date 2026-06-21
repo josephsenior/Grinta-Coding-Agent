@@ -327,7 +327,13 @@ class RendererThinkingMixin:
 
         card = self._thinking_artifact_card(intent)
         if card is not None:
-            self._write_card(card)
+            from backend.cli.event_rendering.unified_renderer import ActivityRenderer
+            from backend.cli.tui.widgets.scan_line import PayloadCard
+
+            body = ActivityRenderer.format_extra_lines(card.extra_lines or []) or intent.text
+            self._append_scan_line_card(
+                PayloadCard(card.verb, card.detail, body or intent.text)
+            )
         return True
 
     def _memory_artifact_card(self, intent: ThinkingRenderIntent) -> ActivityCard:

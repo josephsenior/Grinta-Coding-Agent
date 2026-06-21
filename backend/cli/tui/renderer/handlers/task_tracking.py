@@ -18,6 +18,7 @@ def _handle_task_tracking_observation(
 ) -> None:
     if orch._should_replace_task_list_from_event(event):
         orch._task_list = list(getattr(event, 'task_list', []) or [])
+        orch._last_task_sidebar_signature = None
         orch._refresh_display()
 
 
@@ -26,4 +27,5 @@ def _handle_task_tracking_action(
 ) -> None:
     if orch._should_replace_task_list_from_event(event):
         orch._task_list = list(getattr(event, 'task_list', []) or [])
+        orch._last_task_sidebar_signature = None
         orch._refresh_display()

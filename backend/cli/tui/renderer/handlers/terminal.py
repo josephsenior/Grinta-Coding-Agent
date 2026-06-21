@@ -1,8 +1,7 @@
 """Terminal session event handlers (run, input, read, observation).
 
-Now appends one :class:`TerminalCard` per agent command instead of
-upserting a single :class:`SessionPanel` per session.  A session
-scrollback buffer tracks full output for detail screens.
+Appends one :class:`TerminalCard` per agent command.  A session scrollback
+buffer tracks full output for detail screens.
 """
 
 from __future__ import annotations

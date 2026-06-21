@@ -16,6 +16,7 @@ from backend.cli.tui.screens.detail.browser import BrowserDetailScreen
 from backend.cli.tui.screens.detail.debugger import DebuggerDetailScreen
 from backend.cli.tui.screens.detail.edit import EditDetailScreen
 from backend.cli.tui.screens.detail.message import MessageDetailScreen
+from backend.cli.tui.screens.detail.payload import PayloadDetailScreen
 from backend.cli.tui.screens.detail.shell import ShellDetailScreen
 from backend.cli.tui.screens.detail.terminal import TerminalDetailScreen
 
@@ -27,4 +28,5 @@ __all__ = [
     'TerminalDetailScreen',
     'BrowserDetailScreen',
     'DebuggerDetailScreen',
+    'PayloadDetailScreen',
 ]

@@ -16,6 +16,8 @@ for a single source of truth.
 """
 
 import os
+import tempfile
+from pathlib import Path
 
 
 # ── Helpers ──────────────────────────────────────────────────────────
@@ -255,7 +257,14 @@ CONVERSATION_BASE_DIR = 'sessions'
 # ── Default Configuration ───────────────────────────────────────────
 DEFAULT_RUNTIME = 'local'
 DEFAULT_FILE_STORE = 'local'
-DEFAULT_CACHE_DIR = '/tmp/cache'
+
+
+def default_cache_dir() -> str:
+    """Return a platform-aware cache directory under the system temp folder."""
+    return str(Path(tempfile.gettempdir()) / 'grinta' / 'cache')
+
+
+DEFAULT_CACHE_DIR = default_cache_dir()
 DEFAULT_CONVERSATION_MAX_AGE_SECONDS = 864000
 DEFAULT_MAX_CONCURRENT_CONVERSATIONS = 3
 DEFAULT_VCS_USER_NAME = 'app'

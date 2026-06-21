@@ -12,6 +12,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from backend.core.os_capabilities import OS_CAPS
+
 SUPPORTED_IMAGE_SUFFIXES = frozenset({'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'})
 
 _IMAGE_ATTACHMENT_STYLE = 'bold #5eead4'
@@ -91,7 +93,7 @@ def _dib_to_bmp(dib: bytes) -> bytes | None:
 
 
 def _read_windows_clipboard_image() -> ClipboardImage | None:
-    if sys.platform != 'win32':
+    if not OS_CAPS.is_windows:
         return None
     image = _read_windows_clipboard_image_powershell()
     if image is not None:
@@ -105,7 +107,11 @@ def _read_windows_clipboard_image_ctypes() -> ClipboardImage | None:
     user32 = ctypes.windll.user32
     kernel32 = ctypes.windll.kernel32
 
-    if not user32.OpenClipboard(0):
+    hwnd = user32.GetForegroundWindow()
+    opened = user32.OpenClipboard(hwnd)
+    if not opened:
+        opened = user32.OpenClipboard(0)
+    if not opened:
         return None
 
     try:
@@ -113,6 +119,7 @@ def _read_windows_clipboard_image_ctypes() -> ClipboardImage | None:
             ('PNG', 'image/png', 'clipboard.png'),
             ('JFIF', 'image/jpeg', 'clipboard.jpg'),
             ('GIF', 'image/gif', 'clipboard.gif'),
+            ('WEBP', 'image/webp', 'clipboard.webp'),
         ):
             fmt_id = user32.RegisterClipboardFormatW(fmt_name)
             if not fmt_id or not user32.IsClipboardFormatAvailable(fmt_id):
@@ -154,6 +161,33 @@ def _read_windows_clipboard_image_ctypes() -> ClipboardImage | None:
         user32.CloseClipboard()
 
 
+def clipboard_likely_has_image() -> bool:
+    """Best-effort check that the OS clipboard currently holds image data."""
+    if not OS_CAPS.is_windows:
+        return False
+    import ctypes
+
+    user32 = ctypes.windll.user32
+    hwnd = user32.GetForegroundWindow()
+    opened = user32.OpenClipboard(hwnd)
+    if not opened:
+        opened = user32.OpenClipboard(0)
+    if not opened:
+        return False
+    try:
+        if user32.IsClipboardFormatAvailable(8):  # CF_DIB
+            return True
+        if user32.IsClipboardFormatAvailable(2):  # CF_BITMAP
+            return True
+        for fmt_name in ('PNG', 'JFIF', 'GIF', 'WEBP'):
+            fmt_id = user32.RegisterClipboardFormatW(fmt_name)
+            if fmt_id and user32.IsClipboardFormatAvailable(fmt_id):
+                return True
+        return False
+    finally:
+        user32.CloseClipboard()
+
+
 def _read_windows_clipboard_image_powershell() -> ClipboardImage | None:
     script = """
 Add-Type -AssemblyName System.Windows.Forms
@@ -166,17 +200,20 @@ $img.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
 """
     try:
         completed = subprocess.run(
-            ['powershell', '-NoProfile', '-Command', script],
+            ['powershell', '-NoProfile', '-Sta', '-Command', script],
             check=False,
             capture_output=True,
             timeout=5,
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
-    if completed.returncode != 0 or not completed.stdout:
+    data = completed.stdout or b''
+    if data.startswith(b'\xef\xbb\xbf'):
+        data = data[3:]
+    if completed.returncode != 0 or not data.startswith(b'\x89PNG'):
         return None
     return ClipboardImage(
-        data=completed.stdout,
+        data=data,
         mime_type='image/png',
         label='clipboard.png',
     )

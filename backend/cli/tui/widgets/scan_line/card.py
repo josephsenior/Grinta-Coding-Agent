@@ -111,6 +111,21 @@ class ScanLineCard(Container):
         """Left-pipe color for the current card state."""
         return SCAN_LINE_BORDER_COLORS.get(self._state, SCAN_LINE_BORDER_COLORS['queued'])
 
+    def _scan_summary_line(
+        self,
+        label: str,
+        detail: str,
+        *,
+        detail_max: int = 80,
+    ) -> str:
+        """Label tinted by state + neutral detail text."""
+        text = (detail or '').strip()
+        if len(text) > detail_max:
+            text = text[: detail_max - 1] + '…'
+        from backend.cli.tui.transcript_typography import TX_BODY
+
+        return f'[{self.state_border_color}]{label}[/]  [{TX_BODY}]{text}[/]'
+
     @property
     def state(self) -> str:
         return self._state
@@ -120,6 +135,12 @@ class ScanLineCard(Container):
     def _summary_widget(self) -> Static | None:
         try:
             return self.query_one('#scan-summary', Static)
+        except Exception:
+            return None
+
+    def _delta_widget(self) -> Static | None:
+        try:
+            return self.query_one('#scan-delta', Static)
         except Exception:
             return None
 
@@ -135,6 +156,9 @@ class ScanLineCard(Container):
         sw = self._summary_widget()
         if sw is not None:
             sw.update(self._line_text())
+        dw = self._delta_widget()
+        if dw is not None:
+            dw.update(self._delta_text())
 
     # ── detail screen factory ───────────────────────────────────────
 

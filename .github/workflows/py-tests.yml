@@ -29,7 +29,7 @@ concurrency:
 # - gates-on-linux-coverage-{a,b,d,f,g,e,c,report}: unit tests sharded for coverage on Linux.
 #   Execution shards (d,f,g) skip compileall; syntax is still gated on a/b/c/e shards.
 # - gates-on-linux-extended: integration/e2e/stress after coverage gate passes.
-# - gates-on-windows / gates-on-macos: unit-only PR gates for cross-platform smoke.
+# - gates-on-windows / gates-on-macos: required unit-only PR gates for cross-platform smoke.
 # - heavy-tests: marker-filtered heavy | integration | benchmark (schedule, main, manual).
 jobs:
   gates-on-linux-coverage-a:
@@ -494,7 +494,9 @@ jobs:
   gates-on-macos:
     name: Python Gates on macOS
     runs-on: macos-latest
+    timeout-minutes: 30
     strategy:
+      fail-fast: false
       matrix:
         python-version: ['3.12']
     steps:

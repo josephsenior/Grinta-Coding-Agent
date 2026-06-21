@@ -106,3 +106,43 @@ def test_read_clipboard_image_prefers_first_available_reader(monkeypatch) -> Non
     from backend.cli.tui.image_attachments import _read_clipboard_image_sync
 
     assert _read_clipboard_image_sync() == sample
+
+
+def test_powershell_clipboard_reader_uses_sta(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_run(args, **kwargs):
+        captured['args'] = args
+        class Result:
+            returncode = 1
+            stdout = b''
+
+        return Result()
+
+    monkeypatch.setattr('backend.cli.tui.image_attachments.subprocess.run', fake_run)
+    from backend.cli.tui.image_attachments import _read_windows_clipboard_image_powershell
+
+    assert _read_windows_clipboard_image_powershell() is None
+    assert '-Sta' in captured['args']
+
+
+def test_clipboard_likely_has_image_false_when_closed(monkeypatch) -> None:
+    import sys
+
+    if sys.platform != 'win32':
+        return
+
+    class FakeUser32:
+        def GetForegroundWindow(self):
+            return 0
+
+        def OpenClipboard(self, _hwnd):
+            return False
+
+    monkeypatch.setattr(
+        'ctypes.windll.user32',
+        FakeUser32(),
+    )
+    from backend.cli.tui.image_attachments import clipboard_likely_has_image
+
+    assert clipboard_likely_has_image() is False

@@ -21,7 +21,6 @@ from backend.cli.theme.syntax_theme import (
 from backend.cli.tui.renderer.prep import (
     prep_markdown,
     prep_streaming_renderable,
-    streaming_render_interval,
 )
 
 
@@ -192,7 +191,39 @@ def test_tui_sources_do_not_request_bold_text():
     assert offenders == []
 
 
-def test_streaming_render_interval_shortens_in_code_fence():
-    assert streaming_render_interval('plain prose') == 0.25
-    assert streaming_render_interval('`x`') == 0.12
-    assert streaming_render_interval('```python\nx') == 0.08
+def test_apply_live_response_render_highlights_open_fence_without_deferred_flush():
+    from unittest.mock import MagicMock
+
+    from rich.console import Console
+    from rich.syntax import Syntax
+
+    from backend.cli.display.hud import HUDBar
+    from backend.cli.display.reasoning_display import ReasoningDisplay
+    from backend.cli.tui.app import TUIRenderer
+
+    renderer = TUIRenderer(
+        console=Console(),
+        hud=HUDBar(),
+        reasoning=ReasoningDisplay(),
+        tui=MagicMock(),
+        loop=MagicMock(),
+    )
+    widget = MagicMock()
+    renderer._live_response_widget = widget
+
+    partial = "```python\ndef stream_me():\n    return 1"
+    renderer._apply_live_response_render(partial)
+
+    widget.set_streaming_renderable.assert_called_once()
+    renderable = widget.set_streaming_renderable.call_args[0][0]
+
+    def _contains_syntax(node: object) -> bool:
+        if isinstance(node, Syntax):
+            return True
+        renderables = getattr(node, 'renderables', None)
+        if renderables:
+            return any(_contains_syntax(part) for part in renderables)
+        return False
+
+    assert _contains_syntax(renderable)
+    widget.set_streaming_text.assert_not_called()

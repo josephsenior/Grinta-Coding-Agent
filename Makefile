@@ -6,7 +6,7 @@ BOOTSTRAP := python scripts/bootstrap_env.py
 
 .PHONY: pretest
 pretest:
-	@bash ./backend/scripts/dev/clean_pycache.sh
+	@$(PYTHON) scripts/dev/clean_pycache.py
 
 .PHONY: test-unit
 test-unit: pretest

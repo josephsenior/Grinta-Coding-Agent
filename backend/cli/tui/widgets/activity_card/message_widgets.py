@@ -10,20 +10,26 @@ from textual.containers import Container
 from textual.widgets import Static
 
 from backend.cli.theme import CLR_REASONING_SNAP
+from backend.cli.tui.transcript_typography import THINKING_LABEL
 from backend.cli.tui.image_attachments import image_attachment_status_text
 
 
 class TurnCompletion(Static):
-    """Thin full-width completion marker between agent turns."""
+    """Thin turn separator — matches OrientLine / ThinkingIndicator chrome."""
+
+    _PIPE = '#3d5a4a'
+    _LABEL = '#5a7a6a'
+    _DURATION = '#9aa8b8'
 
     DEFAULT_CSS = """
     TurnCompletion {
         width: 100%;
-        height: 1;
-        margin: 0 0 1 0;
-        padding: 0 1;
-        background: #071b21;
-        color: #8f9fc1;
+        height: auto;
+        margin: 1 0 2 0;
+        padding: 0 1 0 2;
+        border: transparent;
+        border-left: solid #3d5a4a;
+        background: #090d18;
     }
     """
 
@@ -34,11 +40,30 @@ class TurnCompletion(Static):
         id: str | None = None,
     ) -> None:
         super().__init__(id=id)
-        self.update(f'[#5eead4]Finished in:[/] [#c8d4e8]{duration}[/]')
+        self.styles.border_left = ('solid', self._PIPE)
+        self.update(
+            Text.assemble(
+                ('Finished in: ', self._LABEL),
+                (duration, self._DURATION),
+            )
+        )
 
 
 class UserMessage(Static):
     """User message display in the transcript."""
+
+    DEFAULT_CSS = """
+    UserMessage {
+        width: 100%;
+        height: auto;
+        margin: 1 0 2 0;
+        padding: 1 2 2 2;
+        background: #0d1522;
+        border: transparent;
+        border-right: solid #5a6a8a;
+        color: #e9e9e9;
+    }
+    """
 
     def __init__(
         self,
@@ -52,10 +77,12 @@ class UserMessage(Static):
         body = (text or '').rstrip()
         parts: list[Any] = []
         if image_count > 0:
+            from backend.cli.tui.transcript_typography import TX_META
+
             parts.append(
                 Text(
                     image_attachment_status_text(image_count),
-                    style='bold #5eead4',
+                    style=TX_META,
                 )
             )
         if body:
@@ -74,6 +101,19 @@ class UserMessage(Static):
 class AgentMessage(Static):
     """Agent response display in the transcript."""
 
+    DEFAULT_CSS = """
+    AgentMessage {
+        width: 100%;
+        height: auto;
+        margin: 1 0 2 0;
+        padding: 1 2 2 2;
+        border: transparent;
+        border-left: solid #3d4a66;
+        background: #090d18;
+        color: #c8d4e8;
+    }
+    """
+
     def __init__(
         self,
         text: str,
@@ -81,11 +121,14 @@ class AgentMessage(Static):
         renderable: Any | None = None,
         id: str | None = None,
     ) -> None:
+        from backend.cli.tui.transcript_typography import AGENT_PIPE
+
         if renderable is None:
             from backend.cli.tui.renderer.prep import prep_markdown
 
             renderable = prep_markdown(text)
         super().__init__(renderable, id=id)
+        self.styles.border_left = ('solid', AGENT_PIPE)
 
     def update_message(self, text: str, *, renderable: Any | None = None) -> None:
         """Update message content dynamically."""
@@ -103,10 +146,11 @@ class LiveResponse(Static):
     LiveResponse {
         width: 100%;
         height: auto;
-        margin: 0 0 1 0;
-        padding: 0 1 0 2;
-        background: #070b14;
-        border-left: solid #3d5a80;
+        margin: 0 0 2 0;
+        padding: 1 1 1 2;
+        border: transparent;
+        border-left: solid #3d4a66;
+        background: #090d18;
         color: #b8c4d8;
     }
     LiveResponse.-streaming {
@@ -141,32 +185,33 @@ class ThinkingIndicator(Container):
     Supports syntax highlighting for code blocks within thinking content.
     """
 
-    DEFAULT_CSS = """
-    ThinkingIndicator {
+    DEFAULT_CSS = f"""
+    ThinkingIndicator {{
         width: 100%;
         height: auto;
         margin: 0 0 1 0;
         border: transparent;
         background: #090d18;
-        border-left: solid #3d5a80;
+        border-left: solid {THINKING_LABEL};
         padding: 0 1 0 2;
-    }
-    ThinkingIndicator.-hidden {
+    }}
+    ThinkingIndicator.-hidden {{
         display: none;
-    }
-    ThinkingIndicator.-streaming {
+    }}
+    ThinkingIndicator.-streaming {{
         background: #0a101c;
-    }
-    ThinkingIndicator > #thinking-content {
+    }}
+    ThinkingIndicator > #thinking-content {{
         width: 100%;
         height: auto;
-    }
+    }}
     """
 
     def __init__(self, *, id: str | None = None) -> None:
         super().__init__(id=id)
         self._thoughts: list[str] = []
         self._current_action: str = 'Thinking'
+        self.styles.border_left = ('solid', THINKING_LABEL)
         self.add_class('-hidden')
 
     def compose(self) -> ComposeResult:
@@ -202,7 +247,7 @@ class ThinkingIndicator(Container):
         """No-op for API compatibility."""
 
     def _thinking_prefix_renderable(self) -> Text:
-        return Text.assemble((f'{self._current_action}: ', '#42a394'))
+        return Text.assemble((f'{self._current_action}: ', THINKING_LABEL))
 
     def _update_display_lightweight(self, content: Static, full_text: str) -> None:
         from rich.console import Group

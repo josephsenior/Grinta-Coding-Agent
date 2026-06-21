@@ -68,11 +68,11 @@ async def test_call_tool_mcp_success_truncates_content(mock_executor) -> None:
             AsyncMock(return_value=fake_obs),
         ),
         patch(
-            'backend.execution.server.action_execution_server.get_max_edit_observation_chars',
+            'backend.execution.aes.file_operations.get_max_edit_observation_chars',
             return_value=5,
         ),
         patch(
-            'backend.execution.server.action_execution_server.truncate_large_text',
+            'backend.execution.aes.file_operations.truncate_large_text',
             side_effect=lambda t, m, label='': t[:m],
         ),
     ):

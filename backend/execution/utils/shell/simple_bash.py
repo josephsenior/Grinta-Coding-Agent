@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import os
 import subprocess
-import sys
 from typing import TYPE_CHECKING
 
 from backend.core.logging.logger import app_logger as logger
+from backend.core.os_capabilities import OS_CAPS
 from backend.execution.utils.files.bounded_io import bounded_communicate
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.commands import (
@@ -197,9 +197,9 @@ class SimpleBashSession(BaseShellSession):
             cwd=self._cwd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            start_new_session=sys.platform != 'win32',
+            start_new_session=not OS_CAPS.is_windows,
             creationflags=(
-                subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == 'win32' else 0
+                subprocess.CREATE_NEW_PROCESS_GROUP if OS_CAPS.is_windows else 0
             ),
         )
         self._cancellation.register_process(process)

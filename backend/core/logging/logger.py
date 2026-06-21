@@ -352,6 +352,10 @@ if LOG_SHIPPING_ENABLED:
 app_logger.debug('Logging initialized')
 
 
+_LEGACY_LOGS_MIGRATION_DONE = False
+_LEGACY_LOGS_MIGRATION_LOCK = threading.Lock()
+
+
 def _grinta_install_tree_root() -> str:
     """Directory that contains ``backend/`` (editable install or wheel).
 
@@ -379,17 +383,89 @@ def _workspace_logs_segment() -> str | None:
     return f'{safe}__{digest}'
 
 
+def _workspace_logs_root() -> str:
+    """Canonical root for workspace logs under the install tree."""
+    return os.path.join(_grinta_install_tree_root(), 'logs', 'workspaces')
+
+
+def _legacy_workspace_logs_root() -> str:
+    """Legacy workspace-log root kept for backward-compatibility migration."""
+    return os.path.join(_grinta_install_tree_root(), 'backend', 'logs', 'workspaces')
+
+
+def _next_legacy_target(path: str) -> str:
+    """Return a non-colliding target path for migrated legacy artifacts."""
+    base, ext = os.path.splitext(path)
+    idx = 1
+    candidate = f'{base}.legacy-{idx}{ext}'
+    while os.path.exists(candidate):
+        idx += 1
+        candidate = f'{base}.legacy-{idx}{ext}'
+    return candidate
+
+
+def _move_legacy_tree(src_dir: str, dst_dir: str) -> tuple[int, int]:
+    """Move all entries from ``src_dir`` into ``dst_dir`` without overwriting."""
+    moved_dirs = 0
+    moved_files = 0
+    os.makedirs(dst_dir, exist_ok=True)
+    for entry in os.scandir(src_dir):
+        src_path = entry.path
+        dst_path = os.path.join(dst_dir, entry.name)
+        if entry.is_dir(follow_symlinks=False):
+            if os.path.isdir(dst_path):
+                child_dirs, child_files = _move_legacy_tree(src_path, dst_path)
+                moved_dirs += child_dirs
+                moved_files += child_files
+                with contextlib.suppress(OSError):
+                    os.rmdir(src_path)
+                continue
+            if os.path.exists(dst_path):
+                dst_path = _next_legacy_target(dst_path)
+            os.replace(src_path, dst_path)
+            moved_dirs += 1
+            continue
+        if os.path.exists(dst_path):
+            dst_path = _next_legacy_target(dst_path)
+        os.replace(src_path, dst_path)
+        moved_files += 1
+    return moved_dirs, moved_files
+
+
+def _migrate_legacy_workspace_logs() -> None:
+    """Consolidate historical ``backend/logs/workspaces`` into canonical logs root."""
+    global _LEGACY_LOGS_MIGRATION_DONE
+    with _LEGACY_LOGS_MIGRATION_LOCK:
+        if _LEGACY_LOGS_MIGRATION_DONE:
+            return
+        _LEGACY_LOGS_MIGRATION_DONE = True
+    legacy_root = _legacy_workspace_logs_root()
+    if not os.path.isdir(legacy_root):
+        return
+    canonical_root = _workspace_logs_root()
+    try:
+        moved_dirs, moved_files = _move_legacy_tree(legacy_root, canonical_root)
+        with contextlib.suppress(OSError):
+            os.rmdir(legacy_root)
+        with contextlib.suppress(OSError):
+            os.rmdir(os.path.dirname(legacy_root))
+        if moved_dirs or moved_files:
+            app_logger.info(
+                'Migrated legacy workspace logs into canonical root (%d dirs, %d files)',
+                moved_dirs,
+                moved_files,
+            )
+    except Exception:
+        app_logger.debug('Legacy workspace log migration failed', exc_info=True)
+
+
 def _workspace_logs_dir() -> str | None:
     """Workspace-level log directory (shared by all sessions of a workspace)."""
     segment = _workspace_logs_segment()
     if segment is None:
         return None
-    return os.path.join(
-        _grinta_install_tree_root(),
-        'logs',
-        'workspaces',
-        segment,
-    )
+    _migrate_legacy_workspace_logs()
+    return os.path.join(_workspace_logs_root(), segment)
 
 
 def _unbound_log_dir() -> str:

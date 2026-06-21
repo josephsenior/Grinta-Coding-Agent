@@ -22,8 +22,8 @@ DIFF_LINE_ADD = '#b8f0c8'
 DIFF_LINE_REM = '#ffc0c0'
 DIFF_BG_CTX = 'transparent'
 # Softened ~10% toward NAVY_BG for long always-visible diffs
-DIFF_BG_ADD = '#122a22'
-DIFF_BG_REM = '#2a1a1a'
+DIFF_BG_ADD = '#0a1410'
+DIFF_BG_REM = '#120c0c'
 DIFF_INLINE_ADD = NAVY_READY
 DIFF_INLINE_REM = NAVY_ERROR
 DIFF_HDR = NAVY_TEXT_MUTED

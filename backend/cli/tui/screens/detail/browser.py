@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from textual.widgets import Rule, Static
-
 from backend.cli.tui.screens.detail.base import DetailScreen
 
 
@@ -18,8 +16,16 @@ class BrowserDetailScreen(DetailScreen):
         links: list[str] | None = None,
         *,
         title: str = 'Browser',
+        kind: str = 'Browser',
+        heading: str = '',
+        accent: str | None = None,
     ) -> None:
-        super().__init__(title=title)
+        super().__init__(
+            title=title,
+            kind=kind,
+            heading=heading,
+            accent=accent,
+        )
         self._full_url = full_url
         self._actions = list(actions or [])
         self._extracted = extracted
@@ -29,39 +35,47 @@ class BrowserDetailScreen(DetailScreen):
         widgets: list = []
 
         if self._full_url:
-            widgets.append(
-                Static(
-                    f'[#91abec]{self._full_url}[/]',
-                    id='browser-url',
+            widgets.extend(
+                self.section(
+                    'URL',
+                    self.meta_row(
+                        f'[bold #91abec]{self._full_url}[/]',
+                        widget_id='browser-url',
+                    ),
                 )
             )
 
         if self._actions:
-            widgets.append(Rule('Actions', line_style='heavy'))
-            for action in self._actions:
-                widgets.append(
-                    Static(
-                        f'  [#c8d4e8]→[/] [#e2e8f0]{action}[/]',
-                        classes='browser-action',
-                    )
+            widgets.extend(
+                self.section(
+                    'Actions',
+                    *[
+                        self.list_row(f'[#c8d4e8]→[/] [#e2e8f0]{action}[/]')
+                        for action in self._actions
+                    ],
                 )
+            )
 
         if self._extracted:
-            widgets.append(Rule('Extracted', line_style='heavy'))
-            widgets.append(Static(self._extracted, id='browser-extracted'))
+            widgets.extend(
+                self.section(
+                    'Extracted',
+                    self.code_block(self._extracted, widget_id='browser-extracted'),
+                )
+            )
 
         if self._links:
-            link_header = f'Links ({len(self._links)})'
-            widgets.append(Static(f'[#54597b]{link_header}[/]', id='browser-links-hdr'))
-            for link in self._links:
-                widgets.append(
-                    Static(
-                        f'  → [#91abec]{link}[/]',
-                        classes='browser-link',
-                    )
+            widgets.extend(
+                self.section(
+                    f'Links ({len(self._links)})',
+                    *[
+                        self.list_row(f'→ [#91abec]{link}[/]')
+                        for link in self._links
+                    ],
                 )
+            )
 
         if not widgets:
-            widgets.append(Static('(no browser data)', id='browser-empty'))
+            widgets.append(self.empty_state('(no browser data)', widget_id='browser-empty'))
 
         return widgets

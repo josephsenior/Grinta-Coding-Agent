@@ -341,6 +341,27 @@ class CollapsibleSection(Container):
             event.prevent_default()
             event.stop()
 
+    def _sync_body_visibility(self) -> None:
+        """Keep the body visibility aligned with the collapsed flag."""
+        try:
+            body = self.query_one('#body', Vertical)
+        except Exception:
+            return
+        if self._collapsed:
+            body.add_class('-hidden')
+        else:
+            body.remove_class('-hidden')
+
+    def _refresh_body_layout(self) -> None:
+        """Reflow dynamic sidebar rows after mount/replace."""
+        try:
+            body = self.query_one('#body', Vertical)
+        except Exception:
+            return
+        self._sync_body_visibility()
+        body.refresh(layout=True)
+        self.refresh(layout=True)
+
     def set_content(self, content: str) -> None:
         """Update the body content."""
         self._content = content
@@ -348,6 +369,7 @@ class CollapsibleSection(Container):
         body = self.query_one('#body', Vertical)
         body.remove_children()
         body.mount(Static(self._empty_markup(content), id='empty-text'))
+        self._refresh_body_layout()
 
     def set_title(self, title: str) -> None:
         """Update the section title."""
@@ -388,8 +410,8 @@ class CollapsibleSection(Container):
         body.remove_children()
 
         if normalized:
-            for label, item_id, deletable, status, meta, interactive in normalized:
-                body.mount(
+            body.mount(
+                *[
                     SidebarRow(
                         label,
                         item_id,
@@ -398,11 +420,14 @@ class CollapsibleSection(Container):
                         meta=meta,
                         interactive=interactive,
                     )
-                )
+                    for label, item_id, deletable, status, meta, interactive in normalized
+                ]
+            )
         else:
             body.mount(
                 Static(self._empty_markup(self._content or 'No items'), id='empty-text')
             )
+        self._refresh_body_layout()
 
     def expand(self) -> None:
         """Expand the section."""

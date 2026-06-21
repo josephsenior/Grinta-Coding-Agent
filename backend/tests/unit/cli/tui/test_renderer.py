@@ -272,8 +272,6 @@ async def test_tui_live_response_follows_tail_when_not_user_scrolled(
         renderer.update_live_response(
             'Starting response.\n' + '\n'.join(f'new line {idx}' for idx in range(20))
         )
-        if getattr(renderer, '_streaming_render_timer_armed', False):
-            renderer._flush_deferred_streaming_render()
         await pilot.pause()
         await _await_at_bottom(display, pilot)
 
@@ -308,14 +306,28 @@ async def test_tui_live_response_respects_user_scrolled_away(mock_config, monkey
         display.force_scroll_end()
         await pilot.pause()
 
-        display.user_scroll_page_up(animate=False)
-        await pilot.pause()
+        display.user_scroll_home(animate=False)
+        for _ in range(12):
+            display._sync_scroll_state_from_position()
+            if (
+                display._user_scrolled_away
+                and display.max_scroll_y > 0
+                and display.scroll_y < display.max_scroll_y - 1.0
+            ):
+                break
+            await pilot.pause()
+
         assert display._user_scrolled_away is True
+        assert not display._was_at_bottom()
 
         renderer.update_live_response(
             'Starting response.\n' + '\n'.join(f'new line {idx}' for idx in range(20))
         )
-        await pilot.pause()
+        for _ in range(12):
+            display._sync_scroll_state_from_position()
+            if display._user_scrolled_away and not display._was_at_bottom():
+                break
+            await pilot.pause()
 
         assert display._user_scrolled_away is True
         assert not display._was_at_bottom()
@@ -1006,7 +1018,7 @@ async def test_tui_mcp_call_merges_action_and_observation_into_single_card(
             loop=loop,
         )
 
-        from backend.cli.tui.widgets.record_panel import RecordPanel
+        from backend.cli.tui.widgets.scan_line import MCPCard
 
         renderer._process_event(
             MCPAction(name='search_docs', arguments={'q': 'ranking'})
@@ -1020,19 +1032,13 @@ async def test_tui_mcp_call_merges_action_and_observation_into_single_card(
         )
         await pilot.pause()
 
-        mcp_panels = [
-            panel
-            for panel in s.query(RecordPanel).results()
-            if 'category-mcp' in panel.classes
-        ]
-        assert len(mcp_panels) == 1
-        assert '-running' not in mcp_panels[0].classes
-        assert '-collapsed' in mcp_panels[0].classes
-        header = mcp_panels[0].query_one('.record-header-text')
-        rendered = _static_render_plain(header)
-        assert 'Called' in rendered
-        assert 'search_docs' in rendered
-        assert 'ranking' in rendered.lower()
+        mcp_cards = list(s.query(MCPCard).results())
+        assert len(mcp_cards) == 1
+        assert mcp_cards[0].state == 'done'
+        line = str(mcp_cards[0]._line_text())
+        assert 'Called' in line
+        assert 'search_docs' in line
+        assert 'ranking' in line.lower()
 
 
 @pytest.mark.asyncio
@@ -1150,7 +1156,7 @@ async def test_tui_delegate_task_merges_action_and_observation_into_single_card(
             loop=loop,
         )
 
-        from backend.cli.tui.widgets.record_panel import RecordPanel
+        from backend.cli.tui.widgets.scan_line import DelegateCard
 
         renderer._process_event(
             DelegateTaskAction(
@@ -1165,17 +1171,12 @@ async def test_tui_delegate_task_merges_action_and_observation_into_single_card(
         )
         await pilot.pause()
 
-        worker_panels = [
-            panel
-            for panel in s.query(RecordPanel).results()
-            if 'category-workers' in panel.classes
-        ]
-        assert len(worker_panels) == 1
-        assert '-running' not in worker_panels[0].classes
-        header = worker_panels[0].query_one('.record-header-text')
-        rendered = _static_render_plain(header)
-        assert 'Delegated' in rendered
-        assert 'completed' in rendered
+        delegate_cards = list(s.query(DelegateCard).results())
+        assert len(delegate_cards) == 1
+        assert delegate_cards[0].state == 'done'
+        line = str(delegate_cards[0]._line_text())
+        assert 'Delegated' in line
+        assert 'Investigate flaky test' in line
 
 
 @pytest.mark.asyncio
@@ -2083,24 +2084,19 @@ async def test_tui_condensation_request_reuses_status_card(mock_config):
         )
         await pilot.pause()
 
-        compaction_cards = [
-            card
-            for card in s.query(TUIActivityCard).results()
-            if 'category-tool' in card.classes
-        ]
         orient_lines = s.query(OrientLine).results()
         compaction_orient = [
             line for line in orient_lines
             if 'Compacting' in str(line.query_one('#orient-content').renderable)
+            or 'Compacted' in str(line.query_one('#orient-content').renderable)
         ]
-        assert len(compaction_orient) == 1
-        assert len(compaction_cards) == 1
+        assert len(compaction_orient) == 2
 
         started = compaction_orient[0].query_one('#orient-content')
-        completed = compaction_cards[0].query_one('#collapsed-row')
+        completed = compaction_orient[1].query_one('#orient-content')
         assert 'Compacting (1st)' in str(started.renderable)
         assert 'Compacted (1st)' in str(completed.renderable)
-        assert 'Done' in str(completed.renderable)
+        assert 'Compacted summary' in str(completed.renderable)
         assert renderer._compaction_transcript_active is False
 
 

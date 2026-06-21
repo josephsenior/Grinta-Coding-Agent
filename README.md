@@ -28,7 +28,7 @@ Direct link if the animation does not load: [`docs/assets/grinta-demo.gif`](docs
 
 - Latest public build is `v1.0.0-rc1` (release candidate), not final GA.
 - We are actively collecting feedback on first-run setup, UX clarity, and edge-case reliability.
-- Linux and Windows are the current supported release targets; macOS remains best-effort until its CI gate is promoted.
+- Linux, Windows, and macOS are supported release targets with required CI gates on each platform.
 - If you hit friction, please open an issue with the `RC Feedback` template from the issue chooser.
 - GA criteria and release gate details live in [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md).
 

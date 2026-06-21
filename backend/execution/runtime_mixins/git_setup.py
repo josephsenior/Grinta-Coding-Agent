@@ -11,9 +11,10 @@ import shutil
 import string
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from backend.core.logging.logger import app_logger as logger
+from backend.core.os_capabilities import OS_CAPS
 from backend.ledger import EventSource
 from backend.ledger.action import CmdRunAction, FileEditAction, FileReadAction
 from backend.ledger.observation import (
@@ -25,6 +26,63 @@ from backend.utils.async_helpers.async_utils import call_sync_from_async
 if TYPE_CHECKING:
     from backend.core.enums import RuntimeStatus
     from backend.core.providers.provider_models import ProviderTokenType
+
+_ScriptKind = Literal['bash', 'powershell']
+
+_SETUP_SCRIPT_CANDIDATES: dict[bool, tuple[tuple[str, _ScriptKind], ...]] = {
+    True: (
+        ('.grinta/setup.ps1', 'powershell'),
+        ('.grinta/setup.sh', 'bash'),
+    ),
+    False: (
+        ('.grinta/setup.sh', 'bash'),
+        ('.grinta/setup.ps1', 'powershell'),
+    ),
+}
+
+_PRECOMMIT_SCRIPT_CANDIDATES: dict[bool, tuple[tuple[str, _ScriptKind], ...]] = {
+    True: (
+        ('.grinta/pre-commit.ps1', 'powershell'),
+        ('.grinta/pre-commit.sh', 'bash'),
+    ),
+    False: (('.grinta/pre-commit.sh', 'bash'),),
+}
+
+
+def _bash_pre_commit_hook_content(pre_commit_script: str) -> str:
+    return (
+        f'#!/bin/bash\n# This hook was installed by APP\n'
+        f'# It calls the pre-commit script in the .grinta directory\n\n'
+        f'if [ -x "{pre_commit_script}" ]; then\n'
+        f'    . "{pre_commit_script}"\n'
+        f'    exit $?\n'
+        f'else\n'
+        f'    echo "Warning: {pre_commit_script} not found or not executable"\n'
+        f'    exit 0\n'
+        f'fi\n'
+    )
+
+
+def _powershell_pre_commit_hook_content(pre_commit_script: str) -> str:
+    return (
+        '#!/usr/bin/env pwsh\n'
+        '# This hook was installed by APP\n'
+        f'$script = "{pre_commit_script}"\n'
+        'if (Test-Path $script) {\n'
+        '    & $script\n'
+        '    exit $LASTEXITCODE\n'
+        '}\n'
+        f'Write-Host "Warning: {pre_commit_script} not found"\n'
+        'exit 0\n'
+    )
+
+
+def _script_run_command(path: str, kind: _ScriptKind) -> str:
+    if kind == 'powershell':
+        return f'powershell -NoProfile -ExecutionPolicy Bypass -File "{path}"'
+    if OS_CAPS.is_windows:
+        return f'bash "{path}"'
+    return f'chmod +x "{path}" && . "{path}"'
 
 
 class GitSetupMixin:
@@ -122,12 +180,27 @@ class GitSetupMixin:
     # Setup scripts
     # ------------------------------------------------------------------
 
+    def _find_workspace_script(
+        self, candidates: tuple[tuple[str, _ScriptKind], ...]
+    ) -> tuple[str, _ScriptKind] | None:
+        for path, kind in candidates:
+            read_obs = cast(Any, self.read(FileReadAction(path=path)))
+            if not isinstance(read_obs, ErrorObservation):
+                return path, kind
+        return None
+
     def maybe_run_setup_script(self) -> None:
-        """Run .grinta/setup.sh if it exists in the workspace or repository."""
-        setup_script = '.grinta/setup.sh'
-        read_obs = cast(Any, self.read(FileReadAction(path=setup_script)))
-        if isinstance(read_obs, ErrorObservation):
+        """Run a workspace setup script when present under ``.grinta/``.
+
+        Prefers ``setup.ps1`` on Windows and ``setup.sh`` on POSIX, with
+        cross-platform fallbacks when only the other script exists.
+        """
+        resolved = self._find_workspace_script(
+            _SETUP_SCRIPT_CANDIDATES[OS_CAPS.is_windows]
+        )
+        if resolved is None:
             return
+        setup_script, kind = resolved
         if self.status_callback:
             from backend.core.enums import RuntimeStatus
 
@@ -135,7 +208,7 @@ class GitSetupMixin:
                 'info', RuntimeStatus.SETTING_UP_WORKSPACE, 'Setting up workspace...'
             )
         action = CmdRunAction(
-            command=f'chmod +x {setup_script} && source {setup_script}',
+            command=_script_run_command(setup_script, kind),
             blocking=True,
             hidden=True,
         )
@@ -151,17 +224,18 @@ class GitSetupMixin:
 
     def _setup_git_hooks_directory(self) -> bool:
         """Create git hooks directory if needed."""
-        action = CmdRunAction(command='mkdir -p .git/hooks')
-        obs = cast(Any, self.run_action(action))
-        if isinstance(obs, CmdOutputObservation):
-            if obs.exit_code == 0:
-                return True
-            self.log('error', f'Failed to create git hooks directory: {obs.content}')
+        hook_dir = self.workspace_root / '.git' / 'hooks'
+        try:
+            hook_dir.mkdir(parents=True, exist_ok=True)
+            return True
+        except OSError as exc:
+            self.log('error', f'Failed to create git hooks directory: {exc}')
             return False
-        return False
 
     def _make_script_executable(self, script_path: str) -> bool:
-        """Make a script file executable."""
+        """Make a script file executable on POSIX hosts."""
+        if OS_CAPS.is_windows:
+            return True
         action = CmdRunAction(command=f'chmod +x {script_path}')
         obs = cast(Any, self.run_action(action))
         if isinstance(obs, CmdOutputObservation):
@@ -174,30 +248,29 @@ class GitSetupMixin:
     def _preserve_existing_hook(self, pre_commit_hook: str) -> bool:
         """Preserve existing pre-commit hook by moving it to .local file."""
         pre_commit_local = '.git/hooks/pre-commit.local'
-        action = CmdRunAction(command=f'mv {pre_commit_hook} {pre_commit_local}')
-        obs = cast(Any, self.run_action(action))
-        if isinstance(obs, CmdOutputObservation):
-            if obs.exit_code == 0:
-                return bool(
-                    GitSetupMixin._make_script_executable(self, pre_commit_local)
-                )
-            self.log(
-                'error', f'Failed to preserve existing pre-commit hook: {obs.content}'
-            )
-            return False
-
+        src = self.workspace_root / pre_commit_hook
+        dst = self.workspace_root / pre_commit_local
         try:
-            shutil.move(pre_commit_hook, pre_commit_local)
-            return bool(GitSetupMixin._make_script_executable(self, pre_commit_local))
+            shutil.move(str(src), str(dst))
+            return self._make_script_executable(pre_commit_local)
         except (OSError, shutil.Error) as exc:
             self.log('error', f'Failed to preserve existing pre-commit hook: {exc}')
             return False
 
     def _install_pre_commit_hook(
-        self, pre_commit_script: str, pre_commit_hook: str
+        self,
+        pre_commit_script: str,
+        pre_commit_hook: str,
+        *,
+        kind: _ScriptKind,
     ) -> bool:
         """Install the pre-commit hook file."""
-        pre_commit_hook_content = f'#!/bin/bash\n# This hook was installed by APP\n# It calls the pre-commit script in the .app directory\n\nif [ -x "{pre_commit_script}" ]; then\n    source "{pre_commit_script}"\n    exit $?\nelse\n    echo "Warning: {pre_commit_script} not found or not executable"\n    exit 0\nfi\n'
+        if kind == 'powershell':
+            pre_commit_hook_content = _powershell_pre_commit_hook_content(
+                pre_commit_script
+            )
+        else:
+            pre_commit_hook_content = _bash_pre_commit_hook_content(pre_commit_script)
 
         write_obs = cast(
             Any,
@@ -213,17 +286,20 @@ class GitSetupMixin:
             self.log('error', f'Failed to write pre-commit hook: {write_obs.content}')
             return False
 
-        return bool(GitSetupMixin._make_script_executable(self, pre_commit_hook))
+        return self._make_script_executable(pre_commit_hook)
 
     def maybe_setup_git_hooks(self) -> None:
-        """Set up git hooks if .grinta/pre-commit.sh exists in the workspace or repository."""
-        pre_commit_script = '.grinta/pre-commit.sh'
-        pre_commit_hook = '.git/hooks/pre-commit'
+        """Set up git hooks when a pre-commit script exists under ``.grinta/``.
 
-        # Check if pre-commit script exists
-        read_obs = cast(Any, self.read(FileReadAction(path=pre_commit_script)))
-        if isinstance(read_obs, ErrorObservation):
+        Prefers ``pre-commit.ps1`` on Windows and ``pre-commit.sh`` on POSIX.
+        """
+        resolved = self._find_workspace_script(
+            _PRECOMMIT_SCRIPT_CANDIDATES[OS_CAPS.is_windows]
+        )
+        if resolved is None:
             return
+        pre_commit_script, script_kind = resolved
+        pre_commit_hook = '.git/hooks/pre-commit'
 
         if self.status_callback:
             from backend.core.enums import RuntimeStatus
@@ -232,27 +308,23 @@ class GitSetupMixin:
                 'info', RuntimeStatus.SETTING_UP_GIT_HOOKS, 'Setting up git hooks...'
             )
 
-        # Setup hooks directory
-        if not GitSetupMixin._setup_git_hooks_directory(self):
+        if not self._setup_git_hooks_directory():
             return
 
-        # Make pre-commit script executable
-        if not GitSetupMixin._make_script_executable(self, pre_commit_script):
+        if not self._make_script_executable(pre_commit_script):
             return
 
-        # Preserve existing hook if needed
         read_obs = cast(Any, self.read(FileReadAction(path=pre_commit_hook)))
         if (
             not isinstance(read_obs, ErrorObservation)
             and 'This hook was installed by APP' not in read_obs.content
         ):
             self.log('info', 'Preserving existing pre-commit hook')
-            if not GitSetupMixin._preserve_existing_hook(self, pre_commit_hook):
+            if not self._preserve_existing_hook(pre_commit_hook):
                 return
 
-        # Install new hook
-        if GitSetupMixin._install_pre_commit_hook(
-            self, pre_commit_script, pre_commit_hook
+        if self._install_pre_commit_hook(
+            pre_commit_script, pre_commit_hook, kind=script_kind
         ):
             self.log('info', 'Git pre-commit hook installed successfully')
 

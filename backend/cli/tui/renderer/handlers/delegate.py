@@ -52,19 +52,24 @@ def _update_or_write_delegate_card(
     success: bool,
     preview: str | None,
 ) -> None:
+    from backend.cli.tui.widgets.scan_line import DelegateCard
+
     pending = orch._pending_delegate_card
-    if pending is not None:
-        status = 'ok' if success else 'err'
-        outcome = 'completed' if success else 'failed'
-        orch._update_record_panel_outcome(
-            pending,
-            status=status,
-            outcome=outcome,
-            extra_content=preview,
+    if isinstance(pending, DelegateCard):
+        pending.complete(
+            result=preview or '',
+            success=success,
+            worker=card.detail if hasattr(card, 'detail') else '',
         )
         orch._pending_delegate_card = None
-    else:
-        orch._write_record_card(card)
+        return
+    orch._append_scan_line_card(
+        DelegateCard(
+            resolved_task,
+            result=preview or '',
+            success=success,
+        )
+    )
 
 
 def _handle_delegate_task_action(
@@ -77,7 +82,10 @@ def _handle_delegate_task_action(
         orch._active_worker_tasks.append(orch._summarize_worker_task(task))
     orch._sync_worker_strip()
     card = ActivityRenderer.delegation(task, worker)
-    widget = orch._write_record_card(card, processing=True)
+    from backend.cli.tui.widgets.scan_line import DelegateCard
+
+    widget = DelegateCard(task, worker=worker)
+    orch._append_scan_line_card(widget)
     orch._pending_delegate_card = widget
 
 

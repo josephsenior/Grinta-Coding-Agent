@@ -14,6 +14,7 @@ from textual.widgets import (
 )
 
 from backend.cli.theme import CLR_REASONING_SNAP
+from backend.cli.tui.transcript_typography import THINKING_LABEL
 from backend.cli.tui.constants import (
     _TUI_HISTORY_RENDER_LIMIT,
 )
@@ -22,13 +23,6 @@ from backend.ledger import (
 )
 
 _LIVE_SCROLL_PAINT_INTERVAL = 0.25
-_LIVE_STREAMING_RENDER_INTERVAL = 0.25
-
-
-def _streaming_render_interval(text: str) -> float:
-    from backend.cli.tui.renderer.prep import streaming_render_interval
-
-    return streaming_render_interval(text)
 
 
 class RendererLiveMixin:
@@ -136,9 +130,9 @@ class RendererLiveMixin:
         widget = self._live_response_widget
         if widget is None:
             return
-        # Reuse an off-thread-prepared renderable when available (filled by
-        # prep_streaming_response_async during _preprocess_event_async) so the
-        # heavy Pygments/Markdown pass never runs on the Textual event loop.
+        if text == getattr(self, '_last_streaming_response_applied_text', ''):
+            return
+
         cache = getattr(self, '_streaming_render_cache', None)
         renderable = None
         if cache is not None:
@@ -147,8 +141,10 @@ class RendererLiveMixin:
             if renderable is None:
                 renderable = prep_streaming_renderable(text)
             widget.set_streaming_renderable(renderable)
+            self._last_streaming_response_applied_text = text
         except Exception:
             widget.set_streaming_text(text)
+            self._last_streaming_response_applied_text = text
 
     def _follow_transcript_tail_after_reflow(self, display: Any) -> None:
         """Scroll to tail after in-place widget reflow updates max_scroll_y."""
@@ -158,26 +154,30 @@ class RendererLiveMixin:
         def _follow_after_reflow() -> None:
             if getattr(display, '_user_scrolled_away', False):
                 return
-            # call_after_refresh already runs after the layout reflow that
-            # updates max_scroll_y, so a single scroll is sufficient. Avoid
-            # piling extra call_soon callbacks onto the event loop.
+            try:
+                # Use transcript-level follow-tail scheduling so repeated
+                # streaming updates are coalesced instead of queuing one
+                # scroll callback per token/frame.
+                follow_tail = getattr(display, 'follow_tail', None)
+                if callable(follow_tail):
+                    follow_tail()
+                    return
+            except Exception:
+                pass
             try:
                 display._suppress_scroll_sync = True
                 display.scroll_end(animate=False, force=True, immediate=True)
                 display.call_after_refresh(display._release_programmatic_scroll)
             except Exception:
-                follow_tail = getattr(display, 'follow_tail', None)
-                if callable(follow_tail):
-                    follow_tail()
+                pass
 
         display.call_after_refresh(_follow_after_reflow)
 
     def _flush_deferred_streaming_render(self) -> None:
-        self._streaming_render_timer_armed = False
+        """Apply any pending live-response paint (terminal flush hook)."""
         text = getattr(self, '_live_response_pending_text', '')
         if not text.strip():
             return
-        self._last_streaming_render_at = time.monotonic()
         self._apply_live_response_render(text)
         try:
             display = self._tui._get_display()
@@ -216,22 +216,28 @@ class RendererLiveMixin:
             display.append_widget(self._live_response_widget)
 
         self._live_response_pending_text = text
-        now = time.monotonic()
-        last_render = getattr(self, '_last_streaming_render_at', 0.0)
-        render_interval = _streaming_render_interval(text)
-        if last_render <= 0.0 or (now - last_render) >= render_interval:
-            self._last_streaming_render_at = now
-            self._streaming_render_timer_armed = False
-            self._apply_live_response_render(text)
-        elif not getattr(self, '_streaming_render_timer_armed', False):
-            self._streaming_render_timer_armed = True
-            delay = max(render_interval - (now - last_render), 0.01)
-            try:
-                self._loop.call_later(delay, self._flush_deferred_streaming_render)
-            except RuntimeError:
-                self._streaming_render_timer_armed = False
-                self._last_streaming_render_at = now
-                self._apply_live_response_render(text)
+        anchor_scroll_y: float | None = None
+        if not should_follow and in_place_update:
+            anchor_scroll_y = float(display.scroll_y)
+        self._apply_live_response_render(text)
+        if anchor_scroll_y is not None and getattr(display, '_user_scrolled_away', False):
+
+            def _restore_scroll_anchor() -> None:
+                if not getattr(display, '_user_scrolled_away', False):
+                    return
+                try:
+                    display._suppress_scroll_sync = True
+                    display.scroll_to(
+                        y=anchor_scroll_y,
+                        animate=False,
+                        immediate=True,
+                    )
+                    display.call_after_refresh(display._release_programmatic_scroll)
+                except Exception:
+                    pass
+
+            display.call_after_refresh(_restore_scroll_anchor)
+            display.note_tail_activity()
         if should_follow:
             follow_tail = getattr(display, 'follow_tail', None)
             if callable(follow_tail):
@@ -247,8 +253,7 @@ class RendererLiveMixin:
         self._live_response = ''
         self._live_response_dirty = False
         self._live_response_pending_text = ''
-        self._streaming_render_timer_armed = False
-        self._last_streaming_render_at = 0.0
+        self._last_streaming_response_applied_text = ''
 
         display = self._tui._get_display()
         if type(display).__name__ == 'MagicMock':
@@ -276,7 +281,7 @@ class RendererLiveMixin:
             if thoughts and self._live_thinking_dirty:
                 self._live_thinking_widget.finalize()
                 snapshot = Text.assemble(
-                    ('Thinking:', '#42a394'),
+                    ('Thinking:', THINKING_LABEL),
                     '  ',
                     Text('\n  '.join(thoughts), style=CLR_REASONING_SNAP),
                 )

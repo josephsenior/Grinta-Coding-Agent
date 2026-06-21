@@ -7,9 +7,12 @@ is <3 KB and they share similar import profiles.
 
 from __future__ import annotations
 
+import json
+import time
 from typing import Any
 
 import pyperclip
+from pathlib import Path
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -18,6 +21,47 @@ from textual.widget import Widget
 from textual.widgets import Label, Select, Static, TextArea
 
 from backend.core.interaction_modes import AGENT_MODE, VISIBLE_INTERACTION_MODES
+from backend.cli.tui.transcript_typography import esc_hint_markup
+
+_DEBUG_SESSION_ID = '64043f'
+_DEBUG_LOG_PATH = Path(__file__).resolve().parents[4] / 'debug-64043f.log'
+
+
+def _agent_debug_log(
+    *,
+    run_id: str,
+    hypothesis_id: str,
+    location: str,
+    message: str,
+    data: dict[str, Any],
+) -> None:
+    payload = {
+        'sessionId': _DEBUG_SESSION_ID,
+        'id': f'{_DEBUG_SESSION_ID}-{time.time_ns()}',
+        'runId': run_id,
+        'hypothesisId': hypothesis_id,
+        'location': location,
+        'message': message,
+        'data': data,
+        'timestamp': int(time.time() * 1000),
+    }
+    line = json.dumps(payload, ensure_ascii=True, default=str) + '\n'
+    targets: list[Path] = [_DEBUG_LOG_PATH]
+    try:
+        from backend.core.logging.logger import get_log_dir
+
+        session_log_path = Path(get_log_dir()) / f'debug-{_DEBUG_SESSION_ID}.log'
+        if session_log_path not in targets:
+            targets.append(session_log_path)
+    except Exception:
+        pass
+    for path in targets:
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open('a', encoding='utf-8') as handle:
+                handle.write(line)
+        except Exception:
+            continue
 
 
 class ScrollTailBadge(Static):
@@ -106,12 +150,25 @@ class Transcript(VerticalScroll):
         self._last_scroll_y = 0.0
         self._last_max_scroll_y = 0.0
         self._load_earlier_button: Static | None = None
+        self._debug_mount_logged = False
+        self._follow_tail_pending = False
 
     def compose(self) -> ComposeResult:
         yield ScrollTailBadge()
 
     def on_mount(self) -> None:
         self._scroll_badge = self.query_one('#scroll-badge', ScrollTailBadge)
+        if not self._debug_mount_logged:
+            self._debug_mount_logged = True
+            #region agent log
+            _agent_debug_log(
+                run_id='pre-fix',
+                hypothesis_id='H4',
+                location='widgets/small.py:on_mount',
+                message='transcript instrumentation active',
+                data={'widget': 'Transcript'},
+            )
+            #endregion
 
     def _update_scroll_badge(self) -> None:
         badge = self._scroll_badge
@@ -206,6 +263,19 @@ class Transcript(VerticalScroll):
         if self.max_scroll_y > 0:
             self._user_initiated_scroll_away = True
             self._set_user_scrolled_away(True)
+            #region agent log
+            _agent_debug_log(
+                run_id='pre-fix',
+                hypothesis_id='H4',
+                location='widgets/small.py:pause_auto_scroll',
+                message='user paused auto-scroll',
+                data={
+                    'scrollY': round(float(self.scroll_y), 2),
+                    'maxScrollY': round(float(self.max_scroll_y), 2),
+                    'tailUnread': int(self._tail_unread_count),
+                },
+            )
+            #endregion
 
     def _content_widgets(self) -> list[Widget]:
         widgets: list[Widget] = []
@@ -230,10 +300,41 @@ class Transcript(VerticalScroll):
             return
 
         if not self.should_follow_tail():
+            #region agent log
+            _agent_debug_log(
+                run_id='pre-fix',
+                hypothesis_id='H1',
+                location='widgets/small.py:sync_viewport',
+                message='viewport prune skipped while away from tail',
+                data={
+                    'widgetCount': len(widgets),
+                    'maxMounted': max_mounted,
+                    'scrollY': round(float(self.scroll_y), 2),
+                    'maxScrollY': round(float(self.max_scroll_y), 2),
+                    'userScrolledAway': bool(self._user_scrolled_away),
+                    'tailUnread': int(self._tail_unread_count),
+                },
+            )
+            #endregion
             return
 
         overflow = len(widgets) - max_mounted
         to_unmount = widgets[:overflow]
+        #region agent log
+        _agent_debug_log(
+            run_id='pre-fix',
+            hypothesis_id='H1',
+            location='widgets/small.py:sync_viewport',
+            message='viewport pruning mounted widgets',
+            data={
+                'widgetCount': len(widgets),
+                'maxMounted': max_mounted,
+                'overflow': overflow,
+                'unmountCount': len(to_unmount),
+                'underBackpressure': bool(self._under_backpressure),
+            },
+        )
+        #endregion
 
         cache = getattr(renderer, '_render_cache', None)
         for widget in to_unmount:
@@ -264,6 +365,20 @@ class Transcript(VerticalScroll):
 
     def on_scroll(self, _event: Widget.Scroll) -> None:
         if self._suppress_scroll_sync:
+            #region agent log
+            _agent_debug_log(
+                run_id='pre-fix',
+                hypothesis_id='H2',
+                location='widgets/small.py:on_scroll',
+                message='scroll event ignored due suppress flag',
+                data={
+                    'suppressScrollSync': True,
+                    'scrollY': round(float(self.scroll_y), 2),
+                    'maxScrollY': round(float(self.max_scroll_y), 2),
+                    'userScrolledAway': bool(self._user_scrolled_away),
+                },
+            )
+            #endregion
             return
         self._sync_scroll_state_from_position()
         self._maybe_prefetch_earlier()
@@ -274,6 +389,19 @@ class Transcript(VerticalScroll):
         # swallow this input during active streaming.
         self._suppress_scroll_sync = False
         self.pause_auto_scroll()
+        #region agent log
+        _agent_debug_log(
+            run_id='pre-fix',
+            hypothesis_id='H4',
+            location='widgets/small.py:_on_mouse_scroll_up',
+            message='mouse scroll up received by transcript',
+            data={
+                'scrollYBefore': round(float(self.scroll_y), 2),
+                'maxScrollYBefore': round(float(self.max_scroll_y), 2),
+                'userScrolledAway': bool(self._user_scrolled_away),
+            },
+        )
+        #endregion
         super()._on_mouse_scroll_up(event)
 
     def _on_mouse_scroll_down(self, event: events.MouseScrollDown) -> None:
@@ -311,19 +439,54 @@ class Transcript(VerticalScroll):
 
     def _schedule_follow_tail(self) -> None:
         """Scroll after layout refresh so max_scroll_y reflects new children."""
+        if self._follow_tail_pending:
+            return
+        self._follow_tail_pending = True
 
         def _scroll_after_layout() -> None:
-            if self._user_scrolled_away:
-                return
-            self._suppress_scroll_sync = True
-            self.scroll_end(animate=False, force=True, immediate=True)
-            self.call_after_refresh(self._release_programmatic_scroll)
+            try:
+                if self._user_scrolled_away:
+                    return
+                was_suppressed = bool(self._suppress_scroll_sync)
+                self._suppress_scroll_sync = True
+                if was_suppressed:
+                    #region agent log
+                    _agent_debug_log(
+                        run_id='pre-fix',
+                        hypothesis_id='H5',
+                        location='widgets/small.py:_schedule_follow_tail',
+                        message='follow-tail scheduled while suppress already active',
+                        data={
+                            'scrollY': round(float(self.scroll_y), 2),
+                            'maxScrollY': round(float(self.max_scroll_y), 2),
+                            'underBackpressure': bool(self._under_backpressure),
+                        },
+                    )
+                    #endregion
+                self.scroll_end(animate=False, force=True, immediate=True)
+                self.call_after_refresh(self._release_programmatic_scroll)
+            finally:
+                self._follow_tail_pending = False
 
         self.call_after_refresh(_scroll_after_layout)
 
     def _release_programmatic_scroll(self) -> None:
         self._suppress_scroll_sync = False
         self._sync_scroll_state_from_position()
+        #region agent log
+        _agent_debug_log(
+            run_id='pre-fix',
+            hypothesis_id='H2',
+            location='widgets/small.py:_release_programmatic_scroll',
+            message='programmatic scroll suppression released',
+            data={
+                'scrollY': round(float(self.scroll_y), 2),
+                'maxScrollY': round(float(self.max_scroll_y), 2),
+                'userInitiatedAway': bool(self._user_initiated_scroll_away),
+                'userScrolledAway': bool(self._user_scrolled_away),
+            },
+        )
+        #endregion
         if self._was_at_bottom() and not self._user_initiated_scroll_away:
             self._set_user_scrolled_away(False)
 
@@ -350,6 +513,25 @@ class Transcript(VerticalScroll):
             self._schedule_follow_tail()
         else:
             self.note_tail_activity()
+        content_count = self.child_widget_count
+        if content_count and content_count % 200 == 0:
+            #region agent log
+            _agent_debug_log(
+                run_id='pre-fix',
+                hypothesis_id='H1',
+                location='widgets/small.py:append_widget',
+                message='transcript content growth checkpoint',
+                data={
+                    'contentCount': content_count,
+                    'shouldFollow': bool(should_follow),
+                    'userScrolledAway': bool(self._user_scrolled_away),
+                    'underBackpressure': bool(self._under_backpressure),
+                    'tailUnread': int(self._tail_unread_count),
+                    'scrollY': round(float(self.scroll_y), 2),
+                    'maxScrollY': round(float(self.max_scroll_y), 2),
+                },
+            )
+            #endregion
 
     def write(self, renderable: Any) -> None:
         """Compatibility method for RichLog interface."""
@@ -368,6 +550,7 @@ class Transcript(VerticalScroll):
         self._scroll_badge = None
         self._user_scrolled_away = False
         self._user_initiated_scroll_away = False
+        self._follow_tail_pending = False
         self._load_earlier_button = None
         self._tail_unread_count = 0
         self.mount(ScrollTailBadge())
@@ -440,12 +623,39 @@ class PromptTextArea(TextArea):
         super().__init__(*args, **kwargs)
         self._previous_input_text = ''
 
-    def _paste_target_screen(self) -> Any | None:
+    def _resolve_grinta_screen(self) -> Any | None:
+        """Return the main Grinta screen even when a modal/detail is stacked."""
         app = getattr(self, 'app', None)
-        screen = getattr(app, 'screen', None) if app is not None else None
-        if screen is not None:
-            return screen
+        if app is not None:
+            main = getattr(app, '_screen', None)
+            if main is not None and hasattr(main, 'try_paste_clipboard_image'):
+                return main
+            screen = getattr(app, 'screen', None)
+            if screen is not None and hasattr(screen, 'try_paste_clipboard_image'):
+                return screen
         return getattr(self, 'screen', None)
+
+    def _paste_target_screen(self) -> Any | None:
+        return self._resolve_grinta_screen()
+
+    async def _try_attach_clipboard_image(self) -> bool:
+        """Attach a clipboard image or report why paste could not continue."""
+        screen = self._paste_target_screen()
+        if screen is None or not hasattr(screen, 'try_paste_clipboard_image'):
+            return False
+        if await screen.try_paste_clipboard_image():
+            return True
+        from backend.cli.tui.image_attachments import clipboard_likely_has_image
+
+        if clipboard_likely_has_image():
+            notify = getattr(screen, 'notify_warning', None)
+            if callable(notify):
+                notify(
+                    'Clipboard contains an image but Grinta could not read it. '
+                    'Try copying again or use the attach-images action.'
+                )
+            return True
+        return False
 
     def watch_text(self, text: str) -> None:
         previous = self._previous_input_text
@@ -473,12 +683,10 @@ class PromptTextArea(TextArea):
         """Paste text or attach a clipboard image when available."""
         if self.read_only:
             return
-        screen = self._paste_target_screen()
-        if screen is not None and hasattr(screen, 'try_paste_clipboard_image'):
-            if await screen.try_paste_clipboard_image():
-                event.prevent_default()
-                event.stop()
-                return
+        if await self._try_attach_clipboard_image():
+            event.prevent_default()
+            event.stop()
+            return
         event.prevent_default()
         self._paste_text_from_clipboard(event)
 
@@ -486,10 +694,8 @@ class PromptTextArea(TextArea):
         """Paste from system clipboard directly."""
         if self.read_only:
             return
-        screen = self._paste_target_screen()
-        if screen is not None and hasattr(screen, 'try_paste_clipboard_image'):
-            if await screen.try_paste_clipboard_image():
-                return
+        if await self._try_attach_clipboard_image():
+            return
         try:
             pyperclip.paste()
         except Exception:
@@ -553,6 +759,10 @@ class HUD(Vertical):
 
     def compose(self) -> ComposeResult:
         with Horizontal(id='hud-line-2-row'):
+            yield Label(
+                esc_hint_markup('Interrupt'),
+                id='hud-hint-interrupt',
+            )
             yield Label('[#7a6a4a]Mode:[/]', id='hud-label-mode')
             yield HudModeSelect(
                 [(c.capitalize(), c) for c in VISIBLE_INTERACTION_MODES],

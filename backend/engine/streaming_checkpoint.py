@@ -32,6 +32,7 @@ from backend.core.constants import (
     DEFAULT_AGENT_STREAMING_CHECKPOINT_MAX_AGE_SECONDS,
 )
 from backend.core.logging.logger import app_logger as logger
+from backend.core.os_capabilities import OS_CAPS
 
 
 @dataclass
@@ -303,7 +304,7 @@ class StreamingCheckpoint:
 
     @staticmethod
     def _fsync_parent_dir(path: Path) -> None:
-        if os.name == 'nt':
+        if OS_CAPS.is_windows:
             return
         with suppress(OSError, AttributeError):
             dir_fd = os.open(path.parent, os.O_RDONLY)

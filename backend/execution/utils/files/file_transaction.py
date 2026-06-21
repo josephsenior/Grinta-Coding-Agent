@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from backend.core.logging.logger import app_logger as logger
+from backend.core.os_capabilities import OS_CAPS
 from backend.utils.async_helpers.async_utils import call_sync_from_async
 
 if TYPE_CHECKING:
@@ -76,7 +77,7 @@ def _atomic_write_text(file_path: str, content: str) -> None:
 
 
 def _fsync_parent_dir(parent: str) -> None:
-    if os.name == 'nt' or not parent:
+    if OS_CAPS.is_windows or not parent:
         return
     with contextlib.suppress(OSError, AttributeError):
         dir_fd = os.open(parent, os.O_RDONLY)

@@ -16,6 +16,7 @@ import pytest
 from backend.core.os_capabilities import OSCapabilities, override_os_capabilities
 from backend.execution.utils.shell.unified_shell import (
     BaseShellSession,
+    _interactive_shell_argv,
     create_shell_session,
 )
 
@@ -207,6 +208,8 @@ class _DummyTools:
         has_tmux: bool,
         has_powershell: bool = False,
         shell_type: str = 'bash',
+        shell_path: str | None = None,
+        bash_path: str | None = None,
     ):
         self.has_bash = has_bash
         self.has_tmux = has_tmux
@@ -214,6 +217,17 @@ class _DummyTools:
         self.shell_type = shell_type
         self.is_container_runtime = False
         self.is_wsl_runtime = False
+        self._shell_path = shell_path
+        self._bash_path = bash_path
+
+    def get_tool_info(self, tool_name: str):
+        from backend.execution.utils.tool_registry import ToolInfo
+
+        if tool_name == 'shell' and self._shell_path:
+            return ToolInfo(self.shell_type, True, path=self._shell_path)
+        if tool_name == 'bash' and self._bash_path:
+            return ToolInfo('bash', True, path=self._bash_path)
+        return None
 
 
 class TestCreateShellSession:
@@ -379,3 +393,56 @@ class TestCreateShellSession:
             cancellation_service=MagicMock(),
         )
         assert isinstance(session, _DummySession)
+
+    def test_interactive_session_passes_registry_shell_argv(
+        self, tmp_path, monkeypatch, request
+    ):
+        _force_os(request, windows=True)
+        monkeypatch.setitem(
+            sys.modules,
+            'backend.execution.utils.shell.pty_session',
+            types.SimpleNamespace(PtyUnavailableError=RuntimeError),
+        )
+
+        captured: dict[str, Any] = {}
+
+        class _CapturingPtySession:
+            def __init__(self, **kwargs):
+                captured.update(kwargs)
+
+        monkeypatch.setitem(
+            sys.modules,
+            'backend.execution.utils.shell.pty_shell_session',
+            types.SimpleNamespace(PtyInteractiveShellSession=_CapturingPtySession),
+        )
+
+        tools = _DummyTools(
+            has_bash=False,
+            has_tmux=False,
+            has_powershell=True,
+            shell_type='pwsh',
+            shell_path='C:/Program Files/PowerShell/7/pwsh.exe',
+        )
+        session = create_shell_session(
+            work_dir=str(tmp_path),
+            tools=tools,
+            cancellation_service=MagicMock(),
+            interactive=True,
+        )
+        assert isinstance(session, _CapturingPtySession)
+        assert captured['shell_argv'] == [
+            'C:/Program Files/PowerShell/7/pwsh.exe',
+            '-NoLogo',
+            '-NoProfile',
+        ]
+
+    def test_interactive_shell_argv_prefers_powershell_on_windows(self, request):
+        _force_os(request, windows=True)
+        tools = _DummyTools(
+            has_bash=True,
+            has_tmux=False,
+            has_powershell=True,
+            shell_type='pwsh',
+            shell_path='C:/pwsh.exe',
+        )
+        assert _interactive_shell_argv(tools) == ['C:/pwsh.exe', '-NoLogo', '-NoProfile']
