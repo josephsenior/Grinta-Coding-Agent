@@ -8,26 +8,39 @@ This matrix defines what Grinta currently supports for official OSS releases.
 | --- | --- | --- |
 | Linux | Supported | Required CI gate runs full `backend/tests` with coverage (`gates-on-linux`). |
 | Windows | Supported | Required CI gate runs `backend/tests/unit` (`gates-on-windows`). |
-| macOS | Best effort | CI runs in advisory mode (`continue-on-error: true`). |
+| macOS | Supported | Required CI gate runs `backend/tests/unit` (`gates-on-macos`). |
 
 ### macOS platform policy
 
-Grinta **ships and accepts contributions on macOS**, but macOS is not a
-release-blocking platform until the `gates-on-macos` job is promoted from
-advisory to required in [`.github/workflows/py-tests.yml`](../.github/workflows/py-tests.yml).
+macOS is a **required release platform** alongside Linux and Windows. The
+`gates-on-macos` job in [`.github/workflows/py-tests.yml`](../.github/workflows/py-tests.yml)
+runs the full unit corpus on every PR and on `main`.
 
-Until then:
+Contributors on Mac should still run `pytest backend/tests/unit` locally before
+opening PRs that touch shell, terminal, or path handling.
 
-- Treat macOS failures in CI as **signal, not a merge blocker**.
-- Do not claim macOS is fully certified in release notes unless the macOS gate
-  has been green for the same sustained window as Linux and Windows (see
-  [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md)).
-- Contributors on Mac should still run `pytest backend/tests/unit` locally before
-  opening PRs that touch shell, terminal, or path handling.
+## Platform parity gaps
 
-Promotion criteria for required macOS CI: seven consecutive green days on
-`main`, no open P0 macOS-only issues, and release notes updated to list macOS
-as supported (same bar as Linux/Windows in this matrix).
+Grinta is **cross-platform by design**, not OS-transparent. The execution layer
+routes through `OS_CAPS` and `UnifiedShellSession`, but some capabilities differ
+by host OS. Treat this table as the honest parity contract.
+
+| Area | Linux | Windows | macOS |
+| --- | --- | --- | --- |
+| Core agent loop (read/edit/run/git) | Full | Full | Full (best effort) |
+| Interactive terminal (tmux-backed) | Full | Not available natively | Full |
+| Interactive terminal (PTY / subprocess fallback) | Available | Limited interactivity | Available |
+| Workspace setup scripts | `.grinta/setup.sh` | `.grinta/setup.ps1` preferred; `.grinta/setup.sh` via Git Bash | `.grinta/setup.sh` |
+| Git pre-commit hooks | `.grinta/pre-commit.sh` | `.grinta/pre-commit.ps1` preferred; `.grinta/pre-commit.sh` via Git Bash | `.grinta/pre-commit.sh` |
+| `sandboxed_local` profile | bubblewrap (`bwrap`) | AppContainer | `sandbox-exec` |
+| MCP (local runtime / action client) | Full | Full (HTTP/SSE + allowlisted stdio) | Full |
+| MCP (remote action-execution client) | Full | Full when server exposes MCP | Full |
+| Default cache directory | System temp (`<temp>/grinta/cache`) | Same | Same |
+| CI certification depth | Full tests + coverage + integration | Unit tests | Unit tests (required) |
+
+When a feature is **limited** rather than **absent**, the runtime logs a warning
+and the agent prompt layer (`terminal_contract`) steers the model toward the
+active shell contract (PowerShell vs bash).
 
 ## Python
 

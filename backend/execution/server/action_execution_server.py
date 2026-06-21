@@ -29,10 +29,6 @@ from pydantic import BaseModel
 
 from backend.core.logging.logger import app_logger as logger
 from backend.core.os_capabilities import OS_CAPS
-from backend.execution.aes.file_operations import (
-    get_max_edit_observation_chars,
-    truncate_large_text,
-)
 from backend.execution.mcp.proxy import MCPProxyManager
 from backend.execution.plugin_loader import init_plugins
 from backend.execution.plugins import Plugin
@@ -270,60 +266,17 @@ class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
 
     async def call_tool_mcp(self, action: MCPAction) -> Observation:
         """Execute an MCP tool call using Grinta's MCP client integration."""
-        try:
-            from backend.core.config.config_loader import load_app_config
-            from backend.core.config.mcp_config import _filter_windows_stdio_servers
-            from backend.integrations.mcp.mcp_utils import (
-                call_tool_mcp,
-                create_mcps,
-            )
+        from backend.execution.utils.mcp_runtime import call_mcp_action
 
-            if self._mcp_clients is None:
-                # Prefer injected config (e.g. in-process runtime), fallback to load.
-                cfg = self._mcp_config
-                if cfg is None:
-                    cfg = load_app_config().mcp
-
-                servers = getattr(cfg, 'servers', []) or []
-                # Apply the same allowlist-based Windows filter used during
-                # config loading so that explicitly-allowed stdio servers are
-                # kept while unknown ones are still blocked.
-                servers = _filter_windows_stdio_servers(list(servers))
-                self._mcp_servers_resolved = list(servers)
-                self._mcp_clients = await create_mcps(servers)
-                from backend.integrations.mcp.mcp_tool_aliases import (
-                    prepare_mcp_tool_exposed_names,
-                )
-
-                _reserved = (
-                    getattr(cfg, 'mcp_exposed_name_reserved', None) or frozenset()
-                )
-                prepare_mcp_tool_exposed_names(self._mcp_clients, set(_reserved))
-
-            observation = await call_tool_mcp(
-                self._mcp_clients,
-                action,
-                configured_servers=self._mcp_servers_resolved,
-            )  # type: ignore[arg-type]
-
-            # Apply truncation to large MCP outputs
-            if hasattr(observation, 'content') and isinstance(observation.content, str):
-                max_chars = (
-                    get_max_edit_observation_chars()
-                )  # Reuse same limit or similar logic
-                observation.content = truncate_large_text(
-                    observation.content, max_chars, label=f'MCP:{action.name}'
-                )
-
-            return observation
-        except Exception as e:
-            logger.error('MCP call failed for %s: %s', action.name, e, exc_info=True)
-            return ErrorObservation(
-                content=(
-                    f"MCP tool call failed for '{action.name}': {type(e).__name__}: {e}. "
-                    'Use non-MCP tools as a fallback or check MCP configuration.'
-                )
-            )
+        observation, clients, servers = await call_mcp_action(
+            action,
+            mcp_config=self._mcp_config,
+            clients=self._mcp_clients,
+            servers_resolved=self._mcp_servers_resolved,
+        )
+        self._mcp_clients = clients
+        self._mcp_servers_resolved = servers
+        return observation
 
     async def lsp_query(self, action: LspQueryAction) -> Observation:
         """Execute an LSP query using the lsp_client."""

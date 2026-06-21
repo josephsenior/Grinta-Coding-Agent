@@ -36,6 +36,8 @@ class ShellToolRegistryLike(Protocol):
     is_container_runtime: bool
     is_wsl_runtime: bool
 
+    def get_tool_info(self, tool_name: str) -> Any | None: ...
+
 
 class UnifiedShellSession(ABC):
     """Abstract base class for shell sessions.
@@ -479,9 +481,76 @@ def _kill_on_hard_timeout(
     return partial_out, err_msg, 124
 
 
+def _default_interactive_shell_argv() -> list[str]:
+    """Fallback argv when the tool registry does not expose shell paths."""
+    import shutil
+
+    if OS_CAPS.is_windows:
+        pwsh = shutil.which('pwsh')
+        if pwsh:
+            return [pwsh, '-NoLogo', '-NoProfile']
+        powershell = shutil.which('powershell')
+        if powershell:
+            return [powershell, '-NoLogo', '-NoProfile']
+        return ['cmd.exe']
+    bash = shutil.which('bash')
+    if bash:
+        return [bash, '--norc', '--noprofile', '-i']
+    return ['sh', '-i']
+
+
+def _interactive_shell_argv(
+    resolved_tools: ShellToolRegistryLike,
+) -> list[str] | None:
+    """Pick a long-lived interactive shell argv from the tool registry."""
+    import shutil
+
+    if OS_CAPS.is_windows:
+        prefer_ps = resolve_windows_powershell_preference(
+            has_bash=resolved_tools.has_bash,
+            has_powershell=resolved_tools.has_powershell,
+        )
+        if prefer_ps and resolved_tools.has_powershell:
+            shell_info = resolved_tools.get_tool_info('shell')
+            exe = shell_info.path if shell_info and shell_info.path else None
+            if exe:
+                return [exe, '-NoLogo', '-NoProfile']
+            return _default_interactive_shell_argv()
+        if resolved_tools.has_bash:
+            bash_info = resolved_tools.get_tool_info('bash')
+            exe = (
+                bash_info.path
+                if bash_info and bash_info.path
+                else shutil.which('bash')
+            )
+            if exe:
+                return [exe, '--norc', '--noprofile', '-i']
+        return _default_interactive_shell_argv()
+
+    bash_info = resolved_tools.get_tool_info('bash')
+    if bash_info and bash_info.available and bash_info.path:
+        return [bash_info.path, '--norc', '--noprofile', '-i']
+    shell_info = resolved_tools.get_tool_info('shell')
+    if shell_info and shell_info.available and shell_info.path:
+        base = os.path.basename(shell_info.path.lower())
+        if base in {'bash', 'bash.exe', 'sh', 'sh.exe', 'zsh', 'zsh.exe'}:
+            return [shell_info.path, '--norc', '--noprofile', '-i']
+    return None
+
+
 def _try_create_interactive_session(
+    *,
+    resolved_tools: ShellToolRegistryLike | None = None,
     **session_kwargs: Any,
 ) -> UnifiedShellSession | None:
+    argv = (
+        _interactive_shell_argv(resolved_tools)
+        if resolved_tools is not None
+        else None
+    )
+    if argv is not None:
+        session_kwargs = {**session_kwargs, 'shell_argv': argv}
+
     try:
         from backend.execution.utils.shell.pty_session import PtyUnavailableError
         from backend.execution.utils.shell.pty_shell_session import (
@@ -652,9 +721,20 @@ def create_shell_session(
     sandboxed_local = is_sandboxed_local_profile(security_config)
 
     if interactive:
-        result = _try_create_interactive_session(**session_kwargs)
+        result = _try_create_interactive_session(
+            resolved_tools=resolved_tools,
+            **session_kwargs,
+        )
         if result is not None:
             return result
+        if OS_CAPS.is_windows:
+            logger.warning(
+                'Interactive ConPTY session unavailable on Windows; falling back '
+                'to subprocess shell (terminal_input/read may be limited). '
+                'pywinpty ships with Grinta on Windows — if you installed normally, '
+                'try reinstalling or running from a fresh venv; partial/source '
+                'setups may need `uv sync` / `pip install -e .`.'
+            )
 
     if OS_CAPS.is_windows:
         return _create_windows_shell_session(resolved_tools, session_kwargs)

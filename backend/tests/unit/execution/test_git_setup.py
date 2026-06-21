@@ -12,7 +12,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from backend.execution.runtime_mixins.git_setup import GitSetupMixin
+from backend.execution.runtime_mixins.git_setup import (
+    GitSetupMixin,
+    _script_run_command,
+)
 from backend.ledger.action import CmdRunAction, FileEditAction, FileReadAction
 from backend.ledger.observation import CmdOutputObservation, ErrorObservation
 
@@ -77,26 +80,21 @@ class _FakeGitRuntime(GitSetupMixin):
 
 
 class TestSetupGitHooksDirectory:
-    def test_success(self):
+    def test_success(self, tmp_path):
         runtime = _FakeGitRuntime()
-        runtime._run_results = [
-            CmdOutputObservation(content='', command='mkdir -p .git/hooks', exit_code=0)
-        ]
+        runtime.workspace_root = tmp_path
         assert runtime._setup_git_hooks_directory() is True
+        assert (tmp_path / '.git' / 'hooks').is_dir()
 
-    def test_failure_exit_code(self):
+    def test_failure(self):
         runtime = _FakeGitRuntime()
-        runtime._run_results = [
-            CmdOutputObservation(
-                content='Error', command='mkdir -p .git/hooks', exit_code=1
-            )
-        ]
-        assert runtime._setup_git_hooks_directory() is False
+        with patch.object(Path, 'mkdir', side_effect=OSError('permission denied')):
+            assert runtime._setup_git_hooks_directory() is False
 
     def test_non_cmd_output(self):
         runtime = _FakeGitRuntime()
-        runtime._run_results = [ErrorObservation('Error')]
-        assert runtime._setup_git_hooks_directory() is False
+        with patch.object(Path, 'mkdir', side_effect=OSError('permission denied')):
+            assert runtime._setup_git_hooks_directory() is False
 
 
 # -----------------------------------------------------------
@@ -110,7 +108,16 @@ class TestMakeScriptExecutable:
         runtime._run_results = [
             CmdOutputObservation(content='', command='chmod +x script.sh', exit_code=0)
         ]
-        assert runtime._make_script_executable('script.sh') is True
+        with patch('backend.execution.runtime_mixins.git_setup.OS_CAPS') as caps:
+            caps.is_windows = False
+            assert runtime._make_script_executable('script.sh') is True
+
+    def test_skips_chmod_on_windows(self):
+        runtime = _FakeGitRuntime()
+        with patch('backend.execution.runtime_mixins.git_setup.OS_CAPS') as caps:
+            caps.is_windows = True
+            assert runtime._make_script_executable('script.ps1') is True
+        assert runtime._run_results == []
 
     def test_failure_exit_code(self):
         runtime = _FakeGitRuntime()
@@ -119,12 +126,16 @@ class TestMakeScriptExecutable:
                 content='Permission denied', command='chmod +x script.sh', exit_code=1
             )
         ]
-        assert runtime._make_script_executable('script.sh') is False
+        with patch('backend.execution.runtime_mixins.git_setup.OS_CAPS') as caps:
+            caps.is_windows = False
+            assert runtime._make_script_executable('script.sh') is False
 
     def test_non_cmd_output(self):
         runtime = _FakeGitRuntime()
         runtime._run_results = [ErrorObservation('Error')]
-        assert runtime._make_script_executable('script.sh') is False
+        with patch('backend.execution.runtime_mixins.git_setup.OS_CAPS') as caps:
+            caps.is_windows = False
+            assert runtime._make_script_executable('script.sh') is False
 
 
 # -----------------------------------------------------------
@@ -136,30 +147,13 @@ class TestPreserveExistingHook:
     def test_success_mv_command(self):
         runtime = _FakeGitRuntime()
         runtime._run_results = [
-            CmdOutputObservation(content='', command='mv', exit_code=0),  # mv
-            CmdOutputObservation(content='', command='chmod', exit_code=0),  # chmod
-        ]
-        assert runtime._preserve_existing_hook('.git/hooks/pre-commit') is True
-
-    def test_mv_fails_falls_back_to_shutil(self):
-        runtime = _FakeGitRuntime()
-        # Return ErrorObservation (not CmdOutputObservation) to trigger shutil fallback
-        runtime._run_results = [
-            ErrorObservation('mv failed'),  # mv fails with error (not CmdOutput)
-            CmdOutputObservation(
-                content='', command='chmod', exit_code=0
-            ),  # chmod after shutil.move
+            CmdOutputObservation(content='', command='chmod', exit_code=0),
         ]
         with patch('backend.execution.runtime_mixins.git_setup.shutil.move'):
             assert runtime._preserve_existing_hook('.git/hooks/pre-commit') is True
 
     def test_shutil_raises_oserror(self):
         runtime = _FakeGitRuntime()
-        runtime._run_results = [
-            ErrorObservation(
-                'mv command error'
-            ),  # Not a CmdOutputObservation -> triggers shutil
-        ]
         with patch(
             'backend.execution.runtime_mixins.git_setup.shutil.move', side_effect=OSError('fail')
         ):
@@ -168,12 +162,16 @@ class TestPreserveExistingHook:
     def test_chmod_fails_after_move(self):
         runtime = _FakeGitRuntime()
         runtime._run_results = [
-            CmdOutputObservation(content='', command='mv', exit_code=0),  # mv
             CmdOutputObservation(
                 content='chmod failed', command='chmod', exit_code=1
-            ),  # chmod
+            ),
         ]
-        assert runtime._preserve_existing_hook('.git/hooks/pre-commit') is False
+        with (
+            patch('backend.execution.runtime_mixins.git_setup.shutil.move'),
+            patch('backend.execution.runtime_mixins.git_setup.OS_CAPS') as caps,
+        ):
+            caps.is_windows = False
+            assert runtime._preserve_existing_hook('.git/hooks/pre-commit') is False
 
 
 # -----------------------------------------------------------
@@ -188,9 +186,11 @@ class TestInstallPreCommitHook:
         runtime._run_results = [
             CmdOutputObservation(content='', command='chmod', exit_code=0)
         ]  # chmod
-        result = runtime._install_pre_commit_hook(
-            '.grinta/pre-commit.sh', '.git/hooks/pre-commit'
-        )
+        with patch('backend.execution.runtime_mixins.git_setup.OS_CAPS') as caps:
+            caps.is_windows = False
+            result = runtime._install_pre_commit_hook(
+                '.grinta/pre-commit.sh', '.git/hooks/pre-commit', kind='bash'
+            )
         assert result is True
 
     def test_write_fails(self):
@@ -199,7 +199,7 @@ class TestInstallPreCommitHook:
             'Write error'
         )
         result = runtime._install_pre_commit_hook(
-            '.grinta/pre-commit.sh', '.git/hooks/pre-commit'
+            '.grinta/pre-commit.sh', '.git/hooks/pre-commit', kind='bash'
         )
         assert result is False
 
@@ -209,9 +209,11 @@ class TestInstallPreCommitHook:
         runtime._run_results = [
             CmdOutputObservation(content='chmod failed', command='chmod', exit_code=1)
         ]
-        result = runtime._install_pre_commit_hook(
-            '.grinta/pre-commit.sh', '.git/hooks/pre-commit'
-        )
+        with patch('backend.execution.runtime_mixins.git_setup.OS_CAPS') as caps:
+            caps.is_windows = False
+            result = runtime._install_pre_commit_hook(
+                '.grinta/pre-commit.sh', '.git/hooks/pre-commit', kind='bash'
+            )
         assert result is False
 
 
@@ -224,6 +226,7 @@ class TestMaybeRunSetupScript:
     def test_no_setup_script(self):
         runtime = _FakeGitRuntime()
         runtime._read_results['.grinta/setup.sh'] = ErrorObservation('Not found')
+        runtime._read_results['.grinta/setup.ps1'] = ErrorObservation('Not found')
         runtime.maybe_run_setup_script()
         # Should return early without running action
 
@@ -237,6 +240,16 @@ class TestMaybeRunSetupScript:
         ]
         runtime.maybe_run_setup_script()
         # Should run action
+
+    def test_setup_ps1_on_windows(self):
+        runtime = _FakeGitRuntime()
+        runtime._read_results['.grinta/setup.ps1'] = MagicMock(
+            content="Write-Host 'setup'"
+        )
+        with patch('backend.execution.runtime_mixins.git_setup.OS_CAPS') as caps:
+            caps.is_windows = True
+            runtime.maybe_run_setup_script()
+        assert runtime._run_results == []
 
     def test_setup_script_with_status_callback(self):
         runtime = _FakeGitRuntime()
@@ -258,36 +271,39 @@ class TestMaybeSetupGitHooks:
     def test_no_pre_commit_script(self):
         runtime = _FakeGitRuntime()
         runtime._read_results['.grinta/pre-commit.sh'] = ErrorObservation('Not found')
+        runtime._read_results['.grinta/pre-commit.ps1'] = ErrorObservation('Not found')
         runtime.maybe_setup_git_hooks()
         # Should return early
 
-    def test_hooks_directory_creation_fails(self):
+    def test_hooks_directory_creation_fails(self, tmp_path):
         runtime = _FakeGitRuntime()
+        runtime.workspace_root = tmp_path
         runtime._read_results['.grinta/pre-commit.sh'] = MagicMock(
             content='#!/bin/bash'
         )
-        runtime._run_results = [
-            CmdOutputObservation(content='mkdir failed', command='mkdir', exit_code=1)
-        ]
-        runtime.maybe_setup_git_hooks()
+        with patch.object(Path, 'mkdir', side_effect=OSError('mkdir failed')):
+            runtime.maybe_setup_git_hooks()
         # Should return early after mkdir fails
 
-    def test_chmod_pre_commit_script_fails(self):
+    def test_chmod_pre_commit_script_fails(self, tmp_path):
         runtime = _FakeGitRuntime()
+        runtime.workspace_root = tmp_path
         runtime._read_results['.grinta/pre-commit.sh'] = MagicMock(
             content='#!/bin/bash'
         )
         runtime._run_results = [
-            CmdOutputObservation(content='', command='mkdir', exit_code=0),  # mkdir
             CmdOutputObservation(
                 content='chmod failed', command='chmod', exit_code=1
-            ),  # chmod
+            ),
         ]
-        runtime.maybe_setup_git_hooks()
+        with patch('backend.execution.runtime_mixins.git_setup.OS_CAPS') as caps:
+            caps.is_windows = False
+            runtime.maybe_setup_git_hooks()
         # Should return early after chmod fails
 
-    def test_preserve_existing_hook(self):
+    def test_preserve_existing_hook(self, tmp_path):
         runtime = _FakeGitRuntime()
+        runtime.workspace_root = tmp_path
         runtime._read_results['.grinta/pre-commit.sh'] = MagicMock(
             content='#!/bin/bash'
         )
@@ -295,26 +311,18 @@ class TestMaybeSetupGitHooks:
             content='#!/bin/bash\nexisting hook'
         )
         runtime._run_results = [
-            CmdOutputObservation(content='', command='mkdir', exit_code=0),  # mkdir
-            CmdOutputObservation(
-                content='', command='chmod', exit_code=0
-            ),  # chmod pre-commit.sh
-            CmdOutputObservation(
-                content='', command='mv', exit_code=0
-            ),  # mv existing hook
-            CmdOutputObservation(
-                content='', command='chmod', exit_code=0
-            ),  # chmod .local
-            CmdOutputObservation(
-                content='', command='chmod', exit_code=0
-            ),  # chmod new hook
+            CmdOutputObservation(content='', command='chmod', exit_code=0),
+            CmdOutputObservation(content='', command='chmod', exit_code=0),
+            CmdOutputObservation(content='', command='chmod', exit_code=0),
         ]
         runtime._write_results['.git/hooks/pre-commit'] = MagicMock()
-        runtime.maybe_setup_git_hooks()
+        with patch('backend.execution.runtime_mixins.git_setup.shutil.move'):
+            runtime.maybe_setup_git_hooks()
         # Should preserve existing hook
 
-    def test_skip_if_app_installed(self):
+    def test_skip_if_app_installed(self, tmp_path):
         runtime = _FakeGitRuntime()
+        runtime.workspace_root = tmp_path
         runtime._read_results['.grinta/pre-commit.sh'] = MagicMock(
             content='#!/bin/bash'
         )
@@ -322,38 +330,47 @@ class TestMaybeSetupGitHooks:
             content='#!/bin/bash\n# This hook was installed by APP\n'
         )
         runtime._run_results = [
-            CmdOutputObservation(content='', command='mkdir', exit_code=0),  # mkdir
-            CmdOutputObservation(
-                content='', command='chmod', exit_code=0
-            ),  # chmod pre-commit.sh
-            CmdOutputObservation(
-                content='', command='chmod', exit_code=0
-            ),  # chmod new hook
+            CmdOutputObservation(content='', command='chmod', exit_code=0),
+            CmdOutputObservation(content='', command='chmod', exit_code=0),
         ]
         runtime._write_results['.git/hooks/pre-commit'] = MagicMock()
         runtime.maybe_setup_git_hooks()
         # Should not preserve if already APP hook
 
-    def test_preserve_fails(self):
+    def test_preserve_fails(self, tmp_path):
         runtime = _FakeGitRuntime()
+        runtime.workspace_root = tmp_path
         runtime._read_results['.grinta/pre-commit.sh'] = MagicMock(
             content='#!/bin/bash'
         )
         runtime._read_results['.git/hooks/pre-commit'] = MagicMock(content='existing')
         runtime._run_results = [
-            CmdOutputObservation(content='', command='mkdir', exit_code=0),  # mkdir
-            CmdOutputObservation(
-                content='', command='chmod', exit_code=0
-            ),  # chmod pre-commit.sh
-            CmdOutputObservation(
-                content='mv failed', command='mv', exit_code=1
-            ),  # mv fails
+            CmdOutputObservation(content='', command='chmod', exit_code=0),
         ]
         with patch(
             'backend.execution.runtime_mixins.git_setup.shutil.move', side_effect=OSError('fail')
         ):
             runtime.maybe_setup_git_hooks()
         # Should return early if preserve fails
+
+
+class TestScriptRunCommand:
+    def test_powershell_command(self):
+        cmd = _script_run_command('.grinta/setup.ps1', 'powershell')
+        assert 'powershell' in cmd
+        assert '.grinta/setup.ps1' in cmd
+
+    def test_bash_command_on_windows(self):
+        with patch('backend.execution.runtime_mixins.git_setup.OS_CAPS') as caps:
+            caps.is_windows = True
+            cmd = _script_run_command('.grinta/setup.sh', 'bash')
+        assert cmd.startswith('bash ')
+
+    def test_bash_command_on_posix(self):
+        with patch('backend.execution.runtime_mixins.git_setup.OS_CAPS') as caps:
+            caps.is_windows = False
+            cmd = _script_run_command('.grinta/setup.sh', 'bash')
+        assert 'chmod +x' in cmd
 
 
 # -----------------------------------------------------------
@@ -407,7 +424,7 @@ async def test_clone_or_init_no_repo_with_init():
     runtime = _FakeGitRuntime()
     runtime.config.init_git_in_empty_workspace = True
     with patch(
-        'backend.execution.git_setup.call_sync_from_async', new_callable=AsyncMock
+        'backend.execution.runtime_mixins.git_setup.call_sync_from_async', new_callable=AsyncMock
     ):
         result = await runtime.clone_or_init_repo(None, None, None)
     assert result == ''
@@ -430,7 +447,7 @@ async def test_clone_or_init_with_branch():
         return_value='https://git.example.com/owner/repo.git'
     )
     with patch(
-        'backend.execution.git_setup.call_sync_from_async', new_callable=AsyncMock
+        'backend.execution.runtime_mixins.git_setup.call_sync_from_async', new_callable=AsyncMock
     ):
         result = await runtime.clone_or_init_repo(None, 'owner/repo', 'main')
     assert result == 'repo'
@@ -443,7 +460,7 @@ async def test_clone_or_init_no_branch():
         return_value='https://git.example.com/owner/MyRepo.git'
     )
     with patch(
-        'backend.execution.git_setup.call_sync_from_async', new_callable=AsyncMock
+        'backend.execution.runtime_mixins.git_setup.call_sync_from_async', new_callable=AsyncMock
     ) as mock_call:
         result = await runtime.clone_or_init_repo(None, 'owner/MyRepo', None)
     assert result == 'myrepo'
@@ -459,7 +476,7 @@ async def test_clone_or_init_with_status_callback():
     )
     runtime.status_callback = MagicMock()
     with patch(
-        'backend.execution.git_setup.call_sync_from_async', new_callable=AsyncMock
+        'backend.execution.runtime_mixins.git_setup.call_sync_from_async', new_callable=AsyncMock
     ):
         result = await runtime.clone_or_init_repo(None, 'owner/repo', 'main')
     assert result == 'repo'

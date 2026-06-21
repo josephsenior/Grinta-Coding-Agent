@@ -321,14 +321,15 @@ class RendererDisplayMixin:
         signature_key = tuple(task_signature)
         if signature_key == getattr(self, '_last_task_sidebar_signature', None):
             return
-        self._last_task_sidebar_signature = signature_key
 
         task_items = self._build_task_sidebar_items(task_signature)
-        self._update_sidebar_section(
+        if not self._update_sidebar_section(
             '#sidebar-tasks',
             f'Tasks ({len(task_signature)})',
             task_items,
-        )
+        ):
+            return
+        self._last_task_sidebar_signature = signature_key
 
         active_task_id: str | None = None
         for task_id, status, _desc in task_signature:
@@ -345,8 +346,26 @@ class RendererDisplayMixin:
                     row.add_class('-active-task')
                 else:
                     row.remove_class('-active-task')
+            self._schedule_tasks_sidebar_relayout(section)
         except Exception:
             pass
+
+    def _schedule_tasks_sidebar_relayout(self, section: Any) -> None:
+        """Second-pass layout after dynamic task rows mount."""
+        call_after = getattr(self._tui, 'call_after_refresh', None)
+        if not callable(call_after):
+            section.refresh(layout=True)
+            return
+
+        def _relayout() -> None:
+            try:
+                section.refresh(layout=True)
+                container = self._tui.query_one('#sidebar-container')
+                container.refresh(layout=True)
+            except Exception:
+                pass
+
+        call_after(_relayout)
 
     def _is_runtime_bootstrap_pending(self) -> bool:
         bootstrapping = getattr(self._tui, '_bootstrapping', None)
@@ -373,7 +392,7 @@ class RendererDisplayMixin:
         items,
         *,
         empty_message: str | None = None,
-    ):
+    ) -> bool:
         from backend.cli.tui.widgets.collapsible import CollapsibleSection
 
         try:
@@ -382,8 +401,9 @@ class RendererDisplayMixin:
             if empty_message is not None:
                 widget._content = empty_message
             widget.set_items(items)
+            return True
         except Exception:
-            pass
+            return False
 
     def _build_task_sidebar_items(self, task_signature):
         _TASK_TO_SIDEBAR_STATUS = {
@@ -592,19 +612,6 @@ class RendererDisplayMixin:
             'neutral': 'neutral',
         }
         status = status_map.get(card.secondary_kind, 'neutral')
-        terminal_command = None
-        shell_kind = None
-        if card.badge_category in ('shell', 'terminal', 'debugger'):
-            from backend.cli.tui.helpers import infer_display_shell_kind
-
-            terminal_command = TUIActivityCard._command_from_detail(card.detail)
-            shell_kind = (
-                'terminal'
-                if card.badge_category == 'terminal'
-                else 'debugger'
-                if card.badge_category == 'debugger'
-                else infer_display_shell_kind(terminal_command)
-            )
         widget = TUIActivityCard(
             verb=card.verb,
             detail=card.detail,
@@ -616,22 +623,17 @@ class RendererDisplayMixin:
             collapsible=card.is_collapsible,
             syntax_language=card.syntax_language,
             show_meta=bool(card.meta_lines),
-            shell_kind=shell_kind,
-            terminal_command=terminal_command,
         )
         if card.meta_lines:
             widget.set_meta(*card.meta_lines)
 
         is_tool = card.badge_category in (
             'tool',
-            'shell',
-            'terminal',
             'files',
             'browser',
             'mcp',
             'workers',
             'code',
-            'debugger',
         )
         is_active = is_tool and card.secondary_kind == 'neutral'
         if is_active:
@@ -657,35 +659,6 @@ class RendererDisplayMixin:
             display.append_widget(widget)
         self._sync_transcript_viewport()
 
-    def _mount_file_change_card(
-        self,
-        *,
-        display_path: str,
-        outcome: str | None,
-        encoded_diff: str | None,
-        diff_path: str = '',
-    ) -> Any:
-        """Append a static file-change diff card (observation-only, no animations)."""
-        from backend.cli.tui.widgets.file_change_card import FileChangeCard
-
-        self._flush_orient_burst()
-        self.commit_live_thinking()
-        self._clear_last_active_card_processing()
-        widget = FileChangeCard(
-            display_path=display_path,
-            outcome=outcome,
-            encoded_diff=encoded_diff,
-            diff_path=diff_path or display_path,
-        )
-        display = self._tui._get_display()
-        self._register_widget_event_id(widget)
-        if getattr(self, '_prepend_mode', False):
-            display.prepend_widget(widget)
-        else:
-            display.append_widget(widget, animate=False)
-        self._sync_transcript_viewport()
-        return widget
-
     def _append_scan_line_card(self, card: Any) -> Any:
         """Append a 1-line :class:`ScanLineCard` to the transcript feed."""
         self._flush_orient_burst()
@@ -705,14 +678,6 @@ class RendererDisplayMixin:
         widget = OrientLine(model)
         self._append_transcript_widget(widget)
         return widget
-
-    def _write_session_panel(self, panel: Any) -> Any:
-        """Mount a session-tier panel (always-open body)."""
-        self._flush_orient_burst()
-        self.commit_live_thinking()
-        self._clear_last_active_card_processing()
-        self._append_transcript_widget(panel)
-        return panel
 
     def _write_record_card(
         self,

@@ -7,7 +7,6 @@ from textual.app import ComposeResult
 from textual.containers import Container
 from textual.widgets import Static
 
-from backend.cli.theme import CLR_REASONING_SNAP
 from backend.cli.tool_display.orient_tools import OrientLineModel
 
 # Left pipe colors — aligned with exploration activity-card accents.
@@ -81,14 +80,16 @@ class OrientLine(Container):
         self.styles.border_left = ('solid', _pipe_color(model.tool))
 
     def _line_text(self) -> Text:
+        from backend.cli.tui.transcript_typography import TX_BODY, TX_BODY_DIM, TX_MUTED
+
         prefix = f'{self.model.icon} {self.model.verb}: '
         target = self.model.target or '…'
         result = self.model.result or 'completed'
         return Text.assemble(
             (prefix, _prefix_color(self.model.tool)),
-            (target, '#c8d4e8'),
-            (' · ', '#54597b'),
-            (result, CLR_REASONING_SNAP),
+            (target, TX_BODY),
+            (' · ', TX_MUTED),
+            (result, TX_BODY_DIM),
         )
 
     def compose(self) -> ComposeResult:

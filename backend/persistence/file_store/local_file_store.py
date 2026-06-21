@@ -10,6 +10,7 @@ import time
 from contextlib import suppress
 
 from backend.core.logging.logger import app_logger as logger
+from backend.core.os_capabilities import OS_CAPS
 from backend.persistence.file_store.atomic_write import replace_file_with_retry
 from backend.persistence.file_store.files import FileStore
 
@@ -122,7 +123,7 @@ class LocalFileStore(FileStore):
     @staticmethod
     def _fsync_directory(dir_name: str) -> None:
         """Best-effort fsync of the parent directory after atomic replace."""
-        if os.name == 'nt':
+        if OS_CAPS.is_windows:
             return
         with suppress(OSError, AttributeError):
             dir_fd = os.open(dir_name, os.O_RDONLY)

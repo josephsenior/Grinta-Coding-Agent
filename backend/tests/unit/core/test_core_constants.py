@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import tempfile
+from pathlib import Path
 from unittest.mock import patch
 
 from backend.core.constants import (
@@ -37,6 +39,7 @@ from backend.core.constants import (
     SECRET_PLACEHOLDER,
     SETTINGS_CACHE_TTL,
     _parse_bool_env,
+    default_cache_dir,
 )
 
 # ── _parse_bool_env ──────────────────────────────────────────────────
@@ -86,6 +89,10 @@ class TestCoreConstants:
     def test_path_constants(self):
         assert DEFAULT_CONFIG_FILE == 'settings.json'
         assert isinstance(DEFAULT_LOCAL_DATA_ROOT, str)
+
+    def test_default_cache_dir_uses_system_temp(self):
+        expected = Path(tempfile.gettempdir()) / 'grinta' / 'cache'
+        assert default_cache_dir() == str(expected)
 
     def test_security(self):
         assert SECRET_PLACEHOLDER == '**********'

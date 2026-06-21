@@ -178,7 +178,7 @@ class ScreenInputMixin:
             return
         pending = len(getattr(self, '_pending_image_urls', []) or [])
         if pending > 0:
-            hint.update(image_attachment_status_text(pending, rich=True))
+            hint.update(image_attachment_status_text(pending, rich=False))
             hint.add_class('-image-attached')
             hint.display = True
             return

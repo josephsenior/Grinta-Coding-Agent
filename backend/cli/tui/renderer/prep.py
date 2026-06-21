@@ -283,6 +283,10 @@ async def prep_streaming_response_async(orch: Any, text: str) -> None:
     except Exception:
         return
     cache[key] = renderable
+    if getattr(orch, '_live_response', '') == content:
+        apply = getattr(orch, '_apply_live_response_render', None)
+        if callable(apply):
+            apply(content)
     # Bound the cache: streaming text only grows, so the oldest (shortest)
     # snapshots are the safest to drop.
     if len(cache) > _STREAMING_RENDER_CACHE_MAX:

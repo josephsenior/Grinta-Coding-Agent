@@ -2,6 +2,7 @@
 
 import pytest
 
+from backend.cli.tui.widgets.welcome import WelcomeWidget
 from backend.tests.unit.cli.tui import _shared
 from backend.tests.unit.cli.tui._shared import *  # noqa: F403
 
@@ -10,6 +11,11 @@ for _name in dir(_shared):
         globals()[_name] = getattr(_shared, _name)
 
 from backend.tests.unit.cli.tui._shared import _get_screen
+
+
+def test_welcome_select_current_before_mount() -> None:
+    widget = WelcomeWidget()
+    assert widget.select_current() == widget._suggestions[0]
 
 
 @pytest.mark.asyncio

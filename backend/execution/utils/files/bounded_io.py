@@ -22,6 +22,7 @@ import threading
 from pathlib import Path
 
 from backend.core.bounded_result import BoundedResult  # noqa: F401
+from backend.core.os_capabilities import OS_CAPS
 
 # Default per-stream cap. 8 MiB is large enough for almost any real command
 # output and small enough to keep peak agent RSS bounded even under abuse.
@@ -117,7 +118,7 @@ def kill_process_tree(process: subprocess.Popen) -> None:
     pid = getattr(process, 'pid', None)
     if not pid:
         return
-    if os.name == 'nt':
+    if OS_CAPS.is_windows:
         try:
             subprocess.run(
                 ['taskkill', '/PID', str(pid), '/T', '/F'],

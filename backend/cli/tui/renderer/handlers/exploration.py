@@ -51,29 +51,6 @@ def clear_pending_exploration_cards(orch: 'RendererEventProcessorMixin') -> None
     orch._pending_exploration_meta = None
 
 
-def _update_or_write_lsp_card(
-    orch: 'RendererEventProcessorMixin',
-    card: Any,
-    symbol: str,
-    available: bool,
-    preview: str | None,
-) -> None:
-    pending = orch._pending_lsp_card
-    if isinstance(pending, OrientLineModel):
-        return
-    if pending is not None:
-        status = 'ok' if available else 'err'
-        orch._update_activity_card_outcome(
-            pending,
-            status=status,
-            outcome=card.secondary or 'completed',
-            extra_content=preview,
-        )
-        orch._pending_lsp_card = None
-    else:
-        orch._write_card(card)
-
-
 def _handle_grep_action(orch: 'RendererEventProcessorMixin', event: GrepAction) -> None:
     model = grep_action_model(event)
     orch._pending_search_card = model

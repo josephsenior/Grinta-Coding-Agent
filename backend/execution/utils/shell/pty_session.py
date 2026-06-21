@@ -296,8 +296,10 @@ def _spawn_backend(config: InteractiveSessionConfig) -> Any:
             from winpty import PtyProcess  # type: ignore[import-not-found]
         except ImportError as exc:  # pragma: no cover - import guard
             raise PtyUnavailableError(
-                'pywinpty is required for interactive terminals on Windows. '
-                "Install it with: `pip install 'pywinpty>=2.0'`."
+                'Interactive ConPTY backend (pywinpty) is unavailable. '
+                'It is bundled with Grinta on Windows; a normal install should '
+                'include it. Reinstall the package or refresh your environment '
+                '(e.g. `uv sync`, `pip install -e .`) if this persists.'
             ) from exc
 
         # pywinpty accepts either a list or a pre-formatted command line.
@@ -321,8 +323,10 @@ def _spawn_backend(config: InteractiveSessionConfig) -> Any:
         from ptyprocess import PtyProcessUnicode  # type: ignore[import-not-found]
     except ImportError as exc:  # pragma: no cover - import guard
         raise PtyUnavailableError(
-            'ptyprocess is required for interactive terminals on POSIX. '
-            "Install it with: `pip install 'ptyprocess>=0.7'`."
+            'Interactive PTY backend (ptyprocess) is unavailable. '
+            'It is bundled with Grinta on Linux/macOS; a normal install should '
+            'include it. Reinstall the package or refresh your environment '
+            '(e.g. `uv sync`, `pip install -e .`) if this persists.'
         ) from exc
 
     return PtyProcessUnicode.spawn(

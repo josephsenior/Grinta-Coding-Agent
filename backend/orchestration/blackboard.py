@@ -13,6 +13,8 @@ import json
 import os
 import tempfile
 
+from backend.core.os_capabilities import OS_CAPS
+
 MAX_BLACKBOARD_KEYS = 256
 MAX_BLACKBOARD_KEY_BYTES = 512
 MAX_BLACKBOARD_VALUE_BYTES = 16 * 1024
@@ -54,7 +56,7 @@ class Blackboard:
 
     @staticmethod
     def _fsync_dir(path: str) -> None:
-        if os.name == 'nt':
+        if OS_CAPS.is_windows:
             return
         with contextlib.suppress(OSError, AttributeError):
             dir_fd = os.open(path, os.O_RDONLY)

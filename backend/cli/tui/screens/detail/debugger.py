@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from textual.widgets import Rule, Static
-
 from backend.cli.tui.screens.detail.base import DetailScreen
 
 
@@ -17,8 +15,16 @@ class DebuggerDetailScreen(DetailScreen):
         current_frame_index: int = 0,
         *,
         title: str = 'Debugger',
+        kind: str = 'Debug',
+        heading: str = '',
+        accent: str | None = None,
     ) -> None:
-        super().__init__(title=title)
+        super().__init__(
+            title=title,
+            kind=kind,
+            heading=heading,
+            accent=accent,
+        )
         self._stack = list(stack or [])
         self._variables = list(variables or [])
         self._current_frame_index = current_frame_index
@@ -27,28 +33,33 @@ class DebuggerDetailScreen(DetailScreen):
         widgets: list = []
 
         if self._stack:
-            widgets.append(Rule('Stack', line_style='heavy'))
-            for idx, frame in enumerate(self._stack):
-                prefix = '  →' if idx == self._current_frame_index else '    '
-                style = '#5eead4' if idx == self._current_frame_index else '#c8d4e8'
-                widgets.append(
-                    Static(
-                        f'[{style}]{prefix} {frame}[/]',
-                        classes='debugger-frame',
-                    )
+            widgets.extend(
+                self.section(
+                    'Stack',
+                    *[
+                        self.list_row(
+                            f'{"→" if idx == self._current_frame_index else " "} {frame}',
+                            active=idx == self._current_frame_index,
+                        )
+                        for idx, frame in enumerate(self._stack)
+                    ],
                 )
+            )
 
         if self._variables:
-            widgets.append(Rule('Variables', line_style='heavy'))
-            for name, value in self._variables:
-                widgets.append(
-                    Static(
-                        f'  [#c8d4e8]{name}[/] [#54597b]=[/] [#91abec]{value}[/]',
-                        classes='debugger-var',
-                    )
+            widgets.extend(
+                self.section(
+                    'Variables',
+                    *[
+                        self.list_row(
+                            f'[#c8d4e8]{name}[/] [#54597b]=[/] [#91abec]{value}[/]'
+                        )
+                        for name, value in self._variables
+                    ],
                 )
+            )
 
         if not widgets:
-            widgets.append(Static('(no debugger state)', id='debugger-empty'))
+            widgets.append(self.empty_state('(no debugger state)', widget_id='debugger-empty'))
 
         return widgets

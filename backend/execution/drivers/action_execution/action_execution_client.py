@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 
-from backend.core.os_capabilities import OS_CAPS
 from backend.execution.server.base import Runtime
 from backend.execution.utils.files.request import send_request
 from backend.execution.utils.system_stats import update_last_execution_time
@@ -34,9 +33,9 @@ class ActionExecutionClient(Runtime):
     * *Always available* — works on all platforms (``run``, ``read``, ``write``,
       ``edit``, ``browse``, ``think``, ``list_files``, ``copy_to``,
       ``check_if_alive``, ``send_action_for_execution``).
-    * *Platform-restricted* — only available on non-Windows hosts.  On Windows
-      these methods return a typed ``ErrorObservation`` with a clear message
-      instead of silently no-opping (``call_tool_mcp``, ``get_mcp_config``).
+    * *Platform-restricted* — remote-only behaviors may differ when a local MCP
+      configuration is present.  ``call_tool_mcp`` and ``get_mcp_config`` use
+      the shared MCP runtime on all platforms.
     * *Not yet implemented* — calling raises ``UnsupportedActionError`` with a
     human-readable message (``copy_from``, ``_upload_file_to_runtime``).
 
@@ -60,12 +59,8 @@ class ActionExecutionClient(Runtime):
         }
     )
 
-    # Actions restricted on Windows
-    _WINDOWS_UNSUPPORTED: frozenset[str] = frozenset(
-        {
-            'call_tool_mcp',
-        }
-    )
+    # Actions that require a remote action-execution server endpoint
+    _REMOTE_ONLY_ACTIONS: frozenset[str] = frozenset()
 
     def __init__(
         self,
@@ -100,45 +95,62 @@ class ActionExecutionClient(Runtime):
         )
         self._vscode_token: str | None = None
         self._action_server_session = HttpSession()
+        self._mcp_clients: list[Any] | None = None
+        self._mcp_servers_resolved: list[Any] | None = None
+        self._mcp_config: Any | None = getattr(config, 'mcp', None)
 
     async def connect(self) -> None:
         pass
 
     def get_mcp_config(self, extra_servers: list[Any] | None = None) -> Any:
-        if OS_CAPS.is_windows:
-            from backend.core.config.mcp_config import MCPConfig
-
-            return MCPConfig()
-
-        resp = self._send_action_server_request('GET', '/mcp_config')  # type: ignore[unreachable]
-        data = resp.json()
-
-        from backend.core.config.mcp_config import MCPConfig, MCPServerConfig
-
-        config = MCPConfig(
-            servers=[MCPServerConfig(**s) for s in data.get('servers', [])]
+        from backend.core.config.mcp_config import (
+            MCPConfig,
+            MCPServerConfig,
+            _filter_windows_stdio_servers,
         )
 
-        # Add default SSE server if none from server
-        if not config.servers:
+        local_cfg = getattr(self.config, 'mcp', None)
+        servers = list(getattr(local_cfg, 'servers', []) or []) if local_cfg else []
+
+        server_url = (getattr(self, 'action_execution_server_url', None) or '').strip()
+        if server_url:
+            try:
+                resp = self._send_action_server_request('GET', '/mcp_config')
+                data = resp.json()
+                remote = [MCPServerConfig(**s) for s in data.get('servers', [])]
+                if remote:
+                    servers = remote
+            except Exception as exc:
+                logger.debug(
+                    'Remote MCP config unavailable; using local configuration: %s',
+                    exc,
+                )
+
+        servers = _filter_windows_stdio_servers(list(servers))
+        config = MCPConfig(servers=servers)
+
+        if not config.servers and server_url:
             config.servers.append(
                 MCPServerConfig(
                     name='default',
                     type='sse',
-                    url=f'{getattr(self, "action_execution_server_url", "")}/mcp',
+                    url=f'{server_url.rstrip("/")}/mcp',
                     transport='sse',
                 )
             )
 
         if extra_servers:
             config.servers.extend(extra_servers)
-            # Update server if needed
-            self._send_action_server_request(
-                'POST',
-                '/mcp_config',
-                json={'servers': [s.model_dump() for s in config.servers]},
-            )
-            self._last_updated_mcp_stdio_servers = extra_servers
+            if server_url:
+                try:
+                    self._send_action_server_request(
+                        'POST',
+                        '/mcp_config',
+                        json={'servers': [s.model_dump() for s in config.servers]},
+                    )
+                    self._last_updated_mcp_stdio_servers = extra_servers
+                except Exception as exc:
+                    logger.debug('Failed to push MCP config to remote server: %s', exc)
 
         return config
 
@@ -209,23 +221,18 @@ class ActionExecutionClient(Runtime):
         return resp.json()
 
     async def call_tool_mcp(self, action: Any) -> Any:
-        """Call an MCP tool.  Not available on Windows."""
-        if OS_CAPS.is_windows:
-            from backend.ledger.observation import ErrorObservation
+        """Execute an MCP tool call using the shared runtime MCP integration."""
+        from backend.execution.utils.mcp_runtime import call_mcp_action
 
-            return ErrorObservation(
-                content=(
-                    'MCP tools are not supported on Windows. '
-                    'To use MCP, run Grinta on Linux or macOS, or '
-                    'use Grinta in a Linux/macOS environment.'
-                )
-            )
-
-        raise UnsupportedActionError(
-            'call_tool_mcp requires the action-execution server to have '
-            'an MCP endpoint configured.  Ensure the runtime supports MCP '
-            'or override this method in your runtime subclass.'
+        observation, clients, servers = await call_mcp_action(
+            action,
+            mcp_config=self._mcp_config or getattr(self.config, 'mcp', None),
+            clients=self._mcp_clients,
+            servers_resolved=self._mcp_servers_resolved,
         )
+        self._mcp_clients = clients
+        self._mcp_servers_resolved = servers
+        return observation
 
     def check_if_alive(self) -> None:
         self._send_action_server_request('GET', '/ping')

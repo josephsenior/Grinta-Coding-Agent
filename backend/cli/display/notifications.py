@@ -11,6 +11,8 @@ import os
 import shutil
 import subprocess
 
+from backend.core.os_capabilities import OS_CAPS
+
 logger = logging.getLogger(__name__)
 
 # Env var to disable notifications entirely.
@@ -42,7 +44,7 @@ def notify(title: str, body: str, *, urgency: str = 'normal') -> None:
 
 
 def _do_notify(title: str, body: str, *, urgency: str) -> None:
-    if os.name == 'nt':
+    if OS_CAPS.is_windows:
         _notify_windows(title, body)
     elif shutil.which('osascript'):
         _notify_macos(title, body)

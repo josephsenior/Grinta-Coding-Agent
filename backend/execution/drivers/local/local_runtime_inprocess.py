@@ -786,7 +786,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
 
     def additional_agent_instructions(self) -> str:
         """Provide runtime-specific instructions about the local environment and paths."""
-        import sys
+        from backend.core.os_capabilities import OS_CAPS
 
         workspace_root = self.workspace_root.absolute()
         project_root = (
@@ -794,8 +794,8 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         )
         platform_name = (
             'Windows'
-            if sys.platform.startswith('win')
-            else ('macOS' if sys.platform == 'darwin' else 'Linux')
+            if OS_CAPS.is_windows
+            else ('macOS' if OS_CAPS.is_macos else 'Linux')
         )
 
         return (

@@ -52,6 +52,8 @@ class WelcomeWidget(Vertical):
             )
         self._callback_name = callback_name
         self._show_logo = show_logo
+        self._selected = 0
+        self._items: list[Static] = []
 
     def compose(self) -> ComposeResult:
         if self._show_logo:
