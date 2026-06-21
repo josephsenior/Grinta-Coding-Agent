@@ -91,7 +91,7 @@ class WelcomeWidget(Vertical):
             if width >= 80:
                 logo_static.update(_get_welcome_figlet())
             else:
-                logo_static.update('[#91abec]GRINTA[/]')
+                logo_static.update('[#6F86B6]GRINTA[/]')
         # Preserve any selection set before mount (e.g. by a pre-selection
         # call on the active communicate card). Default to 0 otherwise.
         self._selected = getattr(self, '_selected', 0)

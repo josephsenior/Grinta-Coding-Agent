@@ -138,7 +138,7 @@ def build_skills_panel(
 ) -> Panel:
     """Build scrollable skills/playbooks list panel."""
     if skills is None:
-        skills = _load_playbook_skills()
+        skills = load_sidebar_skills()
 
     table = Table.grid(expand=True, padding=(0, 1))
     table.add_column(width=2)  # bullet
@@ -178,6 +178,26 @@ def _load_playbook_skills() -> list[str]:
         ]
     except OSError:
         return []
+
+
+def _load_user_skills() -> list[str]:
+    """Load user-created skill names from ~/.grinta/skills/."""
+    try:
+        root = Path.home() / '.grinta' / 'skills'
+        if not root.is_dir():
+            return []
+        return [
+            p.stem
+            for p in root.iterdir()
+            if p.is_file() and p.suffix.lower() == '.md'
+        ]
+    except OSError:
+        return []
+
+
+def load_sidebar_skills() -> list[str]:
+    """Bundled playbooks plus user skills under ~/.grinta/skills."""
+    return sorted({*_load_playbook_skills(), *_load_user_skills()})
 
 
 def build_sidebar(
@@ -223,5 +243,6 @@ __all__ = [
     'compute_main_width',
     'compute_sidebar_width',
     'load_playbook_skills',
+    'load_sidebar_skills',
     'should_show_sidebar',
 ]

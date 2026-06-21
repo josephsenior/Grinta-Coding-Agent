@@ -193,6 +193,22 @@ class ScreenInputMixin:
         self._refresh_input_attachment_hint()
         return True
 
+    def clear_pending_image_attachments(self) -> bool:
+        """Drop all staged clipboard images. Returns True if any were removed."""
+        if not self._pending_image_urls:
+            return False
+        self._pending_image_urls = []
+        self._refresh_input_attachment_hint()
+        return True
+
+    def remove_last_pending_image_attachment(self) -> bool:
+        """Drop the most recently staged image. Returns True if one was removed."""
+        if not self._pending_image_urls:
+            return False
+        self._pending_image_urls.pop()
+        self._refresh_input_attachment_hint()
+        return True
+
     async def try_paste_clipboard_image(self) -> bool:
         """Attach an image from the OS clipboard when one is available."""
         if getattr(self, '_turn_in_flight', False):

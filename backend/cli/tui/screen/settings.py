@@ -28,6 +28,24 @@ from backend.core.interaction_modes import (
 class ScreenSettingsMixin:
     """Settings-related methods of GrintaScreen."""
 
+    def _refresh_sidebar(self) -> None:
+        renderer = self._renderer
+        if renderer is None:
+            return
+        renderer.invalidate_sidebar()
+        renderer._refresh_display()
+
+    def _reload_mcp_config_and_refresh_sidebar(self) -> None:
+        from backend.core.config import load_app_config
+        from backend.integrations.mcp.native_backends import (
+            count_user_visible_mcp_servers,
+        )
+
+        self._config = load_app_config()
+        self._hud.update_mcp_servers(count_user_visible_mcp_servers(self._config))
+        self._render_hud_bar()
+        self._refresh_sidebar()
+
     def on_focus(self, event: events.Focus) -> None:
         if event.control and event.control.id == 'input':
             try:
@@ -388,7 +406,6 @@ class ScreenSettingsMixin:
             if skill_path.exists():
                 skill_path.unlink()
                 self.notify(f'Skill deleted: {name}', severity='information')
-                self._last_sidebar_state = None
             else:
                 self.notify(f'Skill not found: {name}', severity='warning')
         except Exception as e:
@@ -398,6 +415,7 @@ class ScreenSettingsMixin:
         """Delete a skill file, offloaded to a thread pool."""
         import asyncio
         await asyncio.to_thread(self._delete_skill_sync, name)
+        self._refresh_sidebar()
 
     def _delete_mcp_server_sync(self, name: str) -> None:
         """Synchronous MCP server deletion - used internally by _delete_mcp_server()."""
@@ -414,7 +432,6 @@ class ScreenSettingsMixin:
         try:
             remove_mcp_server(name)
             self.notify(f'MCP Server removed: {name}', severity='information')
-            self._last_sidebar_state = None
         except Exception as e:
             self.notify(f'Failed to remove MCP server: {e}', severity='error')
 
@@ -422,6 +439,7 @@ class ScreenSettingsMixin:
         """Delete an MCP server, offloaded to a thread pool."""
         import asyncio
         await asyncio.to_thread(self._delete_mcp_server_sync, name)
+        self._reload_mcp_config_and_refresh_sidebar()
 
     @work
     async def on_collapsible_section_action_clicked(self, event: Any) -> None:
@@ -448,7 +466,6 @@ class ScreenSettingsMixin:
         try:
             skill_path.write_text(content, encoding='utf-8')
             self.notify(f'Skill created: {name}', severity='information')
-            self._last_sidebar_state = None
         except Exception as e:
             self.notify(f'Failed to create skill: {e}', severity='error')
 
@@ -456,6 +473,7 @@ class ScreenSettingsMixin:
         """Create a skill file, offloaded to a thread pool."""
         import asyncio
         await asyncio.to_thread(self._create_skill_sync, name, content)
+        self._refresh_sidebar()
 
     def _add_mcp_server_sync(self, name: str, command: str) -> None:
         """Synchronous MCP server addition - used internally by _add_mcp_server()."""
@@ -464,7 +482,6 @@ class ScreenSettingsMixin:
         try:
             add_mcp_server(name, command=command)
             self.notify(f'MCP Server added: {name}', severity='information')
-            self._last_sidebar_state = None
         except Exception as e:
             self.notify(f'Failed to add MCP server: {e}', severity='error')
 
@@ -472,3 +489,4 @@ class ScreenSettingsMixin:
         """Add an MCP server, offloaded to a thread pool."""
         import asyncio
         await asyncio.to_thread(self._add_mcp_server_sync, name, command)
+        self._reload_mcp_config_and_refresh_sidebar()
