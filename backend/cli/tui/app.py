@@ -277,6 +277,8 @@ class TUIRenderer(
         self._live_response_widget: Any | None = None
         self._task_list: list[dict[str, Any]] = []
         self._last_sidebar_state: Any = None
+        self._playbook_skills_cache: list[Any] | None = None
+        self._playbook_skills_cache_sig: tuple[float, float] | None = None
         self._streaming_active: bool = False
 
         # Unit test compatibility

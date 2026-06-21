@@ -151,6 +151,32 @@ class ConfirmWidget(Widget):
             )
             actions.mount(btn)
 
+    def configure_prompt(
+        self,
+        message: str,
+        options: list[tuple[str, str]],
+        recommended: int | None = None,
+    ) -> None:
+        """Populate the confirmation bar with a simple prompt."""
+        info_static = self.query_one('#confirm-info', Static)
+        info_static.update(message)
+
+        actions = self.query_one('#confirm-actions', Horizontal)
+        actions.remove_children()
+        self._options = options
+        self._recommended = recommended
+        self._button_render_count += 1
+        self._button_id_to_key = {}
+        for i, (key, label) in enumerate(options):
+            button_id = f'confirm-{key}-{self._button_render_count}'
+            self._button_id_to_key[button_id] = key
+            btn = Button(
+                label,
+                id=button_id,
+                variant='primary' if i == (recommended or 0) else 'default',
+            )
+            actions.mount(btn)
+
     def show(self) -> None:
         self.add_class('-visible')
         self._decision = None

@@ -200,6 +200,27 @@ def load_sidebar_skills() -> list[str]:
     return sorted({*_load_playbook_skills(), *_load_user_skills()})
 
 
+def load_sidebar_skill_items() -> list[tuple[str, str, bool, str, str | None, bool]]:
+    """Sidebar rows for bundled and custom skills."""
+    playbook_names = set(_load_playbook_skills())
+    user_names = set(_load_user_skills())
+    items: list[tuple[str, str, bool, str, str | None, bool]] = []
+    for skill in sorted(playbook_names | user_names):
+        if skill in user_names:
+            items.append((skill, f'skill:{skill}', True, 'info', 'custom', True))
+        else:
+            items.append(
+                (skill, f'skill:{skill}', False, 'neutral', 'bundled', True)
+            )
+    return items
+
+
+def is_user_skill(name: str) -> bool:
+    """Return True when the skill lives under ~/.grinta/skills/."""
+    stem = name.removesuffix('.md')
+    return stem in set(_load_user_skills())
+
+
 def build_sidebar(
     task_list: list[dict[str, Any]],
     mcp_servers: list[dict[str, Any]] | None = None,
@@ -242,7 +263,9 @@ __all__ = [
     'build_task_list_panel',
     'compute_main_width',
     'compute_sidebar_width',
+    'is_user_skill',
     'load_playbook_skills',
+    'load_sidebar_skill_items',
     'load_sidebar_skills',
     'should_show_sidebar',
 ]

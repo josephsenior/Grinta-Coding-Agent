@@ -10,6 +10,7 @@ from typing import Any
 
 from textual import events
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Container, Horizontal, Vertical
 from textual.message import Message
 from textual.widgets import Static
@@ -72,9 +73,10 @@ class SidebarRow(Static):
         self._status = status or 'neutral'
         self._meta = meta
         self.interactive = interactive
-        super().__init__(self._build_markup())
         self.item_id = item_id
         self.deletable = deletable
+        self._show_delete_hint = False
+        super().__init__(self._build_markup())
         self.can_focus = interactive
         if not interactive:
             self.add_class('-read-only')
@@ -89,7 +91,23 @@ class SidebarRow(Static):
         bullet_part = f'[{color}]{SIDEBAR_BULLET}[/]'
         label_part = f'[#c8d4e8]{self._label}[/]'
         meta_part = f'  [#54597b]{self._meta}[/]' if self._meta else ''
-        return f'{bullet_part} {label_part}{meta_part}'
+        delete_part = ''
+        if self.deletable and self._show_delete_hint:
+            delete_part = '  [#fd8383]×[/]'
+        return f'{bullet_part} {label_part}{meta_part}{delete_part}'
+
+    def _refresh_row_markup(self) -> None:
+        self.update(self._build_markup())
+
+    def on_focus(self, event: events.Focus) -> None:
+        if self.deletable:
+            self._show_delete_hint = True
+            self._refresh_row_markup()
+
+    def on_blur(self, event: events.Blur) -> None:
+        if self._show_delete_hint:
+            self._show_delete_hint = False
+            self._refresh_row_markup()
 
     def update_status(self, status: str, meta: str | None = None) -> None:
         """Update the row status icon and optional meta text."""
@@ -119,7 +137,7 @@ class SidebarRow(Static):
             self.post_message(self.Selected(self.item_id))
             event.prevent_default()
             event.stop()
-        elif event.key in ('delete', 'backspace'):
+        elif self.deletable and event.key in ('delete', 'backspace'):
             self.post_message(self.DeleteRequested(self.item_id))
             event.prevent_default()
             event.stop()
@@ -213,6 +231,8 @@ class CollapsibleSection(Container):
     BINDINGS = [
         ('enter', 'toggle', 'Toggle Expansion'),
         ('space', 'toggle', 'Toggle Expansion'),
+        Binding('a', 'add_item', 'Add', show=False),
+        Binding('plus', 'add_item', 'Add', show=False),
     ]
 
     def __init__(
@@ -324,6 +344,11 @@ class CollapsibleSection(Container):
     def action_toggle(self) -> None:
         """Action handler for enter/space keypresses."""
         self.toggle()
+
+    def action_add_item(self) -> None:
+        """Open the section add flow when an action label is configured."""
+        if self._action_label:
+            self.post_message(self.ActionClicked(self))
 
     def on_click(self, event: events.Click) -> None:
         """Handle click events on the header or widget itself."""

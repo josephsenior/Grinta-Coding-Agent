@@ -2,12 +2,23 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, Input, Label, Static, TextArea
 
 from backend.cli.tui.widgets.dialogs import ModalDialog
+
+DEFAULT_SKILL_TEMPLATE = """# Skill Name
+
+## When to use
+
+
+## Instructions
+
+"""
 
 
 class GrintaAddSkillDialog(ModalDialog[dict[str, str] | None]):
@@ -26,7 +37,7 @@ class GrintaAddSkillDialog(ModalDialog[dict[str, str] | None]):
                 id='dialog-subtitle',
             )
             yield Label('Skill name', classes='field-label')
-            yield Input(id='skill-name')
+            yield Input(id='skill-name', placeholder='my-skill')
             yield Label('Instructions (Markdown)', classes='field-label')
             yield TextArea(id='skill-content')
             yield Label('', id='dialog-feedback')
@@ -35,6 +46,7 @@ class GrintaAddSkillDialog(ModalDialog[dict[str, str] | None]):
                 yield Button('Cancel', id='settings-cancel')
 
     def on_mount(self) -> None:
+        self.query_one('#skill-content', TextArea).load_text(DEFAULT_SKILL_TEMPLATE)
         self.query_one('#skill-name', Input).focus()
 
     def action_save(self) -> None:
@@ -47,16 +59,21 @@ class GrintaAddSkillDialog(ModalDialog[dict[str, str] | None]):
             self.dismiss(None)
 
     def _submit(self) -> None:
+        feedback = self.query_one('#dialog-feedback', Label)
         name = self.query_one('#skill-name', Input).value.strip()
         content = self.query_one('#skill-content', TextArea).text.strip()
         if not name:
-            self.query_one('#dialog-feedback', Label).update(
-                '[#f05757]Skill name required.[/]'
-            )
+            feedback.update('[#f05757]Skill name required.[/]')
+            return
+        if '/' in name or '\\' in name:
+            feedback.update('[#f05757]Use a simple name without path separators.[/]')
+            return
+        stem = name.removesuffix('.md')
+        skill_path = Path.home() / '.grinta' / 'skills' / f'{stem}.md'
+        if skill_path.exists():
+            feedback.update(f'[#f05757]Skill already exists: {stem}.md[/]')
             return
         if not content:
-            self.query_one('#dialog-feedback', Label).update(
-                '[#f05757]Content required.[/]'
-            )
+            feedback.update('[#f05757]Content required.[/]')
             return
-        self.dismiss({'name': name, 'content': content})
+        self.dismiss({'name': stem, 'content': content})
