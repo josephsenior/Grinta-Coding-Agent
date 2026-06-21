@@ -83,3 +83,17 @@ jobs:
         run: python scripts/bootstrap_env.py dev
       - name: Run mypy
         run: uv run mypy --config-file mypy.ini
+
+  # Repo hygiene: ensure no cache artifacts are tracked
+  repo-hygiene:
+    name: Repo hygiene (no cache artifacts)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Fail if cache directories are tracked
+        run: |
+          if git ls-files | grep -E '(\.mypy_cache|\.ruff_cache|\.pytest_cache|\.hypothesis)' ; then
+            echo "::error::Cache directories (.mypy_cache, .ruff_cache, .pytest_cache, .hypothesis) are tracked in git. Remove them and verify .gitignore."
+            exit 1
+          fi
+          echo "No cache artifacts are tracked in the repository."
