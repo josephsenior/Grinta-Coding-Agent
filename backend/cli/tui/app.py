@@ -298,6 +298,7 @@ class TUIRenderer(
         self._debugger_cards_by_session: dict[str, Any] = {}
         self._pending_debugger_card: Any | None = None
         self._pending_shell_cards_by_command: dict[str, deque[Any]] = defaultdict(deque)
+        RendererTerminalMixin._init_terminal_state(self)
         self._streaming_render_cache: dict[str, Any] = {}
         self._pending_file_read_cards_by_path: dict[str, deque[Any]] = defaultdict(
             deque

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from contextlib import suppress
 from pathlib import Path
 from typing import Any
@@ -55,8 +57,6 @@ class TaskTracker:
 
     def save_to_file(self, task_list: list[dict[str, Any]]) -> None:
         """Save the task list to disk atomically."""
-        import os
-
         from backend.core.tasks.plan_step import normalize_plan_step_payload
         from backend.persistence.file_store.atomic_write import replace_file_with_retry
 
@@ -64,16 +64,23 @@ class TaskTracker:
             normalize_plan_step_payload(task, i + 1) for i, task in enumerate(task_list)
         ]
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix('.json.tmp')
-        with open(tmp, 'w', encoding='utf-8') as f:
+        dir_name = str(self.path.parent)
+        with tempfile.NamedTemporaryFile(
+            prefix=f'.{self.path.name}.tmp.',
+            dir=dir_name,
+            delete=False,
+            mode='w',
+            encoding='utf-8',
+        ) as f:
+            tmp_path = Path(f.name)
             json.dump(normalized, f, indent=2, ensure_ascii=False)
             f.flush()
             os.fsync(f.fileno())
         try:
-            replace_file_with_retry(tmp, self.path)
+            replace_file_with_retry(tmp_path, self.path)
         except Exception:
             with suppress(OSError):
-                tmp.unlink(missing_ok=True)
+                tmp_path.unlink(missing_ok=True)
             raise
 
     def update_task_status(
