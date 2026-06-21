@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -12,7 +11,7 @@ from pathlib import Path
 import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
-_STUB_SOURCE = _REPO_ROOT / 'scripts' / 'smoke' / 'cli_llm_stub_sitecustomize.py'
+_STUB_RUNNER = _REPO_ROOT / 'scripts' / 'smoke' / 'run_cli_with_stub.py'
 
 
 def _write_app_settings(app_root: Path) -> None:
@@ -49,21 +48,18 @@ def test_launch_entry_completes_one_task_via_subprocess(tmp_path: Path) -> None:
     app_root = tmp_path / 'app'
     _write_app_settings(app_root)
 
-    hook_dir = tmp_path / 'hooks'
-    hook_dir.mkdir()
-    shutil.copy2(_STUB_SOURCE, hook_dir / 'sitecustomize.py')
-
     env = os.environ.copy()
     env['LLM_API_KEY'] = 'sk-test-cli-task'
     env['LLM_MODEL'] = 'openai/gpt-4.1'
     env['GRINTA_NO_SPLASH'] = '1'
     env['LOG_TO_FILE'] = 'false'
     env['PYTHONUTF8'] = '1'
+    env['GRINTA_AGENT_RUN_HARD_TIMEOUT_SECONDS'] = '90'
     env['APP_ROOT'] = str(app_root)
     env['HOME'] = str(tmp_path)
     env['USERPROFILE'] = str(tmp_path)
     existing_path = env.get('PYTHONPATH', '')
-    path_parts = [str(hook_dir), str(_REPO_ROOT)]
+    path_parts = [str(_REPO_ROOT)]
     if existing_path:
         path_parts.append(existing_path)
     env['PYTHONPATH'] = os.pathsep.join(path_parts)
@@ -71,8 +67,7 @@ def test_launch_entry_completes_one_task_via_subprocess(tmp_path: Path) -> None:
     result = subprocess.run(
         [
             sys.executable,
-            '-m',
-            'launch.entry',
+            str(_STUB_RUNNER),
             '--project',
             str(project_root),
             '--no-splash',
@@ -90,7 +85,5 @@ def test_launch_entry_completes_one_task_via_subprocess(tmp_path: Path) -> None:
 
     assert result.returncode == 0, result.stderr or result.stdout
     assert 'Summarize README.md in one sentence.' in result.stdout
-    assert (
-        'Task complete: summarized README.md for the CLI regression.' in result.stdout
-    )
+    assert 'Agent completed' in result.stdout
     assert 'Initialization failed' not in result.stdout

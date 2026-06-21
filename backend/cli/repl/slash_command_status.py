@@ -157,6 +157,7 @@ def cmd_health(host: Any, parsed: Any) -> bool:
     """Run a fast self-check.
 
     Verifies debugpy (when installed), ripgrep, git, and model setup.
+    For a fuller standalone report, run ``grinta doctor`` outside the REPL.
     """
     if host._reject_extra_args(parsed):
         return True

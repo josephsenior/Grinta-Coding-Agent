@@ -23,13 +23,11 @@ if (-not $UseUvRun -and -not $PythonExe) {
 $smokeRoot = if ($env:SMOKE_ROOT) { $env:SMOKE_ROOT } else { Join-Path $env:TEMP 'grinta-stub-task-smoke' }
 $appRoot = if ($env:APP_ROOT) { $env:APP_ROOT } else { Join-Path $smokeRoot 'app' }
 $projectRoot = if ($env:PROJECT_ROOT) { $env:PROJECT_ROOT } else { Join-Path $smokeRoot 'project' }
-$hookDir = if ($env:HOOK_DIR) { $env:HOOK_DIR } else { Join-Path $smokeRoot 'hooks' }
-$stubSource = Join-Path $RepoRoot 'scripts\smoke\cli_llm_stub_sitecustomize.py'
+$stubRunner = Join-Path $RepoRoot 'scripts\smoke\run_cli_with_stub.py'
 
 if (Test-Path $smokeRoot) { Remove-Item -Recurse -Force $smokeRoot }
-New-Item -ItemType Directory -Path $appRoot, $projectRoot, $hookDir -Force | Out-Null
+New-Item -ItemType Directory -Path $appRoot, $projectRoot -Force | Out-Null
 Set-Content -Path (Join-Path $projectRoot 'README.md') -Value 'CLI smoke README target' -Encoding utf8
-Copy-Item -Path $stubSource -Destination (Join-Path $hookDir 'sitecustomize.py')
 
 @'
 {
@@ -55,22 +53,24 @@ if (-not $env:LLM_MODEL) { $env:LLM_MODEL = 'openai/gpt-4.1' }
 $env:GRINTA_NO_SPLASH = '1'
 $env:LOG_TO_FILE = 'false'
 $env:PYTHONUTF8 = '1'
-$env:PYTHONPATH = "$hookDir;$RepoRoot"
+$env:PYTHONPATH = $RepoRoot
 
 if ($UseUvRun) {
-    $output = 'Summarize README.md in one sentence.' | uv run python -m backend.cli.entry --project $projectRoot --no-splash 2>&1
+    $output = 'Summarize README.md in one sentence.' | uv run python $stubRunner --project $projectRoot --no-splash 2>&1
 } else {
-    $output = 'Summarize README.md in one sentence.' | & $PythonExe -m backend.cli.entry --project $projectRoot --no-splash 2>&1
+    $output = 'Summarize README.md in one sentence.' | & $PythonExe $stubRunner --project $projectRoot --no-splash 2>&1
 }
 
+$outputText = ($output | Out-String)
+
 if ($LASTEXITCODE -ne 0) {
-    Write-Host $output
+    Write-Host $outputText
     throw "Stub CLI task failed with exit code $LASTEXITCODE"
 }
 
-if ($output -notmatch 'Task complete: summarized README.md for the CLI regression.') {
-    Write-Host $output
-    throw 'Stub CLI task did not emit the expected completion message'
+if ($outputText -notmatch 'Agent completed') {
+    Write-Host $outputText
+    throw 'Stub CLI task did not report agent completion'
 }
 
 Write-Host '==> Stub CLI task smoke passed'

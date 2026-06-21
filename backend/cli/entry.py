@@ -37,8 +37,10 @@ _EPILOG = """examples:
       Start the interactive REPL in the current directory.
   grinta --no-splash
       Start the REPL without the animated splash screen.
-  grinta init
+    grinta init
       Run the first-run wizard to configure your LLM provider.
+  grinta doctor
+      Run install/config/toolchain diagnostics (non-interactive).
   grinta --project /path/to/repo sessions list
       List sessions for an explicit project root.
   grinta sessions list
@@ -138,6 +140,18 @@ def build_parser(*, include_subcommands: bool = True) -> argparse.ArgumentParser
     )
     p_init.set_defaults(func=_run_init)
 
+    p_doctor = subparsers.add_parser(
+        'doctor',
+        help='Run install, config, and toolchain diagnostics',
+    )
+    p_doctor.add_argument(
+        '--verbose',
+        '-v',
+        action='store_true',
+        help='Include slower checks (editing stack / tree-sitter)',
+    )
+    p_doctor.set_defaults(func=_run_doctor)
+
     # `grinta sessions ...`
     p_sessions = subparsers.add_parser('sessions', help='Manage past sessions')
     sessions_sub = p_sessions.add_subparsers(dest='sessions_cmd', required=True)
@@ -235,6 +249,17 @@ def _run_init(_args: argparse.Namespace) -> int:
     )
 
 
+def _run_doctor(args: argparse.Namespace) -> int:
+    from rich.console import Console
+
+    from backend.cli.doctor import cmd_doctor
+    from backend.cli.theme import no_color_enabled
+
+    _pin_project(getattr(args, 'project', None))
+    console = Console(no_color=no_color_enabled(), legacy_windows=False)
+    return cmd_doctor(console, verbose=bool(getattr(args, 'verbose', False)))
+
+
 def _run_sessions(args: argparse.Namespace) -> int:
     from rich.console import Console
 
@@ -269,6 +294,10 @@ def main() -> None:
     # Subcommand dispatch.
     if args.subcommand == 'init':
         rc = _run_init(args) or 0
+        sys.exit(int(rc))
+
+    if args.subcommand == 'doctor':
+        rc = _run_doctor(args) or 0
         sys.exit(int(rc))
 
     if args.subcommand == 'sessions':
