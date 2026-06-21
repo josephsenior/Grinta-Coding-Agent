@@ -114,7 +114,7 @@ class RendererDisplayMixin:
                 empty_message=(
                     'Loading MCP servers...'
                     if mcp_loading
-                    else 'No MCP servers configured'
+                    else 'No servers configured · click + to add'
                 ),
             )
             self._update_sidebar_section(
@@ -122,7 +122,9 @@ class RendererDisplayMixin:
                 'Skills' if skills_loading else f'Skills ({len(skill_items)})',
                 skill_items,
                 empty_message=(
-                    'Loading skills...' if skills_loading else 'No skills available'
+                    'Loading skills...'
+                    if skills_loading
+                    else 'No custom skills · click + to add'
                 ),
             )
 
@@ -459,24 +461,18 @@ class RendererDisplayMixin:
         return playbook_mtime, user_mtime
 
     def _build_skills_sidebar_items(self):
-        from backend.cli.event_rendering.sidebar import load_sidebar_skills
+        from backend.cli.event_rendering import sidebar as sidebar_module
 
-        skills_list: list[str] = []
         sig = self._skills_dirs_mtime()
         if (
             self._playbook_skills_cache is not None
             and sig == self._playbook_skills_cache_sig
         ):
-            skills_list = list(self._playbook_skills_cache)
-        else:
-            skills_list = load_sidebar_skills()
-            self._playbook_skills_cache = list(skills_list)
-            self._playbook_skills_cache_sig = sig
-        skill_items = []
-        if skills_list:
-            for skill in sorted(skills_list):
-                skill_items.append((skill, f'skill:{skill}', True, 'neutral', None))
-        return skill_items
+            return list(self._playbook_skills_cache)
+        items = sidebar_module.load_sidebar_skill_items()
+        self._playbook_skills_cache = list(items)
+        self._playbook_skills_cache_sig = sig
+        return items
 
     def _resolve_mcp_server_list(self, mcp_count):
         from backend.integrations.mcp.native_backends import is_user_visible_mcp_server

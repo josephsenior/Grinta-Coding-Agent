@@ -80,7 +80,7 @@ class ScreenLifecycleMixin:
                     )
                     yield CollapsibleSection(
                         title='MCP Servers',
-                        content='Loading MCP servers...',
+                        content='No servers configured · click + to add',
                         collapsed=False,
                         accent_color='#eacb8a',
                         section_icon='⬡',
@@ -105,7 +105,7 @@ class ScreenLifecycleMixin:
                     )
                     yield CollapsibleSection(
                         title='Skills',
-                        content='Loading skills...',
+                        content='No custom skills · click + to add',
                         collapsed=False,
                         accent_color='#c792ea',
                         section_icon='✦',

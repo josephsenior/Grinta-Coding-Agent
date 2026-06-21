@@ -9,11 +9,12 @@ from textual import events, work
 from backend.cli.event_rendering.panels import task_panel_signature
 from backend.cli.tui.constants import _tui_logger
 from backend.cli.tui.dialogs import (  # noqa: F401
+    ConfirmWidget,
     GrintaAddMCPDialog,
     GrintaAddSkillDialog,
     GrintaConfirmDialog,
 )
-from backend.cli.tui.widgets.collapsible import SidebarRow
+from backend.cli.tui.widgets.collapsible import CollapsibleSection, SidebarRow
 from backend.cli.tui.widgets.small import (
     InputBar,
 )
@@ -45,6 +46,22 @@ class ScreenSettingsMixin:
         self._hud.update_mcp_servers(count_user_visible_mcp_servers(self._config))
         self._render_hud_bar()
         self._refresh_sidebar()
+
+    def _highlight_sidebar_item(self, section_id: str, item_id: str) -> None:
+        try:
+            section = self.query_one(section_id, CollapsibleSection)
+            for row in section.query(SidebarRow):
+                if row.item_id == item_id:
+                    row.add_class('-highlight')
+                    self.set_timer(2.0, lambda r=row: r.remove_class('-highlight'))
+                    break
+        except Exception:
+            pass
+
+    def _existing_mcp_server_names(self) -> set[str]:
+        from backend.cli.settings import get_mcp_servers
+
+        return {str(s.get('name') or '') for s in get_mcp_servers(self._config)}
 
     def on_focus(self, event: events.Focus) -> None:
         if event.control and event.control.id == 'input':
@@ -351,17 +368,26 @@ class ScreenSettingsMixin:
         elif item_id.startswith('mcp:'):
             mcp_name = item_id.split(':', 1)[1]
             self.notify(
-                f'MCP Server: {mcp_name}  |  Press Delete to remove',
+                f'MCP server: {mcp_name} · Del to remove',
                 severity='info',
-                timeout=3.0,
+                timeout=2.5,
             )
         elif item_id.startswith('skill:'):
             skill_name = item_id.split(':', 1)[1]
-            self.notify(
-                f'Playbook Skill: {skill_name}.md  |  Press Delete to remove',
-                severity='info',
-                timeout=3.0,
-            )
+            from backend.cli.event_rendering.sidebar import is_user_skill
+
+            if is_user_skill(skill_name):
+                self.notify(
+                    f'Custom skill: {skill_name}.md · Del to remove',
+                    severity='info',
+                    timeout=2.5,
+                )
+            else:
+                self.notify(
+                    f'Built-in playbook: {skill_name}.md',
+                    severity='info',
+                    timeout=2.5,
+                )
 
     async def on_sidebar_row_delete_requested(self, event: Any) -> None:
         """Handle SidebarRow delete events."""
@@ -376,13 +402,27 @@ class ScreenSettingsMixin:
             self.run_worker(self._confirm_delete_mcp(mcp_name), exclusive=True)
 
     async def _confirm_delete_skill(self, skill_name: str) -> None:
-        result = await self.app.push_screen_wait(
-            GrintaConfirmDialog(
-                title='Delete Skill',
-                body=f'Are you sure you want to delete {skill_name}.md?',
-                options=[('cancel', 'Cancel'), ('delete', 'Delete')],
+        from backend.cli.event_rendering.sidebar import is_user_skill
+
+        if not is_user_skill(skill_name):
+            self.notify(
+                f'Built-in playbook {skill_name}.md cannot be removed.',
+                severity='warning',
+                timeout=2.5,
             )
+            return
+
+        widget = self.query_one('#confirm-widget', ConfirmWidget)
+        widget.configure_prompt(
+            f'Remove custom skill [white]{skill_name}.md[/]?',
+            [('cancel', 'Cancel'), ('delete', 'Remove')],
+            recommended=1,
         )
+        widget.show()
+        try:
+            result = await widget.wait_for_decision()
+        finally:
+            widget.hide()
         if result == 'delete':
             await self._delete_skill(skill_name)
 
@@ -451,10 +491,14 @@ class ScreenSettingsMixin:
             result = await self.app.push_screen_wait(GrintaAddSkillDialog())
             if result:
                 await self._create_skill(result['name'], result['content'])
+                self._highlight_sidebar_item('#sidebar-skills', f"skill:{result['name']}")
         elif event.control.id == 'sidebar-mcp':
-            result = await self.app.push_screen_wait(GrintaAddMCPDialog())
+            result = await self.app.push_screen_wait(
+                GrintaAddMCPDialog(existing_names=self._existing_mcp_server_names())
+            )
             if result:
                 await self._add_mcp_server(result['name'], result['command'])
+                self._highlight_sidebar_item('#sidebar-mcp', f"mcp:{result['name']}")
 
     def _create_skill_sync(self, name: str, content: str) -> None:
         """Synchronous skill creation - used internally by _create_skill()."""

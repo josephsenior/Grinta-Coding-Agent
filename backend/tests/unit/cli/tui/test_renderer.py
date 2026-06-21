@@ -401,7 +401,14 @@ async def test_tui_sidebar_rows_expose_delete_for_mcp_and_skills(
 
     from backend.cli.event_rendering import sidebar as sidebar_module
 
-    monkeypatch.setattr(sidebar_module, '_load_playbook_skills', lambda: ['skill-a'])
+    monkeypatch.setattr(
+        sidebar_module,
+        'load_sidebar_skill_items',
+        lambda: [
+            ('skill-a', 'skill:skill-a', True, 'info', 'custom', True),
+            ('skill-b', 'skill:skill-b', False, 'neutral', 'bundled', True),
+        ],
+    )
 
     async with app.run_test(size=(120, 36)) as pilot:
         await pilot.pause()
@@ -418,6 +425,10 @@ async def test_tui_sidebar_rows_expose_delete_for_mcp_and_skills(
             loop=loop,
         )
         renderer._refresh_display()
+
+        skill_items = renderer._build_skills_sidebar_items()
+        bundled_items = [item for item in skill_items if item[0] == 'skill-b' and not item[2]]
+        assert len(bundled_items) == 1
 
         rows = s.query(SidebarRow).results()
         deletable = [row for row in rows if getattr(row, 'deletable', False)]

@@ -218,6 +218,11 @@ SidebarRow:focus {
     border-left: solid #5eead4;
 }
 
+SidebarRow.-highlight {
+    background: #132a45;
+    border-left: solid #c792ea;
+}
+
 SidebarRow.-active-task {
     background: #0c1828;
     border-left: solid #5eead4;
