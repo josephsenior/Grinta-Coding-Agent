@@ -175,7 +175,17 @@ The massive multi-agent orchestration layer — the MetaSOP system with its role
 
 `think` is deceptively simple. It logs a reasoning step without executing any action. The model uses it to brainstorm fixes, plan refactors, debug hypotheses, or weigh trade-offs before committing. It sounds trivial, but it is one of the most important tools in the entire system because it gives the model a structured place to reason without being forced to act. Without it, models will often act prematurely just because they feel pressure to produce a tool call. `think` relieves that pressure.
 
-`finish` signals task completion. It requires a summary message, a list of completed steps, and suggested next steps. But calling `finish` is not enough — the task validation service independently walks the `task_tracker` and blocks the finish if any steps are still active. The model cannot cheat its way past this gate. It also accepts an optional `lessons_learned` field — observations about the task that get persisted for future runs. That is not self-improvement in the grand ACE sense. It is scar tissue. Tiny, practical lessons that accumulate quietly.
+`finish` signals task completion. It requires a summary message, a list of
+completed steps, and suggested next steps. In the harder-gated phase this
+chapter describes, calling `finish` was not enough — the task validation
+service independently walked the `task_tracker` and blocked the finish if any
+steps were still active. The current release line uses a lighter advisory
+completion-quality signal for plain-text final responses, but the architectural
+point remains the same: the model should not be the only voice declaring work
+complete. `finish` also accepts an optional `lessons_learned` field —
+observations about the task that get persisted for future runs. That is not
+self-improvement in the grand ACE sense. It is scar tissue. Tiny, practical
+lessons that accumulate quietly.
 
 `task_tracker` maintains a structured plan. It has exactly two commands: `update` (create or overwrite the entire plan as a JSON list with `todo`, `in_progress`, and `done` statuses) and `view` (read the current plan). Full replacement semantics. The plan is persisted to `active_plan.json` in the workspace's agent state directory. The compactor reads this file to anchor in-progress tasks as essential events that survive context compaction. Without the tracker, the model would lose its own plan during long sessions when history gets compressed.
 

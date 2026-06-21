@@ -29,7 +29,7 @@ These are the concrete gates already present in the repository.
 
 | Gate | File | Purpose |
 | --- | --- | --- |
-| Python tests | `.github/workflows/py-tests.yml` | Lockfile validation, sharded unit coverage (75%), integration/e2e/stress on Linux, unit smoke on Windows |
+| Python tests | `.github/workflows/py-tests.yml` | Lockfile validation, sharded unit coverage (75%), integration/e2e/stress on Linux, required unit gates on Windows and macOS |
 | Lint + type checks | `.github/workflows/lint.yml` | Pre-commit, version consistency, mypy |
 | CodeQL | `.github/workflows/codeql.yml` | Static security analysis for Python |
 | Bandit | `.github/workflows/bandit.yml` | Python SAST |

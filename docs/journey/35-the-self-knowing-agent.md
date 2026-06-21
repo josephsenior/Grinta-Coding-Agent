@@ -25,7 +25,7 @@ The block currently teaches the model these facts:
 7. Which MCP servers are active in the current session — the curated set (web search, web fetch, GitHub, quality gates, shadcn/ui, context7) is declared as runtime capabilities, not aspirational tool soup. The model knows they exist and can use them, but they are distinct from native core tools.
 8. What mode the session is in — Chat, Plan, or Agent — and which tools are visible in each mode. The model should not see tools it should not use. `finish` and `communicate_with_user` are mode-aware.
 9. Whether the Textual TUI is active. The model knows whether the user is looking at a rich terminal interface with HUD, cards, and mode switch, or a plain terminal.
-10. Whether the quality gate before finish is enabled and whether it runs automatically on task completion.
+10. Whether the current completion-quality signal is enabled and whether it runs automatically on task completion.
 
 The block ends with a sentence I care about: *“treat these as authoritative — do not contradict them in user-facing replies.”* That is not just style. The model would otherwise generate hedge phrases like *“I’m not sure if I can run those in parallel”* even when the block above the hedge said it could. Stating authority explicitly cut the hedging.
 

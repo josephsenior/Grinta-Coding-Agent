@@ -117,7 +117,7 @@ Design intent:
 
 - split control-plane concerns into testable units
 - classify errors into recoverable vs terminal paths
-- prevent false completion with explicit task validation
+- reduce false completion with explicit task tracking and completion-quality validation signals
 
 ### Middleware Pipeline
 
@@ -219,7 +219,7 @@ Core runtime protections include:
 
 - retry and recovery services
 - circuit breaker and stuck detection
-- task validation before finish
+- task tracking and completion-quality validation signals before finish
 - security policy checks in execution path
 
 These controls are designed to reduce false-success runs and uncontrolled loops while keeping the local workflow fast.

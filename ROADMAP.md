@@ -8,7 +8,7 @@ can improve the project without changing the agent's core behavior.
 
 - Keep root docs, user docs, and release docs aligned with the actual shipped behavior.
 - Remove or quarantine stale legacy contributor surfaces that imply an older server-style product.
-- Make release notes explicit about support stance: Linux and Windows supported, macOS best-effort until promoted.
+- Make release notes and support docs explicit about the current support stance, and clearly label historical snapshots when older release notes describe an earlier certification policy.
 - Add a lightweight docs-drift pass to every RC and GA checklist.
 
 ## Track 2: Repository hygiene and maintainer operations

@@ -194,7 +194,7 @@ Grinta wanted more than explicit tooling. It wanted:
 - broader system safety
 - cost awareness
 - long-session coherence
-- validation before finish
+- validation around finish decisions
 - a local-first experience that feels like an actual developer tool
 
 So the lesson I took was not "be a benchmark framework." It was "take the rigor seriously, and extend it beyond the tool loop into the surrounding system architecture."
@@ -281,7 +281,7 @@ Grinta wanted the full loop:
 - validation
 - recovery
 - budget control
-- finish gating
+- completion integrity
 
 So while Aider helped validate the value of a sharp coding assistant, Grinta pushed into a more autonomous execution model with more architectural weight around reliability.
 

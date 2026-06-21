@@ -130,7 +130,14 @@ The **Safety Service** evaluates the security risk of every action before it exe
 
 The **State Transition Service** enforces the state machine explicitly. It maintains a map of valid transitions — which states can follow which other states — and rejects invalid transitions with warnings. This sounds mechanical, but without it, the agent can end up in impossible states where it is simultaneously "running" and "finished" because two concurrent events both triggered state changes. The explicit state graph makes impossible states structurally impossible.
 
-The **Task Validation Service** gets the final vote before a finish action can actually end the session. It walks the task tracker, recursively finds every step that is not marked as done, and if active steps remain, blocks the finish. This is the integrity constraint that prevents the most dangerous failure mode: an agent that confidently reports success while work is still incomplete.
+The **Task Validation Service** got the final vote in the harder-gated phase of
+the system before a finish action could actually end the session. It walked the
+task tracker, recursively found every step that was not marked as done, and if
+active steps remained, blocked the finish. The current release line uses a
+lighter advisory completion-quality path for plain-text final responses, but
+this older contract explains why the subsystem exists at all: to prevent the
+most dangerous failure mode, an agent that confidently reports success while
+work is still incomplete.
 
 ### The Hot Path as a Sentence
 
@@ -211,7 +218,10 @@ One of the strongest lessons of this project is that reliability is not mainly a
 
 Reliability is architecture refusing to let a probabilistic model act without supervision from deterministic systems.
 
-In Grinta, that shows up as explicit state transitions, pending action tracking, validation before finish, middleware gates around execution, and a persistence trail that can be audited after the fact. The goal is simple: make bad behavior visible early, reduce blast radius, and keep sessions recoverable.
+In Grinta, that shows up as explicit state transitions, pending action tracking,
+completion-quality validation signals, middleware gates around execution, and a
+persistence trail that can be audited after the fact. The goal is simple: make
+bad behavior visible early, reduce blast radius, and keep sessions recoverable.
 
 That is what turned this from a clever prototype into a system I could trust under pressure.
 

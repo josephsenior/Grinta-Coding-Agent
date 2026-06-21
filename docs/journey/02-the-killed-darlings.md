@@ -115,7 +115,14 @@ That matters because removal does not always mean regret. Sometimes it means reh
 
 Inside Grinta, the conclusion was clear: a **single capable agent with disciplined planning and validation** was more cost-effective and more aligned with the actual goal of autonomous task completion.
 
-What replaced the multi-agent team inside Grinta is more surgical: a task tracker tool that uses only update and view commands with canonical statuses persisted as a plain JSON list. The task validation service blocks the agent from declaring "done" when plan steps are still outstanding. The compactor reads the active plan file to anchor in-progress tasks as essential events that survive context compaction. The planning is simpler, the execution is cheaper, and the validation is harder to cheat.
+What replaced the multi-agent team inside Grinta is more surgical: a task
+tracker tool that uses only update and view commands with canonical statuses
+persisted as a plain JSON list. In the harder-gated phase of the product, the
+task validation service blocked the agent from declaring "done" when plan steps
+were still outstanding. The compactor reads the active plan file to anchor
+in-progress tasks as essential events that survive context compaction. The
+planning is simpler, the execution is cheaper, and the validation is harder to
+cheat.
 
 The difference in philosophy is stark. The MetaSOP system assumed that better decomposition produces better outcomes. Grinta's current system assumes that better follow-through on simpler plans produces better outcomes. Those are fundamentally different bets about where quality comes from in autonomous work. I made the second bet because I watched the first bet fail — not because the decomposition was wrong, but because the execution layer could not sustain the fidelity the decomposition demanded.
 

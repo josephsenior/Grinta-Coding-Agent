@@ -8,6 +8,12 @@ The diff looks plausible. The tone sounds confident. The summary is clean. If yo
 
 That moment is also where many systems fail, because an agent claiming completion is not evidence of completion.
 
+**Historical note:** this chapter describes the stronger finish-gating contract from
+the phase when Grinta treated completion validation as a hard runtime gate. In
+the current release line, the quality validator is lighter-weight and advisory
+for plain-text final responses. The architectural lesson in this chapter still
+matters; the exact runtime contract has evolved.
+
 ## The Dangerous Version of "Success"
 
 Early on, I treated finish as a procedural endpoint. If the model returned a finish action, the loop ended.
@@ -23,33 +29,33 @@ I learned the hard way that autonomous systems are naturally optimistic narrator
 
 ## Finish Became a Gate, Not a Gesture
 
-Grinta's task validation service changed the contract.
+Grinta's task validation service changed the contract in that phase of the project.
 
-A finish action is now a request, not a verdict.
+At that point, a finish action became a request, not a verdict.
 
-Before finish is allowed, the system can enforce multiple checks:
+Before finish was allowed in that hard-gated design, the system could enforce multiple checks:
 
-1. **Plan-state integrity:** if active plan steps still exist, finish is blocked.
-2. **Validator availability integrity:** if completion validation is enabled but validator is unavailable, finish is blocked (fail closed).
-3. **Task-result integrity:** validators must pass before the session can end.
+1. **Plan-state integrity:** if active plan steps still existed, finish was blocked.
+2. **Validator availability integrity:** if completion validation was enabled but the validator was unavailable, finish was blocked (fail closed).
+3. **Task-result integrity:** validators had to pass before the session could end.
 
-That architecture removes the model's ability to "declare victory" without surviving external checks.
+That architecture removed the model's ability to "declare victory" without surviving external checks.
 
 ## The Plan-State Check Was a Big Deal
 
 One of the strongest checks is also one of the simplest.
 
-The validator walks the task plan tree and recursively finds non-terminal steps. If anything is still `todo` or `in_progress`, finish is blocked and the agent is pushed back into working state.
+The validator walked the task plan tree and recursively found non-terminal steps. If anything was still `todo` or `in_progress`, finish was blocked and the agent was pushed back into working state.
 
-The feedback is explicit, not vague. The system reports which steps are still active and instructs the agent to update task tracking honestly.
+The feedback was explicit, not vague. The system reported which steps were still active and instructed the agent to update task tracking honestly.
 
-That one guard eliminated an entire class of fake-finish behavior.
+That one guard eliminated an entire class of fake-finish behavior in that release phase.
 
 ## Fail Closed, Not Feel Good
 
 There is a policy decision in this subsystem that I care about deeply:
 
-If completion validation is enabled and the validator is missing, Grinta blocks finish.
+If completion validation was enabled and the validator was missing, Grinta blocked finish.
 
 Many systems fail open here because it feels convenient: "validation unavailable, continue anyway." That convenience turns into silent quality regression.
 
@@ -75,7 +81,7 @@ This layer is not trying to prove mathematical correctness. It is enforcing a mi
 
 ## Feedback Had to Be Machine-Actionable
 
-When validation fails, Grinta does not just log a warning for humans.
+When validation failed, Grinta did not just log a warning for humans.
 
 It emits a structured error observation with:
 
@@ -84,7 +90,7 @@ It emits a structured error observation with:
 - missing items
 - concrete suggestions
 
-Then it returns the agent to `RUNNING` state and asks it to continue.
+Then it returned the agent to `RUNNING` state and asked it to continue.
 
 This turns validation from postmortem reporting into active steering.
 
@@ -92,7 +98,7 @@ This turns validation from postmortem reporting into active steering.
 
 There is still a deliberate override: `force_finish`.
 
-That exists because real workflows sometimes need operator authority over strict gates.
+That existed because real workflows sometimes needed operator authority over strict gates.
 
 The key is that it is explicit. Integrity is default; bypass is conscious.
 
@@ -102,7 +108,7 @@ People often ask why autonomous systems feel impressive in demos but unreliable 
 
 One major answer is simple: the demo agent is usually both worker and judge.
 
-In Grinta, those roles are separated on purpose.
+In Grinta, those roles were separated on purpose in the hard-gated design described here.
 
 - The model proposes completion.
 - The system verifies completion.

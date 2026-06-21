@@ -16,7 +16,7 @@
 >
 > A terminal coding agent that plans, executes, validates, and finishes — without a cloud control plane, without lock-in to one model vendor, and without the old heavyweight install footprint.
 >
-> **Current status:** `v1.0.0-rc1` public release candidate. Intended for real-world use, with focused community feedback requested before GA.
+> **Current status:** `v1.0.0-rc1` public release candidate. Core CI and install/onboarding validation are already in place; the remaining GA work is mostly release positioning, documentation alignment, and edge-case hardening.
 
 ### Grinta in action
 
@@ -27,8 +27,9 @@ Direct link if the animation does not load: [`docs/assets/grinta-demo.gif`](docs
 ## Release status
 
 - Latest public build is `v1.0.0-rc1` (release candidate), not final GA.
-- We are actively collecting feedback on first-run setup, UX clarity, and edge-case reliability.
-- Linux, Windows, and macOS are supported release targets with required CI gates on each platform.
+- Core CI, smoke-install, and install/onboarding validation are already in place for the current release line.
+- We are actively collecting feedback on UX clarity and edge-case reliability before the GA call.
+- Linux, Windows, and macOS are supported release targets, but certification depth differs by platform; see [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md).
 - If you hit friction, please open an issue with the `RC Feedback` template from the issue chooser.
 - GA criteria and release gate details live in [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md).
 

@@ -4,7 +4,7 @@ Autonomy without verification is seductive: the agent says, "Done," and everyone
 
 That version is cheap; it is also fake.
 
-If [08. The First Fixed Issue](08-the-first-fixed-issue.md) was the chapter where the system proved it could finish real work once, this chapter is about the machinery that stops the word *finished* from turning into theater.
+If [08. The First Fixed Issue](08-the-first-fixed-issue.md) was the chapter where the system proved it could finish real work once, this chapter is about the machinery that stops the word *finished* from turning into theater. The exact runtime contract can change across release lines; the deeper point here is why independent verification has to exist at all.
 
 It also lives downstream of two other pressures: the memory discipline in [04. The Context War](04-the-context-war.md) and the prompt discipline in [15. Prompts Are Programs](15-prompts-are-programs.md). A system that remembers badly or instructs badly will validate badly too.
 
@@ -233,7 +233,7 @@ What you are really testing is a stack:
 - edit application
 - output observation
 - validator behavior
-- finish gating
+- completion decisions
 - replay fidelity
 
 This is why the unit tests around the validation layer matter so much to me. They are not glamorous. They are not the kind of thing people show in flashy demos. But they are exactly the kind of tests that prevent a system from becoming untrustworthy in slow, embarrassing ways.

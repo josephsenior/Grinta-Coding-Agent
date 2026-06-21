@@ -3,6 +3,9 @@
 `v1.0.0-rc1` is the public release candidate for Grinta's 1.0 line.
 This build is intended for real usage and focused feedback before final GA.
 
+Historical note: these release notes capture the support stance at rc1 publication.
+For the current support contract and CI certification depth, see [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md).
+
 ## What this release is
 
 - Public RC for the CLI-first open-source product surface.
@@ -30,7 +33,7 @@ This build is intended for real usage and focused feedback before final GA.
 - Added clean-box smoke install scripts for Linux/macOS/Windows and Docker.
 - Clarified autonomy language to `conservative` / `balanced` / `full`.
 
-## Platform and support stance
+## Platform and support stance at rc1 publication
 
 - **Supported:** Linux, Windows.
 - **Best effort:** macOS (advisory CI; not yet a required gate).

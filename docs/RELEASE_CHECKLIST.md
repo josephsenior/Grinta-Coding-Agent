@@ -15,6 +15,7 @@ These workflows run on every PR and on pushes to `main`. All **required** jobs m
 | **Run Python Tests** | `gates-on-linux-coverage-{a,b,c,d,f,g,e}` + `report` | Full unit corpus on Linux with sharded coverage; combined report enforces **75%** (`--fail-under=75`). Execution shards (D/F/G) skip `compileall`; syntax is gated on other shards. |
 | **Run Python Tests** | `gates-on-linux-extended` | Integration, e2e, and stress suites on Linux (runs after the coverage report job passes). |
 | **Run Python Tests** | `gates-on-windows` (3.12 + 3.13) | Full unit corpus cross-platform smoke. |
+| **Run Python Tests** | `gates-on-macos` | Full unit corpus on macOS. This is the required macOS certification depth today; Linux remains the only platform with the extended integration/e2e/stress tier. |
 | **Lint** | pre-commit, mypy, version consistency | See [`.github/workflows/lint.yml`](../.github/workflows/lint.yml). |
 | **CodeQL** | Python analysis | Static security analysis. |
 | **Security Scan (Bandit)** | Bandit | Python SAST. |
@@ -26,7 +27,6 @@ These workflows run on every PR and on pushes to `main`. All **required** jobs m
 
 | Job | Notes |
 | --- | --- |
-| `gates-on-macos` | Same unit corpus as Linux; `continue-on-error: true`. See [macOS stance](#macos-stance) below. |
 | `gates-on-linux-py313` | Full unit corpus on Python 3.13; `continue-on-error: true`. |
 | **Heavy / Integration Tests** | Marker-filtered `heavy \| integration \| benchmark` slice; runs on `main`, schedule, and manual dispatch only. |
 
@@ -81,7 +81,7 @@ CI’s `gates-on-linux-extended` already runs integration, e2e, and stress on ev
 - [ ] **Reliability gate + integration/stress:** `make reliability-gate-integration` (adds integration and stress suites).
 - [ ] **Stress suite (spot-check):** `make test-stress` or `PYTHONPATH=. uv run pytest backend/tests/stress -m stress -q`.
 - [ ] **Integration suite (spot-check):** `make test-integration` or `PYTHONPATH=. uv run pytest backend/tests/integration -m integration -q`.
-- [ ] **Fresh-machine onboarding (manual GA gate):** complete the reports in [FRESH_MACHINE_ONBOARDING.md](FRESH_MACHINE_ONBOARDING.md) (3× pipx, 3× source `uv`; Docker optional). CI smoke install does not cover interactive `init` or a first real agent task.
+- [ ] **Fresh-machine onboarding evidence:** keep the reports in [FRESH_MACHINE_ONBOARDING.md](FRESH_MACHINE_ONBOARDING.md) current for supported install paths (3× pipx, 3× source `uv`; Docker optional). CI smoke install still does not cover interactive `init` or a first real agent task, so refresh the manual evidence whenever onboarding-affecting changes land.
 - [ ] **Evaluation (when behavior-sensitive):** run [run-eval workflow](../.github/workflows/run-eval.yml) manually or via release trigger if the release touches autonomy, prompts, safety, or orchestration. See [PROMOTION.md](PROMOTION.md#6-run-evaluation-when-the-release-deserves-it).
 
 ### Optional — full Python test tree
@@ -128,7 +128,7 @@ git push origin main --tags
 
 ## macOS stance
 
-macOS CI is **informational** until `gates-on-macos` is promoted to a required check. Before calling macOS “supported” in release notes, confirm the latest macOS job is green or run `pytest backend/tests/unit` on a Mac. Document known gaps in release notes rather than treating a green Linux/Windows matrix as macOS certification.
+macOS is a supported release platform with a required unit-test gate (`gates-on-macos`) on every PR and on `main`. The current certification depth is unit-only, not the full Linux extended tier. Before making shell/path/terminal-heavy public claims, confirm the latest macOS job is green and run a local Mac smoke when practical. Document known gaps in release notes rather than implying Linux-equivalent certification depth.
 
 ---
 
@@ -136,9 +136,9 @@ macOS CI is **informational** until `gates-on-macos` is promoted to a required c
 
 Use this when deciding whether to move from a public RC to an official GA tag:
 
-- [ ] **Required CI stays green for a sustained window:** Linux + Windows required jobs and lint are green on `main` for at least 7 consecutive days.
-- [ ] **CLI onboarding confidence:** at least 3 fresh-machine install + `grinta init` + first-task reports complete successfully across supported install paths (`pipx` required; source `uv run` required; Docker optional). Table in [FRESH_MACHINE_ONBOARDING.md](FRESH_MACHINE_ONBOARDING.md); partial automation in [smoke-install workflow](../.github/workflows/smoke-install.yml).
+- [ ] **Required CI stays green for a sustained window:** Linux, Windows, and macOS required jobs plus lint are green on `main` for at least 7 consecutive days.
+- [ ] **CLI onboarding confidence:** current successful fresh-machine reports exist across supported install paths (`pipx` required; source `uv run` required; Docker optional) and are refreshed whenever onboarding-affecting changes land. Table in [FRESH_MACHINE_ONBOARDING.md](FRESH_MACHINE_ONBOARDING.md); partial automation in [smoke-install workflow](../.github/workflows/smoke-install.yml).
 - [ ] **RC feedback triage complete:** all high-severity RC feedback issues are fixed and verified or explicitly documented as post-GA follow-up.
 - [ ] **Docs match real behavior:** `README.md`, `docs/USER_GUIDE.md`, `docs/TROUBLESHOOTING.md`, and `docs/SUPPORT_MATRIX.md` reflect current CLI UX, platform support, and completion-validation behavior.
 - [ ] **Packaging artifacts validated:** PyPI install path, Scoop, and Homebrew metadata verified against published artifacts for the target version.
-- [ ] **Known limitations are explicit:** remaining gaps (for example macOS best-effort, Python 3.13 advisory) are listed in release notes and support docs.
+- [ ] **Known limitations are explicit:** remaining gaps (for example macOS unit-only certification depth or Python 3.13 advisory coverage on Linux) are listed in release notes and support docs.
