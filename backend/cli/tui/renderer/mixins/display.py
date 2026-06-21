@@ -27,7 +27,7 @@ class RendererDisplayMixin:
     """history refresh, display writes, retry/runtime strips, cards."""
 
     _playbook_skills_cache: list[str] | None = None
-    _playbook_skills_cache_mtime: float = 0.0
+    _playbook_skills_cache_sig: tuple[float, float] | None = None
 
     def _register_widget_event_id(self, widget: Any) -> None:
         event_id = getattr(self, '_current_event_id', -1)
@@ -89,7 +89,6 @@ class RendererDisplayMixin:
         if skip_sidebar:
             return
         mcp_count = self._hud.state.mcp_servers
-        skill_count = self._hud.bundled_skill_count
 
         mcp_servers = self._resolve_mcp_server_list(mcp_count)
 
@@ -97,7 +96,14 @@ class RendererDisplayMixin:
         skill_items = self._build_skills_sidebar_items()
         mcp_loading = self._mcp_sidebar_is_loading(mcp_items)
         skills_loading = self._skills_sidebar_is_loading(skill_items)
-        current_state = (mcp_servers, skill_count, mcp_loading, skills_loading)
+        current_state = (
+            tuple((s.get('name'), s.get('type')) for s in mcp_servers)
+            if mcp_servers
+            else (),
+            tuple(item[0] for item in skill_items),
+            mcp_loading,
+            skills_loading,
+        )
         if current_state != self._last_sidebar_state:
             self._update_sidebar_section(
                 '#sidebar-mcp',
@@ -121,6 +127,12 @@ class RendererDisplayMixin:
             )
 
             self._last_sidebar_state = current_state
+
+    def invalidate_sidebar(self) -> None:
+        """Force MCP/skills sidebar panels to rebuild on next refresh."""
+        self._last_sidebar_state = None
+        self._playbook_skills_cache = None
+        self._playbook_skills_cache_sig = None
 
     def schedule_lsp_detection(self) -> None:
         """Probe installed language servers off the UI thread."""
@@ -429,27 +441,37 @@ class RendererDisplayMixin:
                 mcp_items.append((name, f'mcp:{name}', True, 'info', server_type))
         return mcp_items
 
-    def _build_skills_sidebar_items(self):
+    def _skills_dirs_mtime(self) -> tuple[float, float]:
         from pathlib import Path
 
         import backend
-        from backend.cli.event_rendering.sidebar import _load_playbook_skills
+
+        playbook_dir = Path(backend.__file__).resolve().parent / 'playbooks'
+        user_dir = Path.home() / '.grinta' / 'skills'
+        try:
+            playbook_mtime = playbook_dir.stat().st_mtime
+        except OSError:
+            playbook_mtime = 0.0
+        try:
+            user_mtime = user_dir.stat().st_mtime
+        except OSError:
+            user_mtime = 0.0
+        return playbook_mtime, user_mtime
+
+    def _build_skills_sidebar_items(self):
+        from backend.cli.event_rendering.sidebar import load_sidebar_skills
 
         skills_list: list[str] = []
-        playbook_dir = Path(backend.__file__).resolve().parent / 'playbooks'
-        try:
-            mtime = playbook_dir.stat().st_mtime
-        except OSError:
-            mtime = 0.0
+        sig = self._skills_dirs_mtime()
         if (
             self._playbook_skills_cache is not None
-            and mtime == self._playbook_skills_cache_mtime
+            and sig == self._playbook_skills_cache_sig
         ):
             skills_list = list(self._playbook_skills_cache)
         else:
-            skills_list = _load_playbook_skills()
+            skills_list = load_sidebar_skills()
             self._playbook_skills_cache = list(skills_list)
-            self._playbook_skills_cache_mtime = mtime
+            self._playbook_skills_cache_sig = sig
         skill_items = []
         if skills_list:
             for skill in sorted(skills_list):

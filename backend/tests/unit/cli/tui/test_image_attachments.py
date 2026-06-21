@@ -146,3 +146,83 @@ def test_clipboard_likely_has_image_false_when_closed(monkeypatch) -> None:
     from backend.cli.tui.image_attachments import clipboard_likely_has_image
 
     assert clipboard_likely_has_image() is False
+
+
+def test_clear_pending_image_attachments() -> None:
+    from backend.cli.tui.screen.input import ScreenInputMixin
+
+    class Stub(ScreenInputMixin):
+        def __init__(self) -> None:
+            self._pending_image_urls = ['data:image/png;base64,abc']
+            self.refreshed = False
+
+        def _refresh_input_attachment_hint(self) -> None:
+            self.refreshed = True
+
+    screen = Stub()
+    assert screen.clear_pending_image_attachments() is True
+    assert screen._pending_image_urls == []
+    assert screen.refreshed
+    assert screen.clear_pending_image_attachments() is False
+
+
+def test_remove_last_pending_image_attachment() -> None:
+    from backend.cli.tui.screen.input import ScreenInputMixin
+
+    class Stub(ScreenInputMixin):
+        def __init__(self) -> None:
+            self._pending_image_urls = ['data:one', 'data:two']
+            self.refreshed = 0
+
+        def _refresh_input_attachment_hint(self) -> None:
+            self.refreshed += 1
+
+    screen = Stub()
+    assert screen.remove_last_pending_image_attachment() is True
+    assert screen._pending_image_urls == ['data:one']
+    assert screen.refreshed == 1
+    assert screen.remove_last_pending_image_attachment() is True
+    assert screen._pending_image_urls == []
+    assert screen.remove_last_pending_image_attachment() is False
+
+
+def test_prompt_text_area_backspace_removes_staged_image(monkeypatch) -> None:
+    from backend.cli.tui.widgets.small import PromptTextArea
+
+    class StubScreen:
+        def __init__(self) -> None:
+            self._pending_image_urls = ['data:image/png;base64,abc']
+
+        def remove_last_pending_image_attachment(self) -> bool:
+            if not self._pending_image_urls:
+                return False
+            self._pending_image_urls.pop()
+            return True
+
+    screen = StubScreen()
+    area = PromptTextArea()
+    area.text = ''
+    monkeypatch.setattr(area, '_paste_target_screen', lambda: screen)
+
+    assert area._try_remove_pending_image_attachment() is True
+    assert screen._pending_image_urls == []
+
+
+def test_prompt_text_area_clears_images_when_text_emptied(monkeypatch) -> None:
+    from backend.cli.tui.widgets.small import PromptTextArea
+
+    class StubScreen:
+        def __init__(self) -> None:
+            self._pending_image_urls = ['data:one', 'data:two']
+
+        def clear_pending_image_attachments(self) -> bool:
+            if not self._pending_image_urls:
+                return False
+            self._pending_image_urls = []
+            return True
+
+    screen = StubScreen()
+    area = PromptTextArea()
+    monkeypatch.setattr(area, '_paste_target_screen', lambda: screen)
+    area._try_clear_pending_image_attachments_on_empty_text('hello', '')
+    assert screen._pending_image_urls == []

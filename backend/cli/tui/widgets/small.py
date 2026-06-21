@@ -835,6 +835,29 @@ class PromptTextArea(TextArea):
     def _paste_target_screen(self) -> Any | None:
         return self._resolve_grinta_screen()
 
+    def _try_remove_pending_image_attachment(self) -> bool:
+        """Remove staged images when the input is empty (backspace/delete)."""
+        screen = self._paste_target_screen()
+        if screen is None or self.text.strip():
+            return False
+        remove_last = getattr(screen, 'remove_last_pending_image_attachment', None)
+        if callable(remove_last) and remove_last():
+            return True
+        return False
+
+    def _try_clear_pending_image_attachments_on_empty_text(
+        self, previous: str, text: str
+    ) -> None:
+        """Clear staged images when the user deletes all typed text."""
+        if not previous.strip() or text.strip():
+            return
+        screen = self._paste_target_screen()
+        if screen is None:
+            return
+        clear_all = getattr(screen, 'clear_pending_image_attachments', None)
+        if callable(clear_all):
+            clear_all()
+
     async def _try_attach_clipboard_image(self) -> bool:
         """Attach a clipboard image or report why paste could not continue."""
         screen = self._paste_target_screen()
@@ -857,13 +880,10 @@ class PromptTextArea(TextArea):
     def watch_text(self, text: str) -> None:
         previous = self._previous_input_text
         self._previous_input_text = text
+        self._try_clear_pending_image_attachments_on_empty_text(previous, text)
         screen = self._paste_target_screen()
         if screen is None:
             return
-        if previous.strip() and not text.strip():
-            pending = getattr(screen, '_pending_image_urls', None)
-            if pending:
-                screen._pending_image_urls = []
         refresh = getattr(screen, '_refresh_input_attachment_hint', None)
         if callable(refresh):
             refresh()
@@ -900,6 +920,10 @@ class PromptTextArea(TextArea):
         self._paste_text_from_clipboard()
 
     def on_key(self, event: events.Key) -> None:
+        if event.key in {'backspace', 'delete'} and self._try_remove_pending_image_attachment():
+            event.prevent_default()
+            event.stop()
+            return
         screen = getattr(self, 'screen', None)
         if event.key in {'pageup', 'pagedown'} and screen is not None:
             if event.key == 'pageup' and hasattr(screen, 'action_scroll_up'):
