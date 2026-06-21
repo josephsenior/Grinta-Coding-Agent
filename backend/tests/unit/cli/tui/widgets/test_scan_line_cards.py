@@ -142,7 +142,7 @@ def test_edit_card_create():
         is_create=True,
         syntax_pass=True,
     )
-    assert '⊕ Created' in _line_text(card)
+    assert '+ Created' in _line_text(card)
     assert 'helper.py' in _line_text(card)
     assert '+48' in card._delta_text()
     assert '✓' in card._delta_text()
@@ -157,7 +157,7 @@ def test_edit_card_failed_syntax():
         syntax_pass=False,
         syntax_error='unexpected indent at line 47',
     )
-    assert '← Edited' in _line_text(card)
+    assert '↲ Edited' in _line_text(card)
     assert '+12' in card._delta_text()
     assert '-4' in card._delta_text()
     assert '✗' in card._delta_text()
@@ -176,7 +176,8 @@ def test_edit_card_unknown_syntax():
 
 def test_edit_card_zero_delta():
     card = EditCard(display_path='backend/raft.py', added=0, removed=0)
-    assert '← Edited' in _line_text(card)
+    assert '↲ Edited' in _line_text(card)
+    assert '[#91abec]↲ Edited[/]' in _line_text(card)
     assert card._delta_text() == ''
 
 

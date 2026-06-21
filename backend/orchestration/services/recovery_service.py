@@ -167,15 +167,18 @@ class RecoveryService:
         self._context = context
 
     def _record_circuit_breaker_error(self, controller, exc: Exception) -> None:
-        from backend.inference.exceptions import (
-            APIConnectionError,
-            BadRequestError,
-            RateLimitError,
-            Timeout,
+        from backend.orchestration.services.error_formatting import (
+            exception_is_notify_ui_only,
         )
 
-        if isinstance(
-            exc, (BadRequestError, RateLimitError, APIConnectionError, Timeout)
+        # API/provider/runtime failures are HUD-only and retried automatically.
+        # They must not advance the consecutive-error counter or false-trip the
+        # circuit breaker into CIRCUIT_BREAKER_WARNING spam.
+        if exception_is_notify_ui_only(
+            exc,
+            _HARD_STOP_EXCEPTIONS,
+            _RATE_LIMITED_EXCEPTIONS,
+            _TRANSIENT_LLM_INFRA_EXCEPTIONS,
         ):
             return
 

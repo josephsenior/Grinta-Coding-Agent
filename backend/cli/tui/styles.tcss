@@ -119,6 +119,12 @@ UnifiedDiffView.-scrollable {
     overflow-y: auto;
 }
 
+UnifiedDiffView.-detail {
+    height: 1fr;
+    overflow-y: auto;
+    border-top: none;
+}
+
 UnifiedDiffView .diff-truncated {
     color: #969aad;
     background: #0a1224;

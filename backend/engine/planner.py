@@ -4,6 +4,7 @@ import os
 from typing import TYPE_CHECKING, Any
 
 from backend.core import json_compat as json
+from backend.core.constants import APP_DEBUG_MODE
 from backend.core.interaction_modes import (
     CHAT_MODE_ALLOWED_TOOLS,
     PLAN_MODE,
@@ -159,12 +160,7 @@ class OrchestratorPlanner:
         mode = self._current_mode()
         tools = self._filter_tools_for_mode(tools, mode)
 
-        if os.environ.get('APP_DEBUG_MODE', '').strip().lower() in (
-            '1',
-            'true',
-            'yes',
-            'on',
-        ):
+        if APP_DEBUG_MODE:
             tool_names = [self._tool_name(t) for t in tools]
             logger.info(
                 '[APP_DEBUG_MODE] build_toolset: mode=%r config.mode=%r tools=%r',
@@ -514,12 +510,7 @@ class OrchestratorPlanner:
             return 0
 
     def _log_debug_mode_info(self, messages: list, state: State, mode: str) -> None:
-        if os.environ.get('APP_DEBUG_MODE', '').strip().lower() not in (
-            '1',
-            'true',
-            'yes',
-            'on',
-        ):
+        if not APP_DEBUG_MODE:
             return
         mode_injected = None
         for i in range(len(messages) - 1, -1, -1):
@@ -711,12 +702,7 @@ class OrchestratorPlanner:
         )
         mode = normalize_interaction_mode(active_run_mode) if active_run_mode else None
         if mode:
-            if os.environ.get('APP_DEBUG_MODE', '').strip().lower() in (
-                '1',
-                'true',
-                'yes',
-                'on',
-            ):
+            if APP_DEBUG_MODE:
                 logger.info(
                     '[APP_DEBUG_MODE] _active_mode_for_state: found active_run_mode=%r in state.extra_data -> returning %r',
                     active_run_mode,
@@ -724,12 +710,7 @@ class OrchestratorPlanner:
                 )
             return mode
         fallback = normalize_interaction_mode(getattr(self._config, 'mode', 'agent'))
-        if os.environ.get('APP_DEBUG_MODE', '').strip().lower() in (
-            '1',
-            'true',
-            'yes',
-            'on',
-        ):
+        if APP_DEBUG_MODE:
             logger.info(
                 '[APP_DEBUG_MODE] _active_mode_for_state: no active_run_mode in extra_data, falling back to config.mode=%r',
                 fallback,

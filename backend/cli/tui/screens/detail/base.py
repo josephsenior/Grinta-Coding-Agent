@@ -7,7 +7,7 @@ from typing import Any
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.screen import Screen
-from textual.widgets import Footer, Static
+from textual.widgets import Static
 
 from backend.cli.tui.screens.detail.helpers import (
     DETAIL_DEFAULT_ACCENT,
@@ -17,7 +17,7 @@ from backend.cli.tui.transcript_typography import esc_hint_markup
 
 
 class DetailScreen(Screen):
-    """Reusable detail screen with header, scrollable body, and footer.
+    """Reusable detail screen with header and scrollable body.
 
     Subclasses override :meth:`build_content` to return their widgets.
     Press ``escape`` to return to the feed.
@@ -42,6 +42,16 @@ class DetailScreen(Screen):
     def build_content(self) -> list:
         """Return widgets to place in the scrollable body."""
         raise NotImplementedError
+
+    @property
+    def _wrap_content_in_panel(self) -> bool:
+        """When True, body widgets sit inside the bordered ``#detail-panel``."""
+        return True
+
+    @property
+    def _use_scroll_body(self) -> bool:
+        """When True, body is a ``VerticalScroll``; otherwise a vertical ``Container``."""
+        return True
 
     def _header_kind_markup(self) -> str:
         label = self._kind or 'Detail'
@@ -101,13 +111,19 @@ class DetailScreen(Screen):
                 yield Static(self._header_kind_markup(), id='detail-kind')
                 yield Static(self._header_heading_markup(), id='detail-heading')
                 yield Static(esc_hint_markup('Back'), id='detail-hint')
-        with VerticalScroll(id='detail-body'):
-            with Container(id='detail-panel'):
+        body = VerticalScroll if self._use_scroll_body else Container
+        with body(id='detail-body'):
+            if self._wrap_content_in_panel:
+                with Container(id='detail-panel'):
+                    for widget in self.build_content():
+                        yield widget
+            else:
                 for widget in self.build_content():
                     yield widget
-        yield Footer()
 
     def on_mount(self) -> None:
+        if not self._wrap_content_in_panel:
+            return
         panel = self.query_one('#detail-panel')
         panel.styles.border_left = ('heavy', self._accent)
 

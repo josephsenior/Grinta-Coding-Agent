@@ -51,6 +51,26 @@ def _first_error_line(content: str) -> str:
     return content.split('\n', 1)[0].strip() or 'An unknown error occurred'
 
 
+def _toast_signature(
+    content: str,
+    error_category: str | None,
+    *,
+    error_id: str | None = None,
+) -> str:
+    if error_id == 'CIRCUIT_BREAKER_WARNING':
+        return error_id
+    parts = [error_id or '', error_category or '', _first_error_line(content)]
+    return '|'.join(parts)
+
+
+def _should_emit_toast(tui: Any, signature: str) -> bool:
+    last = getattr(tui, '_last_notify_ui_only_signature', None)
+    if last == signature:
+        return False
+    setattr(tui, '_last_notify_ui_only_signature', signature)
+    return True
+
+
 def _notification_title(content: str, error_category: str | None) -> str:
     if error_category in _ACTION_REQUIRED_TITLES:
         return _ACTION_REQUIRED_TITLES[error_category]
@@ -69,8 +89,18 @@ def notify_ui_only_error(
     tui: Any,
     content: str,
     error_category: str | None,
+    *,
+    error_id: str | None = None,
 ) -> None:
     """Toast + runtime strip for user-facing errors that must not hit the transcript."""
+    # Transient infra failures (rate limit, timeout, network) are surfaced via
+    # the HUD backoff/retry strip only — no toast popups.
+    if error_category in TRANSIENT_HUD_ONLY_CATEGORIES:
+        return
+
+    signature = _toast_signature(content, error_category, error_id=error_id)
+    if not _should_emit_toast(tui, signature):
+        return
     message = _notification_message(content, error_category)
     severity = 'error' if error_category in _ACTION_REQUIRED_CATEGORIES else 'warning'
     if severity == 'error' and hasattr(tui, 'notify_error'):
@@ -92,8 +122,27 @@ def _notify_ui_only_error(
     orch: 'RendererEventProcessorMixin',
     content: str,
     error_category: str | None,
+    *,
+    error_id: str | None = None,
 ) -> None:
-    notify_ui_only_error(orch._tui, content, error_category)
+    notify_ui_only_error(orch._tui, content, error_category, error_id=error_id)
+
+
+def _notify_guard_warning_once(
+    orch: 'RendererEventProcessorMixin',
+    content: str,
+    *,
+    error_id: str,
+) -> None:
+    """Surface guard warnings as a single toast; keep transcript clean."""
+    signature = _toast_signature(content, None, error_id=error_id)
+    if not _should_emit_toast(orch._tui, signature):
+        return
+    first_line = _first_error_line(content)
+    if hasattr(orch._tui, 'notify_warning'):
+        orch._tui.notify_warning(first_line)
+    else:
+        orch._tui.notify(first_line, severity='warning', timeout=4.0)
 
 
 def _handle_error_observation(
@@ -108,9 +157,13 @@ def _handle_error_observation(
     content = event.content or 'An unknown error occurred'
     if getattr(event, 'agent_only', False):
         return
+    error_id = str(getattr(event, 'error_id', '') or '')
+    if error_id == 'CIRCUIT_BREAKER_WARNING':
+        _notify_guard_warning_once(orch, content, error_id=error_id)
+        return
     if getattr(event, 'notify_ui_only', False):
         error_category = getattr(event, 'error_category', None)
-        _notify_ui_only_error(orch, content, error_category)
+        _notify_ui_only_error(orch, content, error_category, error_id=error_id or None)
         return
     add_panel = getattr(orch._tui, 'add_error_panel', None)
     if callable(add_panel):
@@ -138,6 +191,29 @@ def _handle_status_retry(
     orch._hud.update_agent_state(label)
     orch._tui.set_agent_phase(label)
     orch._update_retry_strip(label, message)
+    if status_type in ('retry_pending', 'llm_retry_pending'):
+        delay_seconds = extras.get('delay_seconds')
+        try:
+            delay = float(delay_seconds) if delay_seconds is not None else 0.0
+        except (TypeError, ValueError):
+            delay = 0.0
+        if delay > 0:
+            arm = getattr(orch._tui, 'arm_retry_countdown', None)
+            if callable(arm):
+                arm(
+                    attempt=max(1, int(extras.get('attempt') or 1)),
+                    max_attempts=max(
+                        1,
+                        int(extras.get('max_attempts') or extras.get('attempt') or 1),
+                    ),
+                    delay_seconds=delay,
+                    reason=str(extras.get('reason') or 'transient failure'),
+                    source=str(extras.get('source') or ''),
+                )
+    elif status_type in ('retry_resuming', 'llm_retry_resuming'):
+        clear = getattr(orch._tui, '_clear_retry_countdown', None)
+        if callable(clear):
+            clear()
 
 
 def _handle_status_compaction(

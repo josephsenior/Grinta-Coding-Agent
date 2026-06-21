@@ -82,3 +82,32 @@ def test_detail_screen_escape_binding():
         binding[0] == 'escape'
         for binding in DetailScreen.BINDINGS
     )
+
+
+def test_edit_detail_screen_fills_body_without_terminal_frame():
+    from backend.cli.tui.screens.detail.edit import EditDetailScreen
+    from backend.cli.tui.widgets.detail_terminal_frame import DetailTerminalFrame
+    from backend.cli.tui.widgets.unified_diff_view import (
+        UnifiedDiffView,
+        encode_diff_view_payload,
+    )
+
+    encoded = encode_diff_view_payload(
+        path='backend/raft/__init__.py',
+        old_content='',
+        new_content='"""Raft cluster API."""\n',
+    )
+    assert encoded is not None
+    screen = EditDetailScreen(
+        title='Created  backend/raft/__init__.py',
+        encoded_diff=encoded,
+        kind='Created',
+        heading='raft/__init__.py',
+    )
+    assert screen._wrap_content_in_panel is False
+    assert screen._use_scroll_body is False
+    widgets = screen.build_content()
+    assert not any(isinstance(w, DetailTerminalFrame) for w in widgets)
+    views = [w for w in widgets if isinstance(w, UnifiedDiffView)]
+    assert len(views) == 1
+    assert views[0].has_class('-detail')

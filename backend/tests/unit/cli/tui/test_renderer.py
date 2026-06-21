@@ -2774,7 +2774,7 @@ async def test_tui_error_observations_follow_visibility_policy(mock_config):
                 error_category='auth',
             )
         )
-        # Transient timeout -> notification only; retry StatusObservation handles strip.
+        # Transient timeout -> HUD/backoff only; no toast popup.
         renderer._process_event(
             ErrorObservation(
                 content='Timeout: provider timed out',
@@ -2789,9 +2789,9 @@ async def test_tui_error_observations_follow_visibility_policy(mock_config):
         assert 'Tool validation failed' in panel_text
         assert s.add_error.call_count == 0
         assert s.add_warning.call_count == 0
-        assert s.notify.call_count == 2
+        assert s.notify.call_count == 1
         severities = [call.kwargs['severity'] for call in s.notify.call_args_list]
-        assert severities == ['error', 'warning']
+        assert severities == ['error']
         assert s.set_runtime_status.called
         status_args = s.set_runtime_status.call_args
         all_args = str(status_args.args) + ' ' + str(status_args.kwargs)

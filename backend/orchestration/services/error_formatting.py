@@ -147,18 +147,48 @@ def _format_rate_limit_guidance(rate_kind, retry_after) -> str:
         )
 
 
-def format_exception(exc, hard_stop_exceptions, rate_limited_exceptions, transient_exceptions):
-    """Format an exception into (text, error_id, notify_ui_only)."""
+def exception_is_notify_ui_only(
+    exc: Exception,
+    hard_stop_exceptions: tuple[type[Exception], ...],
+    rate_limited_exceptions: tuple[type[Exception], ...],
+    transient_exceptions: tuple[type[Exception], ...],
+) -> bool:
+    """Return True when an exception is HUD/toast-only (not agent-actionable)."""
     from backend.core.errors import AgentRuntimeError
     from backend.inference.exceptions import APIError, Timeout as InfraTimeout
 
-    notify_ui_only = (
+    return (
         isinstance(exc, hard_stop_exceptions)
         or isinstance(exc, InfraTimeout)
         or isinstance(exc, rate_limited_exceptions)
         or isinstance(exc, transient_exceptions)
         or isinstance(exc, (APIError, AgentRuntimeError))
         or isinstance(exc, (ImportError, ModuleNotFoundError))
+    )
+
+
+# Guard observations are for the model; they must not advance tool-error counters.
+GUARD_CIRCUIT_BREAKER_ERROR_IDS: frozenset[str] = frozenset(
+    {
+        'CIRCUIT_BREAKER_WARNING',
+        'CIRCUIT_BREAKER_FORCED_SWITCH',
+        'CIRCUIT_BREAKER_TRIPPED',
+    }
+)
+
+
+def observation_skips_circuit_breaker(obs: object) -> bool:
+    """Return True when an ErrorObservation must not count as a tool failure."""
+    if getattr(obs, 'notify_ui_only', False) or getattr(obs, 'agent_only', False):
+        return True
+    error_id = str(getattr(obs, 'error_id', '') or '')
+    return error_id in GUARD_CIRCUIT_BREAKER_ERROR_IDS
+
+
+def format_exception(exc, hard_stop_exceptions, rate_limited_exceptions, transient_exceptions):
+    """Format an exception into (text, error_id, notify_ui_only)."""
+    notify_ui_only = exception_is_notify_ui_only(
+        exc, hard_stop_exceptions, rate_limited_exceptions, transient_exceptions
     )
     err_id = resolve_error_id(exc)
     text = format_error_text(exc)
