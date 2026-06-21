@@ -37,6 +37,11 @@ class TestNotifyUiOnlyError:
         )
 
         assert tui.notify_error.call_count == 1
+        tui.set_runtime_status.assert_called_once_with(
+            'Invalid request',
+            meta='Invalid request: bad temperature',
+            active=True,
+        )
 
     def test_rate_limit_is_hud_only_without_toast(self) -> None:
         tui = SimpleNamespace(

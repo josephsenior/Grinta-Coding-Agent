@@ -194,6 +194,8 @@ class GrintaScreen(
         self._pending_llm_config_apply = False
         self._bootstrapping: asyncio.Event | None = None
         self._bootstrap_task: asyncio.Task[Any] | None = None
+        self._environment_ready: asyncio.Event | None = None
+        self._environment_probe_task: asyncio.Task[Any] | None = None
         self._is_unmounted = False
         self._suggestion_matches: list[str] = []
         self._command_hint = ''

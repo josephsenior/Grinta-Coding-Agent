@@ -113,7 +113,7 @@ def notify_ui_only_error(
     if error_category and error_category not in TRANSIENT_HUD_ONLY_CATEGORIES:
         tui.set_runtime_status(
             _notification_title(content, error_category),
-            _first_error_line(content),
+            meta=_first_error_line(content),
             active=True,
         )
 
