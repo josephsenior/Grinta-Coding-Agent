@@ -190,19 +190,22 @@ def test_edit_card_detail_screen_built():
 def test_shell_card_running():
     card = ShellCard(command='npm install')
     assert card.state == 'running'
-    assert 'Shell' in _line_text(card)
-    assert 'npm install' in _line_text(card)
+    line = _line_text(card)
+    assert 'Shell' in line
+    assert '[#EF9F27]Shell[/]' in line
+    assert 'npm install' in line
 
 
 def test_shell_card_done():
     card = ShellCard(command='cargo test', output='47/47 passed', exit_code=0)
     assert card.state == 'done'
-    assert _line_text(card)
+    assert '[#639922]Shell[/]' in _line_text(card)
 
 
 def test_shell_card_failed():
     card = ShellCard(command='npm build', exit_code=1)
     assert card.state == 'failed'
+    assert '[#E24B4A]Shell[/]' in _line_text(card)
     assert 'exit 1' in card._delta_text()
 
 
