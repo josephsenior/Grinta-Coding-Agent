@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from backend.execution.aes.policy_block_messages import safety_block_message
 from backend.orchestration.tool_pipeline import ToolInvocationMiddleware
 
 if TYPE_CHECKING:
@@ -53,7 +54,7 @@ class SafetyValidatorMiddleware(ToolInvocationMiddleware):
         ctx.block('safety_validator_blocked')
         ctx.metadata['handled'] = True
         error_obs = ErrorObservation(
-            content=f'ACTION BLOCKED FOR SAFETY:\n{validation.blocked_reason}',
+            content=validation.blocked_reason or safety_block_message('HIGH'),
             error_id='SAFETY_VALIDATOR_BLOCKED',
         )
         attach_observation_cause(

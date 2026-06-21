@@ -29,17 +29,11 @@ from backend.cli.tui.app import (
 from backend.cli.tui.dialogs import GrintaHelpDialog, GrintaSessionsDialog
 from backend.cli.tui.main import GrintaTUIApp
 from backend.cli.tui.widgets.activity_card import (
-    ActivityCard as TUIActivityCard,
-)
-from backend.cli.tui.widgets.activity_card import (
     AgentMessage,
     LiveResponse,
-    OrientBurst,
     OrientLine,
     ThinkingIndicator,
-    TurnCompletion,
 )
-from backend.cli.tui.widgets.file_change_card import FileChangeCard
 from backend.cli.tui.widgets.small import ScrollTailBadge
 from backend.cli.tui.widgets.unified_diff_view import UnifiedDiffRow, UnifiedDiffView
 from backend.core.enums import AgentState, EventSource
@@ -102,10 +96,6 @@ def _static_render_plain(static: Static) -> str:
     with console.capture() as capture:
         console.print(rendered)
     return capture.get()
-
-
-def _file_change_cards(screen: GrintaScreen) -> list[FileChangeCard]:
-    return list(screen.query(FileChangeCard).results())
 
 
 async def _await_at_bottom(display, pilot, *, attempts: int = 40) -> None:

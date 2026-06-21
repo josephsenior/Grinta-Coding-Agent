@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from backend.security.safety_config import SafetyConfig
 
 from backend.core.logging.logger import app_logger as logger
+from backend.execution.aes.policy_block_messages import safety_block_message
 from backend.ledger.action import Action, ActionSecurityRisk
 from backend.security.command_analyzer import CommandAnalyzer, RiskCategory
 
@@ -137,6 +138,14 @@ class SafetyValidator:
 
         # Determine if action should be blocked
         should_block = self._should_block_action(assessment, context)
+        if should_block:
+            logger.warning(
+                'Safety validator blocked action (risk=%s): %s | patterns=%s | command=%r',
+                risk_category.value,
+                reason,
+                matched_patterns,
+                command,
+            )
 
         # Create validation result
         result = ValidationResult(
@@ -236,17 +245,9 @@ class SafetyValidator:
 
         """
         if assessment.risk_category == RiskCategory.CRITICAL:
-            return (
-                f'CRITICAL RISK DETECTED: {assessment.reason}\n'
-                f'This action could cause system damage or data loss.\n'
-                f'Matched patterns: {", ".join(assessment.matched_patterns)}'
-            )
+            return safety_block_message('CRITICAL')
         if assessment.risk_level == ActionSecurityRisk.HIGH:
-            return (
-                f'HIGH RISK DETECTED: {assessment.reason}\n'
-                f'This action is blocked in {self.config.environment} environment.\n'
-                f'Matched patterns: {", ".join(assessment.matched_patterns)}'
-            )
+            return safety_block_message('HIGH')
         return assessment.reason
 
     async def _log_to_audit(

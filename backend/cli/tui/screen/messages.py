@@ -46,8 +46,6 @@ class ScreenMessagesMixin:
     def add_user_message(self, text: str, *, image_count: int = 0) -> None:
         """User message."""
         self.finalize_thinking()
-        if self._renderer:
-            self._renderer._clear_last_active_card_processing()
         display = self._get_display()
         if type(display).__name__ == 'MagicMock':
             display.write(text)
@@ -76,8 +74,6 @@ class ScreenMessagesMixin:
     def add_agent_message(self, text: str) -> None:
         """Agent response."""
         self.finalize_thinking()
-        if self._renderer:
-            self._renderer._clear_last_active_card_processing()
         display = self._get_display()
         if type(display).__name__ == 'MagicMock':
             display.write(text)

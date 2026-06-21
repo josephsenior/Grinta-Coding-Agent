@@ -311,6 +311,7 @@ def _process_event_maybe_start_turn(
     orch._turn_count += 1
     orch._tools_in_turn = 0
     orch._turn_start_time = time.monotonic()
+    orch._tui._last_turn_duration = None
 
 
 def _process_event_finalize_thinking(

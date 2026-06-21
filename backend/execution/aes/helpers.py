@@ -10,6 +10,10 @@ from typing import Any, cast
 from backend.core.enums import FileEditSource, FileReadSource
 from backend.core.logging.logger import app_logger as logger
 from backend.core.os_capabilities import OS_CAPS
+from backend.execution.aes.policy_block_messages import (
+    hardened_local_block_message,
+    hardened_local_session_closed_message,
+)
 from backend.execution.aes.security_enforcement import (
     evaluate_hardened_local_command_policy,
     path_is_within_workspace,
@@ -206,12 +210,13 @@ def validate_interactive_session_scope(
 
     executor.session_manager.close_session(session_id)
     executor._clear_terminal_read_cursor(session_id)
-    return ErrorObservation(
-        content=(
-            'Interactive terminal session closed by hardened_local policy: '
-            f'session cwd escaped the workspace. Session: {session_id} | cwd={current_cwd}'
-        )
+    logger.warning(
+        'hardened_local closed interactive terminal session outside workspace: '
+        'session=%s cwd=%s',
+        session_id,
+        current_cwd,
     )
+    return ErrorObservation(content=hardened_local_session_closed_message())
 
 
 def predict_interactive_cwd_change(
@@ -228,7 +233,7 @@ def predict_interactive_cwd_change(
     if len(tokens) < 2 or tokens[1].strip() in {'', '~', '$HOME', '%USERPROFILE%', '-'}:
         return (
             None,
-            'Action blocked by hardened_local policy: interactive directory changes must target an explicit path inside the workspace.',
+            hardened_local_block_message('cd requires explicit in-workspace path'),
         )
 
     target = Path(tokens[1])
@@ -236,10 +241,13 @@ def predict_interactive_cwd_change(
         target.resolve() if target.is_absolute() else (current_cwd / target).resolve()
     )
     if not path_is_within_workspace(predicted, executor._workspace_root()):
+        logger.warning(
+            'hardened_local blocked interactive cd outside workspace: target=%s',
+            predicted,
+        )
         return (
             None,
-            'Action blocked by hardened_local policy: interactive terminal sessions cannot change directory outside the workspace. '
-            f'Requested cwd: {predicted}',
+            hardened_local_block_message('cd outside workspace'),
         )
     return (predicted, None)
 
@@ -255,10 +263,16 @@ def evaluate_interactive_terminal_command(
         return (None, None)
 
     if any(separator in stripped for separator in ('\n', '&&', ';', '||')):
+        logger.warning(
+            'hardened_local blocked chained interactive terminal input: command=%r',
+            stripped,
+        )
         return (
             None,
             ErrorObservation(
-                content='Action blocked by hardened_local policy: interactive terminal input cannot contain chained or multiline commands.'
+                content=hardened_local_block_message(
+                    'chained terminal input not allowed'
+                )
             ),
         )
 
@@ -309,11 +323,13 @@ def validate_workspace_scoped_cwd(
     try:
         effective_cwd.relative_to(root)
     except ValueError:
+        logger.warning(
+            'hardened_local blocked command outside workspace: command=%r cwd=%s',
+            command,
+            effective_cwd,
+        )
         return ErrorObservation(
-            content=(
-                'Action blocked by hardened_local policy: command execution must stay inside the workspace. '
-                f'Command: {command} | cwd={effective_cwd}'
-            )
+            content=hardened_local_block_message('outside workspace')
         )
     return None
 

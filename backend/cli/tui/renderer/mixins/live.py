@@ -97,9 +97,6 @@ class RendererLiveMixin:
         self._live_thinking = text
         self._live_thinking_dirty = bool(text.strip())
 
-        if text.strip():
-            self._clear_last_active_card_processing()
-
         display = self._tui._get_display()
         if type(display).__name__ == 'MagicMock':
             display.clear()
@@ -190,9 +187,6 @@ class RendererLiveMixin:
         """Update the in-flight assistant response in-place."""
         self._live_response = text
         self._live_response_dirty = bool(text.strip())
-
-        if text.strip():
-            self._clear_last_active_card_processing()
 
         display = self._tui._get_display()
         if type(display).__name__ == 'MagicMock':

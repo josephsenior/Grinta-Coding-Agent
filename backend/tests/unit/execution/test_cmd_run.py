@@ -430,7 +430,7 @@ async def test_hardened_local_blocks_command_when_default_session_cwd_outside_wo
     obs = await mock_executor.run(action)
 
     assert isinstance(obs, ErrorObservation)
-    assert 'must stay inside the workspace' in obs.content
+    assert 'Action blocked by hardened_local policy (outside workspace)' in obs.content
     mock_session.execute.assert_not_called()
 
 
@@ -547,7 +547,7 @@ async def test_terminal_input_blocks_session_that_escaped_workspace(
     )
 
     assert isinstance(obs, ErrorObservation)
-    assert 'closed by hardened_local policy' in obs.content
+    assert 'Action blocked by hardened_local policy (terminal session outside workspace)' in obs.content
     mock_executor.session_manager.close_session.assert_called_with('term-1')
     session.write_input.assert_not_called()
 
@@ -572,7 +572,7 @@ async def test_terminal_input_blocks_cd_outside_workspace(mock_executor, tmp_pat
     )
 
     assert isinstance(obs, ErrorObservation)
-    assert 'cannot change directory outside the workspace' in obs.content
+    assert 'Action blocked by hardened_local policy (cd outside workspace)' in obs.content
     session.write_input.assert_not_called()
 
 
@@ -639,7 +639,7 @@ async def test_terminal_read_blocks_session_that_escaped_workspace(
     obs = await mock_executor.terminal_read(TerminalReadAction(session_id='term-4'))
 
     assert isinstance(obs, ErrorObservation)
-    assert 'closed by hardened_local policy' in obs.content
+    assert 'Action blocked by hardened_local policy (terminal session outside workspace)' in obs.content
     mock_executor.session_manager.close_session.assert_called_with('term-4')
 
 

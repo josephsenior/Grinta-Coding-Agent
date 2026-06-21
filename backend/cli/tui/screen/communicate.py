@@ -199,11 +199,13 @@ class ScreenCommunicateMixin:
         return out
 
     def _find_focusable_cards(self) -> list[Widget]:
-        """Return all ActivityCard widgets in the transcript in DOM order."""
-        from backend.cli.tui.widgets.activity_card import ActivityCard
-
+        """Return all focusable scan-line cards in the transcript in DOM order."""
         display = self._get_display()
-        return [c for c in display.query(ActivityCard) if c.display]
+        return [
+            c
+            for c in display.query('ScanLineCard')
+            if c.display and getattr(c, 'can_focus', False)
+        ]
 
     def _set_active_communicate_card(self, card: Any | None) -> None:
         previous = self._active_communicate_card
@@ -259,7 +261,7 @@ class ScreenCommunicateMixin:
         self.action_submit_input()
 
     def action_focus_next_card(self) -> None:
-        """Move keyboard focus to the next ActivityCard or suggestion."""
+        """Focus the next transcript card (jumps in from the input on first press)."""
         if self._welcome_visible:
             ta = self.query_one('#input', TextArea)
             if not ta.text.strip():
@@ -267,19 +269,18 @@ class ScreenCommunicateMixin:
                 if widget is not None:
                     widget.highlight_next()
                 return
-        if self.focused and self.focused is self.query_one('#input', TextArea):
-            return
         cards = self._find_focusable_cards()
         if not cards:
             return
         focused = self.screen.focused
-        start = 0
         if focused in cards:
             start = (cards.index(focused) + 1) % len(cards)
+        else:
+            start = 0
         cards[start].focus()
 
     def action_focus_prev_card(self) -> None:
-        """Move keyboard focus to the previous ActivityCard or suggestion."""
+        """Focus the previous transcript card (jumps in from the input on first press)."""
         if self._welcome_visible:
             ta = self.query_one('#input', TextArea)
             if not ta.text.strip():
@@ -287,15 +288,14 @@ class ScreenCommunicateMixin:
                 if widget is not None:
                     widget.highlight_prev()
                 return
-        if self.focused and self.focused is self.query_one('#input', TextArea):
-            return
         cards = self._find_focusable_cards()
         if not cards:
             return
         focused = self.screen.focused
-        start = -1
         if focused in cards:
             start = cards.index(focused) - 1
+        else:
+            start = -1
         cards[start].focus()
 
     def _update_suggestions_list(self, text: str) -> None:

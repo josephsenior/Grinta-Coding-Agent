@@ -53,11 +53,6 @@ Transcript {
 }
 
 /* Extra breathing room between transcript blocks */
-Transcript > ActivityCard {
-    margin-bottom: 1;
-}
-
-Transcript > FileChangeCard,
 Transcript > UserMessage,
 Transcript > AgentMessage,
 Transcript > LiveResponse,
@@ -65,8 +60,6 @@ Transcript > ThinkingIndicator,
 Transcript > ErrorBlock,
 Transcript > TranscriptNotice,
 Transcript > OrientLine,
-Transcript > RecordPanel,
-Transcript > TurnCompletion,
 Transcript > CollapsibleSection,
 Transcript > ScanLineCard {
     margin-bottom: 2;
@@ -79,22 +72,6 @@ Transcript > ScanLineCard {
     color: #e9e9e9;
     scrollbar-size: 0 0;
     padding: 1 2;
-}
-
-/* ── Interactive Components Focus & Hover ──────────── */
-ActivityCard {
-    transition: background 150ms, border 150ms;
-}
-
-/* ── File change cards ───────────────────────────────── */
-FileChangeCard {
-    width: 100%;
-    height: auto;
-    margin: 0 0 2 0;
-    border: round #1b233a;
-    border-left: heavy #3d4a66;
-    background: #08101d;
-    padding: 0 0 1 0;
 }
 
 /* ── Unified diff view ───────────────────────────────── */
@@ -173,78 +150,6 @@ UnifiedDiffRow .diff-sign.add {
 UnifiedDiffRow .diff-sign.rem {
     color: #fd8383;
     background: #120c0c;
-}
-
-/* ── Legacy diff line widgets (ActivityCard fallback) ── */
-DiffLine.add {
-    background: #0a1410;
-    color: #7de6a1;
-}
-
-DiffLine.rem {
-    background: #120c0c;
-    color: #ff9a9a;
-}
-
-DiffLine.ctx {
-    background: transparent;
-    color: #969aad;
-}
-
-SplitDiffLine .split-pane.left {
-    border-right: solid #26324f;
-}
-
-SplitDiffLine .split-pane.add {
-    background: #122a22;
-    color: #7de6a1;
-}
-
-SplitDiffLine .split-pane.rem {
-    background: #2a1a1a;
-    color: #ff9a9a;
-}
-
-SplitDiffLine .split-pane.ctx {
-    background: transparent;
-    color: #969aad;
-}
-
-/* ── Terminal pane ───────────────────────────────────── */
-TerminalPane {
-    background: #0a0e14;
-}
-
-TerminalPane .terminal-titlebar {
-    background: #141c2e;
-    color: #8f9fc1;
-}
-
-TerminalPane .terminal-prompt {
-    background: #0a0e14;
-}
-
-TerminalPane .terminal-output-wrap {
-    max-height: 24;
-    background: #080c12;
-    scrollbar-color: #33405d #060a14;
-}
-
-TerminalPane .terminal-output {
-    background: #080c12;
-    color: #cbd5e1;
-}
-
-TerminalPane .terminal-footer {
-    background: #0d1219;
-    color: #54597b;
-}
-
-/* ── Terminal activity cards (expanded status strip) ─── */
-ActivityCard.-expanded.-category-shell #collapsed-row-container,
-ActivityCard.-expanded.-category-terminal #collapsed-row-container,
-ActivityCard.-expanded.-category-debugger #collapsed-row-container {
-    height: 1;
 }
 
 CollapsibleSection {

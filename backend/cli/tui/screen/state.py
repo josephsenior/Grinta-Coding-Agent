@@ -43,6 +43,28 @@ from backend.core.interaction_modes import (
 class ScreenStateMixin:
     """State-related methods of GrintaScreen."""
 
+    _TURN_DURATION_STATES = frozenset(
+        {'awaiting_user_input', 'finished', 'stopped', 'error'}
+    )
+
+    @staticmethod
+    def _state_lookup_key(raw_state: str | None) -> str:
+        raw = (raw_state or 'Ready').strip()
+        lookup_key = raw.lower()
+        if lookup_key.startswith('agentstate.'):
+            lookup_key = lookup_key[len('agentstate.') :]
+        if '.' in lookup_key:
+            lookup_key = lookup_key.split('.')[-1]
+        return lookup_key
+
+    def _append_turn_duration(self, display_state: str, raw_state: str | None) -> str:
+        duration = getattr(self, '_last_turn_duration', None)
+        if not duration:
+            return display_state
+        if self._state_lookup_key(raw_state) not in self._TURN_DURATION_STATES:
+            return display_state
+        return f'{display_state} · {duration}'
+
     @classmethod
     def _resolve_state_display(cls, raw_state: str | None) -> tuple[str, str]:
         raw = (raw_state or 'Ready').strip()
@@ -358,6 +380,7 @@ class ScreenStateMixin:
         hud = self._hud
         raw_state = hud.state.agent_state_label or 'Ready'
         display_state, state_color = self._resolve_state_display(raw_state)
+        display_state = self._append_turn_duration(display_state, raw_state)
 
         used = hud.state.context_tokens
         limit = hud.state.context_limit

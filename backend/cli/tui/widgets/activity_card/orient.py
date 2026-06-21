@@ -103,26 +103,3 @@ class OrientLine(Container):
             self.query_one('#orient-content', Static).update(self._line_text())
         except Exception:
             pass
-
-
-class OrientBurst(Container):
-    """Legacy grouped orient container — kept for import compatibility."""
-
-    DEFAULT_CSS = """
-    OrientBurst {
-        display: none;
-    }
-    """
-
-    def __init__(
-        self,
-        area: str,
-        lines: list[OrientLineModel],
-        *,
-        collapsed: bool = True,
-        id: str | None = None,
-    ) -> None:
-        super().__init__(id=id)
-        self._area = area or 'codebase'
-        self._lines = list(lines)
-        self._collapsed = collapsed

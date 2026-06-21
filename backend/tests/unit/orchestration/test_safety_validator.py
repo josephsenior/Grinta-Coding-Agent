@@ -474,9 +474,7 @@ class TestSafetyValidator:
         )
 
         reason = validator._get_blocked_reason(assessment)
-        assert 'CRITICAL RISK DETECTED' in reason
-        assert 'Destructive command' in reason
-        assert 'rm -rf' in reason
+        assert reason == 'Action blocked for safety (risk=CRITICAL)'
 
     def test_get_blocked_reason_for_high(self):
         """Test _get_blocked_reason for HIGH risk."""
@@ -493,9 +491,7 @@ class TestSafetyValidator:
         )
 
         reason = validator._get_blocked_reason(assessment)
-        assert 'HIGH RISK DETECTED' in reason
-        assert 'production' in reason
-        assert 'sudo' in reason
+        assert reason == 'Action blocked for safety (risk=HIGH)'
 
     @pytest.mark.asyncio
     async def test_log_to_audit_returns_disabled_when_no_logger(self):

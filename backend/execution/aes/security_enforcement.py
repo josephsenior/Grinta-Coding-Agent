@@ -13,6 +13,10 @@ from pathlib import Path, PurePath
 from typing import TYPE_CHECKING, Any
 
 from backend.core.logging.logger import app_logger as logger
+from backend.execution.aes.policy_block_messages import (
+    hardened_local_block_message,
+    hardened_local_session_closed_message,
+)
 from backend.execution.runtime_mixins.editor_only_shell_policy import (
     evaluate_editor_only_shell_block,
 )
@@ -182,10 +186,7 @@ def _critical_command_block_message(action: Any) -> str | None:
         assessment.reason,
         action_desc,
     )
-    return (
-        'Action blocked by security policy '
-        f'(risk=CRITICAL, reason={assessment.reason}). Action: {action_desc}'
-    )
+    return 'Action blocked by security policy (risk=CRITICAL)'
 
 
 def resolve_command_cwd(
@@ -226,10 +227,12 @@ def evaluate_hardened_local_command_policy(
         base_cwd=base_cwd,
     )
     if not path_is_within_workspace(effective_cwd, workspace_root):
-        return (
-            'Action blocked by hardened_local policy: command execution must stay inside the workspace. '
-            f'Command: {command} | cwd={effective_cwd}'
+        logger.warning(
+            'hardened_local blocked command outside workspace: command=%r cwd=%s',
+            command,
+            effective_cwd,
         )
+        return hardened_local_block_message('outside workspace')
 
     blocked = _check_git_policy(command, security_config)
     if blocked:
@@ -248,10 +251,11 @@ def _check_background_policy(
     if is_background and not getattr(
         security_config, 'allow_background_processes', False
     ):
-        return (
-            'Action blocked by hardened_local policy: background processes are disabled. '
-            f'Command: {command}'
+        logger.warning(
+            'hardened_local blocked background process: command=%r',
+            command,
         )
+        return hardened_local_block_message('background disabled')
     return None
 
 
@@ -263,11 +267,12 @@ def _check_git_policy(command: str, security_config: Any) -> str | None:
         getattr(security_config, 'hardened_local_git_allowlist', ())
     ):
         return None
-    return (
-        'Action blocked by hardened_local policy: git '
-        f'{git_subcommand} is not in the workspace-scoped allowlist for git subcommands. '
-        f'Command: {command}'
+    logger.warning(
+        'hardened_local blocked git subcommand: subcommand=%s command=%r',
+        git_subcommand,
+        command,
     )
+    return hardened_local_block_message(f'git: {git_subcommand} not allowed')
 
 
 def _check_package_policy(command: str, security_config: Any) -> str | None:
@@ -280,11 +285,12 @@ def _check_package_policy(command: str, security_config: Any) -> str | None:
         getattr(security_config, 'hardened_local_package_allowlist', ())
     ):
         return None
-    return (
-        'Action blocked by hardened_local policy: '
-        f'{package_key} is not in the workspace-scoped allowlist for package installation commands. '
-        f'Command: {command}'
+    logger.warning(
+        'hardened_local blocked package command: package=%s command=%r',
+        package_key,
+        command,
     )
+    return hardened_local_block_message('package install not allowed')
 
 
 def _check_network_policy(command: str, security_config: Any) -> str | None:
@@ -300,11 +306,12 @@ def _check_network_policy(command: str, security_config: Any) -> str | None:
         getattr(security_config, 'hardened_local_network_allowlist', ())
     ):
         return None
-    return (
-        'Action blocked by hardened_local policy: '
-        f'{network_key} is not in the workspace-scoped allowlist for network-capable commands. '
-        f'Command: {command}'
+    logger.warning(
+        'hardened_local blocked network command: network=%s command=%r',
+        network_key,
+        command,
     )
+    return hardened_local_block_message('network not allowed')
 
 
 def evaluate_hardened_local_file_policy(
@@ -315,10 +322,11 @@ def evaluate_hardened_local_file_policy(
     if is_sensitive_path(path) and not getattr(
         security_config, 'allow_sensitive_path_access', False
     ):
-        return (
-            'Action blocked by hardened_local policy: sensitive file access is disabled. '
-            f'Path: {path}'
+        logger.warning(
+            'hardened_local blocked sensitive path access: path=%r',
+            path,
         )
+        return hardened_local_block_message('sensitive path')
     return None
 
 
@@ -475,7 +483,9 @@ class SecurityEnforcementMixin:
                     action_desc,
                     risk.name,
                 )
-                decision.block_message = f'Action blocked by security policy (risk={risk.name}). Action: {action_desc}'
+                decision.block_message = (
+                    f'Action blocked by security policy (risk={risk.name})'
+                )
                 return decision
 
         return decision
@@ -611,23 +621,34 @@ class SecurityEnforcementMixin:
 
         if not self._is_workspace_scoped_command(action):
             cwd = getattr(action, 'cwd', None) or str(self._workspace_root_path())
+            command = getattr(action, 'command', '')
+            logger.warning(
+                'hardened_local blocked %s outside workspace: command=%r cwd=%s',
+                category_label,
+                command,
+                cwd,
+            )
             return ErrorObservation(
-                content=(
-                    f'Action blocked by hardened_local policy: {category_label} must run inside the workspace. '
-                    f'Command: {getattr(action, "command", "")} | cwd={cwd}'
-                )
+                content=hardened_local_block_message('outside workspace')
             )
 
         normalized_allowlist = self._normalize_allowlist(allowlist)
         if command_key in normalized_allowlist:
             return None
 
-        return ErrorObservation(
-            content=(
-                f'Action blocked by hardened_local policy: {command_label} is not in the workspace-scoped allowlist '
-                f'for {category_label}. Command: {getattr(action, "command", "")}'
-            )
+        command = getattr(action, 'command', '')
+        logger.warning(
+            'hardened_local blocked %s allowlist miss: key=%s command=%r',
+            category_label,
+            command_key,
+            command,
         )
+        reason = {
+            'git subcommands': f'git: {command_label} not allowed',
+            'package installation commands': 'package install not allowed',
+            'network-capable commands': 'network not allowed',
+        }.get(category_label, f'{command_label} not allowed')
+        return ErrorObservation(content=hardened_local_block_message(reason))
 
     def _normalize_allowlist(self, values: Any) -> set[str]:
         return normalize_allowlist(values)
