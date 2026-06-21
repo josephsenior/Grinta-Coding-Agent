@@ -234,12 +234,22 @@ class Transcript(VerticalScroll):
         event.stop()
         self.force_scroll_end(reason='tail_badge_follow')
 
-    def _sync_scroll_state_from_position(self) -> None:
+    def _sync_scroll_state_from_position(
+        self, *, from_user_scroll: bool = False
+    ) -> None:
         """Update follow-tail state from scroll position.
 
         Content growth increases max_scroll_y while scroll_y stays put; that
         must not be treated as the user leaving the tail. Only upward movement
         (or already being away from the bottom without fresh content) counts.
+
+        Re-engaging follow (clearing ``_user_scrolled_away``) is gated behind
+        ``from_user_scroll``: only a genuine user gesture that lands at the
+        bottom may resume auto-follow. Programmatic re-pins (follow-tail /
+        force_scroll_end) reach this method via ``on_scroll`` once
+        ``_suppress_scroll_sync`` is cleared; treating those bottom landings as
+        "user returned to tail" wipes a deliberate scroll-away and snaps the
+        viewport back to the tail, which is the scroll-freeze symptom.
         """
         max_y = self.max_scroll_y
         scroll_y = self.scroll_y
@@ -249,13 +259,13 @@ class Transcript(VerticalScroll):
         self._last_scroll_y = scroll_y
 
         if self._user_scrolled_away:
-            if self._was_at_bottom() and scroll_y > last_scroll_y + 0.5:
+            if from_user_scroll and self._was_at_bottom():
                 #region agent log
                 _agent_debug_log(
-                    run_id='pre-fix',
+                    run_id='post-fix',
                     hypothesis_id='H6',
                     location='widgets/small.py:_sync_scroll_state_from_position',
-                    message='auto-clearing scrolled-away from position sync',
+                    message='user scrolled back to bottom; re-engaging follow',
                     data={
                         'scrollY': round(float(scroll_y), 2),
                         'lastScrollY': round(float(last_scroll_y), 2),
@@ -266,8 +276,23 @@ class Transcript(VerticalScroll):
                 #endregion
                 self._set_user_scrolled_away(
                     False,
-                    reason='position_sync_bottom_and_scroll_advanced',
+                    reason='user_scrolled_back_to_bottom',
                 )
+            elif self._was_at_bottom() and scroll_y > last_scroll_y + 0.5:
+                #region agent log
+                _agent_debug_log(
+                    run_id='post-fix',
+                    hypothesis_id='H6',
+                    location='widgets/small.py:_sync_scroll_state_from_position',
+                    message='programmatic bottom landing ignored (away preserved)',
+                    data={
+                        'scrollY': round(float(scroll_y), 2),
+                        'lastScrollY': round(float(last_scroll_y), 2),
+                        'maxScrollY': round(float(max_y), 2),
+                        'userInitiatedAway': bool(self._user_initiated_scroll_away),
+                    },
+                )
+                #endregion
             return
 
         if max_y > last_max_y:
@@ -443,9 +468,12 @@ class Transcript(VerticalScroll):
         #endregion
         super()._on_mouse_scroll_up(event)
 
+    def _sync_scroll_state_from_user_scroll(self) -> None:
+        self._sync_scroll_state_from_position(from_user_scroll=True)
+
     def _on_mouse_scroll_down(self, event: events.MouseScrollDown) -> None:
         super()._on_mouse_scroll_down(event)
-        self.call_after_refresh(self._sync_scroll_state_from_position)
+        self.call_after_refresh(self._sync_scroll_state_from_user_scroll)
 
     def user_scroll_page_up(self, *, animate: bool = True) -> None:
         self._suppress_scroll_sync = False
@@ -455,16 +483,16 @@ class Transcript(VerticalScroll):
     def user_scroll_page_down(self, *, animate: bool = True) -> None:
         self.scroll_page_down(
             animate=animate,
-            on_complete=self._sync_scroll_state_from_position,
+            on_complete=self._sync_scroll_state_from_user_scroll,
         )
-        self.call_after_refresh(self._sync_scroll_state_from_position)
+        self.call_after_refresh(self._sync_scroll_state_from_user_scroll)
 
     def user_scroll_home(self, *, animate: bool = True) -> None:
         self._suppress_scroll_sync = False
         self.pause_auto_scroll()
         self.scroll_home(
             animate=animate,
-            on_complete=self._sync_scroll_state_from_position,
+            on_complete=self._sync_scroll_state_from_user_scroll,
         )
 
     def user_scroll_end(self, *, animate: bool = False) -> None:
