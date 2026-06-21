@@ -14,6 +14,14 @@ if TYPE_CHECKING:
     from backend.cli.tui.screens.detail.base import DetailScreen
 
 
+SCAN_LINE_BORDER_COLORS: dict[str, str] = {
+    'queued': '#2d4a6a',
+    'running': '#EF9F27',
+    'done': '#639922',
+    'failed': '#E24B4A',
+}
+
+
 class ScanLineCard(Container):
     """1-line transcript card matching OrientLine/ThinkingIndicator chrome.
 
@@ -96,6 +104,12 @@ class ScanLineCard(Container):
             self.remove_class(cls)
         self._state = state
         self.add_class(state)
+        self._refresh_line()
+
+    @property
+    def state_border_color(self) -> str:
+        """Left-pipe color for the current card state."""
+        return SCAN_LINE_BORDER_COLORS.get(self._state, SCAN_LINE_BORDER_COLORS['queued'])
 
     @property
     def state(self) -> str:

@@ -1,7 +1,0 @@
-version: 1
-preset: api
-gates:
-  max_file_lines: 1000
-  forbid_todos: true
-  required_files: []
-ignore: []

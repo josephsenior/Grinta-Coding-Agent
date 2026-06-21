@@ -203,7 +203,8 @@ class ShellCard(ScanLineCard):
 
     def _line_text(self) -> str:
         cmd = _truncate(self.command, 50)
-        return f'[#5eead4]Shell[/]  [#c8d4e8]{cmd}[/]'
+        label_color = self.state_border_color
+        return f'[{label_color}]Shell[/]  [#c8d4e8]{cmd}[/]'
 
     def _delta_text(self) -> str:
         if self.exit_code == 0:
