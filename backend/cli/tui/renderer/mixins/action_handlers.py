@@ -203,7 +203,24 @@ class RendererActionHandlersMixin:
             self.clear_live_response()
             return
 
+        if bool(getattr(action, 'transcript_only', False)):
+            self._append_plain_agent_message(content)
+            return
+
         self._commit_final_response(content)
+
+    def _append_plain_agent_message(self, text: str) -> None:
+        """Show agent preamble before tool calls — no card chrome."""
+        content = self._normalize_final_response_text(text)
+        self._tui.finalize_thinking()
+        self.clear_live_response()
+        if not content:
+            return
+        from backend.cli.tui.widgets.activity_card import AgentMessage
+
+        widget = AgentMessage(content, plain=True)
+        self._append_transcript_widget(widget)
+        self._history.append(widget)
 
     @staticmethod
     def _format_retry_status_message(

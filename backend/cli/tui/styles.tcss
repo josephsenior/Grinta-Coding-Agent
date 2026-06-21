@@ -1112,6 +1112,14 @@ AgentMessage {
     color: #c8d4e8;
 }
 
+AgentMessage.-plain {
+    margin: 0 0 1 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: #c8d4e8;
+}
+
 LiveResponse {
     width: 100%;
     height: auto;
