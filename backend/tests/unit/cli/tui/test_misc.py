@@ -69,6 +69,42 @@ async def test_tui_agent_message_action_renders_response(mock_config):
 
 
 @pytest.mark.asyncio
+async def test_tui_transcript_only_agent_message_is_plain(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+
+        action = MessageAction(
+            content='I will inspect the workspace.',
+            transcript_only=True,
+        )
+        action.source = EventSource.AGENT
+        renderer._process_event(action)
+
+        assert renderer._last_final_response_text == ''
+        from backend.cli.tui.widgets.activity_card import AgentMessage
+
+        msgs = list(s.query(AgentMessage).results())
+        assert len(msgs) == 1
+        assert msgs[0].has_class('-plain')
+        assert renderer._history[0] is msgs[0]
+
+
+@pytest.mark.asyncio
 async def test_tui_renderer_receives_queued_agent_message_events(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()

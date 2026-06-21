@@ -112,6 +112,13 @@ class AgentMessage(Static):
         background: #090d18;
         color: #c8d4e8;
     }
+    AgentMessage.-plain {
+        margin: 0 0 1 0;
+        padding: 0;
+        border: none;
+        background: transparent;
+        color: #c8d4e8;
+    }
     """
 
     def __init__(
@@ -119,6 +126,7 @@ class AgentMessage(Static):
         text: str,
         *,
         renderable: Any | None = None,
+        plain: bool = False,
         id: str | None = None,
     ) -> None:
         from backend.cli.tui.transcript_typography import AGENT_PIPE
@@ -128,7 +136,10 @@ class AgentMessage(Static):
 
             renderable = prep_markdown(text)
         super().__init__(renderable, id=id)
-        self.styles.border_left = ('solid', AGENT_PIPE)
+        if plain:
+            self.add_class('-plain')
+        else:
+            self.styles.border_left = ('solid', AGENT_PIPE)
 
     def update_message(self, text: str, *, renderable: Any | None = None) -> None:
         """Update message content dynamically."""
