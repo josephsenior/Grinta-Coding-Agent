@@ -40,6 +40,7 @@ export APP_ROOT
 export LLM_API_KEY="${LLM_API_KEY:-sk-smoke-stub-task}"
 export LLM_MODEL="${LLM_MODEL:-openai/gpt-4.1}"
 export GRINTA_NO_SPLASH=1
+export GRINTA_SKIP_STARTUP_HEALTH_CHECK=1
 export LOG_TO_FILE=false
 export PYTHONUTF8=1
 export PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}"

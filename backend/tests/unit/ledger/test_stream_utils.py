@@ -89,7 +89,7 @@ class TestSessionExists:
         mock_store = MagicMock()
         # Mock successful list call
         with patch(
-            'backend.ledger.stream.call_sync_from_async',
+            'backend.ledger.stream.event_stream.call_sync_from_async',
             return_value=['file1.json', 'file2.json'],
         ):
             result = await session_exists('sess123', mock_store, None)
@@ -102,7 +102,7 @@ class TestSessionExists:
         mock_store = MagicMock()
         # Mock FileNotFoundError
         with patch(
-            'backend.ledger.stream.call_sync_from_async',
+            'backend.ledger.stream.event_stream.call_sync_from_async',
             side_effect=FileNotFoundError('Not found'),
         ):
             result = await session_exists('sess456', mock_store, None)
@@ -114,7 +114,7 @@ class TestSessionExists:
         """Test session_exists with user ID."""
         mock_store = MagicMock()
         with patch(
-            'backend.ledger.stream.call_sync_from_async',
+            'backend.ledger.stream.event_stream.call_sync_from_async',
             return_value=['state.json'],
         ) as mock_call:
             result = await session_exists('sess789', mock_store, 'user123')
@@ -128,7 +128,7 @@ class TestSessionExists:
         """Test session_exists with empty existing directory."""
         mock_store = MagicMock()
         with patch(
-            'backend.ledger.stream.call_sync_from_async',
+            'backend.ledger.stream.event_stream.call_sync_from_async',
             return_value=[],
         ):
             result = await session_exists('sess-empty', mock_store, None)
@@ -143,7 +143,7 @@ class TestSessionExists:
         mock_store.list = MagicMock(return_value=['file.json'])
 
         with patch(
-            'backend.ledger.stream.call_sync_from_async',
+            'backend.ledger.stream.event_stream.call_sync_from_async',
             wraps=lambda fn, *args: fn(*args),
         ):
             await session_exists('sid', mock_store, None)
@@ -157,7 +157,7 @@ class TestSessionExists:
         mock_store = MagicMock()
         # Other exceptions should propagate
         with patch(
-            'backend.ledger.stream.call_sync_from_async',
+            'backend.ledger.stream.event_stream.call_sync_from_async',
             side_effect=ValueError('Unexpected error'),
         ):
             with pytest.raises(ValueError, match='Unexpected error'):

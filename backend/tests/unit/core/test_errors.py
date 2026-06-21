@@ -563,7 +563,7 @@ class TestExceptionCreation:
 
     def test_path_validation_error_no_path(self):
         err = PathValidationError('bad')
-        assert err.path is None
+        assert err.path == '<unknown>'
 
     def test_browser_init(self):
         err = BrowserInitException()
