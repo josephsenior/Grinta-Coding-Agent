@@ -223,6 +223,8 @@ class TestExceptionHandlerService(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(reported_exc, RuntimeError)
         self.assertIn('unexpected error', str(reported_exc))
         self.assertIn('ValueError', str(reported_exc))
+        self.assertIn('/resume', str(reported_exc))
+        self.assertNotIn('refresh the page', str(reported_exc))
 
     @patch('backend.orchestration.services.exception_handler_service.logger')
     async def test_handle_step_exception_logs_traceback(self, mock_logger):

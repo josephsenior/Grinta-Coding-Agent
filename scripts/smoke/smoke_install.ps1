@@ -88,5 +88,10 @@ try {
 }
 
 Write-Host ''
+Write-Host '==> Smoke-test: stub CLI task (deterministic LLM, no live API)'
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+& (Join-Path $repoRoot 'scripts\smoke\run_stub_cli_task.ps1') -PythonExe $pythonExe -RepoRoot $repoRoot
+
+Write-Host ''
 Write-Host "==> Done. Extras installed: $($Extras -join ', ')"
 exit 0

@@ -80,8 +80,8 @@ class ExceptionHandlerService:
         else:
             reported = RuntimeError(
                 f'There was an unexpected error while running the agent: '
-                f'{exc.__class__.__name__}. You can refresh the page or '
-                f'ask the agent to try again.',
+                f'{exc.__class__.__name__}. Restart the session, use /resume '
+                f'if recovering from a checkpoint, or ask the agent to try again.',
             )
 
         await self._ctrl.recovery_service.react_to_exception(reported)

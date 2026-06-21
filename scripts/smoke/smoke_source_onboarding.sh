@@ -33,4 +33,8 @@ if [ -f "$SMOKE_APP_ROOT/settings.json" ]; then
 fi
 unset APP_ROOT
 
+echo "==> Source onboarding smoke: stub CLI task (deterministic LLM, no live API)"
+chmod +x scripts/smoke/run_stub_cli_task.sh
+UV_RUN=1 ./scripts/smoke/run_stub_cli_task.sh ignored "$(pwd)"
+
 echo "==> Source onboarding smoke: passed"

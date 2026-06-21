@@ -2,97 +2,42 @@
 
 from __future__ import annotations
 
+import json
 import os
+import shutil
 import subprocess
 import sys
-import textwrap
 from pathlib import Path
 
 import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
+_STUB_SOURCE = _REPO_ROOT / 'scripts' / 'smoke' / 'cli_llm_stub_sitecustomize.py'
 
 
-def _sitecustomize_source() -> str:
-    return textwrap.dedent(
-        """
-        from __future__ import annotations
-
-        import asyncio
-        from types import SimpleNamespace
-
-        import backend.app.agent_control_loop as agent_loop
-        import backend.app.setup as bootstrap_setup
-        from backend.core.schemas import AgentState
-        from backend.ledger import EventSource, EventStreamSubscriber
-        from backend.ledger.action import MessageAction
-        from backend.ledger.observation.agent import AgentStateChangedObservation
-
-
-        _SEEN_TASKS: list[str] = []
-
-
-        class _FakeController:
-            def __init__(self) -> None:
-                self._state = AgentState.AWAITING_USER_INPUT
-
-            def get_agent_state(self):
-                return self._state
-
-            async def set_agent_state_to(self, state):
-                self._state = state
-
-            def step(self) -> None:
-                return None
-
-            def save_state(self) -> None:
-                return None
-
-
-        def _create_controller(agent, runtime, config, conversation_stats, replay_events=None):
-            del agent, config, conversation_stats, replay_events
-
-            def _capture(event):
-                if isinstance(event, MessageAction) and getattr(event, 'source', None) == EventSource.USER:
-                    _SEEN_TASKS.append(event.content)
-
-            runtime.event_stream.subscribe(
-                EventStreamSubscriber.TEST,
-                _capture,
-                'cli-task-capture',
-            )
-            return _FakeController(), SimpleNamespace()
-
-
-        async def _run_agent_until_done(controller, runtime, memory, end_states):
-            del memory, end_states
-            for _ in range(100):
-                if _SEEN_TASKS:
-                    break
-                await asyncio.sleep(0.01)
-            if not _SEEN_TASKS:
-                raise AssertionError('CLI task was never observed by the fake task loop')
-
-            answer = MessageAction(
-                content='Task complete: summarized README.md for the CLI regression.',
-                wait_for_response=True,
-            )
-            answer.source = EventSource.AGENT
-            runtime.event_stream.add_event(answer, EventSource.AGENT)
-            controller._state = AgentState.AWAITING_USER_INPUT
-            runtime.event_stream.add_event(
-                AgentStateChangedObservation('', AgentState.AWAITING_USER_INPUT),
-                EventSource.AGENT,
-            )
-
-
-        bootstrap_setup.create_controller = _create_controller
-        agent_loop.run_agent_until_done = _run_agent_until_done
-        """
+def _write_app_settings(app_root: Path) -> None:
+    app_root.mkdir(parents=True, exist_ok=True)
+    settings = {
+        'llm_provider': 'openai',
+        'llm_model': 'openai/gpt-4.1',
+        'llm_api_key': '${LLM_API_KEY}',
+        'llm_base_url': '',
+        'agent': {
+            'Orchestrator': {
+                'autonomy_level': 'balanced',
+            },
+        },
+        'security': {
+            'execution_profile': 'hardened_local',
+            'enforce_security': True,
+        },
+    }
+    (app_root / 'settings.json').write_text(
+        json.dumps(settings, indent=2) + '\n',
+        encoding='utf-8',
     )
 
 
-@pytest.mark.skip(reason='Integration test requires full runtime environment')
 @pytest.mark.integration
 def test_launch_entry_completes_one_task_via_subprocess(tmp_path: Path) -> None:
     project_root = tmp_path / 'project'
@@ -101,11 +46,12 @@ def test_launch_entry_completes_one_task_via_subprocess(tmp_path: Path) -> None:
         'CLI task regression target\n', encoding='utf-8'
     )
 
+    app_root = tmp_path / 'app'
+    _write_app_settings(app_root)
+
     hook_dir = tmp_path / 'hooks'
     hook_dir.mkdir()
-    (hook_dir / 'sitecustomize.py').write_text(
-        _sitecustomize_source(), encoding='utf-8'
-    )
+    shutil.copy2(_STUB_SOURCE, hook_dir / 'sitecustomize.py')
 
     env = os.environ.copy()
     env['LLM_API_KEY'] = 'sk-test-cli-task'
@@ -113,6 +59,7 @@ def test_launch_entry_completes_one_task_via_subprocess(tmp_path: Path) -> None:
     env['GRINTA_NO_SPLASH'] = '1'
     env['LOG_TO_FILE'] = 'false'
     env['PYTHONUTF8'] = '1'
+    env['APP_ROOT'] = str(app_root)
     env['HOME'] = str(tmp_path)
     env['USERPROFILE'] = str(tmp_path)
     existing_path = env.get('PYTHONPATH', '')
@@ -137,7 +84,7 @@ def test_launch_entry_completes_one_task_via_subprocess(tmp_path: Path) -> None:
         errors='replace',
         cwd=_REPO_ROOT,
         env=env,
-        timeout=60,
+        timeout=120,
         check=False,
     )
 

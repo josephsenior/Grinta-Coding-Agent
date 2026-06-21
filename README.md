@@ -194,7 +194,7 @@ Minimal config:
 }
 ```
 
-For manual setup, put the real value in a sibling `.env` file or your shell environment as `LLM_API_KEY`; avoid keeping the only copy of a secret directly in `settings.json`.
+For manual setup, put the real value in a sibling `.env` file (next to `settings.json`) or your shell environment as `LLM_API_KEY`; reference it from JSON with `"llm_api_key": "${LLM_API_KEY}"`. Avoid keeping the only copy of a secret directly in `settings.json`. Grinta resolves `${VAR}` placeholders via `backend/core/config/api_key_manager.py`; OS keychain storage is not implemented yet.
 
 Common model ids:
 

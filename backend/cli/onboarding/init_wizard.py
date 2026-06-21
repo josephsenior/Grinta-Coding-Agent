@@ -240,6 +240,8 @@ def _print_welcome(console: Console, platform_info: str) -> None:
             f'[bold]Welcome to Grinta.[/bold] ({platform_info})\n'
             'This wizard configures your LLM provider and writes [bold]settings.json[/bold].\n'
             'API keys are stored in a sibling [bold].env[/bold] file when provided.\n'
+            'New installs default to the [bold]hardened_local[/bold] security profile '
+            '(stricter command/file gates; use [bold]standard[/bold] in settings if you need fewer restrictions).\n'
             f'Re-run any time with [{CLR_BRAND}]grinta init[/].',
             border_style=CLR_CARD_BORDER,
             box=box.ROUNDED,
@@ -318,6 +320,15 @@ def _write_settings_file(
         'llm_model': model,
         'llm_api_key': _settings_api_key_value(provider, api_key),
         'llm_base_url': base_url,
+        'agent': {
+            'Orchestrator': {
+                'autonomy_level': 'balanced',
+            },
+        },
+        'security': {
+            'execution_profile': 'hardened_local',
+            'enforce_security': True,
+        },
     }
     try:
         _atomic_json_write(settings_file, settings)

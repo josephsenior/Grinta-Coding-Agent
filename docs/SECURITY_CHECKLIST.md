@@ -10,7 +10,7 @@ Grinta is **local-first** and runs with **your** user privileges. It is **not** 
 ## Before each session
 
 - [ ] I trust the repository (no malicious `package.json` scripts, no rogue `Makefile`, no `.envrc` I didn't write)
-- [ ] My `settings.json` does **not** contain the only copy of any secret — secrets live in OS keychain or `.env` files via `${VAR}` syntax
+- [ ] My `settings.json` does **not** contain the only copy of any secret — store real keys in environment variables or a sibling `.env` file and reference them with `${VAR}` in `settings.json` (see `backend/core/config/api_key_manager.py`)
 - [ ] I have a clean git working tree (so `git diff` is meaningful as an audit trail)
 - [ ] I know my autonomy level (`/autonomy`) — **conservative** for unfamiliar repos, **balanced** (default) for normal work
 

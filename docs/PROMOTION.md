@@ -51,7 +51,7 @@ make reliability-gate-integration
 
 The first runs the full reliability gate. The second adds integration coverage, the reliability integration bundle, and the stress suite — the stronger pre-release check for RC and GA.
 
-CI's `gates-on-linux-extended` already runs integration, e2e, and stress on every PR; the Makefile targets above are additional local confidence for release cuts.
+CI's `gates-on-linux-extended`, `gates-on-windows-extended`, and `gates-on-macos-extended` jobs already run integration, e2e, and stress on every PR; the Makefile targets above are additional local confidence for release cuts.
 
 ---
 

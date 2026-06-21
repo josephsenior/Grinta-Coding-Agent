@@ -2,7 +2,7 @@
 
 This document describes what runs in GitHub Actions and how it relates to local `pytest` ([`pytest.ini`](../pytest.ini)).
 
-**Linux PR gates** shard the full **unit** corpus (`backend/tests/unit`) across seven coverage jobs, enforce **75%** in `gates-on-linux-coverage-report`, then run integration, e2e, and stress in `gates-on-linux-extended`. **Windows** and **macOS** gates run the full unit corpus for required cross-platform release coverage, while Linux remains the only platform with the extended integration/e2e/stress tier.
+**Linux PR gates** shard the full **unit** corpus (`backend/tests/unit`) across seven coverage jobs, enforce **75%** in `gates-on-linux-coverage-report`, then run integration, e2e, and stress in `gates-on-linux-extended`. **Windows** and **macOS** run the full unit corpus, then the same integration/e2e/stress extended tier after unit gates pass.
 
 For release tagging and GA promotion, see [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
 
@@ -13,7 +13,9 @@ For release tagging and GA promotion, see [RELEASE_CHECKLIST.md](RELEASE_CHECKLI
 | **Run Python Tests** | `gates-on-linux-coverage-{a,b,c,d,f,g,e}` + `report` | Full unit corpus on Linux with sharded coverage; combined report enforces **75%** (`--fail-under=75`). Execution shards (D/F/G) skip `compileall`; syntax is gated on other shards. |
 | **Run Python Tests** | `gates-on-linux-extended` | Integration, e2e, and stress suites on Linux (runs after the coverage report job passes). |
 | **Run Python Tests** | `gates-on-windows` (3.12 + 3.13) | Full unit corpus cross-platform smoke. |
-| **Run Python Tests** | `gates-on-macos` | Full unit corpus on macOS. This is the required macOS certification depth today; Linux remains the only platform with the extended integration/e2e/stress tier. |
+| **Run Python Tests** | `gates-on-windows-extended` | Integration, e2e, and stress suites on Windows (runs after unit gates pass; Python 3.12). |
+| **Run Python Tests** | `gates-on-macos` | Full unit corpus on macOS. |
+| **Run Python Tests** | `gates-on-macos-extended` | Integration, e2e, and stress suites on macOS (runs after unit gate passes). |
 | **Lint** | pre-commit, mypy, version check | See [`.github/workflows/lint.yml`](../.github/workflows/lint.yml). |
 | **CodeQL** | `analyze` | Static security analysis for Python on PRs and main. |
 | **Security Scan (Bandit)** | Bandit | Python SAST; fails on medium/high findings. See [`.github/workflows/bandit.yml`](../.github/workflows/bandit.yml). |
@@ -30,7 +32,7 @@ For release tagging and GA promotion, see [RELEASE_CHECKLIST.md](RELEASE_CHECKLI
 
 ### Coverage
 
-The **75%** gate applies to the **unit** corpus only, measured across sharded Linux jobs and combined in `gates-on-linux-coverage-report`. Integration, e2e, and stress suites run in `gates-on-linux-extended` but do **not** contribute to the coverage percentage.
+The **75%** gate applies to the **unit** corpus only, measured across sharded Linux jobs and combined in `gates-on-linux-coverage-report`. Integration, e2e, and stress suites run in `gates-on-linux-extended`, `gates-on-windows-extended`, and `gates-on-macos-extended` but do **not** contribute to the coverage percentage.
 
 Codecov upload runs from the coverage report job with `fail_ci_if_error: false` (upload failure does not block the merge). The enforced threshold is the local `coverage report --fail-under=75` step in CI, matching [`pyproject.toml`](../pyproject.toml).
 
@@ -63,5 +65,4 @@ See [Contributing — testing](../CONTRIBUTING.md#testing-before-a-pull-request)
 
 For public release messaging, align claims with [Support Matrix](SUPPORT_MATRIX.md):
 
-- Linux and Windows are officially supported.
-- macOS is also a supported release platform with required unit-gate coverage; its current certification depth is unit-only rather than Linux-equivalent extended coverage.
+- Linux, Windows, and macOS are officially supported with unit gates plus extended integration/e2e/stress coverage on all three platforms.

@@ -160,7 +160,7 @@ Grinta executes on local host permissions.
 uv run pytest backend/tests/unit/ --tb=short -q
 ```
 
-That is the fast local loop and matches the **Windows** PR gate and the Linux **unit** coverage shards. On Linux, CI also runs integration, e2e, and stress in `gates-on-linux-extended` after the 75% unit coverage report passes. Local mirror for coverage:
+That is the fast local loop and matches the Linux **unit** coverage shards. On Linux, Windows, and macOS, CI also runs integration, e2e, and stress in the platform extended gates after unit tests pass. Local mirror for coverage:
 
 ```bash
 PYTHONPATH=. uv run pytest --cov=backend --cov-fail-under=75 backend/tests/unit

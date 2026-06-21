@@ -15,7 +15,9 @@ These workflows run on every PR and on pushes to `main`. All **required** jobs m
 | **Run Python Tests** | `gates-on-linux-coverage-{a,b,c,d,f,g,e}` + `report` | Full unit corpus on Linux with sharded coverage; combined report enforces **75%** (`--fail-under=75`). Execution shards (D/F/G) skip `compileall`; syntax is gated on other shards. |
 | **Run Python Tests** | `gates-on-linux-extended` | Integration, e2e, and stress suites on Linux (runs after the coverage report job passes). |
 | **Run Python Tests** | `gates-on-windows` (3.12 + 3.13) | Full unit corpus cross-platform smoke. |
-| **Run Python Tests** | `gates-on-macos` | Full unit corpus on macOS. This is the required macOS certification depth today; Linux remains the only platform with the extended integration/e2e/stress tier. |
+| **Run Python Tests** | `gates-on-windows-extended` | Integration, e2e, and stress suites on Windows (runs after unit gates pass; Python 3.12). |
+| **Run Python Tests** | `gates-on-macos` | Full unit corpus on macOS. |
+| **Run Python Tests** | `gates-on-macos-extended` | Integration, e2e, and stress suites on macOS (runs after unit gate passes). |
 | **Lint** | pre-commit, mypy, version consistency | See [`.github/workflows/lint.yml`](../.github/workflows/lint.yml). |
 | **CodeQL** | Python analysis | Static security analysis. |
 | **Security Scan (Bandit)** | Bandit | Python SAST. |
@@ -75,7 +77,7 @@ WHEEL_DIR=./dist ./scripts/smoke_install.sh
 
 ### RC / GA (stronger gates)
 
-CI’s `gates-on-linux-extended` already runs integration, e2e, and stress on every PR. For RC and GA promotion, also run the local reliability bundles:
+CI’s `gates-on-linux-extended`, `gates-on-windows-extended`, and `gates-on-macos-extended` jobs already run integration, e2e, and stress on every PR. For RC and GA promotion, also run the local reliability bundles:
 
 - [ ] **Reliability gate:** `make reliability-gate` ([`reliability_gate.py`](../backend/scripts/verify/reliability_gate.py)).
 - [ ] **Reliability gate + integration/stress:** `make reliability-gate-integration` (adds integration and stress suites).
@@ -128,7 +130,11 @@ git push origin main --tags
 
 ## macOS stance
 
-macOS is a supported release platform with a required unit-test gate (`gates-on-macos`) on every PR and on `main`. The current certification depth is unit-only, not the full Linux extended tier. Before making shell/path/terminal-heavy public claims, confirm the latest macOS job is green and run a local Mac smoke when practical. Document known gaps in release notes rather than implying Linux-equivalent certification depth.
+macOS is a supported release platform with required unit and extended CI gates
+(`gates-on-macos`, `gates-on-macos-extended`) on every PR and on `main`. Before
+making shell/path/terminal-heavy public claims, confirm the latest macOS jobs are
+green and run a local Mac smoke when practical. Document known platform parity
+gaps in release notes (see [Support Matrix](SUPPORT_MATRIX.md)).
 
 ---
 
@@ -141,4 +147,4 @@ Use this when deciding whether to move from a public RC to an official GA tag:
 - [ ] **RC feedback triage complete:** all high-severity RC feedback issues are fixed and verified or explicitly documented as post-GA follow-up.
 - [ ] **Docs match real behavior:** `README.md`, `docs/USER_GUIDE.md`, `docs/TROUBLESHOOTING.md`, and `docs/SUPPORT_MATRIX.md` reflect current CLI UX, platform support, and completion-validation behavior.
 - [ ] **Packaging artifacts validated:** PyPI install path, Scoop, and Homebrew metadata verified against published artifacts for the target version.
-- [ ] **Known limitations are explicit:** remaining gaps (for example macOS unit-only certification depth or Python 3.13 advisory coverage on Linux) are listed in release notes and support docs.
+- [ ] **Known limitations are explicit:** remaining gaps (for example Python 3.13 advisory coverage on Linux or platform-specific shell/terminal parity) are listed in release notes and support docs.

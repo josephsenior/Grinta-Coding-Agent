@@ -4,12 +4,12 @@
   "llm_api_key": "${LLM_API_KEY}",
   "llm_base_url": "",
   "agent": {
-    "agent": {
+    "Orchestrator": {
       "autonomy_level": "balanced"
     }
   },
   "security": {
-    "execution_profile": "standard",
+    "execution_profile": "hardened_local",
     "enforce_security": true,
     "block_high_risk": false,
     "allow_network_commands": false,
