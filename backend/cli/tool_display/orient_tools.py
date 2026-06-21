@@ -588,14 +588,37 @@ def checkpoint_action_model(action: Any) -> OrientLineModel:
     )
 
 
+def _checkpoint_summary_from_obs(obs: Any) -> str:
+    content = str(getattr(obs, 'content', '') or '').strip()
+    if content.startswith('{'):
+        try:
+            import json
+
+            parsed = json.loads(content)
+            summary = parsed.get('summary')
+            if isinstance(summary, str) and summary.strip():
+                return summary.strip()
+        except json.JSONDecodeError:
+            pass
+    if content.startswith('[CHECKPOINT]'):
+        return content.removeprefix('[CHECKPOINT]').strip()
+    if content.startswith('[ROLLBACK]'):
+        return content.removeprefix('[ROLLBACK]').strip()
+    return content.split('\n', 1)[0].strip() if content else ''
+
+
 def checkpoint_result(obs: Any) -> str:
     if not getattr(obs, 'ok', True):
         reason = str(getattr(obs, 'reason', '') or getattr(obs, 'status', '') or '')
         return 'failed' if not reason else reason[:40]
-    content = str(getattr(obs, 'content', '') or '').strip()
-    if content:
-        first = content.split('\n', 1)[0].strip()
-        return first[:44] if len(first) > 44 else first
+    data = getattr(obs, 'data', None)
+    if isinstance(data, dict):
+        label = str(data.get('label', '') or '').strip()
+        if label:
+            return label[:44]
+    summary = _checkpoint_summary_from_obs(obs)
+    if summary:
+        return summary[:44] if len(summary) > 44 else summary
     if getattr(obs, 'changed_state', False):
         return 'saved'
     return 'completed'

@@ -19,7 +19,13 @@ def test_save_checkpoint_success_and_structured_payload(
     )
     obs = checkpoint.execute_checkpoint(action)
 
-    assert 'Saved #1: phase 1' in obs.content
+    payload = json.loads(obs.content)
+    assert payload['tool'] == 'checkpoint'
+    assert payload['ok'] is True
+    assert payload['summary'] == 'Saved #1: phase 1'
+    assert payload['data']['checkpoint_id'] == 1
+    assert obs.tool_result is not None
+    assert obs.tool_result['ok'] is True
     assert obs.ok is True
     assert obs.status == 'saved'
     assert obs.reason_code == 'CHECKPOINT_SAVED'

@@ -1603,3 +1603,58 @@ def test_fallback_completion_inline_thinking_parsing():
     assert state.content_accumulate == (
         "Let me start by:\n1. Doing research\n2. Exploring the current directory to understand what's there"
     )
+
+
+def test_capture_stream_response_id_from_chunk() -> None:
+    from backend.engine.executor import OrchestratorExecutor
+    from backend.engine.executor_mixins._executor_types import _AsyncStreamingState
+
+    executor = object.__new__(OrchestratorExecutor)
+    state = _AsyncStreamingState()
+    executor._capture_stream_response_id(
+        state,
+        {'id': 'chatcmpl-stream-abc', 'choices': [{'delta': {'content': 'hi'}}]},
+    )
+    assert state.stream_response_id == 'chatcmpl-stream-abc'
+
+    executor._capture_stream_response_id(
+        state,
+        {'id': 'chatcmpl-should-not-overwrite', 'choices': []},
+    )
+    assert state.stream_response_id == 'chatcmpl-stream-abc'
+
+
+def test_build_streaming_response_uses_captured_response_id() -> None:
+    from backend.engine.executor import OrchestratorExecutor
+
+    executor = object.__new__(OrchestratorExecutor)
+    executor._llm = MagicMock()
+    executor._llm.model = 'test-model'
+    executor._llm_model_name = lambda _llm: 'test-model'  # type: ignore[method-assign]
+    executor._resolve_stream_usage = lambda *_args, **_kwargs: {  # type: ignore[method-assign]
+        'prompt_tokens': 1,
+        'completion_tokens': 2,
+        'total_tokens': 3,
+    }
+
+    response = executor._build_streaming_response(
+        {},
+        'visible',
+        'thinking',
+        None,
+        None,
+        stream_response_id='chatcmpl-xyz',
+    )
+    assert response.id == 'chatcmpl-xyz'
+
+
+def test_ensure_stream_response_id_generates_stable_synthetic_id() -> None:
+    from backend.engine.executor import OrchestratorExecutor
+    from backend.engine.executor_mixins._executor_types import _AsyncStreamingState
+
+    executor = object.__new__(OrchestratorExecutor)
+    state = _AsyncStreamingState()
+    first = executor._ensure_stream_response_id(state)
+    second = executor._ensure_stream_response_id(state)
+    assert first == second
+    assert first.startswith('grinta-synthetic-')

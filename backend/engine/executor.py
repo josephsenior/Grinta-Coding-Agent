@@ -273,6 +273,7 @@ class OrchestratorExecutor(
             state.thinking_accumulate,
             tool_calls_list,
             state.streamed_usage,
+            stream_response_id=self._ensure_stream_response_id(state),
         )
         self._record_streaming_metrics(response, time.time())
         return response

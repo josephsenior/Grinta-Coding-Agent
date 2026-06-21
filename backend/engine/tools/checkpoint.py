@@ -154,9 +154,7 @@ def _duplicate_checkpoint_save_result(
         next_best_action=(
             'Continue with the next task step, or call checkpoint save only after new progress.'
         ),
-        human_message=(
-            f"[CHECKPOINT] No-op: latest checkpoint already matches '{label}'."
-        ),
+        summary=f"Latest checkpoint already matches '{label}'.",
     )
 
 
@@ -211,7 +209,7 @@ def _save_checkpoint(label: str, files_modified: str) -> CheckpointObservation:
             retryable=True,
             changed_state=False,
             next_best_action='Call checkpoint save with a short completion label.',
-            human_message="[CHECKPOINT] save requires 'label' describing what was completed.",
+            summary="save requires 'label' describing what was completed.",
         )
 
     checkpoints = _load_checkpoints()
@@ -249,7 +247,7 @@ def _save_checkpoint(label: str, files_modified: str) -> CheckpointObservation:
             changed_state=False,
             data={'label': label, 'files': normalized_files},
             next_best_action='Check filesystem permissions and retry checkpoint save.',
-            human_message=f"[CHECKPOINT] Failed to save '{label}': {exc}",
+            summary=f"Failed to save '{label}': {exc}",
         )
 
     return _checkpoint_result(
@@ -267,7 +265,7 @@ def _save_checkpoint(label: str, files_modified: str) -> CheckpointObservation:
             'total_checkpoints': len(checkpoints),
         },
         next_best_action='Continue with the next planned step.',
-        human_message=f'[CHECKPOINT] Saved #{entry["id"]}: {label}',
+        summary=f'Saved #{entry["id"]}: {label}',
     )
 
 
@@ -296,7 +294,7 @@ def _revert_checkpoint(checkpoint_id: str) -> CheckpointObservation:
                 retryable=True,
                 changed_state=False,
                 next_best_action='Save a checkpoint after a safe milestone with checkpoint(save), then retry checkpoint(revert).',
-                human_message='[ROLLBACK] Failure: No checkpoints found.',
+                summary='No checkpoints found.',
             )
         resolved_id = latest.id
         target_label = 'latest checkpoint'
@@ -316,9 +314,7 @@ def _revert_checkpoint(checkpoint_id: str) -> CheckpointObservation:
                 changed_state=False,
                 data={'requested_checkpoint_id': checkpoint_id},
                 next_best_action='Call checkpoint(view) to inspect valid checkpoints, then retry.',
-                human_message=(
-                    f"[ROLLBACK] Failure: Checkpoint ID '{checkpoint_id}' not found."
-                ),
+                summary=f"Checkpoint ID '{checkpoint_id}' not found.",
             )
         target_label = f'checkpoint {checkpoint_id}'
 
@@ -337,7 +333,7 @@ def _revert_checkpoint(checkpoint_id: str) -> CheckpointObservation:
                 'resolved_checkpoint_id': resolved_id,
             },
             next_best_action='Re-run the next safe step from the restored state.',
-            human_message=f'[ROLLBACK] Success: Workspace reverted to {target_label}.',
+            summary=f'Workspace reverted to {target_label}.',
         )
     else:
         return _checkpoint_result(
@@ -353,7 +349,7 @@ def _revert_checkpoint(checkpoint_id: str) -> CheckpointObservation:
                 'resolved_checkpoint_id': resolved_id,
             },
             next_best_action='Inspect the rollback logs, then retry or recover manually.',
-            human_message=f'[ROLLBACK] Failure: Revert to {target_label} failed.',
+            summary=f'Revert to {target_label} failed.',
         )
 
 
@@ -376,6 +372,40 @@ def _resolve_rollback_id(checkpoint_id: str, manager: Any) -> str | None:
     return checkpoint_id if manager.get_checkpoint(checkpoint_id) else None
 
 
+def _checkpoint_files_for_entry(cp: dict[str, Any]) -> list[str]:
+    files = set(cp.get('files', []))
+    rollback_id = cp.get('rollback_id')
+    if rollback_id:
+        try:
+            from backend.core.workspace_resolution import require_effective_workspace_root
+            from backend.execution.rollback.rollback_manager import RollbackManager
+
+            manager = RollbackManager(
+                workspace_path=str(require_effective_workspace_root()),
+                max_checkpoints=30,
+                auto_cleanup=True,
+            )
+            files.update(manager.get_checkpoint_files(str(rollback_id)))
+        except Exception:
+            pass
+    return sorted(files)
+
+
+def _checkpoint_view_rows(checkpoints: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for cp in checkpoints:
+        rows.append(
+            {
+                'id': cp.get('id'),
+                'label': cp.get('label'),
+                'timestamp': cp.get('timestamp'),
+                'files': _checkpoint_files_for_entry(cp),
+                'rollback_id': cp.get('rollback_id'),
+            }
+        )
+    return rows
+
+
 def _view_checkpoints() -> CheckpointObservation:
     checkpoints = _load_checkpoints()
     if not checkpoints:
@@ -387,38 +417,12 @@ def _view_checkpoints() -> CheckpointObservation:
             reason='No checkpoints saved yet.',
             retryable=False,
             changed_state=False,
-            data={'total_checkpoints': 0},
+            data={'total_checkpoints': 0, 'checkpoints': []},
             next_best_action='Call checkpoint save after completing a logical phase.',
-            human_message='[CHECKPOINT] No checkpoints saved yet.',
+            summary='No checkpoints saved yet.',
         )
 
-    lines: list[str] = []
-    for cp in checkpoints:
-        # Collect files from both manual input and auto-detected rollback snapshot
-        files = set(cp.get('files', []))
-        rollback_id = cp.get('rollback_id')
-        if rollback_id:
-            try:
-                from backend.core.workspace_resolution import (
-                    require_effective_workspace_root,
-                )
-                from backend.execution.rollback.rollback_manager import RollbackManager
-
-                manager = RollbackManager(
-                    workspace_path=str(require_effective_workspace_root()),
-                    max_checkpoints=30,
-                    auto_cleanup=True,
-                )
-                rollback_files = manager.get_checkpoint_files(rollback_id)
-                files.update(rollback_files)
-            except Exception:
-                pass
-
-        files_list = sorted(files)
-        files_str = f' | files: {", ".join(files_list)}' if files_list else ''
-        lines.append(
-            f'  #{cp["id"]} [{cp.get("timestamp", "?")}] {cp["label"]}{files_str}'
-        )
+    rows = _checkpoint_view_rows(checkpoints)
     return _checkpoint_result(
         command='view',
         ok=True,
@@ -427,9 +431,9 @@ def _view_checkpoints() -> CheckpointObservation:
         reason='Checkpoints listed successfully.',
         retryable=False,
         changed_state=False,
-        data={'total_checkpoints': len(checkpoints)},
+        data={'total_checkpoints': len(checkpoints), 'checkpoints': rows},
         next_best_action='Use checkpoint save for new progress or continue execution.',
-        human_message='[CHECKPOINT] Progress:\n' + '\n'.join(lines),
+        summary=f'Listed {len(checkpoints)} checkpoint(s).',
     )
 
 
@@ -446,7 +450,7 @@ def _clear_checkpoints() -> CheckpointObservation:
             changed_state=False,
             data={'total_checkpoints': 0},
             next_best_action='Continue with task execution.',
-            human_message='[CHECKPOINT] No-op: checkpoint store already empty.',
+            summary='Checkpoint store already empty.',
         )
     try:
         _save_checkpoints([])
@@ -460,7 +464,7 @@ def _clear_checkpoints() -> CheckpointObservation:
             retryable=True,
             changed_state=False,
             next_best_action='Check filesystem permissions and retry clear.',
-            human_message=f'[CHECKPOINT] Failed to clear checkpoints: {exc}',
+            summary=f'Failed to clear checkpoints: {exc}',
         )
 
     return _checkpoint_result(
@@ -473,7 +477,7 @@ def _clear_checkpoints() -> CheckpointObservation:
         changed_state=True,
         data={'cleared_count': len(checkpoints), 'total_checkpoints': 0},
         next_best_action='Continue with task execution.',
-        human_message='[CHECKPOINT] All checkpoints cleared.',
+        summary='All checkpoints cleared.',
     )
 
 
@@ -487,10 +491,10 @@ def _checkpoint_result(
     retryable: bool,
     changed_state: bool,
     next_best_action: str,
-    human_message: str,
+    summary: str,
     data: dict[str, Any] | None = None,
 ) -> CheckpointObservation:
-    """Return a human + structured checkpoint result for stronger tool feedback."""
+    """Return a JSON checkpoint payload plus structured tool_result metadata."""
     payload: dict[str, Any] = {
         'tool': CHECKPOINT_TOOL_NAME,
         'command': command,
@@ -501,12 +505,13 @@ def _checkpoint_result(
         'retryable': retryable,
         'changed_state': changed_state,
         'next_best_action': next_best_action,
+        'summary': summary,
     }
     if data is not None:
         payload['data'] = data
 
-    return CheckpointObservation(
-        content=human_message,
+    observation = CheckpointObservation(
+        content=json.dumps(payload, ensure_ascii=False, separators=(',', ':')),
         command=command,
         ok=ok,
         status=status,
@@ -517,3 +522,15 @@ def _checkpoint_result(
         next_best_action=next_best_action,
         data=data or {},
     )
+    observation.tool_result = {
+        'tool': CHECKPOINT_TOOL_NAME,
+        'ok': ok,
+        'retryable': retryable,
+        'error_code': reason_code if not ok else None,
+        'command': command,
+        'status': status,
+        'reason_code': reason_code,
+        'changed_state': changed_state,
+        'observation': observation.observation,
+    }
+    return observation

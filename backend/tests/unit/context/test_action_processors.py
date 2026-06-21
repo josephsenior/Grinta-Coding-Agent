@@ -150,6 +150,41 @@ class TestToolReplayReasoningContent:
             == 'Recovered from action.thought after lite strip.'
         )
 
+    def test_replay_uses_synthetic_key_when_model_response_id_empty(self):
+        pending: dict[str, object] = {}
+        action = GlobAction(pattern='**/*.py')
+        action.tool_call_metadata = ToolCallMetadata(
+            function_name='glob',
+            tool_call_id='call_glob_empty_id',
+            model_response={
+                'id': '',
+                'choices': [
+                    {
+                        'message': {
+                            'role': 'assistant',
+                            'content': '',
+                            'tool_calls': [
+                                {
+                                    'id': 'call_glob_empty_id',
+                                    'type': 'function',
+                                    'function': {
+                                        'name': 'glob',
+                                        'arguments': '{"pattern":"**/*.py"}',
+                                    },
+                                }
+                            ],
+                        }
+                    }
+                ],
+            },
+            total_calls_in_response=1,
+        )
+
+        convert_action_to_messages(action, pending)
+
+        assert 'grinta-synthetic-replay:call_glob_empty_id' in pending
+        assert '' not in pending or len(pending) == 1
+
 
 # ── _handle_message_action ──────────────────────────────────────────
 
