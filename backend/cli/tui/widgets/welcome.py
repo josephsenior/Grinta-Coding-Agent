@@ -12,7 +12,7 @@ from typing import Any
 
 from textual import events
 from textual.app import ComposeResult
-from textual.containers import Vertical
+from textual.containers import Horizontal, Vertical
 from textual.widgets import Static
 
 from backend.cli.tui.constants import (
@@ -58,9 +58,13 @@ class WelcomeWidget(Vertical):
     def compose(self) -> ComposeResult:
         if self._show_logo:
             yield Static('', id='welcome-logo')
-            yield Static(
-                '[#91abec]GRINTA[/] [#54597b]runtime ready[/]',
-                id='welcome-divider',
+            yield Horizontal(
+                Static(
+                    'Local-First Autonomous Software Engineer.',
+                    id='slogan-text',
+                ),
+                Static('Pure Grit.', id='slogan-tagline'),
+                id='welcome-slogan-row',
             )
             yield Static(
                 '[#c8d4e8]Start with a concrete task, or choose a guided starter.[/]',
@@ -87,7 +91,7 @@ class WelcomeWidget(Vertical):
             if width >= 80:
                 logo_static.update(_get_welcome_figlet())
             else:
-                logo_static.update('[#6F86B6]GRINTA[/]')
+                logo_static.update('[#91abec]GRINTA[/]')
         # Preserve any selection set before mount (e.g. by a pre-selection
         # call on the active communicate card). Default to 0 otherwise.
         self._selected = getattr(self, '_selected', 0)

@@ -326,10 +326,23 @@ WelcomeWidget {
     margin: 0 0 1 0;
 }
 
-#welcome-divider {
-    height: 1;
-    color: #8f9fc1;
+#welcome-slogan-row {
+    height: auto;
+    width: 100%;
     margin: 0 0 1 0;
+}
+
+#slogan-text {
+    width: auto;
+    height: auto;
+    color: #54597b;
+}
+
+#slogan-tagline {
+    width: auto;
+    height: auto;
+    color: #ff007f;
+    text-style: bold blink;
 }
 
 #welcome-slogan {

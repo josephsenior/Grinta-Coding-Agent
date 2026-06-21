@@ -28,6 +28,7 @@ import httpx
 from backend.core.enums import RuntimeStatus
 from backend.core.errors import AgentRuntimeDisconnectedError
 from backend.core.logging.logger import app_logger as logger
+from backend.execution.aes.policy_block_messages import action_timeout_message
 from backend.core.providers.provider_handler import ProviderHandler
 from backend.execution.aes.security_enforcement import SecurityEnforcementMixin
 from backend.execution.capabilities import RuntimeCapabilities
@@ -680,7 +681,7 @@ class Runtime(
             event.timeout,
         )
         observation = ErrorObservation(
-            content=f'Action {action_type} exceeded the hard wall-clock timeout of {event.timeout:.0f}s. The operation may still complete in the background. Verify the state of any files or resources this action was modifying before proceeding.',
+            content=action_timeout_message(timeout_seconds=event.timeout),
             error_id='ACTION_EXECUTION_TIMEOUT',
             timeout_kind='action_execution_timeout',
         )

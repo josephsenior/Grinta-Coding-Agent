@@ -8,6 +8,12 @@ from backend.core.constants import DEFAULT_STUCK_COOLDOWN_TURNS
 from backend.core.interaction_modes import normalize_interaction_mode
 from backend.core.logging.logger import app_logger as logger
 from backend.core.schemas import AgentState
+from backend.execution.aes.policy_block_messages import (
+    agent_stall_message,
+    circuit_breaker_strategy_switch_message,
+    circuit_breaker_tripped_message,
+    circuit_breaker_warning_message,
+)
 from backend.ledger import EventSource
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation_cause import attach_observation_cause
@@ -138,16 +144,22 @@ class StepGuardService:
         limit: int,
     ) -> None:
         reason = str(getattr(result, 'reason', 'unknown') or 'unknown')
-        content = (
-            f'CIRCUIT_BREAKER_WARNING: {reason}. '
-            f'Try a different approach. ({warning_count}/{limit})'
+        content = circuit_breaker_warning_message(
+            count=warning_count,
+            limit=limit,
+        )
+        logger.warning(
+            'Circuit breaker warning (%s/%s): %s',
+            warning_count,
+            limit,
+            reason,
         )
         GuardBus.emit(
             controller,
             CIRCUIT_WARNING,
             'CIRCUIT_BREAKER_WARNING',
             content,
-            f'CIRCUIT WARNING: {reason}; choose one concrete next action.',
+            f'Circuit warning: {reason}',
             cause=_pending_action_for_observation_cause(controller),
             cause_context='step_guard.circuit_warning',
         )
@@ -238,16 +250,18 @@ class StepGuardService:
         _state = getattr(controller, 'state', None)
         # If action is switch_context, don't stop the agent, just force a new prompt directive
         if getattr(result, 'action', '') == 'switch_context':
-            content = (
-                f'CIRCUIT BREAKER FORCED STRATEGY SWITCH: {result.reason}\n\n'
-                f'{result.recommendation}'
+            logger.warning(
+                'Circuit breaker forced strategy switch: %s | recommendation=%s',
+                result.reason,
+                result.recommendation,
             )
+            content = circuit_breaker_strategy_switch_message()
             GuardBus.emit(
                 controller,
                 CIRCUIT_WARNING,
                 'CIRCUIT_BREAKER_FORCED_SWITCH',
                 content,
-                'STRATEGY SWITCH REQUIRED: You must use a different tool or strategy now.',
+                'Strategy switch required: use a different tool or approach.',
                 cause=_pending_action_for_observation_cause(controller),
                 cause_context='step_guard.forced_switch',
             )
@@ -256,12 +270,14 @@ class StepGuardService:
             )
             return True
 
+        logger.error(
+            'Circuit breaker tripped: action=%s reason=%s recommendation=%s',
+            result.action,
+            result.reason,
+            result.recommendation,
+        )
         error_obs = ErrorObservation(
-            content=(
-                f'CIRCUIT BREAKER TRIPPED: {result.reason}\n\n'
-                f'Action: {result.action.upper()}\n\n'
-                f'{result.recommendation}'
-            ),
+            content=circuit_breaker_tripped_message(),
             error_id='CIRCUIT_BREAKER_TRIPPED',
         )
         attach_observation_cause(
@@ -317,15 +333,13 @@ class StepGuardService:
             return True  # keep stepping (auto-recover in progress)
 
         if action == 'stop':
+            stall_reason = getattr(result, 'reason', 'unknown')
             logger.error(
-                'No step progress stall after auto-recover',
-                extra={'msg_type': 'NO_STEP_PROGRESS_WATCHDOG'},
+                'No step progress stall after auto-recover: %s',
+                stall_reason,
             )
             error_obs = ErrorObservation(
-                content=(
-                    'NO_STEP_PROGRESS: agent loop stalled in RUNNING state. '
-                    f'Reason: {getattr(result, "reason", "unknown")}'
-                ),
+                content=agent_stall_message(),
                 error_id='NO_STEP_PROGRESS_WATCHDOG',
             )
             attach_observation_cause(

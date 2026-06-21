@@ -149,17 +149,17 @@ class ToolResultValidator(ToolInvocationMiddleware):
                 '; '.join(result.errors),
             )
         if result.blocked:
-            # Block downstream handling with a high-quality reason that can
-            # be emitted as an ErrorObservation by the controller.
-            reason = result.block_reason or 'Tool result failed validation'
-            ctx.block(
-                reason=(
-                    'RESULT VALIDATION BLOCKED:\n'
-                    f'- action={type(ctx.action).__name__}\n'
-                    f'- reason={reason}\n'
-                    'Fix the tool call or re-run with adjusted parameters.'
-                )
+            reason = result.block_reason or 'validation failed'
+            logger.warning(
+                'Tool result validation blocked for %s: %s',
+                type(ctx.action).__name__,
+                reason,
             )
+            from backend.execution.aes.policy_block_messages import (
+                tool_result_validation_block_message,
+            )
+
+            ctx.block(reason=tool_result_validation_block_message(reason))
 
     # ------------------------------------------------------------------ #
     # Built-in rules

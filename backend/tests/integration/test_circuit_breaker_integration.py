@@ -59,7 +59,7 @@ class TestCircuitBreakerIntegration:
         assert error_obs_call is not None, 'ErrorObservation was not added'
         error_obs = error_obs_call[0][0]
         assert error_obs.error_id == 'CIRCUIT_BREAKER_WARNING'
-        assert 'Stuck loop detected' in error_obs.content
+        assert 'Circuit breaker warning' in error_obs.content
 
     @pytest.mark.asyncio
     async def test_circuit_breaker_stop_action(self):
