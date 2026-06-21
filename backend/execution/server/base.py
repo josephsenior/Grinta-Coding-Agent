@@ -28,8 +28,8 @@ import httpx
 from backend.core.enums import RuntimeStatus
 from backend.core.errors import AgentRuntimeDisconnectedError
 from backend.core.logging.logger import app_logger as logger
-from backend.execution.aes.policy_block_messages import action_timeout_message
 from backend.core.providers.provider_handler import ProviderHandler
+from backend.execution.aes.policy_block_messages import action_timeout_message
 from backend.execution.aes.security_enforcement import SecurityEnforcementMixin
 from backend.execution.capabilities import RuntimeCapabilities
 from backend.execution.playbook_loader import PlaybookLoaderMixin
@@ -681,7 +681,7 @@ class Runtime(
             event.timeout,
         )
         observation = ErrorObservation(
-            content=action_timeout_message(timeout_seconds=event.timeout),
+            content=action_timeout_message(timeout_seconds=event.timeout or 0.0),
             error_id='ACTION_EXECUTION_TIMEOUT',
             timeout_kind='action_execution_timeout',
         )

@@ -85,6 +85,7 @@ class ScreenLifecycleMixin:
                         accent_color='#eacb8a',
                         section_icon='⬡',
                         action_label='+',
+                        footer_hint='Space toggle · Enter edit · Del remove',
                         id='sidebar-mcp',
                     )
                     yield CollapsibleSection(
@@ -110,6 +111,7 @@ class ScreenLifecycleMixin:
                         accent_color='#c792ea',
                         section_icon='✦',
                         action_label='+',
+                        footer_hint='Enter view/edit · Del remove',
                         id='sidebar-skills',
                     )
 

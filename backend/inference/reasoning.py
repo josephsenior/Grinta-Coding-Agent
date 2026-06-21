@@ -382,11 +382,11 @@ def _variant_to_kwargs(variant: dict[str, Any]) -> dict[str, Any]:
             # not accept a top-level output_config field, so effort labels are
             # mapped by _anthropic_thinking_for_effort() instead.
             continue
-        elif snake == 'reasoning_effort':
+        if snake == 'reasoning_effort':
             patch['reasoning_effort'] = value
-        elif snake == 'thinking' and isinstance(value, dict):
+        if snake == 'thinking' and isinstance(value, dict):
             patch['thinking'] = _normalize_thinking_dict(value)
-        elif snake == 'thinking_config' and isinstance(value, dict):
+        if snake == 'thinking_config' and isinstance(value, dict):
             patch['thinking_config'] = _normalize_thinking_config_dict(value)
         else:
             patch[snake] = value

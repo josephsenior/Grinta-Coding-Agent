@@ -9,8 +9,8 @@ from backend.cli.tui.renderer.handlers.status import (
     _handle_error_observation,
     notify_ui_only_error,
 )
-from backend.ledger.observation.error import ERROR_CATEGORY_RATE_LIMIT
 from backend.ledger.observation import ErrorObservation
+from backend.ledger.observation.error import ERROR_CATEGORY_RATE_LIMIT
 
 
 class TestNotifyUiOnlyError:

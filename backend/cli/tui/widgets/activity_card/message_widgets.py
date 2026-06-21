@@ -10,8 +10,8 @@ from textual.containers import Container
 from textual.widgets import Static
 
 from backend.cli.theme import CLR_REASONING_SNAP
-from backend.cli.tui.transcript_typography import THINKING_LABEL
 from backend.cli.tui.image_attachments import image_attachment_status_text
+from backend.cli.tui.transcript_typography import THINKING_LABEL
 
 
 class UserMessage(Static):

@@ -260,7 +260,7 @@ def _build_read_symbol_final(
             'status': 'ambiguous',
             'target': display_target,
             'symbol_name': symbol_name,
-            'message': symbol_ambiguity_summary(symbol_name, candidates).split('\n')[0],
+            'message': symbol_ambiguity_summary(symbol_name, candidates).split('\n', maxsplit=1)[0],
             'hint': 'Retry with path + qualified_name + symbol_kind, or use symbol_id.',
             'candidates': compact,
         }

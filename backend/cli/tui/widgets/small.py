@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import json
 import time
+from pathlib import Path
 from typing import Any
 
 import pyperclip
-from pathlib import Path
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -20,8 +20,8 @@ from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import Label, Select, Static, TextArea
 
-from backend.core.interaction_modes import AGENT_MODE, VISIBLE_INTERACTION_MODES
 from backend.cli.tui.transcript_typography import esc_hint_markup
+from backend.core.interaction_modes import AGENT_MODE, VISIBLE_INTERACTION_MODES
 
 _DEBUG_SESSION_ID = '64043f'
 _DEBUG_LOG_PATH = Path(__file__).resolve().parents[4] / 'debug-64043f.log'

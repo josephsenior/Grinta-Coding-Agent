@@ -70,9 +70,7 @@ class Settings(BaseModel):
     llm_provider: str | None = None
     llm_api_key: SecretStr | None = None
     llm_base_url: str | None = None
-    secrets_store: UserSecrets = Field(
-        default_factory=lambda: UserSecrets(), frozen=True
-    )
+    secrets_store: UserSecrets = Field(default_factory=UserSecrets, frozen=True)
     mcp_config: MCPConfig | None = None
 
     model_config = ConfigDict(validate_assignment=True)

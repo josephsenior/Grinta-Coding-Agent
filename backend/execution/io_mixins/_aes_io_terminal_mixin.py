@@ -432,7 +432,7 @@ class _AesIoTerminalMixin:
 
         predicted_cwd, policy_error = self._evaluate_interactive_terminal_command(
             action.command,
-            Path(cwd).resolve(),
+            Path(cwd).resolve(),  # noqa: ASYNC240
         )
         if policy_error is not None:
             self.session_manager.close_session(session_id)

@@ -101,7 +101,7 @@ class _AesIoFileMixin:
 
         lower_path = filepath.lower()
         if not lower_path.endswith(_STRUCTURED_READ_EXTENSIONS):
-            if os.path.isfile(filepath) and is_binary(filepath):
+            if os.path.isfile(filepath) and is_binary(filepath):  # noqa: ASYNC240
                 return ErrorObservation('ERROR_BINARY_FILE')
 
         return self._read_file_by_type(filepath, action, working_dir)

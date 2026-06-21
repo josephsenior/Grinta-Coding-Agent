@@ -726,8 +726,7 @@ def _on_event(orch: 'RendererEventProcessorMixin', event: Any) -> None:
                 or event_id < orch._min_rendered_event_id
             ):
                 orch._min_rendered_event_id = event_id
-            if event_id > orch._max_rendered_event_id:
-                orch._max_rendered_event_id = event_id
+            orch._max_rendered_event_id = max(orch._max_rendered_event_id, event_id)
         coalesced = _try_coalesce_streaming_enqueue(
             orch._pending_events, event
         ) or _try_coalesce_terminal_enqueue(orch._pending_events, event)

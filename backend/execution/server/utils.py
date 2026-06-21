@@ -22,8 +22,8 @@ async def _resolve_list_path(request: Request, client: RuntimeExecutor) -> str:
     if not path:
         return client.initial_cwd
     if os.path.isabs(path):
-        return os.path.normpath(path)
-    return os.path.normpath(os.path.join(client.initial_cwd, path))
+        return os.path.normpath(path)  # noqa: ASYNC240
+    return os.path.normpath(os.path.join(client.initial_cwd, path))  # noqa: ASYNC240
 
 
 def _get_sorted_directory_entries(full_path: str) -> list[str]:

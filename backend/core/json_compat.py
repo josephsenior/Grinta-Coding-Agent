@@ -117,6 +117,8 @@ def dump(obj: Any, fp: IO[str], **kwargs: Any) -> None:
 
 def loads(data: str | bytes | bytearray | memoryview, **kwargs: Any) -> Any:
     """Deserialize JSON text or bytes."""
+    if isinstance(data, memoryview):
+        data = data.tobytes()
     if _ORJSON_AVAILABLE and not kwargs:
         return _orjson.loads(data)
     return _json.loads(data, **kwargs)

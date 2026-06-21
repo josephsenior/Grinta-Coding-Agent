@@ -267,7 +267,7 @@ def _select_and_validate_symbol(
         )
 
         _multi_edit_raise(
-            symbol_ambiguity_summary(symbol_name, candidates).split('\n')[0],
+            symbol_ambiguity_summary(symbol_name, candidates).split('\n', maxsplit=1)[0],
             error_code='SYMBOL_AMBIGUOUS',
             path=path,
             operation='edit_symbol',

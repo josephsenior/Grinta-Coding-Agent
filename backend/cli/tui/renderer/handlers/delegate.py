@@ -81,7 +81,7 @@ def _handle_delegate_task_action(
     else:
         orch._active_worker_tasks.append(orch._summarize_worker_task(task))
     orch._sync_worker_strip()
-    card = ActivityRenderer.delegation(task, worker)
+    ActivityRenderer.delegation(task, worker)
     from backend.cli.tui.widgets.scan_line import DelegateCard
 
     widget = DelegateCard(task, worker=worker)

@@ -381,7 +381,7 @@ async def _async_main(
     from backend.persistence.locations import get_project_local_data_root
 
     resolved_project = (
-        str(Path(project).resolve()) if project else str(Path.cwd().resolve())
+        str(Path(project).resolve()) if project else str(Path.cwd().resolve())  # noqa: ASYNC240
     )
     os.environ['PROJECT_ROOT'] = resolved_project
     # configure_file_logging is idempotent — caller in main() may have already
@@ -578,7 +578,7 @@ def main(
     # Resolve project root early so file logging targets the right workspace
     # directory before any diagnostic or REPL code runs.
     resolved_project = (
-        str(Path(project).resolve()) if project else str(Path.cwd().resolve())
+        str(Path(project).resolve()) if project else str(Path.cwd().resolve())  # noqa: ASYNC240
     )
     os.environ['PROJECT_ROOT'] = resolved_project
     from backend.core.logging.logger import configure_file_logging

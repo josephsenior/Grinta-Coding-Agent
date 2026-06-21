@@ -70,7 +70,7 @@ class PreExecDiffMiddleware(ToolInvocationMiddleware):
         """Compute the diff that a FileEditAction will produce."""
         try:
             path = self._resolve_path(action.path, ctx)
-            if path is None or not os.path.isfile(path):
+            if path is None or not os.path.isfile(path):  # noqa: ASYNC240
                 return
 
             old_content = self._read_file(path)

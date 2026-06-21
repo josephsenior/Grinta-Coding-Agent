@@ -320,7 +320,7 @@ class RendererDisplayMixin:
             adapter = str(entry.get('adapter') or 'unknown')
             auto_resolvable = entry.get('auto_resolvable', entry.get('available'))
             status = 'ok' if auto_resolvable else 'warn'
-            items.append((language, f'dap:{language}', False, status, adapter, False))
+            items.append((language, f'dap:{language}', False, status, None, False))
         return items
 
     def _refresh_tasks_sidebar(self) -> None:
@@ -439,8 +439,12 @@ class RendererDisplayMixin:
         if mcp_servers:
             for server in mcp_servers:
                 name = server.get('name', 'unknown')
-                server_type = server.get('type', 'stdio')
-                mcp_items.append((name, f'mcp:{name}', True, 'info', server_type))
+                enabled = bool(server.get('enabled', True))
+                status = 'ok' if enabled else 'neutral'
+                options = {'toggleable': True, 'disabled': not enabled}
+                mcp_items.append(
+                    (name, f'mcp:{name}', True, status, None, True, options)
+                )
         return mcp_items
 
     def _skills_dirs_mtime(self) -> tuple[float, float]:
@@ -484,7 +488,11 @@ class RendererDisplayMixin:
             and getattr(self._tui._config.mcp, 'servers', None)
         ):
             mcp_servers = [
-                {'name': s.name, 'type': s.type}
+                {
+                    'name': s.name,
+                    'type': s.type,
+                    'enabled': bool(getattr(s, 'enabled', True)),
+                }
                 for s in self._tui._config.mcp.servers
                 if is_user_visible_mcp_server(s.name)
             ]

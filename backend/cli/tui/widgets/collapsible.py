@@ -34,19 +34,16 @@ STATUS_ICONS = {
 }
 
 SIDEBAR_BULLET = '●'
+SIDEBAR_BULLET_DIM = '○'
 
 
 class SidebarRow(Static):
-    """An interactive, hoverable, and focusable row inside sidebar panels.
-
-    Renders in compact format: [status icon] [label] [muted meta]
-    matching the ActivityCard collapsed-row visual language.
-    """
+    """An interactive, hoverable, and focusable row inside sidebar panels."""
 
     can_focus = True
 
     class Selected(Message):
-        """Event fired when the row is selected."""
+        """Event fired when the row is selected (Enter / click)."""
 
         def __init__(self, item_id: str | None) -> None:
             super().__init__()
@@ -54,6 +51,13 @@ class SidebarRow(Static):
 
     class DeleteRequested(Message):
         """Event fired when the row receives a delete intent."""
+
+        def __init__(self, item_id: str | None) -> None:
+            super().__init__()
+            self.item_id = item_id
+
+    class ToggleRequested(Message):
+        """Event fired when a toggleable row should flip enabled state."""
 
         def __init__(self, item_id: str | None) -> None:
             super().__init__()
@@ -68,6 +72,9 @@ class SidebarRow(Static):
         status: str | None = None,
         meta: str | None = None,
         interactive: bool = True,
+        toggleable: bool = False,
+        disabled: bool = False,
+        view_only: bool = False,
     ) -> None:
         self._label = label
         self._status = status or 'neutral'
@@ -75,21 +82,42 @@ class SidebarRow(Static):
         self.interactive = interactive
         self.item_id = item_id
         self.deletable = deletable
+        self.toggleable = toggleable
+        self._disabled = disabled
+        self.view_only = view_only
         self._show_delete_hint = False
         super().__init__(self._build_markup())
         self.can_focus = interactive
+        if view_only:
+            self.add_class('-view-only')
+        if disabled:
+            self.add_class('-disabled')
         if not interactive:
             self.add_class('-read-only')
 
     def _bullet_color(self) -> str:
+        if self._disabled:
+            return '#54597b'
+        if self.view_only:
+            return '#8b95a8'
         if not self.interactive:
             return '#8b95a8'
         return STATUS_COLORS.get(self._status, '#969aad')
 
+    def _bullet_glyph(self) -> str:
+        if self._disabled or self.view_only:
+            return SIDEBAR_BULLET_DIM
+        return SIDEBAR_BULLET
+
     def _build_markup(self) -> str:
         color = self._bullet_color()
-        bullet_part = f'[{color}]{SIDEBAR_BULLET}[/]'
-        label_part = f'[#c8d4e8]{self._label}[/]'
+        bullet_part = f'[{color}]{self._bullet_glyph()}[/]'
+        if self._disabled:
+            label_part = f'[#54597b][strike]{self._label}[/][/]'
+        elif self.view_only:
+            label_part = f'[#8b95a8]{self._label}[/]'
+        else:
+            label_part = f'[#c8d4e8]{self._label}[/]'
         meta_part = f'  [#54597b]{self._meta}[/]' if self._meta else ''
         delete_part = ''
         if self.deletable and self._show_delete_hint:
@@ -98,6 +126,24 @@ class SidebarRow(Static):
 
     def _refresh_row_markup(self) -> None:
         self.update(self._build_markup())
+
+    def set_disabled(self, disabled: bool) -> None:
+        self._disabled = disabled
+        if disabled:
+            self.add_class('-disabled')
+        else:
+            self.remove_class('-disabled')
+        self._refresh_row_markup()
+
+    def on_enter(self, event: events.Enter) -> None:
+        if self.deletable:
+            self._show_delete_hint = True
+            self._refresh_row_markup()
+
+    def on_leave(self, event: events.Leave) -> None:
+        if self.deletable and not self.has_focus:
+            self._show_delete_hint = False
+            self._refresh_row_markup()
 
     def on_focus(self, event: events.Focus) -> None:
         if self.deletable:
@@ -132,6 +178,11 @@ class SidebarRow(Static):
 
     def on_key(self, event: events.Key) -> None:
         if not self.interactive:
+            return
+        if self.toggleable and event.key == 'space':
+            self.post_message(self.ToggleRequested(self.item_id))
+            event.prevent_default()
+            event.stop()
             return
         if event.key in ('enter', 'space'):
             self.post_message(self.Selected(self.item_id))
@@ -224,6 +275,18 @@ class CollapsibleSection(Container):
         color: lightgray;
         opacity: 0.7;
     }
+    CollapsibleSection .sidebar-footer-hint {
+        width: 100%;
+        height: 1;
+        color: #54597b;
+        margin-top: 1;
+    }
+    SidebarRow.-view-only:hover {
+        background: #0d162a;
+    }
+    SidebarRow.-disabled:hover {
+        background: #0d162a;
+    }
     """
 
     can_focus = True
@@ -244,6 +307,7 @@ class CollapsibleSection(Container):
         accent_color: str = '#91abec',
         section_icon: str = '',
         action_label: str | None = None,
+        footer_hint: str | None = None,
         id: str | None = None,
         is_thinking: bool = False,
     ) -> None:
@@ -254,7 +318,8 @@ class CollapsibleSection(Container):
         self._accent_color = accent_color
         self._section_icon = section_icon
         self._action_label = action_label
-        self._items: list[tuple[Any, str, bool, str | None, str | None, bool]] = []
+        self._footer_hint = footer_hint
+        self._items: list[dict[str, Any]] = []
         self._is_thinking = is_thinking
 
     def _header_icon_markup(self) -> str:
@@ -311,14 +376,23 @@ class CollapsibleSection(Container):
         )
         with Vertical(classes=body_classes, id='body'):
             if self._items:
-                for label, item_id, deletable, status, meta, interactive in self._items:
+                for item in self._items:
                     yield SidebarRow(
-                        label,
-                        item_id,
-                        deletable=deletable,
-                        status=status,
-                        meta=meta,
-                        interactive=interactive,
+                        item['label'],
+                        item['item_id'],
+                        deletable=item['deletable'],
+                        status=item.get('status'),
+                        meta=item.get('meta'),
+                        interactive=item.get('interactive', True),
+                        toggleable=item.get('toggleable', False),
+                        disabled=item.get('disabled', False),
+                        view_only=item.get('view_only', False),
+                    )
+                if self._footer_hint:
+                    yield Static(
+                        self._footer_hint,
+                        classes='sidebar-footer-hint',
+                        id='sidebar-footer-hint',
                     )
             else:
                 content_classes = 'empty-text'
@@ -401,53 +475,69 @@ class CollapsibleSection(Container):
         self._section_title = title
         self._refresh_header()
 
+    @staticmethod
+    def _normalize_item(
+        item: tuple[Any, ...],
+    ) -> dict[str, Any]:
+        label = str(item[0])
+        item_id = str(item[1])
+        deletable = bool(item[2]) if len(item) >= 3 else False
+        status = item[3] if len(item) >= 4 else None
+        meta = item[4] if len(item) >= 5 else None
+        interactive = bool(item[5]) if len(item) >= 6 else True
+        options = item[6] if len(item) >= 7 and isinstance(item[6], dict) else {}
+        return {
+            'label': label,
+            'item_id': item_id,
+            'deletable': deletable,
+            'status': status,
+            'meta': meta,
+            'interactive': interactive,
+            'toggleable': bool(options.get('toggleable', False)),
+            'disabled': bool(options.get('disabled', False)),
+            'view_only': bool(options.get('view_only', False)),
+        }
+
     def set_items(
         self,
         items: list[
             tuple[Any, str]
             | tuple[Any, str, bool]
             | tuple[Any, str, bool, str | None, str | None]
+            | tuple[Any, str, bool, str | None, str | None, bool]
+            | tuple[Any, str, bool, str | None, str | None, bool, dict[str, Any]]
         ],
     ) -> None:
-        """Update the list of interactive items in the body.
-
-        Each item is a tuple of (label, item_id) or (label, item_id, deletable)
-        or (label, item_id, deletable, status, meta)
-        or (label, item_id, deletable, status, meta, interactive).
-        """
-        normalized: list[tuple[str, str, bool, str | None, str | None, bool]] = []
-        for item in items:
-            if len(item) >= 4:
-                label, item_id, deletable, status = item[:4]
-                meta = item[4] if len(item) >= 5 else None
-                interactive = bool(item[5]) if len(item) >= 6 else True
-                normalized.append(
-                    (label, item_id, bool(deletable), status, meta, interactive)
-                )
-            elif len(item) == 3:
-                label, item_id, deletable = item
-                normalized.append((label, item_id, bool(deletable), None, None, True))
-            else:
-                label, item_id = item
-                normalized.append((label, item_id, False, None, None, True))
+        """Update the list of interactive items in the body."""
+        normalized = [self._normalize_item(item) for item in items]
         self._items = normalized
         body = self.query_one('#body', Vertical)
         body.remove_children()
 
         if normalized:
-            body.mount(
-                *[
-                    SidebarRow(
-                        label,
-                        item_id,
-                        deletable=deletable,
-                        status=status,
-                        meta=meta,
-                        interactive=interactive,
+            mounts: list[Any] = [
+                SidebarRow(
+                    item['label'],
+                    item['item_id'],
+                    deletable=item['deletable'],
+                    status=item.get('status'),
+                    meta=item.get('meta'),
+                    interactive=item.get('interactive', True),
+                    toggleable=item.get('toggleable', False),
+                    disabled=item.get('disabled', False),
+                    view_only=item.get('view_only', False),
+                )
+                for item in normalized
+            ]
+            if self._footer_hint:
+                mounts.append(
+                    Static(
+                        self._footer_hint,
+                        classes='sidebar-footer-hint',
+                        id='sidebar-footer-hint',
                     )
-                    for label, item_id, deletable, status, meta, interactive in normalized
-                ]
-            )
+                )
+            body.mount(*mounts)
         else:
             body.mount(
                 Static(self._empty_markup(self._content or 'No items'), id='empty-text')

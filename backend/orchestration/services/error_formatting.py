@@ -155,7 +155,8 @@ def exception_is_notify_ui_only(
 ) -> bool:
     """Return True when an exception is HUD/toast-only (not agent-actionable)."""
     from backend.core.errors import AgentRuntimeError
-    from backend.inference.exceptions import APIError, Timeout as InfraTimeout
+    from backend.inference.exceptions import APIError
+    from backend.inference.exceptions import Timeout as InfraTimeout
 
     return (
         isinstance(exc, hard_stop_exceptions)

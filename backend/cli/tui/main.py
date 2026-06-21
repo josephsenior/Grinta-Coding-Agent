@@ -125,7 +125,7 @@ async def run_tui(
     model = config.get_llm_config().model or '(not set)'
     app._hud.update_tokens(0, HUDBar.resolve_context_limit_for_model(model))
     app._hud.update_workspace(
-        str(Path(os.getcwd()).resolve())
+        str(Path(os.getcwd()).resolve())  # noqa: ASYNC240
         if not getattr(config, 'project_root', None)
         else str(getattr(config, 'project_root'))
     )

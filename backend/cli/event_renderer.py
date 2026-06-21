@@ -217,7 +217,6 @@ class CLIEventRenderer(
         sidebar = _build_sidebar(
             task_list=task_list,
             mcp_servers=None,
-            skill_count=self._hud.bundled_skill_count,
             terminal_width=max_width,
         )
 

@@ -255,7 +255,7 @@ async def _run_task(
     from backend.app.main import auto_continue_response, run_controller
     from backend.ledger.action import MessageAction
 
-    config.project_root = str(project_root.resolve())
+    config.project_root = str(project_root.resolve())  # noqa: ASYNC240
     initial_action = MessageAction(content=prompt)
 
     started = time.monotonic()

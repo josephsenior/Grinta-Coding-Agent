@@ -146,7 +146,6 @@ class _ObsShellMixin(_ObservationRenderersBase):
         content: str,
         command: str = '',
     ) -> tuple[str | None, str, list[Any] | None]:
-        [ln.rstrip() for ln in content.split('\n')] if content else []
         result_kind = 'ok' if exit_code == 0 else 'neutral'
 
         syntax_extras = _cmd_stdout_syntax_extras(content)

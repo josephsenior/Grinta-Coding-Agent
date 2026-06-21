@@ -148,7 +148,7 @@ class FileTransaction:
             self.committed = True
 
         # Cleanup backup directory
-        if self.backup_dir and os.path.exists(self.backup_dir):
+        if self.backup_dir and os.path.exists(self.backup_dir):  # noqa: ASYNC240
             try:
                 await call_sync_from_async(shutil.rmtree, self.backup_dir)
                 logger.debug('Cleaned up transaction backup dir: %s', self.backup_dir)

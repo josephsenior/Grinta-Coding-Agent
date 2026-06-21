@@ -96,6 +96,7 @@ class MCPServerConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             '(e.g. when to prefer Context7 vs browser vs fetch).'
         ),
     )
+    enabled: bool = True
 
     @field_validator('name', mode='before')
     @classmethod
@@ -241,6 +242,7 @@ class MCPServerConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             and self.api_key == other.api_key
             and self.transport == other.transport
             and self.usage_hint == other.usage_hint
+            and self.enabled == other.enabled
         )
 
 

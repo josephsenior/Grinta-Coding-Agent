@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import time
-from unittest.mock import MagicMock
 
 from backend.cli.display.hud import HUDBar
 from backend.cli.tui.screen.state import ScreenStateMixin

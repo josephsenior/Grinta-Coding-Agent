@@ -120,7 +120,9 @@ def test_powershell_clipboard_reader_uses_sta(monkeypatch) -> None:
         return Result()
 
     monkeypatch.setattr('backend.cli.tui.image_attachments.subprocess.run', fake_run)
-    from backend.cli.tui.image_attachments import _read_windows_clipboard_image_powershell
+    from backend.cli.tui.image_attachments import (
+        _read_windows_clipboard_image_powershell,
+    )
 
     assert _read_windows_clipboard_image_powershell() is None
     assert '-Sta' in captured['args']

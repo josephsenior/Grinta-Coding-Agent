@@ -541,9 +541,9 @@ async def test_tui_dap_sidebar_lists_detected_adapters(mock_config):
         ]
         assert len(rows) == 2
         by_language = {row._label: row for row in rows}
-        assert by_language['python']._meta == 'debugpy'
+        assert by_language['python']._meta is None
         assert by_language['python']._status == 'ok'
-        assert by_language['javascript']._meta == 'js-debug'
+        assert by_language['javascript']._meta is None
         assert by_language['javascript']._status == 'warn'
         assert dap_section.is_collapsed is False
 

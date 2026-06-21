@@ -72,7 +72,7 @@ def is_debugger_action(action: object) -> bool:
     def _is_dbg_token(v: object) -> bool:
         if v is None:
             return False
-        if v == ActionType.DEBUGGER or v == 'debugger':
+        if v in (ActionType.DEBUGGER, 'debugger'):
             return True
         return getattr(v, 'value', None) == 'debugger'
 

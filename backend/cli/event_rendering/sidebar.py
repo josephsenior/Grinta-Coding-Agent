@@ -200,17 +200,25 @@ def load_sidebar_skills() -> list[str]:
     return sorted({*_load_playbook_skills(), *_load_user_skills()})
 
 
-def load_sidebar_skill_items() -> list[tuple[str, str, bool, str, str | None, bool]]:
+def load_sidebar_skill_items() -> list[tuple[str, str, bool, str, str | None, bool, dict[str, Any]]]:
     """Sidebar rows for bundled and custom skills."""
     playbook_names = set(_load_playbook_skills())
     user_names = set(_load_user_skills())
-    items: list[tuple[str, str, bool, str, str | None, bool]] = []
+    items: list[tuple[str, str, bool, str, str | None, bool, dict[str, Any]]] = []
     for skill in sorted(playbook_names | user_names):
         if skill in user_names:
-            items.append((skill, f'skill:{skill}', True, 'info', 'custom', True))
+            items.append((skill, f'skill:{skill}', True, 'info', None, True, {}))
         else:
             items.append(
-                (skill, f'skill:{skill}', False, 'neutral', 'bundled', True)
+                (
+                    skill,
+                    f'skill:{skill}',
+                    False,
+                    'neutral',
+                    None,
+                    True,
+                    {'view_only': True},
+                )
             )
     return items
 
@@ -224,7 +232,6 @@ def is_user_skill(name: str) -> bool:
 def build_sidebar(
     task_list: list[dict[str, Any]],
     mcp_servers: list[dict[str, Any]] | None = None,
-    skill_count: int | None = None,
     *,
     terminal_width: int = 120,
 ) -> Any | None:

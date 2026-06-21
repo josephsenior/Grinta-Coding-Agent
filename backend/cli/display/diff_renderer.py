@@ -123,7 +123,7 @@ def _is_validation_secondary(text: str) -> bool:
     )
 
 
-def _extract_indentation_warnings(content: str) -> tuple[str, list[str] | None]:
+def _extract_indentation_warnings(content: str) -> tuple[str, list[str]]:
     """Extract indentation warnings from content string.
 
     Returns (content_without_warnings, warnings_list) where warnings_list
@@ -132,7 +132,7 @@ def _extract_indentation_warnings(content: str) -> tuple[str, list[str] | None]:
     marker = '[INDENTATION WARNINGS]'
     idx = content.find(marker)
     if idx == -1:
-        return content, None
+        return content, []
 
     # Split content into main part and warnings
     main_content = content[:idx].rstrip()
@@ -154,7 +154,7 @@ def _extract_indentation_warnings(content: str) -> tuple[str, list[str] | None]:
     if current_warning:
         warnings.append('\n'.join(current_warning))
 
-    return main_content, warnings if warnings else None
+    return main_content, warnings
 
 
 def _extract_tagged_block(content: str, start_tag: str, end_tag: str) -> str | None:
