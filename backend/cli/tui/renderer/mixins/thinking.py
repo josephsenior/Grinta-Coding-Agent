@@ -301,6 +301,7 @@ class RendererThinkingMixin:
             return True
 
         if intent.kind == 'memory':
+            # Working memory / recall / scratchpad are internal — no transcript row.
             return True
 
         if intent.kind == 'checkpoint':
@@ -335,27 +336,6 @@ class RendererThinkingMixin:
                 PayloadCard(card.verb, card.detail, body or intent.text)
             )
         return True
-
-    def _memory_artifact_card(self, intent: ThinkingRenderIntent) -> ActivityCard:
-        text = intent.text
-        detail = intent.detail or text
-        tag = intent.tag
-        if tag == 'WORKING_MEMORY':
-            verb = 'Memory'
-            card_detail = self._trim_card_detail(detail, fallback='working memory')
-        elif tag == 'SEMANTIC_RECALL_RESULT':
-            verb = 'Recalled'
-            card_detail = self._trim_card_detail(detail, fallback='semantic memory')
-        else:
-            verb = 'Scratchpad'
-            card_detail = self._trim_card_detail(detail, fallback='scratchpad')
-        return self._compact_activity_card(
-            verb=verb,
-            detail=card_detail,
-            badge_category='memory',
-            title='Memory',
-            body=text,
-        )
 
     def _code_artifact_card(self, intent: ThinkingRenderIntent) -> ActivityCard:
         text = intent.text
@@ -395,7 +375,7 @@ class RendererThinkingMixin:
         detail = intent.detail or text
 
         if intent.kind == 'memory':
-            return self._memory_artifact_card(intent)
+            return None
 
         if intent.kind == 'shared':
             return self._compact_activity_card(
