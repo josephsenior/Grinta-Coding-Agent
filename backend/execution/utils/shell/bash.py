@@ -184,8 +184,15 @@ class BashSession(BaseShellSession):
             self._cancellation_callback_key,
             self._hard_kill_tmux_session,
         )
-        session.set_option('history-limit', str(self.HISTORY_LIMIT), _global=True)
-        session.history_limit = str(self.HISTORY_LIMIT)
+        history_limit = str(self.HISTORY_LIMIT)
+        try:
+            session.set_option('history-limit', history_limit, _global=True)
+        except TypeError:
+            try:
+                session.set_option('history-limit', history_limit, global_=True)
+            except TypeError:
+                session.set_option('history-limit', history_limit)
+        session.history_limit = history_limit
         window, pane = self._get_window_and_pane_with_retry(session)
         self.window = window
         self.pane = pane

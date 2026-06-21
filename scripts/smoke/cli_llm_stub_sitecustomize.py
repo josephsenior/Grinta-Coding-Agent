@@ -13,13 +13,13 @@ from typing import Any
 import backend.inference.llm as llm_module
 
 _CALL_COUNT = 0
-_COMPLETION_TEXT = (
-    'Task complete: summarized README.md for the CLI regression.'
-)
+_COMPLETION_TEXT = 'Task complete: summarized README.md for the CLI regression.'
 _READ_ARGS = {'type': 'file', 'path': 'README.md', 'security_risk': 'LOW'}
 
 
-def _tool_call_chunks(tool_name: str, arguments: dict[str, Any]) -> list[dict[str, Any]]:
+def _tool_call_chunks(
+    tool_name: str, arguments: dict[str, Any]
+) -> list[dict[str, Any]]:
     args_json = json.dumps(arguments)
     return [
         {

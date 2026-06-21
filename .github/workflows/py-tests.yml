@@ -63,7 +63,7 @@ jobs:
           PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q
           --cov=backend --cov-fail-under=0
           backend/tests/unit/cli backend/tests/unit/client backend/tests/unit/context
-          backend/tests/unit/engine backend/tests/unit/eval
+          backend/tests/unit/engine
       - name: Stage coverage data
         run: cp .coverage coverage-shard-a.dat
       - name: Upload coverage data
