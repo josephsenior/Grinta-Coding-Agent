@@ -185,11 +185,33 @@ class Transcript(VerticalScroll):
         target_distance = self.max_scroll_y - self.scroll_target_y
         return current_distance <= threshold or target_distance <= threshold
 
-    def _set_user_scrolled_away(self, value: bool) -> None:
+    def _set_user_scrolled_away(
+        self, value: bool, *, reason: str = 'unspecified'
+    ) -> None:
+        was_away = bool(self._user_scrolled_away)
+        was_user_initiated = bool(self._user_initiated_scroll_away)
         self._user_scrolled_away = value
         if not value:
             self._user_initiated_scroll_away = False
             self._tail_unread_count = 0
+        if was_away != bool(value):
+            #region agent log
+            _agent_debug_log(
+                run_id='pre-fix',
+                hypothesis_id='H6',
+                location='widgets/small.py:_set_user_scrolled_away',
+                message='user scrolled-away state changed',
+                data={
+                    'reason': reason,
+                    'from': bool(was_away),
+                    'to': bool(value),
+                    'wasUserInitiatedAway': bool(was_user_initiated),
+                    'isUserInitiatedAway': bool(self._user_initiated_scroll_away),
+                    'scrollY': round(float(self.scroll_y), 2),
+                    'maxScrollY': round(float(self.max_scroll_y), 2),
+                },
+            )
+            #endregion
         badge = self._scroll_badge
         if badge is None:
             return
@@ -210,7 +232,7 @@ class Transcript(VerticalScroll):
         self, event: ScrollTailBadge.FollowRequested
     ) -> None:
         event.stop()
-        self.force_scroll_end()
+        self.force_scroll_end(reason='tail_badge_follow')
 
     def _sync_scroll_state_from_position(self) -> None:
         """Update follow-tail state from scroll position.
@@ -228,7 +250,24 @@ class Transcript(VerticalScroll):
 
         if self._user_scrolled_away:
             if self._was_at_bottom() and scroll_y > last_scroll_y + 0.5:
-                self._set_user_scrolled_away(False)
+                #region agent log
+                _agent_debug_log(
+                    run_id='pre-fix',
+                    hypothesis_id='H6',
+                    location='widgets/small.py:_sync_scroll_state_from_position',
+                    message='auto-clearing scrolled-away from position sync',
+                    data={
+                        'scrollY': round(float(scroll_y), 2),
+                        'lastScrollY': round(float(last_scroll_y), 2),
+                        'maxScrollY': round(float(max_y), 2),
+                        'userInitiatedAway': bool(self._user_initiated_scroll_away),
+                    },
+                )
+                #endregion
+                self._set_user_scrolled_away(
+                    False,
+                    reason='position_sync_bottom_and_scroll_advanced',
+                )
             return
 
         if max_y > last_max_y:
@@ -262,7 +301,7 @@ class Transcript(VerticalScroll):
         """
         if self.max_scroll_y > 0:
             self._user_initiated_scroll_away = True
-            self._set_user_scrolled_away(True)
+            self._set_user_scrolled_away(True, reason='pause_auto_scroll')
             #region agent log
             _agent_debug_log(
                 run_id='pre-fix',
@@ -429,7 +468,7 @@ class Transcript(VerticalScroll):
         )
 
     def user_scroll_end(self, *, animate: bool = False) -> None:
-        self.force_scroll_end(animate=animate)
+        self.force_scroll_end(animate=animate, reason='user_scroll_end')
 
     def follow_tail(self) -> None:
         """Pin the transcript to the latest content when the user is following."""
@@ -488,7 +527,9 @@ class Transcript(VerticalScroll):
         )
         #endregion
         if self._was_at_bottom() and not self._user_initiated_scroll_away:
-            self._set_user_scrolled_away(False)
+            self._set_user_scrolled_away(
+                False, reason='release_programmatic_bottom'
+            )
 
     def append_widget(self, widget: Widget, *, animate: bool | None = None) -> None:
         """Mount a widget and auto-scroll unless user scrolled up."""
@@ -537,9 +578,26 @@ class Transcript(VerticalScroll):
         """Compatibility method for RichLog interface."""
         self.append_widget(Static(renderable))
 
-    def force_scroll_end(self, *, animate: bool = False) -> None:
+    def force_scroll_end(
+        self, *, animate: bool = False, reason: str = 'force_scroll_end'
+    ) -> None:
         """Scroll to bottom regardless of user scroll state."""
-        self._set_user_scrolled_away(False)
+        #region agent log
+        _agent_debug_log(
+            run_id='pre-fix',
+            hypothesis_id='H7',
+            location='widgets/small.py:force_scroll_end',
+            message='force_scroll_end invoked',
+            data={
+                'reason': reason,
+                'scrollY': round(float(self.scroll_y), 2),
+                'maxScrollY': round(float(self.max_scroll_y), 2),
+                'userInitiatedAway': bool(self._user_initiated_scroll_away),
+                'userScrolledAway': bool(self._user_scrolled_away),
+            },
+        )
+        #endregion
+        self._set_user_scrolled_away(False, reason=f'force_scroll_end:{reason}')
         self._suppress_scroll_sync = True
         self.scroll_end(animate=animate, force=True, immediate=not animate)
         self.call_after_refresh(self._release_programmatic_scroll)

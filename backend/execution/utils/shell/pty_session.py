@@ -23,12 +23,14 @@ abstractions (``UnifiedShellSession``, agent tools, REPL UI).
 
 from __future__ import annotations
 
+import contextlib
 import errno
 import re
 import shlex
+import signal
 import threading
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -41,6 +43,36 @@ DEFAULT_BUFFER_CHARS = 1_048_576
 DEFAULT_READ_CHUNK = 4096
 DEFAULT_DIMENSIONS: tuple[int, int] = (24, 80)
 _MAX_SANITIZE_CARRY = 256
+
+# ConPTY on Windows may deliver CTRL+C to the host console when we write these
+# bytes to the child PTY.  Guard parent writes so the TUI / agent process survives.
+_CONPTY_HOST_ISOLATED_CTRL_BYTES = frozenset({'\x03'})
+
+
+@contextlib.contextmanager
+def _suppress_parent_console_ctrl_events() -> Iterator[None]:
+    """Prevent ConPTY control writes from terminating the host Python process."""
+    if not IS_WINDOWS:
+        yield
+        return
+
+    import ctypes
+
+    kernel32 = ctypes.windll.kernel32
+    prev_sig = signal.getsignal(signal.SIGINT)
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    # HandlerRoutine=NULL + Add=TRUE => this process ignores CTRL+C (MSDN).
+    kernel32.SetConsoleCtrlHandler(None, True)
+    try:
+        yield
+    finally:
+        kernel32.SetConsoleCtrlHandler(None, False)
+        signal.signal(signal.SIGINT, prev_sig)
+
+
+def _needs_parent_console_ctrl_guard(data: str) -> bool:
+    return IS_WINDOWS and any(ch in _CONPTY_HOST_ISOLATED_CTRL_BYTES for ch in data)
+
 
 # Common terminal control sequences keyed by human-friendly aliases.
 # Values are the literal characters written to the PTY.
@@ -545,8 +577,14 @@ class InteractiveSession:
         self._require_active()
         if not data:
             return 0
+        ctx = (
+            _suppress_parent_console_ctrl_events()
+            if _needs_parent_console_ctrl_guard(data)
+            else contextlib.nullcontext()
+        )
         try:
-            written = self._backend.write(data)  # type: ignore[union-attr]
+            with ctx:
+                written = self._backend.write(data)  # type: ignore[union-attr]
         except Exception as exc:
             raise InteractiveSessionError(f'failed to write to session: {exc}') from exc
         if isinstance(written, int):

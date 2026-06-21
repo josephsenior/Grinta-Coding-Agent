@@ -251,6 +251,10 @@ class ScreenMessagesMixin:
             self.app.copy_to_clipboard(ta.selected_text)
             return
         if self._is_agent_running():
+            session_id = self._active_interactive_terminal_session_id()
+            if session_id is not None:
+                asyncio.create_task(self._forward_terminal_control(session_id, 'C-c'))
+                return
             self._interrupt_agent()
 
     def action_copy_transcript(self) -> None:
@@ -303,6 +307,41 @@ class ScreenMessagesMixin:
             return False
         state = self._controller.get_agent_state()
         return state == AgentState.RUNNING
+
+    def _active_interactive_terminal_session_id(self) -> str | None:
+        """Return the most recent PTY session awaiting interaction, if any."""
+        runtime = getattr(self, '_runtime_stub', None)
+        executor = getattr(runtime, '_executor', None)
+        if executor is None:
+            return None
+        pending = getattr(executor, '_terminal_sessions_awaiting_interaction', None)
+        if not isinstance(pending, list) or not pending:
+            return None
+        session_id = str(pending[-1]).strip()
+        return session_id or None
+
+    async def _forward_terminal_control(self, session_id: str, control: str) -> None:
+        """Send a control sequence to an interactive terminal session."""
+        runtime = getattr(self, '_runtime_stub', None)
+        if runtime is None:
+            return
+        terminal_input = getattr(runtime, 'terminal_input', None)
+        if not callable(terminal_input):
+            return
+        from backend.ledger.action.terminal import TerminalInputAction
+
+        try:
+            await asyncio.to_thread(
+                terminal_input,
+                TerminalInputAction(session_id=session_id, control=control),
+            )
+        except Exception:
+            _tui_logger.debug(
+                'Failed to forward %s to terminal %s',
+                control,
+                session_id,
+                exc_info=True,
+            )
 
     def _interrupt_agent(self) -> None:
         """Cancel the running agent and clean up."""

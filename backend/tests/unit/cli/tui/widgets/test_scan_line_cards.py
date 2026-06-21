@@ -238,8 +238,8 @@ def test_terminal_card_running():
         command='cargo build',
     )
     assert card.state == 'running'
-    assert 'Term' in _line_text(card)
-    assert '[#EF9F27]Term[/]' in _line_text(card)
+    assert 'Terminal' in _line_text(card)
+    assert '[#EF9F27]Terminal[/]' in _line_text(card)
     assert 's1' in _line_text(card)
     assert '/project/grinta' in _line_text(card)
     assert '[#EF9F27]…[/]' in card._delta_text()
