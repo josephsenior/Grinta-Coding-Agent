@@ -177,7 +177,7 @@ class ScreenLifecycleMixin:
                 if self._controller is not None:
                     self._hud.update_agent_state('error')
                 else:
-                    self._hud.update_agent_state('Initializing')
+                    self._hud.update_agent_state('error')
                 self._render_hud_bar()
 
         self._bootstrap_task = asyncio.create_task(_bg(), name='grinta-tui-bootstrap')
@@ -190,6 +190,9 @@ class ScreenLifecycleMixin:
             self._hud_tick = None
         if self._bootstrap_task and not self._bootstrap_task.done():
             self._bootstrap_task.cancel()
+        if self._environment_probe_task and not self._environment_probe_task.done():
+            self._environment_probe_task.cancel()
+            self._environment_probe_task = None
         if self._renderer:
             if self._renderer._event_stream:
                 self._renderer._event_stream.unsubscribe(
@@ -227,12 +230,10 @@ class ScreenLifecycleMixin:
     async def _bootstrap(self, session_id: str | None = None) -> None:
         _tui_logger.debug('_bootstrap: start')
         logger.info('TUI _bootstrap: starting')
-        self._hud.update_agent_state('Initializing')
-        self._render_hud_bar()
-        self._render_hud_bar()
 
         _bootstrapping = asyncio.Event()
         self._bootstrapping = _bootstrapping
+        self._reset_environment_probe()
 
         config = self._config
 
@@ -298,8 +299,6 @@ class ScreenLifecycleMixin:
                 logger.exception('TUI _bootstrap: failed in phase2')
                 raise
 
-            await self._bootstrap_mcp_warmup(agent, runtime, memory)
-
             _tui_logger.debug(
                 f'_bootstrap: controller created, state={controller.get_agent_state()}'
             )
@@ -333,6 +332,7 @@ class ScreenLifecycleMixin:
                 ensure_worker()
 
             await self._bootstrap_setup_renderer(event_stream, controller)
+            self._start_environment_probe(agent, runtime, memory)
             _tui_logger.debug('_bootstrap: done')
         except BaseException:
             if event_stream is not None:
@@ -347,6 +347,13 @@ class ScreenLifecycleMixin:
             raise
         finally:
             _bootstrapping.set()
+            ready = self._environment_ready
+            if (
+                ready is not None
+                and not ready.is_set()
+                and self._environment_probe_task is None
+            ):
+                ready.set()
 
     def _bootstrap_check_unmounted(self, event_stream: Any) -> bool:
         if not self._is_unmounted:
@@ -388,6 +395,62 @@ class ScreenLifecycleMixin:
             _tui_logger.debug('_bootstrap: MCP warmup failed (non-fatal)')
             self._hud.update_mcp_servers(0)
 
+    def _reset_environment_probe(self) -> None:
+        """Clear env-probe state so the next session can warm tools in background."""
+        if self._environment_probe_task and not self._environment_probe_task.done():
+            self._environment_probe_task.cancel()
+        self._environment_probe_task = None
+        self._environment_ready = asyncio.Event()
+
+    def _start_environment_probe(self, agent: Any, runtime: Any, memory: Any) -> None:
+        """Warm MCP tools and probe LSP/DAP off the critical bootstrap path."""
+
+        async def _run() -> None:
+            try:
+                await self._probe_environment(agent, runtime, memory)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception('TUI environment probe failed')
+            finally:
+                ready = self._environment_ready
+                if ready is not None:
+                    ready.set()
+                renderer = self._renderer
+                if renderer is not None:
+                    try:
+                        renderer._refresh_display()
+                    except Exception:
+                        pass
+
+        self._environment_probe_task = asyncio.create_task(
+            _run(),
+            name='grinta-tui-env-probe',
+        )
+
+    async def _probe_environment(self, agent: Any, runtime: Any, memory: Any) -> None:
+        """Connect MCP servers and detect local language/debug runtimes."""
+        probes: list[Any] = [self._bootstrap_mcp_warmup(agent, runtime, memory)]
+        renderer = self._renderer
+        if renderer is not None:
+            probes.append(renderer._detect_lsp_servers_async())
+        await asyncio.gather(*probes)
+
+    async def _ensure_environment_ready(self) -> None:
+        """Wait until MCP + runtime detection finished before the first agent turn."""
+        ready = self._environment_ready
+        if ready is None or ready.is_set():
+            return
+        prev_phase = self._phase_label
+        self._phase_label = 'Preparing environment…'
+        self._render_hud_bar()
+        try:
+            await ready.wait()
+        finally:
+            if self._phase_label == 'Preparing environment…':
+                self._phase_label = prev_phase or 'Ready'
+            self._render_hud_bar()
+
     async def _bootstrap_setup_renderer(
         self, event_stream: Any, controller: Any
     ) -> None:
@@ -413,7 +476,6 @@ class ScreenLifecycleMixin:
         )
         self._hud.update_agent_state('awaiting_user_input')
         self._render_hud_bar()
-        self._renderer.schedule_lsp_detection()
 
         asyncio.create_task(
             self._bootstrap_finalize_renderer(),
@@ -790,6 +852,8 @@ class ScreenLifecycleMixin:
                 '_dispatch_to_agent: missing controller or event_stream, returning'
             )
             return
+
+        await self._ensure_environment_ready()
 
         action = MessageAction(
             content=text,

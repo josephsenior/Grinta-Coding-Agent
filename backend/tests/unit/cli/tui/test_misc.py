@@ -299,6 +299,9 @@ async def test_tui_handle_input_does_not_bootstrap_twice_after_background_ready(
         marker = asyncio.Event()
         self._bootstrapping = marker
         self._controller = FakeController()
+        env_ready = asyncio.Event()
+        env_ready.set()
+        self._environment_ready = env_ready
         marker.set()
 
     monkeypatch.setattr(GrintaScreen, '_bootstrap', fake_bootstrap)
@@ -454,6 +457,63 @@ async def test_bootstrap_setup_renderer_marks_ready_before_hydrate(mock_config):
 
         assert s._hud.state.agent_state_label == 'awaiting_user_input'
         await asyncio.wait_for(hydrate_started.wait(), timeout=2.0)
+
+
+@pytest.mark.asyncio
+async def test_environment_probe_unblocks_dispatch(mock_config, monkeypatch):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    probe_started = asyncio.Event()
+
+    async def slow_probe(self, agent, runtime, memory):
+        probe_started.set()
+        await asyncio.sleep(0.05)
+
+    monkeypatch.setattr(GrintaScreen, '_probe_environment', slow_probe)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+        s = _get_screen(app)
+        s._reset_environment_probe()
+        s._start_environment_probe(MagicMock(), MagicMock(), MagicMock())
+
+        wait_task = asyncio.create_task(s._ensure_environment_ready())
+        await asyncio.wait_for(probe_started.wait(), timeout=2.0)
+        assert not wait_task.done()
+        await asyncio.wait_for(wait_task, timeout=2.0)
+
+
+@pytest.mark.asyncio
+async def test_dispatch_waits_for_environment_ready(mock_config, monkeypatch):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    env_waited = asyncio.Event()
+
+    async def track_env(self):
+        env_waited.set()
+        return None
+
+    monkeypatch.setattr(GrintaScreen, '_ensure_environment_ready', track_env)
+    monkeypatch.setattr(GrintaScreen, '_ensure_agent_task', AsyncMock())
+    monkeypatch.setattr(
+        GrintaScreen,
+        '_poll_for_agent_completion',
+        AsyncMock(return_value=AgentState.AWAITING_USER_INPUT),
+    )
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+        s = _get_screen(app)
+        s._controller = MagicMock()
+        s._event_stream = MagicMock()
+
+        await s._dispatch_to_agent('hello')
+
+        assert env_waited.is_set()
 
 
 @pytest.mark.asyncio

@@ -363,6 +363,12 @@ class RendererDisplayMixin:
 
         call_after(_relayout)
 
+    def _is_environment_probe_pending(self) -> bool:
+        ready = getattr(self._tui, '_environment_ready', None)
+        if ready is None:
+            return False
+        return not ready.is_set()
+
     def _is_runtime_bootstrap_pending(self) -> bool:
         bootstrapping = getattr(self._tui, '_bootstrapping', None)
         if bootstrapping is None:
@@ -372,9 +378,7 @@ class RendererDisplayMixin:
     def _mcp_sidebar_is_loading(self, mcp_items: list) -> bool:
         if mcp_items:
             return False
-        if self._hud.state.mcp_servers is None:
-            return True
-        return self._is_runtime_bootstrap_pending()
+        return self._is_environment_probe_pending()
 
     def _skills_sidebar_is_loading(self, skill_items: list) -> bool:
         if skill_items:
