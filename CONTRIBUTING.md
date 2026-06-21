@@ -96,12 +96,15 @@ python scripts/bootstrap_env.py dev-test
 PYTHONPATH=. uv run pytest --cov=backend --cov-fail-under=75 backend/tests
 ```
 
-- **Windows (`gates-on-windows`):** `backend/tests/unit` only — match locally with:
+- **Windows (`gates-on-windows` + `gates-on-windows-extended`):** unit corpus, then integration/e2e/stress — match locally with:
 
 ```bash
 python scripts/bootstrap_env.py dev-test
 PYTHONPATH=. uv run pytest backend/tests/unit
+PYTHONPATH=. uv run pytest backend/tests/integration backend/tests/e2e backend/tests/stress
 ```
+
+- **macOS (`gates-on-macos` + `gates-on-macos-extended`):** same extended tier as Windows.
 
 For day-to-day edits, `pytest backend/tests/unit` is usually enough before you push. Run the full Linux corpus when your change touches integration, e2e, stress, or cross-cutting orchestration paths.
 

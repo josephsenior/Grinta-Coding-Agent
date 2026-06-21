@@ -33,5 +33,9 @@ try {
     }
 }
 
+Write-Host '==> Source onboarding smoke: stub CLI task (deterministic LLM, no live API)'
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+& (Join-Path $repoRoot 'scripts\smoke\run_stub_cli_task.ps1') -UseUvRun -RepoRoot $repoRoot
+
 Write-Host '==> Source onboarding smoke: passed'
 exit 0

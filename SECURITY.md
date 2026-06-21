@@ -83,8 +83,11 @@ captures the boundaries operators care about most.
 ### Secrets
 
 - Secrets in `settings.json` should be referenced via `${ENV_VAR}` indirection;
-  the canonical secret source is your shell environment, OS keychain, or `.env`
-  file — not the JSON itself.
+  the canonical secret source is your shell environment or a sibling `.env`
+  file under the app settings root (`~/.grinta/` when installed, or the
+  repository root / `APP_ROOT` when running from source) — not the JSON itself.
+  Grinta resolves placeholders through `backend/core/config/api_key_manager.py`.
+  OS keychain integration is not implemented today.
 - The **secret masker** strips known secret patterns (provider API keys, JWTs,
   cloud credentials) from event-stream output, audit logs, and panel renders
   before display.

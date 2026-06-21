@@ -29,7 +29,8 @@ concurrency:
 # - gates-on-linux-coverage-{a,b,d,f,g,e,c,report}: unit tests sharded for coverage on Linux.
 #   Execution shards (d,f,g) skip compileall; syntax is still gated on a/b/c/e shards.
 # - gates-on-linux-extended: integration/e2e/stress after coverage gate passes.
-# - gates-on-windows / gates-on-macos: required unit-only PR gates for cross-platform smoke.
+# - gates-on-windows / gates-on-macos: required unit PR gates for cross-platform smoke.
+# - gates-on-windows-extended / gates-on-macos-extended: integration/e2e/stress after unit gates pass.
 # - heavy-tests: marker-filtered heavy | integration | benchmark (schedule, main, manual).
 jobs:
   gates-on-linux-coverage-a:
@@ -463,6 +464,37 @@ jobs:
         env:
           PYTHONPATH: '.;$env:PYTHONPATH'
 
+  gates-on-windows-extended:
+    name: Python Gates on Windows (extended)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    needs: gates-on-windows
+    strategy:
+      matrix:
+        python-version: ['3.12']
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Install uv
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a
+        with:
+          enable-cache: true
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Lockfile validation
+        run: uv lock --check
+      - name: Install Python dependencies
+        run: python scripts/bootstrap_env.py dev-test
+      - name: Verify optional imports
+        run: python backend/scripts/verify/verify_optional_imports.py
+      - name: Compile backend (syntax gate)
+        run: uv run python -m compileall backend
+      - name: Run integration, e2e, and stress tests
+        run: uv run pytest --maxfail=1 -q -n 2 backend/tests/integration backend/tests/e2e backend/tests/stress
+        env:
+          PYTHONPATH: '.;$env:PYTHONPATH'
+
   heavy-tests:
     name: Heavy / Integration Tests
     runs-on: ubuntu-24.04
@@ -519,3 +551,32 @@ jobs:
         run: uv run python -m compileall backend
       - name: Run unit tests (full corpus)
         run: PYTHONPATH=".:$PYTHONPATH" uv run pytest -q backend/tests/unit
+
+  gates-on-macos-extended:
+    name: Python Gates on macOS (extended)
+    runs-on: macos-latest
+    timeout-minutes: 45
+    needs: gates-on-macos
+    strategy:
+      matrix:
+        python-version: ['3.12']
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Install uv
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a
+        with:
+          enable-cache: true
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Lockfile validation
+        run: uv lock --check
+      - name: Install Python dependencies
+        run: python scripts/bootstrap_env.py dev-test
+      - name: Verify optional imports
+        run: python backend/scripts/verify/verify_optional_imports.py
+      - name: Compile backend (syntax gate)
+        run: uv run python -m compileall backend
+      - name: Run integration, e2e, and stress tests
+        run: PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q -n 2 backend/tests/integration backend/tests/e2e backend/tests/stress

@@ -57,6 +57,8 @@ class TestExceptionHandlerService:
         reported = ctrl.recovery_service.react_to_exception.call_args[0][0]
         assert isinstance(reported, RuntimeError)
         assert 'unexpected error' in str(reported)
+        assert '/resume' in str(reported)
+        assert 'refresh the page' not in str(reported)
 
     async def test_rate_limit_passthrough(self, svc, ctrl):
         exc = RateLimitError('too many')

@@ -6,16 +6,16 @@ This matrix defines what Grinta currently supports for official OSS releases.
 
 | Platform | Status | Notes |
 | --- | --- | --- |
-| Linux | Supported | Required CI gate runs full `backend/tests` with coverage (`gates-on-linux`). |
-| Windows | Supported | Required CI gate runs `backend/tests/unit` (`gates-on-windows`). |
-| macOS | Supported | Required macOS unit gate runs `backend/tests/unit` (`gates-on-macos`); Linux remains the only platform with the full extended integration/e2e/stress tier. |
+| Linux | Supported | Required CI gate runs full unit corpus with coverage, then integration/e2e/stress (`gates-on-linux-*`). |
+| Windows | Supported | Required CI gate runs `backend/tests/unit`, then integration/e2e/stress (`gates-on-windows`, `gates-on-windows-extended`). |
+| macOS | Supported | Required CI gate runs `backend/tests/unit`, then integration/e2e/stress (`gates-on-macos`, `gates-on-macos-extended`). |
 
 ### macOS platform policy
 
-macOS is a supported release platform with a required unit-test gate. The
-`gates-on-macos` job in [`.github/workflows/py-tests.yml`](../.github/workflows/py-tests.yml)
-runs the full unit corpus on every PR and on `main`, but macOS does not yet
-carry the Linux extended integration/e2e/stress tier.
+macOS is a supported release platform with required unit and extended CI gates.
+The `gates-on-macos` and `gates-on-macos-extended` jobs in
+[`.github/workflows/py-tests.yml`](../.github/workflows/py-tests.yml) run on every
+PR and on `main`, matching the Linux extended integration/e2e/stress tier.
 
 Contributors on Mac should still run `pytest backend/tests/unit` locally before
 opening PRs that touch shell, terminal, or path handling.
@@ -37,7 +37,7 @@ by host OS. Treat this table as the honest parity contract.
 | MCP (local runtime / action client) | Full | Full (HTTP/SSE + allowlisted stdio) | Full |
 | MCP (remote action-execution client) | Full | Full when server exposes MCP | Full |
 | Default cache directory | System temp (`<temp>/grinta/cache`) | Same | Same |
-| CI certification depth | Full tests + coverage + integration | Required unit gate | Required unit gate |
+| CI certification depth | Full unit + coverage + integration/e2e/stress | Full unit + integration/e2e/stress | Full unit + integration/e2e/stress |
 
 When a feature is **limited** rather than **absent**, the runtime logs a warning
 and the agent prompt layer (`terminal_contract`) steers the model toward the

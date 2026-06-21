@@ -72,5 +72,11 @@ fi
 unset APP_ROOT
 
 echo
+echo "==> Smoke-test: stub CLI task (deterministic LLM, no live API)"
+repo_root="$(cd "$(dirname "$0")/../.." && pwd)"
+chmod +x "$repo_root/scripts/smoke/run_stub_cli_task.sh"
+"$repo_root/scripts/smoke/run_stub_cli_task.sh" python "$repo_root"
+
+echo
 echo "==> Done. Extras installed: ${EXTRAS:-(none)}"
 deactivate
