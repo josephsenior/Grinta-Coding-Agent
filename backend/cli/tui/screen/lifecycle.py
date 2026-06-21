@@ -244,6 +244,16 @@ class ScreenLifecycleMixin:
             )
             sid = session_id.strip() if session_id else generate_sid(config)
             try:
+                from backend.core.logging.logger import (
+                    bind_session_logging,
+                    configure_file_logging,
+                )
+
+                configure_file_logging()
+                bind_session_logging(sid)
+            except Exception:
+                logger.exception('TUI bootstrap: failed to bind session logging')
+            try:
                 from backend.context.memory.session_context import bind_session_context
 
                 bind_session_context(session_id=sid)

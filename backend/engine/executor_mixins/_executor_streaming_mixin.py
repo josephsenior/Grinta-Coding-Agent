@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import os
 import time
+import uuid
 from typing import TYPE_CHECKING, Any
 
 from backend.core.constants import LLM_STREAM_CHUNK_TIMEOUT_SECONDS
@@ -156,6 +157,46 @@ class _ExecutorStreamingMixin:
                     'arguments': arguments if isinstance(arguments, str) else '',
                 },
             }
+        self._capture_fallback_response_id(state, fallback)
+
+    @staticmethod
+    def _capture_stream_response_id(
+        state: _AsyncStreamingState,
+        chunk: Any,
+    ) -> None:
+        """Capture the provider response id from the first stream chunk that has one."""
+        if (state.stream_response_id or '').strip():
+            return
+        chunk_id: Any = None
+        if isinstance(chunk, dict):
+            chunk_id = chunk.get('id')
+        else:
+            chunk_id = getattr(chunk, 'id', None)
+        if isinstance(chunk_id, str) and chunk_id.strip():
+            state.stream_response_id = chunk_id.strip()
+
+    @staticmethod
+    def _capture_fallback_response_id(
+        state: _AsyncStreamingState,
+        fallback: Any,
+    ) -> None:
+        if (state.stream_response_id or '').strip():
+            return
+        fallback_id = getattr(fallback, 'id', None)
+        if fallback_id is None and isinstance(fallback, dict):
+            fallback_id = fallback.get('id')
+        if isinstance(fallback_id, str) and fallback_id.strip():
+            state.stream_response_id = fallback_id.strip()
+
+    @staticmethod
+    def _ensure_stream_response_id(state: _AsyncStreamingState) -> str:
+        candidate = (state.stream_response_id or '').strip()
+        if candidate:
+            return candidate
+        synthetic = f'grinta-synthetic-{uuid.uuid4().hex}'
+        state.stream_response_id = synthetic
+        logger.debug('Generated synthetic stream response_id=%s', synthetic)
+        return synthetic
 
     def _build_streaming_response(
         self,
@@ -164,6 +205,8 @@ class _ExecutorStreamingMixin:
         thinking_accum: str,
         tool_calls_list: list[dict[str, Any]] | None,
         streamed_usage: dict[str, int] | None,
+        *,
+        stream_response_id: str = '',
     ) -> Any:
         from backend.inference.clients import LLMResponse
 
@@ -174,11 +217,14 @@ class _ExecutorStreamingMixin:
             tool_calls_list,
             streamed_usage,
         )
+        resolved_response_id = (stream_response_id or '').strip()
+        if not resolved_response_id:
+            resolved_response_id = f'grinta-synthetic-{uuid.uuid4().hex}'
         return LLMResponse(
             content=visible_accum,
             model=model_name,
             usage=resolved_usage,
-            response_id='',
+            response_id=resolved_response_id,
             finish_reason='stop',
             tool_calls=tool_calls_list,
             reasoning_content=thinking_accum,
@@ -259,6 +305,7 @@ class _ExecutorStreamingMixin:
             return False  # type: ignore[unreachable]
 
         first_chunk = chunk
+        self._capture_stream_response_id(state, first_chunk)
 
         choices = first_chunk.get('choices', [])
         if choices:
@@ -305,6 +352,7 @@ class _ExecutorStreamingMixin:
                     model=self._llm_model_name(self._llm),
                 ) from None
 
+            self._capture_stream_response_id(state, chunk)
             choices = chunk.get('choices', [])
             if not choices:
                 chunk_usage = chunk.get('usage')

@@ -145,7 +145,7 @@ def _handle_tool_based_action(
     role = _role_from_assistant_message(assistant_msg)
     content_items = _content_from_assistant_message(assistant_msg)
     reasoning_content = _reasoning_content_for_tool_replay(action, assistant_msg)
-    response_id = getattr(llm_response, 'id', None)
+    response_id = _resolve_replay_response_id(action, llm_response)
     if response_id is None:
         return []
 
@@ -216,6 +216,25 @@ def _require_tool_metadata(action: Action):
         f'Tool call metadata should NOT be None when function calling is enabled for agent actions. Action: {action!s}'
     )
     return tool_metadata
+
+
+def _resolve_replay_response_id(
+    action: Action,
+    llm_response: ModelResponseLite,
+) -> str | None:
+    """Return a non-empty key for pending assistant replay messages."""
+    for raw in (
+        getattr(llm_response, 'id', None),
+        getattr(action, 'response_id', None),
+    ):
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+
+    tool_metadata = getattr(action, 'tool_call_metadata', None)
+    tool_call_id = getattr(tool_metadata, 'tool_call_id', None) if tool_metadata else None
+    if isinstance(tool_call_id, str) and tool_call_id.strip():
+        return f'grinta-synthetic-replay:{tool_call_id.strip()}'
+    return None
 
 
 def _extract_llm_response(tool_metadata) -> ModelResponseLite | None:

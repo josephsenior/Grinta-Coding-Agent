@@ -5,10 +5,28 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+from pathlib import Path
 
 import pytest
 
 from backend.core.logging import logger as logger_mod
+
+
+def test_grinta_install_tree_root_points_at_repo_root():
+    install_root = Path(logger_mod._grinta_install_tree_root())
+    assert install_root.name != 'backend'
+    assert (install_root / 'backend' / 'core' / 'logging' / 'logger.py').is_file()
+
+
+def test_workspace_logs_dir_under_repo_logs_not_backend_logs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+):
+    monkeypatch.setenv('PROJECT_ROOT', str(tmp_path))
+    monkeypatch.delenv('APP_PROJECT_ROOT', raising=False)
+    ws_dir = logger_mod._workspace_logs_dir()
+    assert ws_dir is not None
+    install_root = Path(logger_mod._grinta_install_tree_root())
+    assert Path(ws_dir) == install_root / 'logs' / 'workspaces' / logger_mod._workspace_logs_segment()
 
 
 def test_workspace_logs_segment_uses_project_root(

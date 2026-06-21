@@ -47,6 +47,7 @@ class _AsyncStreamingState:
     thinking_accumulate: str = ''
     tool_calls_dict: dict[int, dict[str, Any]] = field(default_factory=dict)
     streamed_usage: dict[str, int] | None = None
+    stream_response_id: str = ''
     in_inline_think_block: bool = False
     last_text_emit_at: float = 0.0
     last_text_emit_len: int = 0

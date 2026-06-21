@@ -14,6 +14,7 @@ import threading
 import traceback
 from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, TextIO
 
 from pythonjsonlogger.json import JsonFormatter
@@ -358,7 +359,9 @@ def _grinta_install_tree_root() -> str:
     the user's repo tree). ``segment`` is derived from ``PROJECT_ROOT`` so each
     workspace is isolated while you keep one Grinta checkout for debugging.
     """
-    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    # ``logger.py`` lives at ``backend/core/logging/logger.py`` — four parents
+    # to the install/repo root (was three when the module was ``backend/core/logger.py``).
+    return str(Path(__file__).resolve().parents[3])
 
 
 def _workspace_logs_segment() -> str | None:
