@@ -103,7 +103,8 @@ def _acquire_session_lock(lock_path: str, lock_data: str) -> Any:
         handle = open(lock_path, 'w', encoding='utf-8')
         try:
             fcntl.flock(  # type: ignore[attr-defined]
-                handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB  # type: ignore[attr-defined]
+                handle.fileno(),
+                fcntl.LOCK_EX | fcntl.LOCK_NB,  # type: ignore[attr-defined]
             )
             handle.write(lock_data)
             handle.flush()
@@ -115,7 +116,7 @@ def _acquire_session_lock(lock_path: str, lock_data: str) -> Any:
             handle.close()
             raise
 
-    import msvcrt
+    import msvcrt  # type: ignore[import-not-found]
 
     handle = open(lock_path, 'w+b')  # type: ignore[assignment]
     try:
@@ -123,12 +124,12 @@ def _acquire_session_lock(lock_path: str, lock_data: str) -> Any:
         handle.flush()
         os.fsync(handle.fileno())
         handle.seek(0)
-        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)  # type: ignore[attr-defined]
         return handle
     except Exception:
         with contextlib.suppress(Exception):
             handle.seek(0)
-            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)  # type: ignore[attr-defined]
         handle.close()
         raise
 
@@ -404,7 +405,8 @@ class EventStream(EventStore):
                     import fcntl  # type: ignore[import-not-found]
 
                     fcntl.flock(  # type: ignore[attr-defined]
-                        self._session_lock_handle.fileno(), fcntl.LOCK_UN  # type: ignore[attr-defined]
+                        self._session_lock_handle.fileno(),
+                        fcntl.LOCK_UN,  # type: ignore[attr-defined]
                     )
                 else:
                     import msvcrt

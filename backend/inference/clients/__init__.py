@@ -6,6 +6,9 @@ offering a lightweight and stable alternative to multi-provider abstraction libr
 Re-exports from submodules for backward compatibility.
 """
 
+from anthropic import Anthropic, AsyncAnthropic  # noqa: F401
+from openai import AsyncOpenAI, OpenAI  # noqa: F401
+
 from backend.inference.clients.anthropic_client import AnthropicClient  # noqa: F401
 from backend.inference.clients.base import (  # noqa: F401
     DirectLLMClient,
@@ -29,22 +32,38 @@ def __getattr__(name: str):
 
     Used to expose GeminiClient without creating an import cycle with
     backend.inference.providers.gemini_ops (which imports
-    DirectLLMClient from us).
+    DirectLLMClient from us). Private helpers are re-exported for tests.
     """
     if name == 'GeminiClient':
         from backend.inference.providers.gemini_ops import GeminiClient
 
         return GeminiClient
+    if name in {'_pool_key', '_resolve_transport_profile'}:
+        from backend.inference.clients import base
+
+        return getattr(base, name)
+    if name == '_openai_completion':
+        from backend.inference.providers.openai_ops import completion
+
+        return completion
+    if name == '_anthropic_completion':
+        from backend.inference.providers.anthropic_ops import completion
+
+        return completion
     raise AttributeError(f'module {__name__!r} has no attribute {name!r}')
 
 
 __all__ = [
     'AnthropicClient',
+    'Anthropic',
+    'AsyncAnthropic',
     'DirectLLMClient',
     'GeminiClient',
     'LLMResponse',
     'OpenAIClient',
     'OpenCodeResponsesClient',
+    'OpenAI',
+    'AsyncOpenAI',
     'TransportProfile',
     'aclose_shared_http_clients',
     'bounded_llm_http_timeout',

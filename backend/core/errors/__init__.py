@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from backend.core.type_safety.path_validation import PathValidationError
+
 
 class AppError(RuntimeError):
     """Base class for normalized app errors."""
@@ -132,6 +134,7 @@ __all__ = [
     'PersistenceError',
     'ReplayError',
     'EventStreamError',
+    'PathValidationError',
 ]
 
 

@@ -1,5 +1,6 @@
 """Tool definitions used by the Orchestrator agent."""
 
+from . import scratchpad as note
 from .analyze_project_structure import create_analyze_project_structure_tool
 from .bash import create_cmd_run_tool
 from .browser_native import create_browser_tool
@@ -47,4 +48,5 @@ __all__ = [
     'create_task_tracker_tool',
     'create_delegate_task_tool',
     'create_terminal_manager_tool',
+    'note',
 ]

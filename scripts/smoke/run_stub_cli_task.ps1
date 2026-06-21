@@ -51,6 +51,7 @@ $env:APP_ROOT = $appRoot
 if (-not $env:LLM_API_KEY) { $env:LLM_API_KEY = 'sk-smoke-stub-task' }
 if (-not $env:LLM_MODEL) { $env:LLM_MODEL = 'openai/gpt-4.1' }
 $env:GRINTA_NO_SPLASH = '1'
+$env:GRINTA_SKIP_STARTUP_HEALTH_CHECK = '1'
 $env:LOG_TO_FILE = 'false'
 $env:PYTHONUTF8 = '1'
 $env:PYTHONPATH = $RepoRoot

@@ -40,7 +40,7 @@ jobs:
       - name: Run wheel smoke install (Unix)
         if: runner.os != 'Windows'
         run: |
-          chmod +x scripts/smoke_install.sh scripts/smoke_source_onboarding.sh
+          chmod +x scripts/smoke_install.sh scripts/smoke_source_onboarding.sh scripts/smoke/*.sh
           WHEEL_DIR=./dist ./scripts/smoke_install.sh
 
       - name: Run wheel smoke install (Windows)

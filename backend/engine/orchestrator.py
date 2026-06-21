@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import asyncio  # noqa: F401
 import contextlib
+import os
 from collections import deque
 from typing import TYPE_CHECKING, Any
 
@@ -96,9 +97,7 @@ class Orchestrator(Agent):
 
         # Register vector-memory callback for the semantic_recall tool
         if self.conversation_memory is not None:
-            register_semantic_recall(
-                self.conversation_memory.recall_from_memory
-            )
+            register_semantic_recall(self.conversation_memory.recall_from_memory)
 
         # Planner/executor wiring
         self.planner: PlannerProtocol = OrchestratorPlanner(
@@ -226,6 +225,16 @@ class Orchestrator(Agent):
         return _impl(self)
 
     def _run_production_health_check(self) -> None:
+        if os.getenv('GRINTA_SKIP_STARTUP_HEALTH_CHECK', '').strip().lower() in {
+            '1',
+            'true',
+            'yes',
+            'on',
+        }:
+            logger.debug(
+                'Skipping startup dependency check (GRINTA_SKIP_STARTUP_HEALTH_CHECK)'
+            )
+            return
         try:
             from backend.engine.tools.health_check import (
                 run_production_health_check,
