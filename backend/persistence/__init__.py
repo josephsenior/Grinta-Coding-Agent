@@ -40,3 +40,17 @@ def get_file_store(
     else:
         store = InMemoryFileStore()
     return store
+
+
+def __getattr__(name: str):
+    """Backward-compatible submodule aliases used by unit-test patch paths."""
+    import importlib
+
+    aliases = {
+        'atomic_write': 'backend.persistence.file_store.atomic_write',
+        'local_file_store': 'backend.persistence.file_store.local_file_store',
+    }
+    target = aliases.get(name)
+    if target is not None:
+        return importlib.import_module(target)
+    raise AttributeError(f'module {__name__!r} has no attribute {name!r}')

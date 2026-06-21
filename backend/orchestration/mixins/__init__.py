@@ -39,3 +39,21 @@ __all__ = [
     '_SessionOrchestratorStepMixin',
     '_SessionOrchestratorWatchdogMixin',
 ]
+
+
+def __getattr__(name: str):
+    """Backward-compatible submodule aliases used by unit-test patch paths."""
+    import importlib
+
+    aliases = {
+        'action_mixin': 'backend.orchestration.mixins.action',
+        'lifecycle_mixin': 'backend.orchestration.mixins.lifecycle',
+        'parallel_mixin': 'backend.orchestration.mixins.parallel',
+        'state_mixin': 'backend.orchestration.mixins.state',
+        'step_mixin': 'backend.orchestration.mixins.step',
+        'watchdog_mixin': 'backend.orchestration.mixins.watchdog',
+    }
+    target = aliases.get(name)
+    if target is not None:
+        return importlib.import_module(target)
+    raise AttributeError(f'module {__name__!r} has no attribute {name!r}')
