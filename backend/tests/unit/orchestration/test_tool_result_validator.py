@@ -351,7 +351,7 @@ class TestObserve:
 
         mock_block.block.assert_called_once()
         call_args = mock_block.block.call_args
-        assert 'RESULT VALIDATION BLOCKED' in call_args.kwargs['reason']
+        assert 'Tool result validation blocked' in call_args.kwargs['reason']
 
     @pytest.mark.asyncio
     async def test_observe_gracefully_handles_rule_exception(self):

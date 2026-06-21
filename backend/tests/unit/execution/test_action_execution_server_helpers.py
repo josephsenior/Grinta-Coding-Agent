@@ -211,7 +211,7 @@ def test_terminal_ids_guardrails_and_cursor_helpers() -> None:
 
     miss = h.missing_terminal_session_error(ex, 'terminal_999', operation='read')
     assert isinstance(miss, ErrorObservation)
-    assert 'terminal_1' in miss.content
+    assert 'terminal_999' in miss.content
 
     h.advance_terminal_read_cursor(ex, 't', 42, mode='delta')
     assert h.get_terminal_read_cursor(ex, 't') == 42
@@ -247,7 +247,7 @@ def test_terminal_input_preflight_rejects_copied_prompt_artifacts() -> None:
         shell_kind='powershell',
     )
     assert isinstance(bash_prompt, ErrorObservation)
-    assert 'TERMINAL_INPUT_REJECTED' in bash_prompt.content
+    assert 'Terminal input rejected' in bash_prompt.content
     assert 'copied shell prompt' in bash_prompt.content
 
     assert (
@@ -263,7 +263,7 @@ def test_terminal_input_preflight_rejects_copied_prompt_artifacts() -> None:
         shell_kind='powershell',
     )
     assert isinstance(ps_prompt, ErrorObservation)
-    assert 'copied PowerShell prompt' in ps_prompt.content
+    assert 'copied powershell prompt' in ps_prompt.content
 
     continuation = h.terminal_input_preflight_error(
         '>> Get-ChildItem',

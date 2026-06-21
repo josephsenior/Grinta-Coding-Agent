@@ -13,6 +13,9 @@ from backend.core.os_capabilities import OS_CAPS
 from backend.execution.aes.policy_block_messages import (
     hardened_local_block_message,
     hardened_local_session_closed_message,
+    terminal_input_rejected_message,
+    terminal_open_loop_message,
+    terminal_session_not_found_message,
 )
 from backend.execution.aes.security_enforcement import (
     evaluate_hardened_local_command_policy,
@@ -539,12 +542,12 @@ def terminal_open_guardrail_error(executor: Any, command: str) -> Any:
         return None
 
     sample_ids = ', '.join(pending[:8]) if pending else 'none'
-    return ErrorObservation(
-        'terminal_manager open loop detected: multiple sessions were opened but '
-        'none were used via action=read or action=input. '
-        f'Current command={command!r}. '
-        f'Use one of these existing session_id values next: {sample_ids}.'
+    logger.warning(
+        'Terminal open loop detected: command=%r pending_sessions=%s',
+        command,
+        sample_ids,
     )
+    return ErrorObservation(content=terminal_open_loop_message())
 
 
 def missing_terminal_session_error(
@@ -566,11 +569,13 @@ def missing_terminal_session_error(
             'No active terminal sessions exist. '
             'Call terminal_manager with action=open and a command first.'
         )
-    return ErrorObservation(
-        f"Terminal session '{session_id}' does not exist (expired or never opened).\n\n"
-        f'Do not invent session IDs. {suggestion}\n\n'
-        'Workflow: action=open → action=read → action=input (not action=open again)'
+    logger.warning(
+        'Terminal session not found: session=%s operation=%s. %s',
+        session_id,
+        operation,
+        suggestion,
     )
+    return ErrorObservation(content=terminal_session_not_found_message(session_id))
 
 
 def terminal_mode(mode: str | None) -> str:
@@ -618,32 +623,30 @@ def terminal_input_preflight_error(
         return None
 
     if _COPIED_BASH_PROMPT_RE.match(text):
-        from backend.utils.terminal.terminal_contract import get_terminal_tool_name
-
-        terminal_tool = get_terminal_tool_name()
+        logger.warning(
+            'Terminal input rejected (copied shell prompt): input=%r',
+            text,
+        )
         return ErrorObservation(
-            content=(
-                'TERMINAL_INPUT_REJECTED: input appears to include a copied shell '
-                f'prompt prefix (`$ `). Send only the command text. Use `{terminal_tool}`.'
-            )
+            content=terminal_input_rejected_message('copied shell prompt')
         )
 
     if _COPIED_PS_PROMPT_RE.match(text):
+        logger.warning(
+            'Terminal input rejected (copied powershell prompt): input=%r',
+            text,
+        )
         return ErrorObservation(
-            content=(
-                'TERMINAL_INPUT_REJECTED: input appears to include a copied PowerShell '
-                'prompt (`PS ...>`). Send only the command text after the prompt.'
-            )
+            content=terminal_input_rejected_message('copied powershell prompt')
         )
 
     if shell_kind == 'powershell' and _COPIED_PS_CONTINUATION_RE.match(text):
+        logger.warning(
+            'Terminal input rejected (powershell continuation prompt): input=%r',
+            text,
+        )
         return ErrorObservation(
-            content=(
-                "TERMINAL_INPUT_REJECTED: input appears to include PowerShell's "
-                'continuation prompt (`>>`). This is shell state, not command text. '
-                'Send a complete PowerShell command, or send `C-c` to cancel the '
-                'continuation before retrying.'
-            )
+            content=terminal_input_rejected_message('powershell continuation prompt')
         )
 
     return None

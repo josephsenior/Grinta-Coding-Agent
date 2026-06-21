@@ -478,7 +478,7 @@ async def test_terminal_run_rejects_copied_shell_prompt_before_sending_input(
     )
 
     assert isinstance(obs, ErrorObservation)
-    assert 'TERMINAL_INPUT_REJECTED' in obs.content
+    assert 'Terminal input rejected' in obs.content
     assert obs.tool_result['error_code'] == 'TERMINAL_INPUT_PREFLIGHT_REJECTED'
     assert obs.tool_result['state'] == 'SESSION_NOT_OPENED'
     assert obs.tool_result['payload']['command_was_sent'] is False
@@ -784,9 +784,7 @@ async def test_terminal_read_rejects_nonexistent_session_with_guidance(
     )
 
     assert isinstance(obs, ErrorObservation)
-    assert 'does not exist' in obs.content
-    assert 'Do not invent' in obs.content
-    assert 'action=open' in obs.content
+    assert "Terminal session 'terminal_session_0' not found" in obs.content
 
 
 @pytest.mark.asyncio
@@ -814,9 +812,7 @@ async def test_terminal_open_guardrail_blocks_repetitive_open_loop(
         TerminalRunAction(command='whoami', cwd=str(workspace))
     )
     assert isinstance(blocked, ErrorObservation)
-    assert 'open loop detected' in blocked.content
-    assert 'action=read or action=input' in blocked.content
-    assert 'terminal_1' in blocked.content
+    assert 'Terminal open loop detected' in blocked.content
 
 
 @pytest.mark.asyncio
