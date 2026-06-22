@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 SCAN_LINE_BORDER_COLORS: dict[str, str] = {
     'queued': '#2d4a6a',
     'running': '#EF9F27',
+    'background': '#6B9FD4',
     'done': '#639922',
     'failed': '#E24B4A',
 }
@@ -53,6 +54,9 @@ class ScanLineCard(Container):
     }
     ScanLineCard.running {
         border-left: solid #EF9F27;
+    }
+    ScanLineCard.background {
+        border-left: solid #6B9FD4;
     }
     ScanLineCard.done {
         border-left: solid #639922;
@@ -111,7 +115,7 @@ class ScanLineCard(Container):
 
     def set_state(self, state: str) -> None:
         """Transition to *state* and update CSS classes."""
-        for cls in ('queued', 'running', 'done', 'failed'):
+        for cls in ('queued', 'running', 'background', 'done', 'failed'):
             self.remove_class(cls)
         self._state = state
         self.add_class(state)

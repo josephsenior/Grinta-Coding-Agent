@@ -13,6 +13,18 @@ def resolve_cmd_output_cwd(event: CmdOutputObservation) -> str | None:
     return None
 
 
+def cmd_output_is_background_detached(event: CmdOutputObservation) -> bool:
+    """True when the runtime detached the command to a background session."""
+    metadata = getattr(event, 'metadata', None)
+    if metadata is not None:
+        if getattr(metadata, 'timeout_kind', None) == 'idle_detach':
+            return bool(getattr(metadata, 'command_still_running', True))
+        meta_exit = getattr(metadata, 'exit_code', None)
+        if meta_exit == -2:
+            return getattr(metadata, 'command_still_running', None) is not False
+    return getattr(event, 'exit_code', None) == -2
+
+
 def sanitize_cmd_output(output: str) -> str:
     if not output:
         return ''

@@ -77,6 +77,8 @@ def _status_indicator_markup(
         if tail and tail != '…':
             return f'[#EF9F27]{_truncate(tail, 40)}[/]'
         return '[#EF9F27]…[/]'
+    if state == 'background':
+        return '[#6B9FD4]detached[/]'
     if state == 'done':
         return '[#639922]✓[/]'
     if state == 'failed':
@@ -278,6 +280,7 @@ class ShellCard(ScanLineCard):
         output: str = '',
         exit_code: int | None = None,
         cwd: str = '',
+        is_background: bool = False,
         id: str | None = None,
     ) -> None:
         super().__init__(id=id)
@@ -285,10 +288,13 @@ class ShellCard(ScanLineCard):
         self.output = output
         self.exit_code = exit_code
         self.cwd = cwd
+        self.is_background = is_background
         self._apply_initial_state()
 
     def _apply_initial_state(self) -> None:
-        if self.exit_code == 0:
+        if self.is_background:
+            self.set_state('background')
+        elif self.exit_code == 0:
             self.set_state('done')
         elif self.exit_code is not None:
             self.set_state('failed')
@@ -302,6 +308,8 @@ class ShellCard(ScanLineCard):
         return _truncate(lines[-1].strip(), 60)
 
     def _result_text(self) -> str:
+        if self.is_background:
+            return 'detached'
         if self.exit_code == 0:
             return '✓'
         if self.exit_code is not None:
@@ -314,6 +322,8 @@ class ShellCard(ScanLineCard):
         )
 
     def _delta_text(self) -> str:
+        if self._state == 'background':
+            return _status_indicator_markup('background')
         return _status_indicator_markup(
             self._state,
             exit_code=self.exit_code,
@@ -328,6 +338,7 @@ class ShellCard(ScanLineCard):
             output=self.output,
             exit_code=self.exit_code,
             cwd=self.cwd,
+            is_background=self.is_background,
             kind='Shell',
             heading=_truncate(self.command, 80),
             accent=self.state_border_color,
@@ -335,7 +346,7 @@ class ShellCard(ScanLineCard):
         )
 
     def refresh_summary(self) -> None:
-        if self._state == 'running':
+        if self._state in ('running', 'background'):
             self._refresh_line()
 
 

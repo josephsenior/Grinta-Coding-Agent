@@ -21,6 +21,7 @@ class ShellDetailScreen(DetailScreen):
         exit_code: int | None = None,
         cwd: str = '',
         *,
+        is_background: bool = False,
         title: str = 'Shell',
         kind: str = 'Shell',
         heading: str = '',
@@ -36,6 +37,7 @@ class ShellDetailScreen(DetailScreen):
         self._output = output
         self._exit_code = exit_code
         self._cwd = cwd
+        self._is_background = is_background
 
     def build_content(self) -> list:
         widgets: list = []
@@ -43,7 +45,7 @@ class ShellDetailScreen(DetailScreen):
         meta_parts: list[str] = []
         if self._cwd:
             meta_parts.append(f'[#969aad]{self._cwd}[/]')
-        exit_chip = format_exit_chip(self._exit_code)
+        exit_chip = format_exit_chip(self._exit_code, is_background=self._is_background)
         if exit_chip:
             meta_parts.append(exit_chip)
         if meta_parts:

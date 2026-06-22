@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from backend.cli.tui.renderer.helpers.shell import (
+    cmd_output_is_background_detached,
     resolve_cmd_output_cwd,
     sanitize_cmd_output,
 )
@@ -36,10 +37,12 @@ def _handle_cmd_output_observation(
     cmd = getattr(event, 'command', '') or ''
     cwd = resolve_cmd_output_cwd(event)
     output = sanitize_cmd_output(output)
-    if output or exit_code is not None:
+    is_background = cmd_output_is_background_detached(event)
+    if output or exit_code is not None or is_background:
         orch._complete_shell_scan_card(
             cmd,
             output=output,
             exit_code=exit_code,
             cwd=cwd,
+            is_background=is_background,
         )

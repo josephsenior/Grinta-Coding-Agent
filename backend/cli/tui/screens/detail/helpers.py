@@ -94,7 +94,9 @@ def format_meta_chips(parts: list[str]) -> str:
     return ' [#54597b]·[/] '.join(parts)
 
 
-def format_exit_chip(exit_code: int | None) -> str | None:
+def format_exit_chip(exit_code: int | None, *, is_background: bool = False) -> str | None:
+    if is_background:
+        return '[#6B9FD4]detached to background[/]'
     if exit_code is None:
         return None
     if exit_code == 0:
