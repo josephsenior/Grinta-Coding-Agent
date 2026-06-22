@@ -84,7 +84,7 @@ class ScreenLifecycleMixin:
                         collapsed=False,
                         accent_color='#eacb8a',
                         section_icon='⬡',
-                        action_label='Manage ›',
+                        action_label='⚙ Edit',
                         action_button_class='-mcp',
                         id='sidebar-mcp',
                     )
@@ -110,7 +110,7 @@ class ScreenLifecycleMixin:
                         collapsed=False,
                         accent_color='#c792ea',
                         section_icon='✦',
-                        action_label='Manage ›',
+                        action_label='✦ Edit',
                         action_button_class='-skill',
                         id='sidebar-skills',
                     )
