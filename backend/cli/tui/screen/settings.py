@@ -50,8 +50,8 @@ class ScreenSettingsMixin:
     def _highlight_sidebar_item(self, section_id: str, item_id: str) -> None:
         try:
             section = self.query_one(section_id, CollapsibleSection)
-            for row in section.query(SidebarRow):
-                if row.item_id == item_id:
+            for row in section.query('.sidebar-item-row'):
+                if getattr(row, 'item_id', None) == item_id:
                     row.add_class('-highlight')
                     self.set_timer(2.0, lambda r=row: r.remove_class('-highlight'))
                     break

@@ -182,7 +182,7 @@ class AutonomyController:
                 return True
 
         if isinstance(action, FileEditAction):
-            return True
+            return action.command != 'create_file'
 
         if isinstance(action, BrowseInteractiveAction | BrowserToolAction):
             return True

@@ -86,7 +86,7 @@ def test_core_cli_renderers_avoid_raw_style_literals() -> None:
         repo / 'backend/cli/event_rendering/panels.py',
         repo / 'backend/cli/session/session_manager.py',
         repo / 'backend/cli/display/diff_renderer.py',
-        repo / 'backend/cli/storage_cleanup.py',
+        repo / 'backend/cli/session/storage_cleanup.py',
         repo / 'backend/cli/repl/run_helpers_mixin.py',
     ]
     targets.extend((repo / 'backend/cli/event_rendering/actions').glob('*.py'))

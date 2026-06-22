@@ -22,7 +22,11 @@ def clean_pycache(root: Path) -> tuple[int, int]:
     removed_dirs = 0
     removed_files = 0
 
-    for path in sorted(root.rglob('__pycache__'), key=lambda p: len(p.parts), reverse=True):
+    for path in sorted(
+        root.rglob('__pycache__'),
+        key=lambda p: len(p.parts),
+        reverse=True,
+    ):
         if not path.is_dir():
             continue
         shutil.rmtree(path, ignore_errors=True)

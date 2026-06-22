@@ -30,7 +30,9 @@ class _LazyModelList:
 
     def _ensure(self) -> list[str]:
         if self._cached is None:
-            self._cached = _get_verified(self._provider)
+            import backend.core.providers as providers
+
+            self._cached = providers._get_verified(self._provider)
         return self._cached
 
     def __iter__(self):

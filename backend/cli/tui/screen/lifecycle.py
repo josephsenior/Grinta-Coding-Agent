@@ -80,12 +80,13 @@ class ScreenLifecycleMixin:
                     )
                     yield CollapsibleSection(
                         title='MCP Servers',
-                        content='No servers configured · click + to add',
+                        content='No servers configured',
                         collapsed=False,
                         accent_color='#eacb8a',
                         section_icon='⬡',
-                        action_label='+',
-                        footer_hint='Space toggle · Enter edit · Del remove',
+                        action_label='Add',
+                        action_button_class='-mcp',
+                        footer_hint='Switch on/off · Edit · Del',
                         id='sidebar-mcp',
                     )
                     yield CollapsibleSection(
@@ -106,12 +107,13 @@ class ScreenLifecycleMixin:
                     )
                     yield CollapsibleSection(
                         title='Skills',
-                        content='No custom skills · click + to add',
+                        content='No custom skills',
                         collapsed=False,
                         accent_color='#c792ea',
                         section_icon='✦',
-                        action_label='+',
-                        footer_hint='Enter view/edit · Del remove',
+                        action_label='Add',
+                        action_button_class='-skill',
+                        footer_hint='Edit/View · Del for custom skills',
                         id='sidebar-skills',
                     )
 

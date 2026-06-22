@@ -51,7 +51,7 @@ class TestDefaultOutFile(unittest.TestCase):
         env = dict(__import__('os').environ)
         env.pop('APP_PLATFORM', None)
         with patch.dict('os.environ', env, clear=True):
-            with patch('backend.tools.tools.build_tree_sitter_lang.sys') as mock_sys:
+            with patch('backend.scripts.build_tree_sitter_lang.sys') as mock_sys:
                 mock_sys.platform = 'linux'
                 result = _default_out_file(out_base)
         self.assertTrue(result.endswith('.so'))
