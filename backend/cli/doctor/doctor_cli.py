@@ -13,7 +13,6 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from rich.console import Console
 from rich.table import Table
@@ -101,7 +100,9 @@ def _check_settings_schema() -> DoctorCheck:
 
     path = get_canonical_settings_path()
     if not Path(path).is_file():
-        return DoctorCheck('settings_schema', False, 'settings.json not found', critical=False)
+        return DoctorCheck(
+            'settings_schema', False, 'settings.json not found', critical=False
+        )
 
     try:
         cfg = AppConfig()
@@ -177,7 +178,9 @@ def _check_execution_profile() -> DoctorCheck:
 
     path = get_canonical_settings_path()
     if not Path(path).is_file():
-        return DoctorCheck('execution', False, 'settings.json not found', critical=False)
+        return DoctorCheck(
+            'execution', False, 'settings.json not found', critical=False
+        )
 
     try:
         cfg = AppConfig()
@@ -227,7 +230,9 @@ def _check_debugpy() -> DoctorCheck:
 
 
 def _check_optional_imports() -> DoctorCheck:
-    script = _repo_root() / 'backend' / 'scripts' / 'verify' / 'verify_optional_imports.py'
+    script = (
+        _repo_root() / 'backend' / 'scripts' / 'verify' / 'verify_optional_imports.py'
+    )
     if not script.is_file():
         return DoctorCheck(
             'optional_imports',
@@ -244,7 +249,12 @@ def _check_optional_imports() -> DoctorCheck:
         check=False,
     )
     if proc.returncode == 0:
-        return DoctorCheck('optional_imports', True, 'no top-level optional import leaks', critical=False)
+        return DoctorCheck(
+            'optional_imports',
+            True,
+            'no top-level optional import leaks',
+            critical=False,
+        )
     detail = (proc.stderr or proc.stdout or 'failed').strip().splitlines()
     first = detail[0] if detail else 'failed'
     return DoctorCheck('optional_imports', False, first, critical=False)
@@ -260,7 +270,9 @@ def _check_editing_stack() -> DoctorCheck:
 
     overall = result.get('overall_status', 'UNKNOWN')
     if overall == 'HEALTHY':
-        return DoctorCheck('editing_stack', True, 'structure editor + atomic refactor', critical=False)
+        return DoctorCheck(
+            'editing_stack', True, 'structure editor + atomic refactor', critical=False
+        )
     se = result.get('structure_editor', {})
     msg = se.get('message', overall) if isinstance(se, dict) else overall
     return DoctorCheck('editing_stack', False, str(msg), critical=False)
@@ -324,8 +336,10 @@ def _render_report(console: Console, checks: list[DoctorCheck]) -> None:
 
     for check in checks:
         mark = _status_mark(check)
-        status_style = CLR_STATUS_OK if check.ok else (
-            CLR_STATUS_ERR if check.critical else CLR_STATUS_WARN
+        status_style = (
+            CLR_STATUS_OK
+            if check.ok
+            else (CLR_STATUS_ERR if check.critical else CLR_STATUS_WARN)
         )
         table.add_row(
             f'[{status_style}]{mark}[/]',
@@ -345,8 +359,7 @@ def _render_report(console: Console, checks: list[DoctorCheck]) -> None:
         )
     elif warnings:
         console.print(
-            f'\n[{CLR_STATUS_WARN}]'
-            f'{len(warnings)} optional check(s) need attention.[/]'
+            f'\n[{CLR_STATUS_WARN}]{len(warnings)} optional check(s) need attention.[/]'
         )
     else:
         console.print(f'\n[{CLR_STATUS_OK}]All checks passed.[/]')

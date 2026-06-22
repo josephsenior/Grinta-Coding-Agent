@@ -43,9 +43,11 @@ def _tree_relative_depth(relative_path: str) -> int:
 def _sorted_tree_files(filenames: list[str]) -> list[str]:
     return sorted(
         filenames,
-        key=lambda name: (0, _TREE_FILE_PRIORITY[name])
-        if name in _TREE_FILE_PRIORITY
-        else (1, name.lower()),
+        key=lambda name: (
+            (0, _TREE_FILE_PRIORITY[name])
+            if name in _TREE_FILE_PRIORITY
+            else (1, name.lower())
+        ),
     )
 
 

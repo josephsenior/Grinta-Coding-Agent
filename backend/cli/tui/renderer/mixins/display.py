@@ -112,9 +112,7 @@ class RendererDisplayMixin:
                 else f'MCP Servers ({len(mcp_servers) if mcp_servers else 0})',
                 mcp_items,
                 empty_message=(
-                    'Loading MCP servers...'
-                    if mcp_loading
-                    else 'No servers configured'
+                    'Loading MCP servers...' if mcp_loading else 'No servers configured'
                 ),
             )
             self._update_sidebar_section(
@@ -122,9 +120,7 @@ class RendererDisplayMixin:
                 'Skills' if skills_loading else f'Skills ({len(skill_items)})',
                 skill_items,
                 empty_message=(
-                    'Loading skills...'
-                    if skills_loading
-                    else 'No custom skills'
+                    'Loading skills...' if skills_loading else 'No custom skills'
                 ),
             )
 
@@ -320,7 +316,7 @@ class RendererDisplayMixin:
             adapter = str(entry.get('adapter') or 'unknown')
             auto_resolvable = entry.get('auto_resolvable', entry.get('available'))
             status = 'ok' if auto_resolvable else 'warn'
-            items.append((language, f'dap:{language}', False, status, None, False))
+            items.append((language, f'dap:{adapter}', False, status, None, False))
         return items
 
     def _refresh_tasks_sidebar(self) -> None:

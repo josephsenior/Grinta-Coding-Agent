@@ -186,7 +186,9 @@ class TestChainingEscalation:
         assert risk == RiskCategory.HIGH
         assert 'chaining' not in reason.lower()
 
-    def test_single_file_delete_with_verify_not_critical(self, analyzer: CommandAnalyzer):
+    def test_single_file_delete_with_verify_not_critical(
+        self, analyzer: CommandAnalyzer
+    ):
         """Single-file Remove-Item -Force with Test-Path must not be CRITICAL."""
         cmd = (
             'Remove-Item tests/test_election.py -Force -ErrorAction SilentlyContinue; '

@@ -521,7 +521,9 @@ class CollapsibleSection(Container):
     def _empty_markup(self, text: str) -> str:
         return f'[#54597b]{SIDEBAR_BULLET}[/] [#54597b]{text}[/]'
 
-    def _make_row(self, item: dict[str, Any]) -> SidebarRow | McpServerRow | SkillSidebarRow:
+    def _make_row(
+        self, item: dict[str, Any]
+    ) -> SidebarRow | McpServerRow | SkillSidebarRow:
         if item.get('toggleable'):
             return McpServerRow(
                 item['label'],

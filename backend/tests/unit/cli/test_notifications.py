@@ -21,8 +21,10 @@ def test_notify_swallows_errors() -> None:
 
 
 def test_do_notify_windows_path() -> None:
+    caps = MagicMock()
+    caps.is_windows = True
     with (
-        patch('os.name', 'nt'),
+        patch.object(notify_mod, 'OS_CAPS', caps),
         patch.object(notify_mod, '_notify_windows') as win,
     ):
         notify_mod._do_notify('title', 'body', urgency='normal')
@@ -30,13 +32,15 @@ def test_do_notify_windows_path() -> None:
 
 
 def test_do_notify_macos_path() -> None:
+    caps = MagicMock()
+    caps.is_windows = False
     with (
-        patch('os.name', 'posix'),
+        patch.object(notify_mod, 'OS_CAPS', caps),
         patch(
             'shutil.which',
-            side_effect=lambda cmd: '/usr/bin/osascript'
-            if cmd == 'osascript'
-            else None,
+            side_effect=lambda cmd: (
+                '/usr/bin/osascript' if cmd == 'osascript' else None
+            ),
         ),
         patch.object(notify_mod, '_notify_macos') as mac,
     ):
@@ -45,13 +49,15 @@ def test_do_notify_macos_path() -> None:
 
 
 def test_do_notify_linux_path() -> None:
+    caps = MagicMock()
+    caps.is_windows = False
     with (
-        patch('os.name', 'posix'),
+        patch.object(notify_mod, 'OS_CAPS', caps),
         patch(
             'shutil.which',
-            side_effect=lambda cmd: '/usr/bin/notify-send'
-            if cmd == 'notify-send'
-            else None,
+            side_effect=lambda cmd: (
+                '/usr/bin/notify-send' if cmd == 'notify-send' else None
+            ),
         ),
         patch.object(notify_mod, '_notify_linux') as linux,
     ):

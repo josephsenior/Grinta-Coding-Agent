@@ -372,10 +372,9 @@ class PtyInteractiveShellSession(BaseShellSession):
         """Wait for a new PS1 block and build the observation (command already sent)."""
         w = self._ps1_wait_timeout()
         if not pty.wait_for_output(
-            predicate=lambda p, nb=ps1_count_before: len(
-                CmdOutputMetadata.matches_ps1_metadata(_norm_tty_text(p))
-            )
-            > nb,
+            predicate=lambda p, nb=ps1_count_before: (
+                len(CmdOutputMetadata.matches_ps1_metadata(_norm_tty_text(p))) > nb
+            ),
             timeout=w,
         ):
             tail = pty.peek()

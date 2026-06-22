@@ -241,9 +241,7 @@ class StateSummary(BaseModel):
     def __str__(self) -> str:
         """Format the state summary in a clear way for Claude 3.7 Sonnet."""
         files_str = (
-            '\n'.join(
-                f'  - {fm.path} ({fm.change_type})' for fm in self.files_modified
-            )
+            '\n'.join(f'  - {fm.path} ({fm.change_type})' for fm in self.files_modified)
             or '(none)'
         )
         errors_str = (
@@ -261,9 +259,7 @@ class StateSummary(BaseModel):
             or '(none)'
         )
         deps_str = (
-            '\n'.join(
-                f'  - {dep.name}@{dep.version}' for dep in self.dependencies
-            )
+            '\n'.join(f'  - {dep.name}@{dep.version}' for dep in self.dependencies)
             or '(none)'
         )
         sections = [

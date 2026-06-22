@@ -137,9 +137,7 @@ async def native_web_fetch_wrapper(
     return {
         'ok': False,
         'isError': True,
-        'error': (
-            'web_fetch failed. Check MCP connectivity or try browser.'
-        ),
+        'error': ('web_fetch failed. Check MCP connectivity or try browser.'),
         'category': 'env',
         'retryable': True,
         'urls': urls,

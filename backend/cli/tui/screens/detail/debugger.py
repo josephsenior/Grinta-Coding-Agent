@@ -60,6 +60,8 @@ class DebuggerDetailScreen(DetailScreen):
             )
 
         if not widgets:
-            widgets.append(self.empty_state('(no debugger state)', widget_id='debugger-empty'))
+            widgets.append(
+                self.empty_state('(no debugger state)', widget_id='debugger-empty')
+            )
 
         return widgets

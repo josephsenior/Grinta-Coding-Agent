@@ -158,9 +158,7 @@ class RendererTerminalMixin:
 
     # ── scrollback buffer ────────────────────────────────────────────
 
-    def _accumulate_terminal_scrollback(
-        self, session_id: str, content: str
-    ) -> None:
+    def _accumulate_terminal_scrollback(self, session_id: str, content: str) -> None:
         if not content:
             return
         buffers = getattr(self, '_terminal_scrollback_by_session', None)

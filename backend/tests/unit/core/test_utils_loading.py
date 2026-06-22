@@ -94,9 +94,7 @@ class TestFinalization:
         cfg.llms = {'default': MagicMock()}
         cfg.llms['default'].log_completions_folder = 'logs'
 
-        with patch(
-            'backend.core.config.config_loader.get_file_store'
-        ) as mock_get_store:
+        with patch('backend.persistence.get_file_store') as mock_get_store:
             with patch('pathlib.Path.mkdir') as mock_mkdir:
                 mock_store = MagicMock()
                 mock_get_store.return_value = mock_store
@@ -115,7 +113,7 @@ class TestFinalization:
         cfg.get_llm_config().model = 'openai/gpt-4.1'
 
         with (
-            patch('backend.core.config.config_loader.get_file_store') as mock_get_store,
+            patch('backend.persistence.get_file_store') as mock_get_store,
             patch('pathlib.Path.mkdir'),
         ):
             mock_store = MagicMock()
@@ -136,7 +134,7 @@ class TestFinalization:
         )
 
         with (
-            patch('backend.core.config.config_loader.get_file_store') as mock_get_store,
+            patch('backend.persistence.get_file_store') as mock_get_store,
             patch('pathlib.Path.mkdir'),
         ):
             mock_store = MagicMock()
@@ -155,7 +153,7 @@ class TestFinalization:
         cfg.cache_dir = str(tmp_path / 'cache')
 
         with (
-            patch('backend.core.config.config_loader.get_file_store') as mock_get_store,
+            patch('backend.persistence.get_file_store') as mock_get_store,
             patch('pathlib.Path.mkdir'),
             patch(
                 'backend.core.config.mcp_config.load_bundled_mcp_server_configs',
@@ -180,7 +178,7 @@ class TestFinalization:
         cfg.get_llm_config().model = 'openai/gpt-4.1'
 
         with (
-            patch('backend.core.config.config_loader.get_file_store') as mock_get_store,
+            patch('backend.persistence.get_file_store') as mock_get_store,
             patch('pathlib.Path.mkdir'),
         ):
             mock_store = MagicMock()

@@ -16,11 +16,7 @@ _TRAFFIC_GREEN = '#57a85f'
 
 def traffic_lights_markup(title: str = '') -> str:
     """Three-dot window chrome row for terminal detail panes."""
-    lights = (
-        f'[{_TRAFFIC_RED}]●[/] '
-        f'[{_TRAFFIC_YELLOW}]●[/] '
-        f'[{_TRAFFIC_GREEN}]●[/]'
-    )
+    lights = f'[{_TRAFFIC_RED}]●[/] [{_TRAFFIC_YELLOW}]●[/] [{_TRAFFIC_GREEN}]●[/]'
     if not title:
         return lights
     return f'{lights}  [#6f83aa]{title}[/]'

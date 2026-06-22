@@ -445,4 +445,8 @@ class TestCreateShellSession:
             shell_type='pwsh',
             shell_path='C:/pwsh.exe',
         )
-        assert _interactive_shell_argv(tools) == ['C:/pwsh.exe', '-NoLogo', '-NoProfile']
+        assert _interactive_shell_argv(tools) == [
+            'C:/pwsh.exe',
+            '-NoLogo',
+            '-NoProfile',
+        ]

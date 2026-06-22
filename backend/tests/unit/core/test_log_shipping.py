@@ -177,7 +177,9 @@ class TestLogShipper:
         async def fake_wait_for(*_args, **_kwargs):
             raise TimeoutError
 
-        monkeypatch.setattr('backend.core.logging.log_shipping.asyncio.wait_for', fake_wait_for)
+        monkeypatch.setattr(
+            'backend.core.logging.log_shipping.asyncio.wait_for', fake_wait_for
+        )
         result = await shipper._wait_for_batch_window()
         assert result is False
 

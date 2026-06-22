@@ -25,6 +25,7 @@ def esc_hint_markup(action: str) -> str:
     """Rich markup for ``esc`` shortcut hints."""
     return f'[{TX_KEY_HINT}]esc[/] [{TX_ACTION_HINT}]{action}[/]'
 
+
 # Left-pipe accents for non-action message blocks
 AGENT_PIPE = '#3d4a66'
 USER_PIPE = '#91abec'

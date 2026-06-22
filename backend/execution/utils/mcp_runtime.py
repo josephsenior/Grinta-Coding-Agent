@@ -61,7 +61,12 @@ async def call_mcp_action(
 
         return observation, active_clients, active_servers
     except Exception as exc:
-        logger.error('MCP call failed for %s: %s', getattr(action, 'name', '?'), exc, exc_info=True)
+        logger.error(
+            'MCP call failed for %s: %s',
+            getattr(action, 'name', '?'),
+            exc,
+            exc_info=True,
+        )
         return (
             ErrorObservation(
                 content=(

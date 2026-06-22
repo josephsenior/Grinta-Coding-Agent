@@ -485,7 +485,9 @@ class ScreenStateMixin:
         max_attempts = int(
             getattr(self, '_retry_countdown_max_attempts', attempt) or attempt
         )
-        reason = str(getattr(self, '_retry_countdown_reason', '') or 'transient failure')
+        reason = str(
+            getattr(self, '_retry_countdown_reason', '') or 'transient failure'
+        )
         source = str(getattr(self, '_retry_countdown_source', '') or '')
         retry_target = 'provider stream' if source == 'llm_stream' else 'provider'
 

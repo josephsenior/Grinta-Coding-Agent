@@ -78,10 +78,7 @@ def test_shell_detail_screen_uses_terminal_frame():
 
 
 def test_detail_screen_escape_binding():
-    assert any(
-        binding[0] == 'escape'
-        for binding in DetailScreen.BINDINGS
-    )
+    assert any(binding[0] == 'escape' for binding in DetailScreen.BINDINGS)
 
 
 def test_edit_detail_screen_fills_body_without_terminal_frame():

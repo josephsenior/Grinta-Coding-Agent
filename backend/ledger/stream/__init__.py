@@ -8,13 +8,13 @@ from __future__ import annotations
 
 from enum import Enum
 
+from backend.core.workspace_resolution import workspace_agent_state_dir  # noqa: F401
 from backend.ledger.stream.event_stream import (  # noqa: F401
     EventStream,
     _warn_unclosed_stream,
     session_exists,
 )
 from backend.utils.async_helpers.async_utils import call_sync_from_async  # noqa: F401
-from backend.core.workspace_resolution import workspace_agent_state_dir  # noqa: F401
 
 
 class EventStreamSubscriber(str, Enum):

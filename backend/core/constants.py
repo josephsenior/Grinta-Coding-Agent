@@ -472,7 +472,9 @@ OTEL_LOG_CORRELATION = _parse_bool_env(
 LOG_TO_FILE = _parse_bool_env('LOG_TO_FILE', default='true')
 LOG_ALL_EVENTS = _parse_bool_env('LOG_ALL_EVENTS')
 APP_DEBUG_PROMPT_ROLES = _parse_bool_env('APP_DEBUG_PROMPT_ROLES', default='true')
-APP_DEBUG_REASONING_ASTEP = _parse_bool_env('APP_DEBUG_REASONING_ASTEP', default='false')
+APP_DEBUG_REASONING_ASTEP = _parse_bool_env(
+    'APP_DEBUG_REASONING_ASTEP', default='false'
+)
 APP_DEBUG_MODE = _parse_bool_env('APP_DEBUG_MODE', default='true')
 
 LOG_COLORS = {

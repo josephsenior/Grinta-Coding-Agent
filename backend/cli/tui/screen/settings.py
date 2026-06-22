@@ -398,7 +398,9 @@ class ScreenSettingsMixin:
         self._config = load_app_config()
         server = get_mcp_server(self._config, name)
         if server is None:
-            self.notify(f'MCP server not found: {name}', severity='warning', timeout=2.5)
+            self.notify(
+                f'MCP server not found: {name}', severity='warning', timeout=2.5
+            )
             return
         enabled = not bool(server.get('enabled', True))
         try:
@@ -426,7 +428,9 @@ class ScreenSettingsMixin:
         self._config = load_app_config()
         server = get_mcp_server(self._config, name)
         if server is None:
-            self.notify(f'MCP server not found: {name}', severity='warning', timeout=2.5)
+            self.notify(
+                f'MCP server not found: {name}', severity='warning', timeout=2.5
+            )
             return
         result = await self.app.push_screen_wait(
             GrintaAddMCPDialog(
@@ -464,7 +468,9 @@ class ScreenSettingsMixin:
             import backend
 
             playbook_path = (
-                Path(backend.__file__).resolve().parent / 'playbooks' / f'{stem}.md'
+                Path(backend.__file__).resolve().parent  # noqa: ASYNC240
+                / 'playbooks'
+                / f'{stem}.md'
             )
             try:
                 content = playbook_path.read_text(encoding='utf-8')
@@ -564,6 +570,7 @@ class ScreenSettingsMixin:
     async def _delete_skill(self, name: str) -> None:
         """Delete a skill file, offloaded to a thread pool."""
         import asyncio
+
         await asyncio.to_thread(self._delete_skill_sync, name)
         self._refresh_sidebar()
 
@@ -588,6 +595,7 @@ class ScreenSettingsMixin:
     async def _delete_mcp_server(self, name: str) -> None:
         """Delete an MCP server, offloaded to a thread pool."""
         import asyncio
+
         await asyncio.to_thread(self._delete_mcp_server_sync, name)
         self._reload_mcp_config_and_refresh_sidebar()
 
@@ -601,9 +609,11 @@ class ScreenSettingsMixin:
             result = await self.app.push_screen_wait(GrintaAddSkillDialog())
             if result:
                 await self._create_skill(result['name'], result['content'])
-                self._highlight_sidebar_item('#sidebar-skills', f"skill:{result['name']}")
+                self._highlight_sidebar_item(
+                    '#sidebar-skills', f'skill:{result["name"]}'
+                )
                 self.notify(
-                    f"Added skill {result['name']}.md · Enter edit · Del remove",
+                    f'Added skill {result["name"]}.md · Enter edit · Del remove',
                     severity='information',
                     timeout=3.0,
                 )
@@ -613,9 +623,9 @@ class ScreenSettingsMixin:
             )
             if result:
                 await self._add_mcp_server(result['name'], result['command'])
-                self._highlight_sidebar_item('#sidebar-mcp', f"mcp:{result['name']}")
+                self._highlight_sidebar_item('#sidebar-mcp', f'mcp:{result["name"]}')
                 self.notify(
-                    f"Added MCP {result['name']} · Enter edit · Del remove",
+                    f'Added MCP {result["name"]} · Enter edit · Del remove',
                     severity='information',
                     timeout=3.0,
                 )
@@ -636,6 +646,7 @@ class ScreenSettingsMixin:
     async def _create_skill(self, name: str, content: str) -> None:
         """Create a skill file, offloaded to a thread pool."""
         import asyncio
+
         await asyncio.to_thread(self._create_skill_sync, name, content)
         self._refresh_sidebar()
 
@@ -652,5 +663,6 @@ class ScreenSettingsMixin:
     async def _add_mcp_server(self, name: str, command: str) -> None:
         """Add an MCP server, offloaded to a thread pool."""
         import asyncio
+
         await asyncio.to_thread(self._add_mcp_server_sync, name, command)
         self._reload_mcp_config_and_refresh_sidebar()

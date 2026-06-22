@@ -84,12 +84,18 @@ class EditDetailScreen(DetailScreen):
                     )
                 )
         else:
-            widgets.append(self.empty_state('No diff available.', widget_id='edit-no-diff'))
+            widgets.append(
+                self.empty_state('No diff available.', widget_id='edit-no-diff')
+            )
 
         if self._syntax_error:
             error_text = (
                 f'[bold #E24B4A]Syntax Error[/]\n[#E24B4A]{self._syntax_error}[/]'
             )
-            widgets.append(Static(error_text, classes='detail-syntax-error', id='edit-syntax-error'))
+            widgets.append(
+                Static(
+                    error_text, classes='detail-syntax-error', id='edit-syntax-error'
+                )
+            )
 
         return widgets

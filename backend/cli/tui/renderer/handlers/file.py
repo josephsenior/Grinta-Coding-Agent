@@ -97,21 +97,24 @@ def _handle_file_edit_observation(
         action = orch._file_edit_actions_by_id.get(cause_id)
 
     if action is not None and getattr(action, 'command', '') == 'multi_edit':
-        _handle_multiedit_observation(orch, event, action, path,
-                                       added, removed, is_create)
+        _handle_multiedit_observation(
+            orch, event, action, path, added, removed, is_create
+        )
         return
 
     # ── single edit ──────────────────────────────────────────────────
     encoded_diff = _resolve_edit_diff(orch, event, path, added, removed, is_create)
-    orch._append_scan_line_card(EditCard(
-        display_path=orch._compact_file_card_path(path),
-        added=added,
-        removed=removed,
-        is_create=is_create,
-        encoded_diff=encoded_diff,
-        syntax_pass=sys_pass == 'pass' if sys_pass else None,
-        syntax_error=syntax_error,
-    ))
+    orch._append_scan_line_card(
+        EditCard(
+            display_path=orch._compact_file_card_path(path),
+            added=added,
+            removed=removed,
+            is_create=is_create,
+            encoded_diff=encoded_diff,
+            syntax_pass=sys_pass == 'pass' if sys_pass else None,
+            syntax_error=syntax_error,
+        )
+    )
 
 
 def _resolve_edit_diff(
@@ -177,15 +180,17 @@ def _handle_multiedit_observation(
     if not file_edits:
         # Fallback: one card for the whole operation
         encoded_diff = _resolve_edit_diff(orch, event, path, added, removed, is_create)
-        orch._append_scan_line_card(EditCard(
-            display_path=orch._compact_file_card_path(path),
-            added=added,
-            removed=removed,
-            is_create=is_create,
-            encoded_diff=encoded_diff,
-            syntax_pass=syntax_pass == 'pass' if syntax_pass else None,
-            syntax_error=syntax_error,
-        ))
+        orch._append_scan_line_card(
+            EditCard(
+                display_path=orch._compact_file_card_path(path),
+                added=added,
+                removed=removed,
+                is_create=is_create,
+                encoded_diff=encoded_diff,
+                syntax_pass=syntax_pass == 'pass' if syntax_pass else None,
+                syntax_error=syntax_error,
+            )
+        )
         return
 
     for item in file_edits:
@@ -204,12 +209,14 @@ def _handle_multiedit_observation(
                 item_diff = _encode_unified_diff_text(file_diff, path=item_path or fp)
                 break
 
-        orch._append_scan_line_card(EditCard(
-            display_path=orch._compact_file_card_path(item_path),
-            added=item_added,
-            removed=item_removed,
-            is_create=is_item_create,
-            encoded_diff=item_diff,
-            syntax_pass=syntax_pass == 'pass' if syntax_pass else None,
-            syntax_error=syntax_error,
-        ))
+        orch._append_scan_line_card(
+            EditCard(
+                display_path=orch._compact_file_card_path(item_path),
+                added=item_added,
+                removed=item_removed,
+                is_create=is_item_create,
+                encoded_diff=item_diff,
+                syntax_pass=syntax_pass == 'pass' if syntax_pass else None,
+                syntax_error=syntax_error,
+            )
+        )

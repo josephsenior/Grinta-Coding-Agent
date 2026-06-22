@@ -547,7 +547,10 @@ async def test_terminal_input_blocks_session_that_escaped_workspace(
     )
 
     assert isinstance(obs, ErrorObservation)
-    assert 'Action blocked by hardened_local policy (terminal session outside workspace)' in obs.content
+    assert (
+        'Action blocked by hardened_local policy (terminal session outside workspace)'
+        in obs.content
+    )
     mock_executor.session_manager.close_session.assert_called_with('term-1')
     session.write_input.assert_not_called()
 
@@ -572,7 +575,9 @@ async def test_terminal_input_blocks_cd_outside_workspace(mock_executor, tmp_pat
     )
 
     assert isinstance(obs, ErrorObservation)
-    assert 'Action blocked by hardened_local policy (cd outside workspace)' in obs.content
+    assert (
+        'Action blocked by hardened_local policy (cd outside workspace)' in obs.content
+    )
     session.write_input.assert_not_called()
 
 
@@ -610,7 +615,8 @@ async def test_terminal_input_allows_cd_within_workspace_and_tracks_cwd(
     mock_executor.session_manager.get_session.return_value = session
 
     with patch(
-        'backend.execution.server.action_execution_server.asyncio.sleep', return_value=None
+        'backend.execution.server.action_execution_server.asyncio.sleep',
+        return_value=None,
     ):
         obs = await mock_executor.terminal_input(
             TerminalInputAction(session_id='term-3', input=f'cd {target}')
@@ -639,7 +645,10 @@ async def test_terminal_read_blocks_session_that_escaped_workspace(
     obs = await mock_executor.terminal_read(TerminalReadAction(session_id='term-4'))
 
     assert isinstance(obs, ErrorObservation)
-    assert 'Action blocked by hardened_local policy (terminal session outside workspace)' in obs.content
+    assert (
+        'Action blocked by hardened_local policy (terminal session outside workspace)'
+        in obs.content
+    )
     mock_executor.session_manager.close_session.assert_called_with('term-4')
 
 
@@ -657,7 +666,8 @@ async def test_terminal_input_submit_false_does_not_append_newline(
     mock_executor.session_manager.get_session.return_value = session
 
     with patch(
-        'backend.execution.server.action_execution_server.asyncio.sleep', return_value=None
+        'backend.execution.server.action_execution_server.asyncio.sleep',
+        return_value=None,
     ):
         obs = await mock_executor.terminal_input(
             TerminalInputAction(session_id='t-sub', input='partial', submit=False)
@@ -704,7 +714,8 @@ async def test_terminal_input_applies_resize_and_control_field(
     mock_executor.session_manager.get_session.return_value = session
 
     with patch(
-        'backend.execution.server.action_execution_server.asyncio.sleep', return_value=None
+        'backend.execution.server.action_execution_server.asyncio.sleep',
+        return_value=None,
     ):
         obs = await mock_executor.terminal_input(
             TerminalInputAction(
@@ -929,7 +940,8 @@ async def test_terminal_input_post_read_uses_stored_cursor(mock_executor, tmp_pa
     mock_executor._terminal_read_cursor['t-cursor'] = 250
 
     with patch(
-        'backend.execution.server.action_execution_server.asyncio.sleep', return_value=None
+        'backend.execution.server.action_execution_server.asyncio.sleep',
+        return_value=None,
     ):
         obs = await mock_executor.terminal_input(
             TerminalInputAction(session_id='t-cursor', control='enter')
@@ -976,7 +988,8 @@ async def test_terminal_input_polls_pty_delta_after_existing_cursor(
     mock_executor._terminal_read_cursor['t-pty'] = 250
 
     with patch(
-        'backend.execution.server.action_execution_server.asyncio.sleep', return_value=None
+        'backend.execution.server.action_execution_server.asyncio.sleep',
+        return_value=None,
     ):
         obs = await mock_executor.terminal_input(
             TerminalInputAction(session_id='t-pty', input='echo ok')

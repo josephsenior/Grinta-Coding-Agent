@@ -176,12 +176,8 @@ class TestPatternSanity:
         assert model_matches(model, RESPONSE_SCHEMA_PATTERNS)
 
     def test_should_support_response_schema_excludes_minimax(self):
-        assert not should_support_response_schema(
-            'minimax-m2.5', provider='vercel'
-        )
-        assert should_support_response_schema(
-            'alibaba/qwen3.7-plus', provider='vercel'
-        )
+        assert not should_support_response_schema('minimax-m2.5', provider='vercel')
+        assert should_support_response_schema('alibaba/qwen3.7-plus', provider='vercel')
 
     def test_get_features_reports_catalog_response_schema(self):
         features = get_features('anthropic/claude-sonnet-4-6')

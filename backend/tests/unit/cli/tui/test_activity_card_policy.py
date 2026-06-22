@@ -79,9 +79,7 @@ async def test_shell_session_panel_keeps_body_visible_after_completion(
         await pilot.pause()
 
         card = next(
-            c
-            for c in screen.query(ShellCard).results()
-            if c.command == 'pytest -q'
+            c for c in screen.query(ShellCard).results() if c.command == 'pytest -q'
         )
         assert card.exit_code == 0
         assert card.output == '2 passed'

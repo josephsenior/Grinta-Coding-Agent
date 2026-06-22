@@ -64,7 +64,9 @@ class DetailScreen(Screen):
 
     def section(self, label: str, *widgets: Static | Container) -> list:
         """Section block with a muted heading and optional body widgets."""
-        items: list = [Static(self._section_heading_markup(label), classes='detail-section-hdr')]
+        items: list = [
+            Static(self._section_heading_markup(label), classes='detail-section-hdr')
+        ]
         items.extend(widgets)
         return items
 
@@ -102,7 +104,9 @@ class DetailScreen(Screen):
         return Static(f'[#54597b]{message}[/]', **kwargs)
 
     def list_row(self, markup: str, *, active: bool = False) -> Static:
-        classes = 'detail-list-row detail-list-row-active' if active else 'detail-list-row'
+        classes = (
+            'detail-list-row detail-list-row-active' if active else 'detail-list-row'
+        )
         return Static(markup, classes=classes)
 
     def compose(self) -> ComposeResult:

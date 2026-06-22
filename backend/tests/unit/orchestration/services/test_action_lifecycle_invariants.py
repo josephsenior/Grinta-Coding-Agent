@@ -112,8 +112,8 @@ class TestActionLifecycleInvariant(unittest.IsolatedAsyncioTestCase):
         )
         try:
             self.controller.event_stream = stream
-            self.context.emit_event.side_effect = (
-                lambda event, source: stream.add_event(event, source)
+            self.context.emit_event.side_effect = lambda event, source: (
+                stream.add_event(event, source)
             )
 
             action = CmdRunAction(command='echo hello')

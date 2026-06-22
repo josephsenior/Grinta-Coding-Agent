@@ -52,7 +52,9 @@ class TerminalDetailScreen(DetailScreen):
             meta_parts.append(exit_chip)
         if meta_parts:
             widgets.append(
-                self.meta_row(format_meta_chips(meta_parts), widget_id='terminal-session')
+                self.meta_row(
+                    format_meta_chips(meta_parts), widget_id='terminal-session'
+                )
             )
 
         frame_parts: list = []
@@ -74,6 +76,8 @@ class TerminalDetailScreen(DetailScreen):
             frame_title = (self._session_id or self._heading or 'terminal')[:48]
             widgets.append(self.terminal_frame(*frame_parts, title=frame_title))
         elif not self._command:
-            widgets.append(self.empty_state('(no terminal content)', widget_id='terminal-empty'))
+            widgets.append(
+                self.empty_state('(no terminal content)', widget_id='terminal-empty')
+            )
 
         return widgets

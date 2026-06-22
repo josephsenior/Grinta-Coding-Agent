@@ -91,7 +91,9 @@ async def test_collapsible_set_items_mounts_visible_rows(mock_config) -> None:
 
 
 @pytest.mark.asyncio
-async def test_task_sidebar_retries_after_failed_first_update(mock_config, monkeypatch) -> None:
+async def test_task_sidebar_retries_after_failed_first_update(
+    mock_config, monkeypatch
+) -> None:
     console = RichConsole()
     loop = __import__('asyncio').get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)

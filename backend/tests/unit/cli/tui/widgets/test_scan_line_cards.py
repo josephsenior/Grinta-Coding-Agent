@@ -22,6 +22,7 @@ from backend.cli.tui.widgets.scan_line import (
 
 # ── test-only minimal ScanLineCard ─────────────────────────────────────
 
+
 class _TestCard(ScanLineCard):
     def _line_text(self) -> str:
         return 'test-card'
@@ -32,11 +33,13 @@ class _TestCard(ScanLineCard):
 
 # ── helpers ────────────────────────────────────────────────────────────
 
+
 def _line_text(card: ScanLineCard) -> str:
     return str(card._line_text())
 
 
 # ── ScanLineCard base ──────────────────────────────────────────────────
+
 
 def test_scan_line_card_initial_state_is_queued():
     card = _TestCard()
@@ -69,6 +72,7 @@ def test_scan_line_card_compose_has_expand_button():
 
 
 # ── parse_syntax_badge ─────────────────────────────────────────────────
+
 
 def test_parse_syntax_badge_pass():
     assert _parse_syntax_badge('edited\n<SYNTAX_CHECK_PASSED />') == 'pass'
@@ -114,6 +118,7 @@ def test_compact_path():
 
 # ── AgentMessageCard ───────────────────────────────────────────────────
 
+
 def test_agent_message_card_line():
     card = AgentMessageCard("I'll run the tests first, then fix the import")
     assert 'Agent' in _line_text(card)
@@ -134,6 +139,7 @@ def test_agent_message_card_detail_screen():
 
 
 # ── EditCard ───────────────────────────────────────────────────────────
+
 
 def test_edit_card_create():
     card = EditCard(
@@ -191,6 +197,7 @@ def test_edit_card_detail_screen_built():
 
 # ── ShellCard ──────────────────────────────────────────────────────────
 
+
 def test_scan_line_icons_are_unique():
     from backend.cli.tui.widgets.scan_line import cards as cards_mod
 
@@ -237,6 +244,7 @@ def test_shell_card_refresh_updates_line():
 
 
 # ── TerminalCard ───────────────────────────────────────────────────────
+
 
 def test_terminal_card_running():
     card = TerminalCard(
@@ -303,6 +311,7 @@ def test_terminal_card_detail_screen():
 
 # ── BrowserCard ────────────────────────────────────────────────────────
 
+
 def test_browser_card_running():
     card = BrowserCard(domain='github.com/raft/paper', action='extracting links')
     assert card.state == 'running'
@@ -336,6 +345,7 @@ def test_browser_card_detail_screen():
 
 
 # ── DebuggerCard ───────────────────────────────────────────────────────
+
 
 def test_debugger_card_running():
     card = DebuggerCard(location='backend/raft.py:47', function='')
@@ -373,6 +383,7 @@ def test_debugger_card_detail_screen():
 
 # ── DelegateCard / MCPCard / PayloadCard ───────────────────────────────
 
+
 def test_delegate_card_running_then_done():
     card = DelegateCard('Investigate flaky test', worker='worker-1')
     assert card.state == 'running'
@@ -401,8 +412,11 @@ def test_payload_card_detail_screen():
 
 # ── detail screen base ─────────────────────────────────────────────────
 
+
 def test_detail_screen_has_escape_binding():
     assert any(
-        binding[0] == 'escape' if isinstance(binding, tuple) else getattr(binding, 'key', '') == 'escape'
+        binding[0] == 'escape'
+        if isinstance(binding, tuple)
+        else getattr(binding, 'key', '') == 'escape'
         for binding in DetailScreen.BINDINGS
     )
