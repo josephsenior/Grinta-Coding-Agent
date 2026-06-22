@@ -32,11 +32,14 @@ def _entry(
 class TestSupportsReasoning:
     def test_metadata_capabilities_reasoning(self):
         entry = _entry(
+            supports_reasoning_effort=True,
+            reasoning_wire=WIRE_OPENAI_REASONING_EFFORT,
+            reasoning_efforts=('high',),
             metadata={
                 'capabilities': {'reasoning': True},
                 'family': 'deepseek-flash-free',
                 'variants': {'high': {'reasoningEffort': 'high'}},
-            }
+            },
         )
         assert supports_reasoning(entry) is True
 
@@ -84,6 +87,7 @@ class TestGatewayReasoningOptions:
             resolve_model_entry_for_capabilities,
         )
         from backend.inference.reasoning import (
+            reasoning_control_available,
             reasoning_effort_display_options,
             reasoning_effort_options,
         )
@@ -95,6 +99,25 @@ class TestGatewayReasoningOptions:
         assert entry is not None
         assert reasoning_effort_options(entry, include_disabled=True) == ()
         assert reasoning_effort_display_options(entry, include_disabled=True) == []
+        assert reasoning_control_available(entry) is False
+
+    def test_opencode_mimo_free_exposes_reasoning_controls(self):
+        from backend.inference.capabilities.param_profiles import (
+            resolve_model_entry_for_capabilities,
+        )
+        from backend.inference.reasoning import (
+            reasoning_control_available,
+            reasoning_effort_display_options,
+            supports_reasoning,
+        )
+
+        entry = resolve_model_entry_for_capabilities('mimo-v2.5-free', 'opencode')
+        assert entry is not None
+        assert supports_reasoning(entry) is True
+        assert reasoning_control_available(entry) is True
+        options = reasoning_effort_display_options(entry, include_disabled=True)
+        assert options
+        assert {value for _label, value in options} >= {'', 'low', 'medium', 'high'}
 
     def test_vercel_claude_via_effective_entry(self):
         from backend.inference.capabilities.param_profiles import (

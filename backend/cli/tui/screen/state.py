@@ -368,9 +368,9 @@ class ScreenStateMixin:
     def _sync_hud_reasoning_visibility(self, hud_bar) -> None:
         try:
             entry = self._resolve_hud_model_entry()
-            from backend.inference.reasoning import supports_reasoning
+            from backend.inference.reasoning import reasoning_control_available
 
-            visible = entry is not None and supports_reasoning(entry)
+            visible = reasoning_control_available(entry)
             hud_bar.query_one('#hud-reasoning').display = visible
             hud_bar.query_one('#hud-label-reasoning').display = visible
         except Exception:

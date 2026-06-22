@@ -188,15 +188,20 @@ def infer_family(entry: ModelEntry) -> str:
 def supports_reasoning(entry: ModelEntry) -> bool:
     """Return whether Grinta can safely configure reasoning for this entry."""
     caps = _capabilities(entry)
-    variants = _variants(entry)
-    if caps.get('reasoning') is True:
-        if variants or entry.provider in {'anthropic', 'google', 'openai', 'xai'}:
-            return True
     if caps.get('reasoning') is False:
         return False
     if entry.thinking_mode:
         return True
+
+    executable = _executable_reasoning_configuration(entry)
+    if executable is None:
+        return False
+    _wire, _allowed = executable
+
     if entry.supports_reasoning_effort:
+        return True
+    variants = _variants(entry)
+    if caps.get('reasoning') is True and variants:
         return True
 
     if entry.provider == 'anthropic':
@@ -228,6 +233,20 @@ def supports_reasoning(entry: ModelEntry) -> bool:
         return True
 
     return _model_name_supports_reasoning(entry)
+
+
+def _executable_reasoning_configuration(
+    entry: ModelEntry,
+) -> tuple[str, tuple[str, ...]] | None:
+    """Return ``(wire, allowed_efforts)`` when effort can be applied, else ``None``."""
+    family = infer_family(entry)
+    wire = _resolve_wire_schema(entry, family)
+    if wire == WIRE_NONE:
+        return None
+    allowed = _allowed_efforts(entry, wire, family)
+    if not allowed:
+        return None
+    return wire, allowed
 
 
 def _resolve_wire_schema(entry: ModelEntry, family: str) -> str:
@@ -344,6 +363,11 @@ def reasoning_effort_display_options(
     return options
 
 
+def reasoning_control_available(entry: ModelEntry | None) -> bool:
+    """Return whether UI should expose a configurable reasoning effort selector."""
+    return entry is not None and supports_reasoning(entry)
+
+
 def reasoning_effort_options(
     entry: ModelEntry | None,
     *,
@@ -356,11 +380,10 @@ def reasoning_effort_options(
     """
     if entry is None or not supports_reasoning(entry):
         return ()
-    family = infer_family(entry)
-    wire = _resolve_wire_schema(entry, family)
-    if wire == WIRE_NONE:
+    executable = _executable_reasoning_configuration(entry)
+    if executable is None:
         return ()
-    values = _allowed_efforts(entry, wire, family)
+    _wire, values = executable
     if include_disabled:
         return ('none', *tuple(value for value in values if value != 'none'))
     return values

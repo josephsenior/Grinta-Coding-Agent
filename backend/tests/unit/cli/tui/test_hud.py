@@ -75,6 +75,64 @@ async def test_tui_hud_bar_shows_accumulated_and_context_tokens(mock_config):
 
 
 @pytest.mark.asyncio
+async def test_tui_hud_reasoning_hidden_when_model_has_no_control(mock_config, monkeypatch):
+    from backend.inference.capabilities.param_profiles import (
+        resolve_model_entry_for_capabilities,
+    )
+
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    mock_config.get_llm_config.return_value.model = 'openai/gpt-4.1'
+    mock_config.get_llm_config.return_value.provider = 'openrouter'
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+    entry = resolve_model_entry_for_capabilities('openai/gpt-4.1', 'openrouter')
+    monkeypatch.setattr(GrintaScreen, '_resolve_hud_model_entry', lambda self: entry)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        s._config = mock_config
+        s._render_hud_bar()
+        await pilot.pause()
+
+        reasoning = s.query_one('#hud-reasoning', Select)
+        label = s.query_one('#hud-label-reasoning', Label)
+        assert reasoning.display is False
+        assert label.display is False
+
+
+@pytest.mark.asyncio
+async def test_tui_hud_reasoning_visible_when_model_supports_control(
+    mock_config, monkeypatch
+):
+    from backend.inference.capabilities.param_profiles import (
+        resolve_model_entry_for_capabilities,
+    )
+
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    mock_config.get_llm_config.return_value.model = 'mimo-v2.5-free'
+    mock_config.get_llm_config.return_value.provider = 'opencode'
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+    entry = resolve_model_entry_for_capabilities('mimo-v2.5-free', 'opencode')
+    monkeypatch.setattr(GrintaScreen, '_resolve_hud_model_entry', lambda self: entry)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        s._config = mock_config
+        s._render_hud_bar()
+        await pilot.pause()
+
+        reasoning = s.query_one('#hud-reasoning', Select)
+        label = s.query_one('#hud-label-reasoning', Label)
+        assert reasoning.display is True
+        assert label.display is True
+
+
+@pytest.mark.asyncio
 async def test_tui_hud_reasoning_select_syncs_from_config(mock_config, monkeypatch):
     console = RichConsole()
     loop = asyncio.get_running_loop()

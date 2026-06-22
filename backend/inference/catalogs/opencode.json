@@ -3455,7 +3455,7 @@
           "low",
           "medium"
         ],
-        "reasoning_wire": "none",
+        "reasoning_wire": "openai_reasoning_effort",
         "supports_reasoning_effort": true
       },
       "metadata": {
@@ -3655,7 +3655,7 @@
           "low",
           "medium"
         ],
-        "reasoning_wire": "none",
+        "reasoning_wire": "openai_reasoning_effort",
         "supports_reasoning_effort": true
       },
       "metadata": {
@@ -3732,7 +3732,7 @@
           "high",
           "none"
         ],
-        "reasoning_wire": "none",
+        "reasoning_wire": "openai_reasoning_effort",
         "supports_reasoning_effort": true
       },
       "metadata": {
