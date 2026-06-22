@@ -53,7 +53,6 @@ class TestCriticalPatterns:
         [
             'rm -rf /',
             'rm -rf /home',
-            'rm -fr /tmp',
             'rm --force --recursive /var',
             'mkfs.ext4 /dev/sda1',
             'dd if=/dev/zero of=/dev/sda',
@@ -69,6 +68,24 @@ class TestCriticalPatterns:
         risk, reason, recs = analyzer.analyze(cmd)
         assert risk == RiskCategory.CRITICAL, f'{cmd!r} should be CRITICAL, got {risk}'
         assert recs
+
+
+class TestWorkspaceCleanupNotCritical:
+    @pytest.mark.parametrize(
+        'cmd',
+        [
+            'Remove-Item .\\tests\\__pycache__ -Recurse -Force',
+            'Remove-Item foo -Recurse -Force',
+            'rm -rf ./tests/__pycache__',
+            'rm -fr /tmp',
+            'rm -rf node_modules',
+        ],
+    )
+    def test_workspace_cleanup_is_not_critical(self, analyzer: CommandAnalyzer, cmd: str):
+        risk, _, _ = analyzer.analyze(cmd)
+        assert risk != RiskCategory.CRITICAL, (
+            f'{cmd!r} should not be CRITICAL, got {risk}'
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -311,7 +328,7 @@ class TestObfuscationNormalization:
             # "-n" echo flag strip
             '$(echo -n rm) -rf /',
             # Nested trivial substitution
-            '$(echo $(echo rm)) -rf /tmp',
+            '$(echo $(echo rm)) -rf /',
         ],
     )
     def test_obfuscated_rm_rf_is_critical(self, analyzer: CommandAnalyzer, cmd: str):

@@ -221,12 +221,12 @@ class TestFileEditorCreate:
         assert 'Syntax validation failed' in result.error
         assert not (Path(self.tmpdir) / 'broken.css').exists()
 
-    def test_python_double_slash_comment_is_rejected_preflight(self):
+    def test_python_double_slash_comment_writes_with_syntax_warning(self):
         bad_python = '// bad comment\nprint("ok")\n'
         result = self.editor(command='create_file', path='bad.py', file_text=bad_python)
-        assert result.error is not None
-        assert 'invalid Python comment prefix' in result.error
-        assert not (Path(self.tmpdir) / 'bad.py').exists()
+        assert result.error is None
+        assert (Path(self.tmpdir) / 'bad.py').exists()
+        assert 'WARNING' in result.output
 
     def test_placeholder_example_content_is_rejected_preflight(self):
         result = self.editor(
@@ -323,7 +323,7 @@ class TestFileEditorEdit:
         content = (Path(self.tmpdir) / 'code.py').read_text()
         assert 'y = 42' in content
 
-    def test_range_edit_blocks_syntax_regression(self):
+    def test_range_edit_warns_on_syntax_regression(self):
         from backend.utils.treesitter import treesitter_editor
 
         if not treesitter_editor.TREE_SITTER_AVAILABLE:
@@ -339,11 +339,12 @@ class TestFileEditorEdit:
             new_str='def broken(\n',
         )
 
-        assert result.error is not None
-        assert result.error_code == 'INTRODUCED_SYNTAX_ERROR'
-        assert target.read_text() == 'def ok():\n    return 1\n'
+        assert result.error is None
+        assert 'WARNING' in result.output
+        assert 'syntax' in result.output.lower()
+        assert target.read_text() == 'def broken(\n    return 1\n'
 
-    def test_range_edit_blocks_python_compile_only_regression(self):
+    def test_range_edit_warns_on_python_compile_only_regression(self):
         target = self._write('code.py', 'def ok():\n    return 1\n')
 
         result = self.editor(
@@ -355,10 +356,10 @@ class TestFileEditorEdit:
             new_str='return 1\n',
         )
 
-        assert result.error is not None
-        assert result.error_code == 'INTRODUCED_SYNTAX_ERROR'
-        assert "'return' outside function" in result.error
-        assert target.read_text() == 'def ok():\n    return 1\n'
+        assert result.error is None
+        assert 'WARNING' in result.output
+        assert "'return' outside function" in result.output
+        assert target.read_text() == 'return 1\n'
 
     def test_edit_dry_run(self):
         self._write('code.py', 'x = 1\n')

@@ -346,16 +346,9 @@ def _validate_edit_before_write(
     regression_error = self._detect_introduced_syntax_error(
         file_path, old_content, new_content
     )
+    warnings: list[str] = []
     if regression_error is not None:
-        return ToolResult(
-            output='',
-            error=regression_error,
-            old_content=old_content,
-            new_content=new_content,
-            error_code='INTRODUCED_SYNTAX_ERROR',
-            retryable=True,
-            operation='edit',
-        ), ''
+        warnings.append(f'WARNING: {regression_error}')
 
     is_valid, msg = self._maybe_validate_syntax_for_file(file_path, new_content)
     if not is_valid:
@@ -368,7 +361,9 @@ def _validate_edit_before_write(
             retryable=True,
             operation='edit',
         ), ''
-    return None, msg if msg else ''
+    if msg and msg.startswith('WARNING:'):
+        warnings.append(msg)
+    return None, '\n'.join(warnings)
 
 
 def _format_edit_success_output(
@@ -527,8 +522,9 @@ def _validate_write_commit(
     regression_error = self._detect_introduced_syntax_error(
         file_path, old_content, content
     )
+    warnings: list[str] = []
     if regression_error is not None:
-        return None, f'WARNING: {regression_error}'
+        warnings.append(f'WARNING: {regression_error}')
 
     is_valid, msg = self._maybe_validate_syntax_for_file(file_path, content)
     if not is_valid:
@@ -541,8 +537,9 @@ def _validate_write_commit(
             retryable=True,
             operation='create_file',
         ), ''
-    soft_warning = msg if msg and msg.startswith('WARNING:') else ''
-    return None, soft_warning
+    if msg and msg.startswith('WARNING:'):
+        warnings.append(msg)
+    return None, '\n'.join(warnings)
 
 
 def _compose_write_commit_output(

@@ -228,38 +228,30 @@ def _validate_multi_edit_file_final(
     *,
     failed_op_index: int | None = None,
     total_ops: int | None = None,
-) -> None:
-    from backend.core.errors.structured_edit_errors import (
-        compact_syntax_detail,
-        extract_syntax_line,
-    )
-
+) -> str | None:
+    """Return a syntax warning for the agent, or None when clean."""
     if not temp_path.exists():
-        return
+        return None
     final_content = temp_path.read_text(encoding='utf-8')
     if final_content == (original_content or ''):
-        return
+        return None
 
+    warnings: list[str] = []
     regression_error = temp_editor._detect_introduced_syntax_error(
         temp_path, original_content, final_content
     )
     if regression_error is not None:
-        _multi_edit_raise(
-            'multi_edit failed: file has syntax errors.',
-            error_code='INTRODUCED_SYNTAX_ERROR',
-            path=rel_path,
-            operation='multi_edit',
-            failed_op_index=failed_op_index,
-            total_ops=total_ops,
-            line=extract_syntax_line(regression_error),
-            detail=compact_syntax_detail(regression_error),
-            retryable=True,
-        )
+        warnings.append(f'WARNING: {regression_error}')
 
     is_valid, msg = temp_editor._maybe_validate_syntax_for_file(
         temp_path, final_content
     )
     if not is_valid:
+        from backend.core.errors.structured_edit_errors import (
+            compact_syntax_detail,
+            extract_syntax_line,
+        )
+
         _multi_edit_raise(
             'multi_edit failed: syntax validation failed.',
             error_code='SYNTAX_VALIDATION_FAILED',
@@ -271,6 +263,9 @@ def _validate_multi_edit_file_final(
             detail=compact_syntax_detail(str(msg or '')),
             retryable=True,
         )
+    if msg and msg.startswith('WARNING:'):
+        warnings.append(msg)
+    return '\n'.join(warnings) if warnings else None
 
 
 def _apply_multi_edit_operation(
@@ -428,7 +423,7 @@ def _apply_multi_edit_to_temp_files(
     workspace_root: str | Path,
     temp_root: Path,
     temp_editor: Any,
-) -> tuple[dict[str, str | None], dict[str, str]]:
+) -> tuple[dict[str, str | None], dict[str, str], list[str]]:
     """Apply multi_edit operations in declaration order against per-file temp copies.
 
     Each operation sees the temp file as left by all prior operations in the batch.
@@ -437,6 +432,7 @@ def _apply_multi_edit_to_temp_files(
     original_snapshots: dict[str, str | None] = {}
     final_contents: dict[str, str] = {}
     temp_paths: dict[str, Path] = {}
+    syntax_warnings: list[str] = []
 
     for op_index, (item_path, _display_path, operation, item) in enumerate(parsed):
         real_path = Path(item_path)
@@ -470,7 +466,7 @@ def _apply_multi_edit_to_temp_files(
                 operation='multi_edit',
                 retryable=True,
             )
-        _validate_multi_edit_file_final(
+        warning = _validate_multi_edit_file_final(
             temp_editor,
             temp_path,
             rel_path,
@@ -478,9 +474,11 @@ def _apply_multi_edit_to_temp_files(
             failed_op_index=len(parsed) - 1 if parsed else None,
             total_ops=len(parsed) or None,
         )
+        if warning:
+            syntax_warnings.append(f'{rel_path}:\n{warning}')
         final_contents[item_path] = temp_path.read_text(encoding='utf-8')
 
-    return original_snapshots, final_contents
+    return original_snapshots, final_contents, syntax_warnings
 
 
 def _verify_no_concurrent_modifications(
@@ -514,7 +512,9 @@ def _commit_multi_edit_transaction(
     return refactor.commit(transaction, validate=False)
 
 
-def _format_multi_edit_success(parsed: list, result: Any) -> MessageAction:
+def _format_multi_edit_success(
+    parsed: list, result: Any, *, syntax_warnings: list[str] | None = None
+) -> MessageAction:
     paths = sorted(
         {display_path for _item_path, display_path, _operation, _item in parsed}
     )
@@ -522,12 +522,13 @@ def _format_multi_edit_success(parsed: list, result: Any) -> MessageAction:
         file_lines = f'  • {paths[0]}'
     else:
         file_lines = '\n'.join(f'  • {p}' for p in paths)
-    return MessageAction(
-        content=(
-            f'✓ multi_edit committed {result.files_modified} file(s) atomically\n'
-            f'{file_lines}'
-        )
+    content = (
+        f'✓ multi_edit committed {result.files_modified} file(s) atomically\n'
+        f'{file_lines}'
     )
+    if syntax_warnings:
+        content += '\n\n[SYNTAX WARNINGS]\n' + '\n\n'.join(syntax_warnings)
+    return MessageAction(content=content)
 
 
 def _format_multi_edit_failure(result: Any) -> NoReturn:
@@ -563,6 +564,7 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
     workspace_root = require_effective_workspace_root()
     refactor = AtomicRefactor()
     transaction = refactor.begin_transaction()
+    syntax_warnings: list[str] = []
     try:
         with ExitStack() as stack:
             for item_path in sorted(seen_paths):
@@ -573,12 +575,14 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
                 temp_root = Path(temp_root_str)
                 temp_editor = FileEditor(workspace_root=str(temp_root))
                 temp_editor._defer_syntax_validation = True
-                original_snapshots, final_contents = _apply_multi_edit_to_temp_files(
-                    parsed,
-                    seen_paths,
-                    workspace_root,
-                    temp_root,
-                    temp_editor,
+                original_snapshots, final_contents, syntax_warnings = (
+                    _apply_multi_edit_to_temp_files(
+                        parsed,
+                        seen_paths,
+                        workspace_root,
+                        temp_root,
+                        temp_editor,
+                    )
                 )
             _verify_no_concurrent_modifications(original_snapshots, workspace_root)
             result = _commit_multi_edit_transaction(
@@ -603,5 +607,7 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
         )
 
     if result.success:
-        return _format_multi_edit_success(parsed, result)
+        return _format_multi_edit_success(
+            parsed, result, syntax_warnings=syntax_warnings
+        )
     _format_multi_edit_failure(result)
