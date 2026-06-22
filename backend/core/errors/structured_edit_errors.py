@@ -69,6 +69,8 @@ def summarize_editor_error(result: Any) -> tuple[str, str, bool, dict[str, Any]]
     error_code = str(getattr(result, 'error_code', None) or 'EDITOR_ERROR')
     operation = str(getattr(result, 'operation', None) or 'edit')
     retryable = bool(getattr(result, 'retryable', True))
+    if error_code == 'UNDO_NO_PRIOR_VERSION':
+        retryable = False
     metadata = getattr(result, 'metadata', None)
     extra: dict[str, Any] = {}
     if isinstance(metadata, dict) and metadata.get('match_count') is not None:
@@ -87,6 +89,9 @@ def summarize_editor_error(result: Any) -> tuple[str, str, bool, dict[str, Any]]
         'CREATE_FILE_ALREADY_EXISTS': 'create failed: file already exists.',
         'EMPTY_OLD_STRING': 'replace_string failed: old_string must not be empty.',
         'REPLACE_STRING_ERROR': 'replace_string failed.',
+        'UNDO_NO_PRIOR_VERSION': (
+            'undo failed: the only recorded change for this file was creating it.'
+        ),
     }
     summary = summaries.get(error_code)
     if summary is None:

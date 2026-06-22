@@ -2332,6 +2332,48 @@ async def test_tui_file_edit_action_and_observation_render_single_delta_card(
 
 
 @pytest.mark.asyncio
+async def test_tui_undo_last_edit_renders_undo_edit_card(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+
+        action = FileEditAction(path='demo.txt', command='undo_last_edit')
+        action._id = 7
+        renderer._process_event(action)
+        await pilot.pause()
+
+        obs = FileEditObservation(
+            content='Undid last edit; restored previous file contents.',
+            path='demo.txt',
+            old_content='alpha\nbeta\n',
+            new_content='alpha\ngamma\n',
+        )
+        obs.cause = 7
+        renderer._process_event(obs)
+        await pilot.pause()
+
+        cards = list(s.query(EditCard).results())
+        assert len(cards) == 1
+        assert cards[0]._is_undo is True
+        assert 'Undo' in str(cards[0]._line_text())
+        assert cards[0]._encoded_diff is not None
+
+
+@pytest.mark.asyncio
 async def test_tui_replace_string_observation_renders_edited_not_created(
     mock_config,
 ):

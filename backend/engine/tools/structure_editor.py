@@ -334,15 +334,21 @@ class StructureEditor:
         if not global_undo_manager.has_history(path):
             return EditResult(success=False, message=f'No undo history for {path}')
 
-        previous_content = global_undo_manager.pop(path)
+        snapshot = global_undo_manager.pop_with_metadata(path)
+        if snapshot is None:
+            return EditResult(success=False, message=f'No undo history for {path}')
+        previous_content = snapshot.content
 
         try:
             if previous_content is None:
-                if os.path.exists(path):
-                    os.remove(path)
+                global_undo_manager.push(path, None, snapshot.editor)
                 return EditResult(
-                    success=True,
-                    message=f'Undid last edit to {path} (file removed)',
+                    success=False,
+                    message=(
+                        'Cannot undo: the only recorded change for this file was creating it. '
+                        'There is no prior version to restore. Delete the file explicitly if '
+                        'you want it removed.'
+                    ),
                 )
             with open(path, 'w', encoding='utf-8') as f:
                 f.write(previous_content)

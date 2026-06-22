@@ -875,7 +875,7 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
         try:
             diff = get_diff(old_content, new_content, action.path)
             if diff:
-                diff = truncate_diff(diff)
+                diff = truncate_diff(diff, path=action.path)
                 result_str = result_str + '\n\n[EDIT_DIFF]\n' + diff
         except Exception:
             pass
