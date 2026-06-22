@@ -3,7 +3,7 @@
 ![Grinta logo](docs/assets/logo.svg)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://python.org)
+[![Python 3.12–3.13](https://img.shields.io/badge/Python-3.12--3.13-3776AB?logo=python&logoColor=white)](https://python.org)
 [![Install: pipx](https://img.shields.io/badge/install-pipx-brightgreen)](docs/INSTALL.md)
 [![mypy: checked](https://img.shields.io/badge/mypy-checked-2A6DB2.svg)](https://mypy-lang.org/)
 [![code style: Ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://github.com/astral-sh/ruff)
@@ -16,7 +16,7 @@
 >
 > A terminal coding agent that plans, executes, validates, and finishes — without a cloud control plane, without lock-in to one model vendor, and without the old heavyweight install footprint.
 >
-> **Current status:** `v1.0.0-rc1` public release candidate. Core CI and install/onboarding validation are already in place; the remaining GA work is mostly release positioning, documentation alignment, and edge-case hardening.
+> **Current status:** `v1.0.0-rc1` public release candidate. Linux, Windows, and macOS run required unit and extended CI gates; smoke-install and onboarding validation are in place. Remaining GA work is mostly documentation alignment, contributor-doc honesty, and edge-case hardening after the post-rc1 decomposition wave.
 
 ### Grinta in action
 
@@ -27,7 +27,7 @@ Direct link if the animation does not load: [`docs/assets/grinta-demo.gif`](docs
 ## Release status
 
 - Latest public build is `v1.0.0-rc1` (release candidate), not final GA.
-- Core CI, smoke-install, and install/onboarding validation are already in place for the current release line.
+- Required CI covers sharded Linux unit coverage (75%), cross-platform unit gates, and integration/e2e/stress on Linux, Windows, and macOS; smoke-install and onboarding validation are in place for the current release line.
 - We are actively collecting feedback on UX clarity and edge-case reliability before the GA call.
 - Linux, Windows, and macOS are supported release targets, but certification depth differs by platform; see [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md).
 - If you hit friction, please open an issue with the `RC Feedback` template from the issue chooser.
@@ -52,7 +52,7 @@ The pitch in one sentence: **a local-first coding agent with deeper built-in too
 
 ## Install
 
-Prerequisites: Python 3.12+ and `pipx`. See [docs/INSTALL.md](docs/INSTALL.md) for all paths.
+Prerequisites: Python 3.12 or 3.13 and `pipx`. See [docs/INSTALL.md](docs/INSTALL.md) for all paths.
 
 ```bash
 pipx install grinta-ai          # base install; optional extras stay opt-in
@@ -131,11 +131,11 @@ graph TB
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the deep dive.
 
-Contributors: Linux PR gates run the full `backend/tests` corpus with coverage; Windows gates run `backend/tests/unit` ([docs/CI.md](docs/CI.md)). Match the tier you are changing before opening a PR ([CONTRIBUTING.md](CONTRIBUTING.md#testing-before-a-pull-request)).
+Contributors: Linux PR gates shard the **unit** corpus (`backend/tests/unit`) with 75% coverage, then run integration/e2e/stress in extended jobs; Windows and macOS run the same unit corpus plus the extended tier ([docs/CI.md](docs/CI.md)). Match the tier you are changing before opening a PR ([CONTRIBUTING.md](CONTRIBUTING.md#testing-before-a-pull-request)).
 
 ## The story behind Grinta
 
-Grinta is a single-author project, written and rewritten in public. The journey — what was killed, what was wrong, what got rebuilt — is **The Book of Grinta**: start at [Preface](docs/journey/preface-why-this-story-matters.md) → [00 · Meaning of Grinta](docs/journey/00-the-meaning-of-grinta.md) through the numbered chapters to [45 · The Product Surface Became Real](docs/journey/45-the-product-surface-became-real.md), then the epilogue [07 · The Road Ahead](docs/journey/07-the-road-ahead.md). Full index and act structure: [docs/journey/README.md](docs/journey/README.md). Stable shortcut from the repo root: [BOOK_OF_GRINTA.md](BOOK_OF_GRINTA.md).
+Grinta is a single-author project, written and rewritten in public. The journey — what was killed, what was wrong, what got rebuilt — is **The Book of Grinta**: start at [Preface](docs/journey/preface-why-this-story-matters.md) → [00 · Meaning of Grinta](docs/journey/00-the-meaning-of-grinta.md) through the numbered chapters to [45 · The Product Surface Became Real](docs/journey/45-the-product-surface-became-real.md) and [46 · The Decomposition Wave](docs/journey/46-the-decomposition-wave.md), then the epilogue [07 · The Road Ahead](docs/journey/07-the-road-ahead.md). Full index and act structure: [docs/journey/README.md](docs/journey/README.md). Stable shortcut from the repo root: [BOOK_OF_GRINTA.md](BOOK_OF_GRINTA.md).
 
 ## Quick start (from source)
 
@@ -143,6 +143,12 @@ Grinta is a single-author project, written and rewritten in public. The journey 
 
 ```powershell
 .\START_HERE.ps1
+```
+
+### Linux / macOS (recommended)
+
+```bash
+./start_here.sh
 ```
 
 ### Linux / macOS / manual
@@ -155,13 +161,13 @@ python scripts/bootstrap_env.py dev-test
 
 Profiles: `base` (runtime only), `dev-test` (contributor default), `browser` / `dev-test-browser` when working on browser automation.
 
-1. Create local settings:
+2. Create local settings:
 
 ```bash
 uv run python -m backend.cli.entry init
 ```
 
-1. Start the CLI:
+3. Start the CLI:
 
 ```bash
 uv run python -m backend.cli.entry
@@ -229,11 +235,11 @@ Optional completion-quality validation surfaces advisory warnings when tracked w
 
 **Contributors:**
 
-- [Contributor Map](docs/CONTRIBUTOR_MAP.md) · [Developer Guide](docs/DEVELOPER.md) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md)
+- [Contributor Map](docs/CONTRIBUTOR_MAP.md) · [Developer Guide](docs/DEVELOPER.md) · [Architecture](docs/ARCHITECTURE.md) · [CI](docs/CI.md) · [Contributing](CONTRIBUTING.md)
 
 **More reference:**
 
-- [Documentation hub](docs/README.md) · [Support Matrix](docs/SUPPORT_MATRIX.md) · [Vocabulary](docs/VOCABULARY.md) · [Security checklist](docs/SECURITY_CHECKLIST.md) · [Roadmap](ROADMAP.md)
+- [Documentation hub](docs/README.md) · [Support Matrix](docs/SUPPORT_MATRIX.md) · [Release checklist](docs/RELEASE_CHECKLIST.md) · [Vocabulary](docs/VOCABULARY.md) · [Security checklist](docs/SECURITY_CHECKLIST.md) · [Roadmap](ROADMAP.md)
 
 **Optional narrative:** [The Book of Grinta](docs/journey/README.md) — engineering memoir; may not reflect the current product surface.
 
