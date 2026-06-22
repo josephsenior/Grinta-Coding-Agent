@@ -6,31 +6,45 @@ from backend.core.tools.tool_names import MEMORY_TOOL_NAME
 from backend.engine.contracts import ChatCompletionToolParam
 from backend.engine.tools.param_defs import create_tool_definition
 
-_MEMORY_DESCRIPTION = (
+_MEMORY_DESCRIPTION_BASE = (
     'Unified memory for this agent.\n\n'
     '**working** — session-scoped cognitive state (hypothesis, findings, blockers, '
     'file_context, decisions, plan). Survives context condensation within the session. '
     'Use update_type=get|update|clear_section with section and content.\n\n'
     '**persist** — workspace-scoped durable facts (conventions, commands, architecture, '
-    'lessons). Rare; only for verified repo facts worth keeping across sessions.\n\n'
+    'lessons). Rare; only for verified repo facts worth keeping across sessions.'
+)
+
+_MEMORY_RECALL_BLOCK = (
+    '\n\n'
     '**recall** — fuzzy search across indexed conversation history when the visible '
     'window no longer shows what you need. Pass key as the search phrase.'
 )
 
 
-def create_memory_tool() -> ChatCompletionToolParam:
+def create_memory_tool(*, include_semantic_recall: bool = True) -> ChatCompletionToolParam:
     """Create the unified memory tool definition."""
+    description = _MEMORY_DESCRIPTION_BASE
+    if include_semantic_recall:
+        description += _MEMORY_RECALL_BLOCK
+    action_enum = ['working', 'persist', 'recall'] if include_semantic_recall else [
+        'working',
+        'persist',
+    ]
+    action_description = (
+        'Memory operation: working (session state), persist (workspace facts), '
+        'or recall (semantic search over indexed history).'
+        if include_semantic_recall
+        else 'Memory operation: working (session state) or persist (workspace facts).'
+    )
     return create_tool_definition(
         name=MEMORY_TOOL_NAME,
-        description=_MEMORY_DESCRIPTION,
+        description=description,
         properties={
             'action': {
                 'type': 'string',
-                'enum': ['working', 'persist', 'recall'],
-                'description': (
-                    'Memory operation: working (session state), persist (workspace facts), '
-                    'or recall (semantic search over indexed history).'
-                ),
+                'enum': action_enum,
+                'description': action_description,
             },
             'key': {
                 'type': 'string',

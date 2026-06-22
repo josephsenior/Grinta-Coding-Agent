@@ -314,7 +314,9 @@ class OrchestratorPlanner:
         return
 
     def _add_browsing_tool(self, tools: list) -> None:
-        if not getattr(self._config, 'enable_browsing', True):
+        from backend.utils.optional_extras import browser_tool_enabled
+
+        if not browser_tool_enabled(self._config):
             return
         from backend.engine.tools.browser_native import create_browser_tool
 
@@ -372,8 +374,13 @@ class OrchestratorPlanner:
             tools.append(create_checkpoint_tool())
         if getattr(self._config, 'enable_working_memory', True):
             from backend.engine.tools.memory import create_memory_tool
+            from backend.utils.optional_extras import vector_memory_enabled
 
-            tools.append(create_memory_tool())
+            tools.append(
+                create_memory_tool(
+                    include_semantic_recall=vector_memory_enabled(self._config)
+                )
+            )
 
     def _refresh_checked_tools_cache(
         self, tools: list[ChatCompletionToolParam]

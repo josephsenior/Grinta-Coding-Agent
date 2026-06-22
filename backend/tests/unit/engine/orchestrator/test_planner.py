@@ -249,7 +249,10 @@ class TestBuildToolset:
 
 
 class TestAddBrowsingTool:
-    def test_browsing_enabled_adds_browser_tool(self):
+    def test_browsing_enabled_adds_browser_tool(self, monkeypatch):
+        from backend.utils import optional_extras as oe
+
+        monkeypatch.setattr(oe, 'browser_tool_enabled', lambda _cfg: True)
         cfg = _make_config(enable_browsing=True)
         p = _make_planner(config=cfg)
         tools: list[Any] = []
@@ -257,7 +260,10 @@ class TestAddBrowsingTool:
         assert len(tools) == 1
         assert tools[0]['function']['name'] == 'browser'
 
-    def test_browsing_disabled_adds_nothing(self):
+    def test_browsing_disabled_adds_nothing(self, monkeypatch):
+        from backend.utils import optional_extras as oe
+
+        monkeypatch.setattr(oe, 'browser_tool_enabled', lambda _cfg: False)
         cfg = _make_config(enable_browsing=False)
         p = _make_planner(config=cfg)
         tools: list[Any] = []

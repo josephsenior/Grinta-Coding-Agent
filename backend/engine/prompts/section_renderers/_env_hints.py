@@ -35,7 +35,11 @@ def _debugger_available(config: Any = None) -> bool:
 
 
 def _discovery_decision_table(
-    *, lsp_available: bool, web_on: bool = True, docs_on: bool = True
+    *,
+    lsp_available: bool,
+    web_on: bool = True,
+    docs_on: bool = True,
+    browser_on: bool = False,
 ) -> str:
     """Canonical routing table for overlapping search/discovery tools."""
     lines = [
@@ -55,14 +59,16 @@ def _discovery_decision_table(
         '- Test files for a module → `glob` (`**/*test*`, `**/*_test.*`) then `grep` for imports/references',
     ]
     if web_on:
-        lines.extend(
-            [
-                '- External/current info (errors, release notes, unknown APIs) → `web_search`',
-                '- Known URL, static/markdown page → `web_fetch` (default for URLs)',
-                '- Login, forms, JS SPA, or interaction required → `browser` (not `web_fetch`)',
-            ]
-        )
-    else:
+        web_lines = [
+            '- External/current info (errors, release notes, unknown APIs) → `web_search`',
+            '- Known URL, static/markdown page → `web_fetch` (default for URLs)',
+        ]
+        if browser_on:
+            web_lines.append(
+                '- Login, forms, JS SPA, or interaction required → `browser` (not `web_fetch`)'
+            )
+        lines.extend(web_lines)
+    elif browser_on:
         lines.append('- Interactive/JS-heavy pages → `browser`')
     if docs_on:
         docs_lines = [
@@ -167,20 +173,26 @@ def _routing_memory_tool_placeholders(
     *,
     working_memory_on: bool,
     tracker_on: bool,
+    semantic_recall_on: bool = False,
 ) -> dict[str, str]:
     ambiguous_intent_instruction = 'If intent is still ambiguous after inspection, see `<ASK_USER_TOOL>` rather than guessing.'
     if working_memory_on:
+        recall_line = (
+            '- `memory(action="recall", key=...)`: fuzzy search when prior turns fell out of '
+            'the visible window.\n'
+            if semantic_recall_on
+            else ''
+        )
         memory_and_context_section = (
             '<MEMORY_AND_CONTEXT>\n'
-            '**memory** tool — three actions only:\n'
+            '**memory** tool — actions:\n'
             '- `memory(action="working", update_type=update, section=..., content=...)`: '
             'session reasoning (hypothesis, findings, blockers, plan). '
             'Auto-restored after condensation; do not re-fetch at session start.\n'
             '- `memory(action="persist", key=..., kind=..., value=...)`: rare workspace facts '
             '(conventions, commands, architecture, lessons). '
             'Ranked workspace memory may appear at session start.\n'
-            '- `memory(action="recall", key=...)`: fuzzy search when prior turns fell out of '
-            'the visible window.\n'
+            f'{recall_line}'
             'Do not store task progress in memory — use `task_tracker`.\n'
             '</MEMORY_AND_CONTEXT>'
         )

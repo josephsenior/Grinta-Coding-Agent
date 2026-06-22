@@ -48,7 +48,9 @@ The default agent name is `Orchestrator`. Common overrides:
 | `mode` | `agent`, `chat`, or `plan` |
 | `autonomy_level` | `conservative`, `balanced`, or `full` |
 | `enable_mcp` | Toggle MCP tools |
-| `enable_browsing` | Toggle browser tools |
+| `enable_browsing` | Native `browser` tool (default on; requires `[browser]` extra at runtime). Set `false` to disable. |
+| `enable_vector_memory` | Semantic recall / vector store (default on; requires `[rag]` extra at runtime). Set `false` to disable. |
+| `enable_hybrid_retrieval` | Hybrid search with `[rag]` (default on; same gating as vector memory). |
 | `enable_task_tracker_tool` | Structured plan tracking in Plan mode |
 
 See `backend/core/config/agent_config.py` for the full schema.

@@ -175,7 +175,11 @@ def execute_memory_recall(action: MemoryRecallAction) -> MemoryRecallObservation
     recall_fn = _semantic_recall_registry.get('fn')
     if recall_fn is None:
         return MemoryRecallObservation(
-            content='Vector memory is not available in this session.',
+            content=(
+                'Semantic recall is not available in this session. Install optional RAG '
+                'with pip install "grinta-ai[rag]" (auto-enabled when installed) or set '
+                'agent.Orchestrator.enable_vector_memory to false to hide recall.'
+            ),
             query=query,
         )
     results = recall_fn(query, 5)

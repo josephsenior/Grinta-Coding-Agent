@@ -11,6 +11,18 @@ from __future__ import annotations
 from typing import Any
 
 
+def _vector_memory_runtime(config: Any) -> bool:
+    from backend.utils.optional_extras import vector_memory_enabled
+
+    return vector_memory_enabled(config)
+
+
+def _browser_runtime(config: Any) -> bool:
+    from backend.utils.optional_extras import browser_tool_enabled
+
+    return browser_tool_enabled(config)
+
+
 def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
     r"""Return ``(lsp_line, dap_line)`` summarizing detected runtimes.
 
@@ -114,10 +126,15 @@ def _render_system_capabilities(
         else ''
     )
 
+    condensation_tiers = (
+        'working / episodic / semantic'
+        if _vector_memory_runtime(config)
+        else 'working / episodic'
+    )
     condensation_line = (
         '- **Conversation condensation**: AUTOMATIC and middleware-driven. '
         'It costs ZERO tool calls and ZERO turns from your budget. '
-        'It uses a 3-tier memory model (working / episodic / semantic) and re-injects a pre-condensation '
+        f'It uses a {condensation_tiers} memory model and re-injects a pre-condensation '
         'snapshot after pruning, so verified facts and the immediate task surface survive. '
         'Do not describe condensation as "lossy" or as something you must invoke manually.'
     )
@@ -140,7 +157,7 @@ def _render_system_capabilities(
         )
 
     browser_line = ''
-    if bool(getattr(config, 'enable_browsing', True)) and can_edit:
+    if _browser_runtime(config) and can_edit:
         web_fetch_hint = (
             'Use `web_fetch` for static URLs; `browser` when interaction is required.'
             if bool(getattr(config, 'enable_web', True))
@@ -153,10 +170,14 @@ def _render_system_capabilities(
 
     memory_line = ''
     if bool(getattr(config, 'enable_working_memory', True)) and can_edit:
+        recall_hint = (
+            ', `recall` for semantic search over indexed history'
+            if _vector_memory_runtime(config)
+            else ''
+        )
         memory_line = (
             '- **Memory (`memory`)**: `working` for session reasoning, `persist` for rare workspace '
-            'facts, `recall` for semantic search over indexed history. Task progress belongs in '
-            '`task_tracker`, not memory.'
+            f'facts{recall_hint}. Task progress belongs in `task_tracker`, not memory.'
         )
 
     checkpoint_line = ''

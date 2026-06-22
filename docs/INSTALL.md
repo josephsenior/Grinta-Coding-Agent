@@ -77,6 +77,32 @@ A Docker Hub mirror is published as `josephsenior/grinta:latest`.
 This repository does not currently ship a maintained `docker-compose.yml`. If you use
 Docker, run the container image directly and treat this path as community-supported.
 
+## Optional extras
+
+```bash
+pipx install "grinta-ai[rag]"      # chromadb + embeddings for semantic memory
+pipx install "grinta-ai[browser]"  # browser-use for in-process Chromium automation
+pipx install "grinta-ai[all]"       # both
+```
+
+When an extra is installed, matching tools appear automatically (config defaults are on). To disable after installing:
+
+```json
+"agent": {
+  "Orchestrator": {
+    "enable_vector_memory": false,
+    "enable_hybrid_retrieval": false,
+    "enable_browsing": false
+  }
+}
+```
+
+**RAG (`[rag]`):** `memory(recall)` and vector memory over long sessions.
+
+**Browser (`[browser]`):** in-process `browser` tool. After install, run once: `uvx browser-use install`.
+
+`web_search` / `web_fetch` are on the base install (no `[browser]` needed).
+
 ## After installation
 
 - Run `grinta init` to configure your LLM provider interactively.

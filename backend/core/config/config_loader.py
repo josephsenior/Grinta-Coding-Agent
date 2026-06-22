@@ -555,9 +555,9 @@ def finalize_config(cfg: AppConfig) -> None:
 
     _ensure_active_agent_compactor_llm(cfg)
     agent_cfg = cfg.get_agent_config(cfg.default_agent)
-    # In-process native browser (browser-use) needs AppConfig.enable_browser on the runtime.
-    # Do not clobber agent enable_browsing here — respect loaded defaults / settings.
-    cfg.enable_browser = bool(agent_cfg.enable_browsing)
+    from backend.utils.optional_extras import browser_tool_enabled
+
+    cfg.enable_browser = browser_tool_enabled(cfg)
     extend_mcp_servers_with_bundled_defaults(cfg.mcp.servers)
     _configure_llm_logging(cfg)
     _ensure_cache_directory(cfg)

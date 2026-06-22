@@ -47,7 +47,7 @@ Measured on a clean `pipx install grinta-ai` base wheel (no `[rag]` / `[browser]
 
 - Idle REPL: ~150 MB RSS (target; run `ps` after launch to verify on your machine)
 - Base install on disk: ~400 MB under `~/.local/pipx/venvs/grinta-ai` before optional extras (tree-sitter grammars dominate)
-- Mid-task with semantic RAG warm: ~600 MB–1.2 GB (ChromaDB + sentence-transformers)
+- Mid-task with semantic RAG warm: ~600 MB–1.2 GB (ChromaDB + FastEmbed ONNX)
 - Long sessions: bounded by auto-compaction; if memory grows unboundedly, file an issue.
 
 ## Measuring

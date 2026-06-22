@@ -264,9 +264,19 @@ class TestSystemCapabilitiesModeSpecific:
 
     # -- Agent mode: tools visible -----------------------------------------
 
-    def test_agent_mode_shows_browser(self):
+    def test_agent_mode_shows_browser(self, monkeypatch):
+        from backend.utils import optional_extras as oe
+
+        monkeypatch.setattr(oe, 'browser_tool_enabled', lambda _cfg: True)
         body = self._render_caps(mode='agent')
         self._assert_contains(body, 'Browser (`browser`)')
+
+    def test_agent_mode_hides_browser_when_extra_unavailable(self, monkeypatch):
+        from backend.utils import optional_extras as oe
+
+        monkeypatch.setattr(oe, 'browser_tool_enabled', lambda _cfg: False)
+        body = self._render_caps(mode='agent', enable_browsing=True)
+        self._assert_not_contains(body, 'Browser (`browser`)')
 
     def test_agent_mode_shows_memory(self):
         body = self._render_caps(mode='agent')
