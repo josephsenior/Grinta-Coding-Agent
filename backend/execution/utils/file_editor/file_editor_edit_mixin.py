@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import re
 from pathlib import Path
 from typing import Any
 
@@ -102,7 +101,11 @@ class FileEditorEditOpsMixin:
         old_content: str | None,
         new_content: str,
     ) -> str | None:
-        """Block edits that turn a previously parse-valid file parse-invalid."""
+        """Detect edits that turn a previously parse-valid file parse-invalid.
+
+        Returns a diagnostic string when a regression is detected. Callers
+        surface this as a post-write WARNING rather than blocking the edit.
+        """
         if (
             old_content is None
             or old_content == new_content
@@ -155,14 +158,6 @@ class FileEditorEditOpsMixin:
         if normalized_lines and normalized_lines.issubset(placeholder_lines):
             return 'Placeholder example content detected.'
 
-        suffix = file_path.suffix.lower()
-        if suffix == '.py':
-            for idx, line in enumerate(content.splitlines(), start=1):
-                if re.match(r'^\s*//', line):
-                    return (
-                        f'Line {idx}: invalid Python comment prefix `//` '
-                        '(Python uses `#`).'
-                    )
         return None
 
     @staticmethod

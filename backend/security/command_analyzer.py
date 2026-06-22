@@ -174,19 +174,52 @@ class CommandAssessment:
 # Pattern banks – order matters: first match wins within a tier.
 # ---------------------------------------------------------------------------
 
+# Windows / Unix paths where recursive delete is never workspace cleanup.
+_CRITICAL_RM_TARGET_RE = re.compile(
+    r'(?:^|\s)(?:'
+    r'/\s*$|'
+    r'/\*\s*$|'
+    r'~/?\s*$|'
+    r'/(?:home|var|usr|etc|boot|dev|sys|proc)(?:/|\s|$)'
+    r')',
+    re.I,
+)
+_CRITICAL_REMOVE_ITEM_PATH_RE = re.compile(
+    r'(?:'
+    r'C:\\Windows\b|'
+    r'C:\\Program Files(?:\s+\(x86\))?|'
+    r'\$env:(?:SystemRoot|windir)\b|'
+    r'[A-Z]:\\?\s*(?:;|\||$)|'
+    r'HKLM:\\|HKCU:\\Software\\Microsoft\\Windows'
+    r')',
+    re.I,
+)
+_RM_RECURSIVE_FORCE_RE = re.compile(
+    r'\brm\s+'
+    r'(?:-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*|-[a-zA-Z]*f[a-zA-Z]*r[a-zA-Z]*|'
+    r'--force\s+--recursive|--recursive\s+--force)\b',
+    re.I,
+)
+_RM_RECURSIVE_ROOT_RE = re.compile(r'\brm\s+-[a-zA-Z]*r[a-zA-Z]*\s+/\s*$', re.I)
+
+
+def _assess_critical_delete(cmd: str) -> str | None:
+    """Return a CRITICAL reason for deletes on system paths, else None."""
+    if _RM_RECURSIVE_FORCE_RE.search(cmd) and _CRITICAL_RM_TARGET_RE.search(cmd):
+        return 'recursive forced delete on system path'
+    if _RM_RECURSIVE_ROOT_RE.search(cmd):
+        return 'recursive delete on root'
+
+    if re.search(r'\bRemove-Item\b', cmd, re.I) and re.search(
+        r'-Recurse\b', cmd, re.I
+    ):
+        if _CRITICAL_REMOVE_ITEM_PATH_RE.search(cmd):
+            return 'recursive delete on Windows system path (PowerShell)'
+    return None
+
+
 _CRITICAL_PATTERNS: list[tuple[re.Pattern[str], str]] = [
-    # Destructive filesystem operations
-    (
-        re.compile(
-            r'\brm\s+(-[a-zA-Z]*r[a-zA-Z]*f|--force\s+--recursive|-[a-zA-Z]*f[a-zA-Z]*r)\b',
-            re.I,
-        ),
-        'recursive forced delete',
-    ),
-    (
-        re.compile(r'\brm\s+-[a-zA-Z]*r[a-zA-Z]*\s+/\s*$', re.I),
-        'recursive delete on root',
-    ),
+    # Destructive filesystem operations (path-scoped; workspace rm -rf is HIGH)
     (re.compile(r'\bmkfs\b', re.I), 'filesystem format'),
     (re.compile(r'\bdd\s+.*\bof=/dev/', re.I), 'raw device write'),
     # Fork bomb — match the canonical ``:(){:|:&};:`` glyph sequence with or
@@ -210,15 +243,8 @@ _CRITICAL_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         re.compile(r'\bsudo\s+(su|passwd|visudo|chmod\s+[0-7]*7[0-7]*\s+/)\b', re.I),
         'privilege escalation',
     ),
-    # Windows equivalents
-    (
-        re.compile(r'\bRemove-Item\b.*-Recurse.*-Force\b', re.I),
-        'recursive forced delete (PowerShell)',
-    ),
-    (
-        re.compile(r'\bRemove-Item\b.*-Force.*-Recurse\b', re.I),
-        'recursive forced delete (PowerShell)',
-    ),
+    # Windows drive format only (Remove-Item on system paths handled by
+    # :func:`_assess_critical_delete` so workspace cleanup stays HIGH/MEDIUM).
     (re.compile(r'\bformat\s+[a-zA-Z]:\s*$', re.I), 'drive format (Windows)'),
     (
         re.compile(r'\bdel\b.*(/s|/q).*(/s|/q)', re.I),
@@ -398,6 +424,13 @@ class CommandAnalyzer:
         # Semicolon is a benign statement separator (common in PowerShell);
         # only escalate on operators that combine or pipe commands.
         has_chaining = bool(re.search(r'(?:&&|\|\||\||&|`|\$\()', cmd))
+        delete_reason = _assess_critical_delete(cmd)
+        if delete_reason is not None:
+            return (
+                RiskCategory.CRITICAL,
+                delete_reason,
+                _RECOMMENDATIONS.get(RiskCategory.CRITICAL, []),
+            )
         risk, reason, recs = self._match_tier(
             cmd, self._extra_critical + _CRITICAL_PATTERNS, RiskCategory.CRITICAL
         )
