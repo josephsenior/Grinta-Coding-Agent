@@ -26,11 +26,11 @@ def test_settings_template_loads_without_schema_drift(template_path: Path) -> No
 
     security = data.get('security')
     assert isinstance(security, dict)
-    assert security.get('execution_profile') == 'hardened_local'
+    assert security.get('execution_profile') == 'standard'
 
     cfg = AppConfig()
     load_from_json(cfg, str(template_path))
 
     orchestrator = cfg.get_agent_config(DEFAULT_AGENT_NAME)
     assert orchestrator.autonomy_level == 'balanced'
-    assert cfg.security.execution_profile == 'hardened_local'
+    assert cfg.security.execution_profile == 'standard'

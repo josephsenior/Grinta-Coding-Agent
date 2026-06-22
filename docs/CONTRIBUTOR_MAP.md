@@ -21,13 +21,13 @@ Install path for end users: `pipx install grinta-ai`. Contributors should use
 | --- | --- | --- |
 | CLI commands, startup, slash commands | `launch/entry.py` → `backend/cli/entry.py` → `backend/cli/main.py`; REPL under `backend/cli/repl/`, settings under `backend/cli/settings/` | `backend/tests/unit/cli/` |
 | TUI screens and rendering | `backend/cli/tui/app.py`, mixins under `backend/cli/tui/` | `backend/tests/unit/cli/tui/` |
-| Agent step loop (core control plane) | `backend/orchestration/session_orchestrator.py` + mixins in `session_orchestrator_mixins/` | `backend/tests/unit/orchestration/services/` |
+| Agent step loop (core control plane) | `backend/orchestration/session_orchestrator.py` + mixins in `backend/orchestration/mixins/` | `backend/tests/unit/orchestration/services/` |
 | Middleware (safety, cost, rollback) | `backend/orchestration/session_orchestrator.py` (pipeline list), files under `backend/orchestration/middleware/` | `backend/tests/unit/orchestration/test_*middleware*` |
-| Tool execution (bash, edit, grep, browser) | `backend/execution/action_execution_server.py`, `backend/engine/tools/` | `backend/tests/unit/execution/`, `backend/tests/unit/engine/` |
-| LLM provider routing and API calls | `backend/inference/registry.py`, `backend/inference/llm.py`, `backend/inference/direct_clients.py` | `backend/tests/unit/inference/` |
-| Model catalogs | `backend/inference/catalogs/*.json` | `backend/tests/unit/inference/test_registry.py`, `test_catalog_integrity.py`, `backend/tests/integration/test_inference_model_listing_integration.py` |
-| Context window and compaction | `backend/context/context_pipeline.py`, `backend/context/prompt_window.py` | `backend/tests/unit/context/` |
-| Event stream and durability | `backend/ledger/stream.py`, `backend/ledger/durable_writer.py` | `backend/tests/unit/ledger/` |
+| Tool execution (bash, edit, grep, browser) | `backend/execution/server/action_execution_server.py`, `backend/engine/tools/` | `backend/tests/unit/execution/`, `backend/tests/unit/engine/` |
+| LLM provider routing and API calls | `backend/inference/llm/`, `backend/inference/provider_resolver.py` | `backend/tests/unit/inference/` |
+| Model catalogs | `backend/inference/catalogs/*.json` | `backend/tests/unit/inference/test_catalog_integrity.py`, `backend/tests/integration/test_inference_model_listing_integration.py` |
+| Context window and compaction | `backend/context/context_pipeline.py`, `backend/context/prompt/prompt_window.py` | `backend/tests/unit/context/` |
+| Event stream and durability | `backend/ledger/stream/event_stream.py`, `backend/ledger/durable_writer.py` | `backend/tests/unit/ledger/` |
 | MCP external tools | `backend/integrations/mcp/`, bootstrap in `backend/execution/mcp/` | `backend/tests/unit/integrations/mcp/` |
 | User settings and config | `backend/core/config/`, `settings.template.json` | `backend/tests/unit/core/` |
 | Safety and command risk | `backend/security/command_analyzer.py`, `backend/orchestration/safety_validator.py` | `backend/tests/unit/security/` |
@@ -44,11 +44,11 @@ backend/cli/entry.py (startup)
     → middleware pipeline               backend/orchestration/middleware/
     → engine plans next Action          backend/engine/
     → ActionExecutionService            backend/orchestration/services/action_execution_service.py
-    → RuntimeExecutor                   backend/execution/action_execution_server.py
+    → RuntimeExecutor                   backend/execution/server/action_execution_server.py
     → Observation                       backend/ledger/observation/
-    → EventStream append                backend/ledger/stream.py
+    → EventStream append                backend/ledger/stream/event_stream.py
     → context compaction (if needed)    backend/context/
-    → LLM call for next turn            backend/inference/llm.py
+    → LLM call for next turn            backend/inference/llm/
 ```
 
 ## Large modules (read before you refactor)

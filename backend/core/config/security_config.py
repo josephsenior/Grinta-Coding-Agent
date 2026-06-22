@@ -111,6 +111,20 @@ class SecurityConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             "allowed inside the workspace, e.g. ['curl', 'invoke-webrequest']."
         ),
     )
+    allow_read_outside_workspace: bool = Field(
+        default=False,
+        description=(
+            'When True, allow read-only access to explicit additional_read_roots '
+            'outside the project workspace. Writes remain workspace-scoped.'
+        ),
+    )
+    additional_read_roots: list[str] = Field(
+        default_factory=list,
+        description=(
+            'Absolute paths approved for read-only access when '
+            'allow_read_outside_workspace is True (for example ~/.config/git).'
+        ),
+    )
     model_config = ConfigDict(extra='ignore')
 
     @classmethod

@@ -11,15 +11,23 @@ from rich.text import Text
 
 from backend.cli.theme import CLR_META, CLR_SPINNER, CLR_STATUS_OK, CLR_STATUS_WARN
 
+_LOCAL_PROVIDERS = frozenset({'ollama', 'lm_studio', 'vllm'})
+
 
 def validate_connection(
     console: Console,
     model: str,
     api_key: str,
     base_url: str | None,
+    *,
+    provider: str = '',
 ) -> None:
     """Test the LLM connection with a minimal request. Non-fatal on failure."""
-    if not api_key:
+    normalized_provider = (provider or '').strip().lower()
+    probe_key = api_key
+    if not probe_key and normalized_provider in _LOCAL_PROVIDERS:
+        probe_key = 'not-needed'
+    if not probe_key:
         return
 
     spinner = Spinner('dots', text='  Validating connection…', style=CLR_SPINNER)
@@ -36,7 +44,7 @@ def validate_connection(
 
                 update_task = asyncio.create_task(_update_spinner_text())
                 try:
-                    return await _test_llm_call(model, api_key, base_url)
+                    return await _test_llm_call(model, probe_key, base_url)
                 finally:
                     update_task.cancel()
 

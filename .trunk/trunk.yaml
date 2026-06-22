@@ -15,13 +15,10 @@ lint:
     - prettier@3.8.2
     - markdownlint@0.48.0
     - git-diff-check
-    - pylint@4.0.5
-    - mypy@1.17.0
-    - black@26.3.1
-    - isort@8.0.1
-    - bandit@1.9.4
     - trufflehog@3.94.3
-    - ruff@0.12.5
+  # Python lint/format/typecheck: authoritative path is pre-commit + CI
+  # (.pre-commit-config.yaml, .github/workflows/lint.yml). Do not enable
+  # duplicate pylint/mypy/ruff/black/isort/bandit here.
   ignore:
     - linters: [ALL]
       paths:

@@ -10,7 +10,7 @@ contents) use the ``glob`` tool instead.
 
 from __future__ import annotations
 
-import os
+import shutil
 from typing import Any
 
 from backend.core.tools.tool_names import GREP_TOOL_NAME
@@ -30,7 +30,9 @@ from backend.engine.tools._search_helpers import (
     make_grep_observation,
     paginate_line_output,
     resolve_search_pagination,
+    resolve_validated_search_path,
     run_ripgrep_command,
+    search_path_validation_error,
 )
 from backend.engine.tools.param_defs import create_tool_definition
 from backend.ledger.action.search import GrepAction
@@ -204,14 +206,16 @@ def execute_grep(action: GrepAction) -> Observation:
             output_mode=mode,
         )
 
-    if not os.path.exists(path):
-        message = f'Path does not exist: {path}'
+    path_error = search_path_validation_error(path, must_exist=True)
+    if path_error is not None:
         return _grep_failure(
-            message=message,
+            message=path_error,
             pattern=pattern,
             path=path,
             output_mode=mode,
         )
+
+    path = resolve_validated_search_path(path, must_exist=True)
 
     rg_path = has_ripgrep()
     if rg_path:

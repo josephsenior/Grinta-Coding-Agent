@@ -19,6 +19,7 @@ from backend.ledger.action import (
     TerminalRunAction,
 )
 from backend.ledger.action.agent import BlackboardAction, DelegateTaskAction
+from backend.ledger.action.mcp import MCPAction
 from backend.orchestration.agent.autonomy import AutonomyController, AutonomyLevel
 
 
@@ -194,6 +195,15 @@ class TestShouldRequestConfirmation:
             )
             is True
         )
+
+    def test_balanced_prompts_for_mcp_actions(self):
+        """MCP tool calls should require confirmation in balanced mode."""
+        config = MagicMock()
+        config.autonomy_level = 'balanced'
+        controller = AutonomyController(config)
+
+        action = MCPAction(name='example_tool', arguments={})
+        assert controller.should_request_confirmation(action) is True
 
 
 class TestHighRiskDetection:

@@ -23,6 +23,17 @@ def _workspace_root() -> Path:
         return Path.cwd().resolve()
 
 
+def _safe_readable_path(path: str, *, must_exist: bool = False) -> Path:
+    from backend.core.type_safety.path_validation import validate_readable_path
+    from backend.core.workspace_resolution import require_effective_workspace_root
+
+    return validate_readable_path(
+        path,
+        require_effective_workspace_root(),
+        must_exist=must_exist,
+    )
+
+
 def _safe_workspace_path(path: str, *, must_exist: bool = False) -> Path:
     from backend.core.type_safety.path_validation import SafePath
 
@@ -204,7 +215,7 @@ def _find_symbol_candidates_in_file(
 
 def _candidate_paths_for_symbol_search(raw_path: str | None = None) -> list[Path]:
     if raw_path:
-        return [_safe_workspace_path(raw_path, must_exist=True)]
+        return [_safe_readable_path(raw_path, must_exist=True)]
 
     root = _workspace_root()
     paths: list[Path] = []

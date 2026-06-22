@@ -540,7 +540,33 @@ def has_ripgrep() -> str | None:
     return shutil.which('rg')
 
 
+def resolve_validated_search_path(path: str, *, must_exist: bool = False) -> str:
+    """Validate and resolve a grep/glob search path within readable workspace bounds."""
+    from backend.core.type_safety.path_validation import validate_readable_path
+    from backend.core.workspace_resolution import require_effective_workspace_root
+
+    raw = (path or '.').strip() or '.'
+    resolved = validate_readable_path(
+        raw,
+        require_effective_workspace_root(),
+        must_exist=must_exist,
+    )
+    return str(resolved)
+
+
+def search_path_validation_error(path: str, *, must_exist: bool = False) -> str | None:
+    """Return a user-facing error when *path* fails workspace read-boundary checks."""
+    from backend.core.type_safety.path_validation import PathValidationError
+
+    try:
+        resolve_validated_search_path(path, must_exist=must_exist)
+        return None
+    except PathValidationError as exc:
+        return exc.message
+
+
 def path_exists_error(path: str) -> str | None:
-    if not os.path.exists(path):
-        return f'Path does not exist: {path}'
+    boundary_error = search_path_validation_error(path, must_exist=True)
+    if boundary_error is not None:
+        return boundary_error
     return None

@@ -12,8 +12,9 @@ class AutonomyLevel(str, Enum):
     The only difference is *when* the agent stops to ask the user before
     running an action:
 
-    - ``CONSERVATIVE``: ask for every runnable action.
-    - ``BALANCED``: ask only for actions classified as high-risk.
+    - ``CONSERVATIVE``: confirm before every action type in the confirmation flow
+      (commands, edits, terminal/browser, MCP, delegation, blackboard writes).
+    - ``BALANCED``: ask only for actions classified as high-risk (including MCP).
     - ``FULL``: never ask; the safety validator still blocks forbidden ops.
     """
 

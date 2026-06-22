@@ -457,6 +457,13 @@ class TestLoadFromJson:
         assert cfg.save_trajectory_path == 'scripts/evals/results/trajectories'
         assert cfg.log_level == 'DEBUG'
 
+    def test_load_from_json_applies_cli_tool_icons(self, tmp_path):
+        json_file = tmp_path / 'settings.json'
+        json_file.write_text(json.dumps({'cli_tool_icons': True}))
+        cfg = AppConfig()
+        load_from_json(cfg, str(json_file))
+        assert cfg.cli_tool_icons is True
+
     def test_load_from_json_requires_provider_for_unprefixed_model(self, tmp_path):
         json_file = tmp_path / 'settings.json'
         json_file.write_text('{"llm_model": "gpt-4o"}')

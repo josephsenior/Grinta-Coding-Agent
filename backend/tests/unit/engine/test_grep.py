@@ -1,10 +1,21 @@
 from __future__ import annotations
 
 import shutil
+from pathlib import Path
+
+import pytest
 
 from backend.engine.tools.grep import build_grep_action, execute_grep
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.search import GrepObservation
+
+
+@pytest.fixture(autouse=True)
+def _workspace_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        'backend.core.workspace_resolution.require_effective_workspace_root',
+        lambda: tmp_path,
+    )
 
 
 class TestExecuteGrep:
@@ -116,3 +127,12 @@ class TestExecuteGrep:
         assert isinstance(obs, ErrorObservation)
         assert 'non-empty' in obs.content
         assert obs.tool_result['error_code'] == 'VALIDATION_ERROR'
+
+    def test_outside_workspace_path_rejected(self, tmp_path, monkeypatch) -> None:
+        monkeypatch.setattr(shutil, 'which', lambda x: None)
+        outside = tmp_path.parent / 'outside_workspace_grep'
+        outside.mkdir(exist_ok=True)
+        action = build_grep_action(pattern='hello', path=str(outside))
+        obs = execute_grep(action)
+        assert isinstance(obs, ErrorObservation)
+        assert 'outside workspace boundary' in obs.content.lower()

@@ -6,6 +6,8 @@ from backend.cli.settings.constants import (
     _PROVIDERS,
     DEFAULT_MODEL_BY_PROVIDER,
 )
+
+_CATEGORY_BY_KEY: dict[str, str] = {key: category for key, _, category in _PROVIDERS}
 from backend.core.providers.configurations import PROVIDER_CONFIGURATIONS
 from backend.inference.catalog.provider_catalog import PROVIDER_DEFAULT_URLS
 
@@ -59,6 +61,7 @@ def build_provider_presets() -> dict[str, dict[str, str]]:
             'default_model': default_model,
             'base_url': base_url,
             'help': _help_text(key, label, category),
+            'category': category,
         }
     return presets
 

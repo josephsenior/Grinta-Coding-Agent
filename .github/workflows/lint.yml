@@ -36,7 +36,7 @@ jobs:
       - name: Install Python dependencies
         run: python scripts/bootstrap_env.py dev
       - name: Install pre-commit
-        run: pip install pre-commit==3.7.0
+        run: pip install pre-commit==4.6
       - id: run-pre-commit-hooks
         run: pre-commit run --all-files --show-diff-on-failure
 

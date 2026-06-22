@@ -97,7 +97,7 @@ Notes:
 - `llm_provider` can be omitted when `llm_model` includes a provider prefix.
 - `llm_base_url` is optional and useful for OpenAI-compatible proxies.
 - Put the real key in a sibling `.env` file or your shell environment as `LLM_API_KEY`.
-- Environment variables still work and can override advanced settings.
+- Environment variables provide defaults that `settings.json` can override for the same keys.
 
 Common environment variables:
 
@@ -233,7 +233,7 @@ Use Grinta in trusted repositories and environments.
 Grinta has three interaction modes that change the conversational contract:
 
 - **Chat** — grounded Q&A and discussion. Use discovery tools (`grep`, `glob`, `find_symbols`, `read`, `lsp`, `analyze_project_structure`) and `ask_user` when needed. No edits or shell execution.
-- **Plan** — read-only investigation plus structured planning. The agent clarifies requirements and produces an actionable plan before any execution. Use this for complex or ambiguous tasks where you want to review the approach first.
+- **Plan** — read-only investigation; may use `task_tracker` for a structured plan when enabled, or prose only. Switch to Agent mode to execute.
 - **Agent** — full task execution. The agent plans, runs tools, validates results, and finishes. This is the default mode when you give a direct task.
 
 In the Textual app, the current mode is visible and selectable in the HUD. The
@@ -245,7 +245,7 @@ current slash-command registry does not expose a `/mode` command.
 There are three stored levels: **conservative**, **balanced**, and **full**. They differ only in **when the agent asks you before running an action**; execution, retries, and prompts are otherwise the same.
 
 - **Conservative** — confirm before every command, mutation, terminal/browser action, MCP call, or worker-coordination action in the confirmation flow.
-- **Balanced** (default) — confirm for high-risk or high-impact actions, including declared `HIGH` risk, dangerous commands, file edits, browser actions, worker delegation, and blackboard writes.
+- **Balanced** (default) — confirm for high-risk or high-impact actions, including declared `HIGH` risk, dangerous commands, file edits (except `create_file`), browser actions, MCP calls, worker delegation, and blackboard writes.
 - **Full** — never prompt for confirmation; hard safety blocks (for example CRITICAL-classified commands) still apply.
 
 Autonomy level is only meaningful in **Agent** mode. Chat and Plan modes have their own interaction contracts independent of autonomy.

@@ -566,6 +566,63 @@ def _readable_path_roots(workspace_root: str | Path) -> tuple[Path, Path]:
     return workspace, workspace_grinta_root(workspace).resolve()
 
 
+_SENSITIVE_READ_DENY_PARTS = (
+    '.ssh',
+    '.aws/credentials',
+    '.aws/credential',
+    '.docker/config.json',
+    '.netrc',
+    '.npmrc',
+    'id_rsa',
+    'id_ed25519',
+    '.git-credentials',
+    'credentials.json',
+    '.env',
+    '.env.local',
+    '.env.production',
+    'cookies.sqlite',
+    'login data',
+)
+
+
+def is_denied_sensitive_read_path(path: str) -> bool:
+    """Return True when *path* matches the always-on sensitive read deny list."""
+    normalized = path.replace('\\', '/').lower()
+    return any(part in normalized for part in _SENSITIVE_READ_DENY_PARTS)
+
+
+def resolve_configured_extra_read_roots() -> tuple[Path, ...]:
+    """Return approved outside-workspace read roots from loaded security config."""
+    try:
+        from backend.core.config import load_app_config
+
+        security = load_app_config().security
+        if not security.allow_read_outside_workspace:
+            return ()
+        roots: list[Path] = []
+        for raw in security.additional_read_roots:
+            text = str(raw or '').strip()
+            if not text:
+                continue
+            try:
+                roots.append(Path(text).expanduser().resolve())
+            except OSError:
+                continue
+        return tuple(roots)
+    except Exception:
+        return ()
+
+
+def _log_outside_workspace_read(path: str, root: Path) -> None:
+    from backend.core.logging.logger import app_logger as logger
+
+    logger.info(
+        'Outside-workspace read allowed: path=%s approved_root=%s',
+        path,
+        root,
+    )
+
+
 def _resolve_readable_candidate(
     path: str,
     workspace: Path,
@@ -582,18 +639,29 @@ def validate_readable_path(
     workspace_root: str | Path,
     *,
     must_exist: bool = False,
+    extra_read_roots: tuple[Path, ...] | None = None,
 ) -> Path:
     """Validate a path for agent read access.
 
     Allows paths under the project workspace or the Grinta workspace data
     bucket (``~/.grinta/workspaces/<id>/``), including persisted tool outputs
-    under ``agent/tool-results/``.
+    under ``agent/tool-results/``. When configured, also allows explicit
+    ``security.additional_read_roots`` entries.
     """
     if not path:
         raise PathValidationError('Path must be a non-empty string', path)
 
+    if is_denied_sensitive_read_path(path):
+        raise PathValidationError(
+            'Path blocked by sensitive-path deny list',
+            path,
+        )
+
     workspace, data_root = _readable_path_roots(workspace_root)
-    allowed_roots = (workspace, data_root)
+    configured_extra = extra_read_roots
+    if configured_extra is None:
+        configured_extra = resolve_configured_extra_read_roots()
+    allowed_roots = (workspace, data_root, *configured_extra)
     validation_must_be_relative = not _is_absolute_input_path(path)
     sanitized = _validate_path_string(
         path,
@@ -614,6 +682,9 @@ def validate_readable_path(
             f'Path outside workspace boundary: {path}',
             path,
         )
+
+    if containing_root not in (workspace, data_root):
+        _log_outside_workspace_read(path, containing_root)
 
     rel_parts = _relative_parts_with_boundary_fallback(
         full_path,

@@ -707,7 +707,34 @@ class ActionExecutionService:
             )
         await controller.set_agent_state_to(_AgentState.AWAITING_USER_INPUT)
 
+    def _interaction_mode_block_message(self, action: Action) -> str | None:
+        from backend.core.interaction_modes import (
+            action_blocked_for_interaction_mode,
+            resolve_active_interaction_mode,
+        )
+
+        state = self._context.state
+        active_run_mode = None
+        configured_mode = None
+        if state is not None:
+            extra = getattr(state, 'extra_data', None) or {}
+            active_run_mode = extra.get('active_run_mode')
+        agent = self._context.agent
+        config = getattr(agent, 'config', None) if agent is not None else None
+        if config is not None:
+            configured_mode = getattr(config, 'mode', None)
+        mode = resolve_active_interaction_mode(
+            active_run_mode=active_run_mode,
+            configured_mode=configured_mode,
+        )
+        return action_blocked_for_interaction_mode(action, mode)
+
     async def execute_action(self, action: Action) -> None:
+        mode_block = self._interaction_mode_block_message(action)
+        if mode_block is not None:
+            self._publish_agent_event(ErrorObservation(content=mode_block))
+            return
+
         # Plugin hook: action_pre
         try:
             from backend.core.plugin import get_plugin_registry

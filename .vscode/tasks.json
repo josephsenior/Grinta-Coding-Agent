@@ -1,4 +1,38 @@
 {
-	"version": "2.0.0",
-	"tasks": []
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Grinta: unit tests",
+      "type": "shell",
+      "command": "uv run pytest backend/tests/unit -q",
+      "options": {
+        "env": {
+          "PYTHONPATH": "."
+        }
+      },
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Grinta: lint (pre-commit)",
+      "type": "shell",
+      "command": "uv run pre-commit run --all-files",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Grinta: launch CLI",
+      "type": "shell",
+      "command": "uv run python -m backend.cli.entry",
+      "options": {
+        "env": {
+          "PYTHONPATH": "."
+        }
+      },
+      "problemMatcher": []
+    }
+  ]
 }
