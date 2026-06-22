@@ -7,10 +7,13 @@ from backend.core.errors import (
     AgentRuntimeError,
     LLMContextWindowExceedError,
 )
+from backend.core.errors import LLMNoResponseError
 from backend.inference.exceptions import (
+    APIConnectionError,
     AuthenticationError,
     BadRequestError,
     ContextWindowExceededError,
+    InternalServerError,
     RateLimitError,
     ServiceUnavailableError,
     Timeout,
@@ -26,7 +29,10 @@ _HARD_STOP_EXCEPTIONS = (
     AgentRuntimeDisconnectedError,
 )
 _TRANSIENT_LLM_INFRA_EXCEPTIONS = (
-    AuthenticationError,  # not actually used here but kept for reference
+    APIConnectionError,
+    InternalServerError,
+    LLMNoResponseError,
+    Timeout,
 )
 
 
@@ -91,9 +97,15 @@ def format_error_guidance(exc: Exception) -> str:
         return _format_rate_limit_guidance(
             getattr(exc, 'kind', None), getattr(exc, 'retry_after', None)
         )
-    if isinstance(exc, Timeout):
+    if isinstance(exc, _TRANSIENT_LLM_INFRA_EXCEPTIONS):
+        if isinstance(exc, Timeout):
+            return (
+                'Transient provider or network issue. The provider timed out on '
+                'this step. Automatic backoff and retry will run if the retry '
+                'queue is available; otherwise the agent will return to the prompt.'
+            )
         return (
-            'The provider timed out on this step. Automatic backoff and retry '
+            'Transient provider or network issue. Automatic backoff and retry '
             'will run if the retry queue is available; otherwise the agent will '
             'return to the prompt.'
         )

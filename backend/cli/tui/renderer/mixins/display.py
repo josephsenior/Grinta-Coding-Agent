@@ -114,7 +114,7 @@ class RendererDisplayMixin:
                 empty_message=(
                     'Loading MCP servers...'
                     if mcp_loading
-                    else 'No servers configured · click + to add'
+                    else 'No servers configured'
                 ),
             )
             self._update_sidebar_section(
@@ -124,7 +124,7 @@ class RendererDisplayMixin:
                 empty_message=(
                     'Loading skills...'
                     if skills_loading
-                    else 'No custom skills · click + to add'
+                    else 'No custom skills'
                 ),
             )
 

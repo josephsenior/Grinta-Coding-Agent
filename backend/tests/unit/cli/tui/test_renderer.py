@@ -415,7 +415,7 @@ async def test_tui_sidebar_rows_expose_delete_for_mcp_and_skills(
 
         s = _get_screen(app)
         from backend.cli.tui.app import TUIRenderer
-        from backend.cli.tui.widgets.collapsible import SidebarRow
+        from backend.cli.tui.widgets.collapsible import McpServerRow, SkillSidebarRow
 
         renderer = TUIRenderer(
             console=console,
@@ -430,10 +430,12 @@ async def test_tui_sidebar_rows_expose_delete_for_mcp_and_skills(
         bundled_items = [item for item in skill_items if item[0] == 'skill-b' and not item[2]]
         assert len(bundled_items) == 1
 
-        rows = s.query(SidebarRow).results()
+        rows = list(s.query('.sidebar-item-row'))
         deletable = [row for row in rows if getattr(row, 'deletable', False)]
         assert any(getattr(row, 'item_id', '') == 'mcp:server-a' for row in deletable)
         assert any(getattr(row, 'item_id', '') == 'skill:skill-a' for row in deletable)
+        assert any(isinstance(row, McpServerRow) for row in rows)
+        assert any(isinstance(row, SkillSidebarRow) for row in rows)
 
 
 @pytest.mark.asyncio

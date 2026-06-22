@@ -237,6 +237,34 @@ SidebarRow.-read-only:hover {
     color: #969aad;
 }
 
+.sidebar-row-btn {
+    height: 3;
+    min-width: 7;
+    width: auto;
+    padding: 0 1;
+    margin: 0 0 0 1;
+    border: none;
+    background: #15274d;
+    color: #c8d4e8;
+}
+
+.sidebar-row-btn:hover,
+.sidebar-row-btn:focus {
+    background: #1e3a70;
+    color: #ffffff;
+}
+
+.sidebar-row-btn.-danger {
+    background: #451a1a;
+    color: #fd8383;
+}
+
+.sidebar-row-btn.-danger:hover,
+.sidebar-row-btn.-danger:focus {
+    background: #5c2424;
+    color: #ffb4b4;
+}
+
 /* ── Command Suggestions ────────────────────────────── */
 #suggestions-list {
     width: 100%;
