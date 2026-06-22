@@ -26,8 +26,8 @@ concurrency:
   cancel-in-progress: true
 
 # CI tiers (see docs/CI.md):
-# - gates-on-linux-coverage-{a,b,d,f,g,e,c,report}: unit tests sharded for coverage on Linux.
-#   Execution shards (d,f,g) skip compileall; syntax is still gated on a/b/c/e shards.
+# - gates-on-linux-coverage-{a,b,d,g,e,c,report}: unit tests sharded for coverage on Linux.
+#   Execution shards (d,g) skip compileall; syntax is still gated on a/b/c/e shards.
 # - gates-on-linux-extended: integration/e2e/stress after coverage gate passes.
 # - gates-on-windows / gates-on-macos: required unit PR gates for cross-platform smoke.
 # - gates-on-windows-extended / gates-on-macos-extended: integration/e2e/stress after unit gates pass.
@@ -160,56 +160,6 @@ jobs:
           path: coverage-shard-d.dat
           if-no-files-found: error
 
-  gates-on-linux-coverage-f:
-    name: Python Gates on Linux (coverage F)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    strategy:
-      matrix:
-        python-version: ['3.12']
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-      - name: Install uv
-        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a
-        with:
-          enable-cache: false
-      - name: Set up Python
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Lockfile validation
-        run: uv lock --check
-      - name: Install Python dependencies
-        run: python scripts/bootstrap_env.py dev-test
-      - name: Verify optional imports
-        run: python backend/scripts/verify/verify_optional_imports.py
-      - name: Run unit tests shard F with coverage
-        run: |
-          mapfile -t tests < <(find backend/tests/unit/execution -name 'test_*.py' | sort)
-          n=${#tests[@]}
-          half=$((n / 2))
-          q=$((n / 4))
-          fq=$((q / 2))
-          ffq=$((fq / 2))
-          for attempt in 1 2 3; do
-            if PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q \
-              --cov=backend --cov-fail-under=0 \
-              "${tests[@]:$half:$ffq}"; then
-              exit 0
-            fi
-            echo "Shard F attempt ${attempt} failed; retrying in 15s..."
-            sleep 15
-          done
-          exit 1
-      - name: Stage coverage data
-        run: cp .coverage coverage-shard-f.dat
-      - name: Upload coverage data
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: coverage-linux-f
-          path: coverage-shard-f.dat
-          if-no-files-found: error
-
   gates-on-linux-coverage-g:
     name: Python Gates on Linux (coverage G)
     runs-on: ubuntu-24.04
@@ -236,16 +186,11 @@ jobs:
       - name: Run unit tests shard G with coverage
         run: |
           mapfile -t tests < <(find backend/tests/unit/execution -name 'test_*.py' | sort)
-          n=${#tests[@]}
-          half=$((n / 2))
-          q=$((n / 4))
-          fq=$((q / 2))
-          ffq=$((fq / 2))
-          start=$((half + ffq))
+          half=$((${#tests[@]} / 2))
           for attempt in 1 2 3; do
             if PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q \
               --cov=backend --cov-fail-under=0 \
-              "${tests[@]:$start}"; then
+              "${tests[@]:$half}"; then
               exit 0
             fi
             echo "Shard G attempt ${attempt} failed; retrying in 15s..."
@@ -351,7 +296,6 @@ jobs:
       - gates-on-linux-coverage-b
       - gates-on-linux-coverage-c
       - gates-on-linux-coverage-d
-      - gates-on-linux-coverage-f
       - gates-on-linux-coverage-g
       - gates-on-linux-coverage-e
     strategy:
@@ -379,10 +323,9 @@ jobs:
           cp coverage-shards/coverage-linux-b/coverage-shard-b.dat .coverage.b
           cp coverage-shards/coverage-linux-c/coverage-shard-c.dat .coverage.c
           cp coverage-shards/coverage-linux-d/coverage-shard-d.dat .coverage.d
-          cp coverage-shards/coverage-linux-f/coverage-shard-f.dat .coverage.f
           cp coverage-shards/coverage-linux-g/coverage-shard-g.dat .coverage.g
           cp coverage-shards/coverage-linux-e/coverage-shard-e.dat .coverage.e
-          uv run coverage combine .coverage.a .coverage.b .coverage.c .coverage.d .coverage.f .coverage.g .coverage.e
+          uv run coverage combine .coverage.a .coverage.b .coverage.c .coverage.d .coverage.g .coverage.e
           uv run coverage report --fail-under=75
           uv run coverage xml -o coverage.xml
       - name: Upload coverage to Codecov
