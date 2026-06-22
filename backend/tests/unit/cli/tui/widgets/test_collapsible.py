@@ -14,7 +14,6 @@ from backend.cli.tui.widgets.collapsible import (
     CollapsibleSection,
     McpServerRow,
     SidebarRow,
-    SkillSidebarRow,
 )
 from backend.tests.unit.cli.tui._shared import _get_screen
 
@@ -44,11 +43,11 @@ def test_collapsible_make_row_routes_mcp_and_skill_rows() -> None:
         'view_only': False,
     }
     assert isinstance(section._make_row(mcp_item), McpServerRow)
-    assert isinstance(section._make_row(skill_item), SkillSidebarRow)
+    assert isinstance(section._make_row(skill_item), SidebarRow)
 
 
 @pytest.mark.asyncio
-async def test_collapsible_add_button_is_rendered(mock_config) -> None:
+async def test_collapsible_manage_button_is_rendered(mock_config) -> None:
     console = RichConsole()
     loop = __import__('asyncio').get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -58,12 +57,12 @@ async def test_collapsible_add_button_is_rendered(mock_config) -> None:
         screen = _get_screen(app)
         mcp_section = screen.query_one('#sidebar-mcp', CollapsibleSection)
         skills_section = screen.query_one('#sidebar-skills', CollapsibleSection)
-        mcp_add = mcp_section.query_one('#action-btn', Button)
-        skills_add = skills_section.query_one('#action-btn', Button)
-        assert str(mcp_add.label) == 'Add'
-        assert str(skills_add.label) == 'Add'
-        assert '-mcp' in mcp_add.classes
-        assert '-skill' in skills_add.classes
+        mcp_manage = mcp_section.query_one('#action-btn', Button)
+        skills_manage = skills_section.query_one('#action-btn', Button)
+        assert str(mcp_manage.label) == 'Manage ›'
+        assert str(skills_manage.label) == 'Manage ›'
+        assert '-mcp' in mcp_manage.classes
+        assert '-skill' in skills_manage.classes
 
 
 @pytest.mark.asyncio

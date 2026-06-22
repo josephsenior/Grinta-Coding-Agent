@@ -115,12 +115,21 @@ class RendererActionHandlersMixin:
             self.clear_live_response()
             return
 
+        content = (getattr(action, 'content', '') or '').strip()
+        normalized_content = (
+            self._normalize_final_response_text(content) if content else ''
+        )
+        if bool(getattr(action, 'final_response', False)) and normalized_content:
+            if normalized_content == self._last_final_response_text:
+                self._tui.finalize_thinking()
+                self.clear_live_response()
+                return
+
         thought = (getattr(action, 'thought', '') or '').strip()
         if thought:
             kind = getattr(action, 'kind', '') or ''
             self._render_thinking_payload(thought, finalize=True, kind=kind)
 
-        content = (getattr(action, 'content', '') or '').strip()
         if not content:
             self._tui.finalize_thinking()
             self.clear_live_response()

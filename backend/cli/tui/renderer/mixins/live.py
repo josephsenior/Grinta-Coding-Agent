@@ -118,26 +118,19 @@ class RendererLiveMixin:
         if should_follow:
             self._maybe_scroll_to_tail(display)
 
-    def _apply_live_response_render(self, text: str) -> None:
-        from backend.cli.tui.renderer.prep import (
-            prep_streaming_renderable,
-            streaming_render_cache_key,
-        )
-
+    def _apply_live_response_render(self, text: str, *, force: bool = False) -> None:
         widget = self._live_response_widget
         if widget is None:
             return
-        if text == getattr(self, '_last_streaming_response_applied_text', ''):
+        if (
+            not force
+            and not getattr(self, '_streaming_active', False)
+            and text == getattr(self, '_last_streaming_response_applied_text', '')
+        ):
             return
 
-        cache = getattr(self, '_streaming_render_cache', None)
-        renderable = None
-        if cache is not None:
-            renderable = cache.get(streaming_render_cache_key(text))
         try:
-            if renderable is None:
-                renderable = prep_streaming_renderable(text)
-            widget.set_streaming_renderable(renderable)
+            widget.set_streaming_content(text)
             self._last_streaming_response_applied_text = text
         except Exception:
             widget.set_streaming_text(text)

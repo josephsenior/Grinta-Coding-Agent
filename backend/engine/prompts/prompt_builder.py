@@ -721,7 +721,11 @@ def _runtime_secrets_lines(secrets: dict[object, object]) -> list[str]:
     return lines
 
 
-def _build_runtime_information_block(runtime_info: RuntimeInfo | None) -> str | None:
+def _build_runtime_information_block(
+    runtime_info: RuntimeInfo | None,
+    *,
+    workspace_is_bare: bool = False,
+) -> str | None:
     if not runtime_info:
         return None
 
@@ -756,6 +760,13 @@ def _build_runtime_information_block(runtime_info: RuntimeInfo | None) -> str | 
     if date:
         ri_lines.append(f"Today's date is {date} (UTC).")
 
+    if workspace_is_bare:
+        ri_lines.append(
+            'No cloned repository metadata or repository instructions were detected for '
+            'this directory; treat it as a plain local workspace rather than a known '
+            'project, and rely on discovery tools to learn what is here.'
+        )
+
     ri_lines.append('</RUNTIME_INFORMATION>')
     return '\n'.join(ri_lines)
 
@@ -785,7 +796,18 @@ def build_workspace_context(
         if block:
             parts.append(block)
 
-    runtime_block = _build_runtime_information_block(runtime_info)
+    has_repo = bool(
+        repository_info
+        and (
+            getattr(repository_info, 'repo_name', '')
+            or getattr(repository_info, 'repo_directory', '')
+        )
+    )
+    workspace_is_bare = not has_repo and not (repo_instructions or '').strip()
+
+    runtime_block = _build_runtime_information_block(
+        runtime_info, workspace_is_bare=workspace_is_bare
+    )
     if runtime_block:
         parts.append(runtime_block)
 

@@ -50,6 +50,8 @@ class RendererDisplayMixin:
         self._pending_shell_cards_by_command = defaultdict(deque)
         self._pending_file_read_cards_by_path = defaultdict(deque)
         self._pending_checkpoint_line = None
+        self._pending_memory_recall_line = None
+        self._pending_memory_persist_line = None
         self._orient_burst_lines = []
         self._orient_burst_widgets = []
         self._orient_burst_area = 'codebase'
@@ -439,7 +441,7 @@ class RendererDisplayMixin:
                 status = 'ok' if enabled else 'neutral'
                 options = {'toggleable': True, 'disabled': not enabled}
                 mcp_items.append(
-                    (name, f'mcp:{name}', True, status, None, True, options)
+                    (name, f'mcp:{name}', False, status, None, False, options)
                 )
         return mcp_items
 

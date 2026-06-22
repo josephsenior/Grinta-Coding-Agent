@@ -7,6 +7,30 @@ from typing import Any
 from backend.ledger.action import Action
 
 
+def suppress_cli_for_streamed_final_messages(
+    actions: list[Action],
+    *,
+    streamed_visible_text: str,
+) -> None:
+    """Hide duplicate final MessageActions already shown via streaming."""
+    from backend.cli.event_rendering.text_utils import sanitize_visible_transcript_text
+    from backend.ledger.action import MessageAction
+
+    streamed = sanitize_visible_transcript_text(streamed_visible_text or '').strip()
+    if not streamed:
+        return
+    for action in actions:
+        if not isinstance(action, MessageAction):
+            continue
+        if not bool(getattr(action, 'final_response', False)):
+            continue
+        content = sanitize_visible_transcript_text(
+            str(getattr(action, 'content', '') or '')
+        ).strip()
+        if content and content == streamed:
+            action.suppress_cli = True
+
+
 def without_blank_agent_messages(actions: list[Action]) -> list[Action]:
     """Drop agent ``MessageAction``s with nothing user-visible."""
     from backend.ledger.action import MessageAction

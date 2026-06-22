@@ -295,6 +295,7 @@ def _process_event_check_user_message(
     if isinstance(event, MessageAction) and orch._is_user_source(source):
         orch._last_thinking_text_hash = ''
         orch._last_thinking_artifact_hash = ''
+        orch._last_final_response_text = ''
 
 
 def _process_event_maybe_start_turn(

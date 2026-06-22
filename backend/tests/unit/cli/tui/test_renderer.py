@@ -389,7 +389,7 @@ async def test_tui_autonomy_visibility_follows_mode(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_tui_sidebar_rows_expose_delete_for_mcp_and_skills(
+async def test_tui_sidebar_mcp_rows_have_switch_and_skills_are_read_only(
     mock_config, monkeypatch
 ):
     console = RichConsole()
@@ -405,8 +405,16 @@ async def test_tui_sidebar_rows_expose_delete_for_mcp_and_skills(
         sidebar_module,
         'load_sidebar_skill_items',
         lambda: [
-            ('skill-a', 'skill:skill-a', True, 'info', 'custom', True),
-            ('skill-b', 'skill:skill-b', False, 'neutral', 'bundled', True),
+            ('skill-a', 'skill:skill-a', False, 'info', None, False),
+            (
+                'skill-b',
+                'skill:skill-b',
+                False,
+                'neutral',
+                None,
+                False,
+                {'view_only': True},
+            ),
         ],
     )
 
@@ -415,7 +423,7 @@ async def test_tui_sidebar_rows_expose_delete_for_mcp_and_skills(
 
         s = _get_screen(app)
         from backend.cli.tui.app import TUIRenderer
-        from backend.cli.tui.widgets.collapsible import McpServerRow, SkillSidebarRow
+        from backend.cli.tui.widgets.collapsible import McpServerRow, SidebarRow
 
         renderer = TUIRenderer(
             console=console,
@@ -428,16 +436,20 @@ async def test_tui_sidebar_rows_expose_delete_for_mcp_and_skills(
 
         skill_items = renderer._build_skills_sidebar_items()
         bundled_items = [
-            item for item in skill_items if item[0] == 'skill-b' and not item[2]
+            item
+            for item in skill_items
+            if item[0] == 'skill-b' and item[6].get('view_only')
         ]
         assert len(bundled_items) == 1
 
         rows = list(s.query('.sidebar-item-row'))
-        deletable = [row for row in rows if getattr(row, 'deletable', False)]
-        assert any(getattr(row, 'item_id', '') == 'mcp:server-a' for row in deletable)
-        assert any(getattr(row, 'item_id', '') == 'skill:skill-a' for row in deletable)
-        assert any(isinstance(row, McpServerRow) for row in rows)
-        assert any(isinstance(row, SkillSidebarRow) for row in rows)
+        mcp_rows = [row for row in rows if getattr(row, 'item_id', '').startswith('mcp:')]
+        skill_rows = [
+            row for row in rows if getattr(row, 'item_id', '').startswith('skill:')
+        ]
+        assert any(isinstance(row, McpServerRow) for row in mcp_rows)
+        assert all(isinstance(row, SidebarRow) for row in skill_rows)
+        assert all(not getattr(row, 'deletable', False) for row in skill_rows)
 
 
 @pytest.mark.asyncio

@@ -110,14 +110,9 @@ def build_mcp_servers_panel(
             if displayed_count >= SIDEBAR_MAX_ROWS:
                 break
             name = server.get('name', 'unknown')
-            server_type = server.get('type', 'stdio')
 
             bullet = Text('• ', style='bold #eacb8a')
-
-            type_badge = f'({server_type})'
-            server_info = Text()
-            server_info.append(name, style='#c8d4e8')
-            server_info.append(f' {type_badge}', style='#54597b')
+            server_info = Text(name, style='#c8d4e8')
 
             table.add_row(bullet, server_info)
             displayed_count += 1
@@ -207,7 +202,7 @@ def load_sidebar_skill_items() -> list[
     items: list[tuple[str, str, bool, str, str | None, bool, dict[str, Any]]] = []
     for skill in sorted(playbook_names | user_names):
         if skill in user_names:
-            items.append((skill, f'skill:{skill}', True, 'info', None, True, {}))
+            items.append((skill, f'skill:{skill}', False, 'info', None, False, {}))
         else:
             items.append(
                 (
@@ -216,7 +211,7 @@ def load_sidebar_skill_items() -> list[
                     False,
                     'neutral',
                     None,
-                    True,
+                    False,
                     {'view_only': True},
                 )
             )

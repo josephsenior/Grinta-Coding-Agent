@@ -48,6 +48,44 @@ def test_transcript_dedupes_same_event_id_only(tmp_path):
     assert 'event 2)' in text
 
 
+def test_transcript_skips_duplicate_final_response_after_stream_final(tmp_path):
+    bind_agent_transcript(str(tmp_path))
+    shared = 'Hello! Yes, I am **Grinta**.'
+    record_stream_final(shared, thinking='intro', event_id=47)
+    record_agent_message(
+        shared,
+        thought='intro',
+        event_id=48,
+        final_response=True,
+    )
+    close_agent_transcript()
+    text = (tmp_path / 'agent_transcript.log').read_text(encoding='utf-8')
+    assert 'AGENT stream-final (event 47)' in text
+    assert 'AGENT final-response (event 48)' not in text
+    assert text.count(shared) == 1
+
+
+def test_suppress_cli_for_streamed_final_messages() -> None:
+    from backend.engine.executor_response_helpers import (
+        suppress_cli_for_streamed_final_messages,
+    )
+    from backend.ledger.action import MessageAction
+
+    streamed = MessageAction(content='Final answer.', final_response=True)
+    suppress_cli_for_streamed_final_messages(
+        [streamed],
+        streamed_visible_text='Final answer.',
+    )
+    assert streamed.suppress_cli is True
+
+    different = MessageAction(content='Different answer.', final_response=True)
+    suppress_cli_for_streamed_final_messages(
+        [different],
+        streamed_visible_text='Final answer.',
+    )
+    assert different.suppress_cli is False
+
+
 def test_transcript_records_tool_step_messages(tmp_path):
     bind_agent_transcript(str(tmp_path))
     record_agent_message(
