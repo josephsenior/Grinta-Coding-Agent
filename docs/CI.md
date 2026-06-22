@@ -2,7 +2,7 @@
 
 This document describes what runs in GitHub Actions and how it relates to local `pytest` ([`pytest.ini`](../pytest.ini)).
 
-**Linux PR gates** shard the full **unit** corpus (`backend/tests/unit`) across seven coverage jobs, enforce **75%** in `gates-on-linux-coverage-report`, then run integration, e2e, and stress in `gates-on-linux-extended`. **Windows** and **macOS** run the full unit corpus, then the same integration/e2e/stress extended tier after unit gates pass.
+**Linux PR gates** shard the full **unit** corpus (`backend/tests/unit`) across six coverage jobs, enforce **75%** in `gates-on-linux-coverage-report`, then run integration, e2e, and stress in `gates-on-linux-extended`. **Windows** and **macOS** run the full unit corpus, then the same integration/e2e/stress extended tier after unit gates pass.
 
 For release tagging and GA promotion, see [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
 

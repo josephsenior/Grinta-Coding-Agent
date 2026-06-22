@@ -50,7 +50,7 @@ python scripts/bootstrap_env.py dev-test
 PYTHONPATH=. uv run pytest --cov=backend --cov-fail-under=75 backend/tests/unit
 ```
 
-CI already shards unit coverage across seven Linux jobs and enforces 75% in `gates-on-linux-coverage-report`; run this locally when debugging coverage gaps.
+CI already shards unit coverage across six Linux jobs and enforces 75% in `gates-on-linux-coverage-report`; run this locally when debugging coverage gaps.
 
 - [ ] **Windows unit smoke (optional local mirror):**
 
