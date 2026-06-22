@@ -228,9 +228,10 @@ def create_undo_last_edit_tool() -> ChatCompletionToolParam:
     return create_tool_definition(
         name=UNDO_LAST_EDIT_TOOL_NAME,
         description=(
-            'Undo the last file-write operation on the given file path. '
-            'Only works on existing files — if the file no longer exists, '
-            'this tool will report an error; use delete or create instead.'
+            'Undo the last content edit on the given file path. '
+            'Only restores a prior version when the file already existed before that edit. '
+            'If the only recorded change was creating the file, this fails — delete the file '
+            'explicitly instead. The file must still exist when you call this tool.'
         ),
         properties={
             'path': get_path_param('Project-relative path to undo the last edit on.'),

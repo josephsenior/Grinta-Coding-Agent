@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from backend.execution.aes.file_operations import (
+    _DIFF_TRUNC_HARD_CAP,
     _format_directory_listing,
     _get_max_cmd_output_chars,
     _list_directory_recursive,
@@ -27,6 +28,7 @@ from backend.execution.aes.file_operations import (
     resolve_path,
     set_file_permissions,
     truncate_cmd_output,
+    truncate_diff,
     truncate_large_text,
 )
 from backend.ledger.action import FileReadAction
@@ -70,6 +72,34 @@ class TestTruncateLargeText:
 
     def test_max_chars_zero(self):
         assert truncate_large_text('hello', 0, label='test') == 'hello'
+
+
+class TestTruncateDiff:
+    def test_small_diff_unchanged(self):
+        diff = 'diff --git a/x b/x\n+added line\n-removed line\n'
+        assert truncate_diff(diff) == diff
+
+    def test_large_diff_inserts_structured_marker(self):
+        diff = '\n'.join(f'+line-{i}' for i in range(20000))
+        result = truncate_diff(diff, path='src/big.py')
+        assert len(result) < len(diff)
+        assert '[EDIT_DIFF_TRUNCATED path=src/big.py]' in result
+        assert 're-read' in result
+
+    def test_large_diff_marker_without_path(self):
+        diff = 'x' * (_DIFF_TRUNC_HARD_CAP + 5000)
+        result = truncate_diff(diff)
+        assert '[EDIT_DIFF_TRUNCATED]' in result
+
+    def test_truncation_snaps_to_line_boundaries(self):
+        # Fixed-width lines: any mid-line cut would produce a short fragment.
+        diff = '\n'.join(f'+line-{i:05d}' for i in range(20000))
+        result = truncate_diff(diff, path='f.py')
+        for line in result.splitlines():
+            if line.startswith('+line-'):
+                assert len(line) == len('+line-00000'), (
+                    f'mid-line cut produced fragment: {line!r}'
+                )
 
 
 class TestTruncateCmdOutput:

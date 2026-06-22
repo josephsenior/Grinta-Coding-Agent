@@ -247,6 +247,7 @@ class TUIRenderer(
         'multi_edit': ('Edited', False),
         'edit': ('Edited', False),
         'insert_text': ('Edited', False),
+        'undo_last_edit': ('Undo', False),
     }
 
     def __init__(

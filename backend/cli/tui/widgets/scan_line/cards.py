@@ -91,6 +91,7 @@ _SCAN_LINE_ICONS: dict[str, str] = {
     'Agent': '◎',
     'Created': '+',
     'Edited': '↲',
+    'Undo': '↶',
     'Shell': '$',
     'Terminal': '▸',
     'Browser': '⌁',
@@ -150,8 +151,8 @@ class EditCard(ScanLineCard):
     """1-line file edit summary — full diff in detail screen.
 
     Shared across ``create_file``, ``insert_text``, ``replace_string``,
-    ``edit_symbol``, and ``multi_edit``.  Only the file path + delta appear
-    in the 1-line summary.
+    ``edit_symbol``, ``multi_edit``, and ``undo_last_edit``.  Only the file
+    path + delta appear in the 1-line summary.
     """
 
     DEFAULT_CSS = """
@@ -159,6 +160,12 @@ class EditCard(ScanLineCard):
         border-left: solid #91abec;
     }
     EditCard.-edited.failed {
+        border-left: solid #E24B4A;
+    }
+    EditCard.-undone {
+        border-left: solid #91abec;
+    }
+    EditCard.-undone.failed {
         border-left: solid #E24B4A;
     }
     """
@@ -170,6 +177,7 @@ class EditCard(ScanLineCard):
         added: int = 0,
         removed: int = 0,
         is_create: bool = False,
+        is_undo: bool = False,
         encoded_diff: str | None = None,
         syntax_pass: bool | None = None,
         syntax_error: str | None = None,
@@ -180,14 +188,22 @@ class EditCard(ScanLineCard):
         self._added = added
         self._removed = removed
         self._is_create = is_create
+        self._is_undo = is_undo
         self._encoded_diff = encoded_diff
         self._syntax_pass = syntax_pass
         self._syntax_error = syntax_error
-        self.add_class('-created' if is_create else '-edited')
+        if is_undo:
+            self.add_class('-undone')
+        else:
+            self.add_class('-created' if is_create else '-edited')
         self._finalize_state()
 
     @property
     def state_border_color(self) -> str:
+        if self._is_undo and self._state != 'failed':
+            from backend.cli.tui.transcript_typography import EDIT_CARD_ACCENT
+
+            return EDIT_CARD_ACCENT
         if not self._is_create and self._state != 'failed':
             from backend.cli.tui.transcript_typography import EDIT_CARD_ACCENT
 
@@ -198,6 +214,13 @@ class EditCard(ScanLineCard):
             self._state, SCAN_LINE_BORDER_COLORS['queued']
         )
 
+    def _edit_verb(self) -> str:
+        if self._is_undo:
+            return 'Undo'
+        if self._is_create:
+            return 'Created'
+        return 'Edited'
+
     def _finalize_state(self) -> None:
         if self._syntax_pass is False:
             self.set_state('failed')
@@ -207,7 +230,7 @@ class EditCard(ScanLineCard):
             self.set_state('done')
 
     def _line_text(self) -> str:
-        verb = 'Created' if self._is_create else 'Edited'
+        verb = self._edit_verb()
         path = _compact_path(self._display_path)
         return self._scan_summary_line(_scan_label_with_icon(verb), path, detail_max=40)
 
@@ -231,7 +254,7 @@ class EditCard(ScanLineCard):
     def build_detail_screen(self) -> DetailScreen:
         from backend.cli.tui.screens.detail import EditDetailScreen
 
-        verb = 'Created' if self._is_create else 'Edited'
+        verb = self._edit_verb()
         return EditDetailScreen(
             title=f'{verb}  {self._display_path}',
             kind=verb,

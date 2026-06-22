@@ -157,6 +157,7 @@ class _ActionDispatchMixin(_ActionRenderersBase):
         'multi_edit': ('Edited', False),
         'edit': ('Edited', False),
         'insert_text': ('Edited', False),
+        'undo_last_edit': ('Undo', False),
     }
 
     def _handle_agent_action(self, action: Action) -> None:

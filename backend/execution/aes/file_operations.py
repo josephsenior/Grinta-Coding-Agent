@@ -226,19 +226,44 @@ _DIFF_TRUNC_HARD_CAP = 20_000
 _DIFF_TRUNC_HEAD_BUDGET = 5_000
 _DIFF_TRUNC_TAIL_BUDGET = 2_000
 
+# Structured marker emitted whenever an edit diff is shortened. Both the
+# prompt-building layer and the agent rely on this exact prefix to detect that
+# the shown changes are incomplete. Keep in sync with the prompt-layer detector
+# in backend.context.processors.observation_processors.
+EDIT_DIFF_TRUNCATED_MARKER_PREFIX = '[EDIT_DIFF_TRUNCATED'
 
-def truncate_diff(value: str) -> str:
+
+def edit_diff_truncated_marker(path: str = '') -> str:
+    """Structured, agent-actionable marker placed where an edit diff was cut."""
+    path_part = f' path={path}' if path else ''
+    return (
+        f'{EDIT_DIFF_TRUNCATED_MARKER_PREFIX}{path_part}] diff shortened due to size '
+        '— re-read the file (or the edited range) to see the complete changes '
+        'before making further edits'
+    )
+
+
+def truncate_diff(value: str, *, path: str = '') -> str:
     """Truncate diff output to a reasonable size.
 
     Preserves the head (5k chars) and tail (2k chars) of the diff
     with a hard cap of 20k chars. This ensures the agent sees the
     beginning of changes and the end summary while preventing
     context window overflow from massive diffs.
+
+    Head/tail are cut on line boundaries so a mangled half-line is never
+    emitted, and a structured :func:`edit_diff_truncated_marker` is inserted so
+    the agent knows the shown diff is incomplete and should re-read the file.
     """
     if len(value) <= _DIFF_TRUNC_HARD_CAP:
         return value
     head = value[:_DIFF_TRUNC_HEAD_BUDGET]
     tail = value[-_DIFF_TRUNC_TAIL_BUDGET:]
+    # Snap to line boundaries to avoid corrupting partial lines.
+    if '\n' in head:
+        head = head[: head.rfind('\n')]
+    if '\n' in tail:
+        tail = tail[tail.find('\n') + 1 :]
     logger.warning(
         'Truncating diff from %s chars to %s chars (head %s + tail %s)',
         len(value),
@@ -246,7 +271,7 @@ def truncate_diff(value: str) -> str:
         _DIFF_TRUNC_HEAD_BUDGET,
         _DIFF_TRUNC_TAIL_BUDGET,
     )
-    return head + '\n[... Diff truncated by app due to size ...]\n' + tail
+    return f'{head}\n{edit_diff_truncated_marker(path)}\n{tail}'
 
 
 # Default max chars for bash command output (configurable via env var).

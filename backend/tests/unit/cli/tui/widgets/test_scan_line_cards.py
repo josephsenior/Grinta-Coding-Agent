@@ -195,6 +195,33 @@ def test_edit_card_detail_screen_built():
     assert isinstance(screen, EditDetailScreen)
 
 
+def test_edit_card_undo():
+    card = EditCard(
+        display_path='backend/raft.py',
+        added=1,
+        removed=2,
+        is_undo=True,
+    )
+    assert '↶ Undo' in _line_text(card)
+    assert '[#91abec]↶ Undo[/]' in _line_text(card)
+    assert 'raft.py' in _line_text(card)
+    assert '+1' in card._delta_text()
+    assert '-2' in card._delta_text()
+
+
+def test_edit_card_undo_detail_screen():
+    card = EditCard(
+        display_path='backend/raft.py',
+        added=0,
+        removed=3,
+        is_undo=True,
+        encoded_diff='payload',
+    )
+    screen = card.build_detail_screen()
+    assert screen._kind == 'Undo'
+    assert 'raft.py' in screen._heading
+
+
 # ── ShellCard ──────────────────────────────────────────────────────────
 
 

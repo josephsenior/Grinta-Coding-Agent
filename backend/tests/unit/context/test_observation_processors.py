@@ -108,6 +108,42 @@ class TestConvertObservation:
         msg = convert_observation_to_message(obs, max_message_chars=None)
         assert msg.role == 'user'
 
+    def test_file_edit_observation_appends_truncation_footer_when_shortened(self):
+        big = 'x' * 5000
+        obs = FileEditObservation(
+            content=big,
+            path='/tmp/big.py',
+            old_content='a',
+            new_content=big,
+        )
+        msg = convert_observation_to_message(obs, max_message_chars=500)
+        text = msg.content[0].text  # type: ignore[union-attr]
+        assert '[EDIT_OBSERVATION_TRUNCATED path=/tmp/big.py]' in text
+        assert len(text) < len(big)
+
+    def test_file_edit_observation_warns_when_execution_marker_present(self):
+        # Content under max_message_chars, but the execution layer already
+        # shortened the diff — the agent must still be told to re-read.
+        obs = FileEditObservation(
+            content='File updated successfully\n\n[EDIT_DIFF]\n'
+            '[EDIT_DIFF_TRUNCATED path=/tmp/x.py] diff shortened due to size',
+            path='/tmp/x.py',
+        )
+        msg = convert_observation_to_message(obs, max_message_chars=100000)
+        text = msg.content[0].text  # type: ignore[union-attr]
+        assert '[EDIT_OBSERVATION_TRUNCATED path=/tmp/x.py]' in text
+
+    def test_file_edit_observation_no_footer_when_complete(self):
+        obs = FileEditObservation(
+            content='File updated successfully',
+            path='/tmp/x.py',
+            old_content='a',
+            new_content='b',
+        )
+        msg = convert_observation_to_message(obs, max_message_chars=100000)
+        text = msg.content[0].text  # type: ignore[union-attr]
+        assert 'EDIT_OBSERVATION_TRUNCATED' not in text
+
     def test_mcp_observation(self):
         obs = MCPObservation(content='mcp result')
         msg = convert_observation_to_message(obs, max_message_chars=None)

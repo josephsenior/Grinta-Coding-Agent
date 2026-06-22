@@ -79,7 +79,7 @@ def test_file_editor_undo_after_edit_range(tmp_path: Path) -> None:
     assert p.read_text(encoding='utf-8') == 'hello old world\n'
 
 
-def test_file_editor_undo_after_create_file_removes_file(tmp_path: Path) -> None:
+def test_file_editor_undo_after_create_file_rejects_undo(tmp_path: Path) -> None:
     editor = FileEditor(workspace_root=str(tmp_path))
     p = tmp_path / 'new.txt'
     assert not p.exists()
@@ -95,10 +95,10 @@ def test_file_editor_undo_after_create_file_removes_file(tmp_path: Path) -> None
     assert p.read_text(encoding='utf-8') == 'only'
 
     undo = editor(command='undo_last_edit', path='new.txt')
-    assert undo.error is None
-    assert undo.old_content == 'only'
-    assert undo.new_content is None
-    assert not p.exists()
+    assert undo.error is not None
+    assert 'creating it' in undo.error.lower()
+    assert undo.error_code == 'UNDO_NO_PRIOR_VERSION'
+    assert p.read_text(encoding='utf-8') == 'only'
 
 
 def test_file_editor_undo_restore_runs_validation(tmp_path: Path, monkeypatch) -> None:

@@ -551,6 +551,21 @@ def _truncate_diff_smart(content: str, max_chars: int) -> str:
     return '\n'.join(result_lines)
 
 
+# Marker prefix emitted by the execution layer (file_operations.truncate_diff)
+# when an edit diff is shortened at production time. Detected here so the agent
+# is always told to re-read, even when the prompt layer itself does not truncate.
+_EDIT_DIFF_TRUNCATED_MARKER_PREFIX = '[EDIT_DIFF_TRUNCATED'
+
+
+def _edit_observation_truncation_footer(path: str) -> str:
+    """Agent-actionable footer telling it the edit result is incomplete."""
+    return (
+        f'[EDIT_OBSERVATION_TRUNCATED path={path}] The result above is incomplete. '
+        'Re-read the file (or the edited range) to confirm the final on-disk '
+        'contents before making further edits or reporting completion.'
+    )
+
+
 @_register_observation_handler(FileEditObservation)
 def _handle_file_edit_observation(
     obs: FileEditObservation, max_message_chars: int | None
@@ -560,22 +575,21 @@ def _handle_file_edit_observation(
     content_str = obs.content_with_hash()
     path = getattr(obs, 'path', 'unknown')
 
-    # For edit_mode=range edits (detected by hash presence), skip truncation.
-    # Range edits produce diffs proportional to the change, not the file size.
-    # Truncation here causes mid-hunk cuts, merged lines, and file corruption.
-    if max_message_chars and len(content_str) > max_message_chars:
-        if obs.new_content_hash:
-            # Hash-verified range edit — use smart truncation that preserves
-            # hunk structure, keeping all hunk headers and first/last lines.
-            text = _truncate_diff_smart(content_str, max_message_chars)
-        else:
-            # For non-range edits, use head_heavy strategy (88% head / 12% tail)
-            # to keep the beginning of edits intact where most changes occur.
-            text = truncate_content(
-                content_str, max_message_chars, strategy='head_heavy'
-            )
+    truncated = bool(max_message_chars) and len(content_str) > max_message_chars
+    if truncated:
+        # Hunk-aware truncation that preserves diff structure (keeps hunk
+        # headers, trims inside oversized hunks). Falls back to head-heavy
+        # truncation internally when no diff hunks are present, so it is safe
+        # for plain summaries, unified diffs, and multi-edit receipts alike.
+        text = _truncate_diff_smart(content_str, max_message_chars)
     else:
         text = content_str
+
+    # Warn the agent whenever the shown changes are incomplete — either because
+    # we truncated here, or because the execution layer already shortened the
+    # diff before it reached the prompt.
+    if truncated or _EDIT_DIFF_TRUNCATED_MARKER_PREFIX in content_str:
+        text = f'{text}\n{_edit_observation_truncation_footer(path)}'
 
     text = f'[FILE_EDIT path={path}]\n{text}'
     return Message(role='user', content=[TextContent(text=text)])
