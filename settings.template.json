@@ -19,5 +19,45 @@
     "allow_sensitive_path_access": false,
     "allow_read_outside_workspace": false,
     "additional_read_roots": []
+  },
+  "mcp_config": {
+    "enabled": true,
+    "servers": [
+      {
+        "name": "shadcn",
+        "type": "stdio",
+        "command": "npx",
+        "args": [
+          "-y",
+          "@jpisnice/shadcn-ui-mcp-server",
+          "--framework",
+          "react"
+        ],
+        "enabled": true,
+        "usage_hint": "shadcn/ui React components: variants, props, CLI install, and registry lookups."
+      },
+      {
+        "name": "github",
+        "type": "stdio",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-github"],
+        "enabled": true,
+        "usage_hint": "GitHub API for repos, issues, PRs, metadata. Set GITHUB_PERSONAL_ACCESS_TOKEN in .env.",
+        "env": {
+          "GITHUB_PERSONAL_ACCESS_TOKEN": ""
+        }
+      },
+      {
+        "name": "rigour",
+        "type": "stdio",
+        "command": "npx",
+        "args": ["-y", "@rigour-labs/mcp"],
+        "enabled": true,
+        "usage_hint": "Rigour — local code governance / quality gates. Prefer rigour_check / rigour_status after substantive edits.",
+        "env": {
+          "RIGOUR_CWD": "${PROJECT_ROOT}"
+        }
+      }
+    ]
   }
 }

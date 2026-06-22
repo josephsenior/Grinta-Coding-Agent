@@ -367,10 +367,14 @@ def load_bundled_mcp_server_configs() -> list[MCPServerConfig]:
     try:
         with path.open(encoding='utf-8') as f:
             mcp_json = json.load(f)
+        from backend.integrations.mcp.native_backends import NATIVE_MCP_SERVER_NAMES
+
         srvs = mcp_json.get('mcpServers') or {}
         out: list[MCPServerConfig] = []
         for name, srv_data in srvs.items():
             if name == 'default' or not isinstance(srv_data, dict):
+                continue
+            if name not in NATIVE_MCP_SERVER_NAMES:
                 continue
             out.append(MCPServerConfig.from_dict(name, srv_data))
         return _filter_windows_stdio_servers(out)
@@ -380,10 +384,11 @@ def load_bundled_mcp_server_configs() -> list[MCPServerConfig]:
 
 
 def extend_mcp_servers_with_bundled_defaults(servers: list[MCPServerConfig]) -> None:
-    """Append bundled defaults for any server name not already in ``servers`` (in place).
+    """Append internal native MCP backends from bundled config (in place).
 
-    Used by :meth:`MCPConfig.from_toml_section` and :func:`finalize_config` so there is
-    one merge rule for the concept “add repo defaults without clobbering explicit config”.
+    Only servers in :data:`~backend.integrations.mcp.native_backends.NATIVE_MCP_SERVER_NAMES`
+    are merged here. User-managed defaults (shadcn, github, rigour, …) live in
+    ``settings.json`` under ``mcp_config.servers``.
     """
     existing = {s.name for s in servers}
     for srv in load_bundled_mcp_server_configs():

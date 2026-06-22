@@ -473,7 +473,12 @@ class TestMCPConfig:
 
         with open(config_json, 'w', encoding='utf-8') as f:
             json.dump(
-                {'mcpServers': {'json-server': {'command': 'npx', 'args': ['test']}}}, f
+                {
+                    'mcpServers': {
+                        'context7': {'command': 'npx', 'args': ['test']},
+                    }
+                },
+                f,
             )
 
         from backend.core.config import mcp_config as mcp_config_mod
@@ -484,7 +489,7 @@ class TestMCPConfig:
 
         mapping = MCPConfig.from_toml_section({'enabled': True, 'servers': []})
         server_names = [s.name for s in mapping['mcp'].servers]
-        assert 'json-server' in server_names
+        assert 'context7' in server_names
 
 
 class TestBundledHelpers:
@@ -571,12 +576,13 @@ class TestBundledHelpers:
 
         assert load_bundled_mcp_server_configs() == []
 
-    def test_load_bundled_mcp_server_configs_skips_default_and_non_dict(
+    def test_load_bundled_mcp_server_configs_skips_default_non_dict_and_user_servers(
         self, tmp_path, monkeypatch
     ):
         config_json = tmp_path / 'config.json'
         config_json.write_text(
-            '{"mcpServers": {"default": {"command": "npx"}, "skip": "x", "keep": {"command": "npx"}}}',
+            '{"mcpServers": {"default": {"command": "npx"}, "skip": "x", '
+            '"github": {"command": "npx"}, "context7": {"command": "npx"}}}',
             encoding='utf-8',
         )
         monkeypatch.setattr(
@@ -588,7 +594,7 @@ class TestBundledHelpers:
 
         servers = load_bundled_mcp_server_configs()
 
-        assert [server.name for server in servers] == ['keep']
+        assert [server.name for server in servers] == ['context7']
 
 
 class TestDefaultServerHelpers:
