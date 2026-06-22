@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import threading
 from contextlib import suppress
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,20 @@ from backend.core.tasks.task_status import (
     TASK_STATUS_SKIPPED,
     TASK_STATUS_TODO,
 )
+
+
+_SAVE_LOCKS: dict[str, threading.Lock] = {}
+_SAVE_LOCKS_GUARD = threading.Lock()
+
+
+def _save_lock_for(path: Path) -> threading.Lock:
+    key = str(path.resolve())
+    with _SAVE_LOCKS_GUARD:
+        lock = _SAVE_LOCKS.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _SAVE_LOCKS[key] = lock
+        return lock
 
 
 class TaskTracker:
@@ -63,25 +78,26 @@ class TaskTracker:
         normalized = [
             normalize_plan_step_payload(task, i + 1) for i, task in enumerate(task_list)
         ]
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        dir_name = str(self.path.parent)
-        with tempfile.NamedTemporaryFile(
-            prefix=f'.{self.path.name}.tmp.',
-            dir=dir_name,
-            delete=False,
-            mode='w',
-            encoding='utf-8',
-        ) as f:
-            tmp_path = Path(f.name)
-            json.dump(normalized, f, indent=2, ensure_ascii=False)
-            f.flush()
-            os.fsync(f.fileno())
-        try:
-            replace_file_with_retry(tmp_path, self.path)
-        except Exception:
-            with suppress(OSError):
-                tmp_path.unlink(missing_ok=True)
-            raise
+        with _save_lock_for(self.path):
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            dir_name = str(self.path.parent)
+            with tempfile.NamedTemporaryFile(
+                prefix=f'.{self.path.name}.tmp.',
+                dir=dir_name,
+                delete=False,
+                mode='w',
+                encoding='utf-8',
+            ) as f:
+                tmp_path = Path(f.name)
+                json.dump(normalized, f, indent=2, ensure_ascii=False)
+                f.flush()
+                os.fsync(f.fileno())
+            try:
+                replace_file_with_retry(tmp_path, self.path)
+            except Exception:
+                with suppress(OSError):
+                    tmp_path.unlink(missing_ok=True)
+                raise
 
     def update_task_status(
         self, task_id: str, status: str, result: str | None = None
