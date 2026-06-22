@@ -48,7 +48,6 @@ class GrintaAddMCPDialog(ModalDialog[dict[str, str] | None]):
                 id='mcp-command',
                 placeholder='npx -y @modelcontextprotocol/server-github',
             )
-            yield Static('[#54597b]stdio or sse[/]', id='mcp-type-hint')
             yield Label('', id='dialog-feedback')
             with Horizontal(id='dialog-buttons'):
                 yield Button('Save', id='settings-save', variant='primary')
@@ -62,24 +61,9 @@ class GrintaAddMCPDialog(ModalDialog[dict[str, str] | None]):
             name_input.disabled = True
             if self._edit_command:
                 command_input.value = self._edit_command
-                self._update_mcp_type_hint(self._edit_command)
             command_input.focus()
         else:
             name_input.focus()
-
-    def on_input_changed(self, event: Input.Changed) -> None:
-        if event.input.id == 'mcp-command':
-            self._update_mcp_type_hint(event.value)
-
-    def _update_mcp_type_hint(self, value: str) -> None:
-        hint = self.query_one('#mcp-type-hint', Static)
-        cmd = value.strip()
-        if not cmd:
-            hint.update('[#54597b]stdio or sse[/]')
-        elif cmd.startswith('http://') or cmd.startswith('https://'):
-            hint.update('[#54efae]Detected: sse (remote URL)[/]')
-        else:
-            hint.update('[#54efae]Detected: stdio (local command)[/]')
 
     def action_save(self) -> None:
         self._submit()

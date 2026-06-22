@@ -654,3 +654,73 @@ def checkpoint_think_orient_model(
         result='completed',
         area='workspace',
     )
+
+
+def memory_recall_action_model(action: Any) -> OrientLineModel:
+    query = str(getattr(action, 'query', '') or '').strip()
+    target = _quote(query) if query else 'history'
+    if len(target) > 46:
+        target = _quote(shorten_middle(query, max_len=40, head_min=12))
+    return OrientLineModel(
+        tool='memory',
+        icon='↺',
+        verb='Recalled',
+        target=target,
+        result='…',
+        area='workspace',
+    )
+
+
+def memory_recall_result(obs: Any) -> str:
+    hits = getattr(obs, 'hits', None)
+    if isinstance(hits, list):
+        count = len(hits)
+        return _plural(count, 'hit') if count else 'no hits'
+    content = str(getattr(obs, 'content', '') or '').strip().lower()
+    if 'not available' in content:
+        return 'unavailable'
+    if 'no indexed' in content or 'no results' in content:
+        return 'no hits'
+    return 'completed'
+
+
+def memory_recall_observation_model(
+    obs: Any, pending: OrientLineModel | None = None
+) -> OrientLineModel:
+    base = pending or memory_recall_action_model(obs)
+    return base.with_result(memory_recall_result(obs))
+
+
+def memory_persist_action_model(action: Any) -> OrientLineModel:
+    key = str(getattr(action, 'key', '') or '').strip()
+    kind = str(getattr(action, 'kind', '') or 'lesson').strip().lower()
+    target = _quote(key) if key else 'entry'
+    if kind and kind != 'lesson':
+        target = f'{kind} · {target}'
+    return OrientLineModel(
+        tool='memory',
+        icon='├',
+        verb='Persisted',
+        target=target,
+        result='…',
+        area='workspace',
+    )
+
+
+def memory_persist_result(obs: Any) -> str:
+    content = str(getattr(obs, 'content', '') or '').strip()
+    lowered = content.lower()
+    if 'fail' in lowered or 'error' in lowered:
+        return content[:44] if content else 'failed'
+    if getattr(obs, 'inserted', False):
+        return 'saved'
+    if content:
+        return content[:44] if len(content) > 44 else content
+    return 'updated'
+
+
+def memory_persist_observation_model(
+    obs: Any, pending: OrientLineModel | None = None
+) -> OrientLineModel:
+    base = pending or memory_persist_action_model(obs)
+    return base.with_result(memory_persist_result(obs))

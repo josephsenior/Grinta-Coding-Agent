@@ -150,7 +150,11 @@ def _has_workspace_content(
     filtered_agents: list[PlaybookKnowledge],
 ) -> bool:
     has_repo = bool(repo_info and (repo_info.repo_name or repo_info.repo_directory))
-    has_runtime = bool(runtime_info.date or runtime_info.custom_secrets_descriptions)
+    has_runtime = bool(
+        runtime_info.date
+        or runtime_info.custom_secrets_descriptions
+        or getattr(runtime_info, 'working_dir', '')
+    )
     has_instructions = (
         bool(repo_instructions.strip()) or conversation_instructions is not None
     )
@@ -172,7 +176,9 @@ def _build_message_content(
         repo_info.repo_name or repo_info.repo_directory
     )
     has_runtime = runtime_info is not None and (
-        runtime_info.date or runtime_info.custom_secrets_descriptions
+        runtime_info.date
+        or runtime_info.custom_secrets_descriptions
+        or getattr(runtime_info, 'working_dir', '')
     )
     has_instructions = (
         bool(repo_instructions.strip()) or conversation_instructions is not None

@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 from pathlib import Path
+from unittest.mock import MagicMock
 
+import pytest
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.syntax import PygmentsSyntaxTheme, Syntax
@@ -19,9 +22,12 @@ from backend.cli.theme.syntax_theme import (
     resolve_syntax_colors,
 )
 from backend.cli.tui.renderer.prep import (
+    prep_live_response_renderable,
     prep_markdown,
     prep_streaming_renderable,
 )
+from backend.cli.event_rendering.text_utils import sanitize_visible_transcript_text
+from backend.ledger.action.message import StreamingChunkAction
 
 
 def _keyword_color(md: Markdown) -> str | None:
@@ -191,6 +197,36 @@ def test_tui_sources_do_not_request_bold_text():
     assert offenders == []
 
 
+@pytest.mark.asyncio
+async def test_preprocess_event_async_normalizes_streaming_cache_key() -> None:
+    from backend.cli.display.hud import HUDBar
+    from backend.cli.display.reasoning_display import ReasoningDisplay
+    from backend.cli.tui.app import TUIRenderer
+    from backend.cli.tui.renderer.drain import _preprocess_event_async
+
+    raw = 'Here is code:\n```python\ndef foo():\n    return 1'
+    norm = sanitize_visible_transcript_text(raw)
+
+    renderer = TUIRenderer(
+        console=Console(),
+        hud=HUDBar(),
+        reasoning=ReasoningDisplay(),
+        tui=MagicMock(),
+        loop=asyncio.get_running_loop(),
+    )
+
+    action = StreamingChunkAction(accumulated=raw, is_final=False)
+    await _preprocess_event_async(renderer, action)
+    assert norm in renderer._streaming_render_cache
+
+
+def test_prep_live_response_renderable_styles_markdown_prose() -> None:
+    from rich.markdown import Markdown
+
+    renderable = prep_live_response_renderable('**bold** and `code`')
+    assert isinstance(renderable, Markdown)
+
+
 def test_apply_live_response_render_highlights_open_fence_without_deferred_flush():
     from unittest.mock import MagicMock
 
@@ -214,8 +250,21 @@ def test_apply_live_response_render_highlights_open_fence_without_deferred_flush
     partial = '```python\ndef stream_me():\n    return 1'
     renderer._apply_live_response_render(partial)
 
-    widget.set_streaming_renderable.assert_called_once()
-    renderable = widget.set_streaming_renderable.call_args[0][0]
+    widget.set_streaming_content.assert_called_once_with(partial)
+    widget.set_streaming_text.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_live_response_set_streaming_content_highlights_open_fence() -> None:
+    from rich.syntax import Syntax
+    from textual.app import App, ComposeResult
+    from textual.widgets import Static
+
+    from backend.cli.tui.widgets.activity_card import LiveResponse
+
+    class _LiveHost(App):
+        def compose(self) -> ComposeResult:
+            yield LiveResponse(id='live')
 
     def _contains_syntax(node: object) -> bool:
         if isinstance(node, Syntax):
@@ -225,5 +274,9 @@ def test_apply_live_response_render_highlights_open_fence_without_deferred_flush
             return any(_contains_syntax(part) for part in renderables)
         return False
 
-    assert _contains_syntax(renderable)
-    widget.set_streaming_text.assert_not_called()
+    async with _LiveHost().run_test() as pilot:
+        await pilot.pause()
+        widget = pilot.app.query_one('#live', LiveResponse)
+        widget.set_streaming_content('```python\ndef stream_me():\n    return 1')
+        content = widget.query_one('#live-content', Static)
+        assert _contains_syntax(content.renderable)

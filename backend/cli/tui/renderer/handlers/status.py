@@ -151,9 +151,11 @@ def _handle_error_observation(
     from backend.cli.tui.renderer.handlers.exploration import (
         clear_pending_exploration_cards,
     )
+    from backend.cli.tui.renderer.handlers.memory import clear_pending_memory_lines
 
     orch._compaction_transcript_active = False
     clear_pending_exploration_cards(orch)
+    clear_pending_memory_lines(orch)
     content = event.content or 'An unknown error occurred'
     if getattr(event, 'agent_only', False):
         return

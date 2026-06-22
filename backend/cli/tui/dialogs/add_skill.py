@@ -7,7 +7,7 @@ from pathlib import Path
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
-from textual.widgets import Button, Input, Label, Static, TextArea
+from textual.widgets import Button, Input, Label, TextArea
 
 from backend.cli.tui.widgets.dialogs import ModalDialog
 
@@ -44,16 +44,12 @@ class GrintaAddSkillDialog(ModalDialog[dict[str, str] | None]):
     def compose(self) -> ComposeResult:
         if self._read_only:
             title = 'View Skill'
-            subtitle = 'Built-in playbook (read-only).'
         elif self._edit_name:
             title = 'Edit Skill'
-            subtitle = 'Update the reusable instruction file for future sessions.'
         else:
-            title = 'Add Custom Skill'
-            subtitle = 'Create a reusable instruction file for future sessions.'
+            title = 'Add Skill'
         with Vertical(id='dialog-container'):
             yield Label(title, id='dialog-title')
-            yield Static(subtitle, id='dialog-subtitle')
             yield Label('Skill name', classes='field-label')
             yield Input(id='skill-name', placeholder='my-skill')
             yield Label('Instructions (Markdown)', classes='field-label')

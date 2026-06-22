@@ -156,6 +156,36 @@ def _syntax_block(code: str, language: str) -> Syntax:
     )
 
 
+def prep_live_response_renderable(text: str) -> Any:
+    """Render in-flight assistant messages with the same richness as finalized rows.
+
+    Prose uses full Markdown (matching :class:`AgentMessage`). Fenced code blocks
+    use the streaming fence parser so open blocks still tokenize as tokens arrive.
+    """
+    content = text or ''
+    if not content.strip():
+        return Text('')
+
+    if '```' not in content:
+        return prep_markdown(content)
+
+    raw_parts, _tail, _has_open = _split_streaming_fences(content)
+    parts: list[Any] = []
+    for segment in raw_parts:
+        if isinstance(segment, Syntax):
+            parts.append(segment)
+            continue
+        if not isinstance(segment, str) or not segment.strip():
+            continue
+        parts.append(prep_markdown(segment))
+
+    if not parts:
+        return Text(content)
+    if len(parts) == 1:
+        return parts[0]
+    return Group(*parts)
+
+
 def prep_streaming_renderable(
     text: str, *, base_text_style: str = NAVY_TEXT_PRIMARY
 ) -> Any:
@@ -227,6 +257,10 @@ async def prep_streaming_renderable_async(text: str) -> Any:
     return await asyncio.to_thread(prep_streaming_renderable, text)
 
 
+async def prep_live_response_renderable_async(text: str) -> Any:
+    return await asyncio.to_thread(prep_live_response_renderable, text)
+
+
 async def prep_unified_diff_text_async(diff_text: str) -> str:
     return await asyncio.to_thread(prep_unified_diff_text, diff_text)
 
@@ -279,14 +313,14 @@ async def prep_streaming_response_async(orch: Any, text: str) -> None:
     if key in cache:
         return
     try:
-        renderable = await asyncio.to_thread(prep_streaming_renderable, content)
+        renderable = await asyncio.to_thread(prep_live_response_renderable, content)
     except Exception:
         return
     cache[key] = renderable
     if getattr(orch, '_live_response', '') == content:
         apply = getattr(orch, '_apply_live_response_render', None)
         if callable(apply):
-            apply(content)
+            apply(content, force=True)
     # Bound the cache: streaming text only grows, so the oldest (shortest)
     # snapshots are the safest to drop.
     if len(cache) > _STREAMING_RENDER_CACHE_MAX:

@@ -11,7 +11,7 @@ from textual.widgets import Static
 
 from backend.cli.theme import CLR_REASONING_SNAP
 from backend.cli.tui.image_attachments import image_attachment_status_text
-from backend.cli.tui.transcript_typography import THINKING_LABEL
+from backend.cli.tui.transcript_typography import THINKING_LABEL, USER_PIPE
 
 
 class UserMessage(Static):
@@ -23,10 +23,10 @@ class UserMessage(Static):
         height: auto;
         margin: 1 0 2 0;
         padding: 1 2 2 2;
-        background: #0d1522;
+        background: #151d32;
         border: transparent;
-        border-right: solid #5a6a8a;
-        color: #e9e9e9;
+        border-right: wide #91abec;
+        color: #f2f6ff;
     }
     """
 
@@ -61,23 +61,16 @@ class UserMessage(Static):
 
             renderable = Group(*parts)
         super().__init__(renderable, id=id)
+        self.styles.border_right = ('wide', USER_PIPE)
 
 
 class AgentMessage(Static):
-    """Agent response display in the transcript."""
+    """Agent response display in the transcript — plain text, no card chrome."""
 
     DEFAULT_CSS = """
     AgentMessage {
         width: 100%;
         height: auto;
-        margin: 1 0 2 0;
-        padding: 1 2 2 2;
-        border: transparent;
-        border-left: solid #3d4a66;
-        background: #090d18;
-        color: #c8d4e8;
-    }
-    AgentMessage.-plain {
         margin: 0 0 1 0;
         padding: 0;
         border: none;
@@ -91,11 +84,9 @@ class AgentMessage(Static):
         text: str,
         *,
         renderable: Any | None = None,
-        plain: bool = False,
+        plain: bool = True,
         id: str | None = None,
     ) -> None:
-        from backend.cli.tui.transcript_typography import AGENT_PIPE
-
         if renderable is None:
             from backend.cli.tui.renderer.prep import prep_markdown
 
@@ -103,8 +94,6 @@ class AgentMessage(Static):
         super().__init__(renderable, id=id)
         if plain:
             self.add_class('-plain')
-        else:
-            self.styles.border_left = ('solid', AGENT_PIPE)
 
     def update_message(self, text: str, *, renderable: Any | None = None) -> None:
         """Update message content dynamically."""
@@ -115,42 +104,95 @@ class AgentMessage(Static):
         self.update(renderable)
 
 
-class LiveResponse(Static):
-    """In-flight assistant response with lightweight streaming affordances."""
+class LiveResponse(Container):
+    """In-flight assistant response — streams with the same markdown richness as finals."""
 
     DEFAULT_CSS = """
     LiveResponse {
         width: 100%;
         height: auto;
-        margin: 0 0 2 0;
-        padding: 1 1 1 2;
-        border: transparent;
-        border-left: solid #3d4a66;
-        background: #090d18;
+        margin: 0 0 1 0;
+        padding: 0;
+        border: none;
+        background: transparent;
+    }
+    LiveResponse > #live-content {
+        width: 100%;
+        height: auto;
         color: #b8c4d8;
     }
-    LiveResponse.-streaming {
+    LiveResponse.-streaming > #live-content {
         color: #d5dee8;
     }
     """
 
+    def __init__(self, *, id: str | None = None) -> None:
+        super().__init__(id=id)
+        self._pending_text: str = ''
+
+    def compose(self) -> ComposeResult:
+        yield Static('', id='live-content')
+
+    def on_mount(self) -> None:
+        if self._pending_text:
+            self.set_streaming_content(self._pending_text)
+
+    def _live_content(self) -> Static | None:
+        try:
+            return self.query_one('#live-content', Static)
+        except Exception:
+            return None
+
     def set_streaming_renderable(self, renderable: Any) -> None:
         """Update visible streaming content."""
+        content = self._live_content()
+        if content is None:
+            return
         if renderable is None or renderable == '':
-            self.update('')
+            content.update('')
             self.remove_class('-streaming')
             return
         self.add_class('-streaming')
-        self.update(renderable)
+        content.update(renderable)
+
+    def set_streaming_content(self, text: str) -> None:
+        """Highlight in-flight assistant markdown like finalized AgentMessage rows."""
+        if not text:
+            self._pending_text = ''
+            content = self._live_content()
+            if content is not None:
+                content.update('')
+            self.remove_class('-streaming')
+            return
+        from backend.cli.tui.renderer.prep import prep_live_response_renderable
+
+        renderable = prep_live_response_renderable(text)
+        content = self._live_content()
+        if content is None:
+            self._pending_text = text
+            self.add_class('-streaming')
+            return
+        self._pending_text = ''
+        self.add_class('-streaming')
+        content.update(renderable)
 
     def set_streaming_text(self, text: str) -> None:
         """Fallback plain-text update when highlighted prep is unavailable."""
         if not text:
-            self.update('')
+            self._pending_text = ''
+            content = self._live_content()
+            if content is not None:
+                content.update('')
             self.remove_class('-streaming')
             return
+        content = self._live_content()
+        if content is None:
+            self._pending_text = text
+            self.add_class('-streaming')
+            return
+        self._pending_text = ''
         self.add_class('-streaming')
-        self.update(Text(text, style='#d5dee8'))
+        content.update(Text(text, style='#d5dee8'))
 
 
 class ThinkingIndicator(Container):

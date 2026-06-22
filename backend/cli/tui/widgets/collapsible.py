@@ -160,16 +160,16 @@ class SidebarRow(Static):
 
 
 class McpServerRow(Horizontal):
-    """MCP server row with a visible on/off switch and action buttons."""
+    """MCP server row: read-only label with a compact enable switch on the right."""
 
     DEFAULT_CSS = """
     McpServerRow {
         width: 100%;
         height: auto;
-        min-height: 3;
+        min-height: 1;
         align: left middle;
         margin: 0 0 1 0;
-        padding: 0 0 0 1;
+        padding: 0 1;
         background: transparent;
     }
     McpServerRow:hover {
@@ -183,38 +183,31 @@ class McpServerRow(Horizontal):
         background: #132a45;
         border-left: solid #eacb8a;
     }
-    McpServerRow.-disabled .sidebar-row-label {
-        color: #54597b;
-        text-style: strike;
+    McpServerRow .sidebar-row-label {
+        width: 1fr;
+        height: 1;
+        content-align: left middle;
+        padding: 0;
     }
     McpServerRow Switch {
-        width: 10;
-        height: 3;
-        margin: 0 1 0 0;
+        width: 4;
+        height: 1;
+        min-height: 1;
+        margin: 0 0 0 1;
         border: none;
         background: transparent;
         padding: 0;
     }
     McpServerRow Switch .switch--slider {
-        color: #2a3654;
-        background: #1a2440;
+        background: #0f1c30;
+        color: #54597b;
     }
     McpServerRow Switch.-on .switch--slider {
-        color: #54efae;
-        background: #1a3d2e;
+        background: #15274d;
+        color: #5eead4;
     }
     McpServerRow Switch:focus {
         border: none;
-    }
-    McpServerRow .sidebar-row-label {
-        width: 1fr;
-        height: 1;
-        content-align: left middle;
-        color: #c8d4e8;
-        padding: 0 1;
-    }
-    McpServerRow .sidebar-row-label:hover {
-        color: #ffffff;
     }
     """
 
@@ -224,28 +217,27 @@ class McpServerRow(Horizontal):
         item_id: str | None,
         *,
         enabled: bool = True,
-        deletable: bool = False,
     ) -> None:
         super().__init__(classes='sidebar-item-row')
         self.item_id = item_id
-        self.deletable = deletable
         self._label = label
         self._enabled = enabled
         self._suppress_switch = False
         if not enabled:
             self.add_class('-disabled')
 
+    def _label_markup(self) -> str:
+        if self._enabled:
+            bullet = f'[{STATUS_COLORS["ok"]}]{SIDEBAR_BULLET}[/]'
+            label_part = f'[#c8d4e8]{self._label}[/]'
+        else:
+            bullet = f'[#54597b]{SIDEBAR_BULLET_DIM}[/]'
+            label_part = f'[#54597b][strike]{self._label}[/][/]'
+        return f'{bullet} {label_part}'
+
     def compose(self) -> ComposeResult:
+        yield Static(self._label_markup(), classes='sidebar-row-label', id='row-label')
         yield Switch(value=self._enabled, id='mcp-enable-switch')
-        yield Static(self._label, classes='sidebar-row-label', id='row-label')
-        yield Button('Edit', id='row-edit-btn', classes='sidebar-row-btn')
-        if self.deletable:
-            yield Button(
-                'Del',
-                id='row-delete-btn',
-                classes='sidebar-row-btn -danger',
-                variant='error',
-            )
 
     def on_mount(self) -> None:
         self._suppress_switch = True
@@ -259,100 +251,6 @@ class McpServerRow(Horizontal):
             return
         self.post_message(SidebarRow.ToggleRequested(self.item_id))
         event.stop()
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == 'row-edit-btn':
-            self.post_message(SidebarRow.Selected(self.item_id))
-        elif event.button.id == 'row-delete-btn':
-            self.post_message(SidebarRow.DeleteRequested(self.item_id))
-        event.stop()
-
-    def on_click(self, event: events.Click) -> None:
-        if event.widget and event.widget.id == 'row-label':
-            self.post_message(SidebarRow.Selected(self.item_id))
-            event.prevent_default()
-            event.stop()
-
-
-class SkillSidebarRow(Horizontal):
-    """Skill row with explicit view/edit and delete buttons."""
-
-    DEFAULT_CSS = """
-    SkillSidebarRow {
-        width: 100%;
-        height: auto;
-        min-height: 3;
-        align: left middle;
-        margin: 0 0 1 0;
-        padding: 0 0 0 1;
-        background: transparent;
-    }
-    SkillSidebarRow:hover {
-        background: #101c36;
-    }
-    SkillSidebarRow:focus-within {
-        background: #0e1a30;
-        border-left: solid #c792ea;
-    }
-    SkillSidebarRow.-highlight {
-        background: #132a45;
-        border-left: solid #c792ea;
-    }
-    SkillSidebarRow.-view-only .sidebar-row-label {
-        color: #8b95a8;
-    }
-    SkillSidebarRow .sidebar-row-label {
-        width: 1fr;
-        height: 1;
-        content-align: left middle;
-        color: #c8d4e8;
-        padding: 0 1;
-    }
-    SkillSidebarRow .sidebar-row-label:hover {
-        color: #ffffff;
-    }
-    """
-
-    def __init__(
-        self,
-        label: str,
-        item_id: str | None,
-        *,
-        deletable: bool = False,
-        view_only: bool = False,
-    ) -> None:
-        super().__init__(classes='sidebar-item-row')
-        self.item_id = item_id
-        self.deletable = deletable
-        self.view_only = view_only
-        self._label = label
-        if view_only:
-            self.add_class('-view-only')
-
-    def compose(self) -> ComposeResult:
-        yield Static(self._label, classes='sidebar-row-label', id='row-label')
-        action = 'View' if self.view_only else 'Edit'
-        yield Button(action, id='row-edit-btn', classes='sidebar-row-btn')
-        if self.deletable:
-            yield Button(
-                'Del',
-                id='row-delete-btn',
-                classes='sidebar-row-btn -danger',
-                variant='error',
-            )
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == 'row-edit-btn':
-            self.post_message(SidebarRow.Selected(self.item_id))
-        elif event.button.id == 'row-delete-btn':
-            self.post_message(SidebarRow.DeleteRequested(self.item_id))
-        event.stop()
-
-    def on_click(self, event: events.Click) -> None:
-        if event.widget and event.widget.id == 'row-label':
-            self.post_message(SidebarRow.Selected(self.item_id))
-            event.prevent_default()
-            event.stop()
 
 
 class CollapsibleSection(Container):
@@ -403,31 +301,34 @@ class CollapsibleSection(Container):
     CollapsibleSection .collapsible-header.expanded {
         color: #c8d4e8;
     }
-    CollapsibleSection .sidebar-add-btn {
-        height: 3;
-        min-width: 10;
+    CollapsibleSection .sidebar-manage-btn {
+        height: 1;
+        min-height: 1;
+        min-width: 0;
         width: auto;
-        padding: 0 2;
+        padding: 0 1;
         margin: 0;
         border: none;
+        background: transparent;
+        text-style: none;
     }
-    CollapsibleSection .sidebar-add-btn.-mcp {
-        background: #3d3420;
+    CollapsibleSection .sidebar-manage-btn.-mcp {
+        color: #6f83aa;
+    }
+    CollapsibleSection .sidebar-manage-btn.-mcp:hover,
+    CollapsibleSection .sidebar-manage-btn.-mcp:focus {
+        background: transparent;
         color: #eacb8a;
+        border: none;
     }
-    CollapsibleSection .sidebar-add-btn.-mcp:hover,
-    CollapsibleSection .sidebar-add-btn.-mcp:focus {
-        background: #524628;
-        color: #fff4d6;
+    CollapsibleSection .sidebar-manage-btn.-skill {
+        color: #6f83aa;
     }
-    CollapsibleSection .sidebar-add-btn.-skill {
-        background: #2e2440;
+    CollapsibleSection .sidebar-manage-btn.-skill:hover,
+    CollapsibleSection .sidebar-manage-btn.-skill:focus {
+        background: transparent;
         color: #c792ea;
-    }
-    CollapsibleSection .sidebar-add-btn.-skill:hover,
-    CollapsibleSection .sidebar-add-btn.-skill:focus {
-        background: #3d3054;
-        color: #e4c4ff;
+        border: none;
     }
     CollapsibleSection .collapsible-body {
         width: 100%;
@@ -521,23 +422,12 @@ class CollapsibleSection(Container):
     def _empty_markup(self, text: str) -> str:
         return f'[#54597b]{SIDEBAR_BULLET}[/] [#54597b]{text}[/]'
 
-    def _make_row(
-        self, item: dict[str, Any]
-    ) -> SidebarRow | McpServerRow | SkillSidebarRow:
+    def _make_row(self, item: dict[str, Any]) -> SidebarRow | McpServerRow:
         if item.get('toggleable'):
             return McpServerRow(
                 item['label'],
                 item['item_id'],
                 enabled=not item.get('disabled', False),
-                deletable=item.get('deletable', False),
-            )
-        item_id = str(item.get('item_id') or '')
-        if item_id.startswith('skill:'):
-            return SkillSidebarRow(
-                item['label'],
-                item['item_id'],
-                deletable=item.get('deletable', False),
-                view_only=item.get('view_only', False),
             )
         return SidebarRow(
             item['label'],
@@ -566,7 +456,7 @@ class CollapsibleSection(Container):
                 ),
             )
             if self._action_label:
-                btn_classes = 'sidebar-add-btn'
+                btn_classes = 'sidebar-manage-btn'
                 if self._action_button_class:
                     btn_classes = f'{btn_classes} {self._action_button_class}'
                 yield Button(

@@ -9,6 +9,10 @@ from backend.cli.tool_display.orient_tools import (
     checkpoint_action_model,
     checkpoint_observation_model,
     checkpoint_result,
+    memory_persist_action_model,
+    memory_persist_observation_model,
+    memory_recall_action_model,
+    memory_recall_observation_model,
 )
 from backend.ledger.action.memory_tools import (
     CheckpointAction,
@@ -33,6 +37,12 @@ if TYPE_CHECKING:
     )
 
 
+def clear_pending_memory_lines(orch: 'RendererEventProcessorMixin') -> None:
+    """Drop in-flight memory orient rows when a tool resolves as ErrorObservation."""
+    orch._pending_memory_recall_line = None
+    orch._pending_memory_persist_line = None
+
+
 def _handle_checkpoint_observation(
     orch: 'RendererEventProcessorMixin', event: CheckpointObservation
 ) -> None:
@@ -53,13 +63,23 @@ def _handle_working_memory_observation(
 def _handle_memory_persist_observation(
     orch: 'RendererEventProcessorMixin', event: MemoryPersistObservation
 ) -> None:
-    return
+    pending = getattr(orch, '_pending_memory_persist_line', None)
+    if isinstance(pending, OrientLineModel):
+        orch._write_orient_line(memory_persist_observation_model(event, pending))
+    else:
+        orch._write_orient_line(memory_persist_observation_model(event))
+    orch._pending_memory_persist_line = None
 
 
 def _handle_memory_recall_observation(
     orch: 'RendererEventProcessorMixin', event: MemoryRecallObservation
 ) -> None:
-    return
+    pending = getattr(orch, '_pending_memory_recall_line', None)
+    if isinstance(pending, OrientLineModel):
+        orch._write_orient_line(memory_recall_observation_model(event, pending))
+    else:
+        orch._write_orient_line(memory_recall_observation_model(event))
+    orch._pending_memory_recall_line = None
 
 
 def _handle_scratchpad_note_observation(
@@ -89,13 +109,13 @@ def _handle_working_memory_action(
 def _handle_memory_persist_action(
     orch: 'RendererEventProcessorMixin', event: MemoryPersistAction
 ) -> None:
-    return
+    orch._pending_memory_persist_line = memory_persist_action_model(event)
 
 
 def _handle_memory_recall_action(
     orch: 'RendererEventProcessorMixin', event: MemoryRecallAction
 ) -> None:
-    return
+    orch._pending_memory_recall_line = memory_recall_action_model(event)
 
 
 def _handle_scratchpad_note_action(

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import copy
-from pathlib import Path
 from typing import Any
 
 from textual import events, work
@@ -9,10 +8,8 @@ from textual import events, work
 from backend.cli.event_rendering.panels import task_panel_signature
 from backend.cli.tui.constants import _tui_logger
 from backend.cli.tui.dialogs import (  # noqa: F401
-    ConfirmWidget,
-    GrintaAddMCPDialog,
-    GrintaAddSkillDialog,
-    GrintaConfirmDialog,
+    GrintaManageMCPDialog,
+    GrintaManageSkillsDialog,
 )
 from backend.cli.tui.widgets.collapsible import CollapsibleSection, SidebarRow
 from backend.cli.tui.widgets.small import (
@@ -46,22 +43,6 @@ class ScreenSettingsMixin:
         self._hud.update_mcp_servers(count_user_visible_mcp_servers(self._config))
         self._render_hud_bar()
         self._refresh_sidebar()
-
-    def _highlight_sidebar_item(self, section_id: str, item_id: str) -> None:
-        try:
-            section = self.query_one(section_id, CollapsibleSection)
-            for row in section.query('.sidebar-item-row'):
-                if getattr(row, 'item_id', None) == item_id:
-                    row.add_class('-highlight')
-                    self.set_timer(2.0, lambda r=row: r.remove_class('-highlight'))
-                    break
-        except Exception:
-            pass
-
-    def _existing_mcp_server_names(self) -> set[str]:
-        from backend.cli.settings import get_mcp_servers
-
-        return {str(s.get('name') or '') for s in get_mcp_servers(self._config)}
 
     def on_focus(self, event: events.Focus) -> None:
         if event.control and event.control.id == 'input':
@@ -365,12 +346,6 @@ class ScreenSettingsMixin:
                 severity='info',
                 timeout=2.5,
             )
-        elif item_id.startswith('mcp:'):
-            mcp_name = item_id.split(':', 1)[1]
-            self.run_worker(self._open_mcp_editor(mcp_name), exclusive=True)
-        elif item_id.startswith('skill:'):
-            skill_name = item_id.split(':', 1)[1]
-            self.run_worker(self._open_skill_editor(skill_name), exclusive=True)
 
     def on_sidebar_row_toggle_requested(self, event: Any) -> None:
         if not isinstance(event, SidebarRow.ToggleRequested) or not event.item_id:
@@ -378,18 +353,6 @@ class ScreenSettingsMixin:
         if event.item_id.startswith('mcp:'):
             mcp_name = event.item_id.split(':', 1)[1]
             self.run_worker(self._toggle_mcp_server(mcp_name), exclusive=True)
-
-    async def on_sidebar_row_delete_requested(self, event: Any) -> None:
-        """Handle SidebarRow delete events."""
-        if not isinstance(event, SidebarRow.DeleteRequested) or not event.item_id:
-            return
-        item_id = event.item_id
-        if item_id.startswith('skill:'):
-            skill_name = item_id[6:]
-            self.run_worker(self._confirm_delete_skill(skill_name), exclusive=True)
-        elif item_id.startswith('mcp:'):
-            mcp_name = item_id.split(':', 1)[1]
-            self.run_worker(self._confirm_delete_mcp(mcp_name), exclusive=True)
 
     async def _toggle_mcp_server(self, name: str) -> None:
         from backend.cli.settings import get_mcp_server, set_mcp_server_enabled
@@ -417,252 +380,26 @@ class ScreenSettingsMixin:
         state = 'enabled' if enabled else 'disabled'
         self.notify(f'MCP {name}: {state}', severity='information', timeout=2.0)
 
-    async def _open_mcp_editor(self, name: str) -> None:
-        from backend.cli.settings import (
-            get_mcp_server,
-            mcp_server_endpoint,
-            update_mcp_server,
-        )
-        from backend.core.config import load_app_config
-
-        self._config = load_app_config()
-        server = get_mcp_server(self._config, name)
-        if server is None:
-            self.notify(
-                f'MCP server not found: {name}', severity='warning', timeout=2.5
-            )
-            return
-        result = await self.app.push_screen_wait(
-            GrintaAddMCPDialog(
-                existing_names=self._existing_mcp_server_names(),
-                edit_name=name,
-                edit_command=mcp_server_endpoint(server),
-            )
-        )
-        if not result:
-            return
-        try:
-            update_mcp_server(
-                name,
-                command=result['command'],
-                config=self._config,
-            )
-        except Exception as exc:
-            self.notify(
-                f'Failed to update MCP server: {exc}',
-                severity='error',
-                timeout=3.0,
-            )
-            return
-        self._reload_mcp_config_and_refresh_sidebar()
-        self.notify(f'MCP server updated: {name}', severity='information', timeout=2.0)
-
-    async def _open_skill_editor(self, name: str) -> None:
-        from backend.cli.event_rendering.sidebar import is_user_skill
-
-        stem = name.removesuffix('.md')
-        skill_path = Path.home() / '.grinta' / 'skills' / f'{stem}.md'
-        read_only = not is_user_skill(stem)
-        content = ''
-        if read_only:
-            import backend
-
-            playbook_path = (
-                Path(backend.__file__).resolve().parent  # noqa: ASYNC240
-                / 'playbooks'
-                / f'{stem}.md'
-            )
-            try:
-                content = playbook_path.read_text(encoding='utf-8')
-            except OSError:
-                self.notify(
-                    f'Built-in playbook not found: {stem}.md',
-                    severity='warning',
-                    timeout=2.5,
-                )
-                return
-        else:
-            try:
-                content = skill_path.read_text(encoding='utf-8')
-            except OSError:
-                self.notify(
-                    f'Custom skill not found: {stem}.md',
-                    severity='warning',
-                    timeout=2.5,
-                )
-                return
-
-        result = await self.app.push_screen_wait(
-            GrintaAddSkillDialog(
-                edit_name=stem,
-                edit_content=content,
-                read_only=read_only,
-            )
-        )
-        if not result or read_only:
-            return
-        await self._save_skill_content(stem, result['content'])
-
-    async def _save_skill_content(self, name: str, content: str) -> None:
-        import asyncio
-
-        await asyncio.to_thread(self._save_skill_content_sync, name, content)
-        self._refresh_sidebar()
-        self.notify(f'Skill updated: {name}.md', severity='information', timeout=2.0)
-
-    def _save_skill_content_sync(self, name: str, content: str) -> None:
-        skills_dir = Path.home() / '.grinta' / 'skills'
-        skills_dir.mkdir(parents=True, exist_ok=True)
-        stem = name.removesuffix('.md')
-        skill_path = skills_dir / f'{stem}.md'
-        skill_path.write_text(content, encoding='utf-8')
-
-    async def _confirm_delete_skill(self, skill_name: str) -> None:
-        from backend.cli.event_rendering.sidebar import is_user_skill
-
-        if not is_user_skill(skill_name):
-            self.notify(
-                f'Built-in playbook {skill_name}.md cannot be removed.',
-                severity='warning',
-                timeout=2.5,
-            )
-            return
-
-        widget = self.query_one('#confirm-widget', ConfirmWidget)
-        widget.configure_prompt(
-            f'Remove custom skill [white]{skill_name}.md[/]?',
-            [('cancel', 'Cancel'), ('delete', 'Remove')],
-            recommended=1,
-        )
-        widget.show()
-        try:
-            result = await widget.wait_for_decision()
-        finally:
-            widget.hide()
-        if result == 'delete':
-            await self._delete_skill(skill_name)
-
-    async def _confirm_delete_mcp(self, mcp_name: str) -> None:
-        result = await self.app.push_screen_wait(
-            GrintaConfirmDialog(
-                title='Delete MCP Server',
-                body=f"Are you sure you want to remove the server '{mcp_name}'?",
-                options=[('cancel', 'Cancel'), ('delete', 'Remove')],
-            )
-        )
-        if result == 'delete':
-            await self._delete_mcp_server(mcp_name)
-
-    def _delete_skill_sync(self, name: str) -> None:
-        """Synchronous skill deletion - used internally by _delete_skill()."""
-        if not name.endswith('.md'):
-            name += '.md'
-        skill_path = Path.home() / '.grinta' / 'skills' / name
-        try:
-            if skill_path.exists():
-                skill_path.unlink()
-                self.notify(f'Skill deleted: {name}', severity='information')
-            else:
-                self.notify(f'Skill not found: {name}', severity='warning')
-        except Exception as e:
-            self.notify(f'Failed to delete skill: {e}', severity='error')
-
-    async def _delete_skill(self, name: str) -> None:
-        """Delete a skill file, offloaded to a thread pool."""
-        import asyncio
-
-        await asyncio.to_thread(self._delete_skill_sync, name)
-        self._refresh_sidebar()
-
-    def _delete_mcp_server_sync(self, name: str) -> None:
-        """Synchronous MCP server deletion - used internally by _delete_mcp_server()."""
-        from backend.integrations.mcp.native_backends import is_user_visible_mcp_server
-
-        if not is_user_visible_mcp_server(name):
-            self.notify(
-                f"'{name}' is a bundled internal backend and cannot be removed.",
-                severity='warning',
-            )
-            return
-        from backend.cli.settings import remove_mcp_server
-
-        try:
-            remove_mcp_server(name)
-            self.notify(f'MCP Server removed: {name}', severity='information')
-        except Exception as e:
-            self.notify(f'Failed to remove MCP server: {e}', severity='error')
-
-    async def _delete_mcp_server(self, name: str) -> None:
-        """Delete an MCP server, offloaded to a thread pool."""
-        import asyncio
-
-        await asyncio.to_thread(self._delete_mcp_server_sync, name)
-        self._reload_mcp_config_and_refresh_sidebar()
-
     @work
     async def on_collapsible_section_action_clicked(self, event: Any) -> None:
-        """Handle [+] Add clicks on sidebar sections."""
+        """Open manage dialogs from sidebar section headers."""
         if not event.control:
             return
 
+        from backend.core.config import load_app_config
+
         if event.control.id == 'sidebar-skills':
-            result = await self.app.push_screen_wait(GrintaAddSkillDialog())
-            if result:
-                await self._create_skill(result['name'], result['content'])
-                self._highlight_sidebar_item(
-                    '#sidebar-skills', f'skill:{result["name"]}'
-                )
-                self.notify(
-                    f'Added skill {result["name"]}.md · Enter edit · Del remove',
-                    severity='information',
-                    timeout=3.0,
-                )
+            changed = await self.app.push_screen_wait(GrintaManageSkillsDialog())
+            if changed:
+                self._refresh_sidebar()
+                self.notify('Skills updated', severity='information', timeout=2.0)
         elif event.control.id == 'sidebar-mcp':
-            result = await self.app.push_screen_wait(
-                GrintaAddMCPDialog(existing_names=self._existing_mcp_server_names())
+            self._config = load_app_config()
+            changed = await self.app.push_screen_wait(
+                GrintaManageMCPDialog(self._config)
             )
-            if result:
-                await self._add_mcp_server(result['name'], result['command'])
-                self._highlight_sidebar_item('#sidebar-mcp', f'mcp:{result["name"]}')
+            if changed:
+                self._reload_mcp_config_and_refresh_sidebar()
                 self.notify(
-                    f'Added MCP {result["name"]} · Enter edit · Del remove',
-                    severity='information',
-                    timeout=3.0,
+                    'MCP servers updated', severity='information', timeout=2.0
                 )
-
-    def _create_skill_sync(self, name: str, content: str) -> None:
-        """Synchronous skill creation - used internally by _create_skill()."""
-        skills_dir = Path.home() / '.grinta' / 'skills'
-        skills_dir.mkdir(parents=True, exist_ok=True)
-        if not name.endswith('.md'):
-            name += '.md'
-        skill_path = skills_dir / name
-        try:
-            skill_path.write_text(content, encoding='utf-8')
-            self.notify(f'Skill created: {name}', severity='information')
-        except Exception as e:
-            self.notify(f'Failed to create skill: {e}', severity='error')
-
-    async def _create_skill(self, name: str, content: str) -> None:
-        """Create a skill file, offloaded to a thread pool."""
-        import asyncio
-
-        await asyncio.to_thread(self._create_skill_sync, name, content)
-        self._refresh_sidebar()
-
-    def _add_mcp_server_sync(self, name: str, command: str) -> None:
-        """Synchronous MCP server addition - used internally by _add_mcp_server()."""
-        from backend.cli.settings import add_mcp_server
-
-        try:
-            add_mcp_server(name, command=command)
-            self.notify(f'MCP Server added: {name}', severity='information')
-        except Exception as e:
-            self.notify(f'Failed to add MCP server: {e}', severity='error')
-
-    async def _add_mcp_server(self, name: str, command: str) -> None:
-        """Add an MCP server, offloaded to a thread pool."""
-        import asyncio
-
-        await asyncio.to_thread(self._add_mcp_server_sync, name, command)
-        self._reload_mcp_config_and_refresh_sidebar()

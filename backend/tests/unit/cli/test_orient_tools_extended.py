@@ -21,6 +21,12 @@ from backend.cli.tool_display.orient_tools import (
     grep_action_model,
     lsp_action_model,
     lsp_result,
+    memory_persist_action_model,
+    memory_persist_observation_model,
+    memory_persist_result,
+    memory_recall_action_model,
+    memory_recall_observation_model,
+    memory_recall_result,
     mcp_action_model,
     mcp_result,
     read_symbols_action_model,
@@ -144,3 +150,62 @@ def test_orient_line_with_result_on_mcp_models() -> None:
     )
     updated = pending.with_result('3 results')
     assert updated.result == '3 results'
+
+
+def test_memory_recall_orient_models() -> None:
+    action = memory_recall_action_model(
+        SimpleNamespace(query='workspace conventions')
+    )
+    assert action.tool == 'memory'
+    assert action.verb == 'Recalled'
+    assert 'workspace conventions' in action.target
+    assert action.area == 'workspace'
+
+    with_hits = memory_recall_observation_model(
+        SimpleNamespace(
+            query='workspace conventions',
+            hits=[{'excerpt': 'a'}, {'excerpt': 'b'}],
+            content='2 results',
+        ),
+        action,
+    )
+    assert with_hits.result == '2 hits'
+
+    empty = memory_recall_observation_model(
+        SimpleNamespace(
+            query='missing',
+            hits=[],
+            content='No indexed memory results found for query: missing',
+        )
+    )
+    assert empty.result == 'no hits'
+
+
+def test_memory_persist_orient_models() -> None:
+    action = memory_persist_action_model(
+        SimpleNamespace(key='run-tests', kind='command', value='pytest -q')
+    )
+    assert action.verb == 'Persisted'
+    assert 'command' in action.target
+    assert 'run-tests' in action.target
+
+    saved = memory_persist_observation_model(
+        SimpleNamespace(
+            key='run-tests',
+            kind='command',
+            inserted=True,
+            content='Stored workspace memory entry.',
+        ),
+        action,
+    )
+    assert saved.result == 'saved'
+
+    updated = memory_persist_observation_model(
+        SimpleNamespace(
+            key='run-tests',
+            kind='command',
+            inserted=False,
+            content='Updated existing entry.',
+        )
+    )
+    assert memory_persist_result(updated) == 'updated'

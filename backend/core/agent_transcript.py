@@ -15,6 +15,7 @@ _LOCK = threading.Lock()
 _TRANSCRIPT_PATH: str | None = None
 _TRANSCRIPT_STREAM: TextIO | None = None
 _LAST_WRITTEN_KEYS: set[tuple[str, int | None]] = set()
+_LAST_STREAM_FINAL_CONTENT: str = ''
 
 
 def _now_stamp() -> str:
@@ -27,7 +28,7 @@ def _event_suffix(event_id: int | None) -> str:
 
 def bind_agent_transcript(session_log_dir: str) -> None:
     """Open or rotate ``agent_transcript.log`` for the active session."""
-    global _TRANSCRIPT_PATH, _TRANSCRIPT_STREAM, _LAST_WRITTEN_KEYS
+    global _TRANSCRIPT_PATH, _TRANSCRIPT_STREAM, _LAST_WRITTEN_KEYS, _LAST_STREAM_FINAL_CONTENT
     path = os.path.join(session_log_dir, 'agent_transcript.log')
     with _LOCK:
         close_agent_transcript_unlocked()
@@ -42,10 +43,11 @@ def bind_agent_transcript(session_log_dir: str) -> None:
         _TRANSCRIPT_PATH = path
         _TRANSCRIPT_STREAM = stream
         _LAST_WRITTEN_KEYS = set()
+        _LAST_STREAM_FINAL_CONTENT = ''
 
 
 def close_agent_transcript_unlocked() -> None:
-    global _TRANSCRIPT_PATH, _TRANSCRIPT_STREAM, _LAST_WRITTEN_KEYS
+    global _TRANSCRIPT_PATH, _TRANSCRIPT_STREAM, _LAST_WRITTEN_KEYS, _LAST_STREAM_FINAL_CONTENT
     if _TRANSCRIPT_STREAM is not None:
         try:
             _TRANSCRIPT_STREAM.flush()
@@ -55,6 +57,13 @@ def close_agent_transcript_unlocked() -> None:
     _TRANSCRIPT_STREAM = None
     _TRANSCRIPT_PATH = None
     _LAST_WRITTEN_KEYS = set()
+    _LAST_STREAM_FINAL_CONTENT = ''
+
+
+def _normalize_transcript_content(text: str) -> str:
+    from backend.cli.event_rendering.text_utils import sanitize_visible_transcript_text
+
+    return sanitize_visible_transcript_text(text or '').strip()
 
 
 def close_agent_transcript() -> None:
@@ -79,6 +88,9 @@ def _write_block(kind: str, body: str, *, event_id: int | None = None) -> None:
 
 
 def record_user_message(content: str, *, event_id: int | None = None) -> None:
+    global _LAST_STREAM_FINAL_CONTENT
+    with _LOCK:
+        _LAST_STREAM_FINAL_CONTENT = ''
     _write_block('USER', content, event_id=event_id)
 
 
@@ -90,6 +102,13 @@ def record_agent_message(
     final_response: bool = False,
     tool_step: bool = False,
 ) -> None:
+    global _LAST_STREAM_FINAL_CONTENT
+    normalized_content = _normalize_transcript_content(content)
+    if final_response and normalized_content:
+        with _LOCK:
+            if normalized_content == _LAST_STREAM_FINAL_CONTENT:
+                _LAST_STREAM_FINAL_CONTENT = ''
+                return
     parts: list[str] = []
     if content.strip():
         parts.append(content.strip())
@@ -113,6 +132,11 @@ def record_stream_final(
     event_id: int | None = None,
     suppress_live_response: bool = False,
 ) -> None:
+    global _LAST_STREAM_FINAL_CONTENT
+    normalized_accumulated = _normalize_transcript_content(accumulated)
+    if normalized_accumulated:
+        with _LOCK:
+            _LAST_STREAM_FINAL_CONTENT = normalized_accumulated
     parts: list[str] = []
     if accumulated.strip():
         parts.append(accumulated.strip())

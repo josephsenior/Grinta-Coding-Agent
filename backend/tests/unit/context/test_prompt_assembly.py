@@ -117,6 +117,10 @@ class TestHasWorkspaceContent:
         ri = RuntimeInfo(date='2025-01-01')
         assert _has_workspace_content(None, ri, '', None, [])
 
+    def test_runtime_working_dir(self):
+        ri = RuntimeInfo(date='', working_dir='/tmp/project')
+        assert _has_workspace_content(None, ri, '', None, [])
+
     def test_instructions(self):
         assert _has_workspace_content(None, RuntimeInfo(date=''), 'do stuff', None, [])
 
@@ -168,9 +172,26 @@ class TestProcessRecallObservation:
             repo_instructions='',
             conversation_instructions='',
             playbook_knowledge=[],
+            working_dir='',
         )
         cfg = _agent_config()
         assert process_recall_observation(obs, 0, [], cfg, _prompt_manager()) == []
+
+    def test_workspace_with_only_working_dir_emits_message(self):
+        obs = _make_obs(
+            repo_name='',
+            repo_directory='',
+            runtime_hosts={},
+            date='',
+            custom_secrets_descriptions={},
+            repo_instructions='',
+            conversation_instructions='',
+            playbook_knowledge=[],
+            working_dir='/tmp/project',
+        )
+        cfg = _agent_config()
+        msgs = process_recall_observation(obs, 0, [], cfg, _prompt_manager())
+        assert msgs
 
 
 # ── filter_agents_in_playbook_obs ────────────────────────────────────

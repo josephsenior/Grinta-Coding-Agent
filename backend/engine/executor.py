@@ -155,6 +155,15 @@ class OrchestratorExecutor(
         actions = self._without_blank_agent_messages(
             self._response_to_actions(response)
         )
+        if response is not None and event_stream is not None:
+            from backend.engine.executor_response_helpers import (
+                suppress_cli_for_streamed_final_messages,
+            )
+
+            suppress_cli_for_streamed_final_messages(
+                actions,
+                streamed_visible_text=self._extract_response_text(response),
+            )
         # Commit only after the model response has been converted into durable
         # actions. If conversion fails, the WAL remains as an explicit recovery
         # fence instead of making an incomplete turn look successful.
@@ -207,6 +216,14 @@ class OrchestratorExecutor(
         execution_time = time.time() - start_time
         actions = self._without_blank_agent_messages(
             self._response_to_actions(response)
+        )
+        from backend.engine.executor_response_helpers import (
+            suppress_cli_for_streamed_final_messages,
+        )
+
+        suppress_cli_for_streamed_final_messages(
+            actions,
+            streamed_visible_text=state.content_accumulate,
         )
         return ExecutionResult(actions, response, execution_time, error_message)
 

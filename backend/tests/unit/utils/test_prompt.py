@@ -59,6 +59,31 @@ class TestPromptManager:
         )
         assert 'The current working directory is /tmp/grinta_project' in ctx
         assert 'relative' in ctx.lower()
+
+    def test_build_workspace_context_notes_bare_workspace(self, prompt_dir):
+        from backend.utils.prompt import RuntimeInfo
+
+        pm = PromptManager(prompt_dir)
+        ctx = pm.build_workspace_context(
+            None,
+            RuntimeInfo(date='2026-01-01', working_dir='/tmp/grinta_project'),
+            None,
+        )
+        assert 'plain local workspace' in ctx
+
+    def test_build_workspace_context_omits_bare_note_with_repo_instructions(
+        self, prompt_dir
+    ):
+        from backend.utils.prompt import RuntimeInfo
+
+        pm = PromptManager(prompt_dir)
+        ctx = pm.build_workspace_context(
+            None,
+            RuntimeInfo(date='2026-01-01', working_dir='/tmp/grinta_project'),
+            None,
+            repo_instructions='Follow the house style.',
+        )
+        assert 'plain local workspace' not in ctx
         assert 'does not list project files' in ctx
         assert 'glob' in ctx
 

@@ -377,7 +377,9 @@ async def _preprocess_event_async(
     if isinstance(event, StreamingChunkAction):
         if getattr(event, 'is_tool_call', False):
             return
-        text = getattr(event, 'accumulated', '') or ''
+        normalize = getattr(orch, '_normalize_final_response_text', None)
+        raw = getattr(event, 'accumulated', '') or ''
+        text = normalize(raw) if callable(normalize) else raw
         if text.strip():
             from backend.cli.tui.renderer.prep import prep_streaming_response_async
 
