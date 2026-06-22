@@ -237,43 +237,49 @@ SidebarRow.-read-only:hover {
     color: #969aad;
 }
 
-CollapsibleSection Button.sidebar-manage-btn {
+SidebarManageButton {
     dock: right;
+    width: auto;
     height: 1;
     min-height: 1;
     min-width: 0;
     padding: 0 1;
     margin: 0 0 0 1;
-    border: round #26324f;
-    background: #0a1324;
+    content-align: center middle;
     text-style: none;
     color: #6f83aa;
+    background: transparent;
+    border: none;
 }
 
-CollapsibleSection Button.sidebar-manage-btn.-mcp {
-    border: round #3d3528;
+SidebarManageButton:hover {
+    color: #91abec;
+    background: #101c36;
+}
+
+SidebarManageButton:focus {
+    color: #c8d4e8;
+    background: #0e1a30;
+}
+
+SidebarManageButton.-mcp {
     color: #b89a6a;
-    background: #12100c;
 }
 
-CollapsibleSection Button.sidebar-manage-btn.-mcp:hover,
-CollapsibleSection Button.sidebar-manage-btn.-mcp:focus {
-    background: #1a1610;
+SidebarManageButton.-mcp:hover,
+SidebarManageButton.-mcp:focus {
     color: #eacb8a;
-    border: round #eacb8a;
+    background: #1a1610;
 }
 
-CollapsibleSection Button.sidebar-manage-btn.-skill {
-    border: round #352a45;
+SidebarManageButton.-skill {
     color: #a88fd4;
-    background: #100c16;
 }
 
-CollapsibleSection Button.sidebar-manage-btn.-skill:hover,
-CollapsibleSection Button.sidebar-manage-btn.-skill:focus {
-    background: #181024;
+SidebarManageButton.-skill:hover,
+SidebarManageButton.-skill:focus {
     color: #c792ea;
-    border: round #c792ea;
+    background: #181024;
 }
 
 GrintaManageMCPDialog > #dialog-container,

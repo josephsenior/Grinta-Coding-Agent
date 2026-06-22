@@ -201,20 +201,10 @@ def load_sidebar_skill_items() -> list[
     user_names = set(_load_user_skills())
     items: list[tuple[str, str, bool, str, str | None, bool, dict[str, Any]]] = []
     for skill in sorted(playbook_names | user_names):
-        if skill in user_names:
-            items.append((skill, f'skill:{skill}', False, 'info', None, False, {}))
-        else:
-            items.append(
-                (
-                    skill,
-                    f'skill:{skill}',
-                    False,
-                    'neutral',
-                    None,
-                    False,
-                    {'view_only': True},
-                )
-            )
+        options: dict[str, Any] = {}
+        if skill not in user_names:
+            options['view_only'] = True
+        items.append((skill, f'skill:{skill}', False, 'skill', None, False, options))
     return items
 
 

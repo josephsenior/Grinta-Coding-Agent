@@ -83,7 +83,7 @@ def _discovery_decision_table(
     lines.extend(
         [
             '- Directed exploration (1–3 targeted searches): use `grep`, `glob`, or `find_symbols` directly',
-            '- Broader multi-location exploration: batch parallel searches in one turn before widening scope',
+            '- Broader multi-location exploration: search multiple independent locations before widening scope',
         ]
     )
     if lsp_available:
@@ -156,17 +156,6 @@ def _path_uncertainty_hint(
     if shell_is_powershell:
         return f'When paths are uncertain: use {explore}; PowerShell rules in `<SHELL_IDENTITY>`.'
     return f'When paths are uncertain: use {explore}; see `<SHELL_IDENTITY>`.'
-
-
-def _routing_tool_batching_paragraph(function_calling_mode: str | None) -> str:
-    _ = function_calling_mode
-    return (
-        'You may batch independent read-only discovery (`grep`, `glob`, `find_symbols`, '
-        '`read` line ranges, `analyze_project_structure`, `lsp`) in one turn when they '
-        'improve latency. Dependent edits and runs must remain sequential. '
-        'Start bounded: files_with_matches before content, line ranges before whole files; '
-        'paginate with head_limit/offset instead of unbounded scans.'
-    )
 
 
 def _routing_memory_tool_placeholders(

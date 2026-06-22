@@ -8,7 +8,7 @@ Documents and guards Grinta's contract across providers:
   Anthropic SDK routes (different wire protocols; Anthropic still supports parallel
   tool *use* via multiple ``tool_use`` blocks).
 * ``_provider_parallel_tool_calls_supported`` (prompt builder) mirrors catalog only.
-* ``_render_system_capabilities`` gates the user-facing ENABLED/DISABLED line.
+* ``_render_system_capabilities`` omits the parallel line unless scheduling and provider both allow it.
 
 If you change sanitization or catalog defaults, update this module alongside
 ``docs/`` or provider catalog files.
@@ -156,7 +156,7 @@ def test_provider_parallel_tool_calls_supported_matrix(
     (
         'parallel_cfg',
         'provider_flag',
-        'expect_parallel_visible',
+        'expect_parallel_line',
     ),
     [
         pytest.param(True, True, True, id='all_gates_on'),
@@ -167,7 +167,7 @@ def test_provider_parallel_tool_calls_supported_matrix(
 def test_system_capabilities_parallel_scheduling_line_matrix(
     parallel_cfg: bool,
     provider_flag: bool,
-    expect_parallel_visible: bool,
+    expect_parallel_line: bool,
 ) -> None:
     cfg = SimpleNamespace(
         enable_parallel_tool_scheduling=parallel_cfg,
@@ -180,15 +180,15 @@ def test_system_capabilities_parallel_scheduling_line_matrix(
         function_calling_mode='native',
         parallel_tool_calls_provider_flag=provider_flag,
     )
-    if expect_parallel_visible:
-        assert 'ENABLED for read-only batches' in text
+    if expect_parallel_line:
+        assert 'Parallel tool calls' in text
+        assert 'supported' in text
     else:
-        assert 'ENABLED for read-only batches' not in text
-        assert 'Parallel tool scheduling' not in text
+        assert 'Parallel tool calls' not in text
 
 
 def test_system_capabilities_parallel_native_all_on_renders_enabled() -> None:
-    """Explicit happy path: ENABLED substring must appear."""
+    """Explicit happy path: parallel line must appear."""
     cfg = SimpleNamespace(
         enable_parallel_tool_scheduling=True,
         enable_checkpoints=False,
@@ -200,6 +200,5 @@ def test_system_capabilities_parallel_native_all_on_renders_enabled() -> None:
         function_calling_mode='native',
         parallel_tool_calls_provider_flag=True,
     )
-    assert 'Parallel tool scheduling' in text
-    assert 'ENABLED for read-only batches' in text
-    assert '`read`' in text and '`grep`' in text
+    assert 'Parallel tool calls' in text
+    assert 'supported' in text

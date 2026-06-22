@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 from rich.console import Console as RichConsole
-from textual.widgets import Button
 
 from backend.cli.display.hud import HUDBar
 from backend.cli.display.reasoning_display import ReasoningDisplay
@@ -13,6 +12,7 @@ from backend.cli.tui.main import GrintaTUIApp
 from backend.cli.tui.widgets.collapsible import (
     CollapsibleSection,
     McpServerRow,
+    SidebarManageButton,
     SidebarRow,
 )
 from backend.tests.unit.cli.tui._shared import _get_screen
@@ -35,7 +35,7 @@ def test_collapsible_make_row_routes_mcp_and_skill_rows() -> None:
         'label': 'my-skill',
         'item_id': 'skill:my-skill',
         'deletable': True,
-        'status': 'info',
+        'status': 'skill',
         'meta': None,
         'interactive': True,
         'toggleable': False,
@@ -57,10 +57,10 @@ async def test_collapsible_manage_button_is_rendered(mock_config) -> None:
         screen = _get_screen(app)
         mcp_section = screen.query_one('#sidebar-mcp', CollapsibleSection)
         skills_section = screen.query_one('#sidebar-skills', CollapsibleSection)
-        mcp_manage = mcp_section.query_one('#action-btn', Button)
-        skills_manage = skills_section.query_one('#action-btn', Button)
-        assert str(mcp_manage.label) == '⚙ Edit'
-        assert str(skills_manage.label) == '✦ Edit'
+        mcp_manage = mcp_section.query_one('#action-btn', SidebarManageButton)
+        skills_manage = skills_section.query_one('#action-btn', SidebarManageButton)
+        assert str(mcp_manage.renderable) == 'Edit'
+        assert str(skills_manage.renderable) == 'Edit'
         assert '-mcp' in mcp_manage.classes
         assert '-skill' in skills_manage.classes
 

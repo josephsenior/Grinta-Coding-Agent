@@ -27,10 +27,9 @@
 <EXECUTION_DISCIPLINE>
 Loop: reason clearly → use tools → advance.
 **Output bounds:** Start narrow — `files_with_matches` before `content`, line ranges before whole files, targeted `glob`/`find_symbols` before repo-wide scans. Paginate with `head_limit`/`offset`; do not pull unbounded output into context.
-**Re-read policy:** Do not re-read a file you just wrote in the same turn **except** when grounding **tests or public API contracts** against that same file (see rule 8 in `<CRITICAL_TOOL_EXECUTION_RULES>`).
+**Re-read policy:** Do not re-read a file you just wrote in the same turn **except** when grounding **tests or public API contracts** against that same file (see rule 8 in `<CRITICAL_TOOL_EXECUTION_RULES>`), or when an edit observation includes `[EDIT_DIFF_TRUNCATED]` / `[EDIT_OBSERVATION_TRUNCATED]` — follow that observation footer.
 **Priorities:** SECURITY > CORRECTNESS > EFFICIENCY > SIMPLICITY.
 **Batching:** {batch_commands}
-{tool_call_batching_mode}
 </EXECUTION_DISCIPLINE>
 
 <SECURITY>

@@ -13,7 +13,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Horizontal, Vertical
 from textual.message import Message
-from textual.widgets import Button, Static, Switch
+from textual.widgets import Static, Switch
 
 STATUS_COLORS = {
     'ok': '#54efae',
@@ -22,6 +22,7 @@ STATUS_COLORS = {
     'info': '#91abec',
     'neutral': '#969aad',
     'running': '#5eead4',
+    'skill': '#c792ea',
 }
 
 STATUS_ICONS = {
@@ -98,6 +99,8 @@ class SidebarRow(Static):
     def _bullet_color(self) -> str:
         if self._disabled:
             return '#54597b'
+        if self._status == 'skill':
+            return STATUS_COLORS['skill']
         if self.view_only:
             return '#8b95a8'
         if not self.interactive:
@@ -105,6 +108,8 @@ class SidebarRow(Static):
         return STATUS_COLORS.get(self._status, '#969aad')
 
     def _bullet_glyph(self) -> str:
+        if self._status == 'skill' and not self._disabled:
+            return SIDEBAR_BULLET
         if self._disabled or self.view_only:
             return SIDEBAR_BULLET_DIM
         return SIDEBAR_BULLET
@@ -203,8 +208,8 @@ class McpServerRow(Horizontal):
         color: #54597b;
     }
     McpServerRow Switch.-on .switch--slider {
-        background: #15274d;
-        color: #5eead4;
+        background: #0f2a22;
+        color: #54efae;
     }
     McpServerRow Switch:focus {
         border: none;
@@ -251,6 +256,75 @@ class McpServerRow(Horizontal):
             return
         self.post_message(SidebarRow.ToggleRequested(self.item_id))
         event.stop()
+
+
+class SidebarManageButton(Static):
+    """Compact header action chip — avoids Textual Button's multi-row tall borders."""
+
+    class Pressed(Message):
+        """Posted when the manage chip is activated."""
+
+        def __init__(self, control: 'SidebarManageButton') -> None:
+            super().__init__()
+            self._control = control
+
+        @property
+        def control(self) -> 'SidebarManageButton':
+            return self._control
+
+    DEFAULT_CSS = """
+    SidebarManageButton {
+        dock: right;
+        width: auto;
+        height: 1;
+        min-height: 1;
+        min-width: 0;
+        padding: 0 1;
+        margin: 0 0 0 1;
+        content-align: center middle;
+        text-style: none;
+        color: #6f83aa;
+        background: transparent;
+        border: none;
+    }
+    SidebarManageButton:hover {
+        color: #91abec;
+        background: #101c36;
+    }
+    SidebarManageButton:focus {
+        color: #c8d4e8;
+        background: #0e1a30;
+    }
+    SidebarManageButton.-mcp {
+        color: #b89a6a;
+    }
+    SidebarManageButton.-mcp:hover,
+    SidebarManageButton.-mcp:focus {
+        color: #eacb8a;
+        background: #1a1610;
+    }
+    SidebarManageButton.-skill {
+        color: #a88fd4;
+    }
+    SidebarManageButton.-skill:hover,
+    SidebarManageButton.-skill:focus {
+        color: #c792ea;
+        background: #181024;
+    }
+    """
+
+    def __init__(self, label: str, *, classes: str = '', id: str | None = None) -> None:
+        super().__init__(label, classes=classes, id=id)
+        self.can_focus = True
+
+    def on_click(self, event: events.Click) -> None:
+        event.stop()
+        self.post_message(self.Pressed(self))
+
+    def on_key(self, event: events.Key) -> None:
+        if event.key in ('enter', 'space'):
+            event.stop()
+            self.post_message(self.Pressed(self))
 
 
 class CollapsibleSection(Container):
@@ -301,41 +375,6 @@ class CollapsibleSection(Container):
     }
     CollapsibleSection .collapsible-header.expanded {
         color: #c8d4e8;
-    }
-    CollapsibleSection .sidebar-manage-btn {
-        dock: right;
-        height: 1;
-        min-height: 1;
-        min-width: 0;
-        width: auto;
-        padding: 0 1;
-        margin: 0 0 0 1;
-        border: round #26324f;
-        background: #0a1324;
-        text-style: none;
-        color: #6f83aa;
-    }
-    CollapsibleSection .sidebar-manage-btn.-mcp {
-        border: round #3d3528;
-        color: #b89a6a;
-        background: #12100c;
-    }
-    CollapsibleSection .sidebar-manage-btn.-mcp:hover,
-    CollapsibleSection .sidebar-manage-btn.-mcp:focus {
-        background: #1a1610;
-        color: #eacb8a;
-        border: round #eacb8a;
-    }
-    CollapsibleSection .sidebar-manage-btn.-skill {
-        border: round #352a45;
-        color: #a88fd4;
-        background: #100c16;
-    }
-    CollapsibleSection .sidebar-manage-btn.-skill:hover,
-    CollapsibleSection .sidebar-manage-btn.-skill:focus {
-        background: #181024;
-        color: #c792ea;
-        border: round #c792ea;
     }
     CollapsibleSection .collapsible-body {
         width: 100%;
@@ -463,10 +502,10 @@ class CollapsibleSection(Container):
                 ),
             )
             if self._action_label:
-                btn_classes = 'sidebar-manage-btn'
+                btn_classes = ''
                 if self._action_button_class:
-                    btn_classes = f'{btn_classes} {self._action_button_class}'
-                yield Button(
+                    btn_classes = self._action_button_class
+                yield SidebarManageButton(
                     self._action_label,
                     id='action-btn',
                     classes=btn_classes,
@@ -515,8 +554,8 @@ class CollapsibleSection(Container):
         if self._action_label:
             self.post_message(self.ActionClicked(self))
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == 'action-btn':
+    def on_sidebar_manage_button_pressed(self, event: SidebarManageButton.Pressed) -> None:
+        if event.control.id == 'action-btn':
             self.post_message(self.ActionClicked(self))
             event.stop()
 

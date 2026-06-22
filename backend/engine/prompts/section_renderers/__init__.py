@@ -48,7 +48,6 @@ from backend.engine.prompts.section_renderers._env_hints import (
     _path_uncertainty_hint,
     _repo_discovery_contract,
     _routing_memory_tool_placeholders,
-    _routing_tool_batching_paragraph,
 )
 from backend.engine.prompts.section_renderers._examples import _render_examples
 from backend.engine.prompts.section_renderers._interaction import (
@@ -99,5 +98,4 @@ __all__ = [
     '_repo_discovery_contract',
     '_resolve_terminal_command_tool',
     '_routing_memory_tool_placeholders',
-    '_routing_tool_batching_paragraph',
 ]
