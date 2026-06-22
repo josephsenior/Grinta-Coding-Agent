@@ -6,8 +6,8 @@ from backend.core.errors import (
     AgentRuntimeDisconnectedError,
     AgentRuntimeError,
     LLMContextWindowExceedError,
+    LLMNoResponseError,
 )
-from backend.core.errors import LLMNoResponseError
 from backend.inference.exceptions import (
     APIConnectionError,
     AuthenticationError,
@@ -198,7 +198,9 @@ def observation_skips_circuit_breaker(obs: object) -> bool:
     return error_id in GUARD_CIRCUIT_BREAKER_ERROR_IDS
 
 
-def format_exception(exc, hard_stop_exceptions, rate_limited_exceptions, transient_exceptions):
+def format_exception(
+    exc, hard_stop_exceptions, rate_limited_exceptions, transient_exceptions
+):
     """Format an exception into (text, error_id, notify_ui_only)."""
     notify_ui_only = exception_is_notify_ui_only(
         exc, hard_stop_exceptions, rate_limited_exceptions, transient_exceptions

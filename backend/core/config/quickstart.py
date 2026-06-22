@@ -23,6 +23,7 @@ from pathlib import Path
 
 from backend.core.config.dotenv_keys import persist_llm_api_key_to_dotenv
 from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
+from backend.inference.provider_resolver import discover_all_local_models
 
 
 def generate_quickstart_config(
@@ -62,8 +63,6 @@ def _interactive_init(dest: Path) -> None:
 
     # 1. Detect local models
     print('\n🔍 Scanning for local LLMs (Ollama, LM Studio, etc.)...')
-    from backend.inference.provider_resolver import discover_all_local_models
-
     local_models = discover_all_local_models()
     suggested_model = 'gemini-2.5-flash'
 

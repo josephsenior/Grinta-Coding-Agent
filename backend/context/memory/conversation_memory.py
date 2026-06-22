@@ -971,19 +971,18 @@ class ContextMemory:
             encoded_content: list[TextContent | ImageContent]
             tool_result = getattr(obs, 'tool_result', None)
             if isinstance(tool_result, dict):
-                import json
+                from backend.inference.tool_support.tool_result_format import (
+                    encode_tool_result_payload,
+                )
 
-                payload = json.dumps(
+                payload = encode_tool_result_payload(
+                    tool_name,
                     {
                         'message': _json_safe_tool_message_content(message),
                         'tool_result': tool_result,
                     },
-                    ensure_ascii=False,
-                    separators=(',', ':'),
                 )
-                encoded_content = [
-                    TextContent(text=payload)
-                ]
+                encoded_content = [TextContent(text=payload)]
             else:
                 encoded_content = message.content
             tool_call_id_to_message[tool_call_metadata.tool_call_id] = Message(

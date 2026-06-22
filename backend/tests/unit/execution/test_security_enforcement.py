@@ -247,7 +247,10 @@ class TestEnforceSecurity:
 
         assert result is not None
         assert result.__class__.__name__ == 'ErrorObservation'
-        assert 'Action blocked by hardened_local policy (background disabled)' in result.content
+        assert (
+            'Action blocked by hardened_local policy (background disabled)'
+            in result.content
+        )
 
     def test_sandboxed_local_reuses_hardened_local_command_policy(self):
         from backend.ledger.action import CmdRunAction
@@ -263,7 +266,10 @@ class TestEnforceSecurity:
 
         assert result is not None
         assert result.__class__.__name__ == 'ErrorObservation'
-        assert 'Action blocked by hardened_local policy (network not allowed)' in result.content
+        assert (
+            'Action blocked by hardened_local policy (network not allowed)'
+            in result.content
+        )
 
     def test_hardened_local_blocks_network_commands(self):
         from backend.ledger.action import CmdRunAction
@@ -279,7 +285,10 @@ class TestEnforceSecurity:
 
         assert result is not None
         assert result.__class__.__name__ == 'ErrorObservation'
-        assert 'Action blocked by hardened_local policy (network not allowed)' in result.content
+        assert (
+            'Action blocked by hardened_local policy (network not allowed)'
+            in result.content
+        )
 
     def test_hardened_local_blocks_package_installs(self):
         from backend.ledger.action import CmdRunAction
@@ -295,7 +304,10 @@ class TestEnforceSecurity:
 
         assert result is not None
         assert result.__class__.__name__ == 'ErrorObservation'
-        assert 'Action blocked by hardened_local policy (package install not allowed)' in result.content
+        assert (
+            'Action blocked by hardened_local policy (package install not allowed)'
+            in result.content
+        )
         from backend.ledger.action import FileReadAction
 
         rt = _FakeRuntime(
@@ -309,7 +321,9 @@ class TestEnforceSecurity:
 
         assert result is not None
         assert result.__class__.__name__ == 'ErrorObservation'
-        assert 'Action blocked by hardened_local policy (sensitive path)' in result.content
+        assert (
+            'Action blocked by hardened_local policy (sensitive path)' in result.content
+        )
 
     def test_hardened_local_allows_git_subcommand_in_workspace_allowlist(self):
         from backend.ledger.action import CmdRunAction
@@ -341,7 +355,10 @@ class TestEnforceSecurity:
         result = rt._enforce_security(action)
 
         assert result is not None
-        assert 'Action blocked by hardened_local policy (outside workspace)' in result.content
+        assert (
+            'Action blocked by hardened_local policy (outside workspace)'
+            in result.content
+        )
 
     def test_hardened_local_allows_package_command_from_allowlist(self):
         from backend.ledger.action import CmdRunAction
@@ -374,4 +391,7 @@ class TestEnforceSecurity:
         result = rt._enforce_security(action)
 
         assert result is not None
-        assert 'Action blocked by hardened_local policy (network not allowed)' in result.content
+        assert (
+            'Action blocked by hardened_local policy (network not allowed)'
+            in result.content
+        )

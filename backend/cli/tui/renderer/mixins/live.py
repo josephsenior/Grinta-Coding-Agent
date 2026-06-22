@@ -214,7 +214,9 @@ class RendererLiveMixin:
         if not should_follow and in_place_update:
             anchor_scroll_y = float(display.scroll_y)
         self._apply_live_response_render(text)
-        if anchor_scroll_y is not None and getattr(display, '_user_scrolled_away', False):
+        if anchor_scroll_y is not None and getattr(
+            display, '_user_scrolled_away', False
+        ):
 
             def _restore_scroll_anchor() -> None:
                 if not getattr(display, '_user_scrolled_away', False):

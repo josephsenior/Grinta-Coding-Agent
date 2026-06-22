@@ -104,9 +104,7 @@ class TestValidateStatusCallbacks:
         runtime = MagicMock(spec=[])
         controller = MagicMock(spec=[])
 
-        with patch(
-            'backend.app.agent_control_loop.logger.warning'
-        ) as warning:
+        with patch('backend.app.agent_control_loop.logger.warning') as warning:
             _validate_status_callbacks(runtime, controller)
 
         warning.assert_not_called()

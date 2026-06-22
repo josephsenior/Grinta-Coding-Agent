@@ -427,7 +427,9 @@ async def test_tui_sidebar_rows_expose_delete_for_mcp_and_skills(
         renderer._refresh_display()
 
         skill_items = renderer._build_skills_sidebar_items()
-        bundled_items = [item for item in skill_items if item[0] == 'skill-b' and not item[2]]
+        bundled_items = [
+            item for item in skill_items if item[0] == 'skill-b' and not item[2]
+        ]
         assert len(bundled_items) == 1
 
         rows = list(s.query('.sidebar-item-row'))
@@ -1054,8 +1056,10 @@ async def test_tui_browser_screenshot_merges_with_action_card(mock_config):
         cards = list(s.query(BrowserCard).results())
         assert len(cards) >= 1, f'Expected >=1 BrowserCard, got {len(cards)}'
         assert any(
-            'navigate' in str(c._line_text()) or 'captured' in str(c._line_text())
-            or 'navigate' in str(c._delta_text()) or 'captured' in str(c._delta_text())
+            'navigate' in str(c._line_text())
+            or 'captured' in str(c._line_text())
+            or 'navigate' in str(c._delta_text())
+            or 'captured' in str(c._delta_text())
             for c in cards
         )
 
@@ -1094,6 +1098,7 @@ async def test_tui_final_stream_and_message_action_do_not_duplicate(mock_config)
 
         assert renderer._last_final_response_text == 'Final answer.'
         from backend.cli.tui.widgets.activity_card import AgentMessage
+
         msgs = list(s.query(AgentMessage).results())
         assert len(msgs) == 1
 
@@ -1135,7 +1140,9 @@ async def test_tui_final_stream_commits_response(mock_config):
 
         assert renderer._last_final_response_text == 'Plain preview.'
         assert renderer._live_response == ''
-        assert len(renderer._history) == 1  # suppressed message should not add to history
+        assert (
+            len(renderer._history) == 1
+        )  # suppressed message should not add to history
 
 
 @pytest.mark.asyncio
@@ -1182,6 +1189,7 @@ async def test_tui_final_stream_empty_accumulated_commits_live_response(mock_con
         assert renderer._last_final_response_text == 'Live content preview.'
         assert renderer._live_response == ''
         from backend.cli.tui.widgets.activity_card import AgentMessage
+
         msgs = list(s.query(AgentMessage).results())
         assert len(msgs) >= 1
 
@@ -1871,12 +1879,17 @@ async def test_tui_compaction_status_renders_persistent_card(mock_config):
 
         orient_lines = s.query(OrientLine).results()
         compaction_orient = [
-            line for line in orient_lines
+            line
+            for line in orient_lines
             if 'Compacting' in str(line.query_one('#orient-content').renderable)
         ]
         assert len(compaction_orient) == 1
-        assert 'Compacting (1st)' in str(compaction_orient[0].query_one('#orient-content').renderable)
-        assert 'context' in str(compaction_orient[0].query_one('#orient-content').renderable)
+        assert 'Compacting (1st)' in str(
+            compaction_orient[0].query_one('#orient-content').renderable
+        )
+        assert 'context' in str(
+            compaction_orient[0].query_one('#orient-content').renderable
+        )
         assert renderer._compaction_transcript_active is True
         assert renderer._condensation_count == 1
 
@@ -1916,7 +1929,8 @@ async def test_tui_condensation_request_reuses_status_card(mock_config):
 
         orient_lines = s.query(OrientLine).results()
         compaction_orient = [
-            line for line in orient_lines
+            line
+            for line in orient_lines
             if 'Compacting' in str(line.query_one('#orient-content').renderable)
             or 'Compacted' in str(line.query_one('#orient-content').renderable)
         ]
@@ -1971,6 +1985,7 @@ async def test_tui_final_stream_and_normalized_message_do_not_duplicate(mock_con
         assert 'Final answer.' in renderer._last_final_response_text
         assert '<function name="read">' in renderer._last_final_response_text
         from backend.cli.tui.widgets.activity_card import AgentMessage
+
         msgs = list(s.query(AgentMessage).results())
         assert len(msgs) >= 2
 
@@ -2738,6 +2753,7 @@ async def test_tui_debugger_events_render_terminal_style_card(mock_config, monke
         await pilot.pause()
         s = _get_screen(app)
         from backend.cli.tui.app import TUIRenderer
+
         return
         from backend.ledger.action.debugger import DebuggerAction
         from backend.ledger.observation.debugger import DebuggerObservation

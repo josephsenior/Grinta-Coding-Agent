@@ -324,10 +324,7 @@ class TestEditFunction:
         f.write_text('content')
         result = editor.edit_function(str(f), 'func', 'body')
         assert result.success is False
-        assert (
-            'tree-sitter' in result.message.lower()
-            or 'source code' in result.message.lower()
-        )
+        assert 'unsupported file type' in result.message.lower()
 
 
 # ---------------------------------------------------------------------------

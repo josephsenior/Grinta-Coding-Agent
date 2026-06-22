@@ -155,16 +155,15 @@ class TestPreserveExistingHook:
     def test_shutil_raises_oserror(self):
         runtime = _FakeGitRuntime()
         with patch(
-            'backend.execution.runtime_mixins.git_setup.shutil.move', side_effect=OSError('fail')
+            'backend.execution.runtime_mixins.git_setup.shutil.move',
+            side_effect=OSError('fail'),
         ):
             assert runtime._preserve_existing_hook('.git/hooks/pre-commit') is False
 
     def test_chmod_fails_after_move(self):
         runtime = _FakeGitRuntime()
         runtime._run_results = [
-            CmdOutputObservation(
-                content='chmod failed', command='chmod', exit_code=1
-            ),
+            CmdOutputObservation(content='chmod failed', command='chmod', exit_code=1),
         ]
         with (
             patch('backend.execution.runtime_mixins.git_setup.shutil.move'),
@@ -292,9 +291,7 @@ class TestMaybeSetupGitHooks:
             content='#!/bin/bash'
         )
         runtime._run_results = [
-            CmdOutputObservation(
-                content='chmod failed', command='chmod', exit_code=1
-            ),
+            CmdOutputObservation(content='chmod failed', command='chmod', exit_code=1),
         ]
         with patch('backend.execution.runtime_mixins.git_setup.OS_CAPS') as caps:
             caps.is_windows = False
@@ -348,7 +345,8 @@ class TestMaybeSetupGitHooks:
             CmdOutputObservation(content='', command='chmod', exit_code=0),
         ]
         with patch(
-            'backend.execution.runtime_mixins.git_setup.shutil.move', side_effect=OSError('fail')
+            'backend.execution.runtime_mixins.git_setup.shutil.move',
+            side_effect=OSError('fail'),
         ):
             runtime.maybe_setup_git_hooks()
         # Should return early if preserve fails
@@ -424,7 +422,8 @@ async def test_clone_or_init_no_repo_with_init():
     runtime = _FakeGitRuntime()
     runtime.config.init_git_in_empty_workspace = True
     with patch(
-        'backend.execution.runtime_mixins.git_setup.call_sync_from_async', new_callable=AsyncMock
+        'backend.execution.runtime_mixins.git_setup.call_sync_from_async',
+        new_callable=AsyncMock,
     ):
         result = await runtime.clone_or_init_repo(None, None, None)
     assert result == ''
@@ -447,7 +446,8 @@ async def test_clone_or_init_with_branch():
         return_value='https://git.example.com/owner/repo.git'
     )
     with patch(
-        'backend.execution.runtime_mixins.git_setup.call_sync_from_async', new_callable=AsyncMock
+        'backend.execution.runtime_mixins.git_setup.call_sync_from_async',
+        new_callable=AsyncMock,
     ):
         result = await runtime.clone_or_init_repo(None, 'owner/repo', 'main')
     assert result == 'repo'
@@ -460,7 +460,8 @@ async def test_clone_or_init_no_branch():
         return_value='https://git.example.com/owner/MyRepo.git'
     )
     with patch(
-        'backend.execution.runtime_mixins.git_setup.call_sync_from_async', new_callable=AsyncMock
+        'backend.execution.runtime_mixins.git_setup.call_sync_from_async',
+        new_callable=AsyncMock,
     ) as mock_call:
         result = await runtime.clone_or_init_repo(None, 'owner/MyRepo', None)
     assert result == 'myrepo'
@@ -476,7 +477,8 @@ async def test_clone_or_init_with_status_callback():
     )
     runtime.status_callback = MagicMock()
     with patch(
-        'backend.execution.runtime_mixins.git_setup.call_sync_from_async', new_callable=AsyncMock
+        'backend.execution.runtime_mixins.git_setup.call_sync_from_async',
+        new_callable=AsyncMock,
     ):
         result = await runtime.clone_or_init_repo(None, 'owner/repo', 'main')
     assert result == 'repo'

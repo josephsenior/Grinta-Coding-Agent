@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
 # ── helpers ────────────────────────────────────────────────────────────
 
+
 def _truncate(text: str, max_len: int = 80) -> str:
     t = text.strip()
     if len(t) <= max_len:
@@ -47,7 +48,11 @@ def _extract_syntax_error(content: str) -> str | None:
     if '<SYNTAX_CHECK_FAILED>' not in content:
         return None
     start = content.index('<SYNTAX_CHECK_FAILED>') + len('<SYNTAX_CHECK_FAILED>')
-    end = content.index('</SYNTAX_CHECK_FAILED>', start) if '</SYNTAX_CHECK_FAILED>' in content[start:] else len(content)
+    end = (
+        content.index('</SYNTAX_CHECK_FAILED>', start)
+        if '</SYNTAX_CHECK_FAILED>' in content[start:]
+        else len(content)
+    )
     return content[start:end].strip() or None
 
 
@@ -110,6 +115,7 @@ def _scan_label_with_icon(label: str) -> str:
 
 # ── AgentMessageCard ───────────────────────────────────────────────────
 
+
 class AgentMessageCard(ScanLineCard):
     """1-line agent message summary — full markdown in detail screen."""
 
@@ -138,6 +144,7 @@ class AgentMessageCard(ScanLineCard):
 
 
 # ── EditCard ───────────────────────────────────────────────────────────
+
 
 class EditCard(ScanLineCard):
     """1-line file edit summary — full diff in detail screen.
@@ -202,9 +209,7 @@ class EditCard(ScanLineCard):
     def _line_text(self) -> str:
         verb = 'Created' if self._is_create else 'Edited'
         path = _compact_path(self._display_path)
-        return self._scan_summary_line(
-            _scan_label_with_icon(verb), path, detail_max=40
-        )
+        return self._scan_summary_line(_scan_label_with_icon(verb), path, detail_max=40)
 
     def _delta_text(self) -> str:
         parts: list[str] = []
@@ -238,6 +243,7 @@ class EditCard(ScanLineCard):
 
 
 # ── ShellCard ──────────────────────────────────────────────────────────
+
 
 class ShellCard(ScanLineCard):
     """1-line shell command summary — full output in detail screen."""
@@ -311,6 +317,7 @@ class ShellCard(ScanLineCard):
 
 
 # ── TerminalCard ───────────────────────────────────────────────────────
+
 
 class TerminalCard(ScanLineCard):
     """1-line terminal interaction — one card per agent command.
@@ -389,6 +396,7 @@ class TerminalCard(ScanLineCard):
 
 # ── BrowserCard ────────────────────────────────────────────────────────
 
+
 class BrowserCard(ScanLineCard):
     """1-line browser action summary — full URL + actions in detail."""
 
@@ -458,6 +466,7 @@ class BrowserCard(ScanLineCard):
 
 # ── DebuggerCard ───────────────────────────────────────────────────────
 
+
 class DebuggerCard(ScanLineCard):
     """1-line debugger state summary — stack + locals in detail."""
 
@@ -522,6 +531,7 @@ class DebuggerCard(ScanLineCard):
 
 # ── DelegateCard ───────────────────────────────────────────────────────
 
+
 class DelegateCard(ScanLineCard):
     """1-line delegated worker summary — full result in detail screen."""
 
@@ -584,6 +594,7 @@ class DelegateCard(ScanLineCard):
 
 
 # ── MCPCard ────────────────────────────────────────────────────────────
+
 
 class MCPCard(ScanLineCard):
     """1-line MCP tool call — arguments + result in detail screen."""
@@ -666,6 +677,7 @@ class MCPCard(ScanLineCard):
 
 
 # ── PayloadCard ────────────────────────────────────────────────────────
+
 
 class PayloadCard(ScanLineCard):
     """Generic artifact row (thinking code/tool/shared payloads)."""

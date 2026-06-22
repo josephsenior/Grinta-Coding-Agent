@@ -231,7 +231,9 @@ def _resolve_replay_response_id(
             return raw.strip()
 
     tool_metadata = getattr(action, 'tool_call_metadata', None)
-    tool_call_id = getattr(tool_metadata, 'tool_call_id', None) if tool_metadata else None
+    tool_call_id = (
+        getattr(tool_metadata, 'tool_call_id', None) if tool_metadata else None
+    )
     if isinstance(tool_call_id, str) and tool_call_id.strip():
         return f'grinta-synthetic-replay:{tool_call_id.strip()}'
     return None
@@ -279,7 +281,9 @@ def _role_from_assistant_message(
     return cast(Literal['user', 'system', 'assistant', 'tool'], role_value)
 
 
-def _reasoning_content_for_tool_replay(action: Action, assistant_msg: Any) -> str | None:
+def _reasoning_content_for_tool_replay(
+    action: Action, assistant_msg: Any
+) -> str | None:
     """Preserve reasoning traces when replaying tool-call assistant turns."""
     reasoning = getattr(assistant_msg, 'reasoning_content', None)
     if isinstance(reasoning, str) and reasoning.strip():

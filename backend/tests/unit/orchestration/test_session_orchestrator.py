@@ -424,24 +424,18 @@ class TestLogging(unittest.TestCase):
     def setUp(self):
         self.ctrl = _make_controller()
 
-    @patch(
-        'backend.orchestration.mixins.action_mixin.logger'
-    )
+    @patch('backend.orchestration.mixins.action_mixin.logger')
     def test_log_info(self, mock_logger):
         self.ctrl.log('info', 'Hello')
         mock_logger.info.assert_called_once()
 
-    @patch(
-        'backend.orchestration.mixins.action_mixin.logger'
-    )
+    @patch('backend.orchestration.mixins.action_mixin.logger')
     def test_log_includes_session_id(self, mock_logger):
         self.ctrl.log('debug', 'Testing')
         call_kwargs = mock_logger.debug.call_args
         self.assertIn('session_id', call_kwargs.kwargs.get('extra', {}))
 
-    @patch(
-        'backend.orchestration.mixins.action_mixin.logger'
-    )
+    @patch('backend.orchestration.mixins.action_mixin.logger')
     def test_log_merges_extra(self, mock_logger):
         self.ctrl.log('warning', 'Alert', extra={'custom_key': 'val'})
         call_kwargs = mock_logger.warning.call_args
@@ -868,8 +862,8 @@ class TestFirstUserMessage(unittest.TestCase):
         msg.source = EventSource.USER
         orig_isinstance = builtins.isinstance
         builtins.isinstance = lambda o, c: (
-            c is MessageAction and o is msg
-        ) or orig_isinstance(o, c)
+            (c is MessageAction and o is msg) or orig_isinstance(o, c)
+        )
         try:
             result = self.ctrl._first_user_message([msg])
         finally:

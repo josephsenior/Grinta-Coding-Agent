@@ -187,9 +187,7 @@ def _load_user_skills() -> list[str]:
         if not root.is_dir():
             return []
         return [
-            p.stem
-            for p in root.iterdir()
-            if p.is_file() and p.suffix.lower() == '.md'
+            p.stem for p in root.iterdir() if p.is_file() and p.suffix.lower() == '.md'
         ]
     except OSError:
         return []
@@ -200,7 +198,9 @@ def load_sidebar_skills() -> list[str]:
     return sorted({*_load_playbook_skills(), *_load_user_skills()})
 
 
-def load_sidebar_skill_items() -> list[tuple[str, str, bool, str, str | None, bool, dict[str, Any]]]:
+def load_sidebar_skill_items() -> list[
+    tuple[str, str, bool, str, str | None, bool, dict[str, Any]]
+]:
     """Sidebar rows for bundled and custom skills."""
     playbook_names = set(_load_playbook_skills())
     user_names = set(_load_user_skills())

@@ -674,7 +674,10 @@ class RecoveryService:
         from backend.orchestration.services.error_formatting import format_exception
 
         return format_exception(
-            exc, _HARD_STOP_EXCEPTIONS, _RATE_LIMITED_EXCEPTIONS, _TRANSIENT_LLM_INFRA_EXCEPTIONS
+            exc,
+            _HARD_STOP_EXCEPTIONS,
+            _RATE_LIMITED_EXCEPTIONS,
+            _TRANSIENT_LLM_INFRA_EXCEPTIONS,
         )
 
 

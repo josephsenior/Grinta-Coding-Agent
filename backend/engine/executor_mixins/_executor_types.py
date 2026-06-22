@@ -83,4 +83,6 @@ class _FunctionCallingProxy:
             setattr(self.module, key, value)
 
 
-orchestrator_function_calling = _FunctionCallingProxy('backend.engine.function_calling.dispatch')
+orchestrator_function_calling = _FunctionCallingProxy(
+    'backend.engine.function_calling.dispatch'
+)

@@ -273,9 +273,7 @@ def _handle_undo_last_edit_tool(arguments: Mapping[str, Any]) -> Action:
     path = str(require_tool_argument(arguments, 'path', UNDO_LAST_EDIT_TOOL_NAME))
     safe_path = _safe_workspace_path(path)
     if not safe_path.is_file():
-        raise FunctionCallValidationError(
-            f"File '{path}' does not exist."
-        )
+        raise FunctionCallValidationError(f"File '{path}' does not exist.")
     return FileEditAction(
         path=_relative_display_path(safe_path),
         command='undo_last_edit',

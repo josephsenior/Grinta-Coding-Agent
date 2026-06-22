@@ -304,9 +304,7 @@ class ContextPipelineCompactionMixin(ContextPipelineGatesMixin):
             keep_first=0,
         )
         try:
-            compactor = StructuredSummaryCompactor.from_config(
-                cfg, self._llm_registry
-            )
+            compactor = StructuredSummaryCompactor.from_config(cfg, self._llm_registry)
         except ValueError as exc:
             logger.warning('ContextPipeline: structured compactor unavailable: %s', exc)
             return None

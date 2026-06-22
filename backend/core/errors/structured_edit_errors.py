@@ -58,6 +58,9 @@ def compact_syntax_detail(message: str) -> str:
     text = text.replace('File has syntax errors.', '')
     text = text.replace('INTRODUCED_SYNTAX_ERROR:', '').strip()
     lines = [line.strip() for line in text.splitlines() if line.strip()]
+    for line in lines:
+        if line.startswith(('SyntaxError:', 'IndentationError:', 'TabError:')):
+            return line
     return lines[0] if lines else text[:240]
 
 
@@ -231,7 +234,9 @@ def normalize_edit_exception(
     command: str,
 ) -> tuple[str, dict[str, Any]]:
     if isinstance(exc, ToolExecutionError) and exc.context:
-        return str(exc).strip(), build_edit_error_tool_result(dict(exc.context), operation=command)
+        return str(exc).strip(), build_edit_error_tool_result(
+            dict(exc.context), operation=command
+        )
 
     if isinstance(exc, FunctionCallValidationError):
         context = parse_validation_error(str(exc), payload)
@@ -402,7 +407,11 @@ def format_read_symbols_failure_message(
 ) -> str:
     if len(failed) == 1 and total == 1:
         item = failed[0]
-        lines = [str(item.get('message') or 'read_symbols failed.').split('\n', maxsplit=1)[0]]
+        lines = [
+            str(item.get('message') or 'read_symbols failed.').split('\n', maxsplit=1)[
+                0
+            ]
+        ]
         symbol = item.get('symbol_name') or item.get('target')
         if symbol:
             lines.append(f'Symbol: {symbol}')

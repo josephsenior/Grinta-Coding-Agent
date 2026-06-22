@@ -26,7 +26,8 @@ def test_logger_init_json_and_file(tmp_path):
         # Mock dependencies for log shipping
         mock_shipper = MagicMock()
         with patch(
-            'backend.core.logging.log_shipping.get_log_shipper', return_value=mock_shipper
+            'backend.core.logging.log_shipping.get_log_shipper',
+            return_value=mock_shipper,
         ):
             with patch('backend.core.logging.logger.LOG_DIR', log_dir):
                 import backend.core.constants as constants_mod

@@ -131,6 +131,7 @@ def _process_tool_call_metadata(value: Any) -> Any:
 
     # Cannot recover – return None but log so we can track occurrences.
     import logging
+
     logging.getLogger(__name__).warning(
         'tool_call_metadata deserialization failed; value=%r', value
     )

@@ -519,9 +519,7 @@ def _interactive_shell_argv(
         if resolved_tools.has_bash:
             bash_info = resolved_tools.get_tool_info('bash')
             exe = (
-                bash_info.path
-                if bash_info and bash_info.path
-                else shutil.which('bash')
+                bash_info.path if bash_info and bash_info.path else shutil.which('bash')
             )
             if exe:
                 return [exe, '--norc', '--noprofile', '-i']
@@ -544,9 +542,7 @@ def _try_create_interactive_session(
     **session_kwargs: Any,
 ) -> UnifiedShellSession | None:
     argv = (
-        _interactive_shell_argv(resolved_tools)
-        if resolved_tools is not None
-        else None
+        _interactive_shell_argv(resolved_tools) if resolved_tools is not None else None
     )
     if argv is not None:
         session_kwargs = {**session_kwargs, 'shell_argv': argv}

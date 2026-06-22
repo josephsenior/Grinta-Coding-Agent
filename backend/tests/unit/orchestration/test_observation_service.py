@@ -48,10 +48,8 @@ def _make_pending_service(action=None) -> MagicMock:
 
     svc.peek_for_cause.side_effect = _peek_for_cause
     svc.pop_for_cause.return_value = action
-    svc.has_outstanding_for_cause.side_effect = (
-        lambda cause: cause is not None
-        and action_id is not None
-        and int(cause) == action_id
+    svc.has_outstanding_for_cause.side_effect = lambda cause: (
+        cause is not None and action_id is not None and int(cause) == action_id
     )
     svc.set = MagicMock()
     return svc

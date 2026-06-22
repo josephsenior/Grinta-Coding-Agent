@@ -57,10 +57,19 @@ def _clear_observation_content(event: Event) -> Event:
 
 # Keywords that indicate important content worth preserving
 _IMPORTANT_CONTENT_KEYWORDS: tuple[str, ...] = (
-    'failed', 'error', 'traceback', 'exception',
-    'passed', 'failed', 'assert', 'pytest',
-    'exit code', 'exit_code', 'fatal',
-    'warning', 'deprecated',
+    'failed',
+    'error',
+    'traceback',
+    'exception',
+    'passed',
+    'failed',
+    'assert',
+    'pytest',
+    'exit code',
+    'exit_code',
+    'fatal',
+    'warning',
+    'deprecated',
 )
 
 # Minimum content size below which clearing is not worth the risk

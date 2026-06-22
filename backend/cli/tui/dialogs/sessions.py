@@ -173,9 +173,7 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
     async def _delete_sessions_on_mount(self, targets: list[str]) -> None:
         """Async wrapper for session deletion during on_mount."""
         deleted, errors = await self._delete_sessions(targets)
-        self._set_feedback(
-            f'Deleted {deleted} session(s). {" ".join(errors)}'.strip()
-        )
+        self._set_feedback(f'Deleted {deleted} session(s). {" ".join(errors)}'.strip())
         self._refresh_table()
 
     def action_refresh(self) -> None:
@@ -419,4 +417,5 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
     async def _delete_sessions(self, targets: list[str]) -> tuple[int, list[str]]:
         """Delete sessions, offloaded to a thread pool to avoid blocking the event loop."""
         import asyncio
+
         return await asyncio.to_thread(self._delete_sessions_sync, targets)

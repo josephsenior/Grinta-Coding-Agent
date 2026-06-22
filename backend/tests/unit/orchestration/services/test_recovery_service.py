@@ -217,7 +217,9 @@ class TestRecoveryService:
         ctrl.circuit_breaker_service.record_error.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_internal_server_error_skips_circuit_breaker(self, mock_context, ctrl):
+    async def test_internal_server_error_skips_circuit_breaker(
+        self, mock_context, ctrl
+    ):
         ctrl.retry_service.schedule_retry_after_failure = AsyncMock(return_value=True)
         svc = RecoveryService(mock_context)
         await svc.react_to_exception(InternalServerError('upstream 500'))

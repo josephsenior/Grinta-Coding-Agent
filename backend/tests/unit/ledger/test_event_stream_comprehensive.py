@@ -109,7 +109,7 @@ class TestEventStreamInit:
     ):
         agent_root = tmp_path / 'agent-state'
         monkeypatch.setattr(
-            'backend.ledger.stream.workspace_agent_state_dir',
+            'backend.ledger.stream.event_stream.workspace_agent_state_dir',
             lambda: agent_root,
         )
 

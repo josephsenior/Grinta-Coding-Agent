@@ -10,7 +10,6 @@ from textual.containers import Container, Horizontal
 from textual.widgets import Static
 
 if TYPE_CHECKING:
-
     from backend.cli.tui.screens.detail.base import DetailScreen
 
 
@@ -121,7 +120,9 @@ class ScanLineCard(Container):
     @property
     def state_border_color(self) -> str:
         """Left-pipe color for the current card state."""
-        return SCAN_LINE_BORDER_COLORS.get(self._state, SCAN_LINE_BORDER_COLORS['queued'])
+        return SCAN_LINE_BORDER_COLORS.get(
+            self._state, SCAN_LINE_BORDER_COLORS['queued']
+        )
 
     def _scan_summary_line(
         self,

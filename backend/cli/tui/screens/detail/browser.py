@@ -68,14 +68,13 @@ class BrowserDetailScreen(DetailScreen):
             widgets.extend(
                 self.section(
                     f'Links ({len(self._links)})',
-                    *[
-                        self.list_row(f'→ [#91abec]{link}[/]')
-                        for link in self._links
-                    ],
+                    *[self.list_row(f'→ [#91abec]{link}[/]') for link in self._links],
                 )
             )
 
         if not widgets:
-            widgets.append(self.empty_state('(no browser data)', widget_id='browser-empty'))
+            widgets.append(
+                self.empty_state('(no browser data)', widget_id='browser-empty')
+            )
 
         return widgets

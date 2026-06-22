@@ -27,10 +27,8 @@ def _executor_for_workspace(root: Path) -> SimpleNamespace:
     ex._terminal_read_cursor = {}
     ex._workspace_root = lambda: root.resolve()
     ex._is_workspace_restricted_profile = lambda: True
-    ex._resolve_effective_cwd = (
-        lambda requested_cwd, base_cwd=None: h.resolve_effective_cwd(
-            ex, requested_cwd, base_cwd
-        )
+    ex._resolve_effective_cwd = lambda requested_cwd, base_cwd=None: (
+        h.resolve_effective_cwd(ex, requested_cwd, base_cwd)
     )
     ex._clear_terminal_read_cursor = MagicMock()
     ex._normalize_terminal_command = h.normalize_terminal_command

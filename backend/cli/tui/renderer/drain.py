@@ -446,7 +446,7 @@ async def drain_events_async(orch: 'RendererEventProcessorMixin') -> None:
     last_streaming_only = False
     if not getattr(orch, '_debug_drain_seen', False):
         setattr(orch, '_debug_drain_seen', True)
-        #region agent log
+        # region agent log
         _agent_debug_log(
             run_id='pre-fix',
             hypothesis_id='H3',
@@ -454,7 +454,7 @@ async def drain_events_async(orch: 'RendererEventProcessorMixin') -> None:
             message='drain instrumentation active',
             data={'pendingDepth': int(len(getattr(orch, '_pending_events', [])))},
         )
-        #endregion
+        # endregion
 
     try:
         while True:
@@ -470,7 +470,7 @@ async def drain_events_async(orch: 'RendererEventProcessorMixin') -> None:
             last_batch = events
             last_streaming_only = streaming_only
             if dropped or len(events) >= 20:
-                #region agent log
+                # region agent log
                 _agent_debug_log(
                     run_id='pre-fix',
                     hypothesis_id='H3',
@@ -482,14 +482,14 @@ async def drain_events_async(orch: 'RendererEventProcessorMixin') -> None:
                         'streamingOnly': bool(streaming_only),
                     },
                 )
-                #endregion
+                # endregion
 
             processed = await _process_events_with_frame_budget(orch, events)
             if processed < len(events):
                 remainder = events[processed:]
                 with orch._pending_lock:
                     orch._pending_events.extendleft(reversed(remainder))
-                #region agent log
+                # region agent log
                 _agent_debug_log(
                     run_id='pre-fix',
                     hypothesis_id='H3',
@@ -501,7 +501,7 @@ async def drain_events_async(orch: 'RendererEventProcessorMixin') -> None:
                         'remainder': int(len(remainder)),
                     },
                 )
-                #endregion
+                # endregion
 
             has_pending = False
             with orch._pending_lock:
@@ -527,7 +527,7 @@ async def drain_events_async(orch: 'RendererEventProcessorMixin') -> None:
 
             elapsed = time.monotonic() - invocation_started
             if elapsed >= _TUI_DRAIN_INVOCATION_BUDGET_SECONDS:
-                #region agent log
+                # region agent log
                 _agent_debug_log(
                     run_id='pre-fix',
                     hypothesis_id='H3',
@@ -538,7 +538,7 @@ async def drain_events_async(orch: 'RendererEventProcessorMixin') -> None:
                         'pendingDepth': int(len(getattr(orch, '_pending_events', []))),
                     },
                 )
-                #endregion
+                # endregion
                 _force_immediate_drain(orch)
                 break
 
@@ -566,7 +566,7 @@ async def drain_events_async(orch: 'RendererEventProcessorMixin') -> None:
         last_streaming_only,
     )
     if pending_depth >= _TUI_BACKPRESSURE_PENDING_THRESHOLD:
-        #region agent log
+        # region agent log
         _agent_debug_log(
             run_id='pre-fix',
             hypothesis_id='H3',
@@ -580,7 +580,7 @@ async def drain_events_async(orch: 'RendererEventProcessorMixin') -> None:
                 'streamingOnly': bool(last_streaming_only),
             },
         )
-        #endregion
+        # endregion
     if pending_depth and requested_while_active:
         _force_immediate_drain(orch)
 

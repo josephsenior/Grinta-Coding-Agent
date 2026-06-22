@@ -184,7 +184,9 @@ class TestColoredFormatter:
         assert 'AGENT_START' in output
 
     def test_error_format_includes_location(self, monkeypatch):
-        monkeypatch.setattr('backend.core.logging.log_formatters.LOG_COLORS', {'ERROR': 'red'})
+        monkeypatch.setattr(
+            'backend.core.logging.log_formatters.LOG_COLORS', {'ERROR': 'red'}
+        )
         monkeypatch.setattr('backend.core.constants.DISABLE_COLOR_PRINTING', False)
         monkeypatch.setattr(
             'backend.core.logging.log_formatters.colored', lambda text, _c: text

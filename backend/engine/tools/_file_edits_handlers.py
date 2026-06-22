@@ -128,9 +128,7 @@ def _handle_create_symbol_public(arguments: Mapping[str, Any]) -> Action:
 
 def _handle_create_tool(arguments: Mapping[str, Any]) -> Action:
     validate_security_risk(arguments, CREATE_TOOL_NAME)
-    create_type = (
-        str(arguments.get('type', '') or '').strip().lower()
-    )
+    create_type = str(arguments.get('type', '') or '').strip().lower()
     if not create_type:
         create_type = 'symbol' if arguments.get('target_symbol') else 'file'
     normalized_args = dict(arguments)
@@ -267,7 +265,9 @@ def _select_and_validate_symbol(
         )
 
         _multi_edit_raise(
-            symbol_ambiguity_summary(symbol_name, candidates).split('\n', maxsplit=1)[0],
+            symbol_ambiguity_summary(symbol_name, candidates).split('\n', maxsplit=1)[
+                0
+            ],
             error_code='SYMBOL_AMBIGUOUS',
             path=path,
             operation='edit_symbol',

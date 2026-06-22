@@ -196,17 +196,21 @@ def _normalize_tool_message(
     if isinstance(tool_call_id, str) and tool_call_id in known_tool_ids:
         result_content: list[dict[str, Any]] = []
         if content.strip():
-            result_content.append({
-                'type': 'tool_result',
-                'tool_use_id': tool_call_id,
-                'content': content,
-            })
+            result_content.append(
+                {
+                    'type': 'tool_result',
+                    'tool_use_id': tool_call_id,
+                    'content': content,
+                }
+            )
         else:
-            result_content.append({
-                'type': 'tool_result',
-                'tool_use_id': tool_call_id,
-                'content': f'[{label} completed]',
-            })
+            result_content.append(
+                {
+                    'type': 'tool_result',
+                    'tool_use_id': tool_call_id,
+                    'content': f'[{label} completed]',
+                }
+            )
         return {
             'role': 'user',
             'content': result_content,

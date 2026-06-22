@@ -334,10 +334,10 @@ def render_markdown_summary(comparison: list[dict[str, Any]]) -> str:
     for row in comparison:
         metrics = row.get('summary_metrics', {})
         lines.append(
-            f"| {row['agent_id']} | {row['overall_score']:.2f} | {row['success_rate']:.2f}% "
-            f"| {metrics.get('Verification', 0.0):.2f} | {metrics.get('Adherence', 0.0):.2f} "
-            f"| {metrics.get('Tool Discipline', 0.0):.2f} | {metrics.get('Code Quality', 0.0):.2f} "
-            f"| {metrics.get('Recovery', 0.0):.2f} |"
+            f'| {row["agent_id"]} | {row["overall_score"]:.2f} | {row["success_rate"]:.2f}% '
+            f'| {metrics.get("Verification", 0.0):.2f} | {metrics.get("Adherence", 0.0):.2f} '
+            f'| {metrics.get("Tool Discipline", 0.0):.2f} | {metrics.get("Code Quality", 0.0):.2f} '
+            f'| {metrics.get("Recovery", 0.0):.2f} |'
         )
 
     lines.append('')

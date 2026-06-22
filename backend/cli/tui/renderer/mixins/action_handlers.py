@@ -330,9 +330,7 @@ class RendererActionHandlersMixin:
             self._in_agent_turn = False
             if self._tools_in_turn > 0:
                 elapsed = time.monotonic() - self._turn_start_time
-                self._tui._last_turn_duration = self._format_turn_duration(
-                    int(elapsed)
-                )
+                self._tui._last_turn_duration = self._format_turn_duration(int(elapsed))
             else:
                 self._tui._last_turn_duration = None
 

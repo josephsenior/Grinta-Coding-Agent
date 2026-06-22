@@ -26,7 +26,10 @@ def test_workspace_logs_dir_under_repo_logs_not_backend_logs(
     ws_dir = logger_mod._workspace_logs_dir()
     assert ws_dir is not None
     install_root = Path(logger_mod._grinta_install_tree_root())
-    assert Path(ws_dir) == install_root / 'logs' / 'workspaces' / logger_mod._workspace_logs_segment()
+    assert (
+        Path(ws_dir)
+        == install_root / 'logs' / 'workspaces' / logger_mod._workspace_logs_segment()
+    )
 
 
 def test_workspace_logs_segment_uses_project_root(
@@ -94,7 +97,9 @@ def test_workspace_logs_dir_migrates_legacy_backend_logs(
     legacy_ws.mkdir(parents=True)
     (legacy_ws / 'app.log').write_text('legacy\n', encoding='utf-8')
 
-    monkeypatch.setattr(logger_mod, '_grinta_install_tree_root', lambda: str(install_root))
+    monkeypatch.setattr(
+        logger_mod, '_grinta_install_tree_root', lambda: str(install_root)
+    )
     monkeypatch.setattr(logger_mod, '_workspace_logs_segment', lambda: 'sample_ws')
     monkeypatch.setattr(logger_mod, '_LEGACY_LOGS_MIGRATION_DONE', False)
 
@@ -117,7 +122,9 @@ def test_workspace_logs_dir_migration_keeps_existing_canonical_files(
     legacy_ws.mkdir(parents=True)
     (legacy_ws / 'app.log').write_text('legacy\n', encoding='utf-8')
 
-    monkeypatch.setattr(logger_mod, '_grinta_install_tree_root', lambda: str(install_root))
+    monkeypatch.setattr(
+        logger_mod, '_grinta_install_tree_root', lambda: str(install_root)
+    )
     monkeypatch.setattr(logger_mod, '_workspace_logs_segment', lambda: 'sample_ws')
     monkeypatch.setattr(logger_mod, '_LEGACY_LOGS_MIGRATION_DONE', False)
 

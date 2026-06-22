@@ -47,7 +47,9 @@ class ShellDetailScreen(DetailScreen):
         if exit_chip:
             meta_parts.append(exit_chip)
         if meta_parts:
-            widgets.append(self.meta_row(format_meta_chips(meta_parts), widget_id='shell-meta'))
+            widgets.append(
+                self.meta_row(format_meta_chips(meta_parts), widget_id='shell-meta')
+            )
 
         frame_parts: list = []
         if self._command:

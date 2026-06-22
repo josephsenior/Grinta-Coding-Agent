@@ -113,6 +113,7 @@ def test_powershell_clipboard_reader_uses_sta(monkeypatch) -> None:
 
     def fake_run(args, **kwargs):
         captured['args'] = args
+
         class Result:
             returncode = 1
             stdout = b''

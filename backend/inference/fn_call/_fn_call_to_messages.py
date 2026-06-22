@@ -121,7 +121,12 @@ def _format_tool_content(content: Any, tool_name: str) -> list[dict]:
         effective_content = f'[{tool_name} completed]'
     elif content is None:
         effective_content = f'[{tool_name} completed]'
-    return [{'type': 'text', 'text': encode_tool_result_payload(tool_name, effective_content)}]
+    return [
+        {
+            'type': 'text',
+            'text': encode_tool_result_payload(tool_name, effective_content),
+        }
+    ]
 
 
 def _extract_and_validate_params(

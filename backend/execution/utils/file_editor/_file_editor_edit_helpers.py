@@ -347,11 +347,27 @@ def _validate_edit_before_write(
         file_path, old_content, new_content
     )
     if regression_error is not None:
-        return None, f'WARNING: {regression_error}'
+        return ToolResult(
+            output='',
+            error=regression_error,
+            old_content=old_content,
+            new_content=new_content,
+            error_code='INTRODUCED_SYNTAX_ERROR',
+            retryable=True,
+            operation='edit',
+        ), ''
 
     is_valid, msg = self._maybe_validate_syntax_for_file(file_path, new_content)
     if not is_valid:
-        return None, f'WARNING: {msg}'
+        return ToolResult(
+            output='',
+            error=f'Syntax validation failed: {msg}',
+            old_content=old_content,
+            new_content=new_content,
+            error_code='SYNTAX_VALIDATION_FAILED',
+            retryable=True,
+            operation='edit',
+        ), ''
     return None, msg if msg else ''
 
 
@@ -516,7 +532,15 @@ def _validate_write_commit(
 
     is_valid, msg = self._maybe_validate_syntax_for_file(file_path, content)
     if not is_valid:
-        return None, f'WARNING: {msg}'
+        return ToolResult(
+            output='',
+            error=f'Syntax validation failed: {msg}',
+            old_content=old_content,
+            new_content=content,
+            error_code='SYNTAX_VALIDATION_FAILED',
+            retryable=True,
+            operation='create_file',
+        ), ''
     soft_warning = msg if msg and msg.startswith('WARNING:') else ''
     return None, soft_warning
 

@@ -212,7 +212,9 @@ class TestSharedHttpClients:
         with (
             patch('backend.inference.clients.OpenAI'),
             patch('backend.inference.clients.AsyncOpenAI'),
-            patch('backend.inference.clients.openai_client._openai_completion') as completion,
+            patch(
+                'backend.inference.clients.openai_client._openai_completion'
+            ) as completion,
         ):
             client = OpenAIClient('gpt-4o', 'sk-test', timeout=12)
             client.completion(messages=[])

@@ -331,7 +331,10 @@ class RendererThinkingMixin:
             from backend.cli.event_rendering.unified_renderer import ActivityRenderer
             from backend.cli.tui.widgets.scan_line import PayloadCard
 
-            body = ActivityRenderer.format_extra_lines(card.extra_lines or []) or intent.text
+            body = (
+                ActivityRenderer.format_extra_lines(card.extra_lines or [])
+                or intent.text
+            )
             self._append_scan_line_card(
                 PayloadCard(card.verb, card.detail, body or intent.text)
             )

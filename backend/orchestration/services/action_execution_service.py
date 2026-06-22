@@ -547,7 +547,13 @@ class ActionExecutionService:
                     use_confirmation_replay=use_confirmation_replay,
                 )
 
-            except (LLMMalformedActionError, LLMNoActionError, LLMResponseError, FunctionCallValidationError, FunctionCallNotExistsError) as exc:
+            except (
+                LLMMalformedActionError,
+                LLMNoActionError,
+                LLMResponseError,
+                FunctionCallValidationError,
+                FunctionCallNotExistsError,
+            ) as exc:
                 (
                     should_continue,
                     error_logged,

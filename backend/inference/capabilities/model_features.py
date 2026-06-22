@@ -189,7 +189,10 @@ def should_support_response_schema(
         candidates.append(f'{provider}/{model}')
     if aliases:
         candidates.extend(str(alias) for alias in aliases)
-    if any(model_matches(candidate, RESPONSE_SCHEMA_EXCLUDED_PATTERNS) for candidate in candidates):
+    if any(
+        model_matches(candidate, RESPONSE_SCHEMA_EXCLUDED_PATTERNS)
+        for candidate in candidates
+    ):
         return False
     return any(
         model_matches(candidate, RESPONSE_SCHEMA_PATTERNS) for candidate in candidates
