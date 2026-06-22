@@ -73,6 +73,7 @@ class RendererTerminalMixin:
         output: str,
         exit_code: int | None,
         cwd: str | None = None,
+        is_background: bool = False,
     ) -> None:
         queue = self._pending_shell_cards_by_command.get(command)
         card = queue.popleft() if queue else None
@@ -87,6 +88,7 @@ class RendererTerminalMixin:
                 output=output,
                 exit_code=exit_code,
                 cwd=cwd or '',
+                is_background=is_background,
             )
             self._append_scan_line_card(card)
             return
@@ -94,7 +96,10 @@ class RendererTerminalMixin:
         card.output = output
         card.exit_code = exit_code
         card.cwd = cwd or card.cwd
-        if exit_code == 0:
+        card.is_background = is_background
+        if is_background:
+            card.set_state('background')
+        elif exit_code == 0:
             card.set_state('done')
         elif exit_code is not None:
             card.set_state('failed')

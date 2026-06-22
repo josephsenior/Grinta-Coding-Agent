@@ -255,6 +255,18 @@ def test_shell_card_failed():
     assert '[#E24B4A]✗ 1[/]' in card._delta_text()
 
 
+def test_shell_card_background_detached():
+    card = ShellCard(
+        command='npm run dev',
+        output='listening on 3000',
+        exit_code=-2,
+        is_background=True,
+    )
+    assert card.state == 'background'
+    assert '[#6B9FD4]$ Shell[/]' in _line_text(card)
+    assert '[#6B9FD4]detached[/]' in card._delta_text()
+
+
 def test_shell_card_detail_screen():
     card = ShellCard(command='cargo test', output='ok. 47 passed', exit_code=0)
     screen = card.build_detail_screen()
