@@ -379,6 +379,9 @@ def _write_settings_file(
             'enforce_security': True,
         },
     }
+    from backend.core.config.mcp_defaults import default_user_mcp_config
+
+    settings['mcp_config'] = default_user_mcp_config()
     try:
         _atomic_json_write(settings_file, settings)
     except PermissionError:

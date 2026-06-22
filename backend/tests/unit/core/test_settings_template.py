@@ -28,6 +28,13 @@ def test_settings_template_loads_without_schema_drift(template_path: Path) -> No
     assert isinstance(security, dict)
     assert security.get('execution_profile') == 'standard'
 
+    mcp_config = data.get('mcp_config')
+    assert isinstance(mcp_config, dict)
+    server_names = [s['name'] for s in mcp_config.get('servers', [])]
+    assert 'shadcn' in server_names
+    assert 'github' in server_names
+    assert 'rigour' in server_names
+
     cfg = AppConfig()
     load_from_json(cfg, str(template_path))
 
