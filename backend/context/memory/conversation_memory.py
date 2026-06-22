@@ -215,7 +215,7 @@ class ContextMemory:
             logger.warning(
                 'Failed to initialize vector memory: %s\n'
                 'Continuing without persistent memory. To enable:\n'
-                '  pip install chromadb sentence-transformers',
+                '  pip install "grinta-ai[rag]"',
                 e,
             )
             return None

@@ -15,6 +15,12 @@ from backend.engine.prompts.section_renderers._env_hints import (
 )
 
 
+def _semantic_recall_runtime(config: Any) -> bool:
+    from backend.utils.optional_extras import vector_memory_enabled
+
+    return vector_memory_enabled(config)
+
+
 def _render_routing(
     render_partial: Callable[..., str],
     is_windows: bool,
@@ -66,14 +72,18 @@ def _render_routing(
     memory_kw = _routing_memory_tool_placeholders(
         working_memory_on=working_memory_on,
         tracker_on=tracker_on,
+        semantic_recall_on=_semantic_recall_runtime(config),
     )
 
     web_on = bool(getattr(config, 'enable_web', True))
     docs_on = bool(getattr(config, 'enable_docs', True))
+    from backend.utils.optional_extras import browser_tool_enabled
+
     discovery_decision_table = _discovery_decision_table(
         lsp_available=lsp_available,
         web_on=web_on,
         docs_on=docs_on,
+        browser_on=browser_tool_enabled(config) and can_edit,
     )
 
     if not can_edit:

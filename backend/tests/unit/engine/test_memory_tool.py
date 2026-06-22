@@ -39,6 +39,15 @@ def test_memory_persist_requires_key_and_value() -> None:
         _handle_memory_tool({'action': 'persist', 'key': 'k'})
 
 
+def test_create_memory_tool_omits_recall_when_disabled() -> None:
+    from backend.engine.tools.memory import create_memory_tool
+
+    tool = create_memory_tool(include_semantic_recall=False)
+    props = tool['function']['parameters']['properties']
+    assert 'recall' not in props['action']['enum']
+    assert 'recall' not in tool['function']['description'].lower()
+
+
 def test_memory_recall_without_vector_store() -> None:
     action = _handle_memory_tool({'action': 'recall', 'key': 'auth decision'})
     assert isinstance(action, MemoryRecallAction)

@@ -17,6 +17,12 @@ from backend.engine.prompts.section_renderers._env_hints import (
 )
 
 
+def _semantic_recall_runtime(config: Any) -> bool:
+    from backend.utils.optional_extras import vector_memory_enabled
+
+    return vector_memory_enabled(config)
+
+
 def _build_context_discipline_section(
     *,
     working_memory_on: bool,
@@ -62,15 +68,17 @@ def _build_when_to_use_context(
     working_memory_on: bool,
     tracker_on: bool,
     checkpoints_on: bool,
+    semantic_recall_on: bool = False,
 ) -> str:
     parts = ['<WHEN_TO_USE_CONTEXT>']
     if working_memory_on:
         parts.append(
             '- **memory(action="working")**: hypothesis, findings, blockers, and plan during long work.'
         )
-        parts.append(
-            '- **memory(action="recall", key=...)**: when the visible window no longer shows a prior decision.'
-        )
+        if semantic_recall_on:
+            parts.append(
+                '- **memory(action="recall", key=...)**: when the visible window no longer shows a prior decision.'
+            )
     if checkpoints_on:
         parts.append(
             '- **checkpoint**: `view` before choosing a revert target; `revert` after a bad edit '
@@ -146,6 +154,7 @@ def _render_autonomy(
         working_memory_on=working_memory_on,
         tracker_on=tracker_on,
         checkpoints_on=checkpoints_on,
+        semantic_recall_on=_semantic_recall_runtime(config),
     )
     risk_preview = _build_risk_preview(tracker_on=tracker_on)
 

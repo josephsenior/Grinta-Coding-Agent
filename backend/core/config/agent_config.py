@@ -129,7 +129,8 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     enable_browsing: bool = Field(
         default=DEFAULT_AGENT_BROWSING_ENABLED,
         description=(
-            'Expose the native browser tool (requires optional `browser` dependency group)'
+            'Native browser tool. Default on; exposed only when the `[browser]` '
+            'extra is installed. Set false in settings to disable.'
         ),
     )
     enable_web: bool = Field(
@@ -149,16 +150,15 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     enable_vector_memory: bool = Field(
         default=DEFAULT_AGENT_VECTOR_MEMORY_ENABLED,
         description=(
-            'Enable persistent vector memory store. Disabled by default to keep '
-            'installs lean. Requires the optional [rag] extra '
-            '(`pip install "grinta-ai[rag]"`).'
+            'Vector memory / semantic recall. Default on; active only when the '
+            '`[rag]` extra is installed. Set false in settings to disable.'
         ),
     )
     enable_hybrid_retrieval: bool = Field(
         default=DEFAULT_AGENT_HYBRID_RETRIEVAL_ENABLED,
         description=(
-            'Enable hybrid retrieval for vector memory. Requires '
-            'enable_vector_memory and the optional [rag] extra.'
+            'Hybrid BM25 + vector retrieval (requires `[rag]`). Default on; gated at '
+            'runtime like enable_vector_memory.'
         ),
     )
     prompt_render_cache_enabled: bool = Field(
