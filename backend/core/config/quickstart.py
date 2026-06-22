@@ -1,5 +1,9 @@
 """Quick-start configuration generator for new Grinta users.
 
+.. deprecated::
+    Use ``grinta init`` (``backend/cli/onboarding/init_wizard.py``) for
+    interactive setup. This module remains for programmatic quick-start only.
+
 Generates a minimal ``settings.json`` with only the settings that matter
 on day one.  Every other knob inherits sensible defaults.
 
@@ -118,7 +122,13 @@ def _interactive_init(dest: Path) -> None:
 
 def main() -> None:
     """CLI entry-point: ``python -m backend.core.config.quickstart``."""
-    # Determine project root (where settings.json lives)
+    import warnings
+
+    warnings.warn(
+        'backend.core.config.quickstart is deprecated; use `grinta init` instead.',
+        DeprecationWarning,
+        stacklevel=1,
+    )
     project_root = Path(os.environ.get('APP_PROJECT_ROOT', Path.cwd()))
     dest = project_root / 'settings.json'
     _interactive_init(dest)

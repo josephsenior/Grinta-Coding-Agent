@@ -126,7 +126,7 @@ class SafetyService:
             )
             return
 
-        if is_high_security_risk:
+        if is_high_security_risk or is_ask_for_every_action:
             action.confirmation_state = ActionConfirmationStatus.AWAITING_CONFIRMATION
         elif autonomy and autonomy.should_request_confirmation(action):
             action.confirmation_state = ActionConfirmationStatus.AWAITING_CONFIRMATION

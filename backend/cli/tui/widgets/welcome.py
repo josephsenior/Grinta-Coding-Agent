@@ -75,7 +75,7 @@ class WelcomeWidget(Vertical):
                 id='welcome-tagline',
             )
             yield Static(
-                '[#8f9fc1]Use up/down + Enter, or click a starter task.[/]',
+                '[#8f9fc1]Use up/down + Enter, or click a starter task. Press F1 or /help for commands. New here? Run /health or grinta doctor.[/]',
                 id='welcome-instruction',
             )
         else:

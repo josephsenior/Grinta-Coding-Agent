@@ -94,15 +94,18 @@ def _parse_project_dir_from_argv() -> Path | None:
     return None
 
 
-def _grinta_install_tree_for_dotenv() -> Path:
-    """``backend/cli/main.py`` → parents ``cli``, ``backend``, Grinta repo root."""
-    return Path(__file__).resolve().parent.parent.parent
+def _app_settings_dotenv_path() -> Path:
+    """Return the canonical ``.env`` path next to ``settings.json``."""
+    from backend.core.app_paths import get_app_settings_root
+
+    return Path(get_app_settings_root()) / '.env'
 
 
 def _load_dotenv_early(*, explicit_project: str | None = None) -> None:
     """Load ``.env`` into ``os.environ`` before backend imports.
 
-    1. **Grinta install** ``<repo>/.env`` — optional keys and overrides (e.g. ``LOG_TO_FILE=false``).
+    1. **App settings** ``<settings_root>/.env`` — where ``grinta init`` writes secrets
+       (``~/.grinta/.env`` for pipx installs, repo root for source checkouts).
        Logging defaults are defined in ``backend.core.constants``; raw LLM debug logging is off by default.
     2. Optional **``-p`` / explicit project** ``.env`` with ``override=True`` so a
        client repo can override API keys without duplicating logging flags.
@@ -110,14 +113,14 @@ def _load_dotenv_early(*, explicit_project: str | None = None) -> None:
     The process **cwd** is intentionally not loaded: launch location stays unrelated
     to where configuration lives.
 
-    Uses ``override=False`` for the Grinta file so real OS environment variables win.
+    Uses ``override=False`` for the settings file so real OS environment variables win.
     """
     try:
         from dotenv import load_dotenv
     except ImportError:
         return
     try:
-        load_dotenv(_grinta_install_tree_for_dotenv() / '.env', override=False)
+        load_dotenv(_app_settings_dotenv_path(), override=False)
     except OSError:
         pass
     for base in (

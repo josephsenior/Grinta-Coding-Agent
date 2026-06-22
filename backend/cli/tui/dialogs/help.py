@@ -37,6 +37,10 @@ class GrintaHelpDialog(ModalDialog[str | None]):
                     section_title='Slash commands',
                     id='help-commands',
                 )
+                yield CommandListSection('Interaction modes (HUD)')
+                yield CommandListRow('Chat', 'Read-only Q&A and discovery tools')
+                yield CommandListRow('Plan', 'Read-only investigation; optional structured plan')
+                yield CommandListRow('Agent', 'Full task loop (default); autonomy applies here')
                 yield CommandListSection('Keyboard shortcuts')
                 for key, detail in KEYBOARD_SHORTCUTS:
                     yield CommandListRow(key, detail)

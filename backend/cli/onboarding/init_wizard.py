@@ -42,9 +42,15 @@ from backend.cli.theme import (
 from backend.core.app_paths import get_canonical_settings_path
 from backend.core.config.dotenv_keys import persist_llm_api_key_to_dotenv
 from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
-from backend.inference.provider_resolver import check_local_providers
+from backend.inference.provider_resolver import check_local_providers, discover_all_local_models
 
 _PROVIDER_PRESETS = ONBOARDING_PROVIDER_PRESETS
+_PROVIDER_CATEGORY_ORDER = ('cloud', 'aggregator', 'local')
+_PROVIDER_CATEGORY_LABELS = {
+    'cloud': 'Cloud providers',
+    'aggregator': 'Aggregators / gateways',
+    'local': 'Local servers',
+}
 
 
 def _get_platform_info() -> str:
@@ -193,20 +199,46 @@ def _confirm_overwrite_existing(
 
 
 def _print_provider_table(console: Console, detected: list[str]) -> None:
-    table = Table(
-        title='Pick a provider',
-        title_style=CLR_CARD_TITLE,
-        border_style=CLR_CARD_BORDER,
-        box=box.ROUNDED,
-        padding=(1, 2),
-    )
-    table.add_column('Key', style=CLR_BRAND)
-    table.add_column('Description')
-    table.add_column('Detected', style=CLR_STATUS_OK)
-    for key, preset in _PROVIDER_PRESETS.items():
-        detected_marker = '✓' if key in detected else ''
-        table.add_row(key, preset['help'], detected_marker)
-    console.print(table)
+    for category in _PROVIDER_CATEGORY_ORDER:
+        rows = [
+            (key, preset)
+            for key, preset in _PROVIDER_PRESETS.items()
+            if preset.get('category') == category
+        ]
+        if not rows:
+            continue
+        table = Table(
+            title=_PROVIDER_CATEGORY_LABELS.get(category, category.title()),
+            title_style=CLR_CARD_TITLE,
+            border_style=CLR_CARD_BORDER,
+            box=box.ROUNDED,
+            padding=(1, 2),
+        )
+        table.add_column('Key', style=CLR_BRAND)
+        table.add_column('Description')
+        table.add_column('Detected', style=CLR_STATUS_OK)
+        for key, preset in rows:
+            detected_marker = '✓' if key in detected else ''
+            table.add_row(key, preset['help'], detected_marker)
+        console.print(table)
+
+
+def _discover_local_models() -> dict[str, list[str]]:
+    """Return discovered local models keyed by provider id."""
+    try:
+        return discover_all_local_models()
+    except Exception:
+        return {}
+
+
+def _default_model_for_provider(
+    provider: str,
+    local_models: dict[str, list[str]],
+) -> str:
+    models = local_models.get(provider) or []
+    if models:
+        return f'{provider}/{models[0]}'
+    return _PROVIDER_PRESETS[provider]['default_model']
 
 
 def _collect_api_key(console: Console, preset: dict[str, Any]) -> str:
@@ -240,8 +272,9 @@ def _print_welcome(console: Console, platform_info: str) -> None:
             f'[bold]Welcome to Grinta.[/bold] ({platform_info})\n'
             'This wizard configures your LLM provider and writes [bold]settings.json[/bold].\n'
             'API keys are stored in a sibling [bold].env[/bold] file when provided.\n'
-            'New installs default to the [bold]hardened_local[/bold] security profile '
-            '(stricter command/file gates; use [bold]standard[/bold] in settings if you need fewer restrictions).\n'
+            'New installs default to the [bold]standard[/bold] security profile '
+            '(full interactive terminal and debugger support; set '
+            '[bold]hardened_local[/bold] in settings for stricter command/file gates).\n'
             f'Re-run any time with [{CLR_BRAND}]grinta init[/].',
             border_style=CLR_CARD_BORDER,
             box=box.ROUNDED,
@@ -280,7 +313,9 @@ def _detect_and_report(console: Console) -> list[str]:
 
 
 def _collect_user_choices(
-    console: Console, detected: list[str]
+    console: Console,
+    detected: list[str],
+    local_models: dict[str, list[str]],
 ) -> tuple[str, str, str, str] | None:
     _print_provider_table(console, detected)
     provider = Prompt.ask(
@@ -289,9 +324,15 @@ def _collect_user_choices(
         default=detected[0] if detected else 'openai',
     )
     preset = _PROVIDER_PRESETS[provider]
+    default_model = _default_model_for_provider(provider, local_models)
+    if provider in local_models:
+        console.print(
+            f'[{CLR_STATUS_OK}]Discovered models:[/] '
+            f'{", ".join(local_models[provider][:8])}'
+        )
     model = Prompt.ask(
         'Model id (provider/model)',
-        default=preset['default_model'],
+        default=default_model,
     )
     if not model or not model.strip():
         console.print(
@@ -300,6 +341,13 @@ def _collect_user_choices(
         )
         return None
     api_key = _collect_api_key(console, preset)
+    if _provider_requires_api_key(provider) and not api_key:
+        if not Confirm.ask(
+            'No API key provided. Save settings anyway?',
+            default=False,
+        ):
+            console.print('[dim]No changes made.[/dim]')
+            return None
     base_url = Prompt.ask(
         'Base URL (leave blank for default)',
         default=preset['base_url'],
@@ -322,11 +370,12 @@ def _write_settings_file(
         'llm_base_url': base_url,
         'agent': {
             'Orchestrator': {
+                'mode': 'agent',
                 'autonomy_level': 'balanced',
             },
         },
         'security': {
-            'execution_profile': 'hardened_local',
+            'execution_profile': 'standard',
             'enforce_security': True,
         },
     }
@@ -396,12 +445,19 @@ def _collect_and_persist(
     console: Console,
     settings_file: Path,
     detected: list[str],
+    local_models: dict[str, list[str]],
 ) -> tuple[str, str, str, str] | None:
-    choices = _collect_user_choices(console, detected)
+    choices = _collect_user_choices(console, detected, local_models)
     if choices is None:
         return None
     provider, model, api_key, base_url = choices
-    validate_connection(console, model, api_key, base_url or None)
+    validate_connection(
+        console,
+        model,
+        api_key,
+        base_url or None,
+        provider=provider,
+    )
     err = _write_settings_file(
         console, settings_file, provider, model, api_key, base_url
     )
@@ -474,7 +530,8 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
     if not _confirm_continue(console, existing):
         return 0
     detected = _detect_and_report(console)
-    choices = _collect_and_persist(console, settings_file, detected)
+    local_models = _discover_local_models()
+    choices = _collect_and_persist(console, settings_file, detected, local_models)
     if choices is None:
         return 3
     provider, model, api_key, base_url = choices

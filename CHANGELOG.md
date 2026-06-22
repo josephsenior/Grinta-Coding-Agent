@@ -117,17 +117,12 @@ before the final `1.0.0` cut.
 ### Migration
 
 - **`autonomy_level: supervised` is renamed to `conservative`** to
-  better describe the behaviour ("confirm every action") and to avoid
-  implying extra oversight features that don't exist. The string
-  `supervised` is still accepted in config files and on the `/autonomy`
-  slash command — it is silently rewritten to `conservative` and a
-  one-time deprecation warning is logged. The alias will be removed in
-  a future release; please update your configs.
-- If you previously relied on **per-mode cost caps** (`$5` for
-  supervised, `$10` for balanced, `$15` warn for full) being applied
-  automatically by `PermissionsConfig.get_preset()`, set
-  `max_cost_per_task` and `warn_at_cost` explicitly in your permissions
-  config — they are no longer derived from the autonomy mode.
+  better describe the behaviour ("confirm every action in the confirmation
+  flow") and to avoid implying extra oversight features that don't exist.
+  The string `supervised` is **rejected** in config files and on the
+  `/autonomy` slash command; use `conservative` instead.
+- Set `max_budget_per_task` explicitly in `settings.json` for per-task
+  spend caps (see [docs/SETTINGS.md](docs/SETTINGS.md)).
 
 ## [0.56.0] - 2026-04-29
 

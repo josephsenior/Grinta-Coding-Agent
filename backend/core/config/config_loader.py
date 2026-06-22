@@ -116,6 +116,39 @@ _JSON_LLM_KEYS = (
 )
 
 
+_JSON_TOP_LEVEL_KEYS = frozenset(
+    {
+        *_JSON_LLM_KEYS,
+        'mcp_host',
+        'project_root',
+        'max_budget_per_task',
+        'max_iterations',
+        'pending_action_timeout',
+        'save_trajectory_path',
+        'log_level',
+        'mcp_config',
+        'agent',
+        'security',
+        'cli_tool_icons',
+    }
+)
+
+
+def _warn_unknown_json_keys(
+    data: dict[str, object],
+    *,
+    json_file: str,
+    summary: ConfigLoadSummary,
+) -> None:
+    unknown = sorted(key for key in data if key not in _JSON_TOP_LEVEL_KEYS)
+    for key in unknown:
+        summary.record(
+            'settings.json',
+            'ignored',
+            f"Unknown top-level key '{key}' was ignored. See docs/SETTINGS.md.",
+        )
+
+
 def _load_json_settings(
     json_file: str, *, strict_config: bool
 ) -> dict[str, object] | None:
@@ -330,6 +363,8 @@ def _apply_json_top_level_fields(cfg: AppConfig, data: dict[str, object]) -> Non
         cfg.save_trajectory_path = cast(str, data['save_trajectory_path'])
     if data.get('log_level'):
         cfg.log_level = cast(str, data['log_level'])
+    if 'cli_tool_icons' in data:
+        cfg.cli_tool_icons = bool(data['cli_tool_icons'])
 
 
 def _parse_mcp_server_entry(entry: object):
@@ -440,6 +475,7 @@ def load_from_json(cfg: AppConfig, json_file: str = 'settings.json') -> None:
         data = _load_json_settings(json_file, strict_config=strict_config)
         if data is None:
             return
+        _warn_unknown_json_keys(data, json_file=json_file, summary=summary)
         _apply_json_llm_config(
             cfg,
             data,

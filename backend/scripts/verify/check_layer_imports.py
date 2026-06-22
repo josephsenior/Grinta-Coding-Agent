@@ -92,7 +92,7 @@ EXEMPTIONS: dict[str, str] = {
     'backend.app.setup': 'Bootstrap: creates agent, controller, memory, runtime',
     'backend.core.config.config_loader': 'Bootstrap: registers custom agent classes',
     # TODO: Refactor to remove cross-layer imports.
-    'backend.engine.orchestrator': 'Temporary: engine imports execution.plugins for AgentSkills',
+    'backend.engine.orchestrator': 'Engine per-step agent imports orchestration.agent.Agent base class',
     'backend.engine.__init__': '__init__.py re-exports orchestration.agent for backwards compat',
     'backend.execution.server.action_execution_server': 'Execution imports engine.tools.prompt for tool registry',
     'backend.execution.aes.helpers': 'Execution imports engine.function_calling for multi-edit handler',

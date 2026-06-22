@@ -23,15 +23,39 @@ from backend.cli.settings.constants import (
 )
 
 
+def _is_local_llm_config(llm_cfg: object) -> bool:
+    """Return True when the configured model can run without a cloud API key."""
+    from backend.inference.provider_resolver import get_resolver
+
+    resolver = get_resolver()
+    model = (getattr(llm_cfg, 'model', None) or '').strip()
+    if model and resolver.is_local_model(model):
+        return True
+
+    provider = (
+        getattr(llm_cfg, 'custom_llm_provider', None)
+        or getattr(llm_cfg, 'provider', None)
+        or ''
+    )
+    if str(provider).strip().lower() in {'ollama', 'lm_studio', 'vllm'}:
+        return True
+
+    base = (getattr(llm_cfg, 'base_url', None) or '').strip().lower()
+    return any(host in base for host in ('localhost', '127.0.0.1', '0.0.0.0'))
+
+
 def needs_onboarding(config: AppConfig) -> bool:
-    """Return True when no usable LLM API key is configured."""
+    """Return True when no usable LLM configuration is available."""
     try:
         llm_cfg = config.get_llm_config()
         key = llm_cfg.api_key
-        if key is None:
-            return True
-        raw = key.get_secret_value() if hasattr(key, 'get_secret_value') else str(key)
-        return not raw or raw.strip() == ''
+        if key is not None:
+            raw = key.get_secret_value() if hasattr(key, 'get_secret_value') else str(key)
+            if raw and raw.strip():
+                return False
+        if _is_local_llm_config(llm_cfg):
+            return False
+        return True
     except Exception:
         logger.debug('Could not read LLM config for onboarding check', exc_info=True)
         return True

@@ -43,16 +43,16 @@ Direct link if the animation does not load: [`docs/assets/grinta-demo.gif`](docs
 | DAP debugger integration                                                          | ✅ auto-discovered  | ❌      | ❌                | ❌             |
 | Cost / token / latency HUD                                                        | ✅ live             | partial | ❌                | partial        |
 | Stuck-loop + cost-acceleration detection                                          | ✅                  | ❌      | partial           | ❌             |
-| Risk-classified actions + audit log                                               | ✅ `hardened_local` | ❌      | partial           | partial        |
+| Risk-classified actions + audit log                                               | ✅                  | ❌      | partial           | partial        |
 | Session checkpoint / resume / revert                                              | ✅ event-stream     | ✅ git  | partial           | ❌             |
 | Windows-supported workflow (PowerShell)                                           | ✅                  | partial | partial           | partial        |
 | MCP support                                                                       | ✅                  | ❌      | ✅ strong         | partial        |
 
 The pitch in one sentence: **a local-first coding agent with deeper built-in tooling than most terminal peers, without locking you to a single model vendor.**
 
-## Install in 30 seconds
+## Install
 
-Prerequisites: Python 3.12+ and `pipx`.
+Prerequisites: Python 3.12+ and `pipx`. See [docs/INSTALL.md](docs/INSTALL.md) for all paths.
 
 ```bash
 pipx install grinta-ai          # base install; optional extras stay opt-in
@@ -68,7 +68,7 @@ pipx install "grinta-ai[browser]"  # adds browser-use for web automation
 pipx install "grinta-ai[all]"      # rag + browser
 ```
 
-The base install includes PDF, DOCX, PPTX, and LaTeX parsing. RAG and browser automation stay opt-in. The isolated Python environment is roughly **~400 MB on disk** before optional extras (tree-sitter grammars dominate); idle runtime memory is **~150 MB RAM** — see [docs/PERFORMANCE.md](docs/PERFORMANCE.md). The `grinta init` wizard configures provider, model, and key; local Ollama, LM Studio, and vLLM models can also be discovered with `uv run python -m backend.inference.discover_models` from a source checkout. Installed runs use `~/.grinta/settings.json`; source checkouts use the repository `settings.json`; `APP_ROOT` can intentionally override that root. Other install paths (uv, Homebrew, Scoop, and experimental Docker image usage) are in [docs/INSTALL.md](docs/INSTALL.md).
+The base install includes PDF, DOCX, PPTX, and LaTeX parsing. RAG and browser automation stay opt-in. Disk and memory footprint targets are documented in [docs/PERFORMANCE.md](docs/PERFORMANCE.md) (measured on a clean pipx install; optional extras add more). The `grinta init` wizard configures provider, model, and key; local Ollama, LM Studio, and vLLM servers are probed during setup (no API key required for local providers). Installed runs use `~/.grinta/settings.json`; source checkouts use the repository `settings.json`; `APP_ROOT` can intentionally override that root. Other install paths (uv, Homebrew, Scoop, and experimental Docker image usage) are in [docs/INSTALL.md](docs/INSTALL.md).
 
 ## What you get
 
@@ -84,10 +84,10 @@ The base install includes PDF, DOCX, PPTX, and LaTeX parsing. RAG and browser au
 Grinta exposes three modes in the Textual HUD (Chat, Plan, Agent). They change the conversational contract, not just the prompt tone:
 
 - **Chat** — read-only Q&A and discovery tools; no edits or shell.
-- **Plan** — read-only investigation plus a structured plan before execution.
+- **Plan** — read-only investigation; may use `task_tracker` for a structured plan when enabled, or prose only. Switch to Agent mode to execute.
 - **Agent** — full task loop (default for direct work).
 
-Autonomy (`/autonomy`: conservative, balanced, full) controls confirmation prompts in **Agent** mode only. Runtime hardening is configured separately with `security.execution_profile` (`standard`, `hardened_local`, `sandboxed_local`).
+Autonomy (`/autonomy`: conservative, balanced, full) controls confirmation prompts in **Agent** mode only. Runtime hardening is configured separately with `security.execution_profile` (`standard` is the default and supports the interactive terminal and debugger; `hardened_local` and `sandboxed_local` add stricter policy gates).
 
 ## Common slash commands
 
@@ -109,7 +109,7 @@ Playbook workflows (`/debug`, `/testing`, `/feature`, …) and the full registry
 
 ## Security boundary
 
-Grinta executes actions on the local host. `hardened_local` adds stricter policy checks but **is not** sandboxing or process isolation; `sandboxed_local` adds process isolation only for non-interactive commands. Read [docs/SECURITY_CHECKLIST.md](docs/SECURITY_CHECKLIST.md) **before pointing Grinta at code you do not trust** — for hostile codebases, run inside a VM or container.
+Grinta executes actions on the local host. The default `standard` profile preserves full interactive terminal and debugger support. `hardened_local` adds stricter policy checks but **is not** sandboxing or process isolation; `sandboxed_local` adds process isolation only for non-interactive commands. Read [docs/SECURITY_CHECKLIST.md](docs/SECURITY_CHECKLIST.md) **before pointing Grinta at code you do not trust** — for hostile codebases, run inside a VM or container.
 
 ## Architecture (high level)
 
@@ -219,24 +219,23 @@ Stuck detection, retry/recovery flows, and circuit breakers are built into orche
 
 ### Completion integrity
 
-Task validation can block finish calls when tracked work is incomplete.
+Optional completion-quality validation surfaces advisory warnings when tracked work looks incomplete; it does not hard-block the agent from finishing.
 
 ## Documentation
 
-- [Documentation hub](docs/README.md)
-- [User Guide](docs/USER_GUIDE.md)
-- [Quick Start](docs/QUICK_START.md)
-- [Troubleshooting](docs/TROUBLESHOOTING.md)
-- [Support Matrix](docs/SUPPORT_MATRIX.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Developer Guide](docs/DEVELOPER.md)
-- [Vocabulary](docs/VOCABULARY.md)
-- [The Book of Grinta](docs/journey/README.md)
-- [Contributing](CONTRIBUTING.md)
-- [Governance](GOVERNANCE.md)
-- [Maintainers](MAINTAINERS.md)
-- [Community](COMMUNITY.md)
-- [Roadmap](ROADMAP.md)
+**Start here (end users):**
+
+- [Install](docs/INSTALL.md) · [User Guide](docs/USER_GUIDE.md) · [settings.json reference](docs/SETTINGS.md) · [Troubleshooting](docs/TROUBLESHOOTING.md)
+
+**Contributors:**
+
+- [Contributor Map](docs/CONTRIBUTOR_MAP.md) · [Developer Guide](docs/DEVELOPER.md) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md)
+
+**More reference:**
+
+- [Documentation hub](docs/README.md) · [Support Matrix](docs/SUPPORT_MATRIX.md) · [Vocabulary](docs/VOCABULARY.md) · [Security checklist](docs/SECURITY_CHECKLIST.md) · [Roadmap](ROADMAP.md)
+
+**Optional narrative:** [The Book of Grinta](docs/journey/README.md) — engineering memoir; may not reflect the current product surface.
 
 ## Contributing
 

@@ -97,13 +97,30 @@ def test_parse_project_dir_from_argv_long_form(
     assert got == proj.resolve()
 
 
-def test_parse_project_dir_from_argv_equals(
+def test_app_settings_dotenv_path_uses_settings_root(
     monkeypatch: pytest.MonkeyPatch, tmp_path
 ) -> None:
     from backend.cli import main as cli_main
 
-    proj = tmp_path / 'eqproj'
-    proj.mkdir()
-    monkeypatch.setattr(sys, 'argv', ['grinta', f'--project={proj}'])
-    got = cli_main._parse_project_dir_from_argv()
-    assert got == proj.resolve()
+    settings_root = tmp_path / 'grinta-home'
+    settings_root.mkdir()
+    monkeypatch.setenv('APP_ROOT', str(settings_root))
+    assert cli_main._app_settings_dotenv_path() == settings_root / '.env'
+
+
+def test_load_dotenv_early_reads_settings_root_env(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    from backend.cli import main as cli_main
+
+    settings_root = tmp_path / 'grinta-home'
+    settings_root.mkdir()
+    env_file = settings_root / '.env'
+    env_file.write_text('LLM_API_KEY=from-settings-root\n', encoding='utf-8')
+    monkeypatch.setenv('APP_ROOT', str(settings_root))
+    monkeypatch.delenv('LLM_API_KEY', raising=False)
+
+    cli_main._load_dotenv_early()
+
+    assert os.environ.get('LLM_API_KEY') == 'from-settings-root'
+

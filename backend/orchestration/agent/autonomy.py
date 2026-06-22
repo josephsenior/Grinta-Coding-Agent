@@ -24,6 +24,7 @@ from backend.ledger.action import (
     TerminalInputAction,
     TerminalRunAction,
 )
+from backend.ledger.action.mcp import MCPAction
 from backend.security.command_analyzer import CommandAnalyzer, RiskCategory
 
 if TYPE_CHECKING:
@@ -191,6 +192,9 @@ class AutonomyController:
             return True
 
         if isinstance(action, BlackboardAction) and action.command.lower() == 'set':
+            return True
+
+        if isinstance(action, MCPAction):
             return True
 
         return False

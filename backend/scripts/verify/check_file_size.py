@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Advisory file-size budget check for CLI refactor tracking.
+"""Advisory file-size budget check for refactor tracking.
 
-Warns when Python files under ``backend/cli/`` exceed soft limits.
+Warns when Python files under watched backend trees exceed soft limits.
 New or changed files above the hard limit fail the check.
 
 Run via:  python backend/scripts/verify/check_file_size.py
@@ -17,11 +17,23 @@ from pathlib import Path
 
 SOFT_LIMIT = 500
 HARD_LIMIT = 800
-WATCH_ROOT = Path('backend/cli')
+WATCH_ROOTS = (
+    Path('backend/cli'),
+    Path('backend/orchestration'),
+    Path('backend/engine'),
+)
 
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[3]
+
+
+def _is_watched(path: Path, root: Path) -> bool:
+    try:
+        rel = path.relative_to(root).as_posix()
+    except ValueError:
+        return False
+    return any(rel.startswith(f'{watch.as_posix()}/') for watch in WATCH_ROOTS)
 
 
 def _changed_files(root: Path) -> list[Path]:
@@ -38,7 +50,7 @@ def _changed_files(root: Path) -> list[Path]:
     files: list[Path] = []
     for line in result.stdout.splitlines():
         path = root / line.strip()
-        if path.suffix == '.py' and WATCH_ROOT in path.parents:
+        if path.suffix == '.py' and _is_watched(path, root):
             files.append(path)
     return files
 
@@ -92,7 +104,11 @@ def main() -> int:
         if not paths:
             return 0
     else:
-        paths = list((root / WATCH_ROOT).rglob('*.py'))
+        paths: list[Path] = []
+        for watch in WATCH_ROOTS:
+            watch_path = root / watch
+            if watch_path.is_dir():
+                paths.extend(watch_path.rglob('*.py'))
 
     return _check(paths, changed_only=args.changed_only)
 

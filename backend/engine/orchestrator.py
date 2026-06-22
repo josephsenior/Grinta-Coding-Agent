@@ -1,5 +1,10 @@
 """Orchestrator agent entrypoint wired to modular planner, executor, and memory subsystems.
 
+Naming note: this ``Orchestrator`` class is the **per-step LLM agent** inside the
+engine layer. The session control plane is
+:class:`backend.orchestration.session_orchestrator.SessionOrchestrator` — a
+different type with a similar name.
+
 Architecture notes (preserve these strengths):
 - Protocol-first design: Orchestrator depends on ``PlannerProtocol``,
   ``ExecutorProtocol``, ``SafetyManagerProtocol``, ``MemoryManagerProtocol``

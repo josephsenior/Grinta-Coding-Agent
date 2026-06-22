@@ -28,7 +28,6 @@ from backend.core.constants import (
     DEFAULT_AGENT_CLI_MODE,
     DEFAULT_AGENT_COMPLEXITY_ITERATION_MULTIPLIER,
     DEFAULT_AGENT_CONDENSATION_REQUEST_ENABLED,
-    DEFAULT_AGENT_CONFIRM_ACTIONS,
     DEFAULT_AGENT_DEBUGGER_ENABLED,
     DEFAULT_AGENT_DOCS_ENABLED,
     DEFAULT_AGENT_DYNAMIC_ITERATIONS_ENABLED,
@@ -93,7 +92,6 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         enable_web: Whether to expose native web_search and web_fetch tools
         enable_docs: Whether to expose native docs_resolve and docs_query tools
         enable_auto_lint: Whether to enable automatic linting after edits
-        confirm_actions: Whether to require user confirmation before executing actions
         llm_draft_config: LLM configuration for draft operations
 
     """
@@ -176,7 +174,6 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         default_factory=list, description='List of playbooks disabled for this agent'
     )
     enable_auto_lint: bool = Field(default=DEFAULT_AGENT_AUTO_LINT_ENABLED)
-    confirm_actions: bool = Field(default=DEFAULT_AGENT_CONFIRM_ACTIONS)
     llm_draft_config: LLMConfig | None = Field(default=None)
     auto_retry_on_error: bool = Field(
         default=DEFAULT_AGENT_AUTO_RETRY_ON_ERROR,
@@ -241,7 +238,10 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     )
     enable_plan_mode: bool = Field(
         default=DEFAULT_AGENT_PLAN_MODE_ENABLED,
-        description='Enable task planning and decomposition (task tracker tool)',
+        description=(
+            'Deprecated: plan mode is controlled by agent.mode=plan and the '
+            'task_tracker tool. This flag is retained for backward compatibility only.'
+        ),
     )
     enable_mcp: bool = Field(default=DEFAULT_AGENT_MCP_ENABLED)
     enable_auto_planning: bool = Field(

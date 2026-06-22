@@ -160,6 +160,15 @@ def _check_llm_config() -> DoctorCheck:
 
     key = api_key_manager.get_api_key_for_model(model, llm_cfg.api_key)
     if key is None or not key.get_secret_value().strip():
+        from backend.cli.settings.onboarding import _is_local_llm_config
+
+        if _is_local_llm_config(llm_cfg):
+            provider = api_key_manager.extract_provider(model)
+            return DoctorCheck(
+                'llm',
+                True,
+                f'provider={provider} model={model} key=not required (local)',
+            )
         return DoctorCheck(
             'llm',
             False,

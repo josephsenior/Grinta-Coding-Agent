@@ -37,6 +37,7 @@ from backend.core.interaction_modes import (
     VISIBLE_INTERACTION_MODES,
     is_chat_mode,
     normalize_interaction_mode,
+    resolve_active_interaction_mode,
 )
 
 
@@ -98,9 +99,17 @@ class ScreenStateMixin:
 
     def _active_interaction_mode(self) -> str:
         agent_config = self._active_agent_config()
-        return normalize_interaction_mode(
-            getattr(agent_config, 'mode', AGENT_MODE),
-            default=AGENT_MODE,
+        configured = getattr(agent_config, 'mode', AGENT_MODE)
+        active_run_mode = None
+        controller = getattr(self, '_controller', None)
+        if controller is not None:
+            state = getattr(controller, 'state', None)
+            extra = getattr(state, 'extra_data', None) if state is not None else None
+            if isinstance(extra, dict):
+                active_run_mode = extra.get('active_run_mode')
+        return resolve_active_interaction_mode(
+            active_run_mode=active_run_mode,
+            configured_mode=configured,
         )
 
     def _resolve_workspace_display(self, workspace_path) -> str:

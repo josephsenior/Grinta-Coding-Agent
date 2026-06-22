@@ -220,6 +220,8 @@ class TestRunInit:
         assert data['llm_provider'] == 'openai'
         assert data['llm_model'] == 'openai/gpt-4o-mini'
         assert data['llm_api_key'] == '${LLM_API_KEY}'
+        assert data['agent']['Orchestrator']['mode'] == 'agent'
+        assert data['security']['execution_profile'] == 'standard'
         assert (tmp_path / '.env').read_text(
             encoding='utf-8'
         ) == 'LLM_API_KEY=sk-test\n'
@@ -232,6 +234,8 @@ class TestRunInit:
         monkeypatch.delenv('OPENAI_API_KEY', raising=False)
         with (
             patch('backend.cli.onboarding.init_wizard._detect_local', return_value=[]),
+            patch('backend.cli.onboarding.init_wizard._discover_local_models', return_value={}),
+            patch('rich.prompt.Confirm.ask', return_value=True),
             patch(
                 'rich.prompt.Prompt.ask',
                 side_effect=['openai', 'openai/gpt-4o-mini', '', ''],
@@ -245,6 +249,27 @@ class TestRunInit:
         assert data['llm_api_key'] == '${LLM_API_KEY}'
         assert not (tmp_path / '.env').exists()
         assert 'LLM_API_KEY' not in os.environ
+
+    def test_blank_cloud_key_declined_skips_write(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        console = _quiet_console()
+        settings_file = tmp_path / 'settings.json'
+        monkeypatch.delenv('OPENAI_API_KEY', raising=False)
+        with (
+            patch('backend.cli.onboarding.init_wizard._detect_local', return_value=[]),
+            patch('backend.cli.onboarding.init_wizard._discover_local_models', return_value={}),
+            patch('rich.prompt.Confirm.ask', return_value=False),
+            patch(
+                'rich.prompt.Prompt.ask',
+                side_effect=['openai', 'openai/gpt-4o-mini', '', ''],
+            ),
+            _patch_settings_path(settings_file),
+        ):
+            rc = run_init(project_root=tmp_path, console=console)
+
+        assert rc == 3
+        assert not settings_file.exists()
 
     def test_provider_env_key_is_copied_to_generic_dotenv(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

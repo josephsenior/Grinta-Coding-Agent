@@ -1,10 +1,21 @@
 from __future__ import annotations
 
 import shutil
+from pathlib import Path
+
+import pytest
 
 from backend.engine.tools.glob import build_glob_action, execute_glob
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.search import GlobObservation
+
+
+@pytest.fixture(autouse=True)
+def _workspace_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        'backend.core.workspace_resolution.require_effective_workspace_root',
+        lambda: tmp_path,
+    )
 
 
 class TestExecuteGlob:
@@ -69,3 +80,12 @@ class TestExecuteGlob:
         assert isinstance(obs, ErrorObservation)
         assert 'non-empty' in obs.content
         assert obs.tool_result['error_code'] == 'VALIDATION_ERROR'
+
+    def test_outside_workspace_path_rejected(self, tmp_path, monkeypatch) -> None:
+        monkeypatch.setattr(shutil, 'which', lambda x: None)
+        outside = tmp_path.parent / 'outside_workspace_glob'
+        outside.mkdir(exist_ok=True)
+        action = build_glob_action(pattern='*.py', path=str(outside))
+        obs = execute_glob(action)
+        assert isinstance(obs, ErrorObservation)
+        assert 'outside workspace boundary' in obs.content.lower()

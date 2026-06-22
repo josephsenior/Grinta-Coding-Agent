@@ -32,14 +32,17 @@ Prefer MCP servers for external tool integrations — they're the standard path 
 
 ```json
 {
-  "mcp_servers": {
-    "github": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "env": {
-        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+  "mcp_config": {
+    "servers": [
+      {
+        "name": "github",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-github"],
+        "env": {
+          "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+        }
       }
-    }
+    ]
   }
 }
 ```
@@ -84,6 +87,6 @@ For each plugin, define:
 - Grinta executes locally — plugins run with your user privileges
 - Audit logs record every plugin invocation (see `~/.grinta/workspaces/<id>/storage/<session>/audit/`)
 - Use least-privilege authentication (scoped tokens, minimal IAM permissions)
-- Disable network-using tools in `settings.json` `permissions` block when working offline
+- Disable network-using commands when working offline (`security.allow_network_commands: false` in `settings.json`)
 
 For security baseline, see [SECURITY_CHECKLIST.md](SECURITY_CHECKLIST.md).

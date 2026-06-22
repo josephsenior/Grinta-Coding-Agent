@@ -30,10 +30,10 @@ If you observe latencies meaningfully worse than p95 targets, investigate before
 
 - **`/compact`** — manually condense history when context gets tight.
 - **`enable_task_tracker_tool`** — improves long-task discipline at a small token cost.
-- **`enable_think`** — improves weak-model success at a moderate token cost; usually not needed for o1/r1/deepseek-reasoner.
+- **Reasoning effort** (`llm_reasoning_effort` / model catalog) — improves weak-model success at a moderate token cost; usually not needed for o1/r1/deepseek-reasoner.
 - **Disable unused MCP servers** — every connected server adds tools to the prompt.
 - **Use `--model`** to switch to a cheaper model for routine tasks (`gpt-4o-mini`, `gemini-2.5-flash`, local 7B).
-- **Cost guard:** set `permissions.max_cost_per_task` in `settings.json` to a dollar cap; the rate governor will stop the agent if exceeded.
+- **Cost guard:** set `max_budget_per_task` in `settings.json` to a dollar cap; the rate governor will stop the agent if exceeded.
 
 ## Throughput and parallelism
 
@@ -43,7 +43,10 @@ If you observe latencies meaningfully worse than p95 targets, investigate before
 
 ## Memory footprint
 
-- Idle REPL: ~150 MB
+Measured on a clean `pipx install grinta-ai` base wheel (no `[rag]` / `[browser]` extras), Python 3.12, Linux x86_64:
+
+- Idle REPL: ~150 MB RSS (target; run `ps` after launch to verify on your machine)
+- Base install on disk: ~400 MB under `~/.local/pipx/venvs/grinta-ai` before optional extras (tree-sitter grammars dominate)
 - Mid-task with semantic RAG warm: ~600 MB–1.2 GB (ChromaDB + sentence-transformers)
 - Long sessions: bounded by auto-compaction; if memory grows unboundedly, file an issue.
 

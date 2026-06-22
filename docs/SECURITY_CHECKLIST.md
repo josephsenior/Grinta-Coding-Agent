@@ -25,6 +25,12 @@ Grinta is **local-first** and runs with **your** user privileges. It is **not** 
 | **Secret masker** | Known secret patterns stripped from output before display/logging |
 | **Shell guard** | Detects `rm -rf /`, force pushes, encoded payloads, privilege escalation, network exfiltration |
 
+## Read-outside-workspace (`allow_read_outside_workspace`)
+
+- Default is **off**. When enabled, only paths listed in `additional_read_roots` become readable (not the whole filesystem).
+- A sensitive-path deny list always blocks common secret locations (`.ssh`, `.env`, `.npmrc`, `.docker/config.json`, …).
+- **Shell bypass:** file-read tools honor the boundary, but Agent-mode shell commands (`cat`, `Get-Content`, …) do not. Use `hardened_local` or conservative autonomy on unfamiliar repos.
+
 ## What Grinta is **not**
 
 | Misconception | Reality |
@@ -40,7 +46,7 @@ Grinta is **local-first** and runs with **your** user privileges. It is **not** 
 - [ ] Review the audit log (`~/.grinta/workspaces/<id>/storage/<session>/audit/`) after long sessions
 - [ ] Scope API keys to per-project with low spend limits
 - [ ] Pin Grinta to a known version in production-adjacent workflows; track `CHANGELOG.md`
-- [ ] Disable network-using tools in `settings.json` `permissions` block when working offline
+- [ ] Disable network-using commands when working offline (`security.allow_network_commands: false` in `settings.json`)
 
 ## Reporting a vulnerability
 

@@ -12,11 +12,12 @@ grinta init           # First-run wizard: pick provider, paste key
 grinta                # Start the terminal app
 ```
 
-**Windows convenience (pipx):** after `pipx install grinta-ai`, you can run
-[`START_HERE_PIPX.ps1`](START_HERE_PIPX.ps1) from a source checkout (or copy
-[`scripts/launch/start_here_pipx.ps1`](scripts/launch/start_here_pipx.ps1))
-to probe local model servers, run `grinta init` when `~/.grinta/settings.json`
-is missing, and launch the TUI. Unix/macOS pipx users: [`start_here_pipx.sh`](start_here_pipx.sh).
+**Windows convenience (pipx):** after `pipx install grinta-ai`, run
+[`START_HERE.ps1`](START_HERE.ps1) with `-Pipx` from a source checkout (or run
+[`scripts/launch/start_here_pipx.ps1`](scripts/launch/start_here_pipx.ps1)
+directly) to probe local model servers, run `grinta init` when
+`~/.grinta/settings.json` is missing, and launch the TUI. Unix/macOS pipx users:
+[`start_here.sh --pipx`](start_here.sh).
 
 Works on Windows, macOS, Linux. Requires Python 3.12+. Installed runs store settings at `~/.grinta/settings.json` and runtime state under `~/.grinta/workspaces/<id>/storage`.
 
