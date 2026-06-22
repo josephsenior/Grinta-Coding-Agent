@@ -23,6 +23,21 @@ def _browser_runtime(config: Any) -> bool:
     return browser_tool_enabled(config)
 
 
+def _render_parallel_scheduling_line(
+    config: Any,
+    *,
+    parallel_tool_calls_provider_flag: bool,
+) -> str:
+    """One-line parallel tool_calls hint when the runtime supports it; else omit."""
+    parallel_enabled = bool(getattr(config, 'enable_parallel_tool_scheduling', False))
+    if not (parallel_enabled and parallel_tool_calls_provider_flag):
+        return ''
+    return (
+        '- **Parallel tool calls**: supported — emit multiple independent tool_calls '
+        'in one assistant message when that improves latency.'
+    )
+
+
 def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
     r"""Return ``(lsp_line, dap_line)`` summarizing detected runtimes.
 
@@ -104,26 +119,9 @@ def _render_system_capabilities(
 
     can_edit = not (is_chat_mode(mode) or is_plan_mode(mode))
 
-    parallel_enabled = bool(getattr(config, 'enable_parallel_tool_scheduling', False))
-    web_on = bool(getattr(config, 'enable_web', True))
-    docs_on = bool(getattr(config, 'enable_docs', True))
-    parallel_read_only_tools = (
-        '`read`, `grep`, `glob`, `find_symbols`, `analyze_project_structure`, `lsp`'
-    )
-    if web_on:
-        parallel_read_only_tools += ', `web_search`, `web_fetch`'
-    if docs_on:
-        parallel_read_only_tools += ', `docs_resolve`, `docs_query`'
-    parallel_line = (
-        (
-            '- **Parallel tool scheduling**: ENABLED for read-only batches '
-            f'({parallel_read_only_tools}).\n'
-            '  - **Usage**: Emitting multiple tool_calls in one assistant message is supported. '
-            'Emit independent reads in a single assistant turn to run them concurrently.\n'
-            '  - **Constraint**: Only read-only observation tools may run concurrently. Mutating tools, file edits, shell commands, task tracking, and ask_user actions are executed sequentially in model order.'
-        )
-        if parallel_enabled and parallel_tool_calls_provider_flag
-        else ''
+    parallel_line = _render_parallel_scheduling_line(
+        config,
+        parallel_tool_calls_provider_flag=parallel_tool_calls_provider_flag,
     )
 
     condensation_tiers = (

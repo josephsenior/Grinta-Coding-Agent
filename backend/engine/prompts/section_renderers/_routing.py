@@ -11,7 +11,6 @@ from backend.engine.prompts.section_renderers._env_hints import (
     _lsp_available,
     _repo_discovery_contract,
     _routing_memory_tool_placeholders,
-    _routing_tool_batching_paragraph,
 )
 
 
@@ -68,7 +67,6 @@ def _render_routing(
         if debugger_available
         else ''
     )
-    tool_call_batching_mode = _routing_tool_batching_paragraph(function_calling_mode)
     memory_kw = _routing_memory_tool_placeholders(
         working_memory_on=working_memory_on,
         tracker_on=tracker_on,
@@ -107,7 +105,6 @@ def _render_routing(
         post_condensation_retrieval=memory_kw['post_condensation_retrieval'],
         remaining_work_source_of_truth=memory_kw['remaining_work_source_of_truth'],
         surviving_state_facts=memory_kw['surviving_state_facts'],
-        tool_call_batching_mode=tool_call_batching_mode,
         read_and_edit_ladder=read_and_edit_ladder,
         shell_and_execution_ladder=shell_and_execution_ladder,
     )
