@@ -285,6 +285,7 @@ class CollapsibleSection(Container):
         width: 100%;
         margin-bottom: 1;
         align: left middle;
+        padding-right: 0;
     }
     CollapsibleSection .section-icon {
         width: auto;
@@ -302,33 +303,39 @@ class CollapsibleSection(Container):
         color: #c8d4e8;
     }
     CollapsibleSection .sidebar-manage-btn {
+        dock: right;
         height: 1;
         min-height: 1;
         min-width: 0;
         width: auto;
         padding: 0 1;
-        margin: 0;
-        border: none;
-        background: transparent;
+        margin: 0 0 0 1;
+        border: round #26324f;
+        background: #0a1324;
         text-style: none;
+        color: #6f83aa;
     }
     CollapsibleSection .sidebar-manage-btn.-mcp {
-        color: #6f83aa;
+        border: round #3d3528;
+        color: #b89a6a;
+        background: #12100c;
     }
     CollapsibleSection .sidebar-manage-btn.-mcp:hover,
     CollapsibleSection .sidebar-manage-btn.-mcp:focus {
-        background: transparent;
+        background: #1a1610;
         color: #eacb8a;
-        border: none;
+        border: round #eacb8a;
     }
     CollapsibleSection .sidebar-manage-btn.-skill {
-        color: #6f83aa;
+        border: round #352a45;
+        color: #a88fd4;
+        background: #100c16;
     }
     CollapsibleSection .sidebar-manage-btn.-skill:hover,
     CollapsibleSection .sidebar-manage-btn.-skill:focus {
-        background: transparent;
+        background: #181024;
         color: #c792ea;
-        border: none;
+        border: round #c792ea;
     }
     CollapsibleSection .collapsible-body {
         width: 100%;
@@ -463,7 +470,6 @@ class CollapsibleSection(Container):
                     self._action_label,
                     id='action-btn',
                     classes=btn_classes,
-                    variant='primary',
                 )
 
         body_classes = (
