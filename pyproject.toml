@@ -63,7 +63,7 @@ dependencies = [
   "termcolor>=3.1,<4",
   "textual>=1,<9",
   "tree-sitter>=0.24,<0.26",
-  "tree-sitter-language-pack>=0.7.3,<1.10",
+  "tree-sitter-language-pack>=0.7.3,<1.11",
   "urllib3>=2.7,<3",
   "uvicorn>=0.30,<1",
 ]
@@ -102,7 +102,7 @@ dev = [
   "pylint>=4.0.5,<5",
   "pytest>=9.0.3",
   "pytest-asyncio>=1.4,<2",
-  "ruff==0.15.17",
+  "ruff==0.15.18",
   "tiktoken>=0.12",
   "types-pyyaml>=6.0.12.20250516",
   "types-requests>=2.32.4.20260107",
