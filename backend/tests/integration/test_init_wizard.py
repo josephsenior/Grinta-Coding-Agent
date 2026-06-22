@@ -99,7 +99,7 @@ class TestInitWizardCrossPlatform:
         platform_info = _get_platform_info()
 
         assert platform_info in ('Windows', 'macOS', 'Linux')
-        assert any(p in platform_info for p in ('Windows', 'Darwin', 'Linux'))
+        assert any(p in platform_info for p in ('Windows', 'macOS', 'Linux'))
 
     @pytest.mark.integration
     def test_init_command_fails_fast_without_tty(self, tmp_path: Path) -> None:
