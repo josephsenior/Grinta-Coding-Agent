@@ -18,7 +18,6 @@ from backend.core.tasks.task_status import (
     TASK_STATUS_TODO,
 )
 
-
 _SAVE_LOCKS: dict[str, threading.Lock] = {}
 _SAVE_LOCKS_GUARD = threading.Lock()
 
