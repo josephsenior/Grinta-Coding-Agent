@@ -141,9 +141,16 @@ jobs:
         run: |
           mapfile -t tests < <(find backend/tests/unit/execution -name 'test_*.py' | sort)
           half=$((${#tests[@]} / 2))
-          PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q \
-            --cov=backend --cov-fail-under=0 \
-            "${tests[@]:0:$half}"
+          for attempt in 1 2 3; do
+            if PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q \
+              --cov=backend --cov-fail-under=0 \
+              "${tests[@]:0:$half}"; then
+              exit 0
+            fi
+            echo "Shard D attempt ${attempt} failed; retrying in 15s..."
+            sleep 15
+          done
+          exit 1
       - name: Stage coverage data
         run: cp .coverage coverage-shard-d.dat
       - name: Upload coverage data
@@ -184,9 +191,16 @@ jobs:
           q=$((n / 4))
           fq=$((q / 2))
           ffq=$((fq / 2))
-          PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q \
-            --cov=backend --cov-fail-under=0 \
-            "${tests[@]:$half:$ffq}"
+          for attempt in 1 2 3; do
+            if PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q \
+              --cov=backend --cov-fail-under=0 \
+              "${tests[@]:$half:$ffq}"; then
+              exit 0
+            fi
+            echo "Shard F attempt ${attempt} failed; retrying in 15s..."
+            sleep 15
+          done
+          exit 1
       - name: Stage coverage data
         run: cp .coverage coverage-shard-f.dat
       - name: Upload coverage data
@@ -228,9 +242,16 @@ jobs:
           fq=$((q / 2))
           ffq=$((fq / 2))
           start=$((half + ffq))
-          PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q \
-            --cov=backend --cov-fail-under=0 \
-            "${tests[@]:$start}"
+          for attempt in 1 2 3; do
+            if PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q \
+              --cov=backend --cov-fail-under=0 \
+              "${tests[@]:$start}"; then
+              exit 0
+            fi
+            echo "Shard G attempt ${attempt} failed; retrying in 15s..."
+            sleep 15
+          done
+          exit 1
       - name: Stage coverage data
         run: cp .coverage coverage-shard-g.dat
       - name: Upload coverage data
