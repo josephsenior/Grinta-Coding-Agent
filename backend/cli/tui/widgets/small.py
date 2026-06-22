@@ -7,9 +7,6 @@ is <3 KB and they share similar import profiles.
 
 from __future__ import annotations
 
-import json
-import time
-from pathlib import Path
 from typing import Any
 
 import pyperclip
@@ -22,46 +19,6 @@ from textual.widgets import Label, Select, Static, TextArea
 
 from backend.cli.tui.transcript_typography import esc_hint_markup
 from backend.core.interaction_modes import AGENT_MODE, VISIBLE_INTERACTION_MODES
-
-_DEBUG_SESSION_ID = '64043f'
-_DEBUG_LOG_PATH = Path(__file__).resolve().parents[4] / 'debug-64043f.log'
-
-
-def _agent_debug_log(
-    *,
-    run_id: str,
-    hypothesis_id: str,
-    location: str,
-    message: str,
-    data: dict[str, Any],
-) -> None:
-    payload = {
-        'sessionId': _DEBUG_SESSION_ID,
-        'id': f'{_DEBUG_SESSION_ID}-{time.time_ns()}',
-        'runId': run_id,
-        'hypothesisId': hypothesis_id,
-        'location': location,
-        'message': message,
-        'data': data,
-        'timestamp': int(time.time() * 1000),
-    }
-    line = json.dumps(payload, ensure_ascii=True, default=str) + '\n'
-    targets: list[Path] = [_DEBUG_LOG_PATH]
-    try:
-        from backend.core.logging.logger import get_log_dir
-
-        session_log_path = Path(get_log_dir()) / f'debug-{_DEBUG_SESSION_ID}.log'
-        if session_log_path not in targets:
-            targets.append(session_log_path)
-    except Exception:
-        pass
-    for path in targets:
-        try:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            with path.open('a', encoding='utf-8') as handle:
-                handle.write(line)
-        except Exception:
-            continue
 
 
 class ScrollTailBadge(Static):
@@ -150,7 +107,6 @@ class Transcript(VerticalScroll):
         self._last_scroll_y = 0.0
         self._last_max_scroll_y = 0.0
         self._load_earlier_button: Static | None = None
-        self._debug_mount_logged = False
         self._follow_tail_pending = False
 
     def compose(self) -> ComposeResult:
@@ -158,17 +114,6 @@ class Transcript(VerticalScroll):
 
     def on_mount(self) -> None:
         self._scroll_badge = self.query_one('#scroll-badge', ScrollTailBadge)
-        if not self._debug_mount_logged:
-            self._debug_mount_logged = True
-            # region agent log
-            _agent_debug_log(
-                run_id='pre-fix',
-                hypothesis_id='H4',
-                location='widgets/small.py:on_mount',
-                message='transcript instrumentation active',
-                data={'widget': 'Transcript'},
-            )
-            # endregion
 
     def _update_scroll_badge(self) -> None:
         badge = self._scroll_badge
@@ -188,30 +133,10 @@ class Transcript(VerticalScroll):
     def _set_user_scrolled_away(
         self, value: bool, *, reason: str = 'unspecified'
     ) -> None:
-        was_away = bool(self._user_scrolled_away)
-        was_user_initiated = bool(self._user_initiated_scroll_away)
         self._user_scrolled_away = value
         if not value:
             self._user_initiated_scroll_away = False
             self._tail_unread_count = 0
-        if was_away != bool(value):
-            # region agent log
-            _agent_debug_log(
-                run_id='pre-fix',
-                hypothesis_id='H6',
-                location='widgets/small.py:_set_user_scrolled_away',
-                message='user scrolled-away state changed',
-                data={
-                    'reason': reason,
-                    'from': bool(was_away),
-                    'to': bool(value),
-                    'wasUserInitiatedAway': bool(was_user_initiated),
-                    'isUserInitiatedAway': bool(self._user_initiated_scroll_away),
-                    'scrollY': round(float(self.scroll_y), 2),
-                    'maxScrollY': round(float(self.max_scroll_y), 2),
-                },
-            )
-            # endregion
         badge = self._scroll_badge
         if badge is None:
             return
@@ -254,45 +179,15 @@ class Transcript(VerticalScroll):
         max_y = self.max_scroll_y
         scroll_y = self.scroll_y
         last_max_y = self._last_max_scroll_y
-        last_scroll_y = self._last_scroll_y
         self._last_max_scroll_y = max_y
         self._last_scroll_y = scroll_y
 
         if self._user_scrolled_away:
             if from_user_scroll and self._was_at_bottom():
-                # region agent log
-                _agent_debug_log(
-                    run_id='post-fix',
-                    hypothesis_id='H6',
-                    location='widgets/small.py:_sync_scroll_state_from_position',
-                    message='user scrolled back to bottom; re-engaging follow',
-                    data={
-                        'scrollY': round(float(scroll_y), 2),
-                        'lastScrollY': round(float(last_scroll_y), 2),
-                        'maxScrollY': round(float(max_y), 2),
-                        'userInitiatedAway': bool(self._user_initiated_scroll_away),
-                    },
-                )
-                # endregion
                 self._set_user_scrolled_away(
                     False,
                     reason='user_scrolled_back_to_bottom',
                 )
-            elif self._was_at_bottom() and scroll_y > last_scroll_y + 0.5:
-                # region agent log
-                _agent_debug_log(
-                    run_id='post-fix',
-                    hypothesis_id='H6',
-                    location='widgets/small.py:_sync_scroll_state_from_position',
-                    message='programmatic bottom landing ignored (away preserved)',
-                    data={
-                        'scrollY': round(float(scroll_y), 2),
-                        'lastScrollY': round(float(last_scroll_y), 2),
-                        'maxScrollY': round(float(max_y), 2),
-                        'userInitiatedAway': bool(self._user_initiated_scroll_away),
-                    },
-                )
-                # endregion
             return
 
         if max_y > last_max_y:
@@ -327,19 +222,6 @@ class Transcript(VerticalScroll):
         if self.max_scroll_y > 0:
             self._user_initiated_scroll_away = True
             self._set_user_scrolled_away(True, reason='pause_auto_scroll')
-            # region agent log
-            _agent_debug_log(
-                run_id='pre-fix',
-                hypothesis_id='H4',
-                location='widgets/small.py:pause_auto_scroll',
-                message='user paused auto-scroll',
-                data={
-                    'scrollY': round(float(self.scroll_y), 2),
-                    'maxScrollY': round(float(self.max_scroll_y), 2),
-                    'tailUnread': int(self._tail_unread_count),
-                },
-            )
-            # endregion
 
     def _content_widgets(self) -> list[Widget]:
         widgets: list[Widget] = []
@@ -354,12 +236,17 @@ class Transcript(VerticalScroll):
         return widgets
 
     def sync_viewport(self, renderer: Any) -> None:
-        """Unmount off-viewport widgets while retaining render cache for replay."""
+        """Unmount off-viewport widgets and release their per-event render state.
+
+        Pruned widgets are fully discarded (not cached) so the Python GC can
+        reclaim them. Retaining detached widget trees was the root cause of the
+        progressive event-loop freeze: GC pause time grew with the number of
+        retained widgets across a long conversation.
+        """
         from backend.cli.tui.constants import (
             _TUI_VIEWPORT_MAX_MOUNTED,
             _TUI_VIEWPORT_OVERSCAN,
         )
-        from backend.cli.tui.renderer.prep import RenderArtifact
 
         widgets = self._content_widgets()
         max_mounted = _TUI_VIEWPORT_MAX_MOUNTED
@@ -384,34 +271,11 @@ class Transcript(VerticalScroll):
             return
 
         to_unmount = widgets[:overflow]
-        # region agent log
-        _agent_debug_log(
-            run_id='pre-fix',
-            hypothesis_id='H1',
-            location='widgets/small.py:sync_viewport',
-            message='viewport pruning mounted widgets',
-            data={
-                'widgetCount': len(widgets),
-                'maxMounted': max_mounted,
-                'overflow': overflow,
-                'unmountCount': len(to_unmount),
-                'underBackpressure': bool(self._under_backpressure),
-            },
-        )
-        # endregion
-
-        cache = getattr(renderer, '_render_cache', None)
+        forget = getattr(renderer, '_forget_event_state', None)
         for widget in to_unmount:
             setattr(widget, '_tui_removing', True)
-            event_id = getattr(widget, '_ledger_event_id', None)
-            if cache is not None and event_id is not None:
-                cache[event_id] = RenderArtifact(
-                    event_id,
-                    widget,
-                    measured_height=max(getattr(widget, 'size', None).height, 1)
-                    if getattr(widget, 'size', None)
-                    else 1,
-                )
+            if callable(forget):
+                forget(getattr(widget, '_ledger_event_id', None))
             try:
                 widget.remove()
             except Exception:
@@ -428,11 +292,10 @@ class Transcript(VerticalScroll):
         """Prune oldest widgets fully above the viewport while scrolled away.
 
         Keeps an ``overscan`` margin of widgets above the viewport for smooth
-        upward scrolling, caches removed widgets for replay, and re-anchors the
-        scroll position so the user's visible content does not shift.
+        upward scrolling, discards removed widgets (so the GC can reclaim them),
+        and re-anchors the scroll position so the user's visible content does
+        not shift.
         """
-        from backend.cli.tui.renderer.prep import RenderArtifact
-
         scroll_y = float(self.scroll_y)
         widgets = self._content_widgets()
 
@@ -451,21 +314,6 @@ class Transcript(VerticalScroll):
         prunable_end = max(0, anchor_index - max(0, overscan))
         prunable = widgets[:prunable_end][:overflow]
         if not prunable:
-            # region agent log
-            _agent_debug_log(
-                run_id='post-fix',
-                hypothesis_id='H1',
-                location='widgets/small.py:_prune_above_viewport',
-                message='away prune skipped: no off-screen room above viewport',
-                data={
-                    'widgetCount': len(widgets),
-                    'maxMounted': max_mounted,
-                    'overflow': overflow,
-                    'anchorIndex': anchor_index,
-                    'scrollY': round(scroll_y, 2),
-                },
-            )
-            # endregion
             return
 
         anchor = widgets[anchor_index]
@@ -474,18 +322,12 @@ class Transcript(VerticalScroll):
             float(anchor_region.y) - scroll_y if anchor_region is not None else 0.0
         )
 
-        cache = getattr(renderer, '_render_cache', None)
+        forget = getattr(renderer, '_forget_event_state', None)
         removed = 0
         for widget in prunable:
             setattr(widget, '_tui_removing', True)
-            event_id = getattr(widget, '_ledger_event_id', None)
-            if cache is not None and event_id is not None:
-                size = getattr(widget, 'size', None)
-                cache[event_id] = RenderArtifact(
-                    event_id,
-                    widget,
-                    measured_height=max(size.height, 1) if size else 1,
-                )
+            if callable(forget):
+                forget(getattr(widget, '_ledger_event_id', None))
             try:
                 widget.remove()
                 removed += 1
@@ -494,23 +336,6 @@ class Transcript(VerticalScroll):
 
         if not removed:
             return
-
-        # region agent log
-        _agent_debug_log(
-            run_id='post-fix',
-            hypothesis_id='H1',
-            location='widgets/small.py:_prune_above_viewport',
-            message='viewport pruned above-viewport widgets while away from tail',
-            data={
-                'widgetCountBefore': len(widgets),
-                'removed': removed,
-                'widgetCountAfter': len(widgets) - removed,
-                'maxMounted': max_mounted,
-                'anchorIndex': anchor_index,
-                'scrollY': round(scroll_y, 2),
-            },
-        )
-        # endregion
 
         # Re-anchor after the removal relayout so the visible content stays put.
         self._suppress_scroll_sync = True
@@ -540,20 +365,6 @@ class Transcript(VerticalScroll):
 
     def on_scroll(self, _event: Widget.Scroll) -> None:
         if self._suppress_scroll_sync:
-            # region agent log
-            _agent_debug_log(
-                run_id='pre-fix',
-                hypothesis_id='H2',
-                location='widgets/small.py:on_scroll',
-                message='scroll event ignored due suppress flag',
-                data={
-                    'suppressScrollSync': True,
-                    'scrollY': round(float(self.scroll_y), 2),
-                    'maxScrollY': round(float(self.max_scroll_y), 2),
-                    'userScrolledAway': bool(self._user_scrolled_away),
-                },
-            )
-            # endregion
             return
         self._sync_scroll_state_from_position()
         self._maybe_prefetch_earlier()
@@ -564,19 +375,6 @@ class Transcript(VerticalScroll):
         # swallow this input during active streaming.
         self._suppress_scroll_sync = False
         self.pause_auto_scroll()
-        # region agent log
-        _agent_debug_log(
-            run_id='pre-fix',
-            hypothesis_id='H4',
-            location='widgets/small.py:_on_mouse_scroll_up',
-            message='mouse scroll up received by transcript',
-            data={
-                'scrollYBefore': round(float(self.scroll_y), 2),
-                'maxScrollYBefore': round(float(self.max_scroll_y), 2),
-                'userScrolledAway': bool(self._user_scrolled_away),
-            },
-        )
-        # endregion
         super()._on_mouse_scroll_up(event)
 
     def _sync_scroll_state_from_user_scroll(self) -> None:
@@ -625,22 +423,7 @@ class Transcript(VerticalScroll):
             try:
                 if self._user_scrolled_away:
                     return
-                was_suppressed = bool(self._suppress_scroll_sync)
                 self._suppress_scroll_sync = True
-                if was_suppressed:
-                    # region agent log
-                    _agent_debug_log(
-                        run_id='pre-fix',
-                        hypothesis_id='H5',
-                        location='widgets/small.py:_schedule_follow_tail',
-                        message='follow-tail scheduled while suppress already active',
-                        data={
-                            'scrollY': round(float(self.scroll_y), 2),
-                            'maxScrollY': round(float(self.max_scroll_y), 2),
-                            'underBackpressure': bool(self._under_backpressure),
-                        },
-                    )
-                    # endregion
                 self.scroll_end(animate=False, force=True, immediate=True)
                 self.call_after_refresh(self._release_programmatic_scroll)
             finally:
@@ -651,20 +434,6 @@ class Transcript(VerticalScroll):
     def _release_programmatic_scroll(self) -> None:
         self._suppress_scroll_sync = False
         self._sync_scroll_state_from_position()
-        # region agent log
-        _agent_debug_log(
-            run_id='pre-fix',
-            hypothesis_id='H2',
-            location='widgets/small.py:_release_programmatic_scroll',
-            message='programmatic scroll suppression released',
-            data={
-                'scrollY': round(float(self.scroll_y), 2),
-                'maxScrollY': round(float(self.max_scroll_y), 2),
-                'userInitiatedAway': bool(self._user_initiated_scroll_away),
-                'userScrolledAway': bool(self._user_scrolled_away),
-            },
-        )
-        # endregion
         if self._was_at_bottom() and not self._user_initiated_scroll_away:
             self._set_user_scrolled_away(False, reason='release_programmatic_bottom')
 
@@ -691,25 +460,6 @@ class Transcript(VerticalScroll):
             self._schedule_follow_tail()
         else:
             self.note_tail_activity()
-        content_count = self.child_widget_count
-        if content_count and content_count % 200 == 0:
-            # region agent log
-            _agent_debug_log(
-                run_id='pre-fix',
-                hypothesis_id='H1',
-                location='widgets/small.py:append_widget',
-                message='transcript content growth checkpoint',
-                data={
-                    'contentCount': content_count,
-                    'shouldFollow': bool(should_follow),
-                    'userScrolledAway': bool(self._user_scrolled_away),
-                    'underBackpressure': bool(self._under_backpressure),
-                    'tailUnread': int(self._tail_unread_count),
-                    'scrollY': round(float(self.scroll_y), 2),
-                    'maxScrollY': round(float(self.max_scroll_y), 2),
-                },
-            )
-            # endregion
 
     def write(self, renderable: Any) -> None:
         """Compatibility method for RichLog interface."""
@@ -719,21 +469,6 @@ class Transcript(VerticalScroll):
         self, *, animate: bool = False, reason: str = 'force_scroll_end'
     ) -> None:
         """Scroll to bottom regardless of user scroll state."""
-        # region agent log
-        _agent_debug_log(
-            run_id='pre-fix',
-            hypothesis_id='H7',
-            location='widgets/small.py:force_scroll_end',
-            message='force_scroll_end invoked',
-            data={
-                'reason': reason,
-                'scrollY': round(float(self.scroll_y), 2),
-                'maxScrollY': round(float(self.max_scroll_y), 2),
-                'userInitiatedAway': bool(self._user_initiated_scroll_away),
-                'userScrolledAway': bool(self._user_scrolled_away),
-            },
-        )
-        # endregion
         self._set_user_scrolled_away(False, reason=f'force_scroll_end:{reason}')
         self._suppress_scroll_sync = True
         self.scroll_end(animate=animate, force=True, immediate=not animate)
