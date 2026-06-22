@@ -33,12 +33,31 @@ class RendererDisplayMixin:
         event_id = getattr(self, '_current_event_id', -1)
         if event_id < 0:
             return
+        # Tag the widget so the viewport pruner can release this event's render
+        # state when the widget is unmounted. We deliberately do NOT retain the
+        # widget object anywhere: holding detached widget trees across a long
+        # conversation made GC pause time grow without bound, which starved the
+        # Textual event loop (the progressive freeze symptom).
         setattr(widget, '_ledger_event_id', event_id)
+
+    def _forget_event_state(self, event_id: int | None) -> None:
+        """Drop all per-event render state so a pruned widget can be GC'd.
+
+        Called by the transcript viewport when it unmounts an off-screen widget.
+        Clearing the event id from ``_mounted_event_ids`` also lets the
+        load-earlier replay path re-render the row if the user scrolls back up.
+        """
+        if event_id is None or event_id < 0:
+            return
         cache = getattr(self, '_render_cache', None)
         if cache is not None:
-            from backend.cli.tui.renderer.prep import RenderArtifact
-
-            cache[event_id] = RenderArtifact(event_id, widget, measured_height=1)
+            cache.pop(event_id, None)
+        prep = getattr(self, '_render_prep_cache', None)
+        if prep is not None:
+            prep.pop(event_id, None)
+        mounted = getattr(self, '_mounted_event_ids', None)
+        if mounted is not None:
+            mounted.discard(event_id)
 
     def clear_history(self) -> None:
         self._live_thinking_widget = None

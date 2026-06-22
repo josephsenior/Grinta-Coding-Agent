@@ -193,6 +193,12 @@ if TYPE_CHECKING:
 # Re-export for RendererEventProcessorMixin.
 _show_compaction_started_card = show_compaction_started_card
 
+# Upper bound on the replay-dedup set. Event ids are monotonic, so when the set
+# grows past the cap we keep only the most recent ids. This keeps per-event
+# bookkeeping O(1) and memory constant across very long conversations.
+_MOUNTED_EVENT_ID_CAP = 8192
+_MOUNTED_EVENT_ID_RETAIN = 4096
+
 
 # ---------------------------------------------------------------------------
 # Per-event-type handlers
@@ -367,9 +373,11 @@ def _process_event(orch: 'RendererEventProcessorMixin', event: Any) -> None:
         mounted = getattr(orch, '_mounted_event_ids', None)
         if mounted is not None:
             mounted.add(event_id)
-        order = getattr(orch, '_event_order', None)
-        if order is not None and event_id not in order:
-            order.append(event_id)
+            if len(mounted) > _MOUNTED_EVENT_ID_CAP:
+                # Keep only the most recent ids; older events are long pruned.
+                keep = sorted(mounted)[-_MOUNTED_EVENT_ID_RETAIN:]
+                mounted.clear()
+                mounted.update(keep)
     orch._current_event_id = -1
     if not getattr(orch, '_async_drain_active', False):
         flush_sync = getattr(orch, 'flush_pending_final_commits_sync', None)

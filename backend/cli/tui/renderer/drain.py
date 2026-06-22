@@ -16,10 +16,8 @@ Owns:
 from __future__ import annotations
 
 import asyncio
-import json
 import time
 from functools import partial
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from rich.text import Text
@@ -38,50 +36,11 @@ if TYPE_CHECKING:
     )
 
 _TUI_DRAIN_DEBOUNCE_SECONDS = 0.016
-_DEBUG_SESSION_ID = '64043f'
-_DEBUG_LOG_PATH = Path(__file__).resolve().parents[4] / 'debug-64043f.log'
 
 # Pending-queue depth at which we proactively disable transcript mount
 # animations. Skipping the per-widget 0.2s animation during bursts prevents
 # the Textual event loop from stalling while many cards mount at once.
 _TUI_BACKPRESSURE_PENDING_THRESHOLD = 8
-
-
-def _agent_debug_log(
-    *,
-    run_id: str,
-    hypothesis_id: str,
-    location: str,
-    message: str,
-    data: dict[str, Any],
-) -> None:
-    payload = {
-        'sessionId': _DEBUG_SESSION_ID,
-        'id': f'{_DEBUG_SESSION_ID}-{time.time_ns()}',
-        'runId': run_id,
-        'hypothesisId': hypothesis_id,
-        'location': location,
-        'message': message,
-        'data': data,
-        'timestamp': int(time.time() * 1000),
-    }
-    line = json.dumps(payload, ensure_ascii=True, default=str) + '\n'
-    targets: list[Path] = [_DEBUG_LOG_PATH]
-    try:
-        from backend.core.logging.logger import get_log_dir
-
-        session_log_path = Path(get_log_dir()) / f'debug-{_DEBUG_SESSION_ID}.log'
-        if session_log_path not in targets:
-            targets.append(session_log_path)
-    except Exception:
-        pass
-    for path in targets:
-        try:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            with path.open('a', encoding='utf-8') as handle:
-                handle.write(line)
-        except Exception:
-            continue
 
 
 def _set_display_backpressure(
@@ -446,17 +405,6 @@ async def drain_events_async(orch: 'RendererEventProcessorMixin') -> None:
     orch._async_drain_active = True
     last_batch: list[Any] = []
     last_streaming_only = False
-    if not getattr(orch, '_debug_drain_seen', False):
-        setattr(orch, '_debug_drain_seen', True)
-        # region agent log
-        _agent_debug_log(
-            run_id='pre-fix',
-            hypothesis_id='H3',
-            location='renderer/drain.py:drain_events_async',
-            message='drain instrumentation active',
-            data={'pendingDepth': int(len(getattr(orch, '_pending_events', [])))},
-        )
-        # endregion
 
     try:
         while True:
@@ -471,39 +419,12 @@ async def drain_events_async(orch: 'RendererEventProcessorMixin') -> None:
             streaming_only = _is_streaming_only_batch(events)
             last_batch = events
             last_streaming_only = streaming_only
-            if dropped or len(events) >= 20:
-                # region agent log
-                _agent_debug_log(
-                    run_id='pre-fix',
-                    hypothesis_id='H3',
-                    location='renderer/drain.py:drain_events_async',
-                    message='large drain batch observed',
-                    data={
-                        'batchSize': len(events),
-                        'dropped': int(dropped),
-                        'streamingOnly': bool(streaming_only),
-                    },
-                )
-                # endregion
 
             processed = await _process_events_with_frame_budget(orch, events)
             if processed < len(events):
                 remainder = events[processed:]
                 with orch._pending_lock:
                     orch._pending_events.extendleft(reversed(remainder))
-                # region agent log
-                _agent_debug_log(
-                    run_id='pre-fix',
-                    hypothesis_id='H3',
-                    location='renderer/drain.py:drain_events_async',
-                    message='frame budget exhausted before finishing batch',
-                    data={
-                        'batchSize': len(events),
-                        'processed': int(processed),
-                        'remainder': int(len(remainder)),
-                    },
-                )
-                # endregion
 
             has_pending = False
             with orch._pending_lock:
@@ -529,18 +450,6 @@ async def drain_events_async(orch: 'RendererEventProcessorMixin') -> None:
 
             elapsed = time.monotonic() - invocation_started
             if elapsed >= _TUI_DRAIN_INVOCATION_BUDGET_SECONDS:
-                # region agent log
-                _agent_debug_log(
-                    run_id='pre-fix',
-                    hypothesis_id='H3',
-                    location='renderer/drain.py:drain_events_async',
-                    message='invocation budget reached, forcing immediate drain',
-                    data={
-                        'elapsedMs': round(elapsed * 1000.0, 2),
-                        'pendingDepth': int(len(getattr(orch, '_pending_events', []))),
-                    },
-                )
-                # endregion
                 _force_immediate_drain(orch)
                 break
 
@@ -567,22 +476,6 @@ async def drain_events_async(orch: 'RendererEventProcessorMixin') -> None:
         len(last_batch),
         last_streaming_only,
     )
-    if pending_depth >= _TUI_BACKPRESSURE_PENDING_THRESHOLD:
-        # region agent log
-        _agent_debug_log(
-            run_id='pre-fix',
-            hypothesis_id='H3',
-            location='renderer/drain.py:drain_events_async',
-            message='drain exit with elevated pending depth',
-            data={
-                'elapsedMs': round(elapsed_ms, 2),
-                'pendingDepth': int(pending_depth),
-                'prepDepth': int(prep_depth),
-                'lastBatchSize': int(len(last_batch)),
-                'streamingOnly': bool(last_streaming_only),
-            },
-        )
-        # endregion
     if pending_depth and requested_while_active:
         _force_immediate_drain(orch)
 
