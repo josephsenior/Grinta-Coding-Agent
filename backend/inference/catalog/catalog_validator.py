@@ -163,6 +163,15 @@ def _validate_runtime_block(
                     'supports_reasoning_effort requires reasoning_efforts or metadata.variants',
                 )
             )
+        wire_value = wire.strip().lower() if isinstance(wire, str) else ''
+        if wire_value == WIRE_NONE and (has_variants or isinstance(efforts, list)):
+            issues.append(
+                CatalogValidationIssue(
+                    provider,
+                    model_name,
+                    'supports_reasoning_effort with tiers requires a non-none reasoning_wire',
+                )
+            )
         if isinstance(wire, str) and wire.strip() and wire not in VALID_REASONING_WIRES:
             issues.append(
                 CatalogValidationIssue(
