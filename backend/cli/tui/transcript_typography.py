@@ -22,8 +22,11 @@ TX_ACTION_HINT = '#c8d4e8'
 
 
 def esc_hint_markup(action: str) -> str:
-    """Rich markup for ``esc`` shortcut hints."""
-    return f'[{TX_KEY_HINT}]esc[/] [{TX_ACTION_HINT}]{action}[/]'
+    """Rich markup for ``esc`` shortcut hints (matches HUD ``[F1] Help`` chrome)."""
+    return (
+        f'[#54597b]\[[/][#eacb8a]esc[/][#54597b]][/] '
+        f'[#969aad]{action}[/]'
+    )
 
 
 # Left-pipe accents for non-action message blocks

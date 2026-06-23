@@ -368,9 +368,6 @@ class ScreenMessagesMixin:
                 if runtime_client is not None:
                     await runtime_client.hard_kill()
 
-            if self._renderer is not None:
-                self._renderer._tui.add_system_message('Interrupted. Ready for input.')
-
             with contextlib.suppress(Exception):
                 from backend.core.logging.logger import finalize_session_logging_audit
 

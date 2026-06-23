@@ -717,10 +717,6 @@ class HUD(Vertical):
     def compose(self) -> ComposeResult:
         with Horizontal(id='hud-line-2-row'):
             yield Label(id='hud-line-2-ws')
-            yield Label(
-                esc_hint_markup('Interrupt'),
-                id='hud-hint-interrupt',
-            )
             yield Label('[#7a6a4a]Mode:[/]', id='hud-label-mode')
             yield HudModeSelect(
                 [(c.capitalize(), c) for c in VISIBLE_INTERACTION_MODES],
@@ -735,6 +731,7 @@ class HUD(Vertical):
                 id='hud-autonomy',
                 allow_blank=False,
             )
+            yield Label(id='hud-line-2-spacer')
             yield Label(id='hud-line-2')
         with Horizontal(id='hud-line-1-row'):
             yield Label(id='hud-line-1')
@@ -746,6 +743,11 @@ class HUD(Vertical):
                 value='',
                 id='hud-reasoning',
                 allow_blank=False,
+            )
+            yield Label(id='hud-line-1-spacer')
+            yield Label(
+                esc_hint_markup('Interrupt'),
+                id='hud-hint-interrupt',
             )
             yield Label(id='hud-line-1-help')
 
