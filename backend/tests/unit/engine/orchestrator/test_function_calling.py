@@ -12,6 +12,7 @@ import pytest
 from backend.core.errors import (
     FunctionCallNotExistsError,
     FunctionCallValidationError,
+    ToolExecutionError,
 )
 from backend.engine.function_calling.dispatch import (
     _handle_cmd_run_tool,
@@ -686,6 +687,33 @@ class TestMultiEditCommand:
         assert (tmp_path / 'src' / 'chain.py').read_text(
             encoding='utf-8'
         ) == 'STEP = 2\n'
+
+    def test_multi_edit_rolls_back_introduced_syntax_regression(self, tmp_path):
+        from backend.engine.function_calling.dispatch import _handle_multi_edit_command
+
+        py = tmp_path / 'src' / 'broken.py'
+        py.parent.mkdir(parents=True, exist_ok=True)
+        py.write_text('x = 1\n', encoding='utf-8')
+
+        with pytest.raises(ToolExecutionError) as exc_info:
+            _handle_multi_edit_command(
+                '',
+                {
+                    'file_edits': [
+                        {
+                            'path': 'src/broken.py',
+                            'operation': 'replace_string',
+                            'old_string': 'x = 1\n',
+                            'new_string': 'x = (\n',
+                        }
+                    ]
+                },
+            )
+
+        exc = exc_info.value
+        assert exc.context['error_code'] == 'SYNTAX_VALIDATION_FAILED'
+        assert 'syntax validation failed' in str(exc).lower()
+        assert py.read_text(encoding='utf-8') == 'x = 1\n'
 
 
 class TestHealthCheck:

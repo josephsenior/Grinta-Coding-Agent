@@ -220,6 +220,31 @@ def _validate_symbol_range_on_temp(
         )
 
 
+def _raise_multi_edit_syntax_failure(
+    rel_path: str,
+    detail: str,
+    *,
+    failed_op_index: int | None = None,
+    total_ops: int | None = None,
+) -> NoReturn:
+    from backend.core.errors.structured_edit_errors import (
+        compact_syntax_detail,
+        extract_syntax_line,
+    )
+
+    _multi_edit_raise(
+        'multi_edit failed: syntax validation failed.',
+        error_code='SYNTAX_VALIDATION_FAILED',
+        path=rel_path,
+        operation='multi_edit',
+        failed_op_index=failed_op_index,
+        total_ops=total_ops,
+        line=extract_syntax_line(detail),
+        detail=compact_syntax_detail(detail),
+        retryable=True,
+    )
+
+
 def _validate_multi_edit_file_final(
     temp_editor: Any,
     temp_path: Path,
@@ -241,27 +266,22 @@ def _validate_multi_edit_file_final(
         temp_path, original_content, final_content
     )
     if regression_error is not None:
-        warnings.append(f'WARNING: {regression_error}')
+        _raise_multi_edit_syntax_failure(
+            rel_path,
+            regression_error,
+            failed_op_index=failed_op_index,
+            total_ops=total_ops,
+        )
 
     is_valid, msg = temp_editor._maybe_validate_syntax_for_file(
         temp_path, final_content
     )
     if not is_valid:
-        from backend.core.errors.structured_edit_errors import (
-            compact_syntax_detail,
-            extract_syntax_line,
-        )
-
-        _multi_edit_raise(
-            'multi_edit failed: syntax validation failed.',
-            error_code='SYNTAX_VALIDATION_FAILED',
-            path=rel_path,
-            operation='multi_edit',
+        _raise_multi_edit_syntax_failure(
+            rel_path,
+            str(msg or ''),
             failed_op_index=failed_op_index,
             total_ops=total_ops,
-            line=extract_syntax_line(str(msg or '')),
-            detail=compact_syntax_detail(str(msg or '')),
-            retryable=True,
         )
     if msg and msg.startswith('WARNING:'):
         warnings.append(msg)
