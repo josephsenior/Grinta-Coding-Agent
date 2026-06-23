@@ -356,8 +356,6 @@ class TUIRenderer(
 # ── Re-exports for backward compatibility ──
 from backend.cli.tui.constants import (  # noqa: F401
     _FILE_DIFF_AUTO_COLLAPSE_LINES,
-    _TERMINAL_MOUSE_REPORT_RE,
-    _TERMINAL_ORPHAN_PARAM_TOKEN_RE,
     _TUI_DRAIN_FRAME_BUDGET_SECONDS,
     _TUI_HISTORY_RENDER_LIMIT,
     _TUI_PENDING_EVENT_LIMIT,

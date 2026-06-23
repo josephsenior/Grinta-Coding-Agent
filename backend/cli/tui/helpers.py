@@ -8,10 +8,9 @@ from __future__ import annotations
 
 from rich.text import Text
 
+from backend.cli.terminal_sanitize import strip_leaked_terminal_artifacts
 from backend.cli.tui.constants import (
     _FILE_DIFF_AUTO_COLLAPSE_LINES,
-    _TERMINAL_MOUSE_REPORT_RE,
-    _TERMINAL_ORPHAN_PARAM_TOKEN_RE,
     _WELCOME_FIGLET_CACHE,
 )
 from backend.cli.tui.widgets.unified_diff_view import encode_diff_view_payload
@@ -60,11 +59,8 @@ def _strip_ansi(text: str) -> str:
 
 
 def _strip_terminal_control_literals(text: str) -> str:
-    """Remove terminal mouse reports that some consoles leak as input text."""
-    if not text:
-        return text
-    text = _TERMINAL_MOUSE_REPORT_RE.sub('', text)
-    return _TERMINAL_ORPHAN_PARAM_TOKEN_RE.sub('', text)
+    """Remove terminal control leaks that some consoles inject as input text."""
+    return strip_leaked_terminal_artifacts(text)
 
 
 def _sanitize_terminal_display_text(text: str) -> str:
