@@ -13,7 +13,7 @@ from backend.cli.tui.screens.detail.helpers import (
     DETAIL_DEFAULT_ACCENT,
     split_detail_title,
 )
-from backend.cli.tui.transcript_typography import esc_hint_markup
+from backend.cli.tui.transcript_typography import TX_BODY, TX_SECTION, esc_hint_markup
 
 
 class DetailScreen(Screen):
@@ -60,7 +60,7 @@ class DetailScreen(Screen):
     def _header_heading_markup(self) -> str:
         if not self._heading:
             return ''
-        return f'[#c8d4e8]{self._heading}[/]'
+        return f'[{TX_BODY}]{self._heading}[/]'
 
     def section(self, label: str, *widgets: Static | Container) -> list:
         """Section block with a muted heading and optional body widgets."""
@@ -72,10 +72,15 @@ class DetailScreen(Screen):
 
     @staticmethod
     def _section_heading_markup(label: str) -> str:
-        return f'[bold #8f9fc1]{label}[/]'
+        return f'[bold {TX_SECTION}]{label}[/]'
 
-    def meta_row(self, markup: str, *, widget_id: str = '') -> Static:
-        kwargs: dict = {'classes': 'detail-meta'}
+    def meta_row(
+        self, markup: str, *, widget_id: str = '', extra_classes: str = ''
+    ) -> Static:
+        classes = 'detail-meta'
+        if extra_classes:
+            classes = f'{classes} {extra_classes}'
+        kwargs: dict = {'classes': classes}
         if widget_id:
             kwargs['id'] = widget_id
         return Static(markup, **kwargs)
@@ -101,7 +106,9 @@ class DetailScreen(Screen):
         kwargs: dict = {'classes': 'detail-empty'}
         if widget_id:
             kwargs['id'] = widget_id
-        return Static(f'[#54597b]{message}[/]', **kwargs)
+        from backend.cli.tui.transcript_typography import TX_MUTED
+
+        return Static(f'[{TX_MUTED}]{message}[/]', **kwargs)
 
     def list_row(self, markup: str, *, active: bool = False) -> Static:
         classes = (
@@ -188,10 +195,26 @@ class DetailScreen(Screen):
     DetailScreen .detail-section-hdr {
         width: 100%;
         height: auto;
-        margin: 0;
+        margin: 1 0 0 0;
         padding: 0 0 0 0;
         color: #8f9fc1;
         border-bottom: solid #1b233a;
+    }
+    DetailScreen .detail-meta:first-child,
+    DetailScreen .detail-prose:first-child,
+    DetailScreen .detail-code:first-child,
+    DetailScreen .detail-syntax:first-child,
+    DetailScreen DetailTerminalFrame:first-child,
+    DetailScreen .detail-section-hdr:first-child {
+        margin-top: 0;
+    }
+    DetailScreen .detail-section-hdr + .detail-meta,
+    DetailScreen .detail-section-hdr + .detail-prose,
+    DetailScreen .detail-section-hdr + .detail-code,
+    DetailScreen .detail-section-hdr + .detail-list-row,
+    DetailScreen .detail-section-hdr + DetailTerminalFrame {
+        margin-top: 0;
+        padding-top: 0;
     }
     DetailScreen .detail-meta {
         width: 100%;

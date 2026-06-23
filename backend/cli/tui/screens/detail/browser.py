@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from backend.cli.tui.screens.detail.base import DetailScreen
+from backend.cli.tui.screens.detail.helpers import format_url, list_row_arrow
+from backend.cli.tui.transcript_typography import TX_KEY_HINT
 
 
 class BrowserDetailScreen(DetailScreen):
@@ -35,13 +37,11 @@ class BrowserDetailScreen(DetailScreen):
         widgets: list = []
 
         if self._full_url:
-            widgets.extend(
-                self.section(
-                    'URL',
-                    self.meta_row(
-                        f'[bold #91abec]{self._full_url}[/]',
-                        widget_id='browser-url',
-                    ),
+            widgets.append(
+                self.meta_row(
+                    format_url(self._full_url),
+                    widget_id='browser-url',
+                    extra_classes='detail-url',
                 )
             )
 
@@ -50,7 +50,7 @@ class BrowserDetailScreen(DetailScreen):
                 self.section(
                     'Actions',
                     *[
-                        self.list_row(f'[#c8d4e8]→[/] [#e2e8f0]{action}[/]')
+                        self.list_row(list_row_arrow(action))
                         for action in self._actions
                     ],
                 )
@@ -68,7 +68,10 @@ class BrowserDetailScreen(DetailScreen):
             widgets.extend(
                 self.section(
                     f'Links ({len(self._links)})',
-                    *[self.list_row(f'→ [#91abec]{link}[/]') for link in self._links],
+                    *[
+                        self.list_row(list_row_arrow(link, tone=TX_KEY_HINT))
+                        for link in self._links
+                    ],
                 )
             )
 

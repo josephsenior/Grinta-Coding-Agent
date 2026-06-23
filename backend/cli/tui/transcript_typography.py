@@ -19,6 +19,8 @@ TX_MUTED = '#54597b'
 # Keyboard key + action hints (HUD, detail screens)
 TX_KEY_HINT = '#91abec'
 TX_ACTION_HINT = '#c8d4e8'
+# Detail screen section headings
+TX_SECTION = '#8f9fc1'
 
 
 def esc_hint_markup(action: str) -> str:

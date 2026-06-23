@@ -50,10 +50,7 @@ class PayloadDetailScreen(DetailScreen):
             renderable = prep_markdown(self._body)
         except Exception:
             renderable = f'[{TX_BODY}]{self._body}[/]'
-        widgets.extend(
-            self.section(
-                'Output',
-                Static(renderable, classes='detail-prose', id='payload-body'),
-            )
+        widgets.append(
+            Static(renderable, classes='detail-prose', id='payload-body'),
         )
         return widgets
