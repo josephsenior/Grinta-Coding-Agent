@@ -136,6 +136,7 @@ class BaseShellSession(UnifiedShellSession, ABC):
         self._last_output_buffer: str = ''
         # T-P1-1: liveness timestamp for idle-session cleanup.
         self._last_interaction_at: float = time.time()
+        self._last_idle_detach_seconds: float | None = None
 
     def _wrap_subprocess_argv(self, argv: list[str], *, cwd: str) -> list[str]:
         """Prefix child argv with the active sandbox launcher when configured."""
@@ -147,6 +148,12 @@ class BaseShellSession(UnifiedShellSession, ABC):
     def cwd(self) -> str:
         """Get current working directory."""
         return self._cwd
+
+    def _idle_detach_threshold_seconds(self) -> int:
+        """Seconds of silence that triggered (or would trigger) idle detach."""
+        if self._last_idle_detach_seconds is not None:
+            return max(1, int(self._last_idle_detach_seconds))
+        return self.NO_CHANGE_TIMEOUT_SECONDS
 
     def _normalize_timeout(self, timeout: int | str | None) -> int:
         """Normalize timeout value to an integer."""
@@ -218,6 +225,7 @@ class BaseShellSession(UnifiedShellSession, ABC):
         bg_id: str,
         *,
         is_text: bool = False,
+        blocking: bool = False,
     ) -> tuple[str, str, int]:
         """Monitor process with idle-output detection; detach to background on timeout.
 
@@ -239,7 +247,9 @@ class BaseShellSession(UnifiedShellSession, ABC):
         """
         stdout_cap, stderr_cap = _create_output_captures(process, is_text)
         hard_limit, idle_timeout, initial_grace = _compute_timeouts(
-            timeout, self.NO_CHANGE_TIMEOUT_SECONDS
+            timeout,
+            self.NO_CHANGE_TIMEOUT_SECONDS,
+            blocking=blocking,
         )
 
         wall_start = time.monotonic()
@@ -266,8 +276,10 @@ class BaseShellSession(UnifiedShellSession, ABC):
             if _is_idle_timed_out(
                 first_output_seen, now, last_change_time, idle_timeout, initial_grace
             ):
+                effective_idle = idle_timeout if first_output_seen else initial_grace
+                self._last_idle_detach_seconds = effective_idle
                 return _detach_idle_to_background(
-                    self, process, bg_id, stdout_cap, stderr_cap
+                    self, process, bg_id, stdout_cap, stderr_cap, effective_idle
                 )
 
             if now - wall_start >= hard_limit:
@@ -390,12 +402,20 @@ def _create_output_captures(process: Any, is_text: bool) -> tuple[Any, Any]:
 
 
 def _compute_timeouts(
-    timeout: int | None, no_change_timeout_seconds: int
+    timeout: int | None,
+    no_change_timeout_seconds: int,
+    *,
+    blocking: bool = False,
 ) -> tuple[float, float, float]:
-    hard_limit = float(timeout or 600)
-    idle_timeout = float(no_change_timeout_seconds)
-    initial_grace = idle_timeout * 2
-    return hard_limit, idle_timeout, initial_grace
+    from backend.execution.utils.shell.idle_detach_policy import (
+        compute_idle_detach_timeouts,
+    )
+
+    return compute_idle_detach_timeouts(
+        timeout,
+        base_idle_seconds=no_change_timeout_seconds,
+        blocking=blocking,
+    )
 
 
 def _read_stderr(stderr_cap: Any) -> str:
@@ -443,11 +463,16 @@ def _drain_finished_process(
 
 
 def _detach_idle_to_background(
-    session: Any, process: Any, bg_id: str, stdout_cap: Any, stderr_cap: Any
+    session: Any,
+    process: Any,
+    bg_id: str,
+    stdout_cap: Any,
+    stderr_cap: Any,
+    idle_seconds: float,
 ) -> tuple[str, str, int]:
     logger.info(
         'Subprocess idle-output timeout after %ss; detaching to bg session %s',
-        session.NO_CHANGE_TIMEOUT_SECONDS,
+        int(idle_seconds),
         bg_id,
     )
     session._bg_process = process

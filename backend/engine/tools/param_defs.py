@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import copy
 from typing import TYPE_CHECKING, Any
 
+from backend.core.autonomy import security_risk_required_for_autonomy
 from backend.core.constants import (
     RISK_LEVELS,
     SECURITY_RISK_DESC,
@@ -137,11 +139,57 @@ def get_timeout_param(description: str) -> dict[str, Any]:
     }
 
 
+def _relax_security_risk_in_parameters(parameters: dict[str, Any]) -> dict[str, Any]:
+    """Return a copy of *parameters* with ``security_risk`` no longer required."""
+    params = copy.deepcopy(parameters)
+    required = list(params.get('required') or [])
+    if 'security_risk' in required:
+        params['required'] = [name for name in required if name != 'security_risk']
+    for clause in list(params.get('allOf') or []):
+        if not isinstance(clause, dict):
+            continue
+        then = clause.get('then')
+        if not isinstance(then, dict):
+            continue
+        then_required = list(then.get('required') or [])
+        if 'security_risk' in then_required:
+            then['required'] = [
+                name for name in then_required if name != 'security_risk'
+            ]
+    return params
+
+
+def relax_security_risk_in_tool(tool: ChatCompletionToolParam) -> ChatCompletionToolParam:
+    """Make ``security_risk`` optional in a single tool schema."""
+    relaxed = copy.deepcopy(tool)
+    function = relaxed.get('function')
+    if not isinstance(function, dict):
+        return relaxed
+    parameters = function.get('parameters')
+    if not isinstance(parameters, dict):
+        return relaxed
+    function['parameters'] = _relax_security_risk_in_parameters(parameters)
+    return relaxed
+
+
+def relax_security_risk_in_tools(
+    tools: list[ChatCompletionToolParam],
+    autonomy_level: object,
+) -> list[ChatCompletionToolParam]:
+    """Drop ``security_risk`` from required lists when autonomy is full."""
+    if security_risk_required_for_autonomy(autonomy_level):
+        return tools
+    return [relax_security_risk_in_tool(tool) for tool in tools]
+
+
 __all__ = [
+    'create_tool_definition',
     'get_command_param',
     'get_is_input_param',
     'get_path_param',
     'get_security_risk_param',
     'get_timeout_param',
     'get_url_param',
+    'relax_security_risk_in_tool',
+    'relax_security_risk_in_tools',
 ]

@@ -11,6 +11,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from backend.ledger import EventSource
+from backend.ledger.action.commands import CmdRunAction
 from backend.ledger.observation import StatusObservation
 from backend.ledger.observation.empty import NullObservation
 from backend.ledger.stream import EventStream
@@ -53,6 +54,31 @@ async def test_drain_step_barrier_integration_with_pending_service() -> None:
         timeout=2.0,
         poll_interval=0.02,
     )
+    assert drained is True
+    assert svc.has_outstanding() is False
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_drain_step_barrier_uses_pending_budget() -> None:
+    """Mixin drain must wait longer than 2s when CmdRunAction budget allows."""
+    from backend.core.constants import CMD_PENDING_ACTION_TIMEOUT_FLOOR
+
+    stub = _DrainStub()
+    svc = _make_pending_service()
+    stub.services = MagicMock()
+    stub.services.pending_action = svc
+    action = CmdRunAction(command='sleep 60')
+    action.id = 7
+    action.set_hard_timeout(CMD_PENDING_ACTION_TIMEOUT_FLOOR, blocking=False)
+    svc.set(cast(Any, action))
+
+    async def _clear() -> None:
+        await asyncio.sleep(0.08)
+        svc.clear_for_action(cast(Any, action))
+
+    run_or_schedule(_clear())
+
+    drained = await stub._drain_step_barrier()
     assert drained is True
     assert svc.has_outstanding() is False
 

@@ -14,9 +14,9 @@ if TYPE_CHECKING:
     from backend.ledger.action import Action
 
 # Safety-net hard timeout for all commands (seconds).
-# The idle-output timeout (30s no change) handles normal completion.
-# This only fires for commands that keep producing output forever
-# without the shell prompt returning (e.g. infinite log tailing).
+# Idle-output detach thresholds scale with this budget (see
+# ``idle_detach_policy.compute_idle_detach_timeouts``).  The hard limit only
+# fires for commands that keep producing output forever without returning.
 _SAFETY_NET_TIMEOUT: int = 600
 SAFETY_NET_TIMEOUT: int = _SAFETY_NET_TIMEOUT
 
@@ -33,8 +33,9 @@ class CommandTimeoutMixin:
 
         All commands run without a hard wall-clock timeout so that slow
         operations (npm install, prisma generate, cargo build, etc.) are
-        never killed prematurely.  The runtime's idle-output detection
-        (30 s with no new output) handles completion/hang detection.
+        never killed prematurely.  Idle-output detach thresholds scale with
+        the action timeout budget (30s base, up to 90s on the default
+        safety-net path, or half of an agent-specified timeout).
 
         A generous safety-net timeout (_SAFETY_NET_TIMEOUT) catches
         pathological cases where a command keeps emitting output forever.

@@ -19,7 +19,11 @@ from backend.context.compactor.compactor import (
     get_compaction_metadata,
 )
 from backend.context.compactor.condensed_history import CondensedHistory  # noqa: F401
-from backend.context.compactor.microcompact import apply_microcompact  # noqa: F401
+from backend.context.compactor.microcompact import (  # noqa: F401
+    apply_microcompact,
+    clear_microcompact_cleared_ids,
+    get_microcompact_cleared_ids,
+)
 from backend.context.compactor.pre_condensation_snapshot import (  # noqa: F401
     commit_snapshot,
     delete_snapshot,
@@ -39,6 +43,7 @@ __all__ = [
     'CondensedHistory',
     'RollingCompactor',
     'apply_microcompact',
+    'clear_microcompact_cleared_ids',
     'commit_snapshot',
     'delete_snapshot',
     'delete_staging_snapshot',
@@ -46,6 +51,7 @@ __all__ = [
     'finalize_compaction_artifacts',
     'find_last_condensation_action',
     'get_compaction_metadata',
+    'get_microcompact_cleared_ids',
     'load_snapshot',
     'project_after_compact_boundary',
     'save_snapshot',

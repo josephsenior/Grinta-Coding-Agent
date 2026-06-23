@@ -13,6 +13,11 @@ from backend.context.context_pipeline import (
     _shrink_tail_for_token_reduction,
     apply_ineffective_compaction_backoff,
 )
+from backend.context.context_pipeline.compaction import (
+    _CompactionEngine,
+    record_boundary_compact,
+    should_skip_compaction,
+)
 from backend.core.config.compactor_config import ContextPipelineConfig
 from backend.core.constants import (
     DEFAULT_COMPACT_MIN_TOKEN_REDUCTION,
@@ -144,11 +149,11 @@ async def test_prepare_step_uses_prewarmed_compaction(pipeline):
         patch('backend.context.context_pipeline.finalize_compaction_artifacts'),
         patch('backend.context.context_pipeline.maybe_update'),
         patch(
-            'backend.context.context_pipeline.ContextPipeline._passes_effectiveness_gate',
+            'backend.context.context_pipeline.pipeline.passes_effectiveness_gate',
             return_value=True,
         ),
         patch(
-            'backend.context.context_pipeline.ContextPipeline._resolve_continuity_or_fallback',
+            'backend.context.context_pipeline.pipeline.resolve_continuity_or_fallback',
             return_value=action,
         ),
     ):
@@ -177,8 +182,14 @@ async def test_prepare_step_rejects_prewarmed_compaction_that_fails_continuity(
         ) as mock_finalize,
         patch('backend.context.context_pipeline.delete_staging_snapshot'),
         patch('backend.context.context_pipeline.maybe_update'),
-        patch.object(pipeline, '_passes_effectiveness_gate', return_value=True),
-        patch.object(pipeline, '_passes_continuity_gate', return_value=False),
+        patch(
+            'backend.context.context_pipeline.pipeline.passes_effectiveness_gate',
+            return_value=True,
+        ),
+        patch(
+            'backend.context.context_pipeline.compaction._passes_continuity_gate',
+            return_value=False,
+        ),
     ):
         result = await pipeline.prepare_step(state)
 
@@ -254,7 +265,7 @@ def test_configure_structured_compactor_size_forces_material_prune():
     """Regression: fixed max_size=100 left ~49 post-boundary events with zero pruned (5b no-op)."""
     events = [_cmd_output(f'line {i}', i) for i in range(1, 50)]
     compactor = SimpleNamespace(max_size=100, keep_first=0)
-    ContextPipeline._configure_structured_compactor_size(
+    _CompactionEngine._configure_structured_compactor_size(
         compactor, events, SimpleNamespace()
     )
 
@@ -291,17 +302,19 @@ async def test_run_compaction_tries_structured_llm_before_session_memory():
 
     with (
         patch.object(
-            pipeline,
+            pipeline._compaction_engine,
             '_llm_structured_compaction',
             new=AsyncMock(return_value=llm_action),
         ) as mock_llm,
-        patch.object(pipeline, '_session_memory_compaction') as mock_session,
+        patch.object(
+            pipeline._compaction_engine, '_session_memory_compaction'
+        ) as mock_session,
         patch(
-            'backend.context.context_pipeline.session_memory_exists',
+            'backend.context.context_pipeline.compaction.session_memory_exists',
             return_value=True,
         ),
     ):
-        action = await pipeline._run_compaction(
+        action = await pipeline._compaction_engine.run(
             state,
             events,
             events,
@@ -341,22 +354,25 @@ async def test_run_compaction_uses_session_memory_only_as_fallback():
 
     with (
         patch.object(
-            pipeline,
+            pipeline._compaction_engine,
             '_llm_structured_compaction',
             new=AsyncMock(return_value=None),
         ) as mock_llm,
         patch.object(
-            pipeline,
+            pipeline._compaction_engine,
             '_session_memory_compaction',
             return_value=session_action,
         ) as mock_session,
-        patch.object(pipeline, '_action_meets_effectiveness', return_value=True),
         patch(
-            'backend.context.context_pipeline.session_memory_exists',
+            'backend.context.context_pipeline.compaction.action_meets_effectiveness',
+            return_value=True,
+        ),
+        patch(
+            'backend.context.context_pipeline.compaction.session_memory_exists',
             return_value=True,
         ),
     ):
-        action = await pipeline._run_compaction(
+        action = await pipeline._compaction_engine.run(
             state,
             events,
             events,
@@ -448,18 +464,18 @@ def test_ineffective_compaction_backoff_blocks_until_event_threshold(pipeline):
         'skip_compaction_until_event_id'
     ]
     assert skip_until == latest_id + DEFAULT_INEFFECTIVE_COMPACT_SKIP_EVENTS
-    assert pipeline._should_skip_compaction(state, force=False) is True
+    assert should_skip_compaction(state, pipeline._boundary_compact_cooldown, force=False) is True
 
     # Still blocked before threshold.
     state.history.append(_cmd_output('mid', skip_until - 1))
-    assert pipeline._should_skip_compaction(state, force=False) is True
+    assert should_skip_compaction(state, pipeline._boundary_compact_cooldown, force=False) is True
 
     # Unblocked once latest id reaches skip_until (and time backoff expired).
     state.history.append(_cmd_output('past threshold', skip_until))
     pipe = state.extra_data['context_pipeline_state']
     pipe['ineffective_compact_until'] = 0
     state.extra_data['context_pipeline_state'] = pipe
-    assert pipeline._should_skip_compaction(state, force=False) is False
+    assert should_skip_compaction(state, pipeline._boundary_compact_cooldown, force=False) is False
 
 
 def test_ineffective_compaction_backoff_escalates_streak(pipeline):
@@ -493,7 +509,7 @@ def test_shrink_tail_for_token_reduction_drops_oldest_events():
         return value
 
     with patch(
-        'backend.context.context_pipeline._projected_compaction_token_reduction',
+        'backend.context.context_pipeline.helpers._projected_compaction_token_reduction',
         side_effect=fake_reduction,
     ):
         shrunk = _shrink_tail_for_token_reduction(
@@ -520,7 +536,7 @@ def test_successful_boundary_compact_clears_ineffective_backoff(pipeline):
         summary='summary',
         summary_offset=0,
     )
-    pipeline._record_boundary_compact(state, events, action)
+    record_boundary_compact(state, events, action)
     pipe = state.extra_data['context_pipeline_state']
     assert 'skip_compaction_until_event_id' not in pipe
     assert 'ineffective_compact_streak' not in pipe

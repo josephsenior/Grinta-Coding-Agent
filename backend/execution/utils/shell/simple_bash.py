@@ -83,7 +83,10 @@ class SimpleBashSession(BaseShellSession):
         if pending_bg_id is not None:
             process = self._start_subprocess(command)
             out, err, code = self._run_backgroundable(
-                process, timeout_seconds, pending_bg_id
+                process,
+                timeout_seconds,
+                pending_bg_id,
+                blocking=bool(getattr(action, 'blocking', False)),
             )
             if code == -2:
                 # Process was detached to a background session.
@@ -99,7 +102,7 @@ class SimpleBashSession(BaseShellSession):
                 metadata = CmdOutputMetadata(exit_code=-2, working_dir=self._cwd)
                 apply_cmd_output_timeout_metadata(metadata, -2)
                 metadata.suffix = (
-                    f'\n[The command has no new output after {self.NO_CHANGE_TIMEOUT_SECONDS} seconds. '
+                    f'\n[The command has no new output after {self._idle_detach_threshold_seconds()} seconds. '
                     f'It is still running in background session "{pending_bg_id}". '
                     f'Use terminal_read(session_id="{pending_bg_id}") to poll for new output, '
                     f'or terminal_read(session_id="{pending_bg_id}", mode="snapshot") for the full buffer. '

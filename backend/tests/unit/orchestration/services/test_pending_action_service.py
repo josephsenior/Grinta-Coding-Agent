@@ -456,6 +456,51 @@ class TestPendingActionService(unittest.TestCase):
         self.assertIsNone(service.get())
         self.mock_controller.event_stream.add_event.assert_called_once()
 
+    def test_barrier_wait_budget_idle_when_no_outstanding(self):
+        budget = self.service.barrier_wait_budget_seconds()
+        self.assertEqual(budget, 2.0)
+
+    @patch('time.time')
+    def test_barrier_wait_budget_matches_cmd_run_pending_policy(self, mock_time):
+        from backend.core.constants import CMD_PENDING_ACTION_TIMEOUT_FLOOR
+
+        mock_time.return_value = 1000.0
+        action = CmdRunAction(command='sleep 300')
+        action.id = 42
+        action.set_hard_timeout(CMD_PENDING_ACTION_TIMEOUT_FLOOR, blocking=False)
+        self.service.set(action)
+
+        mock_time.return_value = 1010.0
+        budget = self.service.barrier_wait_budget_seconds()
+        expected = CMD_PENDING_ACTION_TIMEOUT_FLOOR - 10.0 + 0.5
+        self.assertAlmostEqual(budget, expected, places=3)
+
+    @patch('time.time')
+    def test_barrier_wait_budget_idle_for_background_cmd_run(self, mock_time):
+        mock_time.return_value = 1000.0
+        action = CmdRunAction(command='long-task', is_background=True)
+        action.id = 7
+        action.set_hard_timeout(600.0, blocking=False)
+        self.service.set(action)
+
+        mock_time.return_value = 1005.0
+        self.assertEqual(self.service.barrier_wait_budget_seconds(), 2.0)
+
+    @patch('time.time')
+    def test_barrier_wait_budget_uses_longest_remaining_row(self, mock_time):
+        mock_time.return_value = 1000.0
+        fast = FileEditAction(path='a.py')
+        fast.id = 1
+        slow = CmdRunAction(command='build')
+        slow.id = 2
+        slow.set_hard_timeout(600.0, blocking=False)
+        self.service.set(fast)
+        self.service.set(slow)
+
+        mock_time.return_value = 1030.0
+        budget = self.service.barrier_wait_budget_seconds()
+        self.assertAlmostEqual(budget, 600.0 - 30.0 + 0.5, places=3)
+
 
 if __name__ == '__main__':
     unittest.main()
@@ -575,3 +620,7 @@ class TestPendingActionWatchdog(unittest.IsolatedAsyncioTestCase):
             self.assertIsNone(service.get())
             self.mock_controller.event_stream.add_event.assert_called_once()
         service.shutdown()
+
+
+if __name__ == '__main__':
+    unittest.main()

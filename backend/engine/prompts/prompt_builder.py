@@ -471,7 +471,12 @@ def _collect_system_prompt_sections(
         ),
         (
             'security_risk_policy',
-            _render_security(cli_mode, enable_web=web_on, enable_docs=docs_on),
+            _render_security(
+                cli_mode,
+                enable_web=web_on,
+                enable_docs=docs_on,
+                autonomy_level=getattr(config, 'autonomy_level', 'balanced'),
+            ),
         ),
         (
             'system_partial_01_autonomy',

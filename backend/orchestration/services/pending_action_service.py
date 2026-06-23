@@ -11,6 +11,9 @@ from typing import TYPE_CHECKING, Any, cast
 from backend.core.constants import (
     BROWSER_TOOL_SYNC_TIMEOUT_SECONDS,
     DEBUGGER_PENDING_ACTION_TIMEOUT_FLOOR,
+    DEFAULT_STEP_TASK_LIVENESS_SECONDS,
+    DRAIN_STEP_BARRIER_GRACE_SECONDS,
+    DRAIN_STEP_BARRIER_IDLE_DEFAULT_SECONDS,
     MCP_PENDING_ACTION_TIMEOUT_FLOOR,
     TERMINAL_IO_PENDING_ACTION_TIMEOUT_FLOOR,
     TERMINAL_RUN_PENDING_ACTION_TIMEOUT_FLOOR,
@@ -79,6 +82,15 @@ def _is_awaiting_confirmation(action: Action) -> bool:
         str(state or '').strip().lower()
         == ActionConfirmationStatus.AWAITING_CONFIRMATION.value
     )
+
+
+def _barrier_should_wait_for_action(action: Action) -> bool:
+    """Return False when the action was intentionally started without blocking."""
+    if getattr(action, 'is_background', False):
+        return False
+    if getattr(action, 'run_in_background', False):
+        return False
+    return True
 
 
 def _delegate_task_pending_timeout(base: float, action: Action) -> float:
@@ -290,6 +302,47 @@ class PendingActionService:
         self._purge_timeouts()
         with self._lock:
             return bool(self._outstanding) or self._legacy_pending is not None
+
+    def _collect_outstanding_entries(self) -> list[tuple[Action, float]]:
+        """Snapshot outstanding rows as (action, registered_at) pairs."""
+        self._purge_timeouts()
+        with self._lock:
+            entries = list(self._outstanding.values())
+            legacy = self._legacy_pending
+        if legacy is not None:
+            entries.append(legacy)
+        return entries
+
+    def barrier_wait_budget_seconds(
+        self,
+        *,
+        idle_default: float = DRAIN_STEP_BARRIER_IDLE_DEFAULT_SECONDS,
+    ) -> float:
+        """How long a step barrier should wait for outstanding pending work.
+
+        Uses the same per-action timeout policy as the pending watchdog
+        (action type + ``action.timeout``), not command-string heuristics.
+        """
+        entries = self._collect_outstanding_entries()
+        if not entries:
+            return idle_default
+
+        now = time.time()
+        budgets: list[float] = []
+        for action, registered_at in entries:
+            if not _barrier_should_wait_for_action(action):
+                continue
+            effective = self._effective_timeout_seconds(self._timeout, action)
+            if not math.isfinite(effective):
+                budgets.append(float(DEFAULT_STEP_TASK_LIVENESS_SECONDS))
+                continue
+            remaining = max(0.0, effective - (now - registered_at))
+            budgets.append(remaining + float(DRAIN_STEP_BARRIER_GRACE_SECONDS))
+
+        if not budgets:
+            return idle_default
+
+        return min(max(budgets), float(DEFAULT_STEP_TASK_LIVENESS_SECONDS))
 
     def _primary_entry(self) -> tuple[Action, float] | None:
         """Latest / highest-id outstanding row (for step guards and logging)."""

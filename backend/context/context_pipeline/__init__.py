@@ -7,7 +7,7 @@ from backend.context.compactor.compaction_finalizer import (
 )
 from backend.context.compactor.pre_condensation_snapshot import delete_staging_snapshot
 from backend.context.context_budget import ContextBudget, record_post_compact_baseline
-from backend.context.context_pipeline.core import ContextPipeline
+from backend.context.context_pipeline.pipeline import ContextPipeline, _EmptyState
 from backend.context.context_pipeline.helpers import (
     _drop_stale_prompt_state_artifacts,
     _latest_event_id,
@@ -43,6 +43,7 @@ __all__ = [
     'ContextBudget',
     'ContextPipeline',
     'PipelineStepResult',
+    '_EmptyState',
     '_COMPACTION_TARGET_RATIO',
     '_CONSECUTIVE_CONDENSATION_KEY',
     '_CONTINUITY_REJECTION_FP_KEY',

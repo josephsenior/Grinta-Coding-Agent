@@ -177,7 +177,7 @@ def _handle_nochange_timeout_command(
         try:
             orch._detach_pane_to_background(bg_id)
             metadata.suffix = (
-                f'\n[The command has no new output after {orch.NO_CHANGE_TIMEOUT_SECONDS} seconds. '
+                f'\n[The command has no new output after {orch._idle_detach_threshold_seconds()} seconds. '
                 f'It is still running in background session "{bg_id}". '
                 f'Use terminal_read(session_id="{bg_id}") to poll for new output, '
                 f'or terminal_read(session_id="{bg_id}", mode="snapshot") for the full buffer. '
@@ -307,18 +307,22 @@ def _check_timeouts(
     """
     time_since_last_change = time.time() - last_change_time
 
-    # Idle timeout: fires for ALL commands.  Blocking commands get a
-    # longer grace period (2×) since builds/installs may have long
-    # quiet phases (e.g. linking, compressing).
-    idle_threshold = (
-        orch.NO_CHANGE_TIMEOUT_SECONDS * 2
-        if action.blocking
-        else orch.NO_CHANGE_TIMEOUT_SECONDS
+    from backend.execution.runtime_mixins.command_timeout import SAFETY_NET_TIMEOUT
+    from backend.execution.utils.shell.idle_detach_policy import (
+        compute_idle_detach_timeouts,
     )
-    # T-P0-1: extend the FIRST idle window so commands that download
-    # metadata before printing don't get prematurely detached.
-    if not first_output_seen:
-        idle_threshold *= 2
+
+    effective_timeout = (
+        min(action.timeout, SAFETY_NET_TIMEOUT)
+        if action.timeout is not None
+        else SAFETY_NET_TIMEOUT
+    )
+    _, idle_timeout, initial_grace = compute_idle_detach_timeouts(
+        effective_timeout,
+        base_idle_seconds=orch.NO_CHANGE_TIMEOUT_SECONDS,
+        blocking=bool(getattr(action, 'blocking', False)),
+    )
+    idle_threshold = idle_timeout if first_output_seen else initial_grace
     logger.debug(
         'CHECKING NO CHANGE TIMEOUT (%ss): elapsed %s. Action blocking: %s',
         idle_threshold,
@@ -327,6 +331,7 @@ def _check_timeouts(
     )
 
     if time_since_last_change >= idle_threshold:
+        orch._last_idle_detach_seconds = idle_threshold
         return _handle_nochange_timeout_command(
             orch, command, pane_content=cur_pane_output, ps1_matches=ps1_matches
         )
@@ -334,13 +339,6 @@ def _check_timeouts(
     # Hard timeout: always enforced.  If the action has no explicit
     # timeout we fall back to _SAFETY_NET_TIMEOUT (600s) to prevent
     # truly pathological hangs.
-    from backend.execution.runtime_mixins.command_timeout import SAFETY_NET_TIMEOUT
-
-    effective_timeout = (
-        min(action.timeout, SAFETY_NET_TIMEOUT)
-        if action.timeout is not None
-        else SAFETY_NET_TIMEOUT
-    )
 
     elapsed_time = time.time() - start_time
     logger.debug(
