@@ -53,9 +53,14 @@ class ScreenActionsMixin:
 
     def _refresh_scanline_cards(self) -> None:
         """250 ms refresh loop — update live summaries for running scan-line cards."""
+        renderer = getattr(self, '_renderer', None)
+        if renderer is not None and getattr(renderer, '_async_drain_active', False):
+            return
         try:
             display = self._get_display()
         except Exception:
+            return
+        if getattr(display, '_under_backpressure', False):
             return
         from backend.cli.tui.widgets.scan_line import ScanLineCard
         from backend.cli.tui.widgets.scan_line.cards import advance_running_ellipsis_frame

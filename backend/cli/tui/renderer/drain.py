@@ -467,6 +467,7 @@ async def drain_events_async(orch: 'RendererEventProcessorMixin') -> None:
         )
         orch._drain_requested_while_active = False
     prep_depth = len(getattr(orch, '_render_prep_cache', {}) or {})
+    mounted_depth = len(getattr(orch, '_mounted_event_ids', set()) or set())
     _tui_logger.debug(
         'tui_drain_ms=%.1f tui_pending_depth=%d tui_prep_queue_depth=%d '
         'tui_last_batch=%d streaming_only=%s',
@@ -614,6 +615,8 @@ def _on_event(orch: 'RendererEventProcessorMixin', event: Any) -> None:
 
     event_id = getattr(event, 'id', -1)
     should_schedule_drain = False
+    coalesced = False
+    pending_backpressure = False
     with orch._pending_lock:
         if event_id >= 0:
             if (
@@ -635,7 +638,12 @@ def _on_event(orch: 'RendererEventProcessorMixin', event: Any) -> None:
             orch._pending_events.append(event)
             if getattr(orch, '_pending_backpressure', False):
                 should_schedule_drain = True
-        if not orch._drain_scheduled:
+            if not orch._drain_scheduled:
+                orch._drain_scheduled = True
+                should_schedule_drain = True
+        elif not orch._drain_scheduled and not getattr(
+            orch, '_async_drain_active', False
+        ):
             orch._drain_scheduled = True
             should_schedule_drain = True
         # Predictive backpressure: flag the display as soon as the queue starts
@@ -644,6 +652,19 @@ def _on_event(orch: 'RendererEventProcessorMixin', event: Any) -> None:
         pending_backpressure = (
             len(orch._pending_events) > _TUI_BACKPRESSURE_PENDING_THRESHOLD
         )
+    skip_signal = coalesced and (
+        getattr(orch, '_drain_scheduled', False)
+        or getattr(orch, '_async_drain_active', False)
+    )
+    if skip_signal:
+        if pending_backpressure:
+            try:
+                orch._loop.call_soon_threadsafe(
+                    partial(_set_display_backpressure, orch, True),
+                )
+            except RuntimeError:
+                pass
+        return
     try:
         orch._loop.call_soon_threadsafe(
             partial(_signal_activity, orch),

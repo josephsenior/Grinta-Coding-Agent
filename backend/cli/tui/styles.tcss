@@ -13,13 +13,13 @@ Screen {
 }
 
 #left-column {
-    width: 75%;
+    width: 78%;
     height: 100%;
     background: #060a14;
 }
 
 #sidebar {
-    width: 25%;
+    width: 22%;
     height: 100%;
     layout: vertical;
     background: #080c18;

@@ -22,7 +22,7 @@ from backend.ledger.action import (
 class RendererActionHandlersMixin:
     """action handlers (search/message/streaming/state)."""
 
-    _LIVE_STREAM_PAINT_INTERVAL = 0.033
+    _LIVE_STREAM_PAINT_INTERVAL = 0.066
 
     def _sync_streaming_mount_mode(self) -> None:
         """Skip transcript mount animations while the LLM stream is active."""
