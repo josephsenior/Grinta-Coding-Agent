@@ -7,8 +7,8 @@ from backend.cli.tui.screens.detail.base import DetailScreen
 from backend.cli.tui.screens.detail.helpers import (
     detail_accent_for_state,
     format_exit_chip,
-    format_numbered_block,
-    format_shell_command,
+    kv_row,
+    list_row_arrow,
     split_detail_title,
 )
 from backend.cli.tui.screens.detail.shell import ShellDetailScreen
@@ -31,15 +31,17 @@ def test_format_exit_chip():
     assert format_exit_chip(None) is None
 
 
-def test_format_numbered_block_includes_gutter():
-    text = format_numbered_block('line one\nline two')
-    assert '│' in text
-    assert 'line one' in text
+def test_list_row_arrow():
+    markup = list_row_arrow('click submit')
+    assert '→' in markup
+    assert 'click submit' in markup
 
 
-def test_format_shell_command():
-    assert '$' in format_shell_command('cargo test')
-    assert 'cargo test' in format_shell_command('cargo test')
+def test_kv_row():
+    markup = kv_row('count', '42')
+    assert 'count' in markup
+    assert '42' in markup
+    assert '=' in markup
 
 
 def test_traffic_lights_markup():
@@ -76,6 +78,20 @@ def test_shell_detail_screen_uses_terminal_frame():
     frames = [w for w in widgets if isinstance(w, DetailTerminalFrame)]
     assert len(frames) == 1
     assert len(frames[0]._children_widgets) == 2
+
+
+def test_terminal_detail_screen_kind_default():
+    from backend.cli.tui.screens.detail.terminal import TerminalDetailScreen
+
+    screen = TerminalDetailScreen(session_id='term-1')
+    assert screen._kind == 'Terminal'
+
+
+def test_debugger_detail_screen_kind_default():
+    from backend.cli.tui.screens.detail.debugger import DebuggerDetailScreen
+
+    screen = DebuggerDetailScreen()
+    assert screen._kind == 'Debugger'
 
 
 def test_detail_screen_escape_binding():

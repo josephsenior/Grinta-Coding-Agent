@@ -2,9 +2,20 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+from backend.cli.tui.transcript_typography import (
+    TX_BODY,
+    TX_BODY_DIM,
+    TX_KEY_HINT,
+    TX_META,
+    TX_MUTED,
+    TX_SECTION,
+)
 from backend.cli.tui.widgets.scan_line.card import SCAN_LINE_BORDER_COLORS
+
+if TYPE_CHECKING:
+    from backend.cli.tui.screens.detail.base import DetailScreen
 
 DETAIL_DEFAULT_ACCENT = '#5eead4'
 
@@ -19,7 +30,7 @@ def traffic_lights_markup(title: str = '') -> str:
     lights = f'[{_TRAFFIC_RED}]●[/] [{_TRAFFIC_YELLOW}]●[/] [{_TRAFFIC_GREEN}]●[/]'
     if not title:
         return lights
-    return f'{lights}  [#6f83aa]{title}[/]'
+    return f'{lights}  [{TX_META}]{title}[/]'
 
 
 def render_command_syntax(command: str) -> Any:
@@ -71,27 +82,9 @@ def split_detail_title(title: str) -> tuple[str, str]:
     return '', title.strip()
 
 
-def format_numbered_block(text: str, *, tone: str = '#c8d4e8') -> str:
-    """Line-numbered monospace block for shell/terminal output."""
-    lines = text.splitlines()
-    if not lines:
-        return text
-    width = len(str(len(lines)))
-    numbered: list[str] = []
-    for index, line in enumerate(lines, 1):
-        gutter = f'[#374151]{index:>{width}} │[/] '
-        numbered.append(gutter + f'[{tone}]{line}[/]')
-    return '\n'.join(numbered)
-
-
-def format_shell_command(command: str) -> str:
-    """Styled ``$ command`` prompt row."""
-    return f'[#5eead4]$[/] [bold #e9e9e9]{command}[/]'
-
-
 def format_meta_chips(parts: list[str]) -> str:
     """Join muted meta fragments with a centered dot."""
-    return ' [#54597b]·[/] '.join(parts)
+    return f' [{TX_MUTED}]·[/] '.join(parts)
 
 
 def format_exit_chip(exit_code: int | None, *, is_background: bool = False) -> str | None:
@@ -105,4 +98,76 @@ def format_exit_chip(exit_code: int | None, *, is_background: bool = False) -> s
 
 
 def format_section_heading(label: str) -> str:
-    return f'[bold #8f9fc1]{label}[/]'
+    return f'[bold {TX_SECTION}]{label}[/]'
+
+
+def format_url(url: str) -> str:
+    """Styled URL for detail meta rows."""
+    return f'[bold {TX_KEY_HINT}]{url}[/]'
+
+
+def list_row_arrow(text: str, *, tone: str = TX_BODY) -> str:
+    """Consistent arrow-prefixed list row markup."""
+    return f'[{TX_BODY}]→[/] [{tone}]{text}[/]'
+
+
+def kv_row(name: str, value: str) -> str:
+    """Name = value row for debugger variables and similar."""
+    return f'[{TX_BODY}]{name}[/] [{TX_MUTED}]=[/] [{TX_KEY_HINT}]{value}[/]'
+
+
+def build_terminal_detail_content(
+    screen: DetailScreen,
+    *,
+    meta_parts: list[str],
+    command: str,
+    output: str,
+    frame_title: str,
+    show_command_when_no_output: bool = True,
+    meta_widget_id: str = '',
+    cmd_widget_id: str = '',
+    output_widget_id: str = '',
+    empty_widget_id: str = '',
+    empty_message: str = '(no output)',
+) -> list:
+    """Shared body builder for shell and terminal detail screens."""
+    widgets: list = []
+
+    if meta_parts:
+        widgets.append(
+            screen.meta_row(format_meta_chips(meta_parts), widget_id=meta_widget_id)
+        )
+
+    frame_parts: list = []
+    if command and (show_command_when_no_output or not output):
+        frame_parts.append(
+            screen.syntax_block(
+                render_command_syntax(command),
+                widget_id=cmd_widget_id,
+            )
+        )
+    if output:
+        frame_parts.append(
+            screen.syntax_block(
+                render_terminal_output(output, language='text'),
+                widget_id=output_widget_id,
+            )
+        )
+    if frame_parts:
+        widgets.append(
+            screen.terminal_frame(*frame_parts, title=frame_title[:48])
+        )
+    elif not command:
+        widgets.append(
+            screen.empty_state(empty_message, widget_id=empty_widget_id)
+        )
+
+    return widgets
+
+
+def format_cwd_meta(cwd: str) -> str:
+    return f'[{TX_BODY_DIM}]{cwd}[/]'
+
+
+def format_session_meta(session_id: str) -> str:
+    return f'[{TX_KEY_HINT}]{session_id}[/]'

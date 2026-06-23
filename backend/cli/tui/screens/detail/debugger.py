@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from backend.cli.tui.screens.detail.base import DetailScreen
+from backend.cli.tui.screens.detail.helpers import kv_row
 
 
 class DebuggerDetailScreen(DetailScreen):
@@ -15,7 +16,7 @@ class DebuggerDetailScreen(DetailScreen):
         current_frame_index: int = 0,
         *,
         title: str = 'Debugger',
-        kind: str = 'Debug',
+        kind: str = 'Debugger',
         heading: str = '',
         accent: str | None = None,
     ) -> None:
@@ -51,9 +52,7 @@ class DebuggerDetailScreen(DetailScreen):
                 self.section(
                     'Variables',
                     *[
-                        self.list_row(
-                            f'[#c8d4e8]{name}[/] [#54597b]=[/] [#91abec]{value}[/]'
-                        )
+                        self.list_row(kv_row(name, value))
                         for name, value in self._variables
                     ],
                 )

@@ -13,17 +13,17 @@ class EditDetailScreen(DetailScreen):
     DEFAULT_CSS = """
     EditDetailScreen #detail-body {
         height: 1fr;
-        padding: 0 0 1 0;
+        padding: 1 2 2 2;
     }
     EditDetailScreen UnifiedDiffView.-detail {
         width: 100%;
         height: 1fr;
-        border: none;
-        background: #060a14;
+        border: solid #1b233a;
+        background: #090d18;
     }
     EditDetailScreen .detail-syntax-error {
         height: auto;
-        margin: 0 1 0 1;
+        margin: 1 0 0 0;
     }
     """
 
@@ -85,7 +85,7 @@ class EditDetailScreen(DetailScreen):
                 )
         else:
             widgets.append(
-                self.empty_state('No diff available.', widget_id='edit-no-diff')
+                self.empty_state('(no diff)', widget_id='edit-no-diff')
             )
 
         if self._syntax_error:
@@ -99,3 +99,9 @@ class EditDetailScreen(DetailScreen):
             )
 
         return widgets
+
+    def on_mount(self) -> None:
+        from backend.cli.tui.widgets.unified_diff_view import UnifiedDiffView
+
+        for view in self.query(UnifiedDiffView):
+            view.styles.border_left = ('heavy', self._accent)

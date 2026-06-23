@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from backend.cli.tui.screens.detail.base import DetailScreen
 from backend.cli.tui.screens.detail.helpers import (
+    build_terminal_detail_content,
+    format_cwd_meta,
     format_exit_chip,
-    format_meta_chips,
-    render_command_syntax,
-    render_terminal_output,
+    format_session_meta,
 )
 
 
@@ -22,7 +22,7 @@ class TerminalDetailScreen(DetailScreen):
         cwd: str = '',
         *,
         title: str = 'Terminal',
-        kind: str = 'Term',
+        kind: str = 'Terminal',
         heading: str = '',
         accent: str | None = None,
         exit_code: int | None = None,
@@ -40,44 +40,25 @@ class TerminalDetailScreen(DetailScreen):
         self._exit_code = exit_code
 
     def build_content(self) -> list:
-        widgets: list = []
-
         meta_parts: list[str] = []
         if self._session_id:
-            meta_parts.append(f'[#91abec]{self._session_id}[/]')
+            meta_parts.append(format_session_meta(self._session_id))
         if self._cwd:
-            meta_parts.append(f'[#969aad]{self._cwd}[/]')
+            meta_parts.append(format_cwd_meta(self._cwd))
         exit_chip = format_exit_chip(self._exit_code)
         if exit_chip:
             meta_parts.append(exit_chip)
-        if meta_parts:
-            widgets.append(
-                self.meta_row(
-                    format_meta_chips(meta_parts), widget_id='terminal-session'
-                )
-            )
 
-        frame_parts: list = []
-        if self._command and not self._scrollback:
-            frame_parts.append(
-                self.syntax_block(
-                    render_command_syntax(self._command),
-                    widget_id='terminal-cmd-row',
-                )
-            )
-        if self._scrollback:
-            frame_parts.append(
-                self.syntax_block(
-                    render_terminal_output(self._scrollback, language='text'),
-                    widget_id='terminal-scrollback',
-                )
-            )
-        if frame_parts:
-            frame_title = (self._session_id or self._heading or 'terminal')[:48]
-            widgets.append(self.terminal_frame(*frame_parts, title=frame_title))
-        elif not self._command:
-            widgets.append(
-                self.empty_state('(no terminal content)', widget_id='terminal-empty')
-            )
-
-        return widgets
+        return build_terminal_detail_content(
+            self,
+            meta_parts=meta_parts,
+            command=self._command,
+            output=self._scrollback,
+            frame_title=self._session_id or self._heading or 'terminal',
+            show_command_when_no_output=not bool(self._scrollback),
+            meta_widget_id='terminal-session',
+            cmd_widget_id='terminal-cmd-row',
+            output_widget_id='terminal-scrollback',
+            empty_widget_id='terminal-empty',
+            empty_message='(no terminal content)',
+        )

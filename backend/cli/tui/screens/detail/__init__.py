@@ -1,12 +1,13 @@
 """Detail screen base and concrete implementations for scan-line cards.
 
-The six concrete detail screens correspond to:
+The seven concrete detail screens correspond to:
 * ``AgentMessageCard`` → ``MessageDetailScreen``
 * ``EditCard`` → ``EditDetailScreen``
 * ``ShellCard`` → ``ShellDetailScreen``
 * ``TerminalCard`` → ``TerminalDetailScreen``
 * ``BrowserCard`` → ``BrowserDetailScreen``
 * ``DebuggerCard`` → ``DebuggerDetailScreen``
+* ``DelegateCard`` / ``MCPCard`` / ``PayloadCard`` → ``PayloadDetailScreen``
 """
 
 from __future__ import annotations
