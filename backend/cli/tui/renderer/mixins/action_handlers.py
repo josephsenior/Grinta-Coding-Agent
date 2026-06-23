@@ -326,11 +326,6 @@ class RendererActionHandlersMixin:
             self._tui.set_agent_phase(str(state))
 
         self._maybe_end_agent_turn(state)
-        if state == AgentState.FINISHED:
-            duration = getattr(self._tui, '_last_turn_duration', None)
-            notice = getattr(self._tui, 'add_task_completed_notice', None)
-            if callable(notice):
-                notice(duration)
         self._state_event.set()
         self._tui._render_hud_bar()
 

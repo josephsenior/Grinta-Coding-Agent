@@ -230,7 +230,7 @@ async def test_tui_inline_command_hint_updates(mock_config):
         ta.text = '/sessions --s'
         await pilot.pause()
 
-        hint = s.query_one('#hud-line-2', Label)
+        hint = s.query_one('#hud-line-1-help', Label)
         assert 'Help' in str(hint.renderable)
 
 

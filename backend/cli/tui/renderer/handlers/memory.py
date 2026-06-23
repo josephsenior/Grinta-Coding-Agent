@@ -48,7 +48,9 @@ def _handle_checkpoint_observation(
 ) -> None:
     pending = getattr(orch, '_pending_checkpoint_line', None)
     if isinstance(pending, OrientLineModel):
-        orch._write_orient_line(pending.with_result(checkpoint_result(event)))
+        orch._write_orient_line(
+            pending.with_result(checkpoint_result(event, target=pending.target))
+        )
     else:
         orch._write_orient_line(checkpoint_observation_model(event))
     orch._pending_checkpoint_line = None

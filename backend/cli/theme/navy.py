@@ -33,6 +33,7 @@ NAVY_READY = '#54efae'  # green — Ready / Success / Healthy
 NAVY_RUNNING = '#f6a657'  # warm amber — Running / active work
 NAVY_RUNNING_DIM = '#c9803f'  # dimmer amber — running pulse off-frame
 NAVY_WAITING = '#f6ff8f'  # lime yellow — Review / Paused / Warning
+NAVY_WAITING_DIM = '#b8bb62'  # dimmer lime — waiting-state pulse off-frame
 NAVY_ERROR = '#fd8383'  # soft red — Error / Danger
 
 # Status accents (for borders, badges, toast accents)

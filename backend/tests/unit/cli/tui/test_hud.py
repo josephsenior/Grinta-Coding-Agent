@@ -24,7 +24,7 @@ async def test_tui_hud_bar_shows_workspace_path(mock_config):
         s._render_hud_bar()
         await pilot.pause()
 
-        stats = s.query_one('#hud-line-1-ws', Label)
+        stats = s.query_one('#hud-line-2-ws', Label)
         rendered = str(stats.renderable)
         assert 'Ws:' in rendered
         assert any(sep in rendered for sep in ('/', '\\', '~'))
@@ -48,8 +48,10 @@ async def test_tui_update_hud_state(mock_config, monkeypatch):
 
         stats = s.query_one('#hud-line-1', Label)
         activity = s.query_one('#hud-line-2', Label)
+        help_label = s.query_one('#hud-line-1-help', Label)
         assert 'Running' in str(stats.renderable)
-        assert 'Help' in str(activity.renderable)
+        assert 'Ctx:' in str(activity.renderable)
+        assert 'Help' in str(help_label.renderable)
 
 
 @pytest.mark.asyncio

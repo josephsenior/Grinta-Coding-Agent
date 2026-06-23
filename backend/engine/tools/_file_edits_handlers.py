@@ -31,6 +31,7 @@ from backend.engine.tools._file_edits_symbols import (
     _build_read_file_action,
     _handle_read_range_public,
     _handle_read_symbols_public,
+    _resolve_read_type,
 )
 from backend.engine.tools._file_ops import (
     _coerce_optional_int,
@@ -51,9 +52,7 @@ from backend.ledger.action import (
 
 
 def _handle_read_tool(arguments: Mapping[str, Any]) -> Action:
-    read_type = (
-        str(require_tool_argument(arguments, 'type', READ_TOOL_NAME)).strip().lower()
-    )
+    read_type = _resolve_read_type(arguments)
     if read_type == 'range':
         raise FunctionCallValidationError(
             'read type=range was removed. Use type=file with path, start_line, and end_line.'

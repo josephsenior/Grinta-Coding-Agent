@@ -89,6 +89,7 @@ from backend.cli.theme.navy import (  # noqa: E402
     NAVY_TEXT_SECONDARY,
     NAVY_TEXT_TERTIARY,
     NAVY_WAITING,
+    NAVY_WAITING_DIM,
     NAVY_YELLOW_ACCENT,
 )
 from backend.cli.theme.styles import (  # noqa: E402
@@ -370,6 +371,7 @@ __all__ = [
     'NAVY_TEXT_SECONDARY',
     'NAVY_TEXT_TERTIARY',
     'NAVY_WAITING',
+    'NAVY_WAITING_DIM',
     'NAVY_YELLOW_ACCENT',
     'PT_COMPLETION_MENU_BG',
     'PT_COMPLETION_MENU_CURRENT',
