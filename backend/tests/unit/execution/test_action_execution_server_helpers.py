@@ -122,7 +122,49 @@ def test_structured_edit_verification_reports_python_compile_failure(tmp_path) -
     assert ok is False
     assert 'syntax=failed' in text
     assert files[0]['syntax'] == 'failed'
+    assert files[0]['added'] >= 0
+    assert files[0]['removed'] >= 0
     assert "'return' outside function" in files[0]['syntax_detail']
+
+
+def test_structured_edit_file_outcomes_include_per_file_diff_and_counts(
+    tmp_path,
+) -> None:
+    target = tmp_path / 'demo.txt'
+    target.write_text('new\n', encoding='utf-8')
+    snapshots = {target: ('old\n', 'demo.txt')}
+
+    outcomes = h._structured_edit_file_outcomes(snapshots)
+    assert len(outcomes) == 1
+    assert outcomes[0]['path'] == 'demo.txt'
+    assert outcomes[0]['changed'] is True
+    assert outcomes[0]['added'] == 1
+    assert outcomes[0]['removed'] == 1
+    assert 'diff' in outcomes[0]
+    assert '-old' in outcomes[0]['diff']
+
+
+def test_build_edit_result_obs_populates_single_file_old_new(tmp_path) -> None:
+    target = tmp_path / 'a.py'
+    target.write_text('beta\n', encoding='utf-8')
+    action = SimpleNamespace(path='.')
+    payload = {
+        'file_edits': [
+            {'path': 'a.py', 'operation': 'replace_string', 'old_string': 'a', 'new_string': 'b'}
+        ]
+    }
+    outcome = MessageAction(content='✓ multi_edit committed 1 file(s) atomically')
+    snapshots = {target: ('alpha\n', 'a.py')}
+
+    obs = h._build_edit_result_obs(outcome, snapshots, action, payload)
+
+    assert isinstance(obs, FileEditObservation)
+    assert obs.path == 'a.py'
+    assert obs.old_content == 'alpha\n'
+    assert obs.new_content == 'beta\n'
+    assert obs.new_content_hash
+    assert obs.tool_result['files'][0]['added'] == 1
+    assert obs.tool_result['files'][0]['removed'] == 1
 
 
 def test_workspace_resolution_and_path_validation() -> None:
@@ -318,26 +360,17 @@ def test_file_read_edit_helpers() -> None:
     assert isinstance(dir_obs, FileReadObservation)
 
 
-def test_build_edit_result_obs_accepts_message_action_outcome() -> None:
+def test_build_edit_result_obs_accepts_message_action_outcome(tmp_path) -> None:
+    target = tmp_path / 'a.py'
+    target.write_text('x', encoding='utf-8')
     action = SimpleNamespace(path='.')
     payload = {'file_edits': [{'path': 'a.py', 'operation': 'replace', 'content': 'x'}]}
     outcome = MessageAction(content='✓ multi_edit committed 1 file(s) atomically')
-    with (
-        patch.object(h, '_combined_structured_edit_diff', return_value=''),
-        patch.object(
-            h,
-            '_structured_edit_verification_receipt',
-            return_value=('verified', [], True),
-        ),
-    ):
-        obs = h._build_edit_result_obs(
-            outcome,
-            {'C:/ws/a.py': ('old', 'a.py')},
-            action,
-            payload,
-        )
+    snapshots = {target: ('old', 'a.py')}
+    obs = h._build_edit_result_obs(outcome, snapshots, action, payload)
     assert isinstance(obs, FileEditObservation)
     assert 'multi_edit committed' in obs.content
+    assert obs.path == 'a.py'
 
 
 def test_edit_via_file_editor_marks_replace_string_as_existing_file() -> None:

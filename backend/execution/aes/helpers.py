@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 from pathlib import Path
@@ -28,7 +29,7 @@ from backend.execution.sandboxing import (
 from backend.execution.sandboxing import (
     is_workspace_restricted_profile as _sandbox_is_workspace_restricted_profile,
 )
-from backend.execution.utils.files.diff import get_diff
+from backend.execution.utils.files.diff import get_diff, get_diff_stats
 from backend.ledger.action import CmdRunAction
 from backend.ledger.observation import (
     ErrorObservation,
@@ -917,69 +918,164 @@ def _record_runtime_undo_snapshot(
     executor.file_editor._push_undo_snapshot(resolved_path, snapshot)
 
 
+def _count_structured_edit_line_changes(
+    old_content: str | None, new_content: str | None
+) -> tuple[int, int]:
+    from difflib import SequenceMatcher
+
+    old_lines = (old_content or '').split('\n')
+    new_lines = (new_content or '').split('\n')
+    added = 0
+    removed = 0
+    for tag, i1, i2, j1, j2 in SequenceMatcher(
+        None, old_lines, new_lines
+    ).get_opcodes():
+        if tag in {'insert', 'replace'}:
+            added += j2 - j1
+        if tag in {'delete', 'replace'}:
+            removed += i2 - i1
+    return added, removed
+
+
+def _structured_edit_file_outcomes(
+    snapshots: dict[Path, tuple[str | None, str]],
+) -> list[dict[str, Any]]:
+    """Build per-file edit metadata from pre/post commit snapshots."""
+    from backend.execution.aes.file_operations import truncate_diff
+    from backend.utils.treesitter.syntax_check import check_syntax
+
+    outcomes: list[dict[str, Any]] = []
+    for resolved_path, (old_content, display_path) in snapshots.items():
+        new_content = _read_existing_text(resolved_path)
+        disk_ok = new_content is not None
+        changed = old_content != new_content
+        file_diff: str | None = None
+        added = 0
+        removed = 0
+
+        if changed and new_content is not None:
+            file_diff = get_diff(old_content or '', new_content or '', display_path)
+            if file_diff:
+                file_diff = truncate_diff(file_diff, path=display_path)
+                stats = get_diff_stats(file_diff)
+                added = int(stats.get('lines_added') or 0)
+                removed = int(stats.get('lines_removed') or 0)
+            else:
+                added, removed = _count_structured_edit_line_changes(
+                    old_content, new_content
+                )
+
+        syntax_status = 'skipped'
+        syntax_detail = ''
+        if new_content is not None:
+            syntax_result = check_syntax(display_path, new_content)
+            syntax_status = syntax_result.status
+            syntax_detail = syntax_result.detail
+
+        outcome: dict[str, Any] = {
+            'path': display_path,
+            'absolute_path': str(resolved_path),
+            'disk_write': 'passed' if disk_ok else 'failed',
+            'changed': changed,
+            'syntax': syntax_status,
+            'added': added,
+            'removed': removed,
+        }
+        if file_diff:
+            outcome['diff'] = file_diff
+        if syntax_detail:
+            outcome['syntax_detail'] = syntax_detail[:1000]
+        outcomes.append(outcome)
+    return outcomes
+
+
+def _join_structured_file_outcome_diffs(file_outcomes: list[dict[str, Any]]) -> str | None:
+    chunks = [
+        str(outcome['diff'])
+        for outcome in file_outcomes
+        if isinstance(outcome.get('diff'), str) and outcome['diff'].strip()
+    ]
+    if not chunks:
+        return None
+    if len(chunks) == 1:
+        return chunks[0]
+    from backend.execution.aes.file_operations import truncate_diff
+
+    return truncate_diff('\n'.join(chunks))
+
+
+def _structured_edit_verification_text(
+    file_outcomes: list[dict[str, Any]],
+) -> tuple[str, bool]:
+    lines = ['[EDIT_VERIFICATION]']
+    all_ok = True
+
+    if not file_outcomes:
+        lines.append('- no file snapshots available for verification')
+        return '\n'.join(lines), False
+
+    for outcome in file_outcomes:
+        file_ok = (
+            outcome.get('disk_write') == 'passed'
+            and outcome.get('syntax') != 'failed'
+        )
+        all_ok = all_ok and file_ok
+        lines.append(
+            f'- {outcome["path"]}: disk_write={outcome["disk_write"]} '
+            f'changed={"yes" if outcome.get("changed") else "no"} '
+            f'syntax={outcome.get("syntax")}'
+        )
+
+    return '\n'.join(lines), all_ok
+
+
+def _resolve_structured_edit_display_path(
+    action: Any,
+    payload: dict[str, Any],
+    file_outcomes: list[dict[str, Any]],
+) -> str:
+    changed = [outcome for outcome in file_outcomes if outcome.get('changed')]
+    candidates = changed or file_outcomes
+    if len(candidates) == 1:
+        return str(candidates[0].get('path') or '')
+    if len(candidates) > 1:
+        paths = [str(outcome.get('path') or '') for outcome in candidates if outcome.get('path')]
+        if len(paths) == 1:
+            return paths[0]
+        if len(paths) <= 3:
+            return ', '.join(paths)
+        return f'{paths[0]}, ... (+{len(paths) - 1} more)'
+
+    for item in payload.get('file_edits') or []:
+        if isinstance(item, dict):
+            item_path = str(item.get('path') or '').strip()
+            if item_path:
+                return item_path
+
+    action_path = str(getattr(action, 'path', '') or '').strip()
+    if action_path and action_path != '.':
+        return action_path
+    return ''
+
+
 def _combined_structured_edit_diff(
     snapshots: dict[Path, tuple[str | None, str]],
 ) -> str | None:
     """Build one unified diff for a structured edit that may touch many files."""
-    from backend.execution.aes.file_operations import truncate_diff
-
-    chunks: list[str] = []
-    for resolved_path, (old_content, display_path) in snapshots.items():
-        new_content = _read_existing_text(resolved_path)
-        if old_content == new_content:
-            continue
-        diff = get_diff(old_content or '', new_content or '', display_path)
-        if diff:
-            chunks.append(diff)
-    if not chunks:
-        return None
-    return truncate_diff('\n'.join(chunks))
+    return _join_structured_file_outcome_diffs(
+        _structured_edit_file_outcomes(snapshots)
+    )
 
 
 def _structured_edit_verification_receipt(
     snapshots: dict[Path, tuple[str | None, str]],
 ) -> tuple[str, list[dict[str, Any]], bool]:
     """Verify structured edits after commit and return an agent-visible receipt."""
-    from backend.utils.treesitter.syntax_check import check_syntax
-
-    file_receipts: list[dict[str, Any]] = []
-    lines = ['[EDIT_VERIFICATION]']
-    all_ok = True
-
-    for resolved_path, (old_content, display_path) in snapshots.items():
-        new_content = _read_existing_text(resolved_path)
-        disk_ok = new_content is not None
-        changed = old_content != new_content
-        syntax_status = 'skipped'
-        syntax_detail = ''
-
-        if new_content is not None:
-            syntax_result = check_syntax(display_path, new_content)
-            syntax_status = syntax_result.status
-            syntax_detail = syntax_result.detail
-
-        file_ok = disk_ok and syntax_status != 'failed'
-        all_ok = all_ok and file_ok
-        receipt = {
-            'path': display_path,
-            'absolute_path': str(resolved_path),
-            'disk_write': 'passed' if disk_ok else 'failed',
-            'changed': changed,
-            'syntax': syntax_status,
-        }
-        if syntax_detail:
-            receipt['syntax_detail'] = syntax_detail[:1000]
-        file_receipts.append(receipt)
-        lines.append(
-            f'- {display_path}: disk_write={receipt["disk_write"]} '
-            f'changed={"yes" if changed else "no"} syntax={syntax_status}'
-        )
-
-    if not snapshots:
-        lines.append('- no file snapshots available for verification')
-        all_ok = False
-
-    return '\n'.join(lines), file_receipts, all_ok
+    file_outcomes = _structured_edit_file_outcomes(snapshots)
+    verification_text, verification_passed = _structured_edit_verification_text(
+        file_outcomes
+    )
+    return verification_text, file_outcomes, verification_passed
 
 
 def _structured_payload_dict(action: Any) -> dict[str, Any]:
@@ -1059,10 +1155,23 @@ def _build_edit_result_obs(
     from backend.ledger.action import MessageAction
     from backend.ledger.observation import FileEditObservation
 
-    diff = _combined_structured_edit_diff(original_snapshots)
-    verification_text, file_receipts, verification_passed = (
-        _structured_edit_verification_receipt(original_snapshots)
+    file_outcomes = _structured_edit_file_outcomes(original_snapshots)
+    diff = _join_structured_file_outcome_diffs(file_outcomes)
+    verification_text, verification_passed = _structured_edit_verification_text(
+        file_outcomes
     )
+    display_path = _resolve_structured_edit_display_path(action, payload, file_outcomes)
+
+    old_content: str | None = None
+    new_content: str | None = None
+    new_content_hash: str | None = None
+    if len(file_outcomes) == 1:
+        resolved_path = next(iter(original_snapshots))
+        old_content, _display_path = original_snapshots[resolved_path]
+        new_content = _read_existing_text(resolved_path)
+        if new_content is not None:
+            new_content_hash = hashlib.sha256(new_content.encode('utf-8')).hexdigest()
+
     summary = (
         outcome.content
         if isinstance(outcome, MessageAction)
@@ -1075,12 +1184,13 @@ def _build_edit_result_obs(
     )
     final_obs = FileEditObservation(
         content=content,
-        path=action.path,
+        path=display_path,
         outcome='edited',
-        old_content=None,
-        new_content=None,
+        old_content=old_content,
+        new_content=new_content,
         diff=diff,
         impl_source=FileEditSource.FILE_EDITOR,
+        new_content_hash=new_content_hash,
     )
     final_obs.tool_result = {
         'tool': 'file_edit',
@@ -1091,7 +1201,7 @@ def _build_edit_result_obs(
         'retryable': not verification_passed,
         'operation': 'multi_edit',
         'payload': payload,
-        'files': file_receipts,
+        'files': file_outcomes,
         'verification_passed': verification_passed,
     }
     return final_obs
