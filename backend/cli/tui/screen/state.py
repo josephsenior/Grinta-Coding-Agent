@@ -581,8 +581,15 @@ class ScreenStateMixin:
         self._retry_active = True
 
     def _maybe_refresh_session_audit(self) -> None:
-        """Keep ``app.stripped.log`` / ``app.audit.txt`` current during long runs."""
+        """Keep ``app.stripped.log`` / ``app.audit.txt`` current during long runs.
+
+        Runs off the Textual event loop so parsing a growing ``app.log`` cannot
+        freeze scroll/keyboard (session logs showed multi-second poll gaps
+        aligned with synchronous audit writes).
+        """
         if not getattr(self, '_agent_running', False):
+            return
+        if getattr(self, '_session_audit_in_flight', False):
             return
         from backend.core.constants import DEFAULT_SESSION_AUDIT_REFRESH_SECONDS
 
@@ -591,12 +598,21 @@ class ScreenStateMixin:
         if (now - last) < DEFAULT_SESSION_AUDIT_REFRESH_SECONDS:
             return
         self._last_session_audit_refresh_at = now
-        try:
-            from backend.core.logging.logger import finalize_session_logging_audit
+        self._session_audit_in_flight = True
 
-            finalize_session_logging_audit()
-        except Exception:
-            pass
+        def _run_audit() -> None:
+            try:
+                from backend.core.logging.logger import finalize_session_logging_audit
+
+                finalize_session_logging_audit()
+            except Exception:
+                pass
+            finally:
+                self._session_audit_in_flight = False
+
+        import threading
+
+        threading.Thread(target=_run_audit, daemon=True, name='session-audit').start()
 
     def set_agent_phase(self, state_value: str) -> None:
         key = state_value.lower().strip()
