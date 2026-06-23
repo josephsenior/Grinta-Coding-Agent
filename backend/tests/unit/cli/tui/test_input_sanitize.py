@@ -23,6 +23,37 @@ def test_tui_strips_leaked_mouse_reports_without_sgr_marker() -> None:
     assert _strip_terminal_control_literals(leaked) == 'PS> hello'
 
 
+def test_tui_strips_screenshot_style_mouse_stream() -> None:
+    leaked = (
+        'PS C:\\Users\\GIGABYTE\\Desktop\\New folder (3)> '
+        '[555;57;27M[555;57;26M[555;58;24M[555555;60;27Mpython'
+    )
+    assert _strip_terminal_control_literals(leaked) == (
+        'PS C:\\Users\\GIGABYTE\\Desktop\\New folder (3)> python'
+    )
+
+
+@pytest.mark.asyncio
+async def test_tui_headless_exit_restores_terminal_modes(mock_config, monkeypatch):
+    from backend.cli.terminal_restore import terminal_restore_guard
+
+    restore_calls: list[int] = []
+    monkeypatch.setattr(
+        'backend.cli.terminal_restore.restore_terminal_modes',
+        lambda **_: restore_calls.append(1),
+    )
+
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    with terminal_restore_guard(app):
+        async with app.run_test(size=(120, 36)):
+            pass
+
+    assert restore_calls
+
+
 @pytest.mark.asyncio
 async def test_tui_input_removes_leaked_mouse_reports_live(mock_config):
     console = RichConsole()

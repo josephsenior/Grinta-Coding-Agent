@@ -197,6 +197,7 @@ class SimpleBashSession(BaseShellSession):
             cwd=self._cwd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            stdin=subprocess.DEVNULL,
             start_new_session=not OS_CAPS.is_windows,
             creationflags=(
                 subprocess.CREATE_NEW_PROCESS_GROUP if OS_CAPS.is_windows else 0

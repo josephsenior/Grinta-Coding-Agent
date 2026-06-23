@@ -19,6 +19,7 @@ from textual.reactive import Reactive
 
 from backend.cli.display.hud import HUDBar
 from backend.cli.display.reasoning_display import ReasoningDisplay
+from backend.cli.terminal_restore import terminal_restore_guard
 from backend.cli.theme import grinta_rich_theme_styles
 from backend.cli.theme.syntax_theme import GRINTA_TERMINAL_THEME
 
@@ -83,6 +84,7 @@ class GrintaTUIApp(App):
 
     async def on_mount(self) -> None:
         from backend.cli.tui.app import GrintaScreen
+        from backend.cli.terminal_restore import capture_driver_console_restore
 
         self._screen = await self.push_screen(
             GrintaScreen(
@@ -93,6 +95,9 @@ class GrintaTUIApp(App):
                 reasoning=self._reasoning,
                 app=self,
             )
+        )
+        self.call_after_refresh(
+            lambda: capture_driver_console_restore(getattr(self, '_driver', None))
         )
 
     def on_unmount(self) -> None:
@@ -132,30 +137,31 @@ async def run_tui(
     app._hud.update_ledger('Starting')
     app._hud.update_agent_state('Starting')
 
-    try:
-        await app.run_async()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        if app._agent_task and not app._agent_task.done():
-            app._agent_task.cancel()
-            try:
-                await asyncio.wait_for(app._agent_task, timeout=5.0)
-            except (asyncio.TimeoutError, asyncio.CancelledError):
-                pass
-
+    with terminal_restore_guard(app):
         try:
-            from backend.core.logging.logger import finalize_session_logging_audit
-
-            finalize_session_logging_audit()
-        except Exception:
+            await app.run_async()
+        except KeyboardInterrupt:
             pass
 
-        # Drain remaining tracked background tasks so asyncio.run() cleanup
-        # doesn't hit RecursionError from Python 3.12's recursive Task.cancel().
-        from backend.utils.async_helpers.async_utils import drain_background_tasks
+    if app._agent_task and not app._agent_task.done():
+        app._agent_task.cancel()
+        try:
+            await asyncio.wait_for(app._agent_task, timeout=5.0)
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            pass
 
-        await drain_background_tasks(max_rounds=2, timeout=2.0)
+    try:
+        from backend.core.logging.logger import finalize_session_logging_audit
+
+        finalize_session_logging_audit()
+    except Exception:
+        pass
+
+    # Drain remaining tracked background tasks so asyncio.run() cleanup
+    # doesn't hit RecursionError from Python 3.12's recursive Task.cancel().
+    from backend.utils.async_helpers.async_utils import drain_background_tasks
+
+    await drain_background_tasks(max_rounds=2, timeout=2.0)
 
 
 async def _async_main_tui(

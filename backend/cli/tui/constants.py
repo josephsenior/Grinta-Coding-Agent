@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import logging
 import os
-import re
 
 _tui_logger = logging.getLogger('grinta.tui')
 _tui_logger.setLevel(logging.DEBUG)
@@ -65,11 +64,6 @@ _TUI_RESUME_HYDRATE_EVENTS = _bounded_int_env(
     'GRINTA_TUI_RESUME_HYDRATE_EVENTS',
     default=80,
     minimum=10,
-)
-
-_TERMINAL_MOUSE_REPORT_RE = re.compile(r'(?:\x1b)?\[(?:<)?\d{1,7};\d{1,7};\d{1,7}[mM]')
-_TERMINAL_ORPHAN_PARAM_TOKEN_RE = re.compile(
-    r'(?:^|(?<=[^\w]))(?:\[?\d+(?:;\d+){2,}[OI]?_){2,}'
 )
 
 _WELCOME_SUGGESTIONS = [

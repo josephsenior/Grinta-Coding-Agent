@@ -342,7 +342,7 @@ class WindowsPowershellSession(BaseShellSession):
                 env=child_env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                stdin=subprocess.PIPE if input_text is not None else None,
+                stdin=subprocess.PIPE if input_text is not None else subprocess.DEVNULL,
             )
 
             self._cancellation.register_process(process)
