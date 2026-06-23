@@ -102,7 +102,7 @@ from backend.cli.repl.slash_registry_prompt import (
 from backend.cli.repl.slash_registry_prompt import (
     build_command_completer as _build_command_completer,
 )
-from backend.cli.repl.slash_registry_terminal import (
+from backend.cli.terminal_sanitize import (
     _CSI_OSC_DCS,
     _ORPHAN_BRACKET_CSI,
     _ORPHAN_PARAM_CHUNK_SINGLE,
