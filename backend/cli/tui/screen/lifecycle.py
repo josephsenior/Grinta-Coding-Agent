@@ -450,12 +450,12 @@ class ScreenLifecycleMixin:
         if ready is None or ready.is_set():
             return
         prev_phase = self._phase_label
-        self._phase_label = 'Preparing environment…'
+        self._phase_label = 'Preparing environment'
         self._render_hud_bar()
         try:
             await ready.wait()
         finally:
-            if self._phase_label == 'Preparing environment…':
+            if self._phase_label == 'Preparing environment':
                 self._phase_label = prev_phase or 'Ready'
             self._render_hud_bar()
 

@@ -16,6 +16,9 @@ from backend.cli.tool_display.orient_tools import (
     _quote,
     analyze_observation_model,
     analyze_result,
+    checkpoint_action_model,
+    checkpoint_observation_model,
+    checkpoint_result,
     file_read_action_model,
     find_symbols_observation_model,
     glob_observation_model,
@@ -316,3 +319,36 @@ def test_count_result_lines_and_json_helpers() -> None:
         )
         == 2
     )
+
+
+def test_checkpoint_result_uses_id_instead_of_duplicating_label() -> None:
+    label = 'Before major rewrite of node.py and cluster.py'
+    obs = SimpleNamespace(
+        ok=True,
+        status='saved',
+        changed_state=True,
+        data={'checkpoint_id': 3, 'label': label},
+        content='',
+    )
+
+    assert checkpoint_result(obs, target=label) == '#3'
+
+
+def test_checkpoint_observation_model_avoids_duplicate_target_and_result() -> None:
+    label = 'Before major rewrite of node.py and cluster.py'
+    pending = checkpoint_action_model(
+        SimpleNamespace(command='save', label=label, checkpoint_id='')
+    )
+    obs = SimpleNamespace(
+        ok=True,
+        status='saved',
+        changed_state=True,
+        data={'checkpoint_id': 3, 'label': label},
+        content='',
+    )
+
+    model = checkpoint_observation_model(obs, pending)
+
+    assert model.target == label
+    assert model.result == '#3'
+    assert model.target not in model.result

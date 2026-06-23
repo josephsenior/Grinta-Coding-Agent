@@ -106,13 +106,6 @@ class ScreenMessagesMixin:
         body.stylize(NAVY_TEXT_MUTED)
         self._write_log(body)
 
-    def add_task_completed_notice(self, duration: str | None = None) -> None:
-        """One-time soft notice when the agent finishes a turn."""
-        if duration:
-            self._emit_transcript_notice(f'Task completed · {duration}')
-        else:
-            self._emit_transcript_notice('Task completed')
-
     def _emit_transcript_notice(self, text: str) -> None:
         """Render a unified soft notice for recoverable issues and tool feedback."""
         from backend.cli.tui.widgets.transcript_notice import TranscriptNotice

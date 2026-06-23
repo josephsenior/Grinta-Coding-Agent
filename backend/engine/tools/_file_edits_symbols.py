@@ -356,8 +356,54 @@ def _coerce_read_symbol_targets(
     result = _coerce_symbols_list_argument(raw_symbols)
     if result is not None:
         return result
+    flat_spec: dict[str, Any] = {}
+    for key in (
+        'qualified_name',
+        'symbol_name',
+        'symbol_id',
+        'path',
+        'symbol_kind',
+        'parent_symbol',
+        'occurrence',
+    ):
+        if arguments.get(key) is not None:
+            flat_spec[key] = arguments.get(key)
+    if (
+        str(flat_spec.get('qualified_name') or '').strip()
+        or str(flat_spec.get('symbol_name') or '').strip()
+        or str(flat_spec.get('symbol_id') or '').strip()
+    ):
+        return [flat_spec]
     raise FunctionCallValidationError(
-        'read type=symbols requires a non-empty symbols[] array.'
+        'read type=symbols requires a non-empty symbols[] array '
+        'or qualified_name, symbol_name, or symbol_id.'
+    )
+
+
+def _infer_read_type(arguments: Mapping[str, Any]) -> str | None:
+    """Infer read kind from argument shape when type is omitted."""
+    if _coerce_symbols_list_argument(arguments.get('symbols')) is not None:
+        return 'symbols'
+    for key in ('qualified_name', 'symbol_name', 'symbol_id'):
+        if str(arguments.get(key) or '').strip():
+            return 'symbols'
+    if arguments.get('start_line') is not None or arguments.get('end_line') is not None:
+        return 'file'
+    if str(arguments.get('path') or '').strip():
+        return 'file'
+    return None
+
+
+def _resolve_read_type(arguments: Mapping[str, Any]) -> str:
+    explicit = str(arguments.get('type', '') or '').strip().lower()
+    if explicit:
+        return explicit
+    inferred = _infer_read_type(arguments)
+    if inferred:
+        return inferred
+    raise FunctionCallValidationError(
+        'read requires type ("file" or "symbols") or inferrable arguments '
+        '(path, symbols[], or qualified_name/symbol_name/symbol_id).'
     )
 
 

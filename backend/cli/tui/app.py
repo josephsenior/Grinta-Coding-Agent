@@ -104,8 +104,8 @@ class GrintaScreen(
         Binding('ctrl+n', 'history_next', 'History Next', show=False),
     ]
     _STATE_LABELS = {
-        'starting': 'Starting…',
-        'loading': 'Loading…',
+        'starting': 'Starting',
+        'loading': 'Loading',
         'running': 'Running',
         'retrying': 'Retrying',
         'backoff': 'Backoff',
@@ -115,7 +115,7 @@ class GrintaScreen(
         'finished': 'Ready',
         'rejected': 'Rejected',
         'error': 'Error',
-        'awaiting_user_confirmation': 'Confirm',
+        'awaiting_user_confirmation': 'Confirming',
         'user_confirmed': 'Confirmed',
         'user_rejected': 'Rejected',
         'rate_limited': 'Rate Limited',

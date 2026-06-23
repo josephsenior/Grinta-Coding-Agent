@@ -716,6 +716,7 @@ class HUD(Vertical):
 
     def compose(self) -> ComposeResult:
         with Horizontal(id='hud-line-2-row'):
+            yield Label(id='hud-line-2-ws')
             yield Label(
                 esc_hint_markup('Interrupt'),
                 id='hud-hint-interrupt',
@@ -746,7 +747,7 @@ class HUD(Vertical):
                 id='hud-reasoning',
                 allow_blank=False,
             )
-            yield Label(id='hud-line-1-ws')
+            yield Label(id='hud-line-1-help')
 
 
 class RendererDrainRequested(Message):

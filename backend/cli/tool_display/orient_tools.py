@@ -607,17 +607,32 @@ def _checkpoint_summary_from_obs(obs: Any) -> str:
     return content.split('\n', 1)[0].strip() if content else ''
 
 
-def checkpoint_result(obs: Any) -> str:
+def checkpoint_result(obs: Any, *, target: str = '') -> str:
     if not getattr(obs, 'ok', True):
         reason = str(getattr(obs, 'reason', '') or getattr(obs, 'status', '') or '')
         return 'failed' if not reason else reason[:40]
     data = getattr(obs, 'data', None)
     if isinstance(data, dict):
-        label = str(data.get('label', '') or '').strip()
-        if label:
-            return label[:44]
+        cp_id = data.get('checkpoint_id')
+        if cp_id is not None:
+            return f'#{cp_id}'
+        total = data.get('total_checkpoints')
+        if isinstance(total, int):
+            return _plural(total, 'checkpoint')
+    status = str(getattr(obs, 'status', '') or '').strip().lower()
+    if status == 'noop':
+        return 'already saved'
+    if status in {'saved', 'reverted', 'cleared', 'empty', 'ok'}:
+        return status
     summary = _checkpoint_summary_from_obs(obs)
+    target_norm = (target or '').strip()
     if summary:
+        if target_norm and (
+            summary == target_norm
+            or summary.endswith(target_norm)
+            or target_norm in summary
+        ):
+            return status or 'completed'
         return summary[:44] if len(summary) > 44 else summary
     if getattr(obs, 'changed_state', False):
         return 'saved'
@@ -628,7 +643,7 @@ def checkpoint_observation_model(
     obs: Any, pending: OrientLineModel | None = None
 ) -> OrientLineModel:
     base = pending or checkpoint_action_model(obs)
-    return base.with_result(checkpoint_result(obs))
+    return base.with_result(checkpoint_result(obs, target=base.target))
 
 
 def checkpoint_think_orient_model(

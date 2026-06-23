@@ -95,17 +95,101 @@ def test_read_rejects_legacy_range_type(monkeypatch, tmp_path):
         )
 
 
-def test_read_symbols_requires_symbols_array(monkeypatch, tmp_path):
+def test_read_symbols_accepts_legacy_flat_qualified_name(monkeypatch, tmp_path):
+    _use_tmp_workspace(monkeypatch, tmp_path)
+    (tmp_path / 'mod.py').write_text(
+        'def login():\n    return True\n', encoding='utf-8'
+    )
+
+    action = _handle_read_tool(
+        {
+            'type': 'symbols',
+            'qualified_name': 'login',
+            'security_risk': 'LOW',
+        }
+    )
+    assert isinstance(action, ReadSymbolsAction)
+    assert action.targets == [{'qualified_name': 'login'}]
+
+
+def test_read_symbols_requires_symbol_target(monkeypatch, tmp_path):
     _use_tmp_workspace(monkeypatch, tmp_path)
 
     with pytest.raises(FunctionCallValidationError, match='symbols\\[\\]'):
         _handle_read_tool(
             {
                 'type': 'symbols',
-                'qualified_name': 'login',
                 'security_risk': 'LOW',
             }
         )
+
+
+def test_read_infers_file_from_path_only(monkeypatch, tmp_path):
+    _use_tmp_workspace(monkeypatch, tmp_path)
+    (tmp_path / 'a.txt').write_text('hello\n', encoding='utf-8')
+
+    action = _handle_read_tool({'path': 'a.txt', 'security_risk': 'LOW'})
+
+    assert isinstance(action, FileReadAction)
+    assert action.path == 'a.txt'
+
+
+def test_read_infers_symbols_from_symbols_array(monkeypatch, tmp_path):
+    _use_tmp_workspace(monkeypatch, tmp_path)
+    (tmp_path / 'mod.py').write_text(
+        'def login():\n    return True\n', encoding='utf-8'
+    )
+
+    action = _handle_read_tool(
+        {
+            'symbols': [{'symbol_name': 'login'}],
+            'security_risk': 'LOW',
+        }
+    )
+
+    assert isinstance(action, ReadSymbolsAction)
+
+
+def test_read_infers_symbols_from_flat_qualified_name(monkeypatch, tmp_path):
+    _use_tmp_workspace(monkeypatch, tmp_path)
+    (tmp_path / 'mod.py').write_text(
+        'def login():\n    return True\n', encoding='utf-8'
+    )
+
+    action = _handle_read_tool(
+        {
+            'qualified_name': 'login',
+            'security_risk': 'LOW',
+        }
+    )
+
+    assert isinstance(action, ReadSymbolsAction)
+    payload = _payload(execute_read_symbols(action))
+    assert payload['results'][0]['status'] == 'resolved'
+
+
+def test_read_infers_file_from_line_bounds(monkeypatch, tmp_path):
+    _use_tmp_workspace(monkeypatch, tmp_path)
+    (tmp_path / 'a.txt').write_text('one\ntwo\nthree\n', encoding='utf-8')
+
+    action = _handle_read_tool(
+        {
+            'path': 'a.txt',
+            'start_line': 2,
+            'end_line': 3,
+            'security_risk': 'LOW',
+        }
+    )
+
+    assert isinstance(action, FileReadAction)
+    assert action.view_range == [2, 3]
+
+
+def test_read_requires_type_or_inferrable_arguments(monkeypatch, tmp_path):
+    _use_tmp_workspace(monkeypatch, tmp_path)
+
+    with pytest.raises(FunctionCallValidationError, match='inferrable arguments'):
+        _handle_read_tool({'security_risk': 'LOW'})
 
 
 def test_read_file_range_requires_both_line_bounds(monkeypatch, tmp_path):

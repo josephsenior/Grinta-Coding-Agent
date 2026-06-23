@@ -23,6 +23,8 @@ from backend.cli.theme import (
     NAVY_RUNNING_DIM,
     NAVY_TEXT_DIM,
     NAVY_TEXT_SECONDARY,
+    NAVY_WAITING,
+    NAVY_WAITING_DIM,
     NAVY_YELLOW_ACCENT,
 )
 from backend.cli.tui.helpers import (
@@ -51,6 +53,34 @@ class ScreenStateMixin:
     )
     _RUNNING_PULSE_BULLETS = ('●', '◉')
     _RUNNING_PULSE_COLORS = (NAVY_RUNNING, NAVY_RUNNING_DIM)
+    _WAITING_PULSE_COLORS = (NAVY_WAITING, NAVY_WAITING_DIM)
+    _HUD_PULSE_EXACT = frozenset(
+        {
+            'running',
+            'starting',
+            'loading',
+            'awaiting_user_confirmation',
+            'rate_limited',
+        }
+    )
+    _HUD_PULSE_PREFIXES = ('backoff', 'retrying')
+
+    @classmethod
+    def _hud_state_should_pulse(cls, raw_state: str | None) -> bool:
+        lookup = cls._state_lookup_key(raw_state)
+        lookup_norm = lookup.replace(' ', '_')
+        if lookup in cls._HUD_PULSE_EXACT or lookup_norm in cls._HUD_PULSE_EXACT:
+            return True
+        return any(
+            lookup.startswith(prefix) or lookup_norm.startswith(prefix)
+            for prefix in cls._HUD_PULSE_PREFIXES
+        )
+
+    @classmethod
+    def _hud_pulse_colors(cls, lookup: str) -> tuple[str, str]:
+        if lookup == 'running':
+            return cls._RUNNING_PULSE_COLORS
+        return cls._WAITING_PULSE_COLORS
 
     @staticmethod
     def _state_lookup_key(raw_state: str | None) -> str:
@@ -68,7 +98,7 @@ class ScreenStateMixin:
             return display_state
         if self._state_lookup_key(raw_state) not in self._TURN_DURATION_STATES:
             return display_state
-        return f'{display_state} · {duration}'
+        return f'{display_state} (worked for {duration})'
 
     @classmethod
     def _resolve_state_display(cls, raw_state: str | None) -> tuple[str, str]:
@@ -134,12 +164,13 @@ class ScreenStateMixin:
         raw_state: str | None = None,
     ) -> str:
         lookup = self._state_lookup_key(raw_state)
-        if lookup == 'running':
+        if self._hud_state_should_pulse(raw_state):
+            pulse_colors = self._hud_pulse_colors(lookup)
             frame = int(getattr(self, '_hud_pulse_frame', 0)) % len(
                 self._RUNNING_PULSE_BULLETS
             )
             bullet = self._RUNNING_PULSE_BULLETS[frame]
-            bullet_color = self._RUNNING_PULSE_COLORS[frame]
+            bullet_color = pulse_colors[frame]
             state_part = (
                 f'[{bullet_color}]{bullet}[/] [{state_color}]{display_state}[/]'
             )
@@ -152,11 +183,11 @@ class ScreenStateMixin:
         return '  '.join(parts)
 
     def _tick_hud_running_pulse(self) -> None:
-        """Advance the running-state bullet pulse (cheap label-only refresh)."""
+        """Advance the HUD bullet pulse for active/waiting states (cheap label-only refresh)."""
         if self._is_unmounted:
             return
         raw_state = self._hud.state.agent_state_label or 'Ready'
-        if self._state_lookup_key(raw_state) != 'running':
+        if not self._hud_state_should_pulse(raw_state):
             if getattr(self, '_hud_pulse_frame', 0) != 0:
                 self._hud_pulse_frame = 0
                 self._render_hud_bar()
@@ -432,20 +463,23 @@ class ScreenStateMixin:
         hud.update_autonomy(autonomy)
 
         workspace = self._resolve_workspace_display(hud.state.workspace_path)
-        ws_display = HUDBar.ellipsize_path(workspace, 35)
+        term_width = getattr(getattr(self, 'size', None), 'width', None) or 120
+        ws_budget = max(20, term_width // 3)
+        ws_display = HUDBar.ellipsize_path(workspace, ws_budget)
         line1 = self._build_hud_line1(display_state, state_color, raw_state=raw_state)
         line1_ws = self._build_hud_line1_ws(ws_display)
         model_label = f'[{NAVY_TEXT_SECONDARY}]{model_display}[/]'
 
         token_display = self._build_context_display(used, limit)
         help_hint = r'[#54597b]\[[/][#eacb8a]F1[/][#54597b]][/] [#969aad]Help[/]'
-        line2 = f'{token_display}   {help_hint}'
+        line2 = token_display
 
         hud_bar = self.query_one('#hud-bar', HUD)
         hud_bar.query_one('#hud-line-1', Label).update(line1)
         hud_bar.query_one('#hud-model-name', Label).update(model_label)
-        hud_bar.query_one('#hud-line-1-ws', Label).update(line1_ws)
+        hud_bar.query_one('#hud-line-2-ws', Label).update(line1_ws)
         hud_bar.query_one('#hud-line-2', Label).update(line2)
+        hud_bar.query_one('#hud-line-1-help', Label).update(help_hint)
         self._sync_hud_reasoning_select(hud_bar)
         self._sync_hud_autonomy_select(hud_bar, autonomy)
         self._sync_hud_mode_select(hud_bar)

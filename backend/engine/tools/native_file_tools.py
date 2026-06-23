@@ -31,13 +31,18 @@ def create_read_tool() -> ChatCompletionToolParam:
             'Read a file, a line range within a file, or one or more symbol bodies. '
             'For files: use type=file with path; add start_line and end_line for a range. '
             'For symbols: use type=symbols with symbols[] (one or more targets). Unique '
-            'symbols auto-resolve; ambiguous symbols return candidates, not guessed bodies.'
+            'symbols auto-resolve; ambiguous symbols return candidates, not guessed bodies. '
+            'When type is omitted: path-only or line bounds infer file; symbols[] or '
+            'qualified_name/symbol_name/symbol_id infer symbols.'
         ),
         properties={
             'type': {
                 'type': 'string',
                 'enum': ['file', 'symbols'],
-                'description': 'Read kind: file (optionally a line range) or symbol bodies.',
+                'description': (
+                    'Read kind: file (optionally a line range) or symbol bodies. '
+                    'Optional when path, symbols[], or symbol identifiers make the intent clear.'
+                ),
             },
             'path': get_path_param(
                 'Project-relative path. Required for type=file; optional default for all symbols[].'
@@ -74,7 +79,7 @@ def create_read_tool() -> ChatCompletionToolParam:
                 'description': 'Default symbol kind for all symbols[] items (function, class, method).',
             },
         },
-        required=['type'],
+        required=[],
     )
 
 

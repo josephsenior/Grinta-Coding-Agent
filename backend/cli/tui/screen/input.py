@@ -709,7 +709,7 @@ class ScreenInputMixin:
             return
 
         self.add_system_message(f'Resuming session: {resolved_id}')
-        self._phase_label = 'Loading…'
+        self._phase_label = 'Loading'
         self._phase_started_at = time.monotonic()
         self._render_hud_bar()
         input_bar = self.query_one('#input-bar', InputBar)
