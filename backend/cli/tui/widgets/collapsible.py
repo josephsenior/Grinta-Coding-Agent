@@ -297,19 +297,21 @@ class SidebarManageButton(Static):
     }
     SidebarManageButton.-mcp {
         color: #b89a6a;
+        background: #1a1610;
     }
     SidebarManageButton.-mcp:hover,
     SidebarManageButton.-mcp:focus {
         color: #eacb8a;
-        background: #1a1610;
+        background: #252015;
     }
     SidebarManageButton.-skill {
         color: #a88fd4;
+        background: #181024;
     }
     SidebarManageButton.-skill:hover,
     SidebarManageButton.-skill:focus {
         color: #c792ea;
-        background: #181024;
+        background: #221830;
     }
     """
 

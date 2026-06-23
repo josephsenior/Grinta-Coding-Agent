@@ -264,22 +264,24 @@ SidebarManageButton:focus {
 
 SidebarManageButton.-mcp {
     color: #b89a6a;
+    background: #1a1610;
 }
 
 SidebarManageButton.-mcp:hover,
 SidebarManageButton.-mcp:focus {
     color: #eacb8a;
-    background: #1a1610;
+    background: #252015;
 }
 
 SidebarManageButton.-skill {
     color: #a88fd4;
+    background: #181024;
 }
 
 SidebarManageButton.-skill:hover,
 SidebarManageButton.-skill:focus {
     color: #c792ea;
-    background: #181024;
+    background: #221830;
 }
 
 GrintaManageMCPDialog > #dialog-container,
@@ -541,6 +543,7 @@ HUD,
     height: 1;
     text-align: left;
     color: #8f9fc1;
+    margin-right: 3;
 }
 
 #hud-line-1-spacer,
@@ -585,7 +588,7 @@ HUD,
 }
 
 #hud-label-mode {
-    margin-left: 0;
+    margin-left: 2;
 }
 
 #hud-label-autonomy {
