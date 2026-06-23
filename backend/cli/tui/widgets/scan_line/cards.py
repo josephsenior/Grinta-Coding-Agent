@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from backend.cli.theme import NAVY_RUNNING
 from backend.cli.tui.widgets.scan_line.card import ScanLineCard
 
 if TYPE_CHECKING:
@@ -65,6 +66,23 @@ def _format_diff_delta(added: int, removed: int) -> str:
     return ' '.join(parts) if parts else '0'
 
 
+_RUNNING_ELLIPSIS_FRAMES = ('…', '..', '.')
+_running_ellipsis_frame = 0
+
+
+def advance_running_ellipsis_frame() -> None:
+    """Advance the running-state ellipsis animation (called every 250 ms)."""
+    global _running_ellipsis_frame
+    _running_ellipsis_frame = (_running_ellipsis_frame + 1) % len(
+        _RUNNING_ELLIPSIS_FRAMES
+    )
+
+
+def _running_ellipsis_markup() -> str:
+    glyph = _RUNNING_ELLIPSIS_FRAMES[_running_ellipsis_frame]
+    return f'[{NAVY_RUNNING}]{glyph}[/]'
+
+
 def _status_indicator_markup(
     state: str,
     *,
@@ -74,9 +92,9 @@ def _status_indicator_markup(
     """Right-slot status glyph for shell/terminal scan rows."""
     if state == 'running':
         tail = (running_tail or '').strip()
-        if tail and tail != '…':
-            return f'[#EF9F27]{_truncate(tail, 40)}[/]'
-        return '[#EF9F27]…[/]'
+        if tail and tail not in _RUNNING_ELLIPSIS_FRAMES:
+            return f'[{NAVY_RUNNING}]{_truncate(tail, 40)}[/]'
+        return _running_ellipsis_markup()
     if state == 'background':
         return '[#6B9FD4]detached[/]'
     if state == 'done':

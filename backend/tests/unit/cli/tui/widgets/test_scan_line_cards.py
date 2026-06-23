@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from backend.cli.theme import NAVY_RUNNING
 from backend.cli.tui.screens.detail.base import DetailScreen
 from backend.cli.tui.widgets.scan_line import (
     AgentMessageCard,
@@ -237,8 +238,22 @@ def test_shell_card_running():
     assert card.state == 'running'
     line = _line_text(card)
     assert '$ Shell' in line or 'Shell' in line
-    assert '[#EF9F27]…[/]' in card._delta_text()
+    assert f'[{NAVY_RUNNING}]…[/]' in card._delta_text()
     assert 'npm install' in line
+
+
+def test_running_ellipsis_cycles_with_refresh_frame():
+    from backend.cli.tui.widgets.scan_line import cards as cards_mod
+
+    cards_mod._running_ellipsis_frame = 0
+    assert cards_mod._running_ellipsis_markup() == f'[{NAVY_RUNNING}]…[/]'
+    cards_mod.advance_running_ellipsis_frame()
+    assert cards_mod._running_ellipsis_markup() == f'[{NAVY_RUNNING}]..[/]'
+    cards_mod.advance_running_ellipsis_frame()
+    assert cards_mod._running_ellipsis_markup() == f'[{NAVY_RUNNING}].[/]'
+    cards_mod.advance_running_ellipsis_frame()
+    assert cards_mod._running_ellipsis_markup() == f'[{NAVY_RUNNING}]…[/]'
+    cards_mod._running_ellipsis_frame = 0
 
 
 def test_shell_card_done():
@@ -294,10 +309,10 @@ def test_terminal_card_running():
     )
     assert card.state == 'running'
     assert '▸ Terminal' in _line_text(card)
-    assert '[#EF9F27]▸ Terminal[/]' in _line_text(card)
+    assert f'[{NAVY_RUNNING}]▸ Terminal[/]' in _line_text(card)
     assert 's1' in _line_text(card)
     assert '/project/grinta' in _line_text(card)
-    assert '[#EF9F27]…[/]' in card._delta_text()
+    assert f'[{NAVY_RUNNING}]…[/]' in card._delta_text()
 
 
 def test_terminal_card_done():
@@ -355,7 +370,7 @@ def test_browser_card_running():
     card = BrowserCard(domain='github.com/raft/paper', action='extracting links')
     assert card.state == 'running'
     assert '⌁ Browser' in _line_text(card)
-    assert '[#EF9F27]⌁ Browser[/]' in _line_text(card)
+    assert f'[{NAVY_RUNNING}]⌁ Browser[/]' in _line_text(card)
     assert 'github.com' in _line_text(card)
     assert 'extracting' in card._delta_text()
 
@@ -390,7 +405,7 @@ def test_debugger_card_running():
     card = DebuggerCard(location='backend/raft.py:47', function='')
     assert card.state == 'running'
     assert '⎇ Debug' in _line_text(card)
-    assert '[#EF9F27]⎇ Debug[/]' in _line_text(card)
+    assert f'[{NAVY_RUNNING}]⎇ Debug[/]' in _line_text(card)
     assert 'backend/raft.py:47' in _line_text(card)
 
 

@@ -30,7 +30,8 @@ NAVY_BRAND_DIM = '#6171a6'  # secondary accent (muted periwinkle)
 
 # Status semantic colors
 NAVY_READY = '#54efae'  # green — Ready / Success / Healthy
-NAVY_RUNNING = '#91abec'  # periwinkle — Running / Processing
+NAVY_RUNNING = '#f6a657'  # warm amber — Running / active work
+NAVY_RUNNING_DIM = '#c9803f'  # dimmer amber — running pulse off-frame
 NAVY_WAITING = '#f6ff8f'  # lime yellow — Review / Paused / Warning
 NAVY_ERROR = '#fd8383'  # soft red — Error / Danger
 

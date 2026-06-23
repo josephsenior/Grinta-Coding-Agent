@@ -208,7 +208,7 @@ def apply_theme_overrides() -> None:
         tokens.CLR_DECISION_BORDER = '#f6ff8f'
         tokens.CLR_USER_BORDER = 'dim #91abec'
         tokens.CLR_USER_BG = 'on #111b29'
-        tokens.CLR_STATE_RUNNING = '#91abec bold'
+        tokens.CLR_STATE_RUNNING = '#f6a657 bold'
         tokens.CLR_AUTONOMY_BALANCED = '#54efae'
         tokens.CLR_AUTONOMY_FULL = '#f6ff8f bold'
         tokens.CLR_AUTONOMY_CONSERVATIVE = '#91abec bold'

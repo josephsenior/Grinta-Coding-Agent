@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from backend.cli.theme import NAVY_RUNNING
 from backend.cli.tui.screens.detail.base import DetailScreen
 from backend.cli.tui.screens.detail.helpers import (
     detail_accent_for_state,
@@ -21,7 +22,7 @@ def test_split_detail_title():
 def test_detail_accent_for_state():
     assert detail_accent_for_state('done') == '#639922'
     assert detail_accent_for_state('failed') == '#E24B4A'
-    assert detail_accent_for_state('running') == '#EF9F27'
+    assert detail_accent_for_state('running') == NAVY_RUNNING
 
 
 def test_format_exit_chip():
