@@ -20,6 +20,7 @@ from backend.cli.theme import (
     NAVY_BRAND,
     NAVY_ERROR,
     NAVY_READY,
+    NAVY_RUNNING,
     NAVY_TEXT_MUTED,
     NAVY_WAITING,
 )
@@ -111,7 +112,7 @@ class GrintaScreen(
         'awaiting_user_input': 'Ready',
         'paused': 'Paused',
         'stopped': 'Stopped',
-        'finished': 'Finished',
+        'finished': 'Ready',
         'rejected': 'Rejected',
         'error': 'Error',
         'awaiting_user_confirmation': 'Confirm',
@@ -122,7 +123,7 @@ class GrintaScreen(
     _STATE_COLORS = {
         'starting': NAVY_WAITING,
         'loading': NAVY_WAITING,
-        'running': NAVY_BRAND,
+        'running': NAVY_RUNNING,
         'retrying': NAVY_WAITING,
         'backoff': NAVY_WAITING,
         'awaiting_user_input': NAVY_READY,
@@ -228,6 +229,7 @@ class GrintaScreen(
         self._hud_select_sync_values: dict[str, tuple[set[str], float]] = {}
         self._pending_image_urls: list[str] = []
         self._last_turn_duration: str | None = None
+        self._hud_pulse_frame = 0
 
 
 class TUIRenderer(

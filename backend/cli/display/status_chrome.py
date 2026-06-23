@@ -444,7 +444,7 @@ def rich_fake_prompt_input_row(fields: StatusFields) -> Any:
     state_l = (fields.agent_state_label or 'Running').strip()
     if state_l.lower() == 'running':
         subline = 'Agent working · ctrl+c to interrupt'
-        spin_style = CLR_BRAND
+        spin_style = CLR_STATE_RUNNING
     else:
         subline = f'{state_l} · ctrl+c if needed'
         spin_style = f'dim {CLR_META}'

@@ -123,6 +123,7 @@ class ScreenLifecycleMixin:
         self.call_after_refresh(self._mark_hud_controls_ready)
         self._update_input_identity()
         self._hud_tick = self.set_interval(1.0, self._refresh_runtime_feedback)
+        self._hud_pulse_tick = self.set_interval(0.5, self._tick_hud_running_pulse)
         self._scanline_refresh_tick = self.set_interval(
             0.25, self._refresh_scanline_cards
         )
@@ -192,6 +193,9 @@ class ScreenLifecycleMixin:
         if self._hud_tick is not None:
             self._hud_tick.stop()
             self._hud_tick = None
+        if getattr(self, '_hud_pulse_tick', None) is not None:
+            self._hud_pulse_tick.stop()
+            self._hud_pulse_tick = None
         if self._bootstrap_task and not self._bootstrap_task.done():
             self._bootstrap_task.cancel()
         if self._environment_probe_task and not self._environment_probe_task.done():

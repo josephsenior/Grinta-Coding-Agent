@@ -9,13 +9,15 @@ from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
 from textual.widgets import Static
 
+from backend.cli.theme import NAVY_RUNNING
+
 if TYPE_CHECKING:
     from backend.cli.tui.screens.detail.base import DetailScreen
 
 
 SCAN_LINE_BORDER_COLORS: dict[str, str] = {
     'queued': '#2d4a6a',
-    'running': '#EF9F27',
+    'running': NAVY_RUNNING,
     'background': '#6B9FD4',
     'done': '#639922',
     'failed': '#E24B4A',
@@ -38,8 +40,8 @@ class ScanLineCard(Container):
     loop calls this method on every mounted card.
     """
 
-    DEFAULT_CSS = """
-    ScanLineCard {
+    DEFAULT_CSS = f"""
+    ScanLineCard {{
         width: 100%;
         height: auto;
         margin: 0;
@@ -47,56 +49,56 @@ class ScanLineCard(Container):
         background: #090d18;
         border-left: solid #2d4a6a;
         padding: 0 1 0 1;
-    }
-    ScanLineCard.queued {
+    }}
+    ScanLineCard.queued {{
         border-left: solid #2d4a6a;
         color: $text-muted;
-    }
-    ScanLineCard.running {
-        border-left: solid #EF9F27;
-    }
-    ScanLineCard.background {
+    }}
+    ScanLineCard.running {{
+        border-left: solid {NAVY_RUNNING};
+    }}
+    ScanLineCard.background {{
         border-left: solid #6B9FD4;
-    }
-    ScanLineCard.done {
+    }}
+    ScanLineCard.done {{
         border-left: solid #639922;
-    }
-    ScanLineCard.failed {
+    }}
+    ScanLineCard.failed {{
         border-left: solid #E24B4A;
-    }
-    ScanLineCard > Horizontal {
+    }}
+    ScanLineCard > Horizontal {{
         width: 100%;
         height: auto;
-    }
-    ScanLineCard #scan-summary {
+    }}
+    ScanLineCard #scan-summary {{
         width: 1fr;
         height: auto;
         content-align: left middle;
         overflow: hidden;
-    }
-    ScanLineCard #scan-expand {
+    }}
+    ScanLineCard #scan-expand {{
         width: 3;
         height: auto;
         content-align: right middle;
         color: #54597b;
-    }
-    ScanLineCard #scan-expand:hover {
+    }}
+    ScanLineCard #scan-expand:hover {{
         color: #91abec;
-    }
-    ScanLineCard #scan-delta {
+    }}
+    ScanLineCard #scan-delta {{
         width: auto;
         min-width: 0;
         height: auto;
         content-align: right middle;
         color: #e2e8f0;
         padding: 0 1 0 0;
-    }
-    ScanLineCard:focus {
+    }}
+    ScanLineCard:focus {{
         background: #10192e;
-    }
-    ScanLineCard:focus #scan-expand {
+    }}
+    ScanLineCard:focus #scan-expand {{
         color: #91abec;
-    }
+    }}
     """
 
     BINDINGS = [

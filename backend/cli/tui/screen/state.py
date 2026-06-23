@@ -19,6 +19,8 @@ from backend.cli.theme import (
     NAVY_BRAND,
     NAVY_GREEN_ACCENT,
     NAVY_RED_ACCENT,
+    NAVY_RUNNING,
+    NAVY_RUNNING_DIM,
     NAVY_TEXT_DIM,
     NAVY_TEXT_SECONDARY,
     NAVY_YELLOW_ACCENT,
@@ -47,6 +49,8 @@ class ScreenStateMixin:
     _TURN_DURATION_STATES = frozenset(
         {'awaiting_user_input', 'finished', 'stopped', 'error'}
     )
+    _RUNNING_PULSE_BULLETS = ('●', '◉')
+    _RUNNING_PULSE_COLORS = (NAVY_RUNNING, NAVY_RUNNING_DIM)
 
     @staticmethod
     def _state_lookup_key(raw_state: str | None) -> str:
@@ -126,12 +130,41 @@ class ScreenStateMixin:
         self,
         display_state: str,
         state_color: str,
+        *,
+        raw_state: str | None = None,
     ) -> str:
+        lookup = self._state_lookup_key(raw_state)
+        if lookup == 'running':
+            frame = int(getattr(self, '_hud_pulse_frame', 0)) % len(
+                self._RUNNING_PULSE_BULLETS
+            )
+            bullet = self._RUNNING_PULSE_BULLETS[frame]
+            bullet_color = self._RUNNING_PULSE_COLORS[frame]
+            state_part = (
+                f'[{bullet_color}]{bullet}[/] [{state_color}]{display_state}[/]'
+            )
+        else:
+            state_part = f'[{state_color}]● {display_state}[/]'
         parts = [
             '[#91abec]GRINTA[/]',
-            f'[{state_color}]● {display_state}[/]',
+            state_part,
         ]
         return '  '.join(parts)
+
+    def _tick_hud_running_pulse(self) -> None:
+        """Advance the running-state bullet pulse (cheap label-only refresh)."""
+        if self._is_unmounted:
+            return
+        raw_state = self._hud.state.agent_state_label or 'Ready'
+        if self._state_lookup_key(raw_state) != 'running':
+            if getattr(self, '_hud_pulse_frame', 0) != 0:
+                self._hud_pulse_frame = 0
+                self._render_hud_bar()
+            return
+        self._hud_pulse_frame = (
+            int(getattr(self, '_hud_pulse_frame', 0)) + 1
+        ) % len(self._RUNNING_PULSE_BULLETS)
+        self._render_hud_bar()
 
     @staticmethod
     def _build_hud_line1_ws(ws_display: str) -> str:
@@ -400,7 +433,7 @@ class ScreenStateMixin:
 
         workspace = self._resolve_workspace_display(hud.state.workspace_path)
         ws_display = HUDBar.ellipsize_path(workspace, 35)
-        line1 = self._build_hud_line1(display_state, state_color)
+        line1 = self._build_hud_line1(display_state, state_color, raw_state=raw_state)
         line1_ws = self._build_hud_line1_ws(ws_display)
         model_label = f'[{NAVY_TEXT_SECONDARY}]{model_display}[/]'
 
