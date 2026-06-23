@@ -178,6 +178,94 @@ def _resolve_edit_diff(
     return None
 
 
+def _structured_edit_file_receipts(event: FileEditObservation) -> list[dict[str, Any]]:
+    tool_result = getattr(event, 'tool_result', None) or {}
+    files = tool_result.get('files')
+    if not isinstance(files, list):
+        return []
+    return [item for item in files if isinstance(item, dict)]
+
+
+def _match_structured_edit_paths(left: str, right: str) -> bool:
+    left_norm = left.replace('\\', '/').strip()
+    right_norm = right.replace('\\', '/').strip()
+    if not left_norm or not right_norm:
+        return False
+    return left_norm.endswith(right_norm) or right_norm.endswith(left_norm.split('/')[-1])
+
+
+def _encode_receipt_diff(
+    receipt: dict[str, Any],
+    *,
+    item_path: str,
+    orch: 'RendererEventProcessorMixin',
+) -> str | None:
+    file_diff = receipt.get('diff')
+    if isinstance(file_diff, str) and file_diff.strip():
+        return _encode_unified_diff_text(file_diff, path=item_path)
+    old_content = receipt.get('old_content')
+    new_content = receipt.get('new_content')
+    if isinstance(old_content, str) and isinstance(new_content, str):
+        from backend.cli.tui.renderer.helpers.file import encode_create_file_diff
+
+        if not old_content.strip() and new_content.strip():
+            return encode_create_file_diff(item_path, new_content)
+        encoded = orch._extract_file_edit_group_rows(
+            type(
+                '_Obs',
+                (),
+                {
+                    'old_content': old_content,
+                    'new_content': new_content,
+                    'path': item_path,
+                },
+            )()
+        )
+        if encoded:
+            return encoded
+    return None
+
+
+def _append_multiedit_cards_from_receipts(
+    orch: 'RendererEventProcessorMixin',
+    event: FileEditObservation,
+    receipts: list[dict[str, Any]],
+    *,
+    is_create: bool,
+    syntax_pass: str | None,
+    syntax_error: str | None,
+) -> bool:
+    rendered = False
+    seen_paths: set[str] = set()
+    for receipt in receipts:
+        if receipt.get('changed') is False:
+            continue
+        item_path = str(receipt.get('path') or '').strip()
+        if not item_path or item_path in seen_paths:
+            continue
+        seen_paths.add(item_path)
+        item_added = int(receipt.get('added') or 0)
+        item_removed = int(receipt.get('removed') or 0)
+        item_diff = _encode_receipt_diff(
+            receipt,
+            item_path=item_path,
+            orch=orch,
+        )
+        orch._append_scan_line_card(
+            EditCard(
+                display_path=orch._compact_file_card_path(item_path),
+                added=item_added,
+                removed=item_removed,
+                is_create=is_create,
+                encoded_diff=item_diff,
+                syntax_pass=syntax_pass == 'pass' if syntax_pass else None,
+                syntax_error=syntax_error,
+            )
+        )
+        rendered = True
+    return rendered
+
+
 def _handle_multiedit_observation(
     orch: 'RendererEventProcessorMixin',
     event: FileEditObservation,
@@ -200,14 +288,20 @@ def _handle_multiedit_observation(
         diff_text = orch._extract_file_edit_diff(event) or ''
     per_file = _split_combined_diff(diff_text) if diff_text else []
 
-    # Map filename → diff chunk
-    per_file_map: dict[str, str] = {}
-    for fp, file_diff in per_file:
-        per_file_map[fp] = file_diff
-
     content = getattr(event, 'content', '') or ''
     syntax_pass = _parse_syntax_badge(content)
     syntax_error = _extract_syntax_error(content) if syntax_pass == 'fail' else None
+
+    receipts = _structured_edit_file_receipts(event)
+    if receipts and _append_multiedit_cards_from_receipts(
+        orch,
+        event,
+        receipts,
+        is_create=is_create,
+        syntax_pass=syntax_pass,
+        syntax_error=syntax_error,
+    ):
+        return
 
     if not file_edits:
         # Fallback: one card for the whole operation
@@ -235,11 +329,32 @@ def _handle_multiedit_observation(
         is_item_create = item.get('command') == 'create_file' or is_create
 
         # Try to find a per-file diff chunk
-        for fp, file_diff in per_file:
-            if fp.endswith(item_path) or item_path.endswith(fp.split('/')[-1]):
-                item_added, item_removed = _count_unified_diff_changes(file_diff)
-                item_diff = _encode_unified_diff_text(file_diff, path=item_path or fp)
-                break
+        receipt_match = next(
+            (
+                receipt
+                for receipt in receipts
+                if _match_structured_edit_paths(
+                    str(receipt.get('path') or ''), str(item_path)
+                )
+            ),
+            None,
+        )
+        if receipt_match is not None:
+            item_added = int(receipt_match.get('added') or item_added)
+            item_removed = int(receipt_match.get('removed') or item_removed)
+            item_diff = _encode_receipt_diff(
+                receipt_match,
+                item_path=item_path,
+                orch=orch,
+            ) or item_diff
+        else:
+            for fp, file_diff in per_file:
+                if _match_structured_edit_paths(fp, item_path):
+                    item_added, item_removed = _count_unified_diff_changes(file_diff)
+                    item_diff = _encode_unified_diff_text(
+                        file_diff, path=item_path or fp
+                    )
+                    break
 
         orch._append_scan_line_card(
             EditCard(
