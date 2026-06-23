@@ -227,8 +227,9 @@ class _SessionOrchestratorParallelMixin(SessionOrchestratorAccessorsMixin):
                 for action in reversed(failed_actions):
                     _prepend_action(current_pending, action)
 
-    async def _drain_step_barrier(self, *, timeout: float = 2.0) -> bool:  # noqa: ASYNC109
+    async def _drain_step_barrier(self, *, timeout: float | None = None) -> bool:
         """Drain background tasks and wait for outstanding pending actions."""
+        from backend.core.constants import DRAIN_STEP_BARRIER_IDLE_DEFAULT_SECONDS
         from backend.utils.async_helpers.async_utils import drain_step_barrier
 
         pending_service = getattr(
@@ -237,10 +238,31 @@ class _SessionOrchestratorParallelMixin(SessionOrchestratorAccessorsMixin):
         has_outstanding = (
             pending_service.has_outstanding if pending_service is not None else None
         )
-        return await drain_step_barrier(
+        if timeout is None:
+            if pending_service is not None:
+                timeout = pending_service.barrier_wait_budget_seconds()
+            else:
+                timeout = DRAIN_STEP_BARRIER_IDLE_DEFAULT_SECONDS
+        drained = await drain_step_barrier(
             has_outstanding=has_outstanding,
             timeout=timeout,
         )
+        if (
+            not drained
+            and pending_service is not None
+            and pending_service.has_outstanding()
+        ):
+            primary = pending_service.get_primary()
+            action_type = type(primary).__name__ if primary is not None else 'unknown'
+            action_id = getattr(primary, 'id', 'unknown') if primary is not None else 'unknown'
+            logger.debug(
+                'Step barrier timed out after %.1fs with outstanding %s (id=%s)',
+                timeout,
+                action_type,
+                action_id,
+                extra={'msg_type': 'STEP_BARRIER_OUTSTANDING'},
+            )
+        return drained
 
     def _maybe_emit_persistence_degraded_warning(self) -> None:
         """Surface one model-visible warning when event persistence is degraded."""

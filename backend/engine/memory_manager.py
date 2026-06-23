@@ -46,6 +46,7 @@ _MIN_HISTORY_EVENTS_FOR_FORCED_COMPACTION = 30
 
 @dataclass
 class _BuildMessagesCache:
+    event_ids: tuple[int | str, ...]
     event_fingerprints: tuple[str, ...]
     messages: list[Message]
     llm_config_key: str
@@ -548,6 +549,9 @@ class ContextMemoryManager:
     def _release_post_compaction_resources(self, state: State, action: object) -> None:
         """Release caches superseded by a compaction pass."""
         self.invalidate_build_messages_cache()
+        from backend.context.compactor.microcompact import clear_microcompact_cleared_ids
+
+        clear_microcompact_cleared_ids(state)
         if self.conversation_memory is not None:
             evicted = self.conversation_memory.release_post_compaction_render_cache()
             if evicted:
@@ -619,8 +623,12 @@ class ContextMemoryManager:
             return messages
 
         config_key = self._llm_build_config_key(llm_config)
+        event_ids = tuple(
+            self._prompt_event_cache_key(event) for event in events_for_prompt
+        )
         fingerprints = tuple(event_fingerprint(event) for event in events_for_prompt)
         self._build_messages_cache = _BuildMessagesCache(
+            event_ids=event_ids,
             event_fingerprints=fingerprints,
             messages=copy.deepcopy(messages),
             llm_config_key=config_key,
@@ -681,10 +689,13 @@ class ContextMemoryManager:
         self, events_for_prompt, initial_user_message, llm_config, prompt_window
     ) -> list[Message]:
         config_key = self._llm_build_config_key(llm_config)
+        event_ids = tuple(
+            self._prompt_event_cache_key(event) for event in events_for_prompt
+        )
         fingerprints = tuple(event_fingerprint(event) for event in events_for_prompt)
         cache = self._build_messages_cache
         incremental = self._is_incremental(
-            cache, config_key, fingerprints, prompt_window
+            cache, config_key, event_ids, prompt_window
         )
         max_message_chars = getattr(llm_config, 'max_message_chars', None)
         vision_is_active = getattr(llm_config, 'vision_is_active', False)
@@ -695,14 +706,14 @@ class ContextMemoryManager:
                 condensed_history=events_for_prompt,
                 initial_user_action=initial_user_message,
                 prefix_messages=cache.messages,
-                prefix_event_count=len(cache.event_fingerprints),
+                prefix_event_count=len(cache.event_ids),
                 max_message_chars=max_message_chars,
                 vision_is_active=vision_is_active,
             )
             logger.debug(
                 'ContextMemoryManager.build_messages incremental tail=%d/%d events',
-                len(fingerprints) - len(cache.event_fingerprints),
-                len(fingerprints),
+                len(event_ids) - len(cache.event_ids),
+                len(event_ids),
             )
         else:
             messages = self.conversation_memory.process_events(
@@ -714,14 +725,20 @@ class ContextMemoryManager:
         return messages
 
     @staticmethod
-    def _is_incremental(cache, config_key, fingerprints, prompt_window) -> bool:
+    def _prompt_event_cache_key(event: Event) -> int | str:
+        event_id = getattr(event, 'id', None)
+        if isinstance(event_id, int):
+            return event_id
+        return event_fingerprint(event)
+
+    @staticmethod
+    def _is_incremental(cache, config_key, event_ids, prompt_window) -> bool:
         return (
             cache is not None
             and cache.llm_config_key == config_key
             and not prompt_window.windowed
-            and len(fingerprints) > len(cache.event_fingerprints)
-            and fingerprints[: len(cache.event_fingerprints)]
-            == cache.event_fingerprints
+            and len(event_ids) > len(cache.event_ids)
+            and event_ids[: len(cache.event_ids)] == cache.event_ids
         )
 
     def _log_build_messages(self, metrics: dict) -> None:

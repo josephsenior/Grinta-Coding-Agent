@@ -72,6 +72,12 @@ DEFAULT_OBSERVATION_HANDLER_TIMEOUT_SECONDS = 10.0
 # non-LLM hangs in action execution, tool pipelines, plugin hooks, etc.;
 # LLM streaming liveness is handled by first-chunk/per-chunk timeouts.
 DEFAULT_STEP_TASK_LIVENESS_SECONDS = 600.0
+# When no runnable action is awaiting an observation, step barriers only drain
+# background asyncio tasks and return quickly.
+DRAIN_STEP_BARRIER_IDLE_DEFAULT_SECONDS = 2.0
+# Small grace added to remaining pending-action budget so barriers do not race
+# the observation handler at the exact timeout boundary.
+DRAIN_STEP_BARRIER_GRACE_SECONDS = 0.5
 # Hard cap on how long run_agent_until_done polls before forcing termination.
 # 0 or negative = disabled (no hard cap).  Set
 # GRINTA_AGENT_RUN_HARD_TIMEOUT_SECONDS=1800 (or any positive value) to cap

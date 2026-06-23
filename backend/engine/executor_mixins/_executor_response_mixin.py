@@ -101,15 +101,25 @@ class _ExecutorResponseMixin:
 
     def _response_to_actions(self, response: ModelResponse) -> list[Action]:
         mcp_tools = self._mcp_tools_provider()
+        config = getattr(self._planner, '_config', None)
+        from backend.core.autonomy import security_risk_required_for_autonomy
+        from backend.engine.function_calling.helpers import (
+            security_risk_validation_scope,
+        )
+
+        require_security_risk = security_risk_required_for_autonomy(
+            getattr(config, 'autonomy_level', 'balanced')
+        )
         try:
-            actions = list(
-                orchestrator_function_calling.response_to_actions(
-                    response,
-                    mcp_tool_names=list(mcp_tools.keys()),
-                    mcp_tools=mcp_tools,
-                    mode=self._get_agent_mode(),
+            with security_risk_validation_scope(required=require_security_risk):
+                actions = list(
+                    orchestrator_function_calling.response_to_actions(
+                        response,
+                        mcp_tool_names=list(mcp_tools.keys()),
+                        mcp_tools=mcp_tools,
+                        mode=self._get_agent_mode(),
+                    )
                 )
-            )
         except Exception as exc:
             if not self._is_recoverable_tool_call_error(exc):
                 raise

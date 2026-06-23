@@ -17,6 +17,10 @@ from backend.context.context_pipeline import (
     ContextPipeline,
     _ContinuityGateDecision,
 )
+from backend.context.context_pipeline.compaction import (
+    _deterministic_fallback_after_rejection,
+    passes_effectiveness_gate,
+)
 from backend.core.config.compactor_config import ContextPipelineConfig
 from backend.core.constants import DEFAULT_EMERGENCY_PROMPT_MIN_EVENTS
 from backend.ledger.action.agent import AgentThinkAction
@@ -136,8 +140,11 @@ def test_deterministic_fallback_commits_after_repeated_equivalent_rejection(
         max_output_tokens=32_768,
     )
 
-    with patch.object(pipeline, '_passes_effectiveness_gate', return_value=True):
-        first = pipeline._deterministic_fallback_after_rejection(
+    with patch(
+        'backend.context.context_pipeline.compaction.passes_effectiveness_gate',
+        return_value=True,
+    ):
+        first = _deterministic_fallback_after_rejection(
             state,
             events,
             events,
@@ -145,7 +152,7 @@ def test_deterministic_fallback_commits_after_repeated_equivalent_rejection(
             llm_config,
             decision,
         )
-        second = pipeline._deterministic_fallback_after_rejection(
+        second = _deterministic_fallback_after_rejection(
             state,
             events,
             events,

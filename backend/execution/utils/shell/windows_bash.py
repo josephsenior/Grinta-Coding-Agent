@@ -237,11 +237,15 @@ class WindowsPowershellSession(BaseShellSession):
         process: subprocess.Popen,
         timeout: int | None,
         command: str,
+        *,
+        blocking: bool = False,
     ) -> tuple[str, str, int] | None:
         pending_bg_id = self._pending_bg_id
         if pending_bg_id is None:
             return None
-        out, err, code = self._run_backgroundable(process, timeout, pending_bg_id)
+        out, err, code = self._run_backgroundable(
+            process, timeout, pending_bg_id, blocking=blocking
+        )
         if code != -2:
             self._cancellation.unregister_process(process.pid)
             if self._command_changes_cwd(command, powershell=True):
@@ -296,6 +300,8 @@ class WindowsPowershellSession(BaseShellSession):
         timeout: int | None = None,
         cwd: str | None = None,
         input_text: str | None = None,
+        *,
+        blocking: bool = False,
     ) -> tuple[str, str, int]:
         """Run a PowerShell command via subprocess.
 
@@ -347,7 +353,9 @@ class WindowsPowershellSession(BaseShellSession):
 
             self._cancellation.register_process(process)
 
-            bg_result = self._run_backgroundable_path(process, timeout, command)
+            bg_result = self._run_backgroundable_path(
+                process, timeout, command, blocking=blocking
+            )
             if bg_result is not None:
                 return bg_result
 
@@ -394,7 +402,10 @@ class WindowsPowershellSession(BaseShellSession):
 
         # Regular foreground command
         return self._execute_foreground_command(
-            command, timeout_seconds_int, action.stdin if is_input else None
+            command,
+            timeout_seconds_int,
+            action.stdin if is_input else None,
+            blocking=bool(getattr(action, 'blocking', False)),
         )
 
     def _update_cwd_if_needed(self) -> None:
@@ -466,13 +477,19 @@ class WindowsPowershellSession(BaseShellSession):
         return self._execute_foreground_command(command, 60, None)
 
     def _execute_foreground_command(
-        self, command: str, timeout: int, stdin: str | None
+        self,
+        command: str,
+        timeout: int,
+        stdin: str | None,
+        *,
+        blocking: bool = False,
     ) -> CmdOutputObservation:
         """Execute a foreground command and format the observation."""
         stdout, stderr, exit_code = self._run_command(
             command,
             timeout=timeout,
             input_text=stdin,
+            blocking=blocking,
         )
 
         if exit_code == -2 and self._bg_process is not None:
@@ -491,7 +508,7 @@ class WindowsPowershellSession(BaseShellSession):
             metadata = CmdOutputMetadata(exit_code=-2, working_dir=self._cwd)
             apply_cmd_output_timeout_metadata(metadata, -2)
             metadata.suffix = (
-                f'\n[The command has no new output after {self.NO_CHANGE_TIMEOUT_SECONDS} seconds. '
+                f'\n[The command has no new output after {self._idle_detach_threshold_seconds()} seconds. '
                 f'It is still running in background session "{bg_id}". '
                 f'Use terminal_read(session_id="{bg_id}") to poll for new output, '
                 f'or terminal_read(session_id="{bg_id}", mode="snapshot") for the full buffer. '

@@ -2,13 +2,34 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Any
 
 from backend.core.constants import RISK_LEVELS
 from backend.core.errors import FunctionCallValidationError
 from backend.core.logging.logger import app_logger as logger
 from backend.ledger.action import Action, ActionSecurityRisk
+
+_security_risk_required: ContextVar[bool] = ContextVar(
+    'security_risk_required', default=True
+)
+
+
+def security_risk_validation_required() -> bool:
+    """Return whether ``security_risk`` is mandatory for the current tool dispatch."""
+    return _security_risk_required.get()
+
+
+@contextmanager
+def security_risk_validation_scope(*, required: bool) -> Iterator[None]:
+    """Temporarily set whether tool handlers must receive ``security_risk``."""
+    token = _security_risk_required.set(required)
+    try:
+        yield
+    finally:
+        _security_risk_required.reset(token)
 
 
 def combine_thought(action: Action, thought: str) -> Action:
@@ -40,9 +61,14 @@ def validate_security_risk(arguments: Mapping[str, Any], tool_name: str) -> None
     invalid value so the failure is surfaced to the model as a tool-call error
     instead of being silently auto-classified server-side. Accepts any case
     (``low``/``LOW``/``Low``) so model output variations don't trip validation.
+
+    When :func:`security_risk_validation_required` is false (full autonomy),
+    a missing value is accepted; a provided value is still validated.
     """
     raw = arguments.get('security_risk')
     if raw is None or (isinstance(raw, str) and not raw.strip()):
+        if not security_risk_validation_required():
+            return
         raise FunctionCallValidationError(
             f'Missing required argument "security_risk" in tool call {tool_name}. '
             f'Provide one of {RISK_LEVELS} based on the action you are about to take.'

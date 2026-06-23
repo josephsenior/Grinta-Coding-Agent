@@ -520,7 +520,17 @@ class SessionOrchestrator(
     async def _step_inner_schedule_next(self) -> None:
         """Schedule the next step if agent is still running."""
         set_step_phase('step_inner:schedule_next')
-        await self._drain_step_barrier()
+        drained = await self._drain_step_barrier()
+        if not drained:
+            pending_service = getattr(
+                getattr(self, 'services', None), 'pending_action', None
+            )
+            if pending_service is not None and pending_service.has_outstanding():
+                logger.debug(
+                    'Deferring schedule_step_soon until outstanding pending clears',
+                    extra={'msg_type': 'STEP_BARRIER_DEFER_SCHEDULE'},
+                )
+                return
         if self.get_agent_state() == AgentState.RUNNING and not self._closed:
             self.schedule_step_soon()
 

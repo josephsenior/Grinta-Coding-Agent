@@ -30,3 +30,11 @@ def normalize_autonomy_level(level: object) -> str:
     if '.' in text:
         text = text.rsplit('.', 1)[-1].lower()
     return text
+
+
+def security_risk_required_for_autonomy(level: object) -> bool:
+    """Return whether tool calls must declare ``security_risk``.
+
+    In full autonomy the label does not gate confirmation, so it is optional.
+    """
+    return normalize_autonomy_level(level) != AutonomyLevel.FULL.value

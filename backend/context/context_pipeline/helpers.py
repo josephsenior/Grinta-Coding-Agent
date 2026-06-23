@@ -5,7 +5,6 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
-import backend.context.context_pipeline as _cp
 from backend.context.compactor.compact_boundary import project_after_compact_boundary
 from backend.context.context_budget import ContextBudget
 from backend.context.context_pipeline.types import (
@@ -133,7 +132,7 @@ def _shrink_tail_for_token_reduction(
     summary_text = summary.strip() or 'summary'
 
     while len(current) > len(protected):
-        reduction = _cp._projected_compaction_token_reduction(
+        reduction = _projected_compaction_token_reduction(
             events,
             current,
             history=history,

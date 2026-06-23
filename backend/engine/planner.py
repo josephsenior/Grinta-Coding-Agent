@@ -169,6 +169,12 @@ class OrchestratorPlanner:
                 tool_names,
             )
 
+        from backend.engine.tools.param_defs import relax_security_risk_in_tools
+
+        tools = relax_security_risk_in_tools(
+            tools, getattr(self._config, 'autonomy_level', 'balanced')
+        )
+
         # Invalidate cached checked-tools when toolset is rebuilt
         self._checked_tools_cache = None
         return tools

@@ -4,8 +4,14 @@ from __future__ import annotations
 
 
 def _render_security(
-    cli_mode: bool = True, *, enable_web: bool = True, enable_docs: bool = True
+    cli_mode: bool = True,
+    *,
+    enable_web: bool = True,
+    enable_docs: bool = True,
+    autonomy_level: object = 'balanced',
 ) -> str:
+    from backend.core.autonomy import security_risk_required_for_autonomy
+
     read_only_tools = (
         '`read`, `grep`, `glob`, `find_symbols`, `analyze_project_structure`, `lsp`'
     )
@@ -22,14 +28,27 @@ def _render_security(
         '  - Changing system settings, global installs, elevated (`sudo`) commands, deleting critical files, '
         'downloading & executing untrusted code, or sending local secrets/data out.'
     )
+    if security_risk_required_for_autonomy(autonomy_level):
+        requirement = (
+            '`security_risk` is **required** on every call to `execute_bash`/`execute_powershell`, '
+            'and the file write tools `create`, `replace_string`, `edit_symbol`, and `multiedit`. '
+            f'Read-only observation tools ({read_only_tools}) do **not** require it. '
+            'Pick one of `LOW` / `MEDIUM` / `HIGH` based on the action you are about to take. '
+            'The server may escalate your risk label; it never lowers it. Missing or invalid values '
+            'fail the call.'
+        )
+    else:
+        requirement = (
+            '`security_risk` is **optional** in full autonomy on `execute_bash`/`execute_powershell`, '
+            'file write tools (`create`, `replace_string`, `edit_symbol`, `multiedit`), and '
+            '`terminal_manager` open. '
+            f'Read-only observation tools ({read_only_tools}) never need it. '
+            'When omitted, the runtime classifies risk server-side. If you provide '
+            '`LOW` / `MEDIUM` / `HIGH`, invalid values still fail the call.'
+        )
     return (
         '# 🔐 Security Risk Policy\n'
-        '`security_risk` is **required** on every call to `execute_bash`/`execute_powershell`, '
-        'and the file write tools `create`, `replace_string`, `edit_symbol`, and `multiedit`. '
-        f'Read-only observation tools ({read_only_tools}) do **not** require it. '
-        'Pick one of `LOW` / `MEDIUM` / `HIGH` based on the action you are about to take. '
-        'The server may escalate your risk label; it never lowers it. Missing or invalid values '
-        'fail the call.\n\n'
+        f'{requirement}\n\n'
         f'{risk_block}\n\n'
         '**Global Rules**\n'
         '- Always escalate to **HIGH** if sensitive data leaves the environment.\n'
