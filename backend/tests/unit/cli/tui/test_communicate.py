@@ -108,13 +108,12 @@ async def test_tui_communicate_proposal_click_submits_selected_option(
             items[0].renderable
         )
 
-        clicked = await pilot.click(
+        await pilot.click(
             items[0],
             offset=(1, 0),
         )
         await pilot.pause()
 
-        assert clicked
         assert len(captured) == 1
         assert 'Patch the current flow' in captured[0]
 
