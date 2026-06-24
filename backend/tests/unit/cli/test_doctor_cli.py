@@ -90,6 +90,8 @@ def test_check_llm_config_passes_for_local_provider_without_key(
     settings_path = tmp_path / 'settings.json'
     settings_path.write_text(json.dumps(settings), encoding='utf-8')
     monkeypatch.setenv('APP_ROOT', str(tmp_path))
+    monkeypatch.delenv('LLM_API_KEY', raising=False)
+    monkeypatch.delenv('OPENCODE_API_KEY', raising=False)
 
     check = _check_llm_config()
     assert check.ok is True

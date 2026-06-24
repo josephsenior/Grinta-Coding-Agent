@@ -2599,22 +2599,17 @@ def test_auto_detect_api_keys_finds_env_var() -> None:
 def test_auto_detect_api_keys_returns_none_when_no_env() -> None:
     """auto_detect_api_keys should return None when no env vars set."""
     from backend.cli.settings import auto_detect_api_keys
+    from backend.core.providers.configurations import PROVIDER_CONFIGURATIONS
 
     config = MagicMock()
     llm_cfg = MagicMock()
     llm_cfg.model = 'some-model'
     config.get_llm_config.return_value = llm_cfg
 
-    # Clear all known API key env vars
     env_clear = {
-        'OPENAI_API_KEY': '',
-        'ANTHROPIC_API_KEY': '',
-        'GEMINI_API_KEY': '',
-        'XAI_API_KEY': '',
-        'GROQ_API_KEY': '',
-        'OPENROUTER_API_KEY': '',
-        'NVIDIA_API_KEY': '',
-        'LIGHTNING_API_KEY': '',
+        env_var: ''
+        for cfg in PROVIDER_CONFIGURATIONS.values()
+        if (env_var := cfg.get('env_var'))
     }
     with patch.dict(os.environ, env_clear, clear=False):
         result = auto_detect_api_keys(config)

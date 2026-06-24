@@ -87,7 +87,9 @@ def test_console_input_guard_context_manager(monkeypatch) -> None:
     def _unhook() -> None:
         calls.append('unhook')
 
-    monkeypatch.setattr(wc, 'win32_disable_processed_input', lambda: calls.append('disable'))
+    monkeypatch.setattr(
+        wc, 'win32_disable_processed_input', lambda: calls.append('disable')
+    )
     monkeypatch.setattr(wc, 'win32_install_ctrl_c_guard', _fake_install)
 
     with wc.win32_console_input_guard():

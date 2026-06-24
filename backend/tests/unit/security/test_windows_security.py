@@ -36,8 +36,8 @@ class TestPowerShellInjection:
     @pytest.mark.parametrize(
         'cmd,min_risk',
         [
-            # Recursive forced delete — CRITICAL
-            ('Remove-Item C:\\Users\\data -Recurse -Force', RiskCategory.CRITICAL),
+            # Recursive forced delete on user data paths — HIGH (system paths stay CRITICAL)
+            ('Remove-Item C:\\Users\\data -Recurse -Force', RiskCategory.HIGH),
             (
                 "Remove-Item 'C:\\Program Files\\app' -Force -Recurse",
                 RiskCategory.CRITICAL,

@@ -1,5 +1,6 @@
 import json
 import os
+from itertools import chain, repeat
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -141,13 +142,8 @@ class TestBashSession:
         self, mock_time, mock_should_continue, session, mock_tmux
     ):
         mock_should_continue.return_value = True
-
-        def time_gen():
-            yield 100
-            while True:
-                yield 150  # trigger no-change timeout
-
-        mock_time.side_effect = time_gen()
+        clock = {'now': 100.0}
+        mock_time.side_effect = lambda: clock['now']
 
         ps1_full = _fake_ps1_json_block(working_dir=session.work_dir, exit_code=0)
         running_output = ps1_full + '\nsleep 100\n'
@@ -156,12 +152,15 @@ class TestBashSession:
         action.set_hard_timeout(200.0, blocking=False)
 
         with patch.object(session, '_get_pane_content') as mock_get_content:
-            mock_get_content.side_effect = [
-                ps1_full,  # initial prompt (ready)
-                running_output,  # command started; no trailing PS1 prompt
-                running_output,  # unchanged output triggers no-change timeout
-            ]
-            with patch('time.sleep'):
+            mock_get_content.side_effect = chain(
+                [ps1_full, running_output, running_output],
+                repeat(running_output),
+            )
+
+            def _advance_clock(_seconds: float) -> None:
+                clock['now'] += session.NO_CHANGE_TIMEOUT_SECONDS + 1
+
+            with patch('time.sleep', side_effect=_advance_clock):
                 result = session.execute(action)
 
         assert 'no new output' in result.metadata.suffix
@@ -173,27 +172,25 @@ class TestBashSession:
         self, mock_time, mock_should_continue, session, mock_tmux
     ):
         mock_should_continue.return_value = True
-
-        def time_gen():
-            yield 100
-            while True:
-                yield 120  # trigger hard timeout
-
-        mock_time.side_effect = time_gen()
+        clock = {'now': 100.0}
+        mock_time.side_effect = lambda: clock['now']
 
         ps1_full = _fake_ps1_json_block(working_dir=session.work_dir, exit_code=0)
         running_output = ps1_full + '\nsleep 100\n'
 
         action = CmdRunAction(command='sleep 100')
-        action.set_hard_timeout(10.0)
+        action.set_hard_timeout(10.0, blocking=False)
 
         with patch.object(session, '_get_pane_content') as mock_get_content:
-            mock_get_content.side_effect = [
-                ps1_full,  # initial prompt (ready)
-                running_output,  # command started; no trailing PS1 prompt
-                running_output,  # unchanged output triggers hard timeout
-            ]
-            with patch('time.sleep'):
+            mock_get_content.side_effect = chain(
+                [ps1_full, running_output, running_output],
+                repeat(running_output),
+            )
+
+            def _advance_clock(_seconds: float) -> None:
+                clock['now'] += 11
+
+            with patch('time.sleep', side_effect=_advance_clock):
                 result = session.execute(action)
 
         assert 'timed out after 10.0 seconds' in result.metadata.suffix

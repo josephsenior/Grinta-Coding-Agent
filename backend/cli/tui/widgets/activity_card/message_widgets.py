@@ -11,7 +11,11 @@ from textual.widgets import Static
 
 from backend.cli.theme import CLR_REASONING_SNAP
 from backend.cli.tui.image_attachments import image_attachment_status_text
-from backend.cli.tui.transcript_typography import THINKING_LABEL, USER_PIPE
+from backend.cli.tui.transcript_typography import (
+    THINKING_LABEL,
+    USER_PIPE,
+    assemble_thinking_renderable,
+)
 
 
 class UserMessage(Static):
@@ -264,17 +268,18 @@ class ThinkingIndicator(Container):
     def finalize(self) -> None:
         """No-op for API compatibility."""
 
-    def _thinking_prefix_renderable(self) -> Text:
-        return Text.assemble((f'{self._current_action}: ', THINKING_LABEL))
-
     def _update_display_lightweight(self, content: Static, full_text: str) -> None:
-        from rich.console import Group
-
         from backend.cli.tui.renderer.prep import prep_streaming_renderable
 
         content.remove_class('-hidden')
         body = prep_streaming_renderable(full_text, base_text_style=CLR_REASONING_SNAP)
-        content.update(Group(self._thinking_prefix_renderable(), body))
+        content.update(
+            assemble_thinking_renderable(
+                self._current_action,
+                THINKING_LABEL,
+                body,
+            )
+        )
 
     def _update_display(self, *, streaming: bool = False) -> None:
         if not self._thoughts:

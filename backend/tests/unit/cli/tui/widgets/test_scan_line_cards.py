@@ -234,6 +234,9 @@ def test_scan_line_icons_are_unique():
 
 
 def test_shell_card_running():
+    from backend.cli.tui.widgets.scan_line import cards as cards_mod
+
+    cards_mod._running_ellipsis_frame = 0
     card = ShellCard(command='npm install')
     assert card.state == 'running'
     line = _line_text(card)

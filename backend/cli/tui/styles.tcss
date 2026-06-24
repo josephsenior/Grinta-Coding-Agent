@@ -596,7 +596,7 @@ HUD,
 }
 
 #hud-reasoning {
-    width: 11;
+    width: 18;
     margin-right: 1;
     background: transparent;
     border: none;
@@ -636,7 +636,7 @@ HUD,
 #hud-reasoning SelectOverlay {
     background: #0d1a30;
     border: solid #6a5020;
-    min-width: 11;
+    min-width: 18;
 }
 
 #hud-reasoning SelectOverlay .option-list--option {
@@ -656,7 +656,7 @@ HUD,
 }
 
 #hud-autonomy {
-    width: 13;
+    width: 20;
     margin-right: 1;
     background: transparent;
     border: none;
@@ -696,6 +696,7 @@ HUD,
 #hud-autonomy SelectOverlay {
     background: #0d1a30;
     border: solid #2a4a7a;
+    min-width: 20;
 }
 
 #hud-autonomy SelectOverlay .option-list--option {
@@ -715,7 +716,7 @@ HUD,
 }
 
 #hud-mode {
-    width: 12;
+    width: 14;
     margin-right: 1;
     background: transparent;
     border: none;
@@ -755,6 +756,7 @@ HUD,
 #hud-mode SelectOverlay {
     background: #0d1a30;
     border: solid #5a3a2a;
+    min-width: 14;
 }
 
 #hud-mode SelectOverlay .option-list--option {

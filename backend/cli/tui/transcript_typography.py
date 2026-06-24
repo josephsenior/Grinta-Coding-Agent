@@ -6,6 +6,8 @@ scan-line cards, and message blocks so the feed reads consistently.
 
 from __future__ import annotations
 
+from typing import Any
+
 # Primary readable content (targets, messages, paths)
 TX_BODY = '#c8d4e8'
 # Secondary values (durations, compact summaries)
@@ -46,3 +48,29 @@ ORIENT_PREFIX_DEFAULT = '#5a7a9a'
 EDIT_CARD_ACCENT = '#91abec'
 WORKER_PIPE = '#3d5a4a'
 MCP_PIPE = '#3a3d5a'
+
+
+def assemble_thinking_renderable(
+    prefix: str,
+    prefix_style: str,
+    body: Any,
+) -> Any:
+    """Place ``prefix:`` on the same line as the first line of thinking content."""
+    from rich.console import Group
+    from rich.text import Text
+
+    label = Text(f'{prefix}: ', style=prefix_style)
+    if isinstance(body, Text):
+        if not (body.plain or ''):
+            return label
+        label.append_text(body)
+        return label
+    if isinstance(body, Group) and body.renderables:
+        first = body.renderables[0]
+        if isinstance(first, Text):
+            merged = Text(f'{prefix}: ', style=prefix_style)
+            merged.append_text(first)
+            if len(body.renderables) == 1:
+                return merged
+            return Group(merged, *body.renderables[1:])
+    return Group(label, body)

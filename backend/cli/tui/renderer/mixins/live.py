@@ -17,7 +17,7 @@ from backend.cli.theme import CLR_REASONING_SNAP
 from backend.cli.tui.constants import (
     _TUI_HISTORY_RENDER_LIMIT,
 )
-from backend.cli.tui.transcript_typography import THINKING_LABEL
+from backend.cli.tui.transcript_typography import THINKING_LABEL, assemble_thinking_renderable
 from backend.ledger import (
     EventStreamSubscriber,
 )
@@ -269,10 +269,10 @@ class RendererLiveMixin:
             thoughts = list(self._live_thinking_widget._thoughts)
             if thoughts and self._live_thinking_dirty:
                 self._live_thinking_widget.finalize()
-                snapshot = Text.assemble(
-                    ('Thinking:', THINKING_LABEL),
-                    '  ',
-                    Text('\n  '.join(thoughts), style=CLR_REASONING_SNAP),
+                snapshot = assemble_thinking_renderable(
+                    'Thinking',
+                    THINKING_LABEL,
+                    Text('\n'.join(thoughts), style=CLR_REASONING_SNAP),
                 )
                 self._history.append(snapshot)
                 self._history.append(Text(''))

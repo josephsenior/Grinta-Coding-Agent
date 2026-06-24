@@ -128,7 +128,9 @@ def win32_install_ctrl_c_guard() -> Callable[[], None] | None:
         while not stop.wait(0.1):
             _enforce()
 
-    thread = threading.Thread(target=_poll, name='grinta-win32-console-guard', daemon=True)
+    thread = threading.Thread(
+        target=_poll, name='grinta-win32-console-guard', daemon=True
+    )
     thread.start()
 
     def unhook() -> None:
