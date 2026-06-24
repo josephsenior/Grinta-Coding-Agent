@@ -17,7 +17,10 @@ from backend.cli.theme import CLR_REASONING_SNAP
 from backend.cli.tui.constants import (
     _TUI_HISTORY_RENDER_LIMIT,
 )
-from backend.cli.tui.transcript_typography import THINKING_LABEL, assemble_thinking_renderable
+from backend.cli.tui.transcript_typography import (
+    THINKING_LABEL,
+    assemble_thinking_renderable,
+)
 from backend.ledger import (
     EventStreamSubscriber,
 )

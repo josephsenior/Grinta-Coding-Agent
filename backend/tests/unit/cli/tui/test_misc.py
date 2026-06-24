@@ -689,9 +689,7 @@ def test_on_event_eagerly_applies_task_list_and_prioritizes_queue(monkeypatch):
     assert orch._task_list == action.task_list
     assert orch._last_task_sidebar_signature is None
     refresh_scheduled = [
-        call
-        for call in scheduled
-        if getattr(call[0], '__name__', '') == '_refresh'
+        call for call in scheduled if getattr(call[0], '__name__', '') == '_refresh'
     ]
     assert refresh_scheduled
     refresh_scheduled[0][0]()
