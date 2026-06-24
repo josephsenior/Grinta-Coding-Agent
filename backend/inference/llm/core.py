@@ -229,9 +229,12 @@ class LLM(RetryMixin, DebugMixin):
 
         call_kwargs = {
             'model': self.config.model,
-            'temperature': self.config.temperature,
             **kwargs,
         }
+        if 'temperature' not in call_kwargs:
+            resolved_temperature = self.config.resolve_temperature()
+            if resolved_temperature is not None:
+                call_kwargs['temperature'] = resolved_temperature
 
         # Some providers (including OpenAI-compatible gateways) treat explicit
         # `null` values differently than omitted parameters. In particular,

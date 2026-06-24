@@ -54,8 +54,10 @@ class RetryService:
             return
 
         loop: asyncio.AbstractEventLoop | None
+        on_loop_thread = False
         try:
             loop = asyncio.get_running_loop()
+            on_loop_thread = True
         except RuntimeError:
             from backend.utils.async_helpers.async_utils import get_main_event_loop
 
@@ -68,24 +70,33 @@ class RetryService:
             )
             return
 
-        async def _worker_wrapper() -> None:
-            try:
-                await self._retry_worker()
-            except Exception as exc:  # pragma: no cover - logged for diagnostics
-                logger.exception(
-                    'Retry worker crashed for controller %s: %s',
-                    self.controller.id,
-                    exc,
-                )
+        def _start_worker() -> None:
+            if self._retry_worker_task is not None and not self._retry_worker_task.done():
+                return
 
-        from backend.utils.async_helpers.async_utils import create_tracked_task
+            async def _worker_wrapper() -> None:
+                try:
+                    await self._retry_worker()
+                except Exception as exc:  # pragma: no cover - logged for diagnostics
+                    logger.exception(
+                        'Retry worker crashed for controller %s: %s',
+                        self.controller.id,
+                        exc,
+                    )
 
-        self._retry_worker_task = create_tracked_task(
-            _worker_wrapper(),
-            name=f'app-retry-worker-{self.controller.id}',
-        )
-        self._task_loop = loop
-        logger.debug('Retry worker started for controller %s', self.controller.id)
+            from backend.utils.async_helpers.async_utils import create_tracked_task
+
+            self._retry_worker_task = create_tracked_task(
+                _worker_wrapper(),
+                name=f'app-retry-worker-{self.controller.id}',
+            )
+            self._task_loop = loop
+            logger.debug('Retry worker started for controller %s', self.controller.id)
+
+        if on_loop_thread:
+            _start_worker()
+        else:
+            loop.call_soon_threadsafe(_start_worker)
 
     def reset_retry_metrics(self) -> None:
         """Reset retry tracking state after successful execution or initialization."""

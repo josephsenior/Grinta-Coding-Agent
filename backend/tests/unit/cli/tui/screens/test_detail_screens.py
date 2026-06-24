@@ -98,6 +98,18 @@ def test_detail_screen_escape_binding():
     assert any(binding[0] == 'escape' for binding in DetailScreen.BINDINGS)
 
 
+def test_section_marks_body_widgets():
+    screen = DetailScreen(title='Test')
+    meta = screen.meta_row('value')
+    prose = screen.empty_state('none')
+    items = screen.section('Summary', meta, prose)
+    assert len(items) == 3
+    assert items[1] is meta
+    assert items[2] is prose
+    assert meta.has_class('detail-section-body')
+    assert prose.has_class('detail-section-body')
+
+
 def test_edit_detail_screen_fills_body_without_terminal_frame():
     from backend.cli.tui.screens.detail.edit import EditDetailScreen
     from backend.cli.tui.widgets.detail_terminal_frame import DetailTerminalFrame

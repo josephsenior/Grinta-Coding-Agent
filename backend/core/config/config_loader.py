@@ -113,6 +113,8 @@ _JSON_LLM_KEYS = (
     'llm_context_window_tokens',
     'llm_max_output_tokens',
     'llm_reasoning_effort',
+    'llm_temperature',
+    'llm_model_temperatures',
 )
 
 
@@ -273,6 +275,42 @@ def _handle_missing_json_llm_provider(
     return True
 
 
+def _apply_json_llm_temperature(
+    llm_dict: dict[str, object], data: dict[str, object]
+) -> None:
+    if 'llm_temperature' not in data:
+        return
+    raw = data['llm_temperature']
+    if raw is None:
+        llm_dict['temperature'] = None
+        return
+    try:
+        llm_dict['temperature'] = float(str(raw))
+    except (ValueError, TypeError):
+        pass
+
+
+def _apply_json_llm_model_temperatures(
+    llm_dict: dict[str, object], data: dict[str, object]
+) -> None:
+    raw = data.get('llm_model_temperatures')
+    if not isinstance(raw, dict):
+        return
+    overrides: dict[str, float | None] = {}
+    for model_key, temp in raw.items():
+        key = str(model_key).strip()
+        if not key:
+            continue
+        if temp is None:
+            overrides[key] = None
+            continue
+        try:
+            overrides[key] = float(str(temp))
+        except (ValueError, TypeError):
+            continue
+    llm_dict['model_temperature_overrides'] = overrides
+
+
 def _build_json_llm_config(
     cfg: AppConfig, data: dict[str, object]
 ) -> dict[str, object]:
@@ -300,6 +338,8 @@ def _build_json_llm_config(
     reasoning_raw = data.get('llm_reasoning_effort', data.get('reasoningEffort'))
     if reasoning_raw is not None and str(reasoning_raw).strip():
         llm_dict['reasoning_effort'] = str(reasoning_raw).strip()
+    _apply_json_llm_temperature(llm_dict, data)
+    _apply_json_llm_model_temperatures(llm_dict, data)
     return llm_dict
 
 

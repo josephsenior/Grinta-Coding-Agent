@@ -67,7 +67,11 @@ class DetailScreen(Screen):
         items: list = [
             Static(self._section_heading_markup(label), classes='detail-section-hdr')
         ]
-        items.extend(widgets)
+        for widget in widgets:
+            add_class = getattr(widget, 'add_class', None)
+            if callable(add_class):
+                add_class('detail-section-body')
+            items.append(widget)
         return items
 
     @staticmethod
@@ -200,19 +204,15 @@ class DetailScreen(Screen):
         color: #8f9fc1;
         border-bottom: solid #1b233a;
     }
-    DetailScreen .detail-meta:first-child,
-    DetailScreen .detail-prose:first-child,
-    DetailScreen .detail-code:first-child,
-    DetailScreen .detail-syntax:first-child,
-    DetailScreen DetailTerminalFrame:first-child,
-    DetailScreen .detail-section-hdr:first-child {
+    DetailScreen .detail-meta:first-of-type,
+    DetailScreen .detail-prose:first-of-type,
+    DetailScreen .detail-code:first-of-type,
+    DetailScreen .detail-syntax:first-of-type,
+    DetailScreen DetailTerminalFrame:first-of-type,
+    DetailScreen .detail-section-hdr:first-of-type {
         margin-top: 0;
     }
-    DetailScreen .detail-section-hdr + .detail-meta,
-    DetailScreen .detail-section-hdr + .detail-prose,
-    DetailScreen .detail-section-hdr + .detail-code,
-    DetailScreen .detail-section-hdr + .detail-list-row,
-    DetailScreen .detail-section-hdr + DetailTerminalFrame {
+    DetailScreen .detail-section-body {
         margin-top: 0;
         padding-top: 0;
     }

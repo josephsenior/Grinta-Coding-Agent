@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, NoReturn, cast
 
 from backend.core.errors import FunctionCallValidationError, ToolExecutionError
+from backend.core.logging.logger import app_logger as logger
 from backend.engine.function_calling.helpers import (
     parse_bool_argument,
 )
@@ -454,6 +455,13 @@ def _apply_multi_edit_to_temp_files(
     temp_paths: dict[str, Path] = {}
     syntax_warnings: list[str] = []
 
+    file_count = len({item_path for item_path, _, _, _ in parsed})
+    logger.info(
+        'multi_edit: applying %s operation(s) across %s file(s) on temp copies',
+        len(parsed),
+        file_count,
+    )
+
     for op_index, (item_path, _display_path, operation, item) in enumerate(parsed):
         real_path = Path(item_path)
         rel_path = _multi_edit_relative_path(item_path, workspace_root)
@@ -538,12 +546,15 @@ def _format_multi_edit_success(
     paths = sorted(
         {display_path for _item_path, display_path, _operation, _item in parsed}
     )
+    operation_count = len(parsed)
+    file_count = len(paths)
     if len(paths) == 1:
         file_lines = f'  • {paths[0]}'
     else:
         file_lines = '\n'.join(f'  • {p}' for p in paths)
     content = (
-        f'✓ multi_edit committed {result.files_modified} file(s) atomically\n'
+        f'✓ multi_edit committed {operation_count} operation(s) across '
+        f'{file_count} file(s) atomically\n'
         f'{file_lines}'
     )
     if syntax_warnings:

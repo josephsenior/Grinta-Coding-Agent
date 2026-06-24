@@ -27,6 +27,8 @@ Secrets belong in a sibling `.env` file or your shell environment. Reference the
 | `llm_context_window_tokens` | int | Optional explicit context window |
 | `llm_max_output_tokens` | int | Optional max output tokens |
 | `llm_reasoning_effort` | string | Optional reasoning effort hint |
+| `llm_temperature` | number \| null | Global sampling temperature; omit or `null` for provider default |
+| `llm_model_temperatures` | object | Per-model temperature overrides (`model id` → number or `null`) |
 | `mcp_host` | string | MCP host override |
 | `project_root` | string | Default project directory |
 | `max_budget_per_task` | number | Per-task USD spend cap |

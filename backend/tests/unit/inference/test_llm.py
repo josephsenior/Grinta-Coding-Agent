@@ -209,6 +209,44 @@ def test_get_call_kwargs_includes_configured_timeout():
     assert kwargs['timeout'] == 23.0
 
 
+def test_get_call_kwargs_omits_temperature_when_unset():
+    llm = object.__new__(LLM)
+    llm.config = LLMConfig(model='openai/gpt-4.1')
+
+    with (
+        patch(
+            'backend.inference.catalog_loader.apply_model_param_overrides',
+            side_effect=lambda _model, call_kwargs, **_kwargs: call_kwargs,
+        ),
+        patch(
+            'backend.inference.catalog_loader.sanitize_call_kwargs_for_provider',
+            side_effect=lambda _model, call_kwargs: call_kwargs,
+        ),
+    ):
+        kwargs = llm._get_call_kwargs()
+
+    assert 'temperature' not in kwargs
+
+
+def test_get_call_kwargs_includes_configured_temperature():
+    llm = object.__new__(LLM)
+    llm.config = LLMConfig(model='openai/gpt-4.1', temperature=0.4)
+
+    with (
+        patch(
+            'backend.inference.catalog_loader.apply_model_param_overrides',
+            side_effect=lambda _model, call_kwargs, **_kwargs: call_kwargs,
+        ),
+        patch(
+            'backend.inference.catalog_loader.sanitize_call_kwargs_for_provider',
+            side_effect=lambda _model, call_kwargs: call_kwargs,
+        ),
+    ):
+        kwargs = llm._get_call_kwargs()
+
+    assert kwargs['temperature'] == 0.4
+
+
 class TestMapAnthropicException:
     """Tests for _map_anthropic_exception() function."""
 
