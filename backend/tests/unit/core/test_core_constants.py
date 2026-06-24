@@ -109,7 +109,7 @@ class TestCoreConstants:
 
     def test_llm_defaults(self):
         assert DEFAULT_LLM_MODEL is None
-        assert DEFAULT_LLM_TEMPERATURE == 0.5
+        assert DEFAULT_LLM_TEMPERATURE is None
 
     def test_agent_defaults(self):
         assert DEFAULT_AGENT_AUTONOMY_LEVEL == 'balanced'

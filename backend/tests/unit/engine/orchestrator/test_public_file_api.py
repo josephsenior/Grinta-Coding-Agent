@@ -635,6 +635,34 @@ def test_multiedit_public_action_normalizes_supported_operations_and_guards_cont
         )
 
 
+def test_multiedit_rejects_replace_string_without_path(monkeypatch, tmp_path):
+    _use_tmp_workspace(monkeypatch, tmp_path)
+
+    with pytest.raises(
+        FunctionCallValidationError, match='replace_string requires path'
+    ):
+        _handle_multiedit_tool(
+            {
+                'operations': [
+                    {
+                        'command': 'replace_string',
+                        'old_string': 'old',
+                        'new_string': 'new',
+                    }
+                ],
+                'security_risk': 'LOW',
+            }
+        )
+
+
+def test_multiedit_schema_requires_path_on_operations() -> None:
+    from backend.engine.tools.native_file_tools import create_multiedit_tool
+
+    params = create_multiedit_tool()['function']['parameters']
+    items = params['properties']['operations']['items']
+    assert items['required'] == ['command', 'path']
+
+
 def test_multiedit_rejects_old_public_aliases(monkeypatch, tmp_path):
     _use_tmp_workspace(monkeypatch, tmp_path)
 

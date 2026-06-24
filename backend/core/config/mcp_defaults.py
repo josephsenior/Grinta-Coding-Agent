@@ -44,10 +44,10 @@ DEFAULT_USER_MCP_SERVERS: list[dict[str, Any]] = [
         'enabled': True,
         'usage_hint': (
             '**Rigour** — local code governance / quality gates. No API key. If the '
-            'project has no `rigour.yml`, Grinta creates a **minimal** one so the '
-            'server can start (upstream `npx rigour init` is broken on npm). Prefer '
-            '**`rigour_check`** / **`rigour_status`** after substantive edits. '
-            '**`RIGOUR_CWD`** is the open workspace.'
+            'project has no `rigour.yml`, Grinta runs **`npx @rigour-labs/cli init`** '
+            'before starting the MCP server (upstream `@rigour-labs/mcp` calls the '
+            'broken `npx rigour init`). Prefer **`rigour_check`** / **`rigour_status`** '
+            'after substantive edits. **`RIGOUR_CWD`** is the open workspace.'
         ),
         'env': {
             'RIGOUR_CWD': '${PROJECT_ROOT}',

@@ -253,6 +253,7 @@ def create_multiedit_tool() -> ChatCompletionToolParam:
             'Use when several edits must land together (implementation + tests, multiple symbols, '
             'ordered string replacements, or mixing replace_string with edit_symbol). '
             'Each operation is either replace_string or edit_symbol. '
+            'All operations succeed together or none are committed. '
             'Not for a single one-off edit — use replace_string or edit_symbol instead.'
         ),
         properties={
@@ -262,8 +263,14 @@ def create_multiedit_tool() -> ChatCompletionToolParam:
                 'items': {
                     'type': 'object',
                     'properties': {
-                        'command': {'type': 'string'},
-                        'path': {'type': 'string'},
+                        'command': {
+                            'type': 'string',
+                            'enum': ['replace_string', 'edit_symbol'],
+                            'description': 'Operation type for this item.',
+                        },
+                        'path': get_path_param(
+                            'Workspace-relative file path. Required for every operation.'
+                        ),
                         'old_string': {'type': 'string'},
                         'new_string': {'type': 'string'},
                         'replace_all': {'type': 'boolean'},
@@ -275,7 +282,17 @@ def create_multiedit_tool() -> ChatCompletionToolParam:
                         'new_content': {'type': 'string'},
                         'edits': {'type': 'array'},
                     },
-                    'required': ['command'],
+                    'required': ['command', 'path'],
+                    'allOf': [
+                        {
+                            'if': {'properties': {'command': {'const': 'replace_string'}}},
+                            'then': {'required': ['old_string', 'new_string']},
+                        },
+                        {
+                            'if': {'properties': {'command': {'const': 'edit_symbol'}}},
+                            'then': {'required': ['new_content']},
+                        },
+                    ],
                 },
             },
             'security_risk': get_security_risk_param(),

@@ -414,7 +414,7 @@ class AtomicRefactor:
         errors = []
         total = len(transaction.edits)
 
-        logger.info('✏️  Applying %s edits...', total)
+        logger.info('✏️  Committing %s file(s) to disk...', total)
         for i, edit in enumerate(transaction.edits):
             try:
                 self._apply_single_edit(edit, validate, validator)

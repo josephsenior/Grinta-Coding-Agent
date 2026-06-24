@@ -16,8 +16,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from backend.core.constants import DEFAULT_LLM_TEMPERATURE
-
 _CATALOG_DIR = Path(__file__).resolve().parent.parent / 'catalogs'
 
 
@@ -1085,14 +1083,6 @@ def apply_model_param_overrides(
     _apply_catalog_token_and_penalty_strips(entry, call_kwargs)
     if entry.strip_reasoning_effort:
         call_kwargs.pop('reasoning_effort', None)
-
-    # Apply model-recommended default temperature when user hasn't explicitly
-    # overridden (i.e. it's still the global default).
-    if (
-        entry.default_temperature is not None
-        and call_kwargs.get('temperature') == DEFAULT_LLM_TEMPERATURE
-    ):
-        call_kwargs['temperature'] = entry.default_temperature
 
     # Provider-side parallel tool_calls. Strictly capability-driven: only set
     # when the catalog entry advertises support. Provider sanitizers below

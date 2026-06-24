@@ -290,11 +290,9 @@ async def _connect_stdio_server(server: MCPServerConfig) -> MCPClient | None:
         server = server.model_copy(update={'env': resolved_env})
 
     if server.name == 'rigour':
-        from backend.integrations.mcp.rigour_bootstrap import (
-            ensure_minimal_rigour_yml_for_mcp,
-        )
+        from backend.integrations.mcp.rigour_bootstrap import ensure_rigour_yml_for_mcp
 
-        ensure_minimal_rigour_yml_for_mcp(resolved_env if resolved_env else server.env)
+        ensure_rigour_yml_for_mcp(resolved_env if resolved_env else server.env)
 
     try:
         await asyncio.wait_for(client.connect_stdio(server), timeout=timeout_sec)

@@ -688,6 +688,46 @@ class TestMultiEditCommand:
             encoding='utf-8'
         ) == 'STEP = 2\n'
 
+    def test_multiedit_multiple_flat_edit_symbol_ops_same_file(self, tmp_path):
+        from backend.engine.function_calling.dispatch import _handle_multi_edit_command
+        from backend.engine.tools._file_edits_handlers import _handle_multiedit_tool
+
+        py = tmp_path / 'src' / 'mod.py'
+        py.parent.mkdir(parents=True, exist_ok=True)
+        py.write_text(
+            'def alpha():\n    return 1\n\n\ndef beta():\n    return 2\n',
+            encoding='utf-8',
+        )
+
+        edit_action = _handle_multiedit_tool(
+            {
+                'operations': [
+                    {
+                        'command': 'edit_symbol',
+                        'path': 'src/mod.py',
+                        'symbol_name': 'alpha',
+                        'new_content': 'def alpha():\n    return 10\n',
+                    },
+                    {
+                        'command': 'edit_symbol',
+                        'path': 'src/mod.py',
+                        'symbol_name': 'beta',
+                        'new_content': 'def beta():\n    return 20\n',
+                    },
+                ],
+                'security_risk': 'LOW',
+            }
+        )
+
+        assert len(edit_action.structured_payload['file_edits']) == 2
+
+        result = _handle_multi_edit_command('.', edit_action.structured_payload)
+        assert isinstance(result, MessageAction)
+        assert '2 operation(s) across 1 file(s)' in result.content
+        text = py.read_text(encoding='utf-8')
+        assert 'return 10' in text
+        assert 'return 20' in text
+
     def test_multi_edit_rolls_back_introduced_syntax_regression(self, tmp_path):
         from backend.engine.function_calling.dispatch import _handle_multi_edit_command
 

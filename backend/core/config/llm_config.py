@@ -60,7 +60,11 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         retry_max_wait: The maximum time to wait between retries, in seconds.
         timeout: The timeout for the API.
         max_message_chars: The approximate max number of characters in the content of an event included in the prompt.
-        temperature: The temperature for the API.
+        temperature: The temperature for the API. None omits the parameter so the
+            provider default is used.
+        model_temperature_overrides: Per-model temperature overrides keyed by full
+            model id or bare model name. None in a value forces the provider default
+            for that model even when a global temperature is set.
         top_p: The top p for the API.
         top_k: The top k for the API.
         custom_llm_provider: The custom LLM provider to use (openai, anthropic, google, xai).
@@ -124,11 +128,21 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         ge=1,
         description='The approximate max number of characters in the content of an event included in the prompt',
     )
-    temperature: float = Field(
+    temperature: float | None = Field(
         default=DEFAULT_LLM_TEMPERATURE,
         ge=0.0,
         le=2.0,
-        description='The temperature for the API (0.0 to 2.0)',
+        description=(
+            'Sampling temperature (0.0 to 2.0). None omits the parameter so the '
+            'provider default is used.'
+        ),
+    )
+    model_temperature_overrides: dict[str, float | None] = Field(
+        default_factory=dict,
+        description=(
+            'Per-model temperature overrides keyed by full model id or bare name. '
+            'A null override uses the provider default for that model.'
+        ),
     )
     top_p: float = Field(
         default=DEFAULT_LLM_TOP_P,
@@ -474,6 +488,17 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
                 )
                 # Note: Can't directly modify Pydantic field, but this will help with logging
 
+    def resolve_temperature(self) -> float | None:
+        """Return the effective temperature for the active model, if any."""
+        model = (self.model or '').strip()
+        overrides = self.model_temperature_overrides or {}
+        if model:
+            bare = model.split('/')[-1] if '/' in model else model
+            for key in (model, bare):
+                if key in overrides:
+                    return overrides[key]
+        return self.temperature
+
     def _configure_model_defaults(self) -> None:
         """Configure model-specific default settings."""
         # Set reasoning_effort to 'high' by default for non-Google Gemini models.
@@ -488,14 +513,6 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             and not uses_google_provider
         ):
             self.reasoning_effort = 'high'
-
-        # Apply catalog default_temperature when still at the global default.
-        if self.model and self.temperature == DEFAULT_LLM_TEMPERATURE:
-            from backend.inference.catalog.catalog_loader import lookup
-
-            entry = lookup(self.model)
-            if entry and entry.default_temperature is not None:
-                object.__setattr__(self, 'temperature', entry.default_temperature)
 
     @property
     def vision_is_active(self) -> bool:

@@ -98,6 +98,34 @@ class TestRetryService(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(service._retry_worker_task)
 
     @patch('backend.orchestration.services.retry_service.get_retry_queue')
+    async def test_ensure_worker_started_from_worker_thread(self, mock_get_queue):
+        """Worker starts when controller is built off the main loop (session resume)."""
+        mock_queue = MagicMock()
+        mock_get_queue.return_value = mock_queue
+
+        service = RetryService(self.mock_context)
+        main_loop = asyncio.get_running_loop()
+        from backend.utils.async_helpers.async_utils import set_main_event_loop
+
+        set_main_event_loop(main_loop)
+
+        with patch(
+            'backend.orchestration.services.retry_service.asyncio.get_running_loop',
+            side_effect=RuntimeError('no running event loop'),
+        ):
+            service.ensure_worker_started()
+
+        await asyncio.sleep(0)
+        self.assertIsNotNone(service._retry_worker_task)
+        task = service._retry_worker_task
+        assert task is not None
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+    @patch('backend.orchestration.services.retry_service.get_retry_queue')
     async def test_initialize_with_queue(self, mock_get_queue):
         """Test initialize starts retry worker when queue available."""
         mock_queue = MagicMock()

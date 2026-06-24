@@ -18,7 +18,7 @@ class TestLLMConfigDefaults:
             cfg = LLMConfig()
         assert cfg.model is None
         assert cfg.num_retries >= 0
-        assert 0.0 <= cfg.temperature <= 2.0
+        assert cfg.temperature is None
         assert 0.0 <= cfg.top_p <= 1.0
 
     def test_empty_model_string_normalizes_to_none(self):
@@ -324,6 +324,46 @@ class TestModelDefaults:
             cfg = LLMConfig(model='gpt-4o')  # Non-Gemini, no reasoning_effort specified
         # Should be set to "high" in set_defaults validator (line 207)
         assert cfg.reasoning_effort == 'high'
+
+
+class TestTemperatureResolution:
+    def test_default_temperature_is_provider_default(self):
+        with suppress_llm_env_export():
+            cfg = LLMConfig(model='openai/gpt-4o')
+        assert cfg.temperature is None
+        assert cfg.resolve_temperature() is None
+
+    def test_global_temperature_override(self):
+        with suppress_llm_env_export():
+            cfg = LLMConfig(model='openai/gpt-4o', temperature=0.7)
+        assert cfg.resolve_temperature() == 0.7
+
+    def test_per_model_temperature_override(self):
+        with suppress_llm_env_export():
+            cfg = LLMConfig(
+                model='openai/gpt-4o',
+                temperature=0.7,
+                model_temperature_overrides={'openai/gpt-4o': 0.2},
+            )
+        assert cfg.resolve_temperature() == 0.2
+
+    def test_per_model_override_by_bare_name(self):
+        with suppress_llm_env_export():
+            cfg = LLMConfig(
+                model='anthropic/claude-sonnet-4-6',
+                temperature=0.7,
+                model_temperature_overrides={'claude-sonnet-4-6': 0.1},
+            )
+        assert cfg.resolve_temperature() == 0.1
+
+    def test_per_model_null_override_uses_provider_default(self):
+        with suppress_llm_env_export():
+            cfg = LLMConfig(
+                model='openai/gpt-4o',
+                temperature=0.7,
+                model_temperature_overrides={'openai/gpt-4o': None},
+            )
+        assert cfg.resolve_temperature() is None
 
 
 # ---------------------------------------------------------------------------

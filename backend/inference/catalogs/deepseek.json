@@ -21,7 +21,6 @@
         "supports_parallel_tool_calls": true,
         "supports_reasoning_effort": true,
         "supports_vision": false,
-        "default_temperature": 1.0,
         "supports_stop_words": true,
         "reasoning_efforts": [
           "low",
