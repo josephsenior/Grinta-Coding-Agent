@@ -159,6 +159,10 @@ class TestFinalization:
                 'backend.core.config.mcp_config.load_bundled_mcp_server_configs',
                 return_value=[],
             ),
+            patch(
+                'backend.utils.optional_extras.is_browser_extra_available',
+                return_value=True,
+            ),
         ):
             mock_store = MagicMock()
             mock_get_store.return_value = mock_store

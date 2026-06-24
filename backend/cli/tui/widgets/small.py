@@ -17,7 +17,7 @@ from textual.widget import Widget
 from textual.widgets import Label, Select, Static
 
 from backend.cli.tui.transcript_typography import esc_hint_markup
-from backend.cli.tui.widgets.prompt_text_area import PromptTextArea
+from backend.cli.tui.widgets.prompt_text_area import PromptTextArea  # noqa: F401
 from backend.core.interaction_modes import AGENT_MODE, VISIBLE_INTERACTION_MODES
 
 

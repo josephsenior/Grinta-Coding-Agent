@@ -759,6 +759,7 @@ class TestGetCallKwargs:
                 top_k=40,
                 reasoning_effort='medium',
                 seed=123,
+                resolve_temperature=lambda: 0.2,
             ),
         )
         return llm
@@ -871,6 +872,7 @@ class TestInbandDisconnectDetection:
             retry_min_wait=0,
             retry_max_wait=0,
             on_cancel_requested_fn=None,
+            resolve_temperature=lambda: 0,
         )
 
         async def _fake_astream(**_kwargs):
@@ -965,6 +967,7 @@ class TestAstreamRetryListener:
             retry_min_wait=0,
             retry_max_wait=0,
             on_cancel_requested_fn=None,
+            resolve_temperature=lambda: 0,
         )
 
         attempts = {'count': 0}

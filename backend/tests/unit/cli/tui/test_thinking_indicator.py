@@ -32,10 +32,9 @@ async def test_thinking_indicator_finalized_inline_code_uses_lightweight_highlig
 
         content = widget.query_one('#thinking-content', Static)
         renderable = content.renderable
-        assert isinstance(renderable, Group)
-        body = renderable.renderables[1]
-        assert isinstance(body, Text)
-        assert 'backend/main.py' in body.plain
+        assert isinstance(renderable, Text)
+        assert renderable.plain.startswith('Thinking: Inspect')
+        assert 'backend/main.py' in renderable.plain
 
 
 @pytest.mark.asyncio
@@ -50,9 +49,15 @@ async def test_thinking_indicator_finalized_fenced_code_uses_syntax() -> None:
         content = widget.query_one('#thinking-content', Static)
         renderable = content.renderable
         assert isinstance(renderable, Group)
-        body = renderable.renderables[1]
-        assert isinstance(body, Group)
-        assert any(isinstance(part, Syntax) for part in body.renderables)
+        assert isinstance(renderable.renderables[0], Text)
+        assert renderable.renderables[0].plain.startswith('Thinking: Plan:')
+        tail = renderable.renderables[1:]
+        assert any(isinstance(part, Syntax) for part in tail) or any(
+            isinstance(part, Group)
+            and any(isinstance(sub, Syntax) for sub in part.renderables)
+            for part in tail
+            if isinstance(part, Group)
+        )
 
 
 @pytest.mark.asyncio
@@ -66,7 +71,5 @@ async def test_thinking_indicator_plain_prose_stays_flat() -> None:
 
         content = widget.query_one('#thinking-content', Static)
         renderable = content.renderable
-        assert isinstance(renderable, Group)
-        body = renderable.renderables[1]
-        assert isinstance(body, Text)
-        assert 'Plotting the next move.' in body.plain
+        assert isinstance(renderable, Text)
+        assert renderable.plain == 'Thinking: Plotting the next move.'

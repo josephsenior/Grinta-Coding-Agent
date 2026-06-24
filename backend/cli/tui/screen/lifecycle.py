@@ -329,6 +329,7 @@ class ScreenLifecycleMixin:
                 config=config,
             )
             self._hud.update_autonomy(autonomy_level)
+            self._render_hud_bar()
 
             from backend.utils.async_helpers.async_utils import set_main_event_loop
 

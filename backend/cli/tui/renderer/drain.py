@@ -28,6 +28,10 @@ from backend.cli.tui.constants import (
     _TUI_DRAIN_INVOCATION_BUDGET_SECONDS,
     _tui_logger,
 )
+from backend.cli.tui.renderer.handlers.task_tracking import (
+    _is_task_tracking_event,
+    eager_apply_task_tracking_event,
+)
 from backend.cli.tui.widgets.small import RendererDrainRequested
 
 if TYPE_CHECKING:
@@ -617,6 +621,7 @@ def _on_event(orch: 'RendererEventProcessorMixin', event: Any) -> None:
     should_schedule_drain = False
     coalesced = False
     pending_backpressure = False
+    priority_event = _is_task_tracking_event(event)
     with orch._pending_lock:
         if event_id >= 0:
             if (
@@ -635,7 +640,10 @@ def _on_event(orch: 'RendererEventProcessorMixin', event: Any) -> None:
                 _TUI_PENDING_EVENT_LIMIT,
             ):
                 should_schedule_drain = True
-            orch._pending_events.append(event)
+            if priority_event:
+                orch._pending_events.appendleft(event)
+            else:
+                orch._pending_events.append(event)
             if getattr(orch, '_pending_backpressure', False):
                 should_schedule_drain = True
             if not orch._drain_scheduled:
@@ -652,6 +660,8 @@ def _on_event(orch: 'RendererEventProcessorMixin', event: Any) -> None:
         pending_backpressure = (
             len(orch._pending_events) > _TUI_BACKPRESSURE_PENDING_THRESHOLD
         )
+    if priority_event:
+        eager_apply_task_tracking_event(orch, event)
     skip_signal = coalesced and (
         getattr(orch, '_drain_scheduled', False)
         or getattr(orch, '_async_drain_active', False)

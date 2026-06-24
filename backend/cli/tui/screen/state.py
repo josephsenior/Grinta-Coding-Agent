@@ -119,8 +119,12 @@ class ScreenStateMixin:
         )
 
     def _active_agent_name(self) -> str:
+        from backend.core.constants import DEFAULT_AGENT_NAME
+
         name = getattr(self._config, 'default_agent', None)
-        return name.strip() if isinstance(name, str) and name.strip() else 'agent'
+        if isinstance(name, str) and name.strip():
+            return name.strip()
+        return DEFAULT_AGENT_NAME
 
     def _active_agent_config(self) -> Any | None:
         getter = getattr(self._config, 'get_agent_config', None)
@@ -259,15 +263,15 @@ class ScreenStateMixin:
         )
 
     def _current_autonomy_level(self) -> str:
-        runtime = self._runtime_autonomy_level()
-        if runtime:
-            return runtime
-
         from backend.cli.settings import get_persisted_autonomy_level
 
         configured = get_persisted_autonomy_level(self._active_agent_name())
         if configured:
             return configured
+
+        runtime = self._runtime_autonomy_level()
+        if runtime:
+            return runtime
 
         return 'balanced'
 
@@ -302,19 +306,29 @@ class ScreenStateMixin:
         return True
 
     def _sync_hud_autonomy_select(self, hud_bar, autonomy: str) -> None:
+        allowed = {'conservative', 'balanced', 'full'}
+        if autonomy not in allowed:
+            autonomy = self._current_autonomy_level()
+        if autonomy not in allowed:
+            autonomy = 'balanced'
         try:
             autonomy_select = hud_bar.query_one('#hud-autonomy', Select)
-            if autonomy_select.value != autonomy:
-                self._mark_hud_select_sync('hud-autonomy', autonomy)
-                self._hud_autonomy_syncing = True
-                try:
-                    with autonomy_select.prevent(Select.Changed):
+            value_changed = autonomy_select.value != autonomy
+            if value_changed:
+                self._mark_hud_select_sync(
+                    'hud-autonomy',
+                    autonomy_select.value,
+                    autonomy,
+                )
+            self._hud_autonomy_syncing = True
+            try:
+                with autonomy_select.prevent(Select.Changed):
+                    if value_changed:
                         autonomy_select.value = autonomy
-                finally:
-                    self._hud_autonomy_syncing = False
+            finally:
+                self._hud_autonomy_syncing = False
         except Exception:
             self._hud_autonomy_syncing = False
-            pass
 
     def _sync_hud_mode_select(self, hud_bar) -> None:
         try:

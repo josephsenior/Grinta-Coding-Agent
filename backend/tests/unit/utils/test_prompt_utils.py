@@ -786,6 +786,25 @@ class TestBuildSystemPromptRenders:
     for any supported feature-flag combination, and must produce non-empty output.
     """
 
+    @pytest.fixture(autouse=True)
+    def _optional_extras_available(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(
+            'backend.utils.optional_extras.is_browser_extra_available',
+            lambda: True,
+        )
+        monkeypatch.setattr(
+            'backend.utils.optional_extras.is_rag_extra_available',
+            lambda: True,
+        )
+        monkeypatch.setattr(
+            'backend.utils.optional_extras.vector_memory_enabled',
+            lambda _config: True,
+        )
+        monkeypatch.setattr(
+            'backend.utils.optional_extras.browser_tool_enabled',
+            lambda _config: True,
+        )
+
     def _assert_renders_cleanly(self, **kwargs: object) -> str:
         from backend.engine.prompts.prompt_builder import build_system_prompt
 

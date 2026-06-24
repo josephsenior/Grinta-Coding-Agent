@@ -647,6 +647,57 @@ def test_no_pending_event_drop_under_burst(monkeypatch):
     assert len(orch._pending_events) <= 5
 
 
+def test_on_event_eagerly_applies_task_list_and_prioritizes_queue(monkeypatch):
+    from collections import deque
+
+    from backend.cli.tui.renderer import drain as drain_mod
+    from backend.ledger.action import TaskTrackingAction
+    from backend.ledger.action.message import StreamingChunkAction
+
+    orch = MagicMock()
+    orch._pending_events = deque()
+    orch._pending_lock = __import__('threading').Lock()
+    orch._drain_scheduled = False
+    orch._pending_events_dropped = 0
+    orch._min_rendered_event_id = -1
+    orch._max_rendered_event_id = -1
+    orch._task_list = []
+    orch._last_task_sidebar_signature = ('cached',)
+    orch._loop = MagicMock()
+    scheduled: list[Any] = []
+    orch._loop.call_soon_threadsafe = lambda fn, *args: scheduled.append((fn, args))
+    orch._should_replace_task_list_from_event = lambda event: bool(
+        getattr(event, 'task_list', None)
+    )
+    refresh_calls: list[str] = []
+    orch._refresh_tasks_sidebar = lambda: refresh_calls.append('refresh')
+
+    for idx in range(3):
+        chunk = StreamingChunkAction(accumulated=f'chunk-{idx}', is_final=False)
+        chunk.id = idx
+        drain_mod._on_event(orch, chunk)
+
+    action = TaskTrackingAction(
+        command='update',
+        task_list=[{'id': '1', 'description': 'Ship tasks sidebar', 'status': 'todo'}],
+    )
+    action.id = 99
+    scheduled.clear()
+    drain_mod._on_event(orch, action)
+
+    assert orch._pending_events[0] is action
+    assert orch._task_list == action.task_list
+    assert orch._last_task_sidebar_signature is None
+    refresh_scheduled = [
+        call
+        for call in scheduled
+        if getattr(call[0], '__name__', '') == '_refresh'
+    ]
+    assert refresh_scheduled
+    refresh_scheduled[0][0]()
+    assert refresh_calls == ['refresh']
+
+
 @pytest.mark.asyncio
 async def test_tui_scroll_badge_shows_and_follows_tail(mock_config, monkeypatch):
     console = RichConsole()

@@ -45,6 +45,10 @@ def _make_controller() -> SessionOrchestrator:
 
     # Services container
     ctrl.services = MagicMock()
+    ctrl.services.pending_action.barrier_wait_budget_seconds = MagicMock(
+        return_value=30.0
+    )
+    ctrl.services.pending_action.has_outstanding = MagicMock(return_value=False)
     # Provide explicit async mocks for methods awaited in normal flows:
     ctrl.services.step_guard.ensure_can_step = AsyncMock(return_value=True)
     ctrl.services.exception_handler.handle_step_exception = AsyncMock()

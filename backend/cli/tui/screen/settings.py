@@ -62,6 +62,8 @@ class ScreenSettingsMixin:
         self._resize_input_bar()
 
     def _apply_autonomy_level(self, new_level: str) -> None:
+        if getattr(self, '_hud_autonomy_syncing', False):
+            return
         level = self._visible_autonomy_level(new_level)
         if level not in {'conservative', 'balanced', 'full'}:
             return
