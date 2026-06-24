@@ -15,6 +15,7 @@ from backend.cli.tui.dialogs.add_skill import GrintaAddSkillDialog
 from backend.cli.tui.dialogs.confirm import GrintaConfirmDialog
 from backend.cli.tui.widgets.dialogs import ModalDialog
 
+
 class GrintaManageSkillsDialog(ModalDialog[bool]):
     """List, add, edit, and remove skills."""
 

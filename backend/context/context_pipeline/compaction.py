@@ -8,7 +8,7 @@ or receive their dependencies as parameters.
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from backend.context.canonical_state import (
     load_canonical_state,
@@ -16,7 +16,7 @@ from backend.context.canonical_state import (
     validate_canonical_state_for_compaction,
 )
 from backend.context.compactor.compact_boundary import project_after_compact_boundary
-from backend.context.memory.session_memory import build_compaction_summary
+from backend.context.compactor.compactor import BaseLLMCompactor, Compaction
 from backend.context.context_budget import ContextBudget, record_post_compact_baseline
 from backend.context.context_pipeline.helpers import (
     _pruned_ids,
@@ -40,10 +40,10 @@ from backend.context.context_pipeline.types import (
 )
 from backend.context.continuity_eval import compaction_passes_continuity_gate
 from backend.context.memory.session_memory import (
+    build_compaction_summary,
     session_memory_exists,
 )
 from backend.core.constants import (
-    DEFAULT_BOUNDARY_COMPACT_COOLDOWN_SECONDS,
     DEFAULT_COMPACT_MIN_PRUNED_EVENTS,
     DEFAULT_COMPACT_MIN_TOKEN_REDUCTION,
     DEFAULT_DEGRADED_COMPACT_TAIL_RATIO,
@@ -176,7 +176,9 @@ def action_meets_effectiveness(
     post_budget = ContextBudget.from_events(
         post_events, llm_config=llm_config, state=state
     )
-    return (pre_tokens - post_budget.estimated_tokens) >= DEFAULT_COMPACT_MIN_TOKEN_REDUCTION
+    return (
+        pre_tokens - post_budget.estimated_tokens
+    ) >= DEFAULT_COMPACT_MIN_TOKEN_REDUCTION
 
 
 def passes_effectiveness_gate(
@@ -195,7 +197,9 @@ def passes_effectiveness_gate(
     post_budget = ContextBudget.from_events(
         post_events, llm_config=llm_config, state=state
     )
-    return (budget.estimated_tokens - post_budget.estimated_tokens) >= DEFAULT_COMPACT_MIN_TOKEN_REDUCTION
+    return (
+        budget.estimated_tokens - post_budget.estimated_tokens
+    ) >= DEFAULT_COMPACT_MIN_TOKEN_REDUCTION
 
 
 def evaluate_continuity_gate(
@@ -284,7 +288,9 @@ def evaluate_continuity_gate(
     )
 
 
-def _record_continuity_rejection(state: State, decision: _ContinuityGateDecision) -> int:
+def _record_continuity_rejection(
+    state: State, decision: _ContinuityGateDecision
+) -> int:
     pipe = _pipeline_state(state)
     previous = pipe.get(_CONTINUITY_REJECTION_FP_KEY)
     streak = pipe.get(_CONTINUITY_REJECTION_STREAK_KEY, 0)
@@ -330,9 +336,7 @@ def _build_deterministic_canonical_compaction(
 ) -> CondensationAction | None:
     try:
         canonical = load_canonical_state(state=state)
-        summary_parts = [
-            render_canonical_state_for_prompt(canonical, char_budget=6000)
-        ]
+        summary_parts = [render_canonical_state_for_prompt(canonical, char_budget=6000)]
     except Exception:
         logger.debug('Canonical fallback summary render failed', exc_info=True)
         summary_parts = []
@@ -474,11 +478,18 @@ class _CompactionEngine:
             budget.fixed_prompt_reserve_tokens,
         )
 
-        llm_allowed = self._config.allow_llm_hot_path and (
-            critical or llm_cooldown_elapsed(state, self._config.llm_compact_cooldown_seconds)
-        ) if hasattr(self._config, 'llm_compact_cooldown_seconds') else (
-            self._config.allow_llm_hot_path and (
-                critical or llm_cooldown_elapsed(state, 300)
+        llm_allowed = (
+            self._config.allow_llm_hot_path
+            and (
+                critical
+                or llm_cooldown_elapsed(
+                    state, self._config.llm_compact_cooldown_seconds
+                )
+            )
+            if hasattr(self._config, 'llm_compact_cooldown_seconds')
+            else (
+                self._config.allow_llm_hot_path
+                and (critical or llm_cooldown_elapsed(state, 300))
             )
         )
         if llm_allowed:
@@ -534,7 +545,9 @@ class _CompactionEngine:
             )
             return None
         if budget is not None:
-            self._configure_structured_compactor_size(compactor, events, budget)
+            self._configure_structured_compactor_size(
+                cast(BaseLLMCompactor, compactor), events, budget
+            )
         from backend.context.view import View
 
         view = View(events=events)
@@ -618,6 +631,7 @@ class _CompactionEngine:
             from backend.context.compactor.strategies.amortized_pruning_compactor import (
                 AmortizedPruningCompactor,
             )
+
             pruned_events = [
                 event
                 for event in events
@@ -642,7 +656,7 @@ class _CompactionEngine:
 
     @staticmethod
     def _configure_structured_compactor_size(
-        compactor: object,
+        compactor: BaseLLMCompactor,
         events: list[Event],
         budget: ContextBudget,
     ) -> None:

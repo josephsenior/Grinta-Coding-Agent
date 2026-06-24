@@ -67,10 +67,12 @@ def test_build_messages_uses_incremental_append_after_microcompact_ages_event():
 
     manager._pipeline = MagicMock()
     manager._pipeline.build_prompt_events.side_effect = (
-        lambda condensed, state=None, llm_config=None, full_history=None: apply_microcompact(
-            list(condensed),
-            preserve_recent=10,
-            state=state,
+        lambda condensed, state=None, llm_config=None, full_history=None: (
+            apply_microcompact(
+                list(condensed),
+                preserve_recent=10,
+                state=state,
+            )
         )
     )
 

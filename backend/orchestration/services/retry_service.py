@@ -71,7 +71,10 @@ class RetryService:
             return
 
         def _start_worker() -> None:
-            if self._retry_worker_task is not None and not self._retry_worker_task.done():
+            if (
+                self._retry_worker_task is not None
+                and not self._retry_worker_task.done()
+            ):
                 return
 
             async def _worker_wrapper() -> None:

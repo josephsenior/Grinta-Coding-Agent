@@ -84,9 +84,7 @@ class EditDetailScreen(DetailScreen):
                     )
                 )
         else:
-            widgets.append(
-                self.empty_state('(no diff)', widget_id='edit-no-diff')
-            )
+            widgets.append(self.empty_state('(no diff)', widget_id='edit-no-diff'))
 
         if self._syntax_error:
             error_text = (

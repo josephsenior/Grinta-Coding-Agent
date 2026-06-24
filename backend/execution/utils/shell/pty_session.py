@@ -409,6 +409,7 @@ class InteractiveSession:
         self._exit_code: int | None = None
         self._eof = False
         self._sanitize_carry = ''
+        self._artifact_carry = ''
 
     @property
     def pid(self) -> int | None:
@@ -544,6 +545,19 @@ class InteractiveSession:
             carry=self._sanitize_carry,
         )
         self._sanitize_carry = next_carry
+        if not clean and not self._artifact_carry:
+            return
+
+        from backend.cli.terminal_sanitize import (
+            split_trailing_incomplete_mouse_artifact,
+            strip_leaked_terminal_artifacts,
+        )
+
+        combined = (self._artifact_carry or '') + (clean or '')
+        self._artifact_carry = ''
+        body, incomplete = split_trailing_incomplete_mouse_artifact(combined)
+        self._artifact_carry = incomplete
+        clean = strip_leaked_terminal_artifacts(body)
         if not clean:
             return
         with self._lock:

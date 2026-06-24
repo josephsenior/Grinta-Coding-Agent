@@ -11,7 +11,7 @@ from backend.cli.tui.dialogs import (  # noqa: F401
     GrintaManageMCPDialog,
     GrintaManageSkillsDialog,
 )
-from backend.cli.tui.widgets.collapsible import CollapsibleSection, SidebarRow
+from backend.cli.tui.widgets.collapsible import SidebarRow
 from backend.cli.tui.widgets.small import (
     InputBar,
 )
@@ -400,6 +400,4 @@ class ScreenSettingsMixin:
             )
             if changed:
                 self._reload_mcp_config_and_refresh_sidebar()
-                self.notify(
-                    'MCP servers updated', severity='information', timeout=2.0
-                )
+                self.notify('MCP servers updated', severity='information', timeout=2.0)

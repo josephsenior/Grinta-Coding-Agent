@@ -81,7 +81,9 @@ class TestWorkspaceCleanupNotCritical:
             'rm -rf node_modules',
         ],
     )
-    def test_workspace_cleanup_is_not_critical(self, analyzer: CommandAnalyzer, cmd: str):
+    def test_workspace_cleanup_is_not_critical(
+        self, analyzer: CommandAnalyzer, cmd: str
+    ):
         risk, _, _ = analyzer.analyze(cmd)
         assert risk != RiskCategory.CRITICAL, (
             f'{cmd!r} should not be CRITICAL, got {risk}'

@@ -989,7 +989,9 @@ def _structured_edit_file_outcomes(
     return outcomes
 
 
-def _join_structured_file_outcome_diffs(file_outcomes: list[dict[str, Any]]) -> str | None:
+def _join_structured_file_outcome_diffs(
+    file_outcomes: list[dict[str, Any]],
+) -> str | None:
     chunks = [
         str(outcome['diff'])
         for outcome in file_outcomes
@@ -1016,8 +1018,7 @@ def _structured_edit_verification_text(
 
     for outcome in file_outcomes:
         file_ok = (
-            outcome.get('disk_write') == 'passed'
-            and outcome.get('syntax') != 'failed'
+            outcome.get('disk_write') == 'passed' and outcome.get('syntax') != 'failed'
         )
         all_ok = all_ok and file_ok
         lines.append(
@@ -1039,7 +1040,11 @@ def _resolve_structured_edit_display_path(
     if len(candidates) == 1:
         return str(candidates[0].get('path') or '')
     if len(candidates) > 1:
-        paths = [str(outcome.get('path') or '') for outcome in candidates if outcome.get('path')]
+        paths = [
+            str(outcome.get('path') or '')
+            for outcome in candidates
+            if outcome.get('path')
+        ]
         if len(paths) == 1:
             return paths[0]
         if len(paths) <= 3:

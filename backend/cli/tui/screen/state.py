@@ -192,9 +192,9 @@ class ScreenStateMixin:
                 self._hud_pulse_frame = 0
                 self._render_hud_bar()
             return
-        self._hud_pulse_frame = (
-            int(getattr(self, '_hud_pulse_frame', 0)) + 1
-        ) % len(self._RUNNING_PULSE_BULLETS)
+        self._hud_pulse_frame = (int(getattr(self, '_hud_pulse_frame', 0)) + 1) % len(
+            self._RUNNING_PULSE_BULLETS
+        )
         self._render_hud_bar()
 
     @staticmethod

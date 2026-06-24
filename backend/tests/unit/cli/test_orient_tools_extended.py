@@ -21,14 +21,13 @@ from backend.cli.tool_display.orient_tools import (
     grep_action_model,
     lsp_action_model,
     lsp_result,
+    mcp_action_model,
+    mcp_result,
     memory_persist_action_model,
     memory_persist_observation_model,
     memory_persist_result,
     memory_recall_action_model,
     memory_recall_observation_model,
-    memory_recall_result,
-    mcp_action_model,
-    mcp_result,
     read_symbols_action_model,
     read_symbols_result,
 )
@@ -153,9 +152,7 @@ def test_orient_line_with_result_on_mcp_models() -> None:
 
 
 def test_memory_recall_orient_models() -> None:
-    action = memory_recall_action_model(
-        SimpleNamespace(query='workspace conventions')
-    )
+    action = memory_recall_action_model(SimpleNamespace(query='workspace conventions'))
     assert action.tool == 'memory'
     assert action.verb == 'Recalled'
     assert 'workspace conventions' in action.target

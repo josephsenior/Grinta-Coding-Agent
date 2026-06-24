@@ -29,10 +29,25 @@ _CSI_OSC_DCS = re.compile(
     r'|(?:\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]))',
     re.DOTALL,
 )
-# SGR mouse reports (with or without ESC / ``<`` prefix).
-_MOUSE_REPORT_RE = re.compile(
-    r'(?:\x1b)?\[(?:<)?\d{1,7};\d{1,7};\d{1,7}[mM]'
+# SGR mouse reports (with or without ESC / ``<`` prefix).  Hosts may leak
+# 2–5 numeric fields before the trailing ``m``/``M`` (Windows Terminal / ConPTY).
+_MOUSE_REPORT_RE = re.compile(r'(?:\x1b)?\[(?:<)?\d{1,7}(?:;\d{1,7}){1,4}[mM]')
+# Trailing fragment of a mouse report split across PTY read chunks.
+_INCOMPLETE_MOUSE_TAIL_RE = re.compile(
+    r'(?:\x1b)?\[(?:<)?\d{1,7}(?:;\d{1,7}){0,4};?\d{0,7}$'
 )
+# Fast gate for polling sanitizers — avoid regex on every keystroke.
+_MOUSE_LEAK_QUICK_RE = re.compile(r'(?:\x1b)?\[(?:<)?\d{1,7};')
+
+
+def split_trailing_incomplete_mouse_artifact(text: str) -> tuple[str, str]:
+    """Hold a partial ``[555;117;`` tail until the next PTY chunk completes it."""
+    if not text or text.endswith(('m', 'M')):
+        return text, ''
+    match = _INCOMPLETE_MOUSE_TAIL_RE.search(text)
+    if match is None:
+        return text, ''
+    return text[: match.start()], match.group(0)
 
 
 def strip_leaked_terminal_artifacts(text: str) -> str:
@@ -61,3 +76,19 @@ def looks_like_terminal_selection_noise(text: str) -> bool:
         return False
     cleaned = strip_leaked_terminal_artifacts(sample)
     return not cleaned.strip()
+
+
+def looks_like_terminal_leak_fragment(text: str) -> bool:
+    """True when the buffer likely contains host-injected mouse/CSI noise."""
+    sample = text or ''
+    if not sample or '[' not in sample:
+        return False
+    return bool(_MOUSE_LEAK_QUICK_RE.search(sample))
+
+
+def sanitize_prompt_input_text(text: str) -> str:
+    """Normalize user input: strip terminal leaks; drop pure-noise buffers."""
+    cleaned = strip_leaked_terminal_artifacts(text)
+    if looks_like_terminal_selection_noise(text):
+        return ''
+    return cleaned

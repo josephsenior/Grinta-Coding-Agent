@@ -77,7 +77,9 @@ async def test_tui_hud_bar_shows_accumulated_and_context_tokens(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_tui_hud_reasoning_hidden_when_model_has_no_control(mock_config, monkeypatch):
+async def test_tui_hud_reasoning_hidden_when_model_has_no_control(
+    mock_config, monkeypatch
+):
     from backend.inference.capabilities.param_profiles import (
         resolve_model_entry_for_capabilities,
     )

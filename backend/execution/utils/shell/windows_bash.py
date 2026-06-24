@@ -310,6 +310,7 @@ class WindowsPowershellSession(BaseShellSession):
             timeout: Timeout in seconds (None for no timeout).
             cwd: Working directory (None to use session CWD).
             input_text: Input to send to the command.
+            blocking: When True, wait for command completion synchronously.
 
         Returns:
             Tuple of (stdout, stderr, exit_code)

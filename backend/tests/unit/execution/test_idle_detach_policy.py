@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from backend.execution.runtime_mixins.command_timeout import SAFETY_NET_TIMEOUT
-from backend.execution.utils.shell.idle_detach_policy import compute_idle_detach_timeouts
+from backend.execution.utils.shell.idle_detach_policy import (
+    compute_idle_detach_timeouts,
+)
 
 
 def test_default_safety_net_scales_idle_to_ninety_seconds():

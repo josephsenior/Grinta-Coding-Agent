@@ -19,7 +19,6 @@ from backend.context.context_pipeline import (
 )
 from backend.context.context_pipeline.compaction import (
     _deterministic_fallback_after_rejection,
-    passes_effectiveness_gate,
 )
 from backend.core.config.compactor_config import ContextPipelineConfig
 from backend.core.constants import DEFAULT_EMERGENCY_PROMPT_MIN_EVENTS

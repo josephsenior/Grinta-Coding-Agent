@@ -63,7 +63,9 @@ class ScreenActionsMixin:
         if getattr(display, '_under_backpressure', False):
             return
         from backend.cli.tui.widgets.scan_line import ScanLineCard
-        from backend.cli.tui.widgets.scan_line.cards import advance_running_ellipsis_frame
+        from backend.cli.tui.widgets.scan_line.cards import (
+            advance_running_ellipsis_frame,
+        )
 
         advance_running_ellipsis_frame()
         for card in list(display.query(ScanLineCard)):

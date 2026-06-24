@@ -58,9 +58,40 @@ class GrintaTUIApp(App):
         # Register Rich theme for consistent markup rendering
         self._console.push_theme(_RICH_THEME)
 
+    async def on_mount(self) -> None:
+        from backend.cli.terminal_restore import capture_driver_console_restore
+        from backend.cli.tui.app import GrintaScreen
+
+        self._screen = await self.push_screen(
+            GrintaScreen(
+                config=self._config,
+                console=self._console,
+                loop=self._loop,
+                hud=self._hud,
+                reasoning=self._reasoning,
+                app=self,
+            )
+        )
+        self.call_after_refresh(
+            lambda: capture_driver_console_restore(getattr(self, '_driver', None))
+        )
+
     async def on_event(self, event: Any) -> None:
         from textual import events as _events
 
+        from backend.cli.terminal_sanitize import (
+            looks_like_terminal_leak_fragment,
+            sanitize_prompt_input_text,
+        )
+
+        if isinstance(event, _events.Paste) and looks_like_terminal_leak_fragment(
+            event.text or ''
+        ):
+            cleaned = sanitize_prompt_input_text(event.text or '')
+            if not cleaned:
+                return
+            if cleaned != event.text:
+                event = _events.Paste(cleaned)
         # When self.focused is None (e.g., focus lost on Alt+Tab), Textual's
         # default handler forwards the Paste event to the Screen, which has no
         # _on_paste handler — the event is silently dropped.  Detect this and
@@ -81,24 +112,6 @@ class GrintaTUIApp(App):
     def compose(self):
         """Layout is handled by the pushed screen."""
         return iter([])
-
-    async def on_mount(self) -> None:
-        from backend.cli.tui.app import GrintaScreen
-        from backend.cli.terminal_restore import capture_driver_console_restore
-
-        self._screen = await self.push_screen(
-            GrintaScreen(
-                config=self._config,
-                console=self._console,
-                loop=self._loop,
-                hud=self._hud,
-                reasoning=self._reasoning,
-                app=self,
-            )
-        )
-        self.call_after_refresh(
-            lambda: capture_driver_console_restore(getattr(self, '_driver', None))
-        )
 
     def on_unmount(self) -> None:
         self._console.pop_theme()
@@ -137,7 +150,9 @@ async def run_tui(
     app._hud.update_ledger('Starting')
     app._hud.update_agent_state('Starting')
 
-    with terminal_restore_guard(app):
+    from backend.cli.win32_console import win32_console_input_guard
+
+    with terminal_restore_guard(app), win32_console_input_guard():
         try:
             await app.run_async()
         except KeyboardInterrupt:

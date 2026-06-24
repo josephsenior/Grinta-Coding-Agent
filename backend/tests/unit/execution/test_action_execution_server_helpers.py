@@ -150,7 +150,12 @@ def test_build_edit_result_obs_populates_single_file_old_new(tmp_path) -> None:
     action = SimpleNamespace(path='.')
     payload = {
         'file_edits': [
-            {'path': 'a.py', 'operation': 'replace_string', 'old_string': 'a', 'new_string': 'b'}
+            {
+                'path': 'a.py',
+                'operation': 'replace_string',
+                'old_string': 'a',
+                'new_string': 'b',
+            }
         ]
     }
     outcome = MessageAction(content='✓ multi_edit committed 1 file(s) atomically')

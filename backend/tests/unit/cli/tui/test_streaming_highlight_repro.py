@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -17,6 +18,7 @@ from backend.cli.event_rendering.text_utils import sanitize_visible_transcript_t
 from backend.cli.tui.app import TUIRenderer
 from backend.cli.tui.renderer.prep import prep_streaming_response_async
 from backend.cli.tui.widgets.activity_card import LiveResponse
+from backend.cli.tui.widgets.small import Transcript
 from backend.ledger.action.message import StreamingChunkAction
 
 
@@ -63,7 +65,7 @@ async def test_streaming_preprocess_cache_key_matches_normalized_apply() -> None
             def follow_tail(self) -> None:
                 return
 
-        renderer._tui._get_display = lambda: _Display()
+        renderer._tui._get_display = lambda: cast(Transcript, _Display())
 
         await prep_streaming_response_async(renderer, norm)
         assert norm in renderer._streaming_render_cache
@@ -101,7 +103,7 @@ async def test_streaming_chunk_drain_path_highlights_open_fence() -> None:
             def follow_tail(self) -> None:
                 return
 
-        renderer._tui._get_display = lambda: _Display()
+        renderer._tui._get_display = lambda: cast(Transcript, _Display())
 
         action = StreamingChunkAction(accumulated=PARTIAL, is_final=False)
         await _preprocess_event_async(renderer, action)

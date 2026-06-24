@@ -227,7 +227,7 @@ class _SessionOrchestratorParallelMixin(SessionOrchestratorAccessorsMixin):
                 for action in reversed(failed_actions):
                     _prepend_action(current_pending, action)
 
-    async def _drain_step_barrier(self, *, timeout: float | None = None) -> bool:
+    async def _drain_step_barrier(self, *, timeout: float | None = None) -> bool:  # noqa: ASYNC109
         """Drain background tasks and wait for outstanding pending actions."""
         from backend.core.constants import DRAIN_STEP_BARRIER_IDLE_DEFAULT_SECONDS
         from backend.utils.async_helpers.async_utils import drain_step_barrier
@@ -254,7 +254,9 @@ class _SessionOrchestratorParallelMixin(SessionOrchestratorAccessorsMixin):
         ):
             primary = pending_service.get_primary()
             action_type = type(primary).__name__ if primary is not None else 'unknown'
-            action_id = getattr(primary, 'id', 'unknown') if primary is not None else 'unknown'
+            action_id = (
+                getattr(primary, 'id', 'unknown') if primary is not None else 'unknown'
+            )
             logger.debug(
                 'Step barrier timed out after %.1fs with outstanding %s (id=%s)',
                 timeout,

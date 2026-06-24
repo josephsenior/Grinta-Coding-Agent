@@ -42,7 +42,10 @@ from backend.cli.theme import (
 from backend.core.app_paths import get_canonical_settings_path
 from backend.core.config.dotenv_keys import persist_llm_api_key_to_dotenv
 from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
-from backend.inference.provider_resolver import check_local_providers, discover_all_local_models
+from backend.inference.provider_resolver import (
+    check_local_providers,
+    discover_all_local_models,
+)
 
 _PROVIDER_PRESETS = ONBOARDING_PROVIDER_PRESETS
 _PROVIDER_CATEGORY_ORDER = ('cloud', 'aggregator', 'local')

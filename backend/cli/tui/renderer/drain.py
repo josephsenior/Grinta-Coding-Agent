@@ -467,7 +467,7 @@ async def drain_events_async(orch: 'RendererEventProcessorMixin') -> None:
         )
         orch._drain_requested_while_active = False
     prep_depth = len(getattr(orch, '_render_prep_cache', {}) or {})
-    mounted_depth = len(getattr(orch, '_mounted_event_ids', set()) or set())
+    len(getattr(orch, '_mounted_event_ids', set()) or set())
     _tui_logger.debug(
         'tui_drain_ms=%.1f tui_pending_depth=%d tui_prep_queue_depth=%d '
         'tui_last_batch=%d streaming_only=%s',
