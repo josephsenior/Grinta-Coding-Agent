@@ -443,7 +443,9 @@ async def test_tui_sidebar_mcp_rows_have_switch_and_skills_are_read_only(
         assert len(bundled_items) == 1
 
         rows = list(s.query('.sidebar-item-row'))
-        mcp_rows = [row for row in rows if getattr(row, 'item_id', '').startswith('mcp:')]
+        mcp_rows = [
+            row for row in rows if getattr(row, 'item_id', '').startswith('mcp:')
+        ]
         skill_rows = [
             row for row in rows if getattr(row, 'item_id', '').startswith('skill:')
         ]

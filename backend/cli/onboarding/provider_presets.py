@@ -6,10 +6,10 @@ from backend.cli.settings.constants import (
     _PROVIDERS,
     DEFAULT_MODEL_BY_PROVIDER,
 )
-
-_CATEGORY_BY_KEY: dict[str, str] = {key: category for key, _, category in _PROVIDERS}
 from backend.core.providers.configurations import PROVIDER_CONFIGURATIONS
 from backend.inference.catalog.provider_catalog import PROVIDER_DEFAULT_URLS
+
+_CATEGORY_BY_KEY: dict[str, str] = {key: category for key, _, category in _PROVIDERS}
 
 _LOCAL_BASE_URLS: dict[str, str] = {
     'ollama': 'http://localhost:11434',

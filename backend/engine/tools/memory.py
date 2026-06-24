@@ -22,15 +22,21 @@ _MEMORY_RECALL_BLOCK = (
 )
 
 
-def create_memory_tool(*, include_semantic_recall: bool = True) -> ChatCompletionToolParam:
+def create_memory_tool(
+    *, include_semantic_recall: bool = True
+) -> ChatCompletionToolParam:
     """Create the unified memory tool definition."""
     description = _MEMORY_DESCRIPTION_BASE
     if include_semantic_recall:
         description += _MEMORY_RECALL_BLOCK
-    action_enum = ['working', 'persist', 'recall'] if include_semantic_recall else [
-        'working',
-        'persist',
-    ]
+    action_enum = (
+        ['working', 'persist', 'recall']
+        if include_semantic_recall
+        else [
+            'working',
+            'persist',
+        ]
+    )
     action_description = (
         'Memory operation: working (session state), persist (workspace facts), '
         'or recall (semantic search over indexed history).'

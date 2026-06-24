@@ -556,7 +556,9 @@ class CollapsibleSection(Container):
         if self._action_label:
             self.post_message(self.ActionClicked(self))
 
-    def on_sidebar_manage_button_pressed(self, event: SidebarManageButton.Pressed) -> None:
+    def on_sidebar_manage_button_pressed(
+        self, event: SidebarManageButton.Pressed
+    ) -> None:
         if event.control.id == 'action-btn':
             self.post_message(self.ActionClicked(self))
             event.stop()

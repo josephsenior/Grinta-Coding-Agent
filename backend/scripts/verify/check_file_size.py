@@ -104,11 +104,12 @@ def main() -> int:
         if not paths:
             return 0
     else:
-        paths: list[Path] = []
+        discovered: list[Path] = []
         for watch in WATCH_ROOTS:
             watch_path = root / watch
             if watch_path.is_dir():
-                paths.extend(watch_path.rglob('*.py'))
+                discovered.extend(watch_path.rglob('*.py'))
+        paths = discovered
 
     return _check(paths, changed_only=args.changed_only)
 

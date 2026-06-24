@@ -464,18 +464,27 @@ def test_ineffective_compaction_backoff_blocks_until_event_threshold(pipeline):
         'skip_compaction_until_event_id'
     ]
     assert skip_until == latest_id + DEFAULT_INEFFECTIVE_COMPACT_SKIP_EVENTS
-    assert should_skip_compaction(state, pipeline._boundary_compact_cooldown, force=False) is True
+    assert (
+        should_skip_compaction(state, pipeline._boundary_compact_cooldown, force=False)
+        is True
+    )
 
     # Still blocked before threshold.
     state.history.append(_cmd_output('mid', skip_until - 1))
-    assert should_skip_compaction(state, pipeline._boundary_compact_cooldown, force=False) is True
+    assert (
+        should_skip_compaction(state, pipeline._boundary_compact_cooldown, force=False)
+        is True
+    )
 
     # Unblocked once latest id reaches skip_until (and time backoff expired).
     state.history.append(_cmd_output('past threshold', skip_until))
     pipe = state.extra_data['context_pipeline_state']
     pipe['ineffective_compact_until'] = 0
     state.extra_data['context_pipeline_state'] = pipe
-    assert should_skip_compaction(state, pipeline._boundary_compact_cooldown, force=False) is False
+    assert (
+        should_skip_compaction(state, pipeline._boundary_compact_cooldown, force=False)
+        is False
+    )
 
 
 def test_ineffective_compaction_backoff_escalates_streak(pipeline):

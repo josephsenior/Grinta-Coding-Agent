@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from backend.cli.terminal_sanitize import strip_leaked_terminal_artifacts
 from backend.ledger.observation import CmdOutputMetadata, CmdOutputObservation
 
 if TYPE_CHECKING:
@@ -45,9 +46,11 @@ def format_shell_output(
     """
     content_parts = []
     if stdout:
-        content_parts.append(stdout)
+        content_parts.append(strip_leaked_terminal_artifacts(stdout))
     if stderr:
-        content_parts.append('[ERROR STREAM]\n' + stderr)
+        content_parts.append(
+            '[ERROR STREAM]\n' + strip_leaked_terminal_artifacts(stderr)
+        )
 
     final_content = '\n'.join(content_parts).strip()
 

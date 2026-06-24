@@ -26,10 +26,8 @@ from backend.context.memory.conversation_memory import ContextMemory
 from backend.context.prompt.prompt_window import event_fingerprint, select_prompt_events
 from backend.context.view import View
 from backend.core.logging.logger import app_logger as logger
-from backend.core.message import Message, TextContent
-from backend.inference.caching.prompt_caching import (
-    should_mark_messages_for_prompt_cache,
-)
+from backend.core.message import Message
+from backend.engine.memory_prompt_cache import apply_prompt_cache_hints
 from backend.ledger.action import MessageAction
 from backend.ledger.action.agent import CondensationAction
 
@@ -549,7 +547,9 @@ class ContextMemoryManager:
     def _release_post_compaction_resources(self, state: State, action: object) -> None:
         """Release caches superseded by a compaction pass."""
         self.invalidate_build_messages_cache()
-        from backend.context.compactor.microcompact import clear_microcompact_cleared_ids
+        from backend.context.compactor.microcompact import (
+            clear_microcompact_cleared_ids,
+        )
 
         clear_microcompact_cleared_ids(state)
         if self.conversation_memory is not None:
@@ -633,7 +633,7 @@ class ContextMemoryManager:
             messages=copy.deepcopy(messages),
             llm_config_key=config_key,
         )
-        self._apply_prompt_cache_hints(messages, llm_config)
+        apply_prompt_cache_hints(messages, llm_config)
         return messages
 
     def _resolve_prompt_events(
@@ -692,11 +692,9 @@ class ContextMemoryManager:
         event_ids = tuple(
             self._prompt_event_cache_key(event) for event in events_for_prompt
         )
-        fingerprints = tuple(event_fingerprint(event) for event in events_for_prompt)
+        tuple(event_fingerprint(event) for event in events_for_prompt)
         cache = self._build_messages_cache
-        incremental = self._is_incremental(
-            cache, config_key, event_ids, prompt_window
-        )
+        incremental = self._is_incremental(cache, config_key, event_ids, prompt_window)
         max_message_chars = getattr(llm_config, 'max_message_chars', None)
         vision_is_active = getattr(llm_config, 'vision_is_active', False)
 
@@ -773,51 +771,6 @@ class ContextMemoryManager:
                 metrics['elapsed'],
                 metrics['window_elapsed'],
             )
-
-    @staticmethod
-    def _apply_prompt_cache_hints(messages: list[Message], llm_config: object) -> None:
-        model = getattr(llm_config, 'model', None) or ''
-        provider = getattr(llm_config, 'custom_llm_provider', None)
-        caching_on = bool(getattr(llm_config, 'caching_prompt', True))
-        if not caching_on or not should_mark_messages_for_prompt_cache(
-            str(model),
-            provider=str(provider) if provider else None,
-        ):
-            return
-
-        first_message = messages[0]
-        for item in first_message.content:
-            if isinstance(item, TextContent):
-                item.cache_prompt = True
-                break
-
-        # Stable intermediate anchors: mark the 4th and 8th user messages
-        # (0-indexed positions 3 and 7).  Because these are absolute positions
-        # from the start of the list they do *not* shift as new messages are
-        # appended, so the Anthropic prompt cache can reuse the prefix across
-        # successive turns.
-        _STABLE_USER_CACHE_POSITIONS = (3, 7)
-        user_msg_idx = 0
-        for msg in messages:
-            if msg.role != 'user':
-                continue
-            if user_msg_idx in _STABLE_USER_CACHE_POSITIONS:
-                for item in msg.content:
-                    if isinstance(item, TextContent):
-                        item.cache_prompt = True
-                        break
-            user_msg_idx += 1
-            if user_msg_idx > max(_STABLE_USER_CACHE_POSITIONS):
-                break
-
-        for message in reversed(messages):
-            if message.role != 'user':
-                continue
-            for item in message.content:
-                if isinstance(item, TextContent):
-                    item.cache_prompt = True
-                    break
-            break
 
 
 __all__ = [

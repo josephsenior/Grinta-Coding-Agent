@@ -8,14 +8,21 @@ from typing import Any
 from backend.core.constants import DEFAULT_AGENT_NAME
 
 
+def _optional_extra_installed(module_name: str) -> bool:
+    try:
+        return importlib.util.find_spec(module_name) is not None
+    except (ImportError, ModuleNotFoundError, ValueError):
+        return False
+
+
 def is_rag_extra_available() -> bool:
     """Return True when the ``[rag]`` extra (chromadb stack) is installed."""
-    return importlib.util.find_spec('chromadb') is not None
+    return _optional_extra_installed('chromadb')
 
 
 def is_browser_extra_available() -> bool:
     """Return True when the ``[browser]`` extra (browser-use) is installed."""
-    return importlib.util.find_spec('browser_use') is not None
+    return _optional_extra_installed('browser_use')
 
 
 def _resolve_agent_config(config: Any) -> Any:
@@ -28,10 +35,14 @@ def _resolve_agent_config(config: Any) -> Any:
 def browser_tool_enabled(config: Any) -> bool:
     """Config allows browser **and** the ``[browser]`` extra is installed."""
     agent = _resolve_agent_config(config)
-    return bool(getattr(agent, 'enable_browsing', True)) and is_browser_extra_available()
+    return (
+        bool(getattr(agent, 'enable_browsing', True)) and is_browser_extra_available()
+    )
 
 
 def vector_memory_enabled(config: Any) -> bool:
     """Config allows vector memory **and** the ``[rag]`` extra is installed."""
     agent = _resolve_agent_config(config)
-    return bool(getattr(agent, 'enable_vector_memory', False)) and is_rag_extra_available()
+    return (
+        bool(getattr(agent, 'enable_vector_memory', False)) and is_rag_extra_available()
+    )

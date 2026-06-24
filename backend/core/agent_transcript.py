@@ -28,7 +28,11 @@ def _event_suffix(event_id: int | None) -> str:
 
 def bind_agent_transcript(session_log_dir: str) -> None:
     """Open or rotate ``agent_transcript.log`` for the active session."""
-    global _TRANSCRIPT_PATH, _TRANSCRIPT_STREAM, _LAST_WRITTEN_KEYS, _LAST_STREAM_FINAL_CONTENT
+    global \
+        _TRANSCRIPT_PATH, \
+        _TRANSCRIPT_STREAM, \
+        _LAST_WRITTEN_KEYS, \
+        _LAST_STREAM_FINAL_CONTENT
     path = os.path.join(session_log_dir, 'agent_transcript.log')
     with _LOCK:
         close_agent_transcript_unlocked()
@@ -47,7 +51,11 @@ def bind_agent_transcript(session_log_dir: str) -> None:
 
 
 def close_agent_transcript_unlocked() -> None:
-    global _TRANSCRIPT_PATH, _TRANSCRIPT_STREAM, _LAST_WRITTEN_KEYS, _LAST_STREAM_FINAL_CONTENT
+    global \
+        _TRANSCRIPT_PATH, \
+        _TRANSCRIPT_STREAM, \
+        _LAST_WRITTEN_KEYS, \
+        _LAST_STREAM_FINAL_CONTENT
     if _TRANSCRIPT_STREAM is not None:
         try:
             _TRANSCRIPT_STREAM.flush()

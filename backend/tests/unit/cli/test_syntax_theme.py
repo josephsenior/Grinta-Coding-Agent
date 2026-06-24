@@ -13,6 +13,7 @@ from rich.markdown import Markdown
 from rich.syntax import PygmentsSyntaxTheme, Syntax
 from rich.theme import Theme
 
+from backend.cli.event_rendering.text_utils import sanitize_visible_transcript_text
 from backend.cli.theme import CLR_REASONING_SNAP, grinta_rich_theme_styles
 from backend.cli.theme.syntax_theme import (
     GRINTA_SYNTAX_COLORS,
@@ -26,7 +27,6 @@ from backend.cli.tui.renderer.prep import (
     prep_markdown,
     prep_streaming_renderable,
 )
-from backend.cli.event_rendering.text_utils import sanitize_visible_transcript_text
 from backend.ledger.action.message import StreamingChunkAction
 
 
@@ -231,7 +231,6 @@ def test_apply_live_response_render_highlights_open_fence_without_deferred_flush
     from unittest.mock import MagicMock
 
     from rich.console import Console
-    from rich.syntax import Syntax
 
     from backend.cli.display.hud import HUDBar
     from backend.cli.display.reasoning_display import ReasoningDisplay

@@ -210,9 +210,7 @@ def _assess_critical_delete(cmd: str) -> str | None:
     if _RM_RECURSIVE_ROOT_RE.search(cmd):
         return 'recursive delete on root'
 
-    if re.search(r'\bRemove-Item\b', cmd, re.I) and re.search(
-        r'-Recurse\b', cmd, re.I
-    ):
+    if re.search(r'\bRemove-Item\b', cmd, re.I) and re.search(r'-Recurse\b', cmd, re.I):
         if _CRITICAL_REMOVE_ITEM_PATH_RE.search(cmd):
             return 'recursive delete on Windows system path (PowerShell)'
     return None

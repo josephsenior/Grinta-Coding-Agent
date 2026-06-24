@@ -575,8 +575,8 @@ def _handle_file_edit_observation(
     content_str = obs.content_with_hash()
     path = getattr(obs, 'path', 'unknown')
 
-    truncated = bool(max_message_chars) and len(content_str) > max_message_chars
-    if truncated:
+    truncated = max_message_chars is not None and len(content_str) > max_message_chars
+    if truncated and max_message_chars is not None:
         # Hunk-aware truncation that preserves diff structure (keeps hunk
         # headers, trims inside oversized hunks). Falls back to head-heavy
         # truncation internally when no diff hunks are present, so it is safe

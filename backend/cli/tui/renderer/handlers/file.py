@@ -60,10 +60,16 @@ def _file_edit_is_undo(
     cause_id = getattr(event, 'cause', None)
     if cause_id is not None:
         cause_action = orch._file_edit_actions_by_id.get(cause_id)
-        if cause_action is not None and getattr(cause_action, 'command', '') == 'undo_last_edit':
+        if (
+            cause_action is not None
+            and getattr(cause_action, 'command', '') == 'undo_last_edit'
+        ):
             return True
     tool_result = getattr(event, 'tool_result', None) or {}
-    if isinstance(tool_result, dict) and tool_result.get('operation') == 'undo_last_edit':
+    if (
+        isinstance(tool_result, dict)
+        and tool_result.get('operation') == 'undo_last_edit'
+    ):
         return True
     content = getattr(event, 'content', '') or ''
     return content.startswith('Undid last edit')
@@ -111,9 +117,13 @@ def _handle_file_edit_observation(
 
     is_undo = _file_edit_is_undo(orch, event, action)
     is_create = False if is_undo else file_edit_observation_is_new_file(event)
-    added, removed = _undo_line_counts(event) if is_undo else (
-        getattr(event, 'added', 0) or 0,
-        getattr(event, 'removed', 0) or 0,
+    added, removed = (
+        _undo_line_counts(event)
+        if is_undo
+        else (
+            getattr(event, 'added', 0) or 0,
+            getattr(event, 'removed', 0) or 0,
+        )
     )
 
     # ── create: derive add count from new_content ───────────────────
@@ -191,7 +201,9 @@ def _match_structured_edit_paths(left: str, right: str) -> bool:
     right_norm = right.replace('\\', '/').strip()
     if not left_norm or not right_norm:
         return False
-    return left_norm.endswith(right_norm) or right_norm.endswith(left_norm.split('/')[-1])
+    return left_norm.endswith(right_norm) or right_norm.endswith(
+        left_norm.split('/')[-1]
+    )
 
 
 def _encode_receipt_diff(
@@ -342,11 +354,14 @@ def _handle_multiedit_observation(
         if receipt_match is not None:
             item_added = int(receipt_match.get('added') or item_added)
             item_removed = int(receipt_match.get('removed') or item_removed)
-            item_diff = _encode_receipt_diff(
-                receipt_match,
-                item_path=item_path,
-                orch=orch,
-            ) or item_diff
+            item_diff = (
+                _encode_receipt_diff(
+                    receipt_match,
+                    item_path=item_path,
+                    orch=orch,
+                )
+                or item_diff
+            )
         else:
             for fp, file_diff in per_file:
                 if _match_structured_edit_paths(fp, item_path):

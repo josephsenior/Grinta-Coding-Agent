@@ -57,14 +57,18 @@ def resolve_active_interaction_mode(
 
 def action_blocked_for_interaction_mode(action: object, mode: object) -> str | None:
     """Return an error message when *action* is not allowed in *mode*."""
-    from backend.ledger.action.agent import BlackboardAction, DelegateTaskAction, TaskTrackingAction
+    from backend.ledger.action.agent import (
+        BlackboardAction,
+        DelegateTaskAction,
+        TaskTrackingAction,
+    )
     from backend.ledger.action.browse import BrowseInteractiveAction
     from backend.ledger.action.browser_tool import BrowserToolAction
     from backend.ledger.action.commands import CmdRunAction
     from backend.ledger.action.debugger import DebuggerAction
     from backend.ledger.action.files import FileEditAction
-    from backend.ledger.action.memory_tools import CheckpointAction, WorkingMemoryAction
     from backend.ledger.action.mcp import MCPAction
+    from backend.ledger.action.memory_tools import CheckpointAction, WorkingMemoryAction
     from backend.ledger.action.terminal import (
         TerminalInputAction,
         TerminalRunAction,

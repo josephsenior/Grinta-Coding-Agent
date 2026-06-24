@@ -234,7 +234,10 @@ class TestRunInit:
         monkeypatch.delenv('OPENAI_API_KEY', raising=False)
         with (
             patch('backend.cli.onboarding.init_wizard._detect_local', return_value=[]),
-            patch('backend.cli.onboarding.init_wizard._discover_local_models', return_value={}),
+            patch(
+                'backend.cli.onboarding.init_wizard._discover_local_models',
+                return_value={},
+            ),
             patch('rich.prompt.Confirm.ask', return_value=True),
             patch(
                 'rich.prompt.Prompt.ask',
@@ -258,7 +261,10 @@ class TestRunInit:
         monkeypatch.delenv('OPENAI_API_KEY', raising=False)
         with (
             patch('backend.cli.onboarding.init_wizard._detect_local', return_value=[]),
-            patch('backend.cli.onboarding.init_wizard._discover_local_models', return_value={}),
+            patch(
+                'backend.cli.onboarding.init_wizard._discover_local_models',
+                return_value={},
+            ),
             patch('rich.prompt.Confirm.ask', return_value=False),
             patch(
                 'rich.prompt.Prompt.ask',

@@ -10,7 +10,6 @@ contents) use the ``glob`` tool instead.
 
 from __future__ import annotations
 
-import shutil
 from typing import Any
 
 from backend.core.tools.tool_names import GREP_TOOL_NAME

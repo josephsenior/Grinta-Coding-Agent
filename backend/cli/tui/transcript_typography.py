@@ -26,7 +26,7 @@ TX_SECTION = '#8f9fc1'
 def esc_hint_markup(action: str) -> str:
     """Rich markup for ``esc`` shortcut hints (matches HUD ``[F1] Help`` chrome)."""
     return (
-        f'[#54597b]\[[/][#eacb8a]esc[/][#54597b]][/] '
+        rf'[#54597b]\[[/][#eacb8a]esc[/][#54597b]][/] '
         f'[#969aad]{action}[/]'
     )
 

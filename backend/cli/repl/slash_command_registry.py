@@ -102,12 +102,6 @@ from backend.cli.repl.slash_registry_prompt import (
 from backend.cli.repl.slash_registry_prompt import (
     build_command_completer as _build_command_completer,
 )
-from backend.cli.terminal_sanitize import (
-    _CSI_OSC_DCS,
-    _ORPHAN_BRACKET_CSI,
-    _ORPHAN_PARAM_CHUNK_SINGLE,
-    _ORPHAN_PARAM_CHUNK_STREAM,
-)
 from backend.cli.repl.slash_registry_terminal import (
     attach_prompt_buffer_csi_sanitizer as _attach_prompt_buffer_csi_sanitizer,
 )
@@ -116,6 +110,12 @@ from backend.cli.repl.slash_registry_terminal import (
 )
 from backend.cli.repl.slash_registry_terminal import (
     strip_leaked_terminal_artifacts as _strip_leaked_terminal_artifacts,
+)
+from backend.cli.terminal_sanitize import (
+    _CSI_OSC_DCS,
+    _ORPHAN_BRACKET_CSI,
+    _ORPHAN_PARAM_CHUNK_SINGLE,
+    _ORPHAN_PARAM_CHUNK_STREAM,
 )
 
 logger = logging.getLogger(__name__)

@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any, Self
 
 from backend.context.canonical_state import reduce_events_into_state
 from backend.context.compactor.compact_boundary import project_after_compact_boundary
+from backend.context.compactor.compaction_finalizer import finalize_compaction_artifacts
 from backend.context.compactor.compactor import Compaction
 from backend.context.compactor.condensed_history import CondensedHistory
 from backend.context.compactor.microcompact import apply_microcompact
@@ -24,11 +25,9 @@ from backend.context.compactor.pre_condensation_snapshot import (
     extract_snapshot,
     save_snapshot,
 )
-from backend.context.compactor.compaction_finalizer import finalize_compaction_artifacts
 from backend.context.context_budget import ContextBudget
 from backend.context.context_pipeline.compaction import (
     _CompactionEngine,
-    evaluate_continuity_gate,
     increment_condensation_counter,
     mark_just_compacted,
     passes_effectiveness_gate,
@@ -176,9 +175,7 @@ class ContextPipeline:
                         return CondensedHistory([], action)
 
         events = post_boundary
-        budget = ContextBudget.from_events(
-            events, llm_config=llm_config, state=state
-        )
+        budget = ContextBudget.from_events(events, llm_config=llm_config, state=state)
         view = getattr(state, 'view', None)
         explicit = bool(getattr(view, 'unhandled_condensation_request', False))
         memory_pressure = getattr(turn_signals, 'memory_pressure', None)
@@ -222,9 +219,7 @@ class ContextPipeline:
             delete_staging_snapshot(state=state)
             return CondensedHistory(history, None)
 
-        if should_skip_compaction(
-            state, self._boundary_compact_cooldown, force=force
-        ):
+        if should_skip_compaction(state, self._boundary_compact_cooldown, force=force):
             delete_staging_snapshot(state=state)
             return CondensedHistory(history, None)
 
@@ -293,11 +288,15 @@ class ContextPipeline:
         just_compacted = False
         if state is not None:
             pipe = getattr(state, 'extra_data', {}).get('context_pipeline_state', {})
-            just_compacted = bool(pipe.get(_JUST_COMPACTED_KEY)) if isinstance(pipe, dict) else False
+            just_compacted = (
+                bool(pipe.get(_JUST_COMPACTED_KEY)) if isinstance(pipe, dict) else False
+            )
             if just_compacted:
                 pipe = dict(pipe) if isinstance(pipe, dict) else {}
                 pipe[_JUST_COMPACTED_KEY] = False
-                state.set_extra('context_pipeline_state', pipe, source='ContextPipeline')
+                state.set_extra(
+                    'context_pipeline_state', pipe, source='ContextPipeline'
+                )
 
         packet = build_context_packet_observation(
             events,
@@ -347,9 +346,7 @@ class ContextPipeline:
         if not events:
             return None
         llm_config = self._llm_config(state)
-        budget = ContextBudget.from_events(
-            events, llm_config=llm_config, state=state
-        )
+        budget = ContextBudget.from_events(events, llm_config=llm_config, state=state)
         action = await self._compaction_engine._llm_structured_compaction(
             events, state, budget=budget, llm_config=llm_config
         )
@@ -361,6 +358,7 @@ class ContextPipeline:
         """Reset condensation-loop counters after a real LLM step."""
         pipe = dict(getattr(state, 'extra_data', {}).get('context_pipeline_state', {}))
         from backend.context.context_pipeline.types import _CONSECUTIVE_CONDENSATION_KEY
+
         pipe[_CONSECUTIVE_CONDENSATION_KEY] = 0
         state.set_extra('context_pipeline_state', pipe, source='ContextPipeline')
 
@@ -371,9 +369,7 @@ class ContextPipeline:
             return False
         llm_config = self._llm_config(state)
         events = self._project_layers_1_to_3(history, state, apply_tool_budget=False)
-        budget = ContextBudget.from_events(
-            events, llm_config=llm_config, state=state
-        )
+        budget = ContextBudget.from_events(events, llm_config=llm_config, state=state)
         view = getattr(state, 'view', None)
         explicit = bool(getattr(view, 'unhandled_condensation_request', False))
         turn_signals = getattr(state, 'turn_signals', None)
@@ -406,7 +402,9 @@ class ContextPipeline:
         )
         return events
 
-    def _extract_pre_condensation_snapshot(self, state: State, history: list[Event]) -> None:
+    def _extract_pre_condensation_snapshot(
+        self, state: State, history: list[Event]
+    ) -> None:
         bind_session_context(state=state)
         try:
             snapshot = extract_snapshot(history)
@@ -499,7 +497,9 @@ class ContextPipeline:
         """Lazily create and cache a StructuredSummaryCompactor."""
         if self._structured_compactor is not None:
             return self._structured_compactor
-        llm_config = getattr(self._config, 'llm_config', None) or self._llm_config(state)
+        llm_config = getattr(self._config, 'llm_config', None) or self._llm_config(
+            state
+        )
         if llm_config is None:
             return None
         from backend.context.compactor.strategies.structured_summary_compactor import (

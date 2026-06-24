@@ -217,6 +217,12 @@ class TestBufferSemantics:
         session._append_to_buffer('0;1;40;1_0;0;32;1_8;1;32;1_')
         assert session.peek() == ''
 
+    def test_append_strips_sgr_mouse_reports(self) -> None:
+        session = self._make_session(buffer_chars=8192)
+        payload = 'PS C:\\Users\\test> ' + '[555;117;1M[555;116;1M[444444;70;11M' * 20
+        session._append_to_buffer(payload)
+        assert session.peek() == 'PS C:\\Users\\test> '
+
 
 class TestTerminalChunkSanitizer:
     def test_preserves_plain_text(self) -> None:

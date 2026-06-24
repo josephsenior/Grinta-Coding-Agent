@@ -123,4 +123,3 @@ def test_load_dotenv_early_reads_settings_root_env(
     cli_main._load_dotenv_early()
 
     assert os.environ.get('LLM_API_KEY') == 'from-settings-root'
-

@@ -159,7 +159,9 @@ def _relax_security_risk_in_parameters(parameters: dict[str, Any]) -> dict[str, 
     return params
 
 
-def relax_security_risk_in_tool(tool: ChatCompletionToolParam) -> ChatCompletionToolParam:
+def relax_security_risk_in_tool(
+    tool: ChatCompletionToolParam,
+) -> ChatCompletionToolParam:
     """Make ``security_risk`` optional in a single tool schema."""
     relaxed = copy.deepcopy(tool)
     function = relaxed.get('function')

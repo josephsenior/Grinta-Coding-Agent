@@ -285,7 +285,9 @@ def create_multiedit_tool() -> ChatCompletionToolParam:
                     'required': ['command', 'path'],
                     'allOf': [
                         {
-                            'if': {'properties': {'command': {'const': 'replace_string'}}},
+                            'if': {
+                                'properties': {'command': {'const': 'replace_string'}}
+                            },
                             'then': {'required': ['old_string', 'new_string']},
                         },
                         {

@@ -22,12 +22,18 @@ def test_runs_cli_init_when_missing(tmp_path: Path, monkeypatch) -> None:
         assert cmd[:3] == ['/usr/bin/npx', '-y', '@rigour-labs/cli']
         assert cmd[3] == 'init'
         assert kwargs['cwd'] == tmp_path
-        (tmp_path / 'rigour.yml').write_text('version: 1\npreset: ui\n', encoding='utf-8')
+        (tmp_path / 'rigour.yml').write_text(
+            'version: 1\npreset: ui\n', encoding='utf-8'
+        )
         return subprocess.CompletedProcess(cmd, 0, '', '')
 
-    monkeypatch.setattr('backend.integrations.mcp.rigour_bootstrap.subprocess.run', _fake_run)
+    monkeypatch.setattr(
+        'backend.integrations.mcp.rigour_bootstrap.subprocess.run', _fake_run
+    )
     ensure_rigour_yml_for_mcp(None)
-    assert (tmp_path / 'rigour.yml').read_text(encoding='utf-8') == 'version: 1\npreset: ui\n'
+    assert (tmp_path / 'rigour.yml').read_text(
+        encoding='utf-8'
+    ) == 'version: 1\npreset: ui\n'
 
 
 def test_does_not_write_yml_when_cli_init_fails(tmp_path: Path, monkeypatch) -> None:
@@ -41,7 +47,9 @@ def test_does_not_write_yml_when_cli_init_fails(tmp_path: Path, monkeypatch) -> 
     )
     monkeypatch.setattr(
         'backend.integrations.mcp.rigour_bootstrap.subprocess.run',
-        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 1, '', 'network error'),
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0], 1, '', 'network error'
+        ),
     )
     ensure_rigour_yml_for_mcp(None)
     assert not (tmp_path / 'rigour.yml').exists()
@@ -69,9 +77,13 @@ def test_skips_when_rigour_yml_already_exists(tmp_path: Path, monkeypatch) -> No
     )
 
     def _should_not_run(*args, **kwargs):
-        raise AssertionError('subprocess.run should not be called when rigour.yml exists')
+        raise AssertionError(
+            'subprocess.run should not be called when rigour.yml exists'
+        )
 
-    monkeypatch.setattr('backend.integrations.mcp.rigour_bootstrap.subprocess.run', _should_not_run)
+    monkeypatch.setattr(
+        'backend.integrations.mcp.rigour_bootstrap.subprocess.run', _should_not_run
+    )
     ensure_rigour_yml_for_mcp(None)
     assert (tmp_path / 'rigour.yml').read_text(encoding='utf-8') == existing
 
@@ -89,7 +101,9 @@ def test_uses_rigour_cwd_from_env(tmp_path: Path, monkeypatch) -> None:
         (ws / 'rigour.yml').write_text('version: 1\n', encoding='utf-8')
         return subprocess.CompletedProcess(cmd, 0, '', '')
 
-    monkeypatch.setattr('backend.integrations.mcp.rigour_bootstrap.subprocess.run', _fake_run)
+    monkeypatch.setattr(
+        'backend.integrations.mcp.rigour_bootstrap.subprocess.run', _fake_run
+    )
     ensure_rigour_yml_for_mcp({'RIGOUR_CWD': str(ws)})
     assert (ws / 'rigour.yml').is_file()
     assert not (tmp_path / 'rigour.yml').exists()

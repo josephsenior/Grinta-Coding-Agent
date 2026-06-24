@@ -50,7 +50,9 @@ def needs_onboarding(config: AppConfig) -> bool:
         llm_cfg = config.get_llm_config()
         key = llm_cfg.api_key
         if key is not None:
-            raw = key.get_secret_value() if hasattr(key, 'get_secret_value') else str(key)
+            raw = (
+                key.get_secret_value() if hasattr(key, 'get_secret_value') else str(key)
+            )
             if raw and raw.strip():
                 return False
         if _is_local_llm_config(llm_cfg):

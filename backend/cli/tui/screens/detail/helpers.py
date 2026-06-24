@@ -87,7 +87,9 @@ def format_meta_chips(parts: list[str]) -> str:
     return f' [{TX_MUTED}]·[/] '.join(parts)
 
 
-def format_exit_chip(exit_code: int | None, *, is_background: bool = False) -> str | None:
+def format_exit_chip(
+    exit_code: int | None, *, is_background: bool = False
+) -> str | None:
     if is_background:
         return '[#6B9FD4]detached to background[/]'
     if exit_code is None:
@@ -154,13 +156,9 @@ def build_terminal_detail_content(
             )
         )
     if frame_parts:
-        widgets.append(
-            screen.terminal_frame(*frame_parts, title=frame_title[:48])
-        )
+        widgets.append(screen.terminal_frame(*frame_parts, title=frame_title[:48]))
     elif not command:
-        widgets.append(
-            screen.empty_state(empty_message, widget_id=empty_widget_id)
-        )
+        widgets.append(screen.empty_state(empty_message, widget_id=empty_widget_id))
 
     return widgets
 

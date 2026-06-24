@@ -594,7 +594,7 @@ def finalize_config(cfg: AppConfig) -> None:
     from backend.core.config.mcp_config import extend_mcp_servers_with_bundled_defaults
 
     _ensure_active_agent_compactor_llm(cfg)
-    agent_cfg = cfg.get_agent_config(cfg.default_agent)
+    cfg.get_agent_config(cfg.default_agent)
     from backend.utils.optional_extras import browser_tool_enabled
 
     cfg.enable_browser = browser_tool_enabled(cfg)

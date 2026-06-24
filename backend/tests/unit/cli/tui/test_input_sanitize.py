@@ -69,3 +69,24 @@ async def test_tui_input_removes_leaked_mouse_reports_live(mock_config):
         await pilot.pause()
 
         assert ta.text == 'hello'
+
+
+@pytest.mark.asyncio
+async def test_tui_input_poll_strips_leaked_mouse_reports(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        ta = s.query_one('#input', TextArea)
+        ta.text = (
+            'PS C:\\Users\\GIGABYTE\\Desktop\\New folder> '
+            + '[555;76;29M[222;1;38M' * 10
+        )
+        await pilot.pause(0.2)
+
+        assert '[555;76;29M' not in ta.text
+        assert ta.text == 'PS C:\\Users\\GIGABYTE\\Desktop\\New folder> '

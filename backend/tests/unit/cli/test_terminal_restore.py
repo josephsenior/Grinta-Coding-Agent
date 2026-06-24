@@ -26,7 +26,16 @@ def _reset_terminal_restore_state() -> None:
 
 def test_terminal_restore_sequences_contains_disable_codes() -> None:
     seq = tr.terminal_restore_sequences()
-    for token in ('1000l', '1002l', '1003l', '1006l', '1015l', '2004l', '1049l', '?25h'):
+    for token in (
+        '1000l',
+        '1002l',
+        '1003l',
+        '1006l',
+        '1015l',
+        '2004l',
+        '1049l',
+        '?25h',
+    ):
         assert token in seq
 
 
@@ -88,7 +97,9 @@ def test_install_and_uninstall_signal_hooks_round_trip() -> None:
 
 def test_signal_handler_restores_before_chaining(monkeypatch) -> None:
     calls: list[str] = []
-    monkeypatch.setattr(tr, 'restore_terminal_modes', lambda **_: calls.append('restore'))
+    monkeypatch.setattr(
+        tr, 'restore_terminal_modes', lambda **_: calls.append('restore')
+    )
     tr._prior_signal_handlers[signal.SIGINT] = lambda _signum, _frame: None
     tr._chain_signal_handler(signal.SIGINT, None)
     assert calls == ['restore']

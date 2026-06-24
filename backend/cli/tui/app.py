@@ -17,7 +17,6 @@ from textual.screen import Screen
 from backend.cli.display.hud import HUDBar
 from backend.cli.display.reasoning_display import ReasoningDisplay
 from backend.cli.theme import (
-    NAVY_BRAND,
     NAVY_ERROR,
     NAVY_READY,
     NAVY_RUNNING,
