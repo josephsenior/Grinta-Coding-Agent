@@ -117,7 +117,11 @@ def check_llm_config(*, model_hint: str | None = None) -> DoctorCheck:
     from backend.core.config.api_key_manager import api_key_manager
     from backend.core.config.config_loader import load_from_json
 
-    if model_hint and str(model_hint).strip() and str(model_hint).strip() != '(not set)':
+    if (
+        model_hint
+        and str(model_hint).strip()
+        and str(model_hint).strip() != '(not set)'
+    ):
         model = str(model_hint).strip()
         return DoctorCheck('model', True, model, critical=False)
 

@@ -39,7 +39,10 @@ def test_prompt_session_requires_tty_streams() -> None:
     piped_stream = MagicMock()
     piped_stream.isatty.return_value = False
 
-    with patch('backend.cli.repl.slash_command_registry._prompt_toolkit_available', return_value=True):
+    with patch(
+        'backend.cli.repl.slash_command_registry._prompt_toolkit_available',
+        return_value=True,
+    ):
         assert _supports_prompt_session(interactive_stream, interactive_stream) is True
     assert _supports_prompt_session(piped_stream, interactive_stream) is False
     assert _supports_prompt_session(interactive_stream, piped_stream) is False

@@ -139,7 +139,9 @@ class TestInteractiveInit:
 class TestQuickstartMain:
     def test_main_redirects_to_grinta_init(self, monkeypatch):
         run_init_mock = Mock(return_value=0)
-        monkeypatch.setattr('backend.cli.onboarding.init_wizard.run_init', run_init_mock)
+        monkeypatch.setattr(
+            'backend.cli.onboarding.init_wizard.run_init', run_init_mock
+        )
 
         with pytest.raises(SystemExit) as exc:
             quickstart.main()

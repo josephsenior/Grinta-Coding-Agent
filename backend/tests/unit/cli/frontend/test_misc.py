@@ -15,8 +15,6 @@ from backend.tests.unit.cli.helpers.slash_host import make_slash_host
 
 
 @pytest.mark.asyncio
-
-
 @pytest.mark.asyncio
 async def test_renderer_handles_error_observation() -> None:
     """ErrorObservation should be rendered with structured error panel."""
@@ -662,8 +660,6 @@ async def test_async_main_keeps_explicit_project_override(
 
 
 @pytest.mark.asyncio
-
-
 def test_find_sessions_root_uses_project_storage_root(tmp_path: Path) -> None:
     from backend.cli.session.session_manager import _find_sessions_root
 
@@ -675,32 +671,14 @@ def test_find_sessions_root_uses_project_storage_root(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-
-
 @pytest.mark.asyncio
-
-
 @pytest.mark.asyncio
-
-
 @pytest.mark.asyncio
-
-
 @pytest.mark.asyncio
-
-
 @pytest.mark.asyncio
-
-
 @pytest.mark.asyncio
-
-
 @pytest.mark.asyncio
-
-
 @pytest.mark.asyncio
-
-
 def test_start_live_passes_vertical_overflow_crop() -> None:
     """Rich Live must use ``crop`` (not ``visible``) for the Thinking panel.
 
@@ -1233,8 +1211,6 @@ def test_resume_command_with_session_id() -> None:
 
 
 @pytest.mark.asyncio
-
-
 def test_renderer_summarizes_plain_ripgrep_match_lines() -> None:
     summary = CLIEventRenderer._summarize_plain_match_lines(
         'backend/foo.py:12:match one\nbackend/bar.py:34:match two\n'

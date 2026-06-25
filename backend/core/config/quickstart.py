@@ -41,7 +41,9 @@ def generate_quickstart_config(
     """
     from backend.cli.onboarding.settings_defaults import build_init_settings
 
-    resolved_provider = provider or (model.split('/', 1)[0] if '/' in model else 'openai')
+    resolved_provider = provider or (
+        model.split('/', 1)[0] if '/' in model else 'openai'
+    )
     payload = build_init_settings(
         provider=resolved_provider,
         model=model,

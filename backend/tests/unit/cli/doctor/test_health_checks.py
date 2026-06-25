@@ -23,8 +23,6 @@ def test_collect_health_checks_uses_model_hint() -> None:
 def test_format_health_report_lines_marks_failures() -> None:
     from backend.cli.doctor.checks import DoctorCheck
 
-    lines = format_health_report_lines(
-        [DoctorCheck('git', False, 'not found on PATH')]
-    )
+    lines = format_health_report_lines([DoctorCheck('git', False, 'not found on PATH')])
     assert lines[0] == 'Self-check:'
     assert '[FAIL]' in lines[1]

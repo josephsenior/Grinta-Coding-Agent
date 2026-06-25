@@ -343,9 +343,7 @@ def show_current_interaction_mode(host: Any, valid_modes: tuple[str, ...]) -> No
         f'  {name:<6} — {_INTERACTION_MODE_HINTS[name]}' for name in valid_modes
     )
     host._renderer.add_system_message(
-        f'Mode: {mode}\n'
-        f'{mode_lines}\n'
-        f'Change with: /mode <{"|".join(valid_modes)}>',
+        f'Mode: {mode}\n{mode_lines}\nChange with: /mode <{"|".join(valid_modes)}>',
         title='mode',
     )
 
@@ -375,10 +373,14 @@ def apply_interaction_mode(host: Any, new_mode: str) -> None:
         controller = host._controller
         if controller is not None:
             agent = getattr(controller, 'agent', None)
-            running_config = getattr(agent, 'config', None) if agent is not None else None
-            if running_config is not None and normalize_interaction_mode(
-                getattr(running_config, 'mode', None)
-            ) == mode:
+            running_config = (
+                getattr(agent, 'config', None) if agent is not None else None
+            )
+            if (
+                running_config is not None
+                and normalize_interaction_mode(getattr(running_config, 'mode', None))
+                == mode
+            ):
                 return
 
     config = getattr(host, '_config', None)

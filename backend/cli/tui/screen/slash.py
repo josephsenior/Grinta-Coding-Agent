@@ -23,7 +23,9 @@ class _TUIRendererAdapter:
         elif title == 'error':
             severity = 'error'
         timeout = 8.0 if len(msg) > 200 else 6.0
-        prefix = f'[{title}] ' if title and title not in {'grinta', 'mode', 'status'} else ''
+        prefix = (
+            f'[{title}] ' if title and title not in {'grinta', 'mode', 'status'} else ''
+        )
         self._screen.notify(f'{prefix}{msg}', severity=severity, timeout=timeout)
 
     def add_markdown_block(self, title: str, body: str) -> None:

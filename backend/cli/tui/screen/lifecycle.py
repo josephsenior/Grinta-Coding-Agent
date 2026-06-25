@@ -349,4 +349,3 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
                 and self._environment_probe_task is None
             ):
                 ready.set()
-

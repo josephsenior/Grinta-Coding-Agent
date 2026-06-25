@@ -175,9 +175,9 @@ def status_fields_from_hud(hud: Any, bundled_skill_count: int) -> StatusFields:
         ledger_status=str(hud.ledger_status),
         agent_state_label=str(hud.agent_state_label or 'Ready').strip(),
         autonomy_level=str(hud.autonomy_level or 'balanced').strip().lower(),
-        interaction_mode=str(
-            getattr(hud, 'interaction_mode', None) or 'agent'
-        ).strip().lower(),
+        interaction_mode=str(getattr(hud, 'interaction_mode', None) or 'agent')
+        .strip()
+        .lower(),
         workspace_path=_shorten_home(
             str(getattr(hud, 'workspace_path', '') or '').strip()
         ),
