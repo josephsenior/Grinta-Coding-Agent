@@ -354,16 +354,17 @@ async def _ensure_controller_loop(
         except Exception:
             logger.debug('Could not set memory status callback', exc_info=True)
         host._controller = controller
-        from backend.cli.settings import sync_persisted_autonomy_to_controller
+        from backend.cli.settings.bootstrap_sync import sync_controller_persisted_settings
         from backend.core.constants import DEFAULT_AGENT_NAME
 
         agent_name = getattr(config, 'default_agent', None) or DEFAULT_AGENT_NAME
         if isinstance(agent_name, str):
             agent_name = agent_name.strip() or DEFAULT_AGENT_NAME
-        sync_persisted_autonomy_to_controller(
+        sync_controller_persisted_settings(
             controller,
             agent_name,
             config=config,
+            hud=getattr(host, '_hud', None),
         )
 
     current_state = controller.get_agent_state()

@@ -316,7 +316,7 @@ alongside built-in tools.
 **Date:** 2025-01 (reaffirmed 2026-03)  
 **Context:** Developers using a coding agent prefer a terminal-native interface over a browser-based one. A TUI avoids Node.js dependencies and integrates naturally into terminal workflows.
 
-**Decision:** Build the primary interactive surface as a Textual TUI for TTY sessions. Piped stdin uses the non-interactive runner (`backend/cli/repl_noninteractive.py`). Prompt-toolkit REPL code remains as shared slash-command and fallback infrastructure.
+**Decision:** Build the primary interactive surface as a Textual TUI for TTY sessions. Piped stdin uses the non-interactive runner (`backend/cli/repl/noninteractive.py`). Prompt-toolkit REPL code remains as shared slash-command and fallback infrastructure.
 
 **Consequences:**
 

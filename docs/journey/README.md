@@ -1,5 +1,7 @@
 # The Book of Grinta
 
+> **Not a product spec.** This memoir is historical narrative. For current install, settings, modes, and CLI behavior use [USER_GUIDE.md](../USER_GUIDE.md), [SETTINGS.md](../SETTINGS.md), and [ARCHITECTURE.md](../ARCHITECTURE.md). Do not configure Grinta from journey chapters.
+
 **An 8-month journey from multi-tenant SaaS to a coherent local-first coding agent.**
 
 By Youssef Mejdi, AI Engineering Student, 4th Year

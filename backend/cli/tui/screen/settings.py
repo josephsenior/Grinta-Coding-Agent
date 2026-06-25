@@ -18,7 +18,6 @@ from backend.cli.tui.widgets.small import (
 from backend.core.interaction_modes import (
     AGENT_MODE,
     VISIBLE_INTERACTION_MODES,
-    is_chat_mode,
     normalize_interaction_mode,
 )
 
@@ -149,43 +148,39 @@ class ScreenSettingsMixin:
         self._update_mode_extra_data(controller, mode)
 
     def _apply_mode_to_controller(self, controller, mode: str) -> None:
-        agent = getattr(controller, 'agent', None)
-        if agent is None:
-            return
-        running_config = getattr(agent, 'config', None)
-        if running_config is not None:
-            running_config.mode = mode
-        planner = getattr(agent, 'planner', None)
-        planner_config = getattr(planner, '_config', None)
-        if planner_config is not None:
-            planner_config.mode = mode
-        if planner is not None and hasattr(planner, 'build_toolset'):
-            try:
-                agent.tools = planner.build_toolset()
-            except Exception:
-                _tui_logger.debug(
-                    'Failed to rebuild toolset on mode change', exc_info=True
-                )
+        from backend.cli.settings.mode_runtime import apply_interaction_mode_to_controller
+
+        apply_interaction_mode_to_controller(controller, mode)
 
     def _update_mode_extra_data(self, controller, mode: str) -> None:
-        state = getattr(controller, 'state', None)
-        extra_data = getattr(state, 'extra_data', None) if state is not None else None
-        if not isinstance(extra_data, dict):
-            return
-        if is_chat_mode(mode):
-            extra_data.pop('active_run_mode', None)
-        else:
-            extra_data['active_run_mode'] = mode
+        from backend.cli.settings.mode_runtime import sync_active_run_mode_extra_data
+
+        sync_active_run_mode_extra_data(controller, mode)
 
     def _apply_mode(self, new_mode: str) -> None:
         mode = normalize_interaction_mode(new_mode, default='')
         if mode not in set(VISIBLE_INTERACTION_MODES):
             return
+        from backend.cli.settings import (
+            get_persisted_interaction_mode,
+            update_interaction_mode,
+        )
+
+        agent_name = self._active_agent_name()
+        previous = self._active_interaction_mode()
+        if (
+            previous == mode
+            and mode == get_persisted_interaction_mode(agent_name)
+        ):
+            return
         self._propagate_mode_to_agent(mode)
         self._render_hud_bar()
         self._update_input_identity(mode)
         self._toggle_autonomy_tabs_visibility(mode)
-        self.notify(f'Mode: {mode}', severity='information', timeout=2.0)
+        self._hud.update_interaction_mode(mode)
+        if previous != mode:
+            update_interaction_mode(mode, agent_name)
+            self.notify(f'Mode: {mode}', severity='information', timeout=2.0)
 
     def _apply_llm_config_to_active_session(self, config) -> str:
         controller = self._controller

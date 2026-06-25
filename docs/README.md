@@ -9,9 +9,9 @@ Choose a path:
 | Understand the system or contribute code | [Contributor Map](CONTRIBUTOR_MAP.md), [Architecture](ARCHITECTURE.md), [Developer Guide](DEVELOPER.md), [Vocabulary](VOCABULARY.md), [CI](CI.md), [Contributing](../CONTRIBUTING.md) |
 | Maintain releases and keep docs honest | [Release Checklist](RELEASE_CHECKLIST.md), [Fresh Machine Onboarding](FRESH_MACHINE_ONBOARDING.md), [Roadmap](../ROADMAP.md) |
 
-## The Book of Grinta (narrative)
+## The Book of Grinta (narrative — not a spec)
 
-Long-form engineering memoir and technical chapters: **[journey/README.md](journey/README.md)**. Start at [Preface: Why This Story Matters](journey/preface-why-this-story-matters.md). Journey chapters are historical narrative and may not reflect the current product surface.
+Long-form engineering memoir: **[journey/README.md](journey/README.md)**. These chapters are **historical narrative only**. They may describe removed features, old autonomy branching, or pre-RC architecture. **Do not use `docs/journey/` as a configuration or behavior reference.** For current behavior use [USER_GUIDE.md](USER_GUIDE.md), [SETTINGS.md](SETTINGS.md), and [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## More reference
 

@@ -21,7 +21,7 @@
     "additional_read_roots": []
   },
   "mcp_config": {
-    "enabled": true,
+    "enabled": false,
     "servers": [
       {
         "name": "shadcn",
@@ -33,7 +33,7 @@
           "--framework",
           "react"
         ],
-        "enabled": true,
+        "enabled": false,
         "usage_hint": "shadcn/ui React components: variants, props, CLI install, and registry lookups."
       },
       {
@@ -41,8 +41,8 @@
         "type": "stdio",
         "command": "npx",
         "args": ["-y", "@modelcontextprotocol/server-github"],
-        "enabled": true,
-        "usage_hint": "GitHub API for repos, issues, PRs, metadata. Set GITHUB_PERSONAL_ACCESS_TOKEN in .env.",
+        "enabled": false,
+        "usage_hint": "GitHub API for repos, issues, PRs, metadata. Set **GITHUB_PERSONAL_ACCESS_TOKEN** in `.env` (classic or fine-grained PAT with repo scope). Bad credentials = expired/revoked token or missing scopes.",
         "env": {
           "GITHUB_PERSONAL_ACCESS_TOKEN": ""
         }
@@ -52,8 +52,8 @@
         "type": "stdio",
         "command": "npx",
         "args": ["-y", "@rigour-labs/mcp"],
-        "enabled": true,
-        "usage_hint": "Rigour — local code governance / quality gates. Prefer rigour_check / rigour_status after substantive edits.",
+        "enabled": false,
+        "usage_hint": "**Rigour** — local code governance / quality gates. No API key. If the project has no `rigour.yml`, Grinta runs **`npx @rigour-labs/cli init`** before starting the MCP server (upstream `@rigour-labs/mcp` calls the broken `npx rigour init`). Prefer **`rigour_check`** / **`rigour_status`** after substantive edits. **`RIGOUR_CWD`** is the open workspace.",
         "env": {
           "RIGOUR_CWD": "${PROJECT_ROOT}"
         }

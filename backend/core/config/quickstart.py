@@ -122,16 +122,14 @@ def _interactive_init(dest: Path) -> None:
 
 def main() -> None:
     """CLI entry-point: ``python -m backend.core.config.quickstart``."""
-    import warnings
+    import sys
 
-    warnings.warn(
-        'backend.core.config.quickstart is deprecated; use `grinta init` instead.',
-        DeprecationWarning,
-        stacklevel=1,
+    sys.stderr.write(
+        'backend.core.config.quickstart is deprecated; use `grinta init` instead.\n'
     )
-    project_root = Path(os.environ.get('APP_PROJECT_ROOT', Path.cwd()))
-    dest = project_root / 'settings.json'
-    _interactive_init(dest)
+    from backend.cli.onboarding.init_wizard import run_init
+
+    raise SystemExit(run_init())
 
 
 if __name__ == '__main__':

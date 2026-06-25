@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from backend.cli.settings.onboarding import needs_onboarding
+import json
+
+from backend.cli.onboarding import needs_onboarding
 from backend.core.config import AppConfig
 
 
@@ -58,3 +60,48 @@ def test_ollama_init_settings_do_not_require_onboarding() -> None:
     llm_cfg.custom_llm_provider = 'ollama'
     llm_cfg.base_url = 'http://localhost:11434'
     assert needs_onboarding(config) is False
+
+
+def test_persist_env_detected_settings_writes_minimal_file(
+    tmp_path, monkeypatch,
+) -> None:
+    from pydantic import SecretStr
+
+    from backend.cli.onboarding.flow import persist_env_detected_settings
+    from backend.cli.onboarding.settings_defaults import default_init_security_block
+
+    settings_file = tmp_path / 'settings.json'
+    monkeypatch.setenv('APP_ROOT', str(tmp_path))
+
+    config = AppConfig()
+    llm_cfg = config.get_llm_config()
+    llm_cfg.api_key = SecretStr('sk-test-openai-key')
+    llm_cfg.model = 'openai/gpt-4.1'
+
+    assert persist_env_detected_settings(
+        config,
+        'openai',
+        api_key='sk-test-openai-key',
+    ) is True
+
+    data = json.loads(settings_file.read_text(encoding='utf-8'))
+    assert data['llm_provider'] == 'openai'
+    assert data['llm_model'] == 'openai/gpt-4.1'
+    assert data['security'] == default_init_security_block()
+    assert 'mcp_config' in data
+
+
+def test_persist_env_detected_settings_skips_existing_provider(
+    tmp_path, monkeypatch,
+) -> None:
+    from backend.cli.onboarding.flow import persist_env_detected_settings
+
+    settings_file = tmp_path / 'settings.json'
+    settings_file.write_text(
+        json.dumps({'llm_provider': 'anthropic', 'llm_model': 'anthropic/claude'}),
+        encoding='utf-8',
+    )
+    monkeypatch.setenv('APP_ROOT', str(tmp_path))
+
+    config = AppConfig()
+    assert persist_env_detected_settings(config, 'openai', api_key='sk-test') is False

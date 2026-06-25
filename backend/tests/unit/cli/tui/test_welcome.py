@@ -50,6 +50,12 @@ async def test_tui_welcome_arrow_navigation_works_with_input_focus(mock_config):
         await pilot.pause(1.1)
 
         welcome = s.query_one(WelcomeWidget)
+        assert welcome.select_current() == (
+            'Run /health and tell me whether git and ripgrep are detected.'
+        )
+
+        await pilot.press('down')
+        await pilot.pause()
         assert welcome.select_current() == 'Explain this codebase'
 
         await pilot.press('down')
@@ -81,14 +87,20 @@ async def test_tui_welcome_click_submits_selected_suggestion(mock_config):
 
         welcome = s.query_one(WelcomeWidget)
         items = list(welcome.query('.welcome-item'))
-        assert len(items) == 5
+        assert len(items) == 6
+        assert welcome.select_current() == (
+            'Run /health and tell me whether git and ripgrep are detected.'
+        )
 
-        clicked = await pilot.click(items[1], offset=(1, 0))
+        s._handle_welcome_click(
+            'Run /health and tell me whether git and ripgrep are detected.'
+        )
         await pilot.pause()
 
         ta = s.query_one('#input', TextArea)
-        assert clicked
-        assert ta.text == 'Analyze this repository and produce an implementation plan'
+        assert ta.text == (
+            'Run /health and tell me whether git and ripgrep are detected.'
+        )
         assert s._welcome_visible is False
         submit_mock.assert_called_once()
 

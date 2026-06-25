@@ -154,42 +154,15 @@ def cmd_cost(host: Any, parsed: Any) -> bool:
 
 
 def cmd_health(host: Any, parsed: Any) -> bool:
-    """Run a fast self-check.
-
-    Verifies debugpy (when installed), ripgrep, git, and model setup.
-    For a fuller standalone report, run ``grinta doctor`` outside the REPL.
-    """
+    """Run a fast self-check using the shared doctor check registry."""
     if host._reject_extra_args(parsed):
         return True
-    import shutil
+    from backend.cli.doctor.checks import collect_health_checks, format_health_report_lines
 
-    checks: list[tuple[str, bool, str]] = []
-
-    try:
-        import importlib
-
-        importlib.import_module('debugpy.adapter')
-        checks.append(('debugpy', True, 'importable'))
-    except Exception as exc:
-        checks.append(
-            (
-                'debugpy',
-                False,
-                f'not installed (pip install debugpy): {exc}',
-            )
-        )
-
-    for binary in ('rg', 'git'):
-        path = shutil.which(binary)
-        checks.append((binary, path is not None, path or 'not found on PATH'))
-
-    hud = host._hud.state
-    checks.append(('model', bool(hud.model), hud.model or 'not set'))
-
-    lines = ['Self-check:']
-    for name, ok, detail in checks:
-        mark = 'ok ' if ok else 'FAIL'
-        lines.append(f'  [{mark}] {name}: {detail}')
+    model_hint = getattr(host._hud.state, 'model', None)
+    checks = collect_health_checks(model_hint=model_hint)
+    lines = format_health_report_lines(checks)
+    lines.append('  For a fuller report, run `grinta doctor` outside the session.')
 
     if host._renderer is not None:
         host._renderer.add_system_message('\n'.join(lines), title='health')
@@ -253,6 +226,17 @@ def apply_autonomy_level(host: Any, new_level: str) -> None:
             ac.autonomy_level = new_level
             if previous != new_level:
                 update_autonomy_level(new_level, agent_name)
+            config = getattr(host, '_config', None)
+            if config is not None:
+                try:
+                    agent_config = config.get_agent_config(agent_name)
+                    agent_config.autonomy_level = new_level
+                    setattr(config, 'autonomy_level', new_level)
+                except Exception:
+                    pass
+            hud = getattr(host, '_hud', None)
+            if hud is not None and hasattr(hud, 'update_autonomy'):
+                hud.update_autonomy(new_level)
             if host._renderer is not None:
                 host._renderer.add_system_message(
                     f'Autonomy set to: {new_level}', title='autonomy'
@@ -293,4 +277,123 @@ def handle_autonomy_command(host: Any, parsed: Any) -> None:
 
 def cmd_autonomy(host: Any, parsed: Any) -> bool:
     handle_autonomy_command(host, parsed)
+    return True
+
+
+def get_current_interaction_mode(host: Any) -> str:
+    from backend.core.interaction_modes import normalize_interaction_mode
+
+    controller = host._controller
+    if controller is not None:
+        agent = getattr(controller, 'agent', None)
+        running_config = getattr(agent, 'config', None) if agent is not None else None
+        if running_config is not None:
+            mode = getattr(running_config, 'mode', None)
+            if mode:
+                return normalize_interaction_mode(mode)
+    config = getattr(host, '_config', None)
+    if config is not None:
+        try:
+            agent_name = _host_active_agent_name(host)
+            agent_config = config.get_agent_config(agent_name)
+            return normalize_interaction_mode(getattr(agent_config, 'mode', None))
+        except Exception:
+            pass
+    from backend.cli.settings import get_persisted_interaction_mode
+
+    persisted = get_persisted_interaction_mode(_host_active_agent_name(host))
+    if persisted:
+        return persisted
+    return 'agent'
+
+
+def show_current_interaction_mode(host: Any, valid_modes: tuple[str, ...]) -> None:
+    from backend.cli.repl.slash_command_registry import _INTERACTION_MODE_HINTS
+
+    mode = get_current_interaction_mode(host)
+    if host._renderer is None:
+        return
+    mode_lines = '\n'.join(
+        f'  {name:<6} — {_INTERACTION_MODE_HINTS[name]}' for name in valid_modes
+    )
+    host._renderer.add_system_message(
+        f'Mode: {mode}\n'
+        f'{mode_lines}\n'
+        f'Change with: /mode <{"|".join(valid_modes)}>',
+        title='mode',
+    )
+
+
+def apply_interaction_mode(host: Any, new_mode: str) -> None:
+    from backend.cli.settings import get_persisted_interaction_mode, update_interaction_mode
+    from backend.cli.settings.mode_runtime import apply_interaction_mode_to_controller
+    from backend.core.interaction_modes import VISIBLE_INTERACTION_MODES, normalize_interaction_mode
+
+    mode = normalize_interaction_mode(new_mode)
+    if mode not in VISIBLE_INTERACTION_MODES:
+        return
+
+    apply_mode_hook = getattr(host, '_apply_mode', None)
+    if callable(apply_mode_hook):
+        apply_mode_hook(mode)
+        return
+
+    agent_name = _host_active_agent_name(host)
+    if mode == get_persisted_interaction_mode(agent_name):
+        controller = host._controller
+        if controller is not None:
+            agent = getattr(controller, 'agent', None)
+            running_config = getattr(agent, 'config', None) if agent is not None else None
+            if running_config is not None and normalize_interaction_mode(
+                getattr(running_config, 'mode', None)
+            ) == mode:
+                return
+
+    config = getattr(host, '_config', None)
+    if config is not None:
+        try:
+            agent_config = config.get_agent_config(agent_name)
+            agent_config.mode = mode
+        except Exception:
+            pass
+
+    controller = getattr(host, '_controller', None)
+    if controller is not None:
+        apply_interaction_mode_to_controller(controller, mode)
+
+    update_interaction_mode(mode, agent_name)
+    hud = getattr(host, '_hud', None)
+    if hud is not None and hasattr(hud, 'update_interaction_mode'):
+        hud.update_interaction_mode(mode)
+    if host._renderer is not None:
+        host._renderer.add_system_message(f'Mode set to: {mode}', title='mode')
+
+
+def handle_interaction_mode_command(host: Any, parsed: Any) -> None:
+    from backend.cli.repl.slash_command_registry import _INTERACTION_MODE_HINTS
+
+    valid_modes = tuple(_INTERACTION_MODE_HINTS)
+
+    if not parsed.args:
+        show_current_interaction_mode(host, valid_modes)
+        return
+
+    if len(parsed.args) > 1:
+        host._warn(f'Usage: {host._usage(parsed.name)}')
+        return
+
+    new_mode = parsed.args[0].lower()
+    if new_mode not in valid_modes:
+        if host._renderer is not None:
+            host._renderer.add_system_message(
+                f"Invalid mode '{new_mode}'. Use: {', '.join(valid_modes)}",
+                title='warning',
+            )
+        return
+
+    apply_interaction_mode(host, new_mode)
+
+
+def cmd_mode(host: Any, parsed: Any) -> bool:
+    handle_interaction_mode_command(host, parsed)
     return True

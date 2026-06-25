@@ -140,6 +140,8 @@ class GrintaScreen(
         '/help': '/help [--all|--search <term>|<command>]',
         '/clear': '/clear',
         '/settings': '/settings',
+        '/mode': '/mode [chat|plan|agent]',
+        '/health': '/health',
         '/sessions': '/sessions [list] [--limit N] [--search TERM] [--sort updated|created|events|cost|model] [--preview N|ID] [--delete N|ID ...]',
         '/resume': '/resume <N|session_id>',
         '/quit': '/quit',

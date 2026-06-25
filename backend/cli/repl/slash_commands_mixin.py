@@ -1,9 +1,7 @@
-"""Slash-command and inspection mixin for :class:`backend.cli.repl.Repl`.
+"""Slash-command handlers shared by TUI and non-interactive CLI.
 
-Holds the ``/checkpoint``, ``/autonomy`` and slash-command handlers so the
-main REPL module can stay close to the project's per-file LOC budget.
-
-The mixin assumes the host class provides:
+The host class (TUI screen or test double) must provide attributes and helpers
+listed below. Command bodies live in sibling ``slash_command_*`` modules.
 
 * attributes: ``_renderer``, ``_console``, ``_config``, ``_hud``,
   ``_controller``, ``_event_stream``, ``_next_action``, ``_pending_resume``,
@@ -200,6 +198,11 @@ class SlashCommandsMixin:
         import backend.cli.repl.slash_command_status as _status
 
         return _status.cmd_autonomy(self, parsed)
+
+    def _cmd_mode(self, parsed: Any) -> bool:
+        import backend.cli.repl.slash_command_status as _status
+
+        return _status.cmd_mode(self, parsed)
 
     # -- diff forwarders ---------------------------------------------------
 

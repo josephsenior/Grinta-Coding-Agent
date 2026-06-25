@@ -64,6 +64,8 @@ Record:
 - Pass / fail for: install, init, TUI launch, first task
 - Notes (errors, friction, screenshots)
 
+File each report under [onboarding_reports/](onboarding_reports/) using [REPORT_TEMPLATE.md](onboarding_reports/REPORT_TEMPLATE.md) and update the tracking matrix in [onboarding_reports/README.md](onboarding_reports/README.md).
+
 ### B. Source `uv` checkout (required ×3)
 
 Prerequisites: Python 3.12+, [uv](https://docs.astral.sh/uv/).

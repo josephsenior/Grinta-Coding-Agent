@@ -81,8 +81,17 @@ may be present in the user's working directory. The resolved path runs
 - TTY stdin -> `backend.cli.tui.main`, the Textual application with transcript cards, HUD, dialogs, and keyboard shortcuts.
 - Non-TTY stdin -> `backend.cli.repl.noninteractive`, for scripted/piped one-shot runs.
 
-The legacy prompt-toolkit REPL still exists as support code and fallback logic,
-but the current interactive product surface is the Textual TUI.
+Interactive UX is the Textual TUI only. The `backend/cli/repl/` package holds slash-command handlers and the non-interactive runner.
+
+### CLI surfaces
+
+| Surface | Path | Role |
+| --- | --- | --- |
+| **Textual TUI** (product) | `backend/cli/tui/` | Default when stdin is a TTY. Full HUD, slash commands, sessions dialog, mode/autonomy controls. |
+| **Slash-command layer** | `backend/cli/repl/slash_command_*` | Shared `/help`, `/mode`, `/health`, etc. Used by TUI and tests. |
+| **Non-interactive** | `backend/cli/repl/noninteractive.py` | Piped stdin / one-shot automation. |
+
+New UX work lands in the TUI; keep slash-command handlers thin when parity is required (for example `/mode`, `/autonomy`, `/health`).
 
 ## Orchestration Layer
 
@@ -122,7 +131,7 @@ Design intent:
 ### Middleware Pipeline
 
 The orchestrator uses a middleware pipeline (assembled in
-`backend/orchestration/session_orchestrator_mixins/_session_orchestrator_lifecycle_mixin.py`)
+`backend/orchestration/mixins/_session_orchestrator_lifecycle_mixin.py`)
 for cross-cutting concerns:
 
 ```python

@@ -20,17 +20,25 @@ backend/cli/
 ├── session/
 │   ├── session_manager.py
 │   └── sessions_cli.py
-├── settings/                      # App settings I/O, onboarding, MCP
+├── settings/                      # App settings I/O, MCP, mode runtime
 │   ├── constants.py, storage.py, query.py
-│   ├── onboarding.py, mcp.py
+│   ├── mode_runtime.py
+│   ├── mcp.py
 │   ├── settings_tui.py
 │   └── confirmation.py
-├── onboarding/
-│   └── init_wizard.py
-├── repl/                          # REPL session + slash commands
-│   ├── session.py                 # Repl class (public: from backend.cli.repl import Repl)
+├── doctor/                        # grinta doctor + shared /health checks
+│   ├── checks.py
+│   └── doctor_cli.py
+├── onboarding/                    # First-run init wizard + flow
+│   ├── flow.py
+│   ├── init_wizard.py
+│   ├── settings_defaults.py
+│   ├── connection_check.py
+│   └── provider_presets.py
+├── repl/                          # Slash commands + non-interactive runner
+│   ├── noninteractive.py
 │   ├── slash_command_registry.py
-│   └── …                          # mixins, slash_command_*, run_helpers_*
+│   └── slash_command_*.py
 ├── tool_display/                  # Rich tool renderers + orient_tools.py
 ├── event_rendering/
 │   ├── unified_renderer/          # ActivityCard + ActivityRenderer
@@ -54,7 +62,7 @@ backend/cli/
 - **Sessions:** `from backend.cli.session import session_manager`
 - **Settings:** `from backend.cli.settings import get_current_model`, etc.
 - **Settings UI:** `from backend.cli.settings.settings_tui import …`
-- **REPL:** `from backend.cli.repl import Repl`; helpers in `repl/noninteractive.py`, `repl/debug.py`
+- **REPL:** `from backend.cli.repl import run_noninteractive`; slash helpers in `repl/slash_command_*`
 - **Session maintenance:** `from backend.cli.session.storage_cleanup import …`
 - **Activity cards:** `from backend.cli.event_rendering.unified_renderer import ActivityRenderer`
 - **Event renderer mixins:** `from backend.cli.event_rendering.observations import ObservationRenderersMixin`
@@ -74,6 +82,8 @@ Advisory: `backend/scripts/verify/check_file_size.py`
 
 ```
 backend/tests/unit/cli/
+├── doctor/       # grinta doctor + /health
+├── settings/     # mode_runtime, interaction mode persistence
 ├── frontend/     # REPL, HUD, event renderer
 └── tui/          # Headless TUI
 ```
@@ -97,6 +107,8 @@ their module (`screen/lifecycle.py` → `ScreenLifecycleMixin`,
 
 | Area | Notes |
 |------|-------|
+| Dual renderer consolidation | Share traits between `event_rendering/` and `tui/renderer/handlers/` when adding observation types |
+| TUI screen decomposition | `lifecycle.py`, `input.py`, `state.py` exceed soft LOC budget; bootstrap sync extracted to `settings/bootstrap_sync.py` |
 | `screen/communicate.py` | Maintained for `communicate_with_user` action types; `ask_user` covers newer flows |
 | Integration-fast CI | Optional speedup |
 | Mypy ratchet | Type-check tightening |

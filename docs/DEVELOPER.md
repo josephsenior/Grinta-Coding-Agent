@@ -109,7 +109,7 @@ Execution internals live under `backend/execution/`.
 Important entrypoints:
 
 - console runtime usage through orchestrator
-- runtime executor implementation in `backend.execution.action_execution_server`
+- runtime executor implementation in `backend.execution.server.action_execution_server`
 - native browser helpers in `backend.execution.browser`
 - DAP/debugger helpers in `backend.execution.dap`
 - MCP runtime/proxy helpers in `backend.execution.mcp`
@@ -142,8 +142,8 @@ Runtime/session state is stored under `~/.grinta/workspaces/<id>/storage`, not u
 ### Interface paths
 
 - TTY startup path: `launch/entry.py` -> `backend/cli/entry.py` -> `backend/cli/main.py` -> `backend/cli/tui/main.py`.
-- Non-interactive path: `backend/cli/main.py` -> `backend/cli/repl_noninteractive.py`.
-- Prompt-toolkit REPL support lives in `backend/cli/repl/` (`session.py` plus slash-command modules); keep it working when changing shared slash-command behavior.
+- Non-interactive path: `backend/cli/main.py` -> `backend/cli/repl/noninteractive.py`.
+- Slash-command handlers live in `backend/cli/repl/slash_command_*`; the Textual TUI is the interactive surface. Keep slash-command behavior consistent when changing shared handlers.
 
 ### Security boundary
 

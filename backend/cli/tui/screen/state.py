@@ -475,6 +475,8 @@ class ScreenStateMixin:
         model_display = model_short if model_short != '(not set)' else '(not set)'
         autonomy = self._current_autonomy_level()
         hud.update_autonomy(autonomy)
+        current_mode = self._active_interaction_mode()
+        hud.update_interaction_mode(current_mode)
 
         workspace = self._resolve_workspace_display(hud.state.workspace_path)
         term_width = getattr(getattr(self, 'size', None), 'width', None) or 120

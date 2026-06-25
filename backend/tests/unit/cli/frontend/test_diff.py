@@ -13,6 +13,7 @@ from backend.tests.unit.cli.frontend._shared import (
     _make_config,
     _make_console,
 )
+from backend.tests.unit.cli.helpers.slash_host import make_slash_host
 
 
 def test_diff_panel_new_file() -> None:
@@ -126,9 +127,9 @@ def test_diff_panel_extracts_diff_preview_block() -> None:
 def test_diff_command_uses_configured_project_root(tmp_path: Path) -> None:
     config = _make_config()
     config.project_root = str(tmp_path)
-    repl = Repl(config, Console(file=io.StringIO(), force_terminal=False))
+    host = make_slash_host(tmp_path)
     mock_renderer = MagicMock()
-    repl.set_renderer(mock_renderer)
+    host.set_renderer(mock_renderer)
     completed = subprocess.CompletedProcess(
         args=['git', 'diff'], returncode=0, stdout='src/app.py\n', stderr=''
     )
@@ -137,7 +138,7 @@ def test_diff_command_uses_configured_project_root(tmp_path: Path) -> None:
         'backend.cli.repl.slash_commands_mixin.subprocess.run',
         return_value=completed,
     ) as run_git:
-        result = repl.handle_command('/diff --name-only "src/app file.py"')
+        result = host.handle_command('/diff --name-only "src/app file.py"')
 
     assert result is True
     run_git.assert_called_once()

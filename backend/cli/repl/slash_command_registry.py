@@ -19,11 +19,9 @@ real implementations live in the ``_slash_registry_*`` siblings:
   helper.
 
 The prompt-toolkit availability check and the TTY-stream guard stay in
-this module so that the two existing test patches
-(``backend.cli.repl.session._prompt_toolkit_available`` and
-``backend.cli.repl.slash_command_registry._prompt_toolkit_available``)
-continue to resolve the same module-level binding that the
-``_supports_prompt_session`` lookup consults.
+this module so test patches against
+``backend.cli.repl.slash_command_registry._prompt_toolkit_available``
+resolve the same binding that ``_supports_prompt_session`` consults.
 """
 
 from __future__ import annotations
@@ -36,6 +34,7 @@ from backend.cli.repl.slash_registry_clipboard import (
 )
 from backend.cli.repl.slash_registry_commands import (
     _AUTONOMY_LEVEL_HINTS,
+    _INTERACTION_MODE_HINTS,
     _COMMAND_ALIASES,
     _COMMAND_NAMES,
     _KNOWN_MODELS,
@@ -148,6 +147,7 @@ __all__ = [
     'SlashCommandParseError',
     'SlashCommandSpec',
     '_AUTONOMY_LEVEL_HINTS',
+    '_INTERACTION_MODE_HINTS',
     '_COMMAND_ALIASES',
     '_COMMAND_NAMES',
     '_CSI_OSC_DCS',

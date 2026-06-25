@@ -41,3 +41,17 @@ def test_settings_template_loads_without_schema_drift(template_path: Path) -> No
     orchestrator = cfg.get_agent_config(DEFAULT_AGENT_NAME)
     assert orchestrator.autonomy_level == 'balanced'
     assert cfg.security.execution_profile == 'standard'
+
+
+def test_settings_template_mcp_matches_defaults() -> None:
+    from backend.core.config.mcp_defaults import default_user_mcp_config
+
+    data = json.loads(_TEMPLATE_PATH.read_text(encoding='utf-8'))
+    assert data['mcp_config'] == default_user_mcp_config()
+
+
+def test_settings_template_security_matches_init_defaults() -> None:
+    from backend.cli.onboarding.settings_defaults import default_init_security_block
+
+    data = json.loads(_TEMPLATE_PATH.read_text(encoding='utf-8'))
+    assert data['security'] == default_init_security_block()

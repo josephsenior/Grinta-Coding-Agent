@@ -1,5 +1,9 @@
-"""REPL session, slash commands, and run helpers."""
+"""Slash commands, non-interactive CLI, and shared REPL helpers.
 
-from backend.cli.repl.session import Repl
+Production entry points: TUI (:mod:`backend.cli.tui`) and
+:func:`backend.cli.repl.noninteractive.run_noninteractive` for piped input.
+"""
 
-__all__ = ['Repl']
+from backend.cli.repl.noninteractive import run_noninteractive
+
+__all__ = ['run_noninteractive']

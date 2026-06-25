@@ -15,11 +15,11 @@ from backend.cli.settings.mcp import (
     update_mcp_server,
 )
 
-# Test hook
-from backend.cli.settings.onboarding import (
+from backend.cli.onboarding import (
     _test_llm_call,  # noqa: F401
     auto_detect_api_keys,
     needs_onboarding,
+    persist_env_detected_settings,
     run_onboarding,
 )
 from backend.cli.settings.query import (
@@ -30,12 +30,15 @@ from backend.cli.settings.query import (
     get_current_provider,
     get_masked_api_key,
     get_persisted_autonomy_level,
+    get_persisted_interaction_mode,
     get_persisted_reasoning_effort,
     sync_persisted_autonomy_to_controller,
+    sync_persisted_interaction_mode_to_controller,
     update_api_key,
     update_autonomy_level,
     update_budget,
     update_cli_tool_icons,
+    update_interaction_mode,
     update_model,
     update_reasoning_effort,
 )
@@ -64,9 +67,12 @@ __all__ = [
     'get_mcp_server',
     'get_mcp_servers',
     'get_persisted_autonomy_level',
+    'get_persisted_interaction_mode',
     'get_persisted_reasoning_effort',
     'mcp_server_endpoint',
     'sync_persisted_autonomy_to_controller',
+    'sync_persisted_interaction_mode_to_controller',
+    'persist_env_detected_settings',
     'needs_onboarding',
     'remove_mcp_server',
     'run_onboarding',
@@ -75,6 +81,7 @@ __all__ = [
     'update_autonomy_level',
     'update_budget',
     'update_cli_tool_icons',
+    'update_interaction_mode',
     'update_model',
     'update_mcp_server',
     'update_reasoning_effort',

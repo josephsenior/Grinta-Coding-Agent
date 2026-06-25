@@ -40,7 +40,7 @@ def test_prompt_session_requires_tty_streams() -> None:
     piped_stream = MagicMock()
     piped_stream.isatty.return_value = False
 
-    with patch('backend.cli.repl.session._prompt_toolkit_available', return_value=True):
+    with patch('backend.cli.repl.slash_command_registry._prompt_toolkit_available', return_value=True):
         assert _supports_prompt_session(interactive_stream, interactive_stream) is True
     assert _supports_prompt_session(piped_stream, interactive_stream) is False
     assert _supports_prompt_session(interactive_stream, piped_stream) is False
@@ -160,15 +160,6 @@ def test_command_completer_suggests_diff_modes() -> None:
     assert [completion.text for completion in completions] == ['--name-only']
 
 
-def test_prompt_message_uses_clean_follow_up_prompt() -> None:
-    repl = Repl(_make_config(), _make_console())
-    renderer = MagicMock()
-    renderer.current_state = AgentState.AWAITING_USER_INPUT
-    repl.set_renderer(renderer)
-
-    assert repl._prompt_message() == '❯ '
-
-
 def test_configure_redirected_streams_uses_utf8_for_non_tty() -> None:
     redirected = MagicMock()
     redirected.isatty.return_value = False
@@ -201,65 +192,6 @@ def test_read_piped_stdin_reads_non_tty_once() -> None:
         assert _read_piped_stdin() == 'queued task\n'
 
 
-def test_autonomy_command_shows_default_level() -> None:
-    """_handle_autonomy_command with no arg shows current level."""
-    repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
-    mock_renderer = MagicMock()
-    repl.set_renderer(mock_renderer)
-
-    repl.handle_autonomy_command('/autonomy')
-    mock_renderer.add_system_message.assert_called_once()
-    call_text = mock_renderer.add_system_message.call_args[0][0]
-    assert 'balanced' in call_text
-
-
-def test_prompt_toolbar_reflects_state_and_autonomy() -> None:
-    repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
-    # PAUSED is collapsed to STOPPED in CLI — label shows "Stopped"
-    repl.set_renderer(type('RendererStub', (), {'current_state': AgentState.STOPPED})())
-
-    autonomy_controller = MagicMock()
-    autonomy_controller.autonomy_level = 'full'
-    controller = MagicMock()
-    controller.autonomy_controller = autonomy_controller
-    repl.set_controller(controller)
-    repl._hud.update_model('openai/google/gemini-3-flash-preview')
-
-    toolbar = repl._prompt_toolbar_text()
-
-    assert 'Stopped' in toolbar
-    assert 'Autonomy: Full' in toolbar
-    assert 'Tab for commands' in toolbar
-    assert 'provider: google' in toolbar
-    assert 'model: gemini-3-flash-preview' in toolbar
-
-
-def test_unknown_command_suggests_closest_match() -> None:
-    repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
-    mock_renderer = MagicMock()
-    repl.set_renderer(mock_renderer)
-
-    result = repl.handle_command('/stat')
-
-    assert result is True
-    message = mock_renderer.add_system_message.call_args[0][0]
-    assert '/status' in message
-    assert 'autocomplete' in message
-
-
-def test_help_command_can_show_single_command_topic() -> None:
-    repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
-    mock_renderer = MagicMock()
-    repl.set_renderer(mock_renderer)
-
-    result = repl.handle_command('/help diff')
-
-    assert result is True
-    mock_renderer.add_markdown_block.assert_called_once()
-    markdown = mock_renderer.add_markdown_block.call_args[0][1]
-    assert '/diff [--stat|--name-only|--patch] [path]' in markdown
-
-
 def test_help_markdown_is_scannable_without_adding_commands() -> None:
     markdown = _build_help_markdown()
 
@@ -274,20 +206,3 @@ def test_help_markdown_lists_ci_and_release_playbook_commands() -> None:
 
     assert '/ci' in markdown
     assert '/release' in markdown
-
-
-def test_autonomy_command_sets_level() -> None:
-    """_handle_autonomy_command with a valid level should update the controller."""
-    repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
-    mock_renderer = MagicMock()
-    repl.set_renderer(mock_renderer)
-
-    ac = MagicMock()
-    ac.autonomy_level = 'balanced'
-    controller = MagicMock()
-    controller.autonomy_controller = ac
-    repl.set_controller(controller)
-
-    repl.handle_autonomy_command('/autonomy full')
-    assert ac.autonomy_level == 'full'
-    mock_renderer.add_system_message.assert_called_once()

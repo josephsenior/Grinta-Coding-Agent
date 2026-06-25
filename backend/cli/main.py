@@ -501,6 +501,7 @@ async def _ensure_onboarded(
         auto_detect_api_keys,
         ensure_default_model,
         needs_onboarding,
+        persist_env_detected_settings,
         run_onboarding,
     )
 
@@ -518,6 +519,23 @@ async def _ensure_onboarded(
 
     detected_provider = auto_detect_api_keys(config)
     if detected_provider and not needs_onboarding(config):
+        llm_cfg = config.get_llm_config()
+        api_key = None
+        if llm_cfg.api_key is not None:
+            api_key = (
+                llm_cfg.api_key.get_secret_value()
+                if hasattr(llm_cfg.api_key, 'get_secret_value')
+                else str(llm_cfg.api_key)
+            )
+        if persist_env_detected_settings(
+            config,
+            detected_provider,
+            api_key=api_key,
+        ):
+            console.print(
+                f'  [{MSG_STYLE_SUCCESS_MARK}]{mark_ok()}[/] Saved detected credentials '
+                'to [bold]settings.json[/bold] for future runs.',
+            )
         console.print(
             f'  [{MSG_STYLE_SUCCESS_MARK}]{mark_ok()}[/] Auto-detected API key from '
             f'environment ([{MSG_STYLE_PROVIDER_HINT}]{detected_provider}[/])',

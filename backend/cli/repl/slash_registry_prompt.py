@@ -21,6 +21,7 @@ from typing import Any, Callable
 
 from backend.cli.repl.slash_registry_commands import (
     _AUTONOMY_LEVEL_HINTS,
+    _INTERACTION_MODE_HINTS,
     _KNOWN_MODELS,
     iter_command_completion_entries,
 )
@@ -68,6 +69,17 @@ def build_command_completer(
                     if level.startswith(lowered_prefix):
                         yield Completion(
                             level,
+                            start_position=-len(argument_prefix),
+                            display_meta=description,
+                        )
+                return
+
+            if canonical_command == '/mode':
+                lowered_prefix = argument_prefix.lower()
+                for mode_name, description in _INTERACTION_MODE_HINTS.items():
+                    if mode_name.startswith(lowered_prefix):
+                        yield Completion(
+                            mode_name,
                             start_position=-len(argument_prefix),
                             display_meta=description,
                         )

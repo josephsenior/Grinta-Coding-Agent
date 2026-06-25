@@ -21,7 +21,7 @@ from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
 logger = logging.getLogger(__name__)
 _console = Console(no_color=no_color_enabled())
 
-from backend.cli.settings.onboarding import (
+from backend.cli.onboarding.flow import (
     _default_model_for_api_key,
     _default_model_from_environment,
 )
@@ -228,6 +228,54 @@ def sync_persisted_autonomy_to_controller(
     return level
 
 
+def sync_persisted_interaction_mode_to_controller(
+    controller: Any,
+    agent_name: str | None = None,
+    *,
+    config: Any | None = None,
+) -> str:
+    """Apply settings.json interaction mode to the live controller.
+
+    Returns the effective mode on the controller after sync.
+    """
+    from backend.cli.settings.mode_runtime import apply_interaction_mode_to_controller
+    from backend.core.constants import DEFAULT_AGENT_NAME
+    from backend.core.interaction_modes import normalize_interaction_mode
+
+    mode = get_persisted_interaction_mode(agent_name)
+    if not mode:
+        agent = getattr(controller, 'agent', None)
+        running_config = getattr(agent, 'config', None) if agent is not None else None
+        if running_config is not None:
+            return normalize_interaction_mode(getattr(running_config, 'mode', None))
+        if config is not None:
+            try:
+                target = (agent_name or DEFAULT_AGENT_NAME).strip() or DEFAULT_AGENT_NAME
+                agent_config = config.get_agent_config(target)
+                return normalize_interaction_mode(getattr(agent_config, 'mode', None))
+            except Exception:
+                logger.debug(
+                    'Could not read interaction mode from config during sync',
+                    exc_info=True,
+                )
+        return 'agent'
+
+    target_agent = (agent_name or DEFAULT_AGENT_NAME).strip() or DEFAULT_AGENT_NAME
+    if config is not None:
+        try:
+            agent_config = config.get_agent_config(target_agent)
+            agent_config.mode = mode
+            setattr(config, 'mode', mode)
+        except Exception:
+            logger.debug(
+                'Could not mirror persisted interaction mode onto config',
+                exc_info=True,
+            )
+
+    apply_interaction_mode_to_controller(controller, mode)
+    return mode
+
+
 def get_persisted_autonomy_level(agent_name: str | None = None) -> str:
     """Return the user-configured autonomy level from settings.json (empty = default)."""
     from backend.core.autonomy import normalize_autonomy_level
@@ -280,6 +328,66 @@ def update_autonomy_level(level: str, agent_name: str | None = None) -> None:
     if not isinstance(agent_entry, dict):
         agent_entry = {}
     agent_entry['autonomy_level'] = normalized
+    agent_section[target_agent] = agent_entry
+    settings['agent'] = agent_section
+    _save_raw_settings(settings)
+
+
+def get_persisted_interaction_mode(agent_name: str | None = None) -> str:
+    """Return the user-configured interaction mode from settings.json (empty = default)."""
+    from backend.core.constants import DEFAULT_AGENT_NAME
+    from backend.core.interaction_modes import normalize_interaction_mode
+
+    agent_section = _load_raw_settings().get('agent')
+    if not isinstance(agent_section, dict):
+        return ''
+
+    candidate_names: list[str] = []
+    if agent_name and agent_name.strip():
+        candidate_names.append(agent_name.strip())
+    for fallback in (DEFAULT_AGENT_NAME, 'agent'):
+        if fallback not in candidate_names:
+            candidate_names.append(fallback)
+    for name, entry in agent_section.items():
+        if (
+            isinstance(name, str)
+            and isinstance(entry, dict)
+            and 'mode' in entry
+            and name not in candidate_names
+        ):
+            candidate_names.append(name)
+
+    for name in candidate_names:
+        entry = agent_section.get(name)
+        if not isinstance(entry, dict):
+            continue
+        mode = normalize_interaction_mode(entry.get('mode'), default='')
+        if mode:
+            return mode
+    return ''
+
+
+def update_interaction_mode(mode: str, agent_name: str | None = None) -> None:
+    """Persist interaction mode without touching other agent fields."""
+    from backend.core.constants import DEFAULT_AGENT_NAME
+    from backend.core.interaction_modes import (
+        VALID_INTERACTION_MODES,
+        normalize_interaction_mode,
+    )
+
+    normalized = normalize_interaction_mode(mode)
+    if normalized not in VALID_INTERACTION_MODES:
+        return
+
+    target_agent = (agent_name or DEFAULT_AGENT_NAME).strip() or DEFAULT_AGENT_NAME
+    settings = _load_raw_settings()
+    agent_section = settings.get('agent')
+    if not isinstance(agent_section, dict):
+        agent_section = {}
+    agent_entry = agent_section.get(target_agent)
+    if not isinstance(agent_entry, dict):
+        agent_entry = {}
+    agent_entry['mode'] = normalized
     agent_section[target_agent] = agent_entry
     settings['agent'] = agent_section
     _save_raw_settings(settings)

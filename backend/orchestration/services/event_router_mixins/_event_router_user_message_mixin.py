@@ -110,6 +110,11 @@ class _EventRouterUserMessageMixin(EventRouterService if TYPE_CHECKING else obje
                 mode,
                 source='EventRouterService.user_message',
             )
+        from backend.cli.settings.mode_runtime import rebuild_agent_toolset
+
+        agent = getattr(self._ctrl, 'agent', None)
+        if agent is not None:
+            rebuild_agent_toolset(agent, mode=mode)
         reset_recovery = getattr(
             getattr(self._ctrl, 'action_execution', None),
             'reset_liveness_recovery_counters',

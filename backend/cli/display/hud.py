@@ -33,6 +33,8 @@ class HUDState:
     agent_state_label: str = 'Ready'
     #: Autonomy level label (e.g. 'balanced', 'full', 'conservative').
     autonomy_level: str = 'balanced'
+    #: Interaction mode label (chat, plan, agent).
+    interaction_mode: str = 'agent'
     #: True when token usage shown in HUD is estimated rather than provider-reported.
     token_usage_estimated: bool = False
     #: Resolved project/workspace root (absolute path) for CLI status display.
@@ -314,6 +316,12 @@ class HUDBar:
     def update_autonomy(self, level: str) -> None:
         """Update the autonomy level shown in the branded row."""
         self.state.autonomy_level = level
+
+    def update_interaction_mode(self, mode: str) -> None:
+        """Update the interaction mode shown in status chrome."""
+        from backend.core.interaction_modes import normalize_interaction_mode
+
+        self.state.interaction_mode = normalize_interaction_mode(mode)
 
     def update_condensation_count(self, count: int) -> None:
         """Update the context condensation count displayed in HUD."""

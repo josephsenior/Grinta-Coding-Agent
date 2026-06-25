@@ -16,6 +16,8 @@ Secrets belong in a sibling `.env` file or your shell environment. Reference the
 
 `settings.json` overrides environment variables for the same key. Unknown top-level keys are ignored and logged as warnings.
 
+**LLM API key exception:** when `LLM_API_KEY` is set in the process environment (including via `.env`), it always wins over `settings.json` for runtime authentication. Keep `"llm_api_key": "${LLM_API_KEY}"` in JSON and store the secret in `.env`.
+
 ## Top-level keys
 
 | Key | Type | Description |
@@ -71,7 +73,35 @@ See `backend/core/config/agent_config.py` for the full schema.
 | `allow_read_outside_workspace` | `false` | Opt in to read-only paths outside the project |
 | `additional_read_roots` | `[]` | Approved absolute paths when outside reads are enabled |
 
-Writes always remain scoped to the project workspace. File-read boundaries do **not** sandbox shell commands: in Agent mode, `cat`/`type` can still reach paths outside the workspace unless a hardened execution profile blocks them.
+### Read-only paths outside the workspace
+
+By default Grinta only reads files inside the open project workspace (plus Grinta’s own data under `~/.grinta/workspaces/<id>/`). To let file-read tools reach sibling directories, shared config, or monorepo packages **without** allowing writes there:
+
+1. Set `security.allow_read_outside_workspace` to `true`.
+2. Add explicit absolute paths to `security.additional_read_roots`, for example:
+
+```json
+"security": {
+  "allow_read_outside_workspace": true,
+  "additional_read_roots": [
+    "/home/you/monorepo/shared-lib",
+    "~/.config/git"
+  ]
+}
+```
+
+Writes remain workspace-scoped. Shell commands (`cat`, `type`, `Get-Content`, etc.) are **not** limited by file-read boundaries in the `standard` execution profile — use `hardened_local` or run in an isolated environment if you need stronger containment.
+
+## `mcp_config`
+
+MCP is **off by default** in `settings.template.json` and in output from `grinta init`. Starter server definitions (shadcn, GitHub, Rigour) are listed with `"enabled": false` so you can turn them on from `/settings` after Node and any required tokens are in place.
+
+| Key | Default | Description |
+| --- | --- | --- |
+| `enabled` | `false` | Master switch for user-configured MCP servers |
+| `servers` | see template | List of stdio/SSE server entries (`enabled` per server) |
+
+Enable MCP when you need external tool servers; base install does not require `npx` or Node.
 
 ## Related docs
 

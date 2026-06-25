@@ -13,6 +13,8 @@ SLASH_COMMAND_DESCRIPTIONS: dict[str, str] = {
     '/help': 'Show help and keyboard shortcuts',
     '/clear': 'Clear the transcript',
     '/settings': 'Open runtime settings',
+    '/mode': 'View or set interaction mode (chat/plan/agent)',
+    '/health': 'Run a fast self-check (git, ripgrep, model)',
     '/sessions': 'Browse and resume saved sessions',
     '/resume': 'Resume a session by number or id',
     '/quit': 'Exit Grinta',

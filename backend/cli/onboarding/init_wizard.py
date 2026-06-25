@@ -39,9 +39,9 @@ from backend.cli.theme import (
     CLR_STATUS_WARN,
     no_color_enabled,
 )
+from backend.cli.onboarding.settings_defaults import build_init_settings
 from backend.core.app_paths import get_canonical_settings_path
 from backend.core.config.dotenv_keys import persist_llm_api_key_to_dotenv
-from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
 from backend.inference.provider_resolver import (
     check_local_providers,
     discover_all_local_models,
@@ -107,13 +107,6 @@ def _detect_local() -> list[str]:
 def _provider_requires_api_key(provider: str) -> bool:
     """Return True when the preset is backed by a cloud API key env var."""
     return bool(_PROVIDER_PRESETS[provider]['env'])
-
-
-def _settings_api_key_value(provider: str, api_key: str) -> str:
-    """Return the settings.json api-key value for the selected provider."""
-    if api_key or _provider_requires_api_key(provider):
-        return LLM_API_KEY_SETTINGS_PLACEHOLDER
-    return ''
 
 
 def _is_env_placeholder(value: str) -> bool:
@@ -366,25 +359,13 @@ def _write_settings_file(
     api_key: str,
     base_url: str,
 ) -> int | None:
-    settings = {
-        'llm_provider': provider,
-        'llm_model': model,
-        'llm_api_key': _settings_api_key_value(provider, api_key),
-        'llm_base_url': base_url,
-        'agent': {
-            'Orchestrator': {
-                'mode': 'agent',
-                'autonomy_level': 'balanced',
-            },
-        },
-        'security': {
-            'execution_profile': 'standard',
-            'enforce_security': True,
-        },
-    }
-    from backend.core.config.mcp_defaults import default_user_mcp_config
-
-    settings['mcp_config'] = default_user_mcp_config()
+    settings = build_init_settings(
+        provider=provider,
+        model=model,
+        api_key=api_key,
+        base_url=base_url,
+        requires_api_key=_provider_requires_api_key(provider),
+    )
     try:
         _atomic_json_write(settings_file, settings)
     except PermissionError:
