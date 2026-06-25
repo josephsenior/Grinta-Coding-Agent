@@ -5,8 +5,8 @@ in **60 seconds**, show a developer that Grinta installs cleanly, picks up a
 local LLM automatically, and solves a real bug end-to-end.
 
 > Record with [`asciinema`](https://asciinema.org/) (preferred for terminals)
-> or any screen recorder of your choice. Output target: `docs/assets/grinta-demo.gif`
-> (referenced from `README.md`) and `docs/grinta-demo.cast`.
+> or any screen recorder of your choice. Output target: `docs/assets/grinta-demo.mp4`
+> (referenced from `README.md`) and optionally `docs/grinta-demo.cast`.
 
 ---
 
@@ -76,7 +76,9 @@ Stop the recording. Trim with `asciinema upload` or convert to GIF with
 [`agg`](https://github.com/asciinema/agg):
 
 ```bash
+# Optional: convert the cast to GIF with agg, or export your screen recording to MP4:
 agg --font-size 18 --theme monokai docs/grinta-demo.cast docs/assets/grinta-demo.gif
+# README uses docs/assets/grinta-demo.mp4 — replace that file after recording.
 ```
 
 ## What viewers should walk away thinking

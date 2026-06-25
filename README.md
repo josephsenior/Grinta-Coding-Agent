@@ -20,9 +20,9 @@
 
 ### Grinta in action
 
-![Grinta terminal demo](docs/assets/grinta-demo.gif)
+<video src="docs/assets/grinta-demo.mp4" autoplay loop muted playsinline></video>
 
-Direct link if the animation does not load: [`docs/assets/grinta-demo.gif`](docs/assets/grinta-demo.gif).
+Direct link if the video does not load: [`docs/assets/grinta-demo.mp4`](docs/assets/grinta-demo.mp4).
 
 ## Release status
 

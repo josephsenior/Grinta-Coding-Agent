@@ -292,7 +292,7 @@ async def test_tui_hud_autonomy_sync_uses_agent_config_without_applying_default(
 
 
 @pytest.mark.asyncio
-async def test_tui_hud_autonomy_prefers_settings_json_over_runtime(
+async def test_tui_hud_autonomy_render_shows_runtime_level(
     mock_config, monkeypatch, tmp_path
 ):
     settings_file = tmp_path / 'settings.json'
@@ -321,7 +321,46 @@ async def test_tui_hud_autonomy_prefers_settings_json_over_runtime(
         await pilot.pause()
 
         autonomy = s.query_one('#hud-autonomy', Select)
-        assert autonomy.value == 'full'
-        assert s._hud.state.autonomy_level == 'full'
-        assert agent_config.autonomy_level == 'balanced'
+        assert autonomy.value == 'balanced'
+        assert s._hud.state.autonomy_level == 'balanced'
         s.notify.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_tui_hud_autonomy_persists_when_runtime_already_matches(
+    mock_config, monkeypatch, tmp_path
+):
+    """TUI choice must write settings.json even when runtime already matches."""
+    settings_file = tmp_path / 'settings.json'
+    settings_file.write_text(
+        '{"agent":{"Orchestrator":{"autonomy_level":"conservative"}}}\n',
+        encoding='utf-8',
+    )
+    monkeypatch.setattr(
+        'backend.cli.settings.storage._settings_path',
+        lambda: settings_file,
+    )
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    agent_config = SimpleNamespace(mode='agent', autonomy_level='full')
+    mock_config.default_agent = 'Orchestrator'
+    mock_config.get_agent_config.return_value = agent_config
+    controller = SimpleNamespace(
+        autonomy_controller=SimpleNamespace(autonomy_level='full')
+    )
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        s._controller = controller  # type: ignore[assignment]
+        s._apply_autonomy_level('full')
+        await pilot.pause()
+
+        from backend.cli.settings import get_persisted_autonomy_level
+
+        assert get_persisted_autonomy_level('Orchestrator') == 'full'
+        autonomy = s.query_one('#hud-autonomy', Select)
+        assert autonomy.value == 'full'
