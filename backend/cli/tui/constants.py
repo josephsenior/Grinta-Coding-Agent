@@ -67,6 +67,7 @@ _TUI_RESUME_HYDRATE_EVENTS = _bounded_int_env(
 )
 
 _WELCOME_SUGGESTIONS = [
+    'Run /health and tell me whether git and ripgrep are detected.',
     'Explain this codebase',
     'Analyze this repository and produce an implementation plan',
     'Plan a safe refactor of this module',
@@ -75,6 +76,7 @@ _WELCOME_SUGGESTIONS = [
 ]
 
 _WELCOME_SUGGESTION_DETAILS = [
+    'Quick smoke test that core tools and your model setup are wired correctly.',
     'Map the architecture, entry points, and important files.',
     'Scan the repo, identify risks, and turn findings into ordered next steps.',
     'Find ownership boundaries, migration steps, and a rollback path.',

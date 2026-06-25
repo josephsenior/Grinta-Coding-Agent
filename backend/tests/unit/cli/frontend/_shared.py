@@ -28,7 +28,6 @@ from backend.cli.main import (
     _read_piped_stdin,
     show_grinta_splash,
 )
-from backend.cli.repl import Repl
 from backend.cli.repl.slash_command_registry import (
     _build_command_completer,
     _build_help_markdown,

@@ -321,14 +321,14 @@ class ScreenLifecycleMixin:
             self._memory_stub = memory
             self._controller = controller
 
-            from backend.cli.settings import sync_persisted_autonomy_to_controller
+            from backend.cli.settings.bootstrap_sync import sync_controller_persisted_settings
 
-            autonomy_level = sync_persisted_autonomy_to_controller(
+            sync_controller_persisted_settings(
                 controller,
                 self._active_agent_name(),
                 config=config,
+                hud=self._hud,
             )
-            self._hud.update_autonomy(autonomy_level)
             self._render_hud_bar()
 
             from backend.utils.async_helpers.async_utils import set_main_event_loop

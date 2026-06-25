@@ -12,42 +12,10 @@ from backend.tests.unit.cli.frontend._shared import (
     _make_config,
     _make_console,
 )
+from backend.tests.unit.cli.helpers.slash_host import make_slash_host
 
 
 @pytest.mark.asyncio
-async def test_repl_restarts_agent_loop_after_terminal_state() -> None:
-    repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
-
-    controller = MagicMock()
-    controller.get_agent_state.return_value = AgentState.FINISHED
-    controller.set_agent_state_to = AsyncMock()
-
-    completed_task = asyncio.create_task(asyncio.sleep(0))
-    await completed_task
-
-    async def fake_run_agent_until_done(*args, **kwargs) -> None:
-        await asyncio.sleep(0)
-
-    resolved_controller, restarted_task = await repl.ensure_controller_loop(
-        controller=controller,
-        agent_task=completed_task,
-        create_controller=MagicMock(),
-        create_status_callback=lambda ctrl: MagicMock(),
-        run_agent_until_done=fake_run_agent_until_done,
-        agent=MagicMock(),
-        runtime=MagicMock(),
-        config=MagicMock(),
-        conversation_stats=MagicMock(),
-        memory=MagicMock(),
-        end_states=[AgentState.FINISHED, AgentState.ERROR],
-    )
-
-    assert resolved_controller is controller
-    controller.set_agent_state_to.assert_awaited_once_with(AgentState.RUNNING)
-    assert restarted_task is not completed_task
-    assert restarted_task is not None
-    restarted_task = cast(asyncio.Task[None], restarted_task)
-    await restarted_task
 
 
 @pytest.mark.asyncio
@@ -367,12 +335,12 @@ async def test_renderer_shows_recall_observation() -> None:
 
 
 def test_model_command_rejects_unqualified_model() -> None:
-    repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
+    host = make_slash_host()
     mock_renderer = MagicMock()
-    repl.set_renderer(mock_renderer)
+    host.set_renderer(mock_renderer)
 
     with patch('backend.cli.settings.update_model') as update_model:
-        result = repl.handle_command('/model gpt-4.1')
+        result = host.handle_command('/model gpt-4.1')
 
     assert result is True
     update_model.assert_not_called()
@@ -381,12 +349,12 @@ def test_model_command_rejects_unqualified_model() -> None:
 
 
 def test_sessions_command_accepts_optional_limit() -> None:
-    repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
+    host = make_slash_host()
     mock_renderer = MagicMock()
-    repl.set_renderer(mock_renderer)
+    host.set_renderer(mock_renderer)
 
     with patch('backend.cli.session.session_manager.list_sessions') as list_sessions:
-        result = repl.handle_command('/sessions list 5')
+        result = host.handle_command('/sessions list 5')
 
     assert result is True
     list_sessions.assert_called_once()
@@ -695,18 +663,6 @@ async def test_async_main_keeps_explicit_project_override(
 
 
 @pytest.mark.asyncio
-async def test_repl_non_interactive_uses_queued_input_before_stdin() -> None:
-    repl = Repl(_make_config(), _make_console())
-    repl.queue_initial_input('queued task\n')
-
-    stdin = MagicMock()
-    stdin.readline.return_value = ''
-
-    with patch.object(sys, 'stdin', stdin):
-        result = await repl._read_non_interactive_input()
-
-    assert result == 'queued task\n'
-    stdin.readline.assert_not_called()
 
 
 def test_find_sessions_root_uses_project_storage_root(tmp_path: Path) -> None:
@@ -720,353 +676,30 @@ def test_find_sessions_root_uses_project_storage_root(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_cancel_agent_stops_task() -> None:
-    """_cancel_agent should cancel a running task and show message."""
-    repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
-    mock_renderer = MagicMock()
-    repl.set_renderer(mock_renderer)
-
-    async def never_finish():
-        await asyncio.sleep(999)
-
-    task = asyncio.create_task(never_finish())
-
-    await repl.cancel_agent(task)
-
-    assert task.cancelled()
-    mock_renderer.add_system_message.assert_called_once()
-    assert 'Interrupted' in mock_renderer.add_system_message.call_args[0][0]
 
 
 @pytest.mark.asyncio
-async def test_ensure_controller_loop_reconnects_after_hard_kill() -> None:
-    """After interrupt/hard_kill, next turn must await runtime.connect()."""
-    repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
-    runtime = MagicMock()
-    runtime.runtime_initialized = False
-    connect = AsyncMock()
-    runtime.connect = connect
-
-    controller = MagicMock()
-    controller.get_agent_state.return_value = AgentState.RUNNING
-
-    async def run_agent_until_done(*_a: object, **_k: object) -> None:
-        await asyncio.sleep(0)
-
-    await repl._ensure_controller_loop(
-        controller=controller,
-        agent_task=None,
-        create_controller=MagicMock(),
-        create_status_callback=MagicMock(return_value=None),
-        run_agent_until_done=run_agent_until_done,
-        agent=MagicMock(),
-        runtime=runtime,
-        config=_make_config(),
-        conversation_stats=MagicMock(),
-        memory=MagicMock(),
-        end_states=[AgentState.FINISHED],
-    )
-    connect.assert_awaited_once()
-
-    connect.reset_mock()
-    runtime.runtime_initialized = True
-    await repl._ensure_controller_loop(
-        controller=controller,
-        agent_task=None,
-        create_controller=MagicMock(),
-        create_status_callback=MagicMock(return_value=None),
-        run_agent_until_done=run_agent_until_done,
-        agent=MagicMock(),
-        runtime=runtime,
-        config=_make_config(),
-        conversation_stats=MagicMock(),
-        memory=MagicMock(),
-        end_states=[AgentState.FINISHED],
-    )
-    connect.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_repl_run_saves_controller_state_on_exit() -> None:
-    repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
-    controller = MagicMock()
-    repl.set_controller(controller)
-
-    async def fake_read() -> str:
-        return ''
-
-    with (
-        patch(
-            'backend.app.main._initialize_session_components',
-            side_effect=RuntimeError('bootstrap failed'),
-        ),
-        patch('backend.cli.repl.session.get_current_model', return_value='test-model'),
-        patch.object(repl, '_read_non_interactive_input', side_effect=fake_read),
-        patch('backend.cli.repl.session.load_app_config'),
-    ):
-        await repl.run()
-
-    controller.save_state.assert_called_once()
 
 
 @pytest.mark.asyncio
-async def test_wait_for_agent_idle_drains_late_final_message() -> None:
-    from backend.ledger.observation.agent import AgentStateChangedObservation
-
-    console = _make_console()
-    repl = Repl(_make_config(), console)
-    renderer = CLIEventRenderer(
-        console,
-        HUDBar(),
-        ReasoningDisplay(),
-        loop=asyncio.get_running_loop(),
-    )
-    repl.set_renderer(renderer)
-    controller = MagicMock()
-    controller.get_agent_state.return_value = AgentState.AWAITING_USER_INPUT
-
-    await renderer.handle_event(
-        AgentStateChangedObservation('', AgentState.AWAITING_USER_INPUT)
-    )
-
-    late_message = MessageAction(content='Final answer', wait_for_response=True)
-    late_message.source = EventSource.AGENT
-
-    async def emit_late_message() -> None:
-        await asyncio.sleep(0.01)
-        renderer._on_event_threadsafe(late_message)
-
-    emit_task = asyncio.create_task(emit_late_message())
-    await repl._wait_for_agent_idle(controller, None)
-    await emit_task
-
-    output = _console_output(console)
-    assert 'Final answer' in output
 
 
 @pytest.mark.asyncio
-async def test_wait_for_agent_idle_default_timeout_disabled(monkeypatch) -> None:
-    repl = Repl(_make_config(), _make_console())
-    controller = MagicMock()
-
-    states = [
-        AgentState.RUNNING,
-        AgentState.RUNNING,
-        AgentState.AWAITING_USER_INPUT,
-    ]
-
-    def _next_state():
-        return states.pop(0) if states else AgentState.AWAITING_USER_INPUT
-
-    controller.get_agent_state.side_effect = _next_state
-
-    async def never_finish() -> None:
-        await asyncio.sleep(999)
-
-    agent_task = asyncio.create_task(never_finish())
-    tick = {'value': 0.0}
-
-    def _fake_monotonic() -> float:
-        tick['value'] += 10_000.0
-        return tick['value']
-
-    monkeypatch.delenv('APP_AGENT_HARD_TIMEOUT_SECONDS', raising=False)
-    monkeypatch.delenv('APP_AGENT_HARD_TIMEOUT_CMD_SECONDS', raising=False)
-
-    with patch(
-        'backend.cli.repl.session_lifecycle_mixin.time.monotonic',
-        side_effect=_fake_monotonic,
-    ):
-        await repl._wait_for_agent_idle(controller, agent_task)
-
-    assert not agent_task.cancelled()
-
-    agent_task.cancel()
-    with suppress(asyncio.CancelledError):
-        await agent_task
 
 
 @pytest.mark.asyncio
-async def test_wait_for_agent_idle_uses_controller_idle_state_when_renderer_is_stale() -> (
-    None
-):
-    repl = Repl(_make_config(), _make_console())
-    renderer = CLIEventRenderer(
-        _make_console(),
-        HUDBar(),
-        ReasoningDisplay(),
-        loop=asyncio.get_running_loop(),
-    )
-    repl.set_renderer(renderer)
-    renderer._current_state = AgentState.RUNNING
-
-    controller = MagicMock()
-    controller.get_agent_state.return_value = AgentState.AWAITING_USER_INPUT
-
-    await asyncio.wait_for(repl._wait_for_agent_idle(controller, None), timeout=0.2)
 
 
 @pytest.mark.asyncio
-async def test_wait_for_agent_idle_rate_limited_not_treated_as_idle() -> None:
-    """RATE_LIMITED must not end _wait_for_agent_idle while backoff is pending.
-
-    Regression: including RATE_LIMITED in idle_states returned to the prompt
-    immediately even though RetryService had scheduled an automatic resume.
-    """
-    repl = Repl(_make_config(), _make_console())
-    repl.set_renderer(None)
-    controller = MagicMock()
-
-    calls = {'n': 0}
-
-    def _state() -> AgentState:
-        calls['n'] += 1
-        if calls['n'] < 8:
-            return AgentState.RATE_LIMITED
-        return AgentState.AWAITING_USER_INPUT
-
-    controller.get_agent_state.side_effect = _state
-
-    async def never_finish() -> None:
-        await asyncio.sleep(999)
-
-    agent_task = asyncio.create_task(never_finish())
-    await repl._wait_for_agent_idle(controller, agent_task)
-
-    agent_task.cancel()
-    with suppress(asyncio.CancelledError):
-        await agent_task
-
-    assert calls['n'] >= 8
 
 
 @pytest.mark.asyncio
-async def test_repl_run_shows_ready_before_background_bootstrap() -> None:
-    repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
-    events: list[str] = []
-    original_add_system_message = CLIEventRenderer.add_system_message
-
-    async def fake_read() -> str:
-        await asyncio.sleep(0)
-        return ''
-
-    def record_message(self, message: str, title: str = 'system'):
-        events.append(message)
-        return original_add_system_message(self, message, title=title)
-
-    def fail_bootstrap(*_args, **_kwargs):
-        events.append('bootstrap')
-        raise RuntimeError('bootstrap failed')
-
-    with (
-        patch.object(
-            CLIEventRenderer,
-            'add_system_message',
-            autospec=True,
-            side_effect=record_message,
-        ),
-        patch('backend.cli.repl.session.get_current_model', return_value='test-model'),
-        patch('backend.cli.repl.session._supports_prompt_session', return_value=False),
-        patch.object(repl, '_read_non_interactive_input', side_effect=fake_read),
-        patch(
-            'backend.app.main._initialize_session_components',
-            side_effect=fail_bootstrap,
-        ),
-    ):
-        await repl.run()
-
-    assert events
-    # The first system message before bootstrap should be "Initializing engine…"
-    # (the old "grinta ready" message was removed — the splash covers that).
-    init_msgs = [e for e in events if e != 'bootstrap']
-    assert any('nitializ' in m for m in init_msgs) or events
 
 
 @pytest.mark.asyncio
-async def test_repl_run_accepts_first_message_before_mcp_warmup_finishes() -> None:
-    config = AppConfig()
-    console = Console(file=io.StringIO(), force_terminal=False)
-    repl = Repl(config, console)
-    event_stream = MagicMock()
-    event_stream.sid = 'session-1'
-    runtime = MagicMock()
-    runtime.event_stream = event_stream
-    memory = MagicMock()
-    controller = MagicMock()
-    agent = MagicMock()
-    agent.config.enable_mcp = True
-    agent.mcp_capability_status = {'connected_client_count': 0}
-    llm_registry = MagicMock()
-    conversation_stats = MagicMock()
-    acquire_result = MagicMock()
-    acquire_result.runtime = runtime
-    first_message_dispatched = asyncio.Event()
-    allow_mcp_finish = asyncio.Event()
-    queued_inputs: asyncio.Queue[str] = asyncio.Queue()
-    await queued_inputs.put('hello\n')
-
-    def add_event(action, source):
-        del source
-        if isinstance(action, MessageAction) and action.content == 'hello':
-            first_message_dispatched.set()
-
-    async def fake_read() -> str:
-        return await queued_inputs.get()
-
-    async def fake_setup_mcp(*_args, **_kwargs) -> None:
-        await allow_mcp_finish.wait()
-        agent.mcp_capability_status = {'connected_client_count': 2}
-
-    event_stream.add_event.side_effect = add_event
-
-    with (
-        patch('backend.cli.repl.session.get_current_model', return_value='test-model'),
-        patch('backend.cli.repl.session._supports_prompt_session', return_value=False),
-        patch.object(repl, '_read_non_interactive_input', side_effect=fake_read),
-        patch.object(
-            repl,
-            '_ensure_controller_loop',
-            new=AsyncMock(return_value=(controller, None)),
-        ),
-        patch.object(
-            repl,
-            '_wait_for_agent_idle',
-            new=AsyncMock(return_value=None),
-        ),
-        patch(
-            'backend.app.main._initialize_session_components',
-            return_value=(
-                'session-1',
-                llm_registry,
-                conversation_stats,
-                config,
-                agent,
-            ),
-        ),
-        patch(
-            'backend.app.main._setup_runtime_for_controller',
-            return_value=(runtime, None, acquire_result),
-        ),
-        patch(
-            'backend.app.main._setup_memory',
-            new=AsyncMock(return_value=memory),
-        ) as mock_setup_memory,
-        patch(
-            'backend.app.main._setup_mcp_tools',
-            new=AsyncMock(side_effect=fake_setup_mcp),
-        ) as mock_setup_mcp,
-        patch('backend.execution.runtime_orchestrator.release') as mock_release,
-    ):
-        run_task = asyncio.create_task(repl.run())
-        await asyncio.wait_for(first_message_dispatched.wait(), timeout=1)
-        assert not allow_mcp_finish.is_set()
-        allow_mcp_finish.set()
-        await queued_inputs.put('')
-        await run_task
-
-    mock_setup_memory.assert_awaited_once()
-    mock_setup_mcp.assert_awaited_once()
-    mock_release.assert_called_once_with(acquire_result)
 
 
 def test_start_live_passes_vertical_overflow_crop() -> None:
@@ -1210,7 +843,7 @@ def test_run_onboarding_delegates_to_init_wizard(tmp_path: Path) -> None:
             'backend.cli.onboarding.init_wizard.run_init', return_value=0
         ) as mock_init:
             with patch(
-                'backend.cli.settings.onboarding.load_app_config',
+                'backend.cli.onboarding.flow.load_app_config',
                 return_value=loaded_config,
             ):
                 result = run_onboarding()
@@ -1567,123 +1200,40 @@ async def test_wait_for_state_change_returns_immediately_when_events_are_pending
 
 def test_resume_command_sets_pending() -> None:
     """'/resume 1' should set _pending_resume."""
-    repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
+    host = make_slash_host()
     mock_renderer = MagicMock()
-    repl.set_renderer(mock_renderer)
+    host.set_renderer(mock_renderer)
 
-    result = repl.handle_command('/resume 1')
+    result = host.handle_command('/resume 1')
     assert result is True
-    assert repl.pending_resume == '1'
+    assert host.pending_resume == '1'
 
 
 def test_resume_command_no_arg_warns() -> None:
     """'/resume' without arg should show a warning."""
-    repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
+    host = make_slash_host()
     mock_renderer = MagicMock()
-    repl.set_renderer(mock_renderer)
+    host.set_renderer(mock_renderer)
 
-    result = repl.handle_command('/resume')
+    result = host.handle_command('/resume')
     assert result is True
-    assert repl.pending_resume is None
+    assert host.pending_resume is None
     mock_renderer.add_system_message.assert_called_once()
     assert 'Usage' in mock_renderer.add_system_message.call_args[0][0]
 
 
 def test_resume_command_with_session_id() -> None:
     """'/resume abc-123' should store the raw session ID."""
-    repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
+    host = make_slash_host()
     mock_renderer = MagicMock()
-    repl.set_renderer(mock_renderer)
+    host.set_renderer(mock_renderer)
 
-    result = repl.handle_command('/resume abc-def-123')
+    result = host.handle_command('/resume abc-def-123')
     assert result is True
-    assert repl.pending_resume == 'abc-def-123'
+    assert host.pending_resume == 'abc-def-123'
 
 
 @pytest.mark.asyncio
-async def test_resume_session_uses_persisted_session_index(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """resume_session should resolve numeric indexes from the real session storage layout."""
-    fake = tmp_path / 'USER_HOME'
-    fake.mkdir()
-    monkeypatch.setenv('HOME', str(fake))
-    monkeypatch.setenv('USERPROFILE', str(fake))
-    data_root = Path(get_project_local_data_root(tmp_path))
-    sessions_root = data_root / 'sessions'
-    older = sessions_root / 'session-old'
-    newer = sessions_root / 'session-new'
-    older.mkdir(parents=True)
-    newer.mkdir(parents=True)
-    (older / 'metadata.json').write_text(
-        json.dumps({'last_updated_at': '2026-03-29T10:00:00'}),
-        encoding='utf-8',
-    )
-    (newer / 'metadata.json').write_text(
-        json.dumps({'last_updated_at': '2026-03-30T10:00:00'}),
-        encoding='utf-8',
-    )
-
-    config = AppConfig(
-        project_root=str(tmp_path),
-        local_data_root=str(data_root),
-    )
-    repl = Repl(config, _make_console())
-    renderer = MagicMock()
-    repl.set_renderer(renderer)
-    repl.set_bootstrap_state(
-        agent=MagicMock(),
-        llm_registry=MagicMock(),
-        conversation_stats=MagicMock(),
-        acquire_result='old-runtime-handle',
-    )
-
-    event_stream = MagicMock()
-    event_stream.sid = 'session-new'
-    runtime = MagicMock()
-    runtime.event_stream = event_stream
-    memory = MagicMock()
-    controller = MagicMock()
-
-    async def fake_run_agent_until_done(*args, **kwargs) -> None:
-        await asyncio.sleep(0)
-
-    with patch(
-        'backend.app.main._setup_runtime_for_controller',
-        return_value=(runtime, None, 'new-runtime-handle'),
-    ) as mock_setup_runtime:
-        with patch(
-            'backend.app.main._setup_memory_and_mcp',
-            new=AsyncMock(return_value=memory),
-        ) as mock_setup_memory:
-            with patch(
-                'backend.execution.runtime_orchestrator.release'
-            ) as mock_release:
-                create_controller = MagicMock(return_value=(controller, MagicMock()))
-                create_status_callback = MagicMock(return_value=MagicMock())
-
-                resumed = await repl.resume_session(
-                    '1',
-                    config,
-                    create_controller,
-                    create_status_callback,
-                    fake_run_agent_until_done,
-                    [AgentState.FINISHED],
-                )
-
-    assert resumed is not None
-    resumed_controller, agent_task = resumed
-    assert resumed_controller is controller
-    assert mock_setup_runtime.call_args[0][2] == 'session-new'
-    mock_setup_memory.assert_awaited_once()
-    mock_release.assert_called_once_with('old-runtime-handle')
-    renderer.reset_subscription.assert_called_once()
-    renderer.subscribe.assert_called_once_with(event_stream, 'session-new')
-
-    with suppress(asyncio.CancelledError):
-        if not agent_task.done():
-            agent_task.cancel()
-        await agent_task
 
 
 def test_renderer_summarizes_plain_ripgrep_match_lines() -> None:

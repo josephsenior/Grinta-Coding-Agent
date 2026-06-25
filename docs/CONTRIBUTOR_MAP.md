@@ -39,7 +39,7 @@ Typical user message through the stack:
 ```text
 backend/cli/entry.py (startup)
   → backend/cli/main.py
-  → backend/cli/tui/main.py or repl_noninteractive.py
+  → backend/cli/tui/main.py or repl/noninteractive.py
   → SessionOrchestrator.step()          backend/orchestration/session_orchestrator.py
     → middleware pipeline               backend/orchestration/middleware/
     → engine plans next Action          backend/engine/
@@ -64,7 +64,7 @@ mixins over growing them further. Split work belongs in focused follow-up PRs.
 | `backend/engine/tools/_file_edits.py` | 1,560 | File edit tools |
 | `backend/context/context_pipeline.py` | 1,350 | Compaction orchestration |
 | `backend/inference/llm.py` | 1,220 | LLM call surface |
-| `backend/ledger/stream.py` | 1,160 | Durable event stream |
+| `backend/ledger/stream/event_stream.py` | Durable event stream |
 | `backend/context/prompt_window.py` | 1,130 | Prompt assembly / windowing |
 
 Orchestration service tests live in `backend/tests/unit/orchestration/services/` (mirrors `backend/orchestration/services/`). The split `_app_renderer_event_processor.py` monolith now lives under `backend/cli/tui/renderer/handlers/`.

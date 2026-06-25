@@ -97,6 +97,7 @@ Autonomy (`/autonomy`: conservative, balanced, full) controls confirmation promp
 | `/settings`   | Model, API key, and MCP configuration                      |
 | `/sessions`   | List past sessions; `/resume <N\|id>` to continue one      |
 | `/model`      | Show or switch the active provider/model                     |
+| `/mode`       | View or set interaction mode (chat / plan / agent)           |
 | `/autonomy`   | View or set confirmation behavior                          |
 | `/cost`       | Tokens, calls, USD spent this session                      |
 | `/diff`       | Workspace git changes (`--stat`, `--name-only`, `--patch`) |

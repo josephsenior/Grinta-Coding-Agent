@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from unittest.mock import Mock
 
+import pytest
+
 import backend.core.config.quickstart as quickstart
 from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
 
@@ -132,16 +134,12 @@ class TestInteractiveInit:
 
 
 class TestQuickstartMain:
-    def test_main_uses_app_project_root(self, tmp_path, monkeypatch):
-        captured_destinations: list[object] = []
+    def test_main_redirects_to_grinta_init(self, monkeypatch):
+        run_init_mock = Mock(return_value=0)
+        monkeypatch.setattr('backend.cli.onboarding.init_wizard.run_init', run_init_mock)
 
-        monkeypatch.setenv('APP_PROJECT_ROOT', str(tmp_path))
-        monkeypatch.setattr(
-            quickstart,
-            '_interactive_init',
-            lambda dest: captured_destinations.append(dest),
-        )
+        with pytest.raises(SystemExit) as exc:
+            quickstart.main()
 
-        quickstart.main()
-
-        assert captured_destinations == [tmp_path / 'settings.json']
+        assert exc.value.code == 0
+        run_init_mock.assert_called_once()

@@ -11,6 +11,7 @@ from backend.core.config.mcp_defaults import (
 def test_default_user_mcp_config_includes_operator_servers() -> None:
     cfg = default_user_mcp_config()
     names = {s['name'] for s in cfg['servers']}
-    assert cfg['enabled'] is True
+    assert cfg['enabled'] is False
     assert names == {s['name'] for s in DEFAULT_USER_MCP_SERVERS}
     assert names == {'shadcn', 'github', 'rigour'}
+    assert all(server.get('enabled') is False for server in cfg['servers'])

@@ -36,6 +36,16 @@ On Windows PowerShell you can use the convenience wrapper instead:
 That script syncs `dev-test` dependencies, checks local model servers, runs `init`
 when `settings.json` is missing, then launches the CLI.
 
+**Windows note:** `make` targets in the Makefile are aimed at macOS, Linux, and WSL.
+On native Windows, use `START_HERE.ps1` (or the `scripts/launch/` scripts) for the
+same happy path, and run pytest directly:
+
+```powershell
+python scripts/bootstrap_env.py dev-test
+$env:PYTHONPATH = '.'
+uv run pytest backend/tests/unit/ --tb=short -q
+```
+
 ### Repo hygiene
 
 - Treat `dist/`, `logs/`, local cache directories, and one-off diagnostics as disposable output, not source.
@@ -89,11 +99,11 @@ See also [docs/QUICK_START.md](docs/QUICK_START.md) and [docs/USER_GUIDE.md](doc
 
 **Required** GitHub Actions jobs differ by platform ([docs/CI.md](docs/CI.md)):
 
-- **Linux (`gates-on-linux`):** full `backend/tests` corpus with coverage — match locally with:
+- **Linux (`gates-on-linux`):** unit corpus with coverage — match locally with:
 
 ```bash
 python scripts/bootstrap_env.py dev-test
-PYTHONPATH=. uv run pytest --cov=backend --cov-fail-under=75 backend/tests
+PYTHONPATH=. uv run pytest --cov=backend --cov-fail-under=75 backend/tests/unit
 ```
 
 - **Windows (`gates-on-windows` + `gates-on-windows-extended`):** unit corpus, then integration/e2e/stress — match locally with:
@@ -179,7 +189,7 @@ without reading the whole tree. Day-to-day reference: [docs/DEVELOPER.md](docs/D
 ### Orchestration Service Map
 
 The `SessionOrchestrator` delegates work to these services (implementation split
-across mixins under `backend/orchestration/session_orchestrator_mixins/`):
+across mixins under `backend/orchestration/mixins/`):
 
 | Service | Responsibility |
 | --- | --- |

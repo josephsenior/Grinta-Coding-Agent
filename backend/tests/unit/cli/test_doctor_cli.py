@@ -30,7 +30,7 @@ def test_collect_checks_includes_core_rows() -> None:
 
 def test_check_binary_found() -> None:
     with patch(
-        'backend.cli.doctor.doctor_cli.shutil.which', return_value='/usr/bin/git'
+        'backend.cli.doctor.checks.shutil.which', return_value='/usr/bin/git'
     ):
         check = _check_binary('git')
     assert check.ok is True
@@ -38,7 +38,7 @@ def test_check_binary_found() -> None:
 
 
 def test_check_binary_missing() -> None:
-    with patch('backend.cli.doctor.doctor_cli.shutil.which', return_value=None):
+    with patch('backend.cli.doctor.checks.shutil.which', return_value=None):
         check = _check_binary('rg')
     assert check.ok is False
     assert 'PATH' in check.detail

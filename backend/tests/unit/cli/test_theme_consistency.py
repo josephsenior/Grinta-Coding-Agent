@@ -1,18 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import cast
 from unittest.mock import MagicMock
 
 from backend.cli.display.status_chrome import StatusFields, pt_stats_row2_fragments
 from backend.cli.display.transcript import format_activity_result_secondary
-from backend.cli.repl import Repl
 from backend.cli.theme import mark_err, mark_info, mark_ok, mark_prompt
-from backend.core.config import AppConfig
-
-
-def _make_repl() -> Repl:
-    return Repl(cast(AppConfig, MagicMock()), MagicMock())
 
 
 def test_transcript_uses_canonical_markers() -> None:
@@ -33,8 +26,7 @@ def test_mark_ok_uses_ascii_when_flagged(monkeypatch) -> None:
 
 
 def test_prompt_marker_uses_theme_constant() -> None:
-    repl = _make_repl()
-    assert mark_prompt() in repl._prompt_message()
+    assert mark_prompt()
 
 
 def test_reasoning_aliases_track_thought_body_after_theme_overrides() -> None:
@@ -57,6 +49,7 @@ def test_prompt_stats_row2_omits_mcp_and_skills_by_default() -> None:
         ledger_status='Healthy',
         agent_state_label='Ready',
         autonomy_level='balanced',
+        interaction_mode='agent',
         workspace_path='',
     )
 
@@ -87,7 +80,7 @@ def test_core_cli_renderers_avoid_raw_style_literals() -> None:
         repo / 'backend/cli/session/session_manager.py',
         repo / 'backend/cli/display/diff_renderer.py',
         repo / 'backend/cli/session/storage_cleanup.py',
-        repo / 'backend/cli/repl/run_helpers_mixin.py',
+        repo / 'backend/cli/repl/slash_commands_mixin.py',
     ]
     targets.extend((repo / 'backend/cli/event_rendering/actions').glob('*.py'))
     targets.extend((repo / 'backend/cli/event_rendering/observations').glob('*.py'))

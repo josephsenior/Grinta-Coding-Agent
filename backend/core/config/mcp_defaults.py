@@ -16,7 +16,7 @@ DEFAULT_USER_MCP_SERVERS: list[dict[str, Any]] = [
             '--framework',
             'react',
         ],
-        'enabled': True,
+        'enabled': False,
         'usage_hint': (
             'shadcn/ui React components: variants, props, CLI install, and registry lookups.'
         ),
@@ -26,7 +26,7 @@ DEFAULT_USER_MCP_SERVERS: list[dict[str, Any]] = [
         'type': 'stdio',
         'command': 'npx',
         'args': ['-y', '@modelcontextprotocol/server-github'],
-        'enabled': True,
+        'enabled': False,
         'usage_hint': (
             'GitHub API for repos, issues, PRs, metadata. Set '
             '**GITHUB_PERSONAL_ACCESS_TOKEN** in `.env` (classic or fine-grained PAT '
@@ -41,7 +41,7 @@ DEFAULT_USER_MCP_SERVERS: list[dict[str, Any]] = [
         'type': 'stdio',
         'command': 'npx',
         'args': ['-y', '@rigour-labs/mcp'],
-        'enabled': True,
+        'enabled': False,
         'usage_hint': (
             '**Rigour** — local code governance / quality gates. No API key. If the '
             'project has no `rigour.yml`, Grinta runs **`npx @rigour-labs/cli init`** '
@@ -59,6 +59,6 @@ DEFAULT_USER_MCP_SERVERS: list[dict[str, Any]] = [
 def default_user_mcp_config() -> dict[str, Any]:
     """Return a copy of the default ``mcp_config`` block for settings.json."""
     return {
-        'enabled': True,
+        'enabled': False,
         'servers': [dict(server) for server in DEFAULT_USER_MCP_SERVERS],
     }

@@ -253,9 +253,11 @@ def _run_doctor(args: argparse.Namespace) -> int:
     from rich.console import Console
 
     from backend.cli.doctor import cmd_doctor
+    from backend.cli.main import _load_dotenv_early
     from backend.cli.theme import no_color_enabled
 
     _pin_project(getattr(args, 'project', None))
+    _load_dotenv_early(explicit_project=getattr(args, 'project', None))
     console = Console(no_color=no_color_enabled(), legacy_windows=False)
     return cmd_doctor(console, verbose=bool(getattr(args, 'verbose', False)))
 

@@ -222,6 +222,28 @@ Use PowerShell for bootstrap and CLI scripts:
 
 ## Diagnostics
 
+### Standalone environment check
+
+Run outside the TUI for a full install report (settings schema, LLM key resolution, `git`, `rg`, optional debugpy):
+
+```bash
+grinta doctor
+```
+
+Use `grinta doctor --verbose` to include the editing-stack probe. Exit code `1` means at least one **critical** check failed.
+
+### In-session quick check
+
+Inside the TUI or legacy REPL:
+
+```text
+/health
+```
+
+`/health` uses the same check registry as `grinta doctor` but only runs the fast subset (debugpy, git, ripgrep, model). For settings-file or schema problems, prefer `grinta doctor`.
+
+### Contributor checks
+
 ```bash
 python --version
 uv --version
@@ -229,7 +251,7 @@ git --version
 uv run python -m backend.cli.entry --help
 ```
 
-Quick local checks:
+Quick local tests:
 
 ```bash
 uv run pytest backend/tests/unit/ --tb=short -q

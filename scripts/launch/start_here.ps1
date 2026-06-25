@@ -60,7 +60,8 @@ if (-not (Test-Path 'settings.json')) {
 
 # Step 2: Launch Grinta CLI
 Write-Host 'Step 2: Starting Grinta CLI...' -ForegroundColor Yellow
-Write-Host 'Runtime state will be stored under ~/.grinta/workspaces/<id>/storage.' -ForegroundColor Cyan
+Write-Host 'Settings for this source checkout: settings.json in the repository root.' -ForegroundColor Cyan
+Write-Host 'Session runtime state: ~/.grinta/workspaces/<id>/storage (pipx installs use ~/.grinta/settings.json).' -ForegroundColor Cyan
 
 & uv run python -m backend.cli.entry
 

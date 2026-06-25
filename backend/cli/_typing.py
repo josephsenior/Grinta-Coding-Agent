@@ -10,54 +10,10 @@ from pathlib import Path
 from typing import Any, Protocol
 
 
-class RunHelpersHost(Protocol):
-    _config: Any
-    _memory: Any
-    _runtime: Any
-    _agent: Any
-    _llm_registry: Any
-    _conversation_stats: Any
-    _pt_session: Any
-    _renderer: Any
-    _console: Any
-    _hud: Any
-    _reasoning: Any
-    _pending_resume: str | None
-    _next_action: Any
-    _last_user_message: str | None
-    _prompt_ctrl_c_hint_shown: bool
-
-    def _create_prompt_session(self) -> Any: ...
-    def _set_footer_system_line(self, text: str, *, kind: str = 'info') -> None: ...
-    async def _read_non_interactive_input(self) -> Any: ...
-    def _handle_parsed_command(self, *args: Any, **kwargs: Any) -> Any: ...
-    def _cancel_agent(self, *args: Any, **kwargs: Any) -> Any: ...
-    def _resume_session(self, *args: Any, **kwargs: Any) -> Any: ...
-    def _wait_for_agent_idle(self, *args: Any, **kwargs: Any) -> Any: ...
-    def _sync_terminal_after_agent_turn(self, *args: Any, **kwargs: Any) -> Any: ...
-    def _invalidate_pt(self) -> None: ...
-    def _warn(self, msg: str) -> None: ...
-
-
 class SlashCommandsHost(Protocol):
     def _command_project_root(self) -> Path: ...
     def _parse_diff_args(self, parsed: Any) -> tuple[str, list[str]] | None: ...
     def _run_git_diff(self, git_args: list[str], cwd: Path) -> str | None: ...
-
-
-class SessionLifecycleHost(Protocol):
-    _memory: Any
-    _runtime: Any
-    _agent: Any
-    _llm_registry: Any
-    _conversation_stats: Any
-    _event_stream: Any
-    _acquire_result: Any
-    _renderer: Any
-    _console: Any
-    _hud: Any
-    _reasoning: Any
-    _controller: Any
 
 
 class ActionRenderersHost(Protocol):

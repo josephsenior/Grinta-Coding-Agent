@@ -14,12 +14,61 @@ from rich.console import Console
 
 from backend.cli.display.hud import HUDBar
 from backend.cli.display.reasoning_display import ReasoningDisplay
-from backend.core.enums import AgentState
 
 if TYPE_CHECKING:
     from backend.core.config import AppConfig
 
 logger = logging.getLogger(__name__)
+
+
+async def _run_controller_with_renderer(
+    config: AppConfig,
+    *,
+    initial_action: object,
+    renderer: object,
+) -> object | None:
+    """Bootstrap runtime and subscribe *renderer* before the controller loop."""
+    from backend.app.main import (
+        _RUNTIME_ORCHESTRATOR,
+        _execute_controller_lifecycle,
+        _initialize_session_components,
+        _setup_runtime_for_controller,
+    )
+
+    session_id, llm_registry, conversation_stats, config_, agent = (
+        _initialize_session_components(config, None)
+    )
+    runtime, repo_directory, acquire_result = _setup_runtime_for_controller(
+        config_,
+        llm_registry,
+        session_id,
+        True,
+        agent,
+        None,
+    )
+    event_stream = runtime.event_stream
+    if event_stream is None:
+        raise RuntimeError('Runtime does not have an event stream')
+    subscribe = getattr(renderer, 'subscribe', None)
+    if callable(subscribe):
+        subscribe(event_stream, event_stream.sid)
+    try:
+        return await _execute_controller_lifecycle(
+            config_=config_,
+            runtime=runtime,
+            session_id=session_id,
+            repo_directory=repo_directory,
+            agent=agent,
+            conversation_stats=conversation_stats,
+            initial_action=initial_action,
+            exit_on_message=False,
+            fake_user_response_fn=None,
+            memory=None,
+            conversation_instructions=None,
+        )
+    finally:
+        if acquire_result is not None:
+            _RUNTIME_ORCHESTRATOR.release(acquire_result)
 
 
 async def run_noninteractive(
@@ -32,17 +81,15 @@ async def run_noninteractive(
     """Run non-interactive REPL: bootstrap agent, read lines, dispatch, print."""
     import time
 
-    from backend.app.main import (
-        run_controller,
-    )
     from backend.cli.event_renderer import CLIEventRenderer
+    from backend.core.enums import AgentState
     from backend.ledger.action import MessageAction
 
     hud = HUDBar()
     reasoning = ReasoningDisplay()
-    CLIEventRenderer(console=console, hud=hud, reasoning=reasoning)
+    renderer = CLIEventRenderer(console=console, hud=hud, reasoning=reasoning)
 
-    console.print('[dim]Initializing engine...[/dim]')
+    renderer.add_system_message('Initializing engine...', title='system')
 
     try:
         if initial_input:
@@ -51,7 +98,10 @@ async def run_noninteractive(
             lines = sys.stdin.readlines()
 
         if not lines:
-            console.print('[dim]No input provided. Use: echo "task" | grinta[/dim]')
+            renderer.add_system_message(
+                'No input provided. Use: echo "task" | grinta',
+                title='system',
+            )
             return
 
         for line in lines:
@@ -59,38 +109,51 @@ async def run_noninteractive(
             if not text:
                 continue
             if text.startswith('/'):
-                _handle_slash_command(text, console)
+                _handle_slash_command(text, console, renderer)
                 continue
 
             console.print(f'[bold #2dd4bf]>[+] [dim]you[/dim][/] {text}')
 
             start_time = time.time()
-            console.print('[dim]Starting agent...[/dim]')
+            renderer.add_system_message('Starting agent...', title='system')
 
             initial_action = MessageAction(content=text)
 
-            state = await run_controller(
-                config_=config,
+            state = await _run_controller_with_renderer(
+                config,
                 initial_action=initial_action,
-                headless_mode=True,
+                renderer=renderer,
             )
 
             elapsed = time.time() - start_time
             if state is None:
-                console.print('[yellow]Agent did not produce a final state[/yellow]')
+                renderer.add_system_message(
+                    'Agent did not produce a final state',
+                    title='warning',
+                )
             elif state.agent_state == AgentState.FINISHED:
-                console.print(f'[green]Agent completed in {elapsed:.1f}s[/green]')
+                renderer.add_system_message(
+                    f'Agent completed in {elapsed:.1f}s',
+                    title='success',
+                )
             elif state.agent_state == AgentState.ERROR:
-                console.print(f'[red]Agent ended with error in {elapsed:.1f}s[/red]')
+                renderer.add_system_message(
+                    f'Agent ended with error in {elapsed:.1f}s',
+                    title='error',
+                )
             else:
-                console.print(
-                    f'[yellow]Agent stopped at {state.agent_state} after {elapsed:.1f}s[/yellow]'
+                renderer.add_system_message(
+                    f'Agent stopped at {state.agent_state} after {elapsed:.1f}s',
+                    title='warning',
                 )
 
     except KeyboardInterrupt:
-        console.print('[yellow]Interrupted by user[/yellow]')
+        renderer.add_system_message('Interrupted by user', title='warning')
     except Exception as e:
-        console.print(f'[red]Error: {type(e).__name__}: {e}[/red]')
+        renderer.add_system_message(
+            f'Error: {type(e).__name__}: {e}',
+            title='error',
+        )
         import traceback
 
         traceback.print_exc()
@@ -100,13 +163,19 @@ async def run_noninteractive(
         await aclose_shared_http_clients()
 
 
-def _handle_slash_command(text: str, console: Console) -> None:
+def _handle_slash_command(text: str, console: Console, renderer: object) -> None:
     cmd = text.lower().strip()
     if cmd in ('/quit', '/q', '/exit'):
         sys.exit(0)
     elif cmd in ('/help', '/h', '/?'):
-        console.print('[dim]Available commands: /help, /clear, /quit[/dim]')
+        add = getattr(renderer, 'add_system_message', None)
+        if callable(add):
+            add('Available commands: /help, /clear, /quit', title='help')
+        else:
+            console.print('[dim]Available commands: /help, /clear, /quit[/dim]')
     elif cmd in ('/clear', '/c'):
-        console.print('[dim](clear not available in non-interactive mode)[/dim]')
+        add = getattr(renderer, 'add_system_message', None)
+        if callable(add):
+            add('(clear not available in non-interactive mode)', title='system')
     else:
         console.print(f'[bold #f87171]Unknown command: {text}[/]')

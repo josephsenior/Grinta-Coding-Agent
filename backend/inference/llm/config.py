@@ -39,10 +39,9 @@ def _apply_base_url_discovery(config: Any, resolver: Any) -> None:
 
 def _is_local_model(config: Any, resolver: Any) -> bool:
     """Check if model is local (no API key required)."""
-    if resolver.is_local_model(config.model):
-        return True
-    base = config.base_url or ''
-    return any(h in base for h in ('localhost', '127.0.0.1', '0.0.0.0'))
+    from backend.inference.local_model import is_local_model_config
+
+    return is_local_model_config(config, resolver)
 
 
 def _validate_api_key_or_local(

@@ -247,11 +247,15 @@ class TestExitCodes:
                             side_effect=['openai', 'test-model', '', ''],
                         ):
                             with patch(
-                                'backend.cli.onboarding.init_wizard.validate_connection'
+                                'backend.cli.onboarding.init_wizard.Confirm.ask',
+                                return_value=True,
                             ):
                                 with patch(
-                                    'backend.cli.onboarding.init_wizard._atomic_json_write'
+                                    'backend.cli.onboarding.init_wizard.validate_connection'
                                 ):
-                                    result = run_init(console=mock_console)
+                                    with patch(
+                                        'backend.cli.onboarding.init_wizard._atomic_json_write'
+                                    ):
+                                        result = run_init(console=mock_console)
 
         assert result == 0

@@ -20,6 +20,8 @@ from backend.cli.display.hud import HUDBar
 from backend.cli.display.reasoning_display import ReasoningDisplay
 from backend.cli.display.status_chrome import (
     autonomy_chrome_suffix,
+    autonomy_visible_for_mode,
+    mode_chrome_suffix,
     status_fields_from_hud,
 )
 from backend.cli.repl.run_helpers_mixin import RunHelpersMixin
@@ -314,6 +316,11 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
             level = str(getattr(ac, 'autonomy_level', 'balanced')).strip().lower()
             if level in _AUTONOMY_LEVEL_HINTS:
                 self._hud.update_autonomy(level)
+        from backend.cli.repl.slash_command_status import get_current_interaction_mode
+
+        mode = get_current_interaction_mode(self)
+        if hasattr(self._hud, 'update_interaction_mode'):
+            self._hud.update_interaction_mode(mode)
         fields = status_fields_from_hud(self._hud.state, self._hud.bundled_skill_count)
         mcp_txt = HUDBar._format_mcp_servers_label(hud.mcp_servers)
         skills_txt = HUDBar._format_skills_label(self._hud.bundled_skill_count)
@@ -329,7 +336,12 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
 
         return {
             'state_label': fields.agent_state_label,
-            'autonomy_label': autonomy_chrome_suffix(fields.autonomy_level),
+            'mode_label': mode_chrome_suffix(mode),
+            'autonomy_label': (
+                autonomy_chrome_suffix(fields.autonomy_level)
+                if autonomy_visible_for_mode(mode)
+                else ''
+            ),
             'workspace': fields.workspace_path,
             'provider': fields.provider,
             'model': fields.model,
@@ -370,8 +382,13 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
     def _prompt_toolbar_text(self) -> str:
         data = self._prompt_panel_data()
         state_label = data['state_label']
+        mode_label = data['mode_label']
         autonomy_label = data['autonomy_label']
-        controls = f'{state_label}  │  {autonomy_label}  │  Tab for commands'
+        control_parts = [state_label, mode_label]
+        if autonomy_label:
+            control_parts.append(autonomy_label)
+        control_parts.append('Tab for commands')
+        controls = '  │  '.join(control_parts)
         telemetry = (
             f'provider: {data["provider"]}  │  model: {data["model"]}  │  {data["token_display"]}  │  {data["cost"]}  │  '
             f'{data["calls"]}  │  {data["mcp"]}  │  {data["skills"]}  │  {data["ledger"]}'

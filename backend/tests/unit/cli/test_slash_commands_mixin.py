@@ -499,6 +499,45 @@ class TestCmdAutonomy:
 
 
 # ---------------------------------------------------------------------------
+# _cmd_mode
+# ---------------------------------------------------------------------------
+
+
+class TestCmdInteractionMode:
+    def test_no_args_shows_current(self) -> None:
+        r = _repl()
+        with patch(
+            'backend.cli.repl.slash_command_status.get_current_interaction_mode',
+            return_value='plan',
+        ):
+            result = r._cmd_mode(_parse('/mode'))
+        assert result is True
+        assert r._renderer is not None
+        messages = [m for _, m in r._renderer.messages]
+        assert any('mode' in m.lower() for m in messages)
+
+    def test_valid_mode_with_controller(self) -> None:
+        r = _repl()
+        mock_agent = MagicMock()
+        mock_agent.config = MagicMock(mode='agent')
+        mock_ctrl = MagicMock()
+        mock_ctrl.agent = mock_agent
+        r._controller = mock_ctrl
+        with patch('backend.cli.settings.update_interaction_mode') as mock_update:
+            result = r._cmd_mode(_parse('/mode chat'))
+        assert result is True
+        mock_update.assert_called_once_with('chat', 'Orchestrator')
+
+    def test_invalid_mode(self) -> None:
+        r = _repl()
+        result = r._cmd_mode(_parse('/mode turbo'))
+        assert result is True
+        assert r._renderer is not None
+        messages = [m for _, m in r._renderer.messages]
+        assert any('invalid' in m.lower() or 'turbo' in m.lower() for m in messages)
+
+
+# ---------------------------------------------------------------------------
 # _cmd_model
 # ---------------------------------------------------------------------------
 

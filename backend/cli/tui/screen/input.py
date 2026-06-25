@@ -606,12 +606,55 @@ class ScreenInputMixin:
             self.app.exit()
         elif cmd == '/settings':
             self.run_worker(self._open_settings_tui(), exclusive=True)
+        elif cmd == '/mode':
+            self._handle_mode_slash(args)
+        elif cmd == '/health':
+            self._handle_health_slash()
         elif cmd == '/sessions':
             self.run_worker(self._run_sessions_tui(args), exclusive=True)
         elif cmd == '/resume':
             self.run_worker(self._run_resume_tui(args), exclusive=True)
         else:
             self.notify_error(f'Unknown command: {text}')
+
+    def _handle_mode_slash(self, args: list[str]) -> None:
+        from backend.cli.repl.slash_command_registry import _INTERACTION_MODE_HINTS
+        from backend.cli.repl.slash_command_status import (
+            apply_interaction_mode,
+            get_current_interaction_mode,
+        )
+
+        valid_modes = tuple(_INTERACTION_MODE_HINTS)
+        if not args:
+            mode = get_current_interaction_mode(self)
+            mode_lines = '\n'.join(
+                f'  {name}: {_INTERACTION_MODE_HINTS[name]}' for name in valid_modes
+            )
+            self.notify(
+                f'Mode: {mode}\n{mode_lines}',
+                severity='information',
+                timeout=6.0,
+            )
+            return
+        if len(args) > 1:
+            self.notify_warning('Usage: /mode [chat|plan|agent]')
+            return
+        new_mode = args[0].lower()
+        if new_mode not in valid_modes:
+            self.notify_warning(
+                f"Invalid mode '{new_mode}'. Use: {', '.join(valid_modes)}"
+            )
+            return
+        apply_interaction_mode(self, new_mode)
+
+    def _handle_health_slash(self) -> None:
+        from backend.cli.doctor.checks import collect_health_checks, format_health_report_lines
+
+        model_hint = getattr(self._hud.state, 'model', None)
+        checks = collect_health_checks(model_hint=model_hint)
+        lines = format_health_report_lines(checks)
+        lines.append('For a fuller report, run `grinta doctor` outside the session.')
+        self.notify('\n'.join(lines), severity='information', timeout=8.0)
 
     async def _open_settings_tui(self) -> None:
         from backend.cli.settings import (

@@ -1,6 +1,6 @@
 """Grinta TUI — main runner that boots the Textual app.
 
-This is the TUI equivalent of the CLI's Repl.run(). It creates the event loop,
+This is the TUI entry point. It creates the event loop,
 bootstraps the agent, and runs the Textual application.
 """
 
@@ -135,7 +135,7 @@ async def run_tui(
     *,
     verbose: bool = False,
 ) -> None:
-    """Run the Grinta TUI. This is the TUI equivalent of Repl.run()."""
+    """Run the Grinta TUI (interactive default when stdin is a TTY)."""
     loop = asyncio.get_running_loop()
 
     app = GrintaTUIApp(config=config, console=console, loop=loop)

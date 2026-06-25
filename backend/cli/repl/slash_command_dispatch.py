@@ -31,6 +31,7 @@ COMMAND_DISPATCH: dict[str, str] = {
     '/sessions': '_cmd_sessions',
     '/resume': '_cmd_resume',
     '/autonomy': '_cmd_autonomy',
+    '/mode': '_cmd_mode',
     '/help': '_cmd_help',
     '/model': '_cmd_model',
     '/compact': '_cmd_compact',

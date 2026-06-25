@@ -236,9 +236,23 @@ Grinta has three interaction modes that change the conversational contract:
 - **Plan** — read-only investigation; may use `task_tracker` for a structured plan when enabled, or prose only. Switch to Agent mode to execute.
 - **Agent** — full task execution. The agent plans, runs tools, validates results, and finishes. This is the default mode when you give a direct task.
 
-In the Textual app, the current mode is visible and selectable in the HUD. The
-mode is also stored on the active agent config for startup/default behavior. The
-current slash-command registry does not expose a `/mode` command.
+In the Textual app, the current mode is visible and selectable in the HUD. Use
+`/mode chat|plan|agent` in the prompt or TUI input. The mode is stored in
+`settings.json` under `agent.Orchestrator.mode`.
+
+### Reading sibling packages (monorepos)
+
+By default, file-read tools only access the open workspace. To read **specific**
+paths outside it (sibling packages, shared libraries, `~/.config/git`) without
+allowing writes there:
+
+1. Keep `security.allow_read_outside_workspace` at `false` unless you need this.
+2. Set it to `true` and list absolute paths in `security.additional_read_roots`.
+
+Writes remain workspace-scoped. Shell commands (`cat`, `Get-Content`, …) are **not**
+limited by file-read boundaries in the `standard` profile — use `hardened_local`
+or conservative autonomy on unfamiliar repos. See [SETTINGS.md](SETTINGS.md) and
+[SECURITY_CHECKLIST.md](SECURITY_CHECKLIST.md).
 
 ### Autonomy levels (`/autonomy`)
 

@@ -84,6 +84,7 @@ class StatusFields:
     ledger_status: str
     agent_state_label: str
     autonomy_level: str
+    interaction_mode: str
     workspace_path: str
     #: Number of context condensations in this session.
     condensation_count: int = 0
@@ -174,6 +175,9 @@ def status_fields_from_hud(hud: Any, bundled_skill_count: int) -> StatusFields:
         ledger_status=str(hud.ledger_status),
         agent_state_label=str(hud.agent_state_label or 'Ready').strip(),
         autonomy_level=str(hud.autonomy_level or 'balanced').strip().lower(),
+        interaction_mode=str(
+            getattr(hud, 'interaction_mode', None) or 'agent'
+        ).strip().lower(),
         workspace_path=_shorten_home(
             str(getattr(hud, 'workspace_path', '') or '').strip()
         ),
@@ -206,10 +210,30 @@ def _shorten_home(path: str) -> str:
     return path
 
 
+def autonomy_visible_for_mode(mode: str) -> bool:
+    """Autonomy chrome is agent-mode only (matches TUI HUD visibility)."""
+    from backend.core.interaction_modes import (
+        is_chat_mode,
+        is_plan_mode,
+        normalize_interaction_mode,
+    )
+
+    normalized = normalize_interaction_mode(mode)
+    return not is_chat_mode(normalized) and not is_plan_mode(normalized)
+
+
 def autonomy_chrome_suffix(level: str) -> str:
     """``Autonomy: Balanced`` style string for GRINTA row / PT."""
     level_stripped = (level or 'balanced').strip()
     return f'Autonomy: {level_stripped.title()}'
+
+
+def mode_chrome_suffix(mode: str) -> str:
+    """``Mode: Agent`` style string for GRINTA row / PT."""
+    from backend.core.interaction_modes import normalize_interaction_mode
+
+    normalized = normalize_interaction_mode(mode)
+    return f'Mode: {normalized.title()}'
 
 
 def ledger_icon(ledger_status: str) -> str:
@@ -336,7 +360,10 @@ def rich_compact_hud_line(
         (f'[{fields.agent_state_label}]', ledger_rich_style(fields.ledger_status))
     )
     parts.append((' ', ''))
-    parts.append((auto_lbl, auto_style))
+    parts.append((mode_chrome_suffix(fields.interaction_mode), CLR_META))
+    if autonomy_visible_for_mode(fields.interaction_mode):
+        parts.append((' ', ''))
+        parts.append((auto_lbl, auto_style))
 
     # Model
     parts.append((' · ', CLR_SEP))
@@ -393,12 +420,15 @@ def rich_fake_prompt_row1(fields: StatusFields) -> Text:
         style=_FAKE_PROMPT_BADGE_STYLES.get(state_label, CLR_STATUS_OK + ' bold'),
     )
     row1.append('  ', style=STYLE_EMPTY)
-    auto_style = CLR_AUTONOMY_BALANCED
-    for needle, style in _FAKE_PROMPT_AUTONOMY_STYLES.items():
-        if needle in fields.autonomy_level:
-            auto_style = style
-            break
-    row1.append(autonomy_chrome_suffix(fields.autonomy_level), style=auto_style)
+    row1.append(mode_chrome_suffix(fields.interaction_mode), style=CLR_META)
+    if autonomy_visible_for_mode(fields.interaction_mode):
+        row1.append('  ', style=STYLE_EMPTY)
+        auto_style = CLR_AUTONOMY_BALANCED
+        for needle, style in _FAKE_PROMPT_AUTONOMY_STYLES.items():
+            if needle in fields.autonomy_level:
+                auto_style = style
+                break
+        row1.append(autonomy_chrome_suffix(fields.autonomy_level), style=auto_style)
     return row1
 
 
@@ -466,7 +496,10 @@ def rich_fake_prompt_compact_line(
     ws = fields.workspace_path
     path_budget = workspace_path_display_max(term_width)
     ws_prefix = f'{HUDBar.ellipsize_path(ws, path_budget)} · ' if ws else ''
-    autonomy_display = autonomy_chrome_suffix(fields.autonomy_level)
+    mode_display = mode_chrome_suffix(fields.interaction_mode)
+    autonomy_segment = ''
+    if autonomy_visible_for_mode(fields.interaction_mode):
+        autonomy_segment = f' · {autonomy_chrome_suffix(fields.autonomy_level)}'
     has_limit = '/' in fields.token_display_compact
     token_display = (
         f'{_token_bar(fields.token_usage_pct, 4)} {fields.token_display_compact}'
@@ -474,7 +507,7 @@ def rich_fake_prompt_compact_line(
         else fields.token_display_compact
     )
     line = (
-        f'{ws_prefix}{fields.agent_state_label} · {autonomy_display} · '
+        f'{ws_prefix}{fields.agent_state_label} · {mode_display}{autonomy_segment} · '
         f'{fields.model_display} · {token_display} · '
         f'${fields.cost_usd:.3f}'
     )
@@ -499,7 +532,10 @@ def pt_compact_line_plain(fields: StatusFields, *, term_width: int = 120) -> str
     ws = fields.workspace_path
     path_budget = workspace_path_display_max(term_width)
     ws_prefix = f'{HUDBar.ellipsize_path(ws, path_budget)} · ' if ws else ''
-    autonomy_display = autonomy_chrome_suffix(fields.autonomy_level)
+    mode_display = mode_chrome_suffix(fields.interaction_mode)
+    autonomy_segment = ''
+    if autonomy_visible_for_mode(fields.interaction_mode):
+        autonomy_segment = f' · {autonomy_chrome_suffix(fields.autonomy_level)}'
     has_limit = '/' in fields.token_display_compact
     token_display = (
         f'{_token_bar(fields.token_usage_pct, 4)} {fields.token_display_compact}'
@@ -507,7 +543,7 @@ def pt_compact_line_plain(fields: StatusFields, *, term_width: int = 120) -> str
         else fields.token_display_compact
     )
     return (
-        f'{ws_prefix}{fields.agent_state_label} · {autonomy_display} · '
+        f'{ws_prefix}{fields.agent_state_label} · {mode_display}{autonomy_segment} · '
         f'{fields.model_display} · {token_display} · '
         f'${fields.cost_usd:.3f}'
     )
@@ -519,14 +555,21 @@ def pt_stats_row1_fragments(
     autonomy_style: str,
 ) -> list[tuple[str, str]]:
     """GRINTA row fragments (prompt_toolkit style classes)."""
-    autonomy_display = autonomy_chrome_suffix(fields.autonomy_level)
-    return [
+    fragments: list[tuple[str, str]] = [
         ('class:prompt.brand', 'GRINTA'),
         ('class:prompt.dim', '  '),
         (state_style, f' {fields.agent_state_label.upper()} '),
         ('class:prompt.dim', '  '),
-        (autonomy_style, autonomy_display),
+        ('class:prompt.dim', mode_chrome_suffix(fields.interaction_mode)),
     ]
+    if autonomy_visible_for_mode(fields.interaction_mode):
+        fragments.extend(
+            [
+                ('class:prompt.dim', '  '),
+                (autonomy_style, autonomy_chrome_suffix(fields.autonomy_level)),
+            ]
+        )
+    return fragments
 
 
 def pt_stats_row2_fragments(

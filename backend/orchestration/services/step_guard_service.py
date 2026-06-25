@@ -181,7 +181,16 @@ class StepGuardService:
     def _prepare_agent_protocol_directive(controller: 'SessionOrchestrator') -> None:
         state = getattr(controller, 'state', None)
         config = getattr(controller, 'config', None)
-        mode = normalize_interaction_mode(getattr(config, 'mode', 'agent'))
+        active_run_mode = None
+        extra = getattr(state, 'extra_data', None) if state is not None else None
+        if isinstance(extra, dict):
+            active_run_mode = extra.get('active_run_mode')
+        from backend.core.interaction_modes import resolve_active_interaction_mode
+
+        mode = resolve_active_interaction_mode(
+            active_run_mode=active_run_mode,
+            configured_mode=getattr(config, 'mode', 'agent') if config is not None else 'agent',
+        )
         prepare_next_agent_step(state, mode)
 
     def _get_replan_flag(self, controller: 'SessionOrchestrator') -> bool:

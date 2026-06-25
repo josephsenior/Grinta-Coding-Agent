@@ -9,6 +9,12 @@ from __future__ import annotations
 
 from backend.cli.repl.slash_registry_models import SlashCommandSpec
 
+_INTERACTION_MODE_HINTS = {
+    'chat': 'Read-only Q&A and discovery tools',
+    'plan': 'Read-only investigation; may use task_tracker',
+    'agent': 'Full task loop with edits and shell',
+}
+
 _AUTONOMY_LEVEL_HINTS = {
     'conservative': 'Always ask before actions',
     'balanced': 'Ask only for high-risk actions',
@@ -201,6 +207,12 @@ _SLASH_COMMANDS = (
         '/autonomy',
         'View or set autonomy (conservative/balanced/full)',
         '/autonomy [conservative|balanced|full]',
+        help_section='model',
+    ),
+    SlashCommandSpec(
+        '/mode',
+        'View or set interaction mode (chat/plan/agent)',
+        '/mode [chat|plan|agent]',
         help_section='model',
     ),
     SlashCommandSpec(
