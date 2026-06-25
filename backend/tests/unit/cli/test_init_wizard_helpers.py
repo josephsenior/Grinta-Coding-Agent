@@ -15,8 +15,8 @@ from backend.cli.onboarding.init_wizard import (
     _is_global_settings,
     _load_existing,
     _provider_requires_api_key,
-    _settings_api_key_value,
 )
+from backend.cli.onboarding.settings_defaults import settings_api_key_value
 from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
 
 
@@ -28,9 +28,10 @@ def test_provider_requires_api_key() -> None:
 
 def test_settings_api_key_value_uses_placeholder_for_env_providers() -> None:
     assert (
-        _settings_api_key_value('openai', 'sk-test') == LLM_API_KEY_SETTINGS_PLACEHOLDER
+        settings_api_key_value('openai', 'sk-test', requires_key=True)
+        == LLM_API_KEY_SETTINGS_PLACEHOLDER
     )
-    assert _settings_api_key_value('ollama', '') == ''
+    assert settings_api_key_value('ollama', '', requires_key=False) == ''
 
 
 def test_is_env_placeholder() -> None:

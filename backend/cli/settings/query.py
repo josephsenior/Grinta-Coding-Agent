@@ -250,7 +250,9 @@ def sync_persisted_interaction_mode_to_controller(
             return normalize_interaction_mode(getattr(running_config, 'mode', None))
         if config is not None:
             try:
-                target = (agent_name or DEFAULT_AGENT_NAME).strip() or DEFAULT_AGENT_NAME
+                target = (
+                    agent_name or DEFAULT_AGENT_NAME
+                ).strip() or DEFAULT_AGENT_NAME
                 agent_config = config.get_agent_config(target)
                 return normalize_interaction_mode(getattr(agent_config, 'mode', None))
             except Exception:

@@ -12,8 +12,13 @@ from backend.cli.settings.mode_runtime import (
 
 
 def test_rebuild_agent_toolset_refreshes_tools() -> None:
-    planner = SimpleNamespace(_config=SimpleNamespace(mode='agent'), build_toolset=MagicMock(return_value=['read']))
-    agent = SimpleNamespace(config=SimpleNamespace(mode='agent'), planner=planner, tools=[])
+    planner = SimpleNamespace(
+        _config=SimpleNamespace(mode='agent'),
+        build_toolset=MagicMock(return_value=['read']),
+    )
+    agent = SimpleNamespace(
+        config=SimpleNamespace(mode='agent'), planner=planner, tools=[]
+    )
 
     rebuild_agent_toolset(agent, mode='plan')
 
@@ -23,8 +28,12 @@ def test_rebuild_agent_toolset_refreshes_tools() -> None:
 
 
 def test_apply_interaction_mode_to_controller_updates_extra_data() -> None:
-    planner = SimpleNamespace(_config=SimpleNamespace(mode='agent'), build_toolset=MagicMock(return_value=[]))
-    agent = SimpleNamespace(config=SimpleNamespace(mode='agent'), planner=planner, tools=[])
+    planner = SimpleNamespace(
+        _config=SimpleNamespace(mode='agent'), build_toolset=MagicMock(return_value=[])
+    )
+    agent = SimpleNamespace(
+        config=SimpleNamespace(mode='agent'), planner=planner, tools=[]
+    )
     controller = SimpleNamespace(agent=agent, state=SimpleNamespace(extra_data={}))
 
     apply_interaction_mode_to_controller(controller, 'plan')

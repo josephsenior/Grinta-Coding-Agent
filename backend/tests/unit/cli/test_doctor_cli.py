@@ -29,9 +29,7 @@ def test_collect_checks_includes_core_rows() -> None:
 
 
 def test_check_binary_found() -> None:
-    with patch(
-        'backend.cli.doctor.checks.shutil.which', return_value='/usr/bin/git'
-    ):
+    with patch('backend.cli.doctor.checks.shutil.which', return_value='/usr/bin/git'):
         check = _check_binary('git')
     assert check.ok is True
     assert check.detail == '/usr/bin/git'

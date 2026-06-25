@@ -188,7 +188,9 @@ class StepGuardService:
         agent = getattr(controller, 'agent', None)
         agent_config = getattr(agent, 'config', None) if agent is not None else None
         configured_mode = (
-            getattr(agent_config, 'mode', 'agent') if agent_config is not None else 'agent'
+            getattr(agent_config, 'mode', 'agent')
+            if agent_config is not None
+            else 'agent'
         )
         mode = resolve_active_interaction_mode(
             active_run_mode=active_run_mode,

@@ -200,9 +200,13 @@ def persist_env_detected_settings(
         try:
             from backend.core.config.dotenv_keys import persist_llm_api_key_to_dotenv
 
-            persist_llm_api_key_to_dotenv(secret.strip(), settings_json_path=settings_path)
+            persist_llm_api_key_to_dotenv(
+                secret.strip(), settings_json_path=settings_path
+            )
         except OSError:
-            logger.warning('Failed to persist env-detected API key to .env', exc_info=True)
+            logger.warning(
+                'Failed to persist env-detected API key to .env', exc_info=True
+            )
     return True
 
 

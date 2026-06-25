@@ -63,7 +63,8 @@ def test_ollama_init_settings_do_not_require_onboarding() -> None:
 
 
 def test_persist_env_detected_settings_writes_minimal_file(
-    tmp_path, monkeypatch,
+    tmp_path,
+    monkeypatch,
 ) -> None:
     from pydantic import SecretStr
 
@@ -78,11 +79,14 @@ def test_persist_env_detected_settings_writes_minimal_file(
     llm_cfg.api_key = SecretStr('sk-test-openai-key')
     llm_cfg.model = 'openai/gpt-4.1'
 
-    assert persist_env_detected_settings(
-        config,
-        'openai',
-        api_key='sk-test-openai-key',
-    ) is True
+    assert (
+        persist_env_detected_settings(
+            config,
+            'openai',
+            api_key='sk-test-openai-key',
+        )
+        is True
+    )
 
     data = json.loads(settings_file.read_text(encoding='utf-8'))
     assert data['llm_provider'] == 'openai'
@@ -92,7 +96,8 @@ def test_persist_env_detected_settings_writes_minimal_file(
 
 
 def test_persist_env_detected_settings_skips_existing_provider(
-    tmp_path, monkeypatch,
+    tmp_path,
+    monkeypatch,
 ) -> None:
     from backend.cli.onboarding.flow import persist_env_detected_settings
 
