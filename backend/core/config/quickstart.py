@@ -35,29 +35,25 @@ def generate_quickstart_config(
     model: str = 'gemini-2.5-flash',
     base_url: str = '',
     max_budget: float | None = None,
+    provider: str | None = None,
 ) -> str:
     """Return a minimal quick-start ``settings.json`` as a string.
 
-    The LLM secret is not embedded: ``llm_api_key`` is the placeholder
-    ``${LLM_API_KEY}``; set ``LLM_API_KEY`` in repo-root ``.env``.
-
-    Args:
-        model: Default model identifier.
-        base_url: Optional base URL for the LLM endpoint.
-        max_budget: Maximum spend per task in USD. None omits the key (unlimited).
-
-    Returns:
-        A JSON-formatted configuration string.
+    Uses the same shape as ``grinta init`` (:func:`build_init_settings`).
     """
-    config: dict[str, object] = {
-        'project_root': './workspace',
-        'llm_model': model,
-        'llm_api_key': LLM_API_KEY_SETTINGS_PLACEHOLDER,
-        'llm_base_url': base_url or '',
-    }
+    from backend.cli.onboarding.settings_defaults import build_init_settings
+
+    resolved_provider = provider or (model.split('/', 1)[0] if '/' in model else 'openai')
+    payload = build_init_settings(
+        provider=resolved_provider,
+        model=model,
+        api_key='',
+        base_url=base_url or '',
+        requires_api_key=True,
+    )
     if max_budget is not None and max_budget > 0:
-        config['max_budget_per_task'] = max_budget
-    return json.dumps(config, indent=2)
+        payload['max_budget_per_task'] = max_budget
+    return json.dumps(payload, indent=2)
 
 
 def _interactive_init(dest: Path) -> None:

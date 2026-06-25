@@ -121,12 +121,18 @@ Important entrypoints:
 ### Default user config
 
 `settings.json` is the default user-facing local config file in a source checkout. Installed CLI runs use `~/.grinta/settings.json`; `APP_ROOT` can intentionally override the settings root.
-Template fields in `settings.template.json`:
 
-- `llm_provider`
-- `llm_model`
-- `llm_api_key`
-- `llm_base_url`
+Copy [settings.template.json](../settings.template.json) or run `grinta init`. The template matches the init wizard output shape:
+
+| Block | Purpose |
+| --- | --- |
+| `llm_provider`, `llm_model`, `llm_api_key`, `llm_base_url` | Model routing (see [SETTINGS.md](SETTINGS.md)) |
+| `agent.Orchestrator.mode` | `chat`, `plan`, or `agent` |
+| `agent.Orchestrator.autonomy_level` | `conservative`, `balanced`, or `full` |
+| `security` | Execution profile and read-boundary policy |
+| `mcp_config` | MCP servers (off by default) |
+
+Full key reference: [SETTINGS.md](SETTINGS.md). Unknown keys are warned at load time; see `backend/core/config/agent_config.py` for optional agent keys.
 
 ### Environment variables
 

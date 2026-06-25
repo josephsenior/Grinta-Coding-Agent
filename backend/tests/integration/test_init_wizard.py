@@ -141,6 +141,55 @@ class TestInitWizardCrossPlatform:
         assert result.returncode == 3
         assert 'grinta init is interactive' in result.stderr
 
+    @pytest.mark.integration
+    def test_init_noninteractive_writes_settings_without_tty(
+        self, tmp_path: Path
+    ) -> None:
+        """``grinta init --non-interactive`` should bootstrap from env when stdin is not a TTY."""
+        env = os.environ.copy()
+        env.update(
+            {
+                'LLM_API_KEY': 'sk-test-key',
+                'LLM_PROVIDER': 'openai',
+                'LLM_MODEL': 'openai/gpt-4o',
+                'GRINTA_NO_SPLASH': '1',
+                'PYTHONUTF8': '1',
+                'HOME': str(tmp_path),
+                'USERPROFILE': str(tmp_path),
+                'APP_ROOT': str(tmp_path / 'app'),
+            }
+        )
+
+        app_root = tmp_path / 'app'
+        app_root.mkdir()
+        project_root = tmp_path / 'project'
+        project_root.mkdir()
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                '-m',
+                'backend.cli.entry',
+                '--project',
+                str(project_root),
+                'init',
+                '--non-interactive',
+                '--force',
+            ],
+            cwd=_REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env=env,
+        )
+
+        assert result.returncode == 0, result.stderr
+        settings_path = app_root / 'settings.json'
+        assert settings_path.is_file()
+        data = json.loads(settings_path.read_text(encoding='utf-8'))
+        assert data['llm_provider'] == 'openai'
+        assert data['llm_model'] == 'openai/gpt-4o'
+
 
 class TestSettingsValidation:
     """Tests for settings file validation."""

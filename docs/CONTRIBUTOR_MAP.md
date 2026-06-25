@@ -19,7 +19,7 @@ Install path for end users: `pipx install grinta-ai`. Contributors should use
 
 | If you are changing… | Start here | Tests nearby |
 | --- | --- | --- |
-| CLI commands, startup, slash commands | `launch/entry.py` → `backend/cli/entry.py` → `backend/cli/main.py`; REPL under `backend/cli/repl/`, settings under `backend/cli/settings/` | `backend/tests/unit/cli/` |
+| CLI commands, startup, slash commands | `launch/entry.py` → `backend/cli/entry.py` → `backend/cli/main.py`; shared slash handlers under `backend/cli/repl/slash_command_*`, TUI in `backend/cli/tui/`, noninteractive runner in `backend/cli/repl/noninteractive.py`, settings under `backend/cli/settings/` | `backend/tests/unit/cli/` |
 | TUI screens and rendering | `backend/cli/tui/app.py`, mixins under `backend/cli/tui/` | `backend/tests/unit/cli/tui/` |
 | Agent step loop (core control plane) | `backend/orchestration/session_orchestrator.py` + mixins in `backend/orchestration/mixins/` | `backend/tests/unit/orchestration/services/` |
 | Middleware (safety, cost, rollback) | `backend/orchestration/session_orchestrator.py` (pipeline list), files under `backend/orchestration/middleware/` | `backend/tests/unit/orchestration/test_*middleware*` |

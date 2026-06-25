@@ -19,7 +19,10 @@ class TestGenerateQuickstartConfig:
         assert data['llm_model'] == 'gemini-2.5-flash'
         assert 'max_budget_per_task' not in data
         assert data['llm_base_url'] == ''
-        assert data['project_root'] == './workspace'
+        assert data['llm_provider'] == 'openai'
+        assert 'agent' in data
+        assert 'security' in data
+        assert 'mcp_config' in data
 
     def test_custom_model(self):
         result = quickstart.generate_quickstart_config(model='gpt-4o')

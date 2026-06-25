@@ -57,6 +57,8 @@ The default agent name is `Orchestrator`. Common overrides:
 | `enable_hybrid_retrieval` | Hybrid search with `[rag]` (default on; same gating as vector memory). |
 | `enable_task_tracker_tool` | Structured plan tracking in Plan mode |
 
+**Disabled in v1.0 (not user-configurable today):** `enable_blackboard` and `enable_swarming` remain in the schema with default `false` but are not wired to the live tool surface. See [USER_GUIDE.md](USER_GUIDE.md#autonomy-levels-autonomy).
+
 See `backend/core/config/agent_config.py` for the full schema.
 
 ## `security` keys
@@ -72,6 +74,12 @@ See `backend/core/config/agent_config.py` for the full schema.
 | `allow_sensitive_path_access` | `false` | Allow sensitive workspace paths in hardened profiles |
 | `allow_read_outside_workspace` | `false` | Opt in to read-only paths outside the project |
 | `additional_read_roots` | `[]` | Approved absolute paths when outside reads are enabled |
+| `validation_mode` | `permissive` | `permissive` (single-user default) or `strict` conversation ownership |
+| `hardened_local_git_allowlist` | `[]` | Git subcommands allowed when `execution_profile` is `hardened_local` |
+| `hardened_local_package_allowlist` | `[]` | Package installs allowed in `hardened_local` |
+| `hardened_local_network_allowlist` | `[]` | Network command families allowed in `hardened_local` |
+
+Set `APP_STRICT_CONFIG=true` before launch to fail fast on invalid `settings.json` (default: warn and continue with defaults).
 
 ### Read-only paths outside the workspace
 

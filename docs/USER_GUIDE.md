@@ -58,10 +58,23 @@ terminal.
 uv run python -m backend.cli.entry init
 ```
 
+Non-interactive bootstrap (CI, smoke scripts, no TTY):
+
+```bash
+export LLM_API_KEY=sk-...
+export LLM_PROVIDER=openai
+grinta init --non-interactive --force
+```
+
+Or with explicit flags: `grinta init --non-interactive --provider ollama --model ollama/llama3.2 --force`. Secrets should come from the environment (`LLM_API_KEY` or provider-specific vars), not the command line.
+
 On Windows PowerShell:
 
 ```powershell
 uv run python -m backend.cli.entry init
+$env:LLM_API_KEY = 'sk-...'
+$env:LLM_PROVIDER = 'openai'
+uv run python -m backend.cli.entry init --non-interactive --force
 ```
 
 ---
@@ -74,6 +87,8 @@ Grinta has two runtime surfaces:
 
 - **Interactive TTY:** `grinta` or `uv run python -m backend.cli.entry` opens the Textual terminal app with transcript cards, HUD, dialogs, and slash commands.
 - **Non-interactive stdin:** piped input runs through `backend.cli.repl.noninteractive` and prints results without the Textual app.
+
+**Piped input semantics:** each non-empty line starts a **new** controller lifecycle. Context does not carry across lines in a pipe or here-doc. For multi-turn work, use the interactive TUI. Supported slash commands in piped mode are `/help`, `/clear`, and `/quit`; use the TUI for the full command set (`/diff`, `/autonomy`, playbooks, etc.).
 
 The same orchestrator, safety checks, provider routing, and event stream back both surfaces.
 
@@ -259,7 +274,7 @@ or conservative autonomy on unfamiliar repos. See [SETTINGS.md](SETTINGS.md) and
 There are three stored levels: **conservative**, **balanced**, and **full**. They differ only in **when the agent asks you before running an action**; execution, retries, and prompts are otherwise the same.
 
 - **Conservative** — confirm before every command, mutation, terminal/browser action, MCP call, or worker-coordination action in the confirmation flow.
-- **Balanced** (default) — confirm for high-risk or high-impact actions, including declared `HIGH` risk, dangerous commands, file edits (except `create_file`), browser actions, MCP calls, worker delegation, and blackboard writes.
+- **Balanced** (default) — confirm for high-risk or high-impact actions, including declared `HIGH` risk, dangerous commands, file edits (except `create_file`), browser actions, MCP calls, and worker delegation.
 - **Full** — never prompt for confirmation; hard safety blocks (for example CRITICAL-classified commands) still apply.
 
 Autonomy level is only meaningful in **Agent** mode. Chat and Plan modes have their own interaction contracts independent of autonomy.

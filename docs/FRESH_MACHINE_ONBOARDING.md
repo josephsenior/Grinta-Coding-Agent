@@ -4,6 +4,12 @@ Use this checklist before GA promotion, when refreshing onboarding evidence, and
 It implements the **CLI onboarding confidence** gate in
 [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
 
+## GA gate status
+
+Honest progress tracking lives in
+[onboarding_reports/GA_GATE_STATUS.md](onboarding_reports/GA_GATE_STATUS.md).
+CI smoke passes **do not** satisfy the interactive GA requirement.
+
 ## What CI automates
 
 The [**Smoke Install** workflow](../.github/workflows/smoke-install.yml) runs on
@@ -15,6 +21,7 @@ every PR and on `main` for **Linux** and **Windows**:
 | `import backend` + `grinta --help` | Yes | Yes |
 | Optional-imports verifier | Yes (from repo checkout) | No |
 | `grinta init` rejects non-TTY (exit 3) | Yes | Yes |
+| `grinta init --non-interactive` (env-based write) | Yes | Yes |
 | Interactive `grinta init` | No | No |
 | First real agent task | No | No |
 

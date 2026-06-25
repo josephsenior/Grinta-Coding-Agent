@@ -62,11 +62,13 @@ from backend.cli.tui.screen.messages import (
 from backend.cli.tui.screen.settings import (
     ScreenSettingsMixin,  # noqa: F401
 )
+from backend.cli.tui.screen.slash import ScreenSlashMixin  # noqa: F401
 from backend.cli.tui.screen.state import ScreenStateMixin  # noqa: F401
 from backend.cli.tui.screen.welcome import (
     ScreenWelcomeMixin,  # noqa: F401
 )
 from backend.core.config import AppConfig
+from backend.cli.repl.slash_registry_commands import slash_hints_from_registry
 
 
 class GrintaScreen(
@@ -77,6 +79,7 @@ class GrintaScreen(
     ScreenWelcomeMixin,
     ScreenSettingsMixin,
     ScreenInputMixin,
+    ScreenSlashMixin,
     ScreenActionsMixin,
     Screen,
 ):
@@ -136,16 +139,7 @@ class GrintaScreen(
         'user_rejected': NAVY_ERROR,
         'rate_limited': NAVY_WAITING,
     }
-    _SLASH_HINTS = {
-        '/help': '/help [--all|--search <term>|<command>]',
-        '/clear': '/clear',
-        '/settings': '/settings',
-        '/mode': '/mode [chat|plan|agent]',
-        '/health': '/health',
-        '/sessions': '/sessions [list] [--limit N] [--search TERM] [--sort updated|created|events|cost|model] [--preview N|ID] [--delete N|ID ...]',
-        '/resume': '/resume <N|session_id>',
-        '/quit': '/quit',
-    }
+    _SLASH_HINTS = slash_hints_from_registry()
     _INPUT_HEIGHT_FRACTION = 0.3
     _MIN_INPUT_HEIGHT = 6
     _ACTION_TYPE_LABELS: dict[str, str] = {
