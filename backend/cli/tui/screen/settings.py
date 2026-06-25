@@ -72,13 +72,16 @@ class ScreenSettingsMixin:
         )
 
         agent_name = self._active_agent_name()
-        previous = self._runtime_autonomy_level()
+        persisted = get_persisted_autonomy_level(agent_name)
+        runtime = self._runtime_autonomy_level()
         if (
-            previous == level
+            runtime == level
             and self._hud.state.autonomy_level == level
-            and level == get_persisted_autonomy_level(agent_name)
+            and level == persisted
         ):
             return
+        if level != persisted:
+            update_autonomy_level(level, agent_name)
         controller = self._controller
         if controller is not None:
             ac = getattr(controller, 'autonomy_controller', None)
@@ -96,8 +99,7 @@ class ScreenSettingsMixin:
             pass
         self._hud.update_autonomy(level)
         self._render_hud_bar()
-        if previous != level:
-            update_autonomy_level(level, agent_name)
+        if runtime != level or persisted != level:
             self.notify(f'Autonomy: {level}', severity='information', timeout=2.0)
 
     def _apply_hud_reasoning_effort(self, effort_value: str) -> None:
@@ -167,19 +169,18 @@ class ScreenSettingsMixin:
         )
 
         agent_name = self._active_agent_name()
+        persisted = get_persisted_interaction_mode(agent_name)
         previous = self._active_interaction_mode()
-        if (
-            previous == mode
-            and mode == get_persisted_interaction_mode(agent_name)
-        ):
+        if previous == mode and mode == persisted:
             return
+        if mode != persisted:
+            update_interaction_mode(mode, agent_name)
         self._propagate_mode_to_agent(mode)
         self._render_hud_bar()
         self._update_input_identity(mode)
         self._toggle_autonomy_tabs_visibility(mode)
         self._hud.update_interaction_mode(mode)
-        if previous != mode:
-            update_interaction_mode(mode, agent_name)
+        if previous != mode or mode != persisted:
             self.notify(f'Mode: {mode}', severity='information', timeout=2.0)
 
     def _apply_llm_config_to_active_session(self, config) -> str:

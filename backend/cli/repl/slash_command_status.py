@@ -211,41 +211,45 @@ def apply_autonomy_level(host: Any, new_level: str) -> None:
     from backend.cli.settings import get_persisted_autonomy_level, update_autonomy_level
 
     agent_name = _host_active_agent_name(host)
-    if new_level == get_persisted_autonomy_level(agent_name):
-        controller = host._controller
-        if controller is not None:
-            ac = getattr(controller, 'autonomy_controller', None)
-            if ac is not None and getattr(ac, 'autonomy_level', None) == new_level:
-                return
-
+    persisted = get_persisted_autonomy_level(agent_name)
     controller = host._controller
-    if controller is not None:
-        ac = getattr(controller, 'autonomy_controller', None)
-        if ac is not None:
-            previous = getattr(ac, 'autonomy_level', None)
-            ac.autonomy_level = new_level
-            if previous != new_level:
-                update_autonomy_level(new_level, agent_name)
-            config = getattr(host, '_config', None)
-            if config is not None:
-                try:
-                    agent_config = config.get_agent_config(agent_name)
-                    agent_config.autonomy_level = new_level
-                    setattr(config, 'autonomy_level', new_level)
-                except Exception:
-                    pass
-            hud = getattr(host, '_hud', None)
-            if hud is not None and hasattr(hud, 'update_autonomy'):
-                hud.update_autonomy(new_level)
-            if host._renderer is not None:
-                host._renderer.add_system_message(
-                    f'Autonomy set to: {new_level}', title='autonomy'
-                )
-            return
+    ac = (
+        getattr(controller, 'autonomy_controller', None)
+        if controller is not None
+        else None
+    )
+    if (
+        new_level == persisted
+        and ac is not None
+        and getattr(ac, 'autonomy_level', None) == new_level
+    ):
+        return
+
+    if new_level != persisted:
+        update_autonomy_level(new_level, agent_name)
+
+    if controller is not None and ac is not None:
+        ac.autonomy_level = new_level
+        config = getattr(host, '_config', None)
+        if config is not None:
+            try:
+                agent_config = config.get_agent_config(agent_name)
+                agent_config.autonomy_level = new_level
+                setattr(config, 'autonomy_level', new_level)
+            except Exception:
+                pass
+        hud = getattr(host, '_hud', None)
+        if hud is not None and hasattr(hud, 'update_autonomy'):
+            hud.update_autonomy(new_level)
+        if host._renderer is not None:
+            host._renderer.add_system_message(
+                f'Autonomy set to: {new_level}', title='autonomy'
+            )
+        return
     if host._renderer is not None:
         host._renderer.add_system_message(
-            'No active controller. Send a message first to initialize, then set autonomy.',
-            title='warning',
+            f'Autonomy set to: {new_level} (saved; applies on next session)',
+            title='autonomy',
         )
 
 

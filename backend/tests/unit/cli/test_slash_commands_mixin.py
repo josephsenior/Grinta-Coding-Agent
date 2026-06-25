@@ -453,9 +453,7 @@ class TestCmdAutonomy:
         assert result is True
         assert r._renderer is not None
         messages = [m for _, m in r._renderer.messages]
-        assert any(
-            'controller' in m.lower() or 'warning' in m.lower() for m in messages
-        )
+        assert any('autonomy' in m.lower() and 'full' in m.lower() for m in messages)
 
     def test_valid_level_with_controller(self) -> None:
         r = _repl()

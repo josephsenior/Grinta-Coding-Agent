@@ -263,15 +263,16 @@ class ScreenStateMixin:
         )
 
     def _current_autonomy_level(self) -> str:
+        """Return the active autonomy level (runtime mirrors settings.json after sync)."""
+        runtime = self._runtime_autonomy_level()
+        if runtime:
+            return runtime
+
         from backend.cli.settings import get_persisted_autonomy_level
 
         configured = get_persisted_autonomy_level(self._active_agent_name())
         if configured:
             return configured
-
-        runtime = self._runtime_autonomy_level()
-        if runtime:
-            return runtime
 
         return 'balanced'
 
