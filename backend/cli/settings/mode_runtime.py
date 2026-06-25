@@ -41,7 +41,7 @@ def rebuild_agent_toolset(agent: object, *, mode: str | None = None) -> None:
         try:
             agent.tools = planner.build_toolset()
         except Exception:
-            logger.debug('Failed to rebuild toolset after mode change', exc_info=True)
+            logger.warning('Failed to rebuild toolset after mode change', exc_info=True)
 
 
 def apply_interaction_mode_to_controller(controller: object, mode: str) -> None:

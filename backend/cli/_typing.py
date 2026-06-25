@@ -16,6 +16,27 @@ class SlashCommandsHost(Protocol):
     def _run_git_diff(self, git_args: list[str], cwd: Path) -> str | None: ...
 
 
+class RunHelpersHost(Protocol):
+    _agent: Any | None
+    _llm_registry: Any | None
+    _conversation_stats: Any | None
+    _runtime: Any | None
+    _memory: Any | None
+    _event_stream: Any | None
+    _controller: Any | None
+    _renderer: Any | None
+    _console: Any
+    _config: Any
+    _hud: Any
+    _loop: Any
+    _agent_task: Any | None
+    _pending_resume: str | None
+    _next_action: Any | None
+    _last_user_message: str | None
+
+    def _warn(self, msg: str) -> None: ...
+
+
 class ActionRenderersHost(Protocol):
     _reasoning: Any
     _cli_tool_icons: Any

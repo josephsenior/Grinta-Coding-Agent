@@ -57,6 +57,7 @@ Prerequisites: Python 3.12 or 3.13 and `pipx`. See [docs/INSTALL.md](docs/INSTAL
 ```bash
 pipx install grinta-ai          # base install; optional extras stay opt-in
 grinta init                     # one-time wizard: pick provider + paste key
+grinta doctor                   # verify settings, git, ripgrep, and model setup
 grinta                          # launch the terminal app in the current directory
 ```
 

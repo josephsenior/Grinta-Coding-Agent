@@ -454,6 +454,23 @@ def _collect_and_persist(
     return choices
 
 
+def _print_toolchain_hints(console: Console) -> None:
+    """Non-blocking git/rg probe during init (same checks as ``grinta doctor``)."""
+    from backend.cli.doctor.checks import check_binary
+
+    missing: list[str] = []
+    for name in ('git', 'rg'):
+        chk = check_binary(name)
+        if not chk.ok:
+            missing.append(name)
+    if missing:
+        tools = ', '.join(missing)
+        console.print(
+            f'[{CLR_STATUS_WARN}]Toolchain: {tools} not found on PATH. '
+            f'Install for full agent features; run `grinta doctor` after setup.[/]'
+        )
+
+
 def _print_success(
     console: Console,
     settings_file: Path,
@@ -483,7 +500,8 @@ def _print_success(
             f'Model: [bold]{model}[/bold]\n\n'
             f'{key_note}'
             f'Start the agent with: [{CLR_BRAND}]grinta[/]\n'
-            f'REPL commands: [{CLR_BRAND}]/help[/] · shell commands: [{CLR_BRAND}]grinta sessions ...[/]',
+            f'Verify setup: [{CLR_BRAND}]grinta doctor[/] or in the TUI ask [{CLR_BRAND}]/health[/]\n'
+            f'Slash commands: [{CLR_BRAND}]/help[/] · shell commands: [{CLR_BRAND}]grinta sessions ...[/]',
             title='Setup saved' if key_note else 'Setup complete',
             border_style=CLR_STATUS_OK,
         )
@@ -522,6 +540,7 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
     if choices is None:
         return 3
     provider, model, api_key, base_url = choices
+    _print_toolchain_hints(console)
     _print_success(console, settings_file, provider, model, project_root, api_key)
     return 0
 

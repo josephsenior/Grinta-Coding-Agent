@@ -83,7 +83,7 @@ CI’s `gates-on-linux-extended`, `gates-on-windows-extended`, and `gates-on-mac
 - [ ] **Reliability gate + integration/stress:** `make reliability-gate-integration` (adds integration and stress suites).
 - [ ] **Stress suite (spot-check):** `make test-stress` or `PYTHONPATH=. uv run pytest backend/tests/stress -m stress -q`.
 - [ ] **Integration suite (spot-check):** `make test-integration` or `PYTHONPATH=. uv run pytest backend/tests/integration -m integration -q`.
-- [ ] **Fresh-machine onboarding evidence:** keep the reports in [FRESH_MACHINE_ONBOARDING.md](FRESH_MACHINE_ONBOARDING.md) current for supported install paths (3× pipx, 3× source `uv`; Docker optional). CI smoke install still does not cover interactive `init` or a first real agent task, so refresh the manual evidence whenever onboarding-affecting changes land.
+- [ ] **Fresh-machine onboarding evidence:** keep the reports in [FRESH_MACHINE_ONBOARDING.md](FRESH_MACHINE_ONBOARDING.md) current for supported install paths (3× pipx, 3× source `uv`; Docker optional). Track honest progress in [onboarding_reports/GA_GATE_STATUS.md](onboarding_reports/GA_GATE_STATUS.md). CI smoke install still does not cover interactive `init` or a first real agent task — **do not tag `v1.0.0` until the GA gate status is green.**
 - [ ] **Evaluation (when behavior-sensitive):** run [run-eval workflow](../.github/workflows/run-eval.yml) manually or via release trigger if the release touches autonomy, prompts, safety, or orchestration. See [PROMOTION.md](PROMOTION.md#6-run-evaluation-when-the-release-deserves-it).
 
 ### Optional — full Python test tree

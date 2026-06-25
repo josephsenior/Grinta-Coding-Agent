@@ -39,6 +39,8 @@ _EPILOG = """examples:
       Start the REPL without the animated splash screen.
     grinta init
       Run the first-run wizard to configure your LLM provider.
+  grinta init --non-interactive
+      Write settings from LLM_API_KEY / LLM_PROVIDER env vars (CI and scripts).
   grinta doctor
       Run install/config/toolchain diagnostics (non-interactive).
   grinta --project /path/to/repo sessions list
@@ -138,6 +140,30 @@ def build_parser(*, include_subcommands: bool = True) -> argparse.ArgumentParser
     p_init = subparsers.add_parser(
         'init', help='First-run wizard: pick provider, paste key, write settings.json'
     )
+    p_init.add_argument(
+        '--non-interactive',
+        action='store_true',
+        help='Write settings from env/flags without the wizard (for CI and scripts)',
+    )
+    p_init.add_argument(
+        '--provider',
+        help='LLM provider id (or set LLM_PROVIDER)',
+    )
+    p_init.add_argument(
+        '--model',
+        '-m',
+        dest='init_model',
+        help='Model id (or set LLM_MODEL)',
+    )
+    p_init.add_argument(
+        '--base-url',
+        help='OpenAI-compatible base URL (or set LLM_BASE_URL)',
+    )
+    p_init.add_argument(
+        '--force',
+        action='store_true',
+        help='Overwrite an existing settings.json',
+    )
     p_init.set_defaults(func=_run_init)
 
     p_doctor = subparsers.add_parser(
@@ -228,21 +254,42 @@ def _pin_project(project: str | None) -> None:
 
 
 def _run_init(_args: argparse.Namespace) -> int:
-    if not sys.stdin.isatty():
+    from backend.cli.main import _load_dotenv_early
+
+    project = getattr(_args, 'project', None)
+    _pin_project(project)
+    _load_dotenv_early(explicit_project=project)
+
+    non_interactive = bool(getattr(_args, 'non_interactive', False))
+    if not sys.stdin.isatty() and not non_interactive:
         print(
-            'grinta init is interactive. Run it in a terminal, or create '
-            'settings.json and .env manually under your Grinta settings root.',
+            'grinta init is interactive. Run it in a terminal, pass '
+            '`grinta init --non-interactive` with LLM_API_KEY / LLM_PROVIDER set, '
+            'or create settings.json and .env manually under your Grinta settings root.',
             file=sys.stderr,
         )
         return 3
+
+    if non_interactive or not sys.stdin.isatty():
+        from rich.console import Console
+
+        from backend.cli.onboarding.init_noninteractive import run_noninteractive_init
+        from backend.cli.theme import no_color_enabled
+
+        return run_noninteractive_init(
+            project_root=Path(project) if project else None,
+            provider=getattr(_args, 'provider', None),
+            model=getattr(_args, 'init_model', None),
+            base_url=getattr(_args, 'base_url', None),
+            force=bool(getattr(_args, 'force', False)),
+            console=Console(no_color=no_color_enabled()),
+        )
 
     from rich.console import Console
 
     from backend.cli.onboarding.init_wizard import run_init
     from backend.cli.theme import no_color_enabled
 
-    project = getattr(_args, 'project', None)
-    _pin_project(project)
     return run_init(
         project_root=Path(project) if project else None,
         console=Console(no_color=no_color_enabled()),

@@ -10,6 +10,8 @@
 | Python version | |
 | Grinta version | `grinta --version` or PyPI tag |
 | Machine | Fresh VM / hardware (no prior `~/.grinta`) |
+| Evidence type | `interactive-fresh-machine` or `ci-smoke-only` |
+| TTY for `grinta init` | yes / no (CI stubs = no) |
 
 ## Provider setup
 

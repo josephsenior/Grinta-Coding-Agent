@@ -211,7 +211,8 @@ def run_onboarding() -> AppConfig:
     if not os.isatty(0):
         _console.print(
             f'[{CLR_STATUS_ERR}]No API key configured.[/]\n'
-            'Run [bold]grinta init[/bold] in an interactive terminal to set provider, model, and API key,\n'
+            'Run [bold]grinta init[/bold] in an interactive terminal, '
+            '[bold]grinta init --non-interactive[/bold] with LLM_API_KEY set, '
             'or create [bold]settings.json[/bold] and [bold].env[/bold] under your app settings root.'
         )
         raise SystemExit(1)

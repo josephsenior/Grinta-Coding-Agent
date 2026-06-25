@@ -187,9 +187,14 @@ class StepGuardService:
             active_run_mode = extra.get('active_run_mode')
         from backend.core.interaction_modes import resolve_active_interaction_mode
 
+        agent = getattr(controller, 'agent', None)
+        agent_config = getattr(agent, 'config', None) if agent is not None else None
+        configured_mode = (
+            getattr(agent_config, 'mode', 'agent') if agent_config is not None else 'agent'
+        )
         mode = resolve_active_interaction_mode(
             active_run_mode=active_run_mode,
-            configured_mode=getattr(config, 'mode', 'agent') if config is not None else 'agent',
+            configured_mode=configured_mode,
         )
         prepare_next_agent_step(state, mode)
 

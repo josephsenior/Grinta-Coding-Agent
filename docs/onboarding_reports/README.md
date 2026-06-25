@@ -14,20 +14,28 @@ Examples:
 
 Copy [REPORT_TEMPLATE.md](REPORT_TEMPLATE.md) for each run.
 
+## GA gate status
+
+See [GA_GATE_STATUS.md](GA_GATE_STATUS.md) for the honest interactive vs CI-only count.
+**GA onboarding is not signed off** until three interactive fresh-machine reports
+exist per required path (pipx + source uv).
+
 ## Tracking matrix
 
-Update the table when a report is filed. Target: **6 reports minimum** (3× pipx, 3× source).
+Update the table when a report is filed. Target: **6 interactive reports minimum**
+(3× pipx, 3× source). Rows marked `ci-only` do **not** count toward GA.
 
-| # | Path | OS | Report file | Install | `grinta init` | TUI launch | First task | Status |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | pipx | Linux | [2026-06-25_pipx_linux_1.md](2026-06-25_pipx_linux_1.md) | pass (CI wheel) | pass (non-TTY) | CI integration | stub task | filed |
-| 2 | pipx | Linux | — | — | — | — | — | pending (manual VM) |
-| 3 | pipx | Windows | [2026-06-25_pipx_windows_1.md](2026-06-25_pipx_windows_1.md) | pass (wheel smoke) | pass | pass | pass | filed |
-| 4 | source uv | Linux | [2026-06-25_source_linux_1.md](2026-06-25_source_linux_1.md) | pass (CI) | pass (non-TTY) | CI | stub | filed |
-| 5 | source uv | Linux | [2026-06-25_source_linux_2.md](2026-06-25_source_linux_2.md) | pass (CI) | pass | CI | integration | filed |
-| 6 | source uv | Windows | [2026-06-25_source_windows_1.md](2026-06-25_source_windows_1.md) | pass | pass | pass | pass | filed |
+| # | Path | OS | Report file | Evidence | Install | `grinta init` | TUI launch | First task | GA credit |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | pipx | Linux | [2026-06-25_pipx_linux_1.md](2026-06-25_pipx_linux_1.md) | ci-only | pass (CI wheel) | pass (non-TTY) | CI integration | stub task | no |
+| 2 | pipx | Linux | — | — | — | — | — | — | pending |
+| 3 | pipx | Windows | [2026-06-25_pipx_windows_1.md](2026-06-25_pipx_windows_1.md) | partial | pass (wheel smoke) | pass | pass | pass | partial |
+| 4 | source uv | Linux | [2026-06-25_source_linux_1.md](2026-06-25_source_linux_1.md) | ci-only | pass (CI) | pass (non-TTY) | CI | stub | no |
+| 5 | source uv | Linux | [2026-06-25_source_linux_2.md](2026-06-25_source_linux_2.md) | ci-only | pass (CI) | pass | CI | integration | no |
+| 6 | source uv | Windows | [2026-06-25_source_windows_1.md](2026-06-25_source_windows_1.md) | interactive | pass | pass | pass | pass | yes |
+| 7 | source uv | Windows | [2026-06-25_source_windows_2.md](2026-06-25_source_windows_2.md) | ci-only | pass | pass (non-TTY guard) | n/a | n/a | no |
 
-Additional Windows source smoke report: [2026-06-25_source_windows_2.md](2026-06-25_source_windows_2.md).
+**Interactive credits toward GA today:** 1 partial (pipx Windows) + 1 (source Windows) — need 4+ more full interactive runs.
 
 Optional: one Docker smoke report (`scripts/smoke/Dockerfile.smoke`) and one macOS pipx report when expanding the support matrix.
 

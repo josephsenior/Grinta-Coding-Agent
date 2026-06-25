@@ -321,3 +321,19 @@ def iter_command_completion_entries() -> list[tuple[str, str]]:
         entries.append((spec.name, spec.description))
         entries.extend((alias, f'Alias for {spec.name}') for alias in spec.aliases)
     return entries
+
+
+def slash_hints_from_registry() -> dict[str, str]:
+    """Map command names to syntax strings for TUI autocomplete and help."""
+    hints: dict[str, str] = {}
+    for spec in _SLASH_COMMANDS:
+        hints[spec.name] = spec.usage
+        for alias in spec.aliases:
+            hints[alias] = spec.usage
+    for spec in _PLAYBOOK_SLASH_COMMANDS:
+        hints[spec.name] = spec.usage
+    hints['/quit'] = '/quit'
+    hints['/exit'] = '/exit'
+    hints['/clear'] = '/clear'
+    hints['/c'] = '/clear'
+    return hints

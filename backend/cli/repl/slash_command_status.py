@@ -280,31 +280,51 @@ def cmd_autonomy(host: Any, parsed: Any) -> bool:
     return True
 
 
-def get_current_interaction_mode(host: Any) -> str:
-    from backend.core.interaction_modes import normalize_interaction_mode
+def _host_active_run_mode(host: Any) -> object:
+    controller = getattr(host, '_controller', None)
+    if controller is None:
+        return None
+    state = getattr(controller, 'state', None)
+    if state is None:
+        return None
+    extra = getattr(state, 'extra_data', None)
+    if not isinstance(extra, dict):
+        return None
+    return extra.get('active_run_mode')
 
+
+def get_current_interaction_mode(host: Any) -> str:
+    from backend.core.interaction_modes import (
+        normalize_interaction_mode,
+        resolve_active_interaction_mode,
+    )
+
+    configured_mode: object = None
     controller = host._controller
     if controller is not None:
         agent = getattr(controller, 'agent', None)
         running_config = getattr(agent, 'config', None) if agent is not None else None
         if running_config is not None:
-            mode = getattr(running_config, 'mode', None)
-            if mode:
-                return normalize_interaction_mode(mode)
-    config = getattr(host, '_config', None)
-    if config is not None:
-        try:
-            agent_name = _host_active_agent_name(host)
-            agent_config = config.get_agent_config(agent_name)
-            return normalize_interaction_mode(getattr(agent_config, 'mode', None))
-        except Exception:
-            pass
-    from backend.cli.settings import get_persisted_interaction_mode
+            configured_mode = getattr(running_config, 'mode', None)
+    if configured_mode is None:
+        config = getattr(host, '_config', None)
+        if config is not None:
+            try:
+                agent_name = _host_active_agent_name(host)
+                agent_config = config.get_agent_config(agent_name)
+                configured_mode = getattr(agent_config, 'mode', None)
+            except Exception:
+                pass
+    if configured_mode is None:
+        from backend.cli.settings import get_persisted_interaction_mode
 
-    persisted = get_persisted_interaction_mode(_host_active_agent_name(host))
-    if persisted:
-        return persisted
-    return 'agent'
+        persisted = get_persisted_interaction_mode(_host_active_agent_name(host))
+        if persisted:
+            configured_mode = persisted
+    return resolve_active_interaction_mode(
+        active_run_mode=_host_active_run_mode(host),
+        configured_mode=configured_mode or 'agent',
+    )
 
 
 def show_current_interaction_mode(host: Any, valid_modes: tuple[str, ...]) -> None:
