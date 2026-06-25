@@ -157,7 +157,10 @@ def cmd_health(host: Any, parsed: Any) -> bool:
     """Run a fast self-check using the shared doctor check registry."""
     if host._reject_extra_args(parsed):
         return True
-    from backend.cli.doctor.checks import collect_health_checks, format_health_report_lines
+    from backend.cli.doctor.checks import (
+        collect_health_checks,
+        format_health_report_lines,
+    )
 
     model_hint = getattr(host._hud.state, 'model', None)
     checks = collect_health_checks(model_hint=model_hint)
@@ -299,7 +302,6 @@ def _host_active_run_mode(host: Any) -> object:
 
 def get_current_interaction_mode(host: Any) -> str:
     from backend.core.interaction_modes import (
-        normalize_interaction_mode,
         resolve_active_interaction_mode,
     )
 
@@ -349,9 +351,15 @@ def show_current_interaction_mode(host: Any, valid_modes: tuple[str, ...]) -> No
 
 
 def apply_interaction_mode(host: Any, new_mode: str) -> None:
-    from backend.cli.settings import get_persisted_interaction_mode, update_interaction_mode
+    from backend.cli.settings import (
+        get_persisted_interaction_mode,
+        update_interaction_mode,
+    )
     from backend.cli.settings.mode_runtime import apply_interaction_mode_to_controller
-    from backend.core.interaction_modes import VISIBLE_INTERACTION_MODES, normalize_interaction_mode
+    from backend.core.interaction_modes import (
+        VISIBLE_INTERACTION_MODES,
+        normalize_interaction_mode,
+    )
 
     mode = normalize_interaction_mode(new_mode)
     if mode not in VISIBLE_INTERACTION_MODES:

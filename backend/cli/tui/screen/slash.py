@@ -86,7 +86,6 @@ class ScreenSlashMixin(SlashCommandsMixin):
             self.app.exit()
 
     def _cmd_exit(self, parsed: Any) -> bool:
-        del parsed
         self._init_slash_renderer()
         from backend.cli.repl.slash_command_actions import cmd_exit
 

@@ -150,7 +150,9 @@ class ScreenSettingsMixin:
         self._update_mode_extra_data(controller, mode)
 
     def _apply_mode_to_controller(self, controller, mode: str) -> None:
-        from backend.cli.settings.mode_runtime import apply_interaction_mode_to_controller
+        from backend.cli.settings.mode_runtime import (
+            apply_interaction_mode_to_controller,
+        )
 
         apply_interaction_mode_to_controller(controller, mode)
 

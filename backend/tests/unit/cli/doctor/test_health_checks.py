@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
-
 from backend.cli.doctor.checks import (
     collect_health_checks,
     format_health_report_lines,

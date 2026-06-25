@@ -16,6 +16,7 @@ from textual.screen import Screen
 
 from backend.cli.display.hud import HUDBar
 from backend.cli.display.reasoning_display import ReasoningDisplay
+from backend.cli.repl.slash_registry_commands import slash_hints_from_registry
 from backend.cli.theme import (
     NAVY_ERROR,
     NAVY_READY,
@@ -68,7 +69,6 @@ from backend.cli.tui.screen.welcome import (
     ScreenWelcomeMixin,  # noqa: F401
 )
 from backend.core.config import AppConfig
-from backend.cli.repl.slash_registry_commands import slash_hints_from_registry
 
 
 class GrintaScreen(

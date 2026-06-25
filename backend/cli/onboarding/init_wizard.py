@@ -30,6 +30,7 @@ from rich.table import Table
 
 from backend.cli.onboarding.connection_check import validate_connection
 from backend.cli.onboarding.provider_presets import ONBOARDING_PROVIDER_PRESETS
+from backend.cli.onboarding.settings_defaults import build_init_settings
 from backend.cli.theme import (
     CLR_BRAND,
     CLR_CARD_BORDER,
@@ -39,7 +40,6 @@ from backend.cli.theme import (
     CLR_STATUS_WARN,
     no_color_enabled,
 )
-from backend.cli.onboarding.settings_defaults import build_init_settings
 from backend.core.app_paths import get_canonical_settings_path
 from backend.core.config.dotenv_keys import persist_llm_api_key_to_dotenv
 from backend.inference.provider_resolver import (

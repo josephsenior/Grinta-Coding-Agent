@@ -12,7 +12,6 @@ from backend.tests.unit.cli.frontend._shared import (
     _build_help_markdown,
     _configure_redirected_streams,
     _console_output,
-    _make_config,
     _make_console,
     _parse_slash_command,
     _prompt_toolkit_available,
