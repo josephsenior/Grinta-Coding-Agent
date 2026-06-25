@@ -78,7 +78,7 @@ jobs:
           node-version: '22'
 
       - name: Set up Python
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: '3.12'
 
@@ -205,7 +205,7 @@ jobs:
           path: ./
 
       - name: Create Release
-        uses: ncipollo/release-action@440c8c1cb0ed28b9f43e4d1d670870f059653174
+        uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd
         with:
           artifacts: "*.vsix"
           token: ${{ secrets.GITHUB_TOKEN }}
