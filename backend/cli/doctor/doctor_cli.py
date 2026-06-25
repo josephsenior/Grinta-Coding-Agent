@@ -13,10 +13,16 @@ from rich.table import Table
 
 from backend.cli.doctor.checks import (
     DoctorCheck,
-    check_binary as _check_binary,
-    check_llm_config as _check_llm_config,
-    check_settings_schema as _check_settings_schema,
     collect_doctor_checks,
+)
+from backend.cli.doctor.checks import (
+    check_binary as _check_binary,
+)
+from backend.cli.doctor.checks import (
+    check_llm_config as _check_llm_config,
+)
+from backend.cli.doctor.checks import (
+    check_settings_schema as _check_settings_schema,
 )
 from backend.cli.theme import (
     CLR_CARD_BORDER,

@@ -9,7 +9,6 @@ for _name in dir(_shared):
 
 from backend.tests.unit.cli.frontend._shared import (
     _console_output,
-    _make_config,
     _make_console,
 )
 from backend.tests.unit.cli.helpers.slash_host import make_slash_host

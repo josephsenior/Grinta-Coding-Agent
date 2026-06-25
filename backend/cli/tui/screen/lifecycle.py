@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import time as _time
-from typing import Any
 
 from textual.app import ComposeResult
 from textual.containers import (
@@ -16,19 +14,13 @@ from textual.widgets import (
     TextArea,
 )
 
-from backend.app.agent_control_loop import run_agent_until_done
-from backend.app.main import (
-    create_agent,
-    create_registry_and_conversation_stats,
-)
 from backend.app.setup import (
-    create_controller,
-    create_memory,
-    create_runtime,
     generate_sid,
 )
 from backend.cli.tui.constants import _tui_logger
 from backend.cli.tui.dialogs import ConfirmWidget, GrintaHelpDialog
+from backend.cli.tui.screen.lifecycle_bootstrap import ScreenLifecycleBootstrapMixin
+from backend.cli.tui.screen.lifecycle_dispatch import ScreenLifecycleDispatchMixin
 from backend.cli.tui.widgets.collapsible import CollapsibleSection
 from backend.cli.tui.widgets.small import (
     HUD,
@@ -39,22 +31,11 @@ from backend.cli.tui.widgets.small import (
     RendererDrainRequested,
     Transcript,
 )
-from backend.core.constants import DEFAULT_TUI_DISPATCH_TIMEOUT_SECONDS
-from backend.core.enums import AgentState, EventSource
 from backend.core.logging.logger import app_logger as logger
 from backend.ledger import EventStream, EventStreamSubscriber
-from backend.ledger.action import (
-    MessageAction,
-)
-from backend.ledger.observation import (
-    StatusObservation,
-)
 from backend.persistence import get_file_store
 from backend.persistence.locations import get_local_data_root
 
-
-from backend.cli.tui.screen.lifecycle_bootstrap import ScreenLifecycleBootstrapMixin
-from backend.cli.tui.screen.lifecycle_dispatch import ScreenLifecycleDispatchMixin
 
 class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatchMixin):
     """Lifecycle-related methods of GrintaScreen."""
@@ -324,7 +305,9 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
             self._memory_stub = memory
             self._controller = controller
 
-            from backend.cli.settings.bootstrap_sync import sync_controller_persisted_settings
+            from backend.cli.settings.bootstrap_sync import (
+                sync_controller_persisted_settings,
+            )
 
             sync_controller_persisted_settings(
                 controller,

@@ -34,9 +34,9 @@ from backend.cli.repl.slash_registry_clipboard import (
 )
 from backend.cli.repl.slash_registry_commands import (
     _AUTONOMY_LEVEL_HINTS,
-    _INTERACTION_MODE_HINTS,
     _COMMAND_ALIASES,
     _COMMAND_NAMES,
+    _INTERACTION_MODE_HINTS,
     _KNOWN_MODELS,
     _PLAYBOOK_SLASH_COMMANDS,
     _SLASH_COMMANDS,

@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from backend.core.constants import DEFAULT_STUCK_COOLDOWN_TURNS
-from backend.core.interaction_modes import normalize_interaction_mode
 from backend.core.logging.logger import app_logger as logger
 from backend.core.schemas import AgentState
 from backend.execution.aes.policy_block_messages import (
@@ -180,7 +179,6 @@ class StepGuardService:
     @staticmethod
     def _prepare_agent_protocol_directive(controller: 'SessionOrchestrator') -> None:
         state = getattr(controller, 'state', None)
-        config = getattr(controller, 'config', None)
         active_run_mode = None
         extra = getattr(state, 'extra_data', None) if state is not None else None
         if isinstance(extra, dict):

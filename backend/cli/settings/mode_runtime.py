@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from backend.core.interaction_modes import is_chat_mode, normalize_interaction_mode
 
