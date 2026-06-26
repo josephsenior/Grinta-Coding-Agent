@@ -19,10 +19,10 @@ class NullActionReason:
     """Legitimate placeholder: bootstrap init or orphaned-observation pairing."""
 
     FALLBACK_EMPTY = 'fallback_empty_response'
-    """LLM produced no tool calls and no text — now raises LLMNoActionError
-    instead of becoming a NullAction, but this constant is preserved for
-    any direct NullAction construction that represents a genuine empty-response
-    fallback (e.g. in tests or future edge cases)."""
+    """LLM produced no tool calls and no visible text yet (e.g. reasoning-only)."""
+
+    REASONING_ONLY = 'reasoning_only'
+    """Model streamed internal reasoning without tool calls or user-facing text."""
 
 
 @dataclass

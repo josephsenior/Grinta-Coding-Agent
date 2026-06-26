@@ -19,9 +19,6 @@ from backend.core.tasks.task_status import (
 TRACKER_CREATED_KEY = '__agent_protocol_tracker_created'
 VALIDATOR_FAILURE_COUNTER_KEY = '__agent_protocol_validator_failure_counter'
 
-ABANDONED_RETRY_PROMPT = 'Run paused because the model returned no usable output.'
-
-
 PROTOCOL_MODES = frozenset({AGENT_MODE, PLAN_MODE})
 
 
