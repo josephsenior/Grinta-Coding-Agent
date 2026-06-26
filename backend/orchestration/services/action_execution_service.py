@@ -18,7 +18,6 @@ from backend.core.errors import (
     FunctionCallValidationError,
     LLMContextWindowExceedError,
     LLMMalformedActionError,
-    LLMNoActionError,
     LLMResponseError,
 )
 from backend.core.logging.logger import app_logger as logger
@@ -38,7 +37,6 @@ from backend.ledger.action.agent import CondensationAction, CondensationRequestA
 from backend.ledger.action.empty import NullActionReason
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.status import StatusObservation
-from backend.orchestration.agent.agent_protocol import ABANDONED_RETRY_PROMPT
 
 if TYPE_CHECKING:
     from backend.orchestration.services.orchestration_context import (
@@ -399,8 +397,6 @@ class ActionExecutionService:
             return f'Tool validation failed: {exc}'
         if isinstance(exc, FunctionCallNotExistsError):
             return f'Tool not found: {exc}'
-        if isinstance(exc, LLMNoActionError):
-            return 'No tool call or final text was detected.'
         return str(exc)
 
     def _publish_repair_error_observation(
@@ -438,32 +434,6 @@ class ActionExecutionService:
         if controller.get_agent_state() == _AgentState.RUNNING:  # type: ignore[attr-defined]
             await controller.set_agent_state_to(_AgentState.ERROR)  # type: ignore[attr-defined]
 
-    async def _pause_after_llm_no_action_repair_exhausted(
-        self,
-        controller: object,
-        *,
-        attempts: int,
-    ) -> None:
-        from backend.core.schemas import AgentState as _AgentState
-
-        event_stream = self._context.event_stream
-        if event_stream is not None:
-            event_stream.add_event(
-                ErrorObservation(
-                    content=ABANDONED_RETRY_PROMPT,
-                    error_id='LLM_NO_ACTION_REPAIR_EXHAUSTED',
-                    agent_only=False,
-                ),
-                EventSource.AGENT,
-            )
-        else:
-            logger.warning(
-                'ActionExecutionService could not publish no-action repair exhaustion '
-                'because event_stream is unavailable'
-            )
-        if controller.get_agent_state() == _AgentState.RUNNING:  # type: ignore[attr-defined]
-            await controller.set_agent_state_to(_AgentState.AWAITING_USER_INPUT)  # type: ignore[attr-defined]
-
     async def _handle_repairable_action_error(
         self,
         exc: Exception,
@@ -495,12 +465,6 @@ class ActionExecutionService:
                 identical_error_count,
                 error_signature,
             )
-            if isinstance(exc, LLMNoActionError):
-                await self._pause_after_llm_no_action_repair_exhausted(
-                    controller,
-                    attempts=identical_error_count,
-                )
-                return False, error_logged, error_signature, identical_error_count
             await self._set_controller_error_if_running(controller)
             return False, error_logged, error_signature, identical_error_count
 
@@ -508,17 +472,6 @@ class ActionExecutionService:
             await self._yield_for_repair_retry()
             return True, error_logged, error_signature, identical_error_count
 
-        if isinstance(exc, LLMNoActionError):
-            logger.error(
-                'get_next_action exhausted %d no-action repair attempts; '
-                'pausing for user input',
-                max_repair_attempts,
-            )
-            await self._pause_after_llm_no_action_repair_exhausted(
-                controller,
-                attempts=max_repair_attempts + 1,
-            )
-            return False, error_logged, error_signature, identical_error_count
         logger.error(
             'get_next_action exhausted %d repair attempts; transitioning to ERROR state',
             max_repair_attempts,
@@ -549,7 +502,6 @@ class ActionExecutionService:
 
             except (
                 LLMMalformedActionError,
-                LLMNoActionError,
                 LLMResponseError,
                 FunctionCallValidationError,
                 FunctionCallNotExistsError,
@@ -588,9 +540,11 @@ class ActionExecutionService:
         return None
 
     async def _handle_consecutive_null_action(self, action: Action) -> Action | None:
-        # Sentinel NullActions (bootstrap init, orphaned-observation pairing) are
-        # legitimate no-ops and must never contribute to the consecutive-null counter.
-        if getattr(action, 'reason', '') == NullActionReason.SENTINEL:
+        # Sentinel and reasoning-only no-ops must not trip the consecutive-null counter.
+        if getattr(action, 'reason', '') in {
+            NullActionReason.SENTINEL,
+            NullActionReason.REASONING_ONLY,
+        }:
             return action
 
         self._consecutive_null_actions += 1

@@ -55,7 +55,7 @@ def _protocol_mode_fallback_message(
 
 def _build_fallback_action(orch: Orchestrator, result) -> Action:
     """Create a final message action when parsing produced no durable action."""
-    from backend.core.errors import LLMNoActionError
+    from backend.ledger.action.empty import NullAction, NullActionReason
 
     message_text = ''
     message = None
@@ -67,13 +67,16 @@ def _build_fallback_action(orch: Orchestrator, result) -> Action:
             message_text = raw if isinstance(raw, str) else str(raw)
 
     if not message_text.strip():
-        raise LLMNoActionError('LLM returned no tool calls and no content.')
+        logger.debug(
+            'LLM returned no tool calls and no content; continuing the run.'
+        )
+        return NullAction(reason=NullActionReason.REASONING_ONLY)
     message_text = _visible_fallback_message_text(message_text)
     if not message_text.strip():
-        raise LLMNoActionError(
-            'LLM returned only internal tool-call transport markers and no '
-            'valid tool action.'
+        logger.debug(
+            'LLM returned only internal tool-call transport markers; continuing the run.'
         )
+        return NullAction(reason=NullActionReason.REASONING_ONLY)
 
     reasoning = ''
     if message is not None:

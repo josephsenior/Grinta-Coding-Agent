@@ -8,10 +8,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.core.errors import LLMNoActionError
 from backend.engine.executor import OrchestratorExecutor
 from backend.engine.orchestrator import Orchestrator
 from backend.ledger.action import Action, MessageAction
+from backend.ledger.action.empty import NullAction, NullActionReason
 
 
 def _make_result(content: str) -> SimpleNamespace:
@@ -65,30 +65,31 @@ def _build_fallback_action(orch: Orchestrator, result: object) -> Action:
 class TestBuildFallbackAction:
     """Integration-level tests for _build_fallback_action."""
 
-    def test_empty_content_raises_llm_no_action_error(self) -> None:
-        """Empty LLM response must raise LLMNoActionError, not silently produce NullAction."""
+    def test_empty_content_returns_reasoning_only_null_action(self) -> None:
+        """Empty LLM responses continue the run instead of pausing."""
         orch = _make_orchestrator()
-        with pytest.raises(LLMNoActionError):
-            _build_fallback_action(orch, _make_result(''))
+        action = _build_fallback_action(orch, _make_result(''))
+        assert isinstance(action, NullAction)
+        assert action.reason == NullActionReason.REASONING_ONLY
 
-    def test_whitespace_only_raises_llm_no_action_error(self) -> None:
-        """Whitespace-only LLM response must raise LLMNoActionError."""
+    def test_whitespace_only_returns_reasoning_only_null_action(self) -> None:
         orch = _make_orchestrator()
-        with pytest.raises(LLMNoActionError):
-            _build_fallback_action(orch, _make_result('   \n  '))
+        action = _build_fallback_action(orch, _make_result('   \n  '))
+        assert isinstance(action, NullAction)
+        assert action.reason == NullActionReason.REASONING_ONLY
 
-    def test_no_response_raises_llm_no_action_error(self) -> None:
-        """No response object at all must raise LLMNoActionError."""
+    def test_no_response_returns_reasoning_only_null_action(self) -> None:
         orch = _make_orchestrator()
         result = SimpleNamespace(actions=[], response=None, execution_time=0.0)
-        with pytest.raises(LLMNoActionError):
-            _build_fallback_action(orch, result)
+        action = _build_fallback_action(orch, result)
+        assert isinstance(action, NullAction)
+        assert action.reason == NullActionReason.REASONING_ONLY
 
-    def test_marker_only_content_raises_llm_no_action_error(self) -> None:
-        """Internal tool-call transport residue must not become visible prose."""
+    def test_marker_only_content_returns_reasoning_only_null_action(self) -> None:
         orch = _make_orchestrator()
-        with pytest.raises(LLMNoActionError):
-            _build_fallback_action(orch, _make_result('[END_TOOL_CALL]'))
+        action = _build_fallback_action(orch, _make_result('[END_TOOL_CALL]'))
+        assert isinstance(action, NullAction)
+        assert action.reason == NullActionReason.REASONING_ONLY
 
     @pytest.mark.parametrize(
         'text',

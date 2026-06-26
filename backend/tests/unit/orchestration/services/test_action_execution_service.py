@@ -9,7 +9,6 @@ from backend.core.errors import (
     FunctionCallValidationError,
     LLMContextWindowExceedError,
     LLMMalformedActionError,
-    LLMNoActionError,
     LLMResponseError,
 )
 from backend.inference.exceptions import (
@@ -94,21 +93,6 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(result)
         self.mock_context.event_stream.add_event.assert_called_once()
 
-    async def test_get_next_action_no_action_error(self):
-        """Test get_next_action handles LLMNoActionError."""
-        self.mock_context.agent.step.side_effect = LLMNoActionError('No action')
-
-        result = await self.service.get_next_action()
-
-        # Should return None, emit hidden repair feedback, then a visible pause notice.
-        self.assertIsNone(result)
-        self.assertEqual(self.mock_context.event_stream.add_event.call_count, 2)
-        final_event = self.mock_context.event_stream.add_event.call_args_list[-1].args[
-            0
-        ]
-        self.assertEqual(final_event.error_id, 'LLM_NO_ACTION_REPAIR_EXHAUSTED')
-        self.assertFalse(final_event.agent_only)
-
     async def test_get_next_action_response_error(self):
         """Test get_next_action handles LLMResponseError."""
         self.mock_context.agent.step.side_effect = LLMResponseError('Response error')
@@ -178,13 +162,6 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaises(RateLimitError):
             await self.service.get_next_action()
-
-    def test_format_repair_error_message_is_brief_for_llm_no_action(self):
-        msg = self.service._format_repair_error_message(LLMNoActionError('no action'))
-
-        self.assertIn('No tool call or final text was detected', msg)
-        self.assertNotIn('terminal_manager', msg)
-        self.assertNotIn('communicate_with_user', msg)
 
     async def test_get_next_action_recovers_first_round_then_pauses(self):
         """Null-action loop uses two-round recovery before pausing.
@@ -540,6 +517,18 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
 
         sentinel = NullAction(reason=NullActionReason.SENTINEL)
         self.mock_context.agent.astep = AsyncMock(return_value=sentinel)
+
+        for _ in range(10):
+            await self.service.get_next_action()
+
+        self.assertEqual(self.service._consecutive_null_actions, 0)
+
+    async def test_reasoning_only_null_action_counter_stays_zero(self):
+        """Reasoning-only turns must not trip the consecutive-null breaker."""
+        from backend.ledger.action.empty import NullActionReason
+
+        reasoning_only = NullAction(reason=NullActionReason.REASONING_ONLY)
+        self.mock_context.agent.astep = AsyncMock(return_value=reasoning_only)
 
         for _ in range(10):
             await self.service.get_next_action()
