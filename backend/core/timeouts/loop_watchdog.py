@@ -1,15 +1,15 @@
 """Out-of-loop watchdog for the main asyncio event loop.
 
-The agent's in-loop safety nets — the step liveness ceiling
-(``DEFAULT_STEP_TASK_LIVENESS_SECONDS``), the per-chunk LLM timeout, and the
-observation-handler timeout — are all implemented with ``asyncio`` timers.
+The agent's in-loop safety nets — the per-chunk LLM timeout
+(``APP_LLM_STREAM_CHUNK_TIMEOUT_SECONDS``) and the observation-handler
+timeout — are all implemented with ``asyncio`` timers.
 That means they share the very loop they are meant to protect: if a
 **synchronous / blocking call runs on the loop thread** (a sync bridge such as
 ``call_async_from_sync`` reached from an ``async`` path, a native C call that
 holds the GIL, a frozen socket, …) the loop stops turning, *no* timer can
 fire, and the freeze leaves **no log line at all** until it ends.  On resume
 every overdue timer fires at once — which is exactly the "agent stopped for no
-reason, then a 600s/1800s timeout tripped together" signature.
+reason, then stalled chunk/observation timers tripped together" signature.
 
 This module closes that blind spot with a **dedicated OS thread** that does not
 depend on the loop:

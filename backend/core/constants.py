@@ -66,12 +66,6 @@ DEFAULT_PENDING_ACTION_TIMEOUT = 120.0
 # instead of letting the agent wedge in RUNNING.  10s is generous for normal
 # observation processing but short enough to recover within a single TUI poll.
 DEFAULT_OBSERVATION_HANDLER_TIMEOUT_SECONDS = 10.0
-# Wall-clock cap on a single step drain iteration.  If a single
-# ``_step_inner`` call exceeds this, we force-complete the step task so
-# the next iteration can start.  This is a coarse controller backstop for
-# non-LLM hangs in action execution, tool pipelines, plugin hooks, etc.;
-# LLM streaming liveness is handled by first-chunk/per-chunk timeouts.
-DEFAULT_STEP_TASK_LIVENESS_SECONDS = 600.0
 # When no runnable action is awaiting an observation, step barriers only drain
 # background asyncio tasks and return quickly.
 DRAIN_STEP_BARRIER_IDLE_DEFAULT_SECONDS = 2.0
@@ -87,8 +81,8 @@ DEFAULT_AGENT_RUN_HARD_TIMEOUT_SECONDS = float(
 )
 # ── Event-loop stall watchdog (backend.core.loop_watchdog) ──────────
 # A dedicated OS thread monitors the main asyncio loop for freezes that the
-# in-loop timers (liveness ceiling, chunk timeout, observation-handler
-# timeout) physically *cannot* catch — a blocked loop cannot fire its own
+# in-loop timers (chunk timeout, observation-handler timeout) physically
+# *cannot* catch — a blocked loop cannot fire its own
 # timers, so such a freeze leaves no log line and no recovery until it ends.
 # When the loop stops ticking for LOOP_WATCHDOG_STALL_SECONDS the watchdog
 # dumps every thread's stack so the blocking call names itself.  When the
@@ -113,7 +107,7 @@ LOOP_WATCHDOG_SUSPEND_SECONDS = float(
 )
 # A single ``run_agent_until_done`` poll sleeps ~0.5s.  If one sleep overruns
 # by more than this, the process/loop was frozen (OS sleep/hibernate, or a
-# blocking call on the loop thread that the liveness ceiling force-cancels).
+# blocking call on the loop thread).
 # Frozen wall-clock time is *not* the agent failing to make progress, so it is
 # credited back to the hard-timeout budget instead of tripping a spurious
 # ERROR — the agent resumes as if nothing happened.

@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, Any, cast
 from backend.core.constants import (
     BROWSER_TOOL_SYNC_TIMEOUT_SECONDS,
     DEBUGGER_PENDING_ACTION_TIMEOUT_FLOOR,
-    DEFAULT_STEP_TASK_LIVENESS_SECONDS,
     DRAIN_STEP_BARRIER_GRACE_SECONDS,
     DRAIN_STEP_BARRIER_IDLE_DEFAULT_SECONDS,
     MCP_PENDING_ACTION_TIMEOUT_FLOOR,
@@ -334,7 +333,6 @@ class PendingActionService:
                 continue
             effective = self._effective_timeout_seconds(self._timeout, action)
             if not math.isfinite(effective):
-                budgets.append(float(DEFAULT_STEP_TASK_LIVENESS_SECONDS))
                 continue
             remaining = max(0.0, effective - (now - registered_at))
             budgets.append(remaining + float(DRAIN_STEP_BARRIER_GRACE_SECONDS))
@@ -342,7 +340,7 @@ class PendingActionService:
         if not budgets:
             return idle_default
 
-        return min(max(budgets), float(DEFAULT_STEP_TASK_LIVENESS_SECONDS))
+        return max(budgets)
 
     def _primary_entry(self) -> tuple[Action, float] | None:
         """Latest / highest-id outstanding row (for step guards and logging)."""

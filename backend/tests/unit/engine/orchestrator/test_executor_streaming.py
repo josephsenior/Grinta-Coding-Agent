@@ -806,6 +806,27 @@ def test_cancel_step_cancels_active_stream_and_discards_checkpoint(
     asyncio.run(run_case())
 
 
+def test_cancel_step_clears_active_stream_handles():
+    from backend.engine.executor import OrchestratorExecutor
+
+    executor = OrchestratorExecutor(
+        llm=MagicMock(),
+        safety_manager=cast(NoopSafetyManager, _Safety()),
+        planner=MagicMock(),
+        mcp_tools_provider=lambda: {},
+    )
+    pending_task = MagicMock()
+    pending_task.done.return_value = False
+    executor._active_stream_task = pending_task
+    executor._active_stream_iter = object()
+
+    executor.cancel_step()
+
+    pending_task.cancel.assert_called_once()
+    assert executor._active_stream_task is None
+    assert executor._active_stream_iter is None
+
+
 def test_async_execute_accumulates_tool_calls(monkeypatch):
     """async_execute should accumulate streamed tool call deltas into complete tool calls."""
     import backend.engine.function_calling.dispatch as fc
