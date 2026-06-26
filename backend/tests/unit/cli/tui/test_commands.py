@@ -273,7 +273,7 @@ async def test_tui_unknown_command(mock_config):
         assert transcript is not None
         s.notify.assert_called_once()
         assert 'Unknown command' in s.notify.call_args.args[0]
-        assert s.notify.call_args.kwargs['severity'] == 'error'
+        assert s.notify.call_args.kwargs['severity'] == 'warning'
 
 
 @pytest.mark.asyncio
