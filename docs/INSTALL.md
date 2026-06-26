@@ -1,6 +1,6 @@
 # Installing Grinta
 
-Grinta is a local-first terminal coding agent. Pick the installation path that matches how you work.
+Command cheat sheet: [QUICK_START.md](QUICK_START.md) (consumer vs dev, all platforms).
 
 ## 1. `pipx` (recommended for most users)
 

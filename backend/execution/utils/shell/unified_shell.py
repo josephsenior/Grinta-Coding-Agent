@@ -627,8 +627,8 @@ def _create_windows_shell_session(
 
     if prefer_powershell and resolved_tools.has_powershell:
         logger.info(
-            'Using WindowsPowershellSession (preferred on Windows). '
-            'Set APP_WINDOWS_SHELL_PREFERENCE=bash to prefer Git Bash.'
+            'Using WindowsPowershellSession. '
+            'Set security.windows_shell to bash in settings.json to prefer Git Bash.'
         )
         return _create_windows_powershell_session(resolved_tools, session_kwargs)
 
@@ -637,7 +637,7 @@ def _create_windows_shell_session(
 
         logger.info(
             'Using SimpleBashSession (Git Bash on Windows). '
-            'Set APP_WINDOWS_SHELL_PREFERENCE=powershell to prefer PowerShell.'
+            'Set security.windows_shell to powershell in settings.json to prefer PowerShell.'
         )
         return SimpleBashSession(**session_kwargs)
 

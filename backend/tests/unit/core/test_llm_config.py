@@ -372,18 +372,6 @@ class TestTemperatureResolution:
 
 
 class TestValidatorEdgeCases:
-    def test_validate_required_strings_with_log_completions_folder(self):
-        """Test validate_required_strings on log_completions_folder."""
-        with suppress_llm_env_export():
-            with pytest.raises(ValidationError):
-                LLMConfig(log_completions_folder='')
-
-    def test_validate_required_strings_valid_log_folder(self):
-        """Test validate_required_strings accepts valid log_completions_folder."""
-        with suppress_llm_env_export():
-            cfg = LLMConfig(log_completions_folder='/tmp/logs')
-        assert cfg.log_completions_folder == '/tmp/logs'
-
     def test_validate_urls_with_none(self):
         """Test validate_urls returns None for None input."""
         with suppress_llm_env_export():

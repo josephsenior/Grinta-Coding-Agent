@@ -71,6 +71,24 @@ def test_context_packet_contains_one_canonical_state_and_latest_verification(
     assert len(packet.content) <= 1800
 
 
+def test_context_packet_gap_fill_when_follow_up_pruned_from_prompt(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setattr(
+        'backend.context.canonical_state.canonical_state_path',
+        lambda state=None: tmp_path / 'canonical_task_state.json',
+    )
+    first = _user('Implement the exporter', 1)
+    steering = _user('Stop and answer in plain text', 2)
+    history = [first, steering]
+
+    packet = build_context_packet([first], history, char_budget=2200)
+
+    assert packet is not None
+    assert 'Preserved user messages not otherwise in prompt:' in packet.content
+    assert 'Stop and answer in plain text' in packet.content
+
+
 def test_context_packet_omits_redundant_user_context_and_stale_objective(
     tmp_path, monkeypatch
 ) -> None:

@@ -378,10 +378,7 @@ class SecurityEnforcementMixin:
 
     def _check_action_confirmation(self, action: Action) -> Observation | None:
         """Check action confirmation state and return appropriate observation."""
-        from backend.ledger.action import (
-            ActionConfirmationStatus,
-            FileEditAction,
-        )
+        from backend.ledger.action import ActionConfirmationStatus
         from backend.ledger.observation import NullObservation, UserRejectObservation
 
         if (
@@ -389,10 +386,6 @@ class SecurityEnforcementMixin:
             and action.confirmation_state
             == ActionConfirmationStatus.AWAITING_CONFIRMATION
         ):
-            # Allow file edits to run in runtime preview mode (dry-run) so users can
-            # review diffs before confirming. Other actions remain blocked.
-            if isinstance(action, FileEditAction):
-                return None
             return NullObservation('')
 
         if (

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Strip noisy session log lines and produce a readable audit summary."""
+"""Generate session.audit.txt and session.txt from session.jsonl."""
 
 from __future__ import annotations
 
@@ -10,27 +10,32 @@ from pathlib import Path
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('log_path', type=Path)
+    parser.add_argument(
+        'log_path',
+        type=Path,
+        help='Path to session.jsonl (or session directory)',
+    )
     parser.add_argument(
         '-o',
         '--output-dir',
         type=Path,
         default=None,
-        help='Directory for stripped log and report (default: same as log)',
+        help='Directory for derived artifacts (default: same as log)',
     )
     args = parser.parse_args()
 
     log_path = args.log_path.resolve()
+    if log_path.is_dir():
+        log_path = log_path / 'session.jsonl'
     out_dir = (args.output_dir or log_path.parent).resolve()
-    stem = log_path.stem
-    stripped_path = out_dir / f'{stem}.stripped.log'
-    report_path = out_dir / f'{stem}.audit.txt'
+    transcript_path = out_dir / 'session.txt'
+    report_path = out_dir / 'session.audit.txt'
     from backend.core.logging.session_log_audit import analyze_session
 
-    result = analyze_session(log_path, stripped_path, report_path)
-    print(f'Wrote stripped log: {stripped_path} ({result.kept_lines:,} lines)')
+    result = analyze_session(log_path, transcript_path, report_path)
+    print(f'Wrote transcript: {transcript_path}')
     print(f'Wrote audit report: {report_path}')
-    print(f'Verdict: {result.verdict}')
+    print(f'Events: {result.kept_lines:,}  Verdict: {result.verdict}')
 
 
 if __name__ == '__main__':

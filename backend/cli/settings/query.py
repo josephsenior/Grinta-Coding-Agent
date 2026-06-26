@@ -225,6 +225,15 @@ def sync_persisted_autonomy_to_controller(
                 exc_info=True,
             )
 
+    try:
+        from backend.core.logging.session_event_logger import (
+            emit_session_context_if_changed,
+        )
+
+        emit_session_context_if_changed()
+    except Exception:
+        pass
+
     return level
 
 

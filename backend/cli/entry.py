@@ -23,6 +23,11 @@ import sys
 import warnings
 from pathlib import Path
 
+# Pin install paths before any backend import resolves logging or settings.
+from backend.core.runtime_paths import pin_grinta_runtime_paths
+
+pin_grinta_runtime_paths()
+
 # Suppress ALL DeprecationWarnings before any package is imported.
 warnings.filterwarnings('ignore', category=DeprecationWarning)
 warnings.filterwarnings(
@@ -334,11 +339,21 @@ def _run_sessions(args: argparse.Namespace) -> int:
     return 2
 
 
+def _ensure_linux_host_tools_early() -> None:
+    try:
+        from backend.utils.linux_host_tools import ensure_linux_host_tools
+
+        ensure_linux_host_tools()
+    except Exception:
+        pass
+
+
 def main() -> None:
     """Parse flags and launch the interactive REPL or a subcommand."""
     parser = build_parser(include_subcommands=True)
 
     args = parser.parse_args(sys.argv[1:])
+    _ensure_linux_host_tools_early()
 
     # Subcommand dispatch.
     if args.subcommand == 'init':

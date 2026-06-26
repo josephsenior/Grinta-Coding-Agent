@@ -513,6 +513,20 @@ def _find_key_user_messages(events):
     return first_user, last_user
 
 
+def _find_recent_user_messages(events, *, limit: int) -> list[Event]:
+    from backend.context.prompt.user_turns import PROTECTED_RECENT_USER_MESSAGE_COUNT
+
+    count = limit if limit > 0 else PROTECTED_RECENT_USER_MESSAGE_COUNT
+    recent: list[Event] = []
+    for event in reversed(events):
+        if not _is_nonempty_user_message(event):
+            continue
+        recent.append(event)
+        if len(recent) >= count:
+            break
+    return list(reversed(recent))
+
+
 def _add_key_event(protected, seen_ids, event):
     if event is not None and id(event) not in seen_ids:
         protected.append(event)
@@ -609,11 +623,16 @@ def _collect_operational_anchor_events(events: list[Event], seen_ids: set[int]):
 
 
 def _protected_summary_events(events: list[Event]) -> list[Event]:
+    from backend.context.prompt.user_turns import PROTECTED_RECENT_USER_MESSAGE_COUNT
+
     protected: list[Event] = []
     seen_user_ids: set[int] = set()
-    first_user, last_user = _find_key_user_messages(events)
+    first_user, _last_user = _find_key_user_messages(events)
+    for user_event in _find_recent_user_messages(
+        events, limit=PROTECTED_RECENT_USER_MESSAGE_COUNT
+    ):
+        _add_key_event(protected, seen_user_ids, user_event)
     _add_key_event(protected, seen_user_ids, first_user)
-    _add_key_event(protected, seen_user_ids, last_user)
     for event in events:
         if isinstance(event, AgentCondensationObservation):
             content = _condensation_content(event)

@@ -266,6 +266,7 @@ def test_window_preserves_first_and_last_user_messages() -> None:
     result = select_prompt_events(events, cfg)
 
     assert first in result.events
+    assert middle in result.events
     assert last in result.events
 
 

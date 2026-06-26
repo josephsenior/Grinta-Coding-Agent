@@ -21,12 +21,17 @@ from pythonjsonlogger.json import JsonFormatter
 
 from backend.core.constants import (
     DEBUG,
-    DEBUG_LLM,
     LOG_JSON,
     LOG_JSON_LEVEL_KEY,
     LOG_LEVEL,
     LOG_TO_FILE,
     OTEL_LOG_CORRELATION,
+)
+from backend.core.logging.session_event_logger import (
+    SessionEventLogHandler,
+    bind_session_event_logger,
+    close_session_event_logger,
+    get_session_event_logger,
 )
 
 # Re-export formatter/filter classes from dedicated module for backward compat.
@@ -43,6 +48,7 @@ from backend.core.logging.log_formatters import (
     StackInfoFilter,
     TraceContextFilter,
     file_formatter,
+    file_json_formatter,
     strip_ansi,
 )
 from backend.core.logging.log_formatters import (
@@ -52,6 +58,7 @@ from backend.core.logging.log_formatters import (
 __all__ = [
     'configure_file_logging',
     'bind_session_logging',
+    'format_active_session_log_path',
     'finalize_session_logging_audit',
     'mcp_log_stream',
     'get_log_dir',
@@ -66,6 +73,7 @@ __all__ = [
     'TraceContextFilter',
     'fix_record',
     'file_formatter',
+    'file_json_formatter',
     'strip_ansi',
 ]
 
@@ -77,19 +85,18 @@ if TYPE_CHECKING:
 else:
     _LoggerAdapter = logging.LoggerAdapter
 
-# If DEBUG_LLM is set, optionally allow an interactive confirmation when explicitly
-# requested. We default to enabling verbose LLM logs without blocking stdin so
-# that headless services and CI runs cannot hang on an unexpected prompt.
-if DEBUG_LLM:
-    logging.warning(
-        'DEBUG_LLM enabled via environment; verbose LLM logs may include sensitive content. Do NOT use in production.',
-    )
+# DEBUG enables stack traces on ERROR via StackInfoFilter.
 if DEBUG:
     current_log_level = logging.DEBUG
 else:
     current_log_level = logging.INFO
 
-llm_formatter = logging.Formatter('%(message)s')
+llm_formatter = logging.Formatter('%(message)s')  # legacy compat for tests
+
+
+def get_session_file_handler() -> SessionEventLogHandler:
+    """Return handler that writes app logger records into session.jsonl."""
+    return SessionEventLogHandler()
 
 
 class RollingLogger:
@@ -226,7 +233,7 @@ def get_file_handler(
     )
     file_handler.setLevel(log_level)
     if LOG_JSON:
-        file_handler.setFormatter(json_formatter())
+        file_handler.setFormatter(file_json_formatter())
     else:
         file_handler.setFormatter(file_formatter)
     return file_handler
@@ -363,9 +370,24 @@ def _grinta_install_tree_root() -> str:
     the user's repo tree). ``segment`` is derived from ``PROJECT_ROOT`` so each
     workspace is isolated while you keep one Grinta checkout for debugging.
     """
+    override = os.getenv('GRINTA_REPO_ROOT', '').strip()
+    if override:
+        return str(Path(override).expanduser().resolve())
+    marker = Path(__file__).resolve()
+    for parent in marker.parents:
+        if (parent / 'backend').is_dir() and (parent / 'pyproject.toml').is_file():
+            return str(parent)
     # ``logger.py`` lives at ``backend/core/logging/logger.py`` — four parents
     # to the install/repo root (was three when the module was ``backend/core/logger.py``).
-    return str(Path(__file__).resolve().parents[3])
+    return str(marker.parents[3])
+
+
+def _grinta_log_base() -> str:
+    """Canonical ``logs/`` directory under the Grinta repo (single source of truth)."""
+    override = os.getenv('GRINTA_LOG_ROOT', '').strip()
+    if override:
+        return str(Path(override).expanduser().resolve())
+    return os.path.join(_grinta_install_tree_root(), 'logs')
 
 
 def _workspace_logs_segment() -> str | None:
@@ -385,7 +407,7 @@ def _workspace_logs_segment() -> str | None:
 
 def _workspace_logs_root() -> str:
     """Canonical root for workspace logs under the install tree."""
-    return os.path.join(_grinta_install_tree_root(), 'logs', 'workspaces')
+    return os.path.join(_grinta_log_base(), 'workspaces')
 
 
 def _legacy_workspace_logs_root() -> str:
@@ -455,8 +477,30 @@ def _migrate_legacy_workspace_logs() -> None:
                 moved_dirs,
                 moved_files,
             )
+        _remove_empty_legacy_log_dirs(legacy_root)
     except Exception:
         app_logger.debug('Legacy workspace log migration failed', exc_info=True)
+
+
+def _remove_empty_legacy_log_dirs(legacy_root: str) -> None:
+    """Drop ``backend/logs`` after migration so only ``logs/`` remains."""
+    try:
+        if not os.path.isdir(legacy_root):
+            return
+        for root, dirs, files in os.walk(legacy_root, topdown=False):
+            for name in files:
+                os.unlink(os.path.join(root, name))
+            for name in dirs:
+                with contextlib.suppress(OSError):
+                    os.rmdir(os.path.join(root, name))
+        with contextlib.suppress(OSError):
+            os.rmdir(legacy_root)
+        legacy_parent = os.path.dirname(legacy_root)
+        if os.path.basename(legacy_parent) == 'logs':
+            with contextlib.suppress(OSError):
+                os.rmdir(legacy_parent)
+    except Exception:
+        app_logger.debug('Legacy log directory cleanup failed', exc_info=True)
 
 
 def _workspace_logs_dir() -> str | None:
@@ -466,6 +510,11 @@ def _workspace_logs_dir() -> str | None:
         return None
     _migrate_legacy_workspace_logs()
     return os.path.join(_workspace_logs_root(), segment)
+
+
+def _effective_workspace_logs_dir() -> str:
+    """Workspace log root, falling back to a temp dir when PROJECT_ROOT is unset."""
+    return _workspace_logs_dir() or _unbound_log_dir()
 
 
 def _unbound_log_dir() -> str:
@@ -479,8 +528,8 @@ def get_log_dir() -> str:
     """Return the active log directory for this process.
 
     Once a session is bound via :func:`bind_session_logging`, this resolves to
-    ``logs/workspaces/<workspace>/sessions/<session_id>/`` so every artifact
-    (``app.log``, MCP server output, ``llm/`` dumps) is isolated per session.
+    ``logs/workspaces/<workspace>/sessions/<session_id>/`` where ``session.jsonl``
+    and derived artifacts live.
     Before a session is bound (early startup) it falls back to the
     workspace-level directory so nothing is lost.
     """
@@ -510,124 +559,50 @@ for logger_name in LOQUACIOUS_LOGGERS:
     logging.getLogger(logger_name).setLevel('WARNING')
 
 
-class LlmFileHandler(logging.FileHandler):
-    """LLM prompt and response logging."""
-
-    def __init__(
-        self,
-        filename: str,
-        mode: str = 'a',
-        encoding: str = 'utf-8',
-        delay: bool = False,
-    ) -> None:
-        """Initialize the file handler for logging LLM prompts or responses.
-
-        Args:
-            filename (str): The name of the log file.
-            mode (str, optional): The file mode. Defaults to 'a'.
-            encoding (str, optional): The file encoding. Defaults to None.
-            delay (bool, optional): Whether to delay file opening. Defaults to False.
-
-        """
-        self.filename = filename
-        self.message_counter = 1
-        if DEBUG:
-            self.session = datetime.now().strftime('%y-%m-%d_%H-%M')
-        else:
-            self.session = 'default'
-        self.log_directory = os.path.join(get_log_dir(), 'llm', self.session)
-        os.makedirs(self.log_directory, exist_ok=True)
-        if not DEBUG:
-            for file in os.listdir(self.log_directory):
-                file_path = os.path.join(self.log_directory, file)
-                try:
-                    os.unlink(file_path)
-                except Exception as e:
-                    app_logger.exception(
-                        'Failed to delete %s. Reason: %s', file_path, e
-                    )
-        filename = f'{self.filename}_{self.message_counter:03}.log'
-        self.baseFilename = os.path.join(self.log_directory, filename)
-        super().__init__(self.baseFilename, mode, encoding, delay)
-
-    def emit(self, record: logging.LogRecord) -> None:
-        """Emits a log record.
-
-        Args:
-            record (logging.LogRecord): The log record to emit.
-
-        """
-        filename = f'{self.filename}_{self.message_counter:03}.log'
-        self.baseFilename = os.path.join(self.log_directory, filename)
-        self.stream = self._open()
-        super().emit(record)
-        self.stream.close()
-        app_logger.debug('Logging to %s', self.baseFilename)
-        self.message_counter += 1
-
-
-def _get_llm_file_handler(name: str, log_level: int) -> LlmFileHandler:
-    llm_file_handler = LlmFileHandler(name, delay=True)
-    llm_file_handler.setFormatter(llm_formatter)
-    llm_file_handler.setLevel(log_level)
-    return llm_file_handler
-
-
-def _setup_llm_logger(name: str, log_level: int) -> logging.Logger:
-    logger = logging.getLogger(name)
-    logger.propagate = False
-    logger.setLevel(logging.DEBUG)  # Force debug
-    return logger
-
-
 _file_logging_configured = False
 
-# The single file handler shared by every Grinta logger, plus the loggers it
-# is attached to. ``bind_session_logging`` swaps this handler so all output
-# follows the active session into ``sessions/<id>/app.log``.
+# Session-scoped logging via session.jsonl
 _LOG_SESSION_ID: str | None = None
 _ACTIVE_SESSION_LOG_DIR: str | None = None
-_SHARED_FILE_HANDLER: logging.Handler | None = None
 _FILE_LOGGER_NAMES: tuple[str, ...] = (
     'app',
     'app.access',
-    'prompt',
-    'response',
     'grinta.tui',
 )
 
 
-def _attach_shared_handler(handler: logging.Handler) -> None:
-    """Attach *handler* to every Grinta logger, dropping stale LLM handlers."""
+def _remove_session_file_handlers() -> None:
     for name in _FILE_LOGGER_NAMES:
         lg = logging.getLogger(name)
         for h in list(lg.handlers):
-            if isinstance(h, LlmFileHandler):
+            if isinstance(h, SessionEventLogHandler):
                 lg.removeHandler(h)
-        if handler not in lg.handlers:
-            lg.addHandler(handler)
+                h.close()
+
+
+def _attach_session_file_handlers() -> None:
+    if not LOG_TO_FILE:
+        return
+    handler = get_session_file_handler()
+    for name in _FILE_LOGGER_NAMES:
+        lg = logging.getLogger(name)
+        if any(isinstance(h, SessionEventLogHandler) for h in lg.handlers):
+            continue
+        lg.addHandler(handler)
 
 
 def configure_file_logging() -> None:
-    """Attach the shared file handler after ``PROJECT_ROOT`` is known.
-
-    Idempotent. Writes to the workspace-level directory until a session is
-    bound (see :func:`bind_session_logging`), at which point all output is
-    re-pointed into that session's own ``app.log``.
-    """
-    global _file_logging_configured, _SHARED_FILE_HANDLER
+    """Mark file logging ready; ``session.jsonl`` opens on :func:`bind_session_logging`."""
+    global _file_logging_configured
     if _file_logging_configured or not LOG_TO_FILE:
         return
-    workspace_dir = _workspace_logs_dir()
-    if workspace_dir is None:
-        app_logger.debug('File logging skipped: no workspace directory resolved')
-        return
-    log_dir = get_log_dir()
-    os.makedirs(log_dir, exist_ok=True)
-    shared_handler = get_file_handler(log_dir, current_log_level)
-    _SHARED_FILE_HANDLER = shared_handler
-    _attach_shared_handler(shared_handler)
-    app_logger.debug('Logging to file in: %s', log_dir)
+    workspace_dir = _effective_workspace_logs_dir()
+    os.makedirs(workspace_dir, exist_ok=True)
+    if _workspace_logs_dir() is None:
+        app_logger.debug(
+            'File logging using fallback directory (set PROJECT_ROOT or -p): %s',
+            workspace_dir,
+        )
     _file_logging_configured = True
 
 
@@ -638,19 +613,20 @@ def _safe_session_segment(session_id: str) -> str:
 
 
 def _flush_shared_file_handler() -> None:
-    """Ensure the active session ``app.log`` is flushed before audit generation."""
-    handler = _SHARED_FILE_HANDLER
-    if handler is None:
-        return
-    with contextlib.suppress(Exception):
-        handler.flush()
-        stream = getattr(handler, 'stream', None)
-        if stream is not None:
-            stream.flush()
+    """Ensure session.jsonl is flushed before audit generation."""
+    sel = get_session_event_logger()
+    if sel is not None:
+        with contextlib.suppress(Exception):
+            sel.flush()
+    for name in _FILE_LOGGER_NAMES:
+        for handler in logging.getLogger(name).handlers:
+            if isinstance(handler, SessionEventLogHandler):
+                with contextlib.suppress(Exception):
+                    handler.flush()
 
 
 def finalize_session_logging_audit(log_dir: str | None = None) -> None:
-    """Write ``app.stripped.log`` and ``app.audit.txt`` for a session log directory."""
+    """Write ``session.audit.txt`` and ``session.txt`` from ``session.jsonl``."""
     if not LOG_TO_FILE:
         return
     from backend.core.logging.session_log_audit import generate_session_audit_artifacts
@@ -698,79 +674,69 @@ atexit.register(_audit_session_log_on_exit)
 
 
 def bind_session_logging(session_id: str | None) -> None:
-    """Re-point all file logging into ``sessions/<session_id>/app.log``.
+    """Bind unified session logging to ``sessions/<session_id>/session.jsonl``.
 
-    Called once the session id is known (see ``bootstrap/setup.py``). This is
-    what makes ``app.log`` session-scoped instead of one ever-growing
-    workspace file shared by every run. Idempotent per session id; safe to
-    call before or after :func:`configure_file_logging`.
+    Called once the session id is known. Emits ``SESSION_START`` and
+    ``SESSION_CONTEXT``. Idempotent per session id.
     """
-    global _LOG_SESSION_ID, _ACTIVE_SESSION_LOG_DIR, _SHARED_FILE_HANDLER
+    global _LOG_SESSION_ID, _ACTIVE_SESSION_LOG_DIR
     if not LOG_TO_FILE or not session_id:
         return
-    workspace_dir = _workspace_logs_dir()
-    if workspace_dir is None:
-        app_logger.debug('Session logging skipped: no workspace directory resolved')
-        return
+    workspace_dir = _effective_workspace_logs_dir()
     segment = _safe_session_segment(str(session_id))
     if _LOG_SESSION_ID == segment:
         return
     previous_segment = _LOG_SESSION_ID
     _flush_shared_file_handler()
-    try:
-        from backend.core.agent_transcript import close_agent_transcript
-
-        close_agent_transcript()
-    except Exception:
-        app_logger.debug('Agent transcript close failed', exc_info=True)
+    close_session_event_logger()
     _audit_previous_session_log(previous_segment)
     _LOG_SESSION_ID = segment
     log_dir = os.path.join(workspace_dir, 'sessions', segment)
     _ACTIVE_SESSION_LOG_DIR = log_dir
     os.makedirs(log_dir, exist_ok=True)
-    new_handler = get_file_handler(log_dir, current_log_level)
-    old_handler = _SHARED_FILE_HANDLER
-    for name in _FILE_LOGGER_NAMES:
-        lg = logging.getLogger(name)
-        if old_handler is not None and old_handler in lg.handlers:
-            lg.removeHandler(old_handler)
-    _attach_shared_handler(new_handler)
-    _SHARED_FILE_HANDLER = new_handler
+    _remove_session_file_handlers()
+    workspace_segment = _workspace_logs_segment()
+    bind_session_event_logger(
+        segment,
+        log_dir,
+        workspace_segment=workspace_segment,
+    )
+    _attach_session_file_handlers()
     _file_logging_configured = True
-    if old_handler is not None and old_handler is not new_handler:
-        with contextlib.suppress(Exception):
-            old_handler.close()
-    try:
-        from backend.core.agent_transcript import bind_agent_transcript
-
-        bind_agent_transcript(log_dir)
-    except Exception:
-        app_logger.debug('Agent transcript logging bind failed', exc_info=True)
     app_logger.info('Session logging bound to %s', log_dir)
 
 
+def format_active_session_log_path() -> str | None:
+    """Return the active ``session.jsonl`` path when file logging is enabled."""
+    if not LOG_TO_FILE:
+        return None
+    from backend.core.logging.session_event_logger import session_log_path
+
+    try:
+        return str(session_log_path(get_log_dir()))
+    except Exception:
+        return None
+
+
 # ──────────────────────────────────────────────────────────────────────────
-# MCP server stderr → unified app.log
-#
-# stdio MCP servers write diagnostics to stderr. Historically each server got
-# its own ``mcp_<name>_stderr.log`` scattered in the log dir. Instead we hand
-# the transport one end of an OS pipe and forward every line into the
-# ``app.mcp.<server>`` logger, so it lands in the *same* (session-scoped)
-# app.log as everything else. One pipe + one daemon reader thread per server
-# for the life of the process (reused across reconnects); because the records
-# propagate to the ``app`` logger's handler, the destination follows session
-# rebinds automatically.
+# MCP server stderr → session.jsonl MCP events
 # ──────────────────────────────────────────────────────────────────────────
 _MCP_LOG_STREAMS: dict[str, Any] = {}
 _MCP_LOG_LOCK = threading.Lock()
 
 
-def _mcp_stderr_forwarder(read_stream: Any, target: logging.Logger) -> None:
+def _mcp_stderr_forwarder(read_stream: Any, server_name: str) -> None:
+    from backend.core.logging.session_event_logger import emit_session_event
+
     try:
         for raw in iter(read_stream.readline, ''):
             line = raw.rstrip('\r\n')
             if line:
-                target.info(line)
+                emit_session_event(
+                    'MCP',
+                    {'server': server_name, 'line': line},
+                    level='INFO',
+                )
     except Exception:  # pragma: no cover - defensive; pipe teardown races
         pass
     finally:
@@ -779,13 +745,7 @@ def _mcp_stderr_forwarder(read_stream: Any, target: logging.Logger) -> None:
 
 
 def mcp_log_stream(server_name: str) -> Any:
-    """Return a writable stream whose lines are forwarded into ``app.log``.
-
-    Hand the returned object to ``StdioTransport(log_file=...)`` instead of a
-    file path. The MCP subprocess's stderr is then merged into the unified
-    ``app.log`` under the ``app.mcp.<server>`` logger rather than a separate
-    per-server file. Cached and reused per server name.
-    """
+    """Return a writable stream whose lines become ``MCP`` events in session.jsonl."""
     safe = re.sub(r'[^A-Za-z0-9._-]+', '_', server_name or 'mcp').strip('_') or 'mcp'
     with _MCP_LOG_LOCK:
         existing = _MCP_LOG_STREAMS.get(safe)
@@ -794,26 +754,15 @@ def mcp_log_stream(server_name: str) -> Any:
         read_fd, write_fd = os.pipe()
         read_stream = os.fdopen(read_fd, 'r', encoding='utf-8', errors='replace')
         write_stream = os.fdopen(write_fd, 'w', encoding='utf-8', errors='replace')
-        mcp_logger = logging.getLogger(f'app.mcp.{safe}')
-        if not getattr(mcp_logger, '_grinta_mcp_configured', False):
-            mcp_logger.setLevel(logging.INFO)
-            mcp_logger.addFilter(SensitiveDataFilter(mcp_logger.name))
-            # Propagates to the 'app' logger, which owns the app.log handler.
-            mcp_logger.propagate = True
-            mcp_logger._grinta_mcp_configured = True  # type: ignore[attr-defined]
         thread = threading.Thread(
             target=_mcp_stderr_forwarder,
-            args=(read_stream, mcp_logger),
+            args=(read_stream, safe),
             name=f'mcp-stderr-{safe}',
             daemon=True,
         )
         thread.start()
         _MCP_LOG_STREAMS[safe] = write_stream
         return write_stream
-
-
-llm_prompt_logger = _setup_llm_logger('prompt', current_log_level)
-llm_response_logger = _setup_llm_logger('response', current_log_level)
 
 
 class AppLoggerAdapter(_LoggerAdapter):

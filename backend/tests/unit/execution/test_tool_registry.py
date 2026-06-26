@@ -3,11 +3,60 @@
 from __future__ import annotations
 
 import subprocess
+from dataclasses import replace
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.execution.utils.tool_registry import ToolInfo, ToolRegistry
+from backend.execution.utils.tool_registry import (
+    ToolInfo,
+    ToolRegistry,
+    _configured_windows_shell,
+    resolve_windows_powershell_preference,
+)
+
+# ── Windows shell preference ───────────────────────────────────────────
+
+
+def _clear_windows_shell_cache() -> None:
+    _configured_windows_shell.cache_clear()
+
+
+class TestWindowsShellPreference:
+    def test_defaults_to_bash_from_settings(self, monkeypatch: pytest.MonkeyPatch):
+        from backend.core.os_capabilities import OS_CAPS, override_os_capabilities
+
+        _clear_windows_shell_cache()
+        monkeypatch.delenv('SECURITY_WINDOWS_SHELL', raising=False)
+        with override_os_capabilities(replace(OS_CAPS, is_windows=True)):
+            assert not resolve_windows_powershell_preference(
+                has_bash=True, has_powershell=True
+            )
+
+    def test_powershell_via_settings_env_override(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        from backend.core.os_capabilities import OS_CAPS, override_os_capabilities
+
+        _clear_windows_shell_cache()
+        monkeypatch.setenv('SECURITY_WINDOWS_SHELL', 'powershell')
+        with override_os_capabilities(replace(OS_CAPS, is_windows=True)):
+            assert resolve_windows_powershell_preference(
+                has_bash=True, has_powershell=True
+            )
+
+    def test_bash_falls_back_to_powershell_when_bash_missing(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        from backend.core.os_capabilities import OS_CAPS, override_os_capabilities
+
+        _clear_windows_shell_cache()
+        monkeypatch.delenv('SECURITY_WINDOWS_SHELL', raising=False)
+        with override_os_capabilities(replace(OS_CAPS, is_windows=True)):
+            assert resolve_windows_powershell_preference(
+                has_bash=False, has_powershell=True
+            )
+
 
 # ── ToolInfo dataclass ────────────────────────────────────────────────
 

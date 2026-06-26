@@ -9,6 +9,7 @@ Inspired by VS Code's approach to cross-platform compatibility.
 
 from __future__ import annotations
 
+import functools
 import os
 import shutil
 import subprocess
@@ -19,26 +20,45 @@ from typing import Literal
 from backend.core.logging.logger import app_logger as logger
 from backend.core.os_capabilities import OS_CAPS
 
+_WINDOWS_SHELL_BASH = frozenset({'bash', 'git-bash', 'gitbash', 'posix'})
+_WINDOWS_SHELL_POWERSHELL = frozenset({'powershell', 'pwsh', 'ps'})
+
+
+@functools.cache
+def _configured_windows_shell() -> Literal['bash', 'powershell']:
+    """Return ``security.windows_shell`` from loaded settings (cached per process)."""
+    raw = os.getenv('SECURITY_WINDOWS_SHELL', '').strip().lower()
+    if raw in _WINDOWS_SHELL_BASH:
+        return 'bash'
+    if raw in _WINDOWS_SHELL_POWERSHELL:
+        return 'powershell'
+
+    try:
+        from backend.core.config.config_loader import load_app_config
+
+        shell = str(getattr(load_app_config().security, 'windows_shell', 'bash')).lower()
+        if shell in _WINDOWS_SHELL_POWERSHELL:
+            return 'powershell'
+    except Exception:
+        logger.debug('Falling back to default windows_shell=bash', exc_info=True)
+
+    return 'bash'
+
 
 def resolve_windows_powershell_preference(
     *, has_bash: bool, has_powershell: bool
 ) -> bool:
     """Return True when Windows terminal contract should use PowerShell.
 
-    Preference is controlled by ``APP_WINDOWS_SHELL_PREFERENCE`` with values:
-
-    - ``powershell`` (default): use PowerShell when available, else bash fallback
-    - ``bash``: prefer Git Bash when available
-    - ``auto``: currently equivalent to ``powershell``
+    Driven by ``security.windows_shell`` in ``settings.json`` (default ``bash``).
+    Override via ``SECURITY_WINDOWS_SHELL`` env or the same key in settings.
     """
     if not OS_CAPS.is_windows:
         return False
 
-    raw_pref = os.getenv('APP_WINDOWS_SHELL_PREFERENCE', 'powershell').strip().lower()
-    if raw_pref in {'bash', 'git-bash', 'gitbash', 'posix'}:
+    if _configured_windows_shell() == 'bash':
         return False if has_bash else has_powershell
 
-    # Default and auto behavior: prefer PowerShell when available.
     return has_powershell
 
 

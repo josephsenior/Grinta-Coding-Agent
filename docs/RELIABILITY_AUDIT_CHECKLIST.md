@@ -48,7 +48,7 @@ Expected production call sites should use `clear_for_action`, `clear_primary`, o
 Inspect the last three workspace logs:
 
 ```bash
-rg "outstanding_count|persistence_health|PERSISTENCE_DEGRADED|DRAIN_STEP_BARRIER_TIMEOUT|lost_events" logs/workspaces/*/app.log
+rg "outstanding_count|persistence_health|PERSISTENCE_DEGRADED|DRAIN_STEP_BARRIER_TIMEOUT|lost_events" logs/workspaces/*/sessions/*/session.jsonl
 ```
 
 Flag any session that ends with `persistence_health=failed` or repeated drain barrier timeouts.

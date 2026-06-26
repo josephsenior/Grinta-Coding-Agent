@@ -49,6 +49,14 @@ def apply_interaction_mode_to_controller(controller: object, mode: str) -> None:
     if agent is not None:
         rebuild_agent_toolset(agent, mode=mode)
     sync_active_run_mode_extra_data(controller, mode)
+    try:
+        from backend.core.logging.session_event_logger import (
+            emit_session_context_if_changed,
+        )
+
+        emit_session_context_if_changed()
+    except Exception:
+        logger.debug('Session context emit after mode change failed', exc_info=True)
 
 
 __all__ = [

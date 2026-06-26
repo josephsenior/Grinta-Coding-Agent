@@ -10,6 +10,7 @@ from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
 def default_init_security_block() -> dict[str, Any]:
     """Return the canonical ``security`` block aligned with ``settings.template.json``."""
     return {
+        'windows_shell': 'bash',
         'execution_profile': 'standard',
         'enforce_security': True,
         'block_high_risk': False,

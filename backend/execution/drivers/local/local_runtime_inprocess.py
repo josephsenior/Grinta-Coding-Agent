@@ -779,9 +779,9 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             )
         else:
             if not self._tool_registry.has_tmux:
-                logger.warning(
-                    'tmux not found. Using simple subprocess-based Bash session. '
-                    'Install tmux for better command management: sudo apt install tmux'
+                logger.info(
+                    'tmux not found; using simple subprocess-based Bash session. '
+                    'Grinta installs tmux automatically on Linux when possible.'
                 )
 
     def additional_agent_instructions(self) -> str:

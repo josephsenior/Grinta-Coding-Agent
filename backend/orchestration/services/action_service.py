@@ -5,7 +5,7 @@ from unittest.mock import Mock
 
 from backend.core.constants import LOG_ALL_EVENTS
 from backend.ledger import EventSource
-from backend.ledger.action import Action, NullAction
+from backend.ledger.action import Action, ActionConfirmationStatus, NullAction
 from backend.ledger.stream import EventStream
 
 if TYPE_CHECKING:
@@ -81,6 +81,25 @@ def _restore_pre_dispatch_hook(
     )
 
 
+def _should_defer_stream_emission_until_confirmed(action: Action) -> bool:
+    """Return True when the action must not be published to the event stream yet.
+
+  Runnable actions that still need user approval are held back here and
+  published once via :meth:`SessionOrchestrator.apply_user_decision`. Publishing
+  them earlier made every subscriber (runtime, TUI, history) observe the same
+  action twice — once while ``AWAITING_CONFIRMATION`` and again after approval —
+  which duplicated shell/thinking rows in the transcript. File creates were
+  especially confusing: the first pass wrote the file and showed ``Created``,
+  then approval re-ran the action against the new file and showed ``Edited``.
+    """
+    if not getattr(action, 'runnable', False):
+        return False
+    return (
+        getattr(action, 'confirmation_state', None)
+        == ActionConfirmationStatus.AWAITING_CONFIRMATION
+    )
+
+
 class ActionService:
     """Coordinates tool pipeline execute/observe and pending action lifecycle."""
 
@@ -146,6 +165,13 @@ class ActionService:
         # Lifecycle state for agent message handoffs is decided by the router
         # after protocol validation.
         await _set_waiting_message_state_if_needed(controller, action)
+
+        if _should_defer_stream_emission_until_confirmed(action):
+            self.set_pending_action(action)
+            _bind_action_context_if_present(controller, action, ctx)
+            log_level = 'info' if LOG_ALL_EVENTS else 'debug'
+            controller.log(log_level, str(action), extra={'msg_type': 'ACTION'})
+            return
 
         es = controller.event_stream
         previous_hook: object | None = None

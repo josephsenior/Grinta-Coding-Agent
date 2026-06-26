@@ -24,6 +24,10 @@ from backend.context.compactor.pre_condensation_snapshot import (
 )
 from backend.context.memory.conversation_memory import ContextMemory
 from backend.context.prompt.prompt_window import event_fingerprint, select_prompt_events
+from backend.context.prompt.user_turns import (
+    collect_user_messages,
+    merge_missing_user_turns,
+)
 from backend.context.view import View
 from backend.core.logging.logger import app_logger as logger
 from backend.core.message import Message
@@ -584,6 +588,15 @@ class ContextMemoryManager:
                 len(pruned_ids),
             )
 
+    def get_user_messages_for_prompt(
+        self,
+        events: Iterable[Event],
+        *,
+        max_turns: int = 6,
+    ) -> list[MessageAction]:
+        """Return recent USER MessageActions for prompt assembly and tests."""
+        return collect_user_messages(events, max_turns=max_turns)
+
     def build_messages(
         self,
         condensed_history: Iterable[Event],
@@ -599,6 +612,15 @@ class ContextMemoryManager:
         window_started = time.perf_counter()
         events_for_prompt, prompt_window = self._resolve_prompt_events(
             condensed_list, state, llm_config
+        )
+        full_history = (
+            list(getattr(state, 'history', []))
+            if state is not None
+            else list(condensed_list)
+        )
+        events_for_prompt = merge_missing_user_turns(
+            list(events_for_prompt),
+            full_history,
         )
         window_elapsed = time.perf_counter() - window_started
 

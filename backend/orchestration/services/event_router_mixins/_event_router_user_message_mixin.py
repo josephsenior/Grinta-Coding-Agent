@@ -97,6 +97,7 @@ class _EventRouterUserMessageMixin(EventRouterService if TYPE_CHECKING else obje
             str(action),
             extra={'msg_type': 'ACTION', 'event_source': EventSource.USER},
         )
+        self._sync_user_message_context()
         recall_type = self._recall_type_for_user_message(action)
         recall_action = RecallAction(query=action.content, recall_type=recall_type)
         agent = getattr(self._ctrl, 'agent', None)
@@ -127,6 +128,31 @@ class _EventRouterUserMessageMixin(EventRouterService if TYPE_CHECKING else obje
         self._ctrl.event_stream.add_event(recall_action, EventSource.USER)
         self._set_pending_recall(recall_action, recall_type)
         await self._ensure_running_for_user_message()
+
+    def _sync_user_message_context(self) -> None:
+        """Refresh canonical state and snapshot after a USER message lands in history."""
+        state = getattr(self._ctrl, 'state', None)
+        if state is None:
+            return
+        history = list(getattr(state, 'history', []))
+        if not history:
+            return
+        try:
+            from backend.context.canonical_state import reduce_events_into_state
+            from backend.context.compactor.pre_condensation_snapshot import (
+                extract_snapshot,
+                save_snapshot,
+            )
+
+            reduce_events_into_state(
+                history,
+                state=state,
+                source='EventRouterService.user_message',
+            )
+            snapshot = extract_snapshot(history)
+            save_snapshot(snapshot, state=state)
+        except Exception:
+            logger.debug('User-message context sync failed', exc_info=True)
 
     async def _intercept_text_tool_call_handoff(self, action: MessageAction) -> bool:
         content = str(getattr(action, 'content', '') or '')

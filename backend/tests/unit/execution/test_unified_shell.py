@@ -19,6 +19,7 @@ from backend.execution.utils.shell.unified_shell import (
     _interactive_shell_argv,
     create_shell_session,
 )
+from backend.execution.utils.tool_registry import _configured_windows_shell
 
 
 def _force_os(request, *, windows: bool) -> None:
@@ -352,6 +353,8 @@ class TestCreateShellSession:
         self, tmp_path, monkeypatch, request
     ):
         _force_os(request, windows=True)
+        monkeypatch.setenv('SECURITY_WINDOWS_SHELL', 'powershell')
+        _configured_windows_shell.cache_clear()
         monkeypatch.setitem(
             sys.modules,
             'backend.execution.utils.shell.windows_bash',
@@ -436,8 +439,35 @@ class TestCreateShellSession:
             '-NoProfile',
         ]
 
-    def test_interactive_shell_argv_prefers_powershell_on_windows(self, request):
+    def test_windows_prefers_bash_by_default(
+        self, tmp_path, monkeypatch, request
+    ):
         _force_os(request, windows=True)
+        monkeypatch.delenv('SECURITY_WINDOWS_SHELL', raising=False)
+        _configured_windows_shell.cache_clear()
+        monkeypatch.setitem(
+            sys.modules,
+            'backend.execution.utils.shell.simple_bash',
+            types.SimpleNamespace(SimpleBashSession=_DummySession),
+        )
+
+        tools = _DummyTools(
+            has_bash=True,
+            has_tmux=False,
+            has_powershell=True,
+            shell_type='pwsh',
+        )
+        session = create_shell_session(
+            work_dir=str(tmp_path),
+            tools=tools,
+            cancellation_service=MagicMock(),
+        )
+        assert isinstance(session, _DummySession)
+
+    def test_interactive_shell_argv_prefers_powershell_on_windows(self, request, monkeypatch):
+        _force_os(request, windows=True)
+        monkeypatch.setenv('SECURITY_WINDOWS_SHELL', 'powershell')
+        _configured_windows_shell.cache_clear()
         tools = _DummyTools(
             has_bash=True,
             has_tmux=False,

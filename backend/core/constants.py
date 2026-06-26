@@ -460,7 +460,7 @@ ENFORCE_API_VERSIONING = os.getenv('APP_PERMISSIVE_API', '').strip().lower() not
 # ── Logging & Debug (env-var driven) ────────────────────────────────
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
 DEBUG = _parse_bool_env('DEBUG')
-DEBUG_LLM = _parse_bool_env('DEBUG_LLM', default='false')
+GRINTA_LOG_WIRE = _parse_bool_env('GRINTA_LOG_WIRE', default='true')
 LOG_JSON = _parse_bool_env('LOG_JSON', default='true')  # Default to JSON for production
 LOG_JSON_LEVEL_KEY = os.getenv('LOG_JSON_LEVEL_KEY', 'level')
 # Enable OTEL log correlation when explicitly requested, defaulting to OTEL_ENABLED
@@ -470,11 +470,9 @@ OTEL_LOG_CORRELATION = _parse_bool_env(
 )
 LOG_TO_FILE = _parse_bool_env('LOG_TO_FILE', default='true')
 LOG_ALL_EVENTS = _parse_bool_env('LOG_ALL_EVENTS')
-APP_DEBUG_PROMPT_ROLES = _parse_bool_env('APP_DEBUG_PROMPT_ROLES', default='true')
 APP_DEBUG_REASONING_ASTEP = _parse_bool_env(
     'APP_DEBUG_REASONING_ASTEP', default='false'
 )
-APP_DEBUG_MODE = _parse_bool_env('APP_DEBUG_MODE', default='true')
 
 LOG_COLORS = {
     'ACTION': 'green',
@@ -651,8 +649,15 @@ DEFAULT_SECRETS_FILENAME = 'user_secrets.json'
 ENV_VAR_REGISTRY: dict[str, tuple[str, str]] = {
     # Logging & debug
     'LOG_LEVEL': ('INFO', 'Root log level (DEBUG / INFO / WARNING / ERROR)'),
-    'DEBUG': ('false', 'Enable general debug mode'),
-    'DEBUG_LLM': ('false', 'Log raw LLM request/response payloads'),
+    'DEBUG': ('false', 'Enable stack traces on ERROR in session.jsonl ISSUE events'),
+    'GRINTA_LOG_WIRE': (
+        'true',
+        'Emit WIRE_PROMPT and WIRE_RESPONSE events with full LLM payloads in session.jsonl',
+    ),
+    'GRINTA_SESSION_AUDIT': (
+        'true',
+        'Generate session.audit.txt and session.txt from session.jsonl',
+    ),
     'APP_CLI_SHOW_REASONING_TEXT': (
         'true',
         'Render reasoning/thinking text in CLI panels; set false/0 to suppress provider reasoning leakage',
@@ -663,23 +668,20 @@ ENV_VAR_REGISTRY: dict[str, tuple[str, str]] = {
     'OTEL_ENABLED': ('false', 'Master switch for OpenTelemetry integration'),
     'LOG_TO_FILE': (
         'true',
-        'Append structured logs under repo logs/app.log; set LOG_TO_FILE=false to disable — when off the CLI keeps the app logger at ERROR on the console',
+        'Append structured logs under <grinta-repo>/logs/workspaces/…; set LOG_TO_FILE=false to disable — when off the CLI keeps the app logger at ERROR on the console',
+    ),
+    'GRINTA_REPO_ROOT': (
+        '',
+        'Override Grinta checkout root used to resolve logs/ (default: auto-detect via pyproject.toml)',
+    ),
+    'GRINTA_LOG_ROOT': (
+        '',
+        'Override canonical logs/ directory (default: <GRINTA_REPO_ROOT>/logs)',
     ),
     'LOG_ALL_EVENTS': ('True', 'Log every event processed by the event stream'),
-    'APP_DEBUG_PROMPT_ROLES': (
-        'true',
-        'Per astep: log message role histogram after build_messages (condensed event count, '
-        'pending condensation, assistant tool-call presence); set false to disable; use with '
-        'LOG_LEVEL=INFO or DEBUG',
-    ),
     'APP_DEBUG_REASONING_ASTEP': (
         'false',
-        'CLI: log ReasoningDisplay lifecycle/thought/action updates with shared astep_id '
-        '(see APP_DEBUG_PROMPT_ROLES) to correlate UI with LLM steps',
-    ),
-    'APP_DEBUG_MODE': (
-        'true',
-        'Log planner/executor mode and toolset details at INFO; set false to disable',
+        'CLI: log ReasoningDisplay lifecycle/thought/action updates with shared astep_id',
     ),
     'GRINTA_DEBUGGER_SYNC_POOL_WORKERS': (
         '6',

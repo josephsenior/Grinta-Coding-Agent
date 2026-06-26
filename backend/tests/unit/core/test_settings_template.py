@@ -27,6 +27,7 @@ def test_settings_template_loads_without_schema_drift(template_path: Path) -> No
     security = data.get('security')
     assert isinstance(security, dict)
     assert security.get('execution_profile') == 'standard'
+    assert security.get('windows_shell') == 'bash'
 
     mcp_config = data.get('mcp_config')
     assert isinstance(mcp_config, dict)
@@ -41,6 +42,7 @@ def test_settings_template_loads_without_schema_drift(template_path: Path) -> No
     orchestrator = cfg.get_agent_config(DEFAULT_AGENT_NAME)
     assert orchestrator.autonomy_level == 'balanced'
     assert cfg.security.execution_profile == 'standard'
+    assert cfg.security.windows_shell == 'bash'
 
 
 def test_settings_template_mcp_matches_defaults() -> None:

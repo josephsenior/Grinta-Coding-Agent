@@ -286,6 +286,7 @@ class ObservationService:
         observation: Observation,
     ) -> None:
         ctx = self._pop_action_context_for_observation(observation)
+        latency_ms = self._pending_service.elapsed_ms_for_action(pending_action)
         self._consume_pending_action(pending_action)
 
         confirmation_service = getattr(controller, 'confirmation_service', None)
@@ -296,7 +297,9 @@ class ObservationService:
             return
         await transition_agent_state_logic(controller, ctx, observation)
 
-        self._log_tool_observation_resolution(pending_action, observation)
+        self._log_tool_observation_resolution(
+            pending_action, observation, latency_ms=latency_ms
+        )
 
         if not isinstance(observation, ErrorObservation):
             tool_name = _extract_tool_name_from_action(pending_action)
@@ -308,8 +311,13 @@ class ObservationService:
 
     @staticmethod
     def _log_tool_observation_resolution(
-        pending_action, observation: Observation
+        pending_action,
+        observation: Observation,
+        *,
+        latency_ms: int | None = None,
     ) -> None:
+        from backend.core.prompt_role_debug import current_astep_id
+
         meta = getattr(pending_action, 'tool_call_metadata', None)
         if meta is None and getattr(observation, 'tool_call_metadata', None) is None:
             return
@@ -320,19 +328,53 @@ class ObservationService:
             or type(pending_action).__name__
         )
         try:
+            from backend.core.logging.session_event_logger import emit_session_event
+
             tool_result = getattr(observation, 'tool_result', None)
             ok = tool_result.get('ok') if isinstance(tool_result, dict) else None
+            if ok is None:
+                ok = not isinstance(observation, ErrorObservation)
+            call_id = getattr(meta, 'tool_call_id', '') or getattr(
+                obs_meta, 'tool_call_id', ''
+            )
+            preview = _compact_log_preview(getattr(observation, 'content', '') or '')
+            emit_session_event(
+                'TOOL_RESULT',
+                {
+                    'tool': tool_name,
+                    'ok': ok,
+                    'latency_ms': latency_ms,
+                    'action_id': getattr(pending_action, 'id', None),
+                    'call_id': call_id or None,
+                    'observation': type(observation).__name__,
+                    'preview': preview,
+                    'content_chars': len(
+                        str(getattr(observation, 'content', '') or '')
+                    ),
+                    'action_type': type(pending_action).__name__,
+                },
+                ctx={'astep_id': current_astep_id() or None},
+            )
             logger.info(
                 'Tool observation resolved: action=%s action_id=%s tool=%s call_id=%s observation=%s ok=%s content_chars=%d preview=%r',
                 type(pending_action).__name__,
                 getattr(pending_action, 'id', None),
                 tool_name,
-                getattr(meta, 'tool_call_id', '')
-                or getattr(obs_meta, 'tool_call_id', ''),
+                call_id,
                 type(observation).__name__,
                 ok,
                 len(str(getattr(observation, 'content', '') or '')),
-                _compact_log_preview(getattr(observation, 'content', '') or ''),
+                preview,
+                extra={
+                    'msg_type': 'TOOL_OBSERVATION_RESOLVED',
+                    'astep_id': current_astep_id() or None,
+                    'tool': tool_name,
+                    'ok': ok,
+                    'latency_ms': latency_ms,
+                    'action_id': getattr(pending_action, 'id', None),
+                    'call_id': call_id or None,
+                    'observation': type(observation).__name__,
+                },
             )
         except Exception:
             logger.debug('Failed to log resolved tool observation', exc_info=True)

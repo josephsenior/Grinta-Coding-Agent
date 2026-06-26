@@ -242,6 +242,21 @@ class PendingActionService:
         self._schedule_watchdog_if_needed()
         return action
 
+    def elapsed_ms_for_action(self, action: Action) -> int | None:
+        """Return milliseconds since *action* was marked pending, if still outstanding."""
+        aid = self._int_action_id(action)
+        if aid is not None:
+            entry = self._outstanding.get(aid)
+            if entry is None:
+                return None
+            _, ts = entry
+            return int((time.time() - ts) * 1000)
+        if self._legacy_pending is not None:
+            legacy_action, ts = self._legacy_pending
+            if legacy_action is action:
+                return int((time.time() - ts) * 1000)
+        return None
+
     def clear_for_action(self, action: Action) -> None:
         """Remove only the outstanding row for *action* (parallel-safe clear)."""
         controller = self._context.get_controller()

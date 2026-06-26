@@ -14,6 +14,7 @@ class Grinta < Formula
 
   depends_on "python@3.12"
   depends_on "ripgrep"
+  depends_on "tmux"
 
   def install
     virtualenv_install_with_resources

@@ -26,11 +26,17 @@ from rich import box
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
-from rich.table import Table
 
 from backend.cli.onboarding.connection_check import validate_connection
+from backend.cli.onboarding.menu_prompts import (
+    format_detected_model_preview,
+    is_more_providers_menu_key,
+    more_providers_menu_key,
+    prompt_numbered_choice,
+)
 from backend.cli.onboarding.provider_presets import ONBOARDING_PROVIDER_PRESETS
 from backend.cli.onboarding.settings_defaults import build_init_settings
+from backend.cli.settings.constants import _PROVIDERS
 from backend.cli.theme import (
     CLR_BRAND,
     CLR_CARD_BORDER,
@@ -48,12 +54,7 @@ from backend.inference.provider_resolver import (
 )
 
 _PROVIDER_PRESETS = ONBOARDING_PROVIDER_PRESETS
-_PROVIDER_CATEGORY_ORDER = ('cloud', 'aggregator', 'local')
-_PROVIDER_CATEGORY_LABELS = {
-    'cloud': 'Cloud providers',
-    'aggregator': 'Aggregators / gateways',
-    'local': 'Local servers',
-}
+_PROVIDER_LABELS = {key: label for key, label, _category in _PROVIDERS}
 
 
 def _get_platform_info() -> str:
@@ -194,29 +195,120 @@ def _confirm_overwrite_existing(
     return True
 
 
-def _print_provider_table(console: Console, detected: list[str]) -> None:
-    for category in _PROVIDER_CATEGORY_ORDER:
-        rows = [
-            (key, preset)
-            for key, preset in _PROVIDER_PRESETS.items()
-            if preset.get('category') == category
-        ]
-        if not rows:
+def _provider_label(key: str) -> str:
+    return _PROVIDER_LABELS.get(key, key)
+
+
+def _build_detected_provider_items(
+    detected: list[str],
+    local_models: dict[str, list[str]],
+) -> list[tuple[str, str]]:
+    items: list[tuple[str, str]] = []
+    for key in detected:
+        if key not in _PROVIDER_PRESETS:
             continue
-        table = Table(
-            title=_PROVIDER_CATEGORY_LABELS.get(category, category.title()),
-            title_style=CLR_CARD_TITLE,
-            border_style=CLR_CARD_BORDER,
-            box=box.ROUNDED,
-            padding=(1, 2),
+        models = local_models.get(key) or []
+        preview = format_detected_model_preview(models)
+        items.append((key, f'{_provider_label(key)} — {preview}'))
+    return items
+
+
+def _build_all_provider_items(exclude: set[str] | None = None) -> list[tuple[str, str]]:
+    skip = exclude or set()
+    return [
+        (key, _provider_label(key))
+        for key, _label, _category in _PROVIDERS
+        if key not in skip
+    ]
+
+
+def _prompt_provider(
+    console: Console,
+    detected: list[str],
+    local_models: dict[str, list[str]],
+) -> str | None:
+    detected_items = _build_detected_provider_items(detected, local_models)
+    if detected_items:
+        console.print(f'[{CLR_STATUS_OK}]Local model servers detected.[/]')
+        menu_items = list(detected_items)
+        menu_items.append((more_providers_menu_key(), 'More cloud providers…'))
+        default_index = 1
+        selected = prompt_numbered_choice(
+            console,
+            title='Select provider:',
+            items=menu_items,
+            default_index=default_index,
         )
-        table.add_column('Key', style=CLR_BRAND)
-        table.add_column('Description')
-        table.add_column('Detected', style=CLR_STATUS_OK)
-        for key, preset in rows:
-            detected_marker = '✓' if key in detected else ''
-            table.add_row(key, preset['help'], detected_marker)
-        console.print(table)
+        if selected is None:
+            return None
+        if is_more_providers_menu_key(selected):
+            return prompt_numbered_choice(
+                console,
+                title='Select cloud provider:',
+                items=_build_all_provider_items(exclude=set(detected)),
+                default_index=1,
+            )
+        return selected
+
+    return prompt_numbered_choice(
+        console,
+        title='Select provider:',
+        items=_build_all_provider_items(),
+        default_index=next(
+            (idx for idx, (key, _label) in enumerate(_build_all_provider_items(), 1) if key == 'openai'),
+            1,
+        ),
+    )
+
+
+def _model_options_for_provider(
+    provider: str,
+    local_models: dict[str, list[str]],
+) -> list[str]:
+    discovered = local_models.get(provider) or []
+    if discovered:
+        return discovered
+    try:
+        from backend.inference.catalog.provider_catalog import (
+            build_model_entries_by_provider,
+        )
+
+        entries = build_model_entries_by_provider(provider=provider).get(provider, [])
+        return [entry.name for entry in entries]
+    except Exception:
+        return []
+
+
+def _prompt_model(
+    console: Console,
+    provider: str,
+    local_models: dict[str, list[str]],
+) -> str | None:
+    default_model = _default_model_for_provider(provider, local_models)
+    options = _model_options_for_provider(provider, local_models)
+    if not options:
+        model = Prompt.ask('Model id (provider/model)', default=default_model).strip()
+        return model or None
+
+    items = [(model_id, model_id) for model_id in options]
+    default_index = 1
+    default_name = default_model.split('/', 1)[-1]
+    for idx, model_id in enumerate(options, 1):
+        if model_id == default_name or f'{provider}/{model_id}' == default_model:
+            default_index = idx
+            break
+
+    selected = prompt_numbered_choice(
+        console,
+        title='Select model:',
+        items=items,
+        default_index=default_index,
+    )
+    if selected is None:
+        return None
+    if '/' in selected:
+        return selected
+    return f'{provider}/{selected}'
 
 
 def _discover_local_models() -> dict[str, list[str]]:
@@ -303,8 +395,6 @@ def _detect_and_report(console: Console) -> list[str]:
     console.print(f'[{CLR_META}]Detecting local model servers...[/]', end='')
     detected = _detect_local()
     console.print(' done.')
-    if detected:
-        console.print(f'[{CLR_STATUS_OK}]Found local:[/] {", ".join(detected)}')
     return detected
 
 
@@ -313,23 +403,12 @@ def _collect_user_choices(
     detected: list[str],
     local_models: dict[str, list[str]],
 ) -> tuple[str, str, str, str] | None:
-    _print_provider_table(console, detected)
-    provider = Prompt.ask(
-        'Provider',
-        choices=list(_PROVIDER_PRESETS.keys()),
-        default=detected[0] if detected else 'openai',
-    )
+    provider = _prompt_provider(console, detected, local_models)
+    if not provider:
+        console.print('[dim]No changes made.[/dim]')
+        return None
     preset = _PROVIDER_PRESETS[provider]
-    default_model = _default_model_for_provider(provider, local_models)
-    if provider in local_models:
-        console.print(
-            f'[{CLR_STATUS_OK}]Discovered models:[/] '
-            f'{", ".join(local_models[provider][:8])}'
-        )
-    model = Prompt.ask(
-        'Model id (provider/model)',
-        default=default_model,
-    )
+    model = _prompt_model(console, provider, local_models)
     if not model or not model.strip():
         console.print(
             f'[{CLR_STATUS_WARN}]Error:[/] Model cannot be empty.',

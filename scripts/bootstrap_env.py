@@ -59,6 +59,33 @@ def main(argv: list[str] | None = None) -> int:
     except FileNotFoundError:
         print('[bootstrap] error: `uv` was not found in PATH.', file=sys.stderr)
         return 127
+    if completed.returncode != 0:
+        return completed.returncode
+
+    host_tools_cmd = [
+        'uv',
+        'run',
+        'python',
+        '-c',
+        (
+            'from backend.utils.linux_host_tools import ensure_linux_host_tools; '
+            'result = ensure_linux_host_tools(); '
+            'print('
+            'f"[bootstrap] linux_host_tools tmux={result.tmux_installed} '
+            'libtmux={result.libtmux_available} ({result.message})"'
+            ')'
+        ),
+    ]
+    try:
+        host_completed = subprocess.run(host_tools_cmd, check=False)
+        if host_completed.returncode != 0:
+            print(
+                '[bootstrap] warning: linux host tool setup exited '
+                f'with code {host_completed.returncode}',
+                file=sys.stderr,
+            )
+    except FileNotFoundError:
+        print('[bootstrap] warning: could not run linux host tool setup.', file=sys.stderr)
     return completed.returncode
 
 

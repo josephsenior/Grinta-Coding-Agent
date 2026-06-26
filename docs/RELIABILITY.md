@@ -79,7 +79,7 @@ instead of seeing a bare `DAPError`.
 
 ## What to do when something goes wrong
 
-* **Hung tool call.** Open `logs/workspaces/<ws>/app.log` and look for the
+* **Hung tool call.** Open `logs/workspaces/<ws>/sessions/<session_id>/session.jsonl` and look for the
   most recent `_handle_action START` and the matching `END`. If you see the
   new `DAP: …` lines, the debugger is working through its handshake. If you
   see no progress for > 30 s, copy the tail and file an issue.
@@ -176,7 +176,7 @@ flush permanently fails.
 
 ## What to do when something goes wrong (log triage)
 
-Search `logs/workspaces/<ws>/app.log` for:
+Search `logs/workspaces/<ws>/sessions/<session_id>/session.jsonl` for:
 
 * **`outstanding_count`** — pending rows not cleared; may indicate a parallel
   batch race or late observation.

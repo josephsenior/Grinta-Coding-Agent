@@ -17,10 +17,38 @@ echo -e "${CYAN}Starting Grinta Setup...${NC}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
+# Logs + settings always live in the Grinta install tree — never in the open project folder.
+export GRINTA_REPO_ROOT="$ROOT"
+export GRINTA_LOG_ROOT="$ROOT/logs"
+mkdir -p "$GRINTA_LOG_ROOT"
+
+if [[ "$ROOT" == /mnt/* ]]; then
+    echo -e "${YELLOW}Note: Grinta is on a Windows drive (${ROOT}).${NC}"
+    echo -e "${YELLOW}      For faster setup, clone to Linux home instead:${NC}"
+    echo -e "${YELLOW}        git clone ${ROOT} ~/Grinta && cd ~/Grinta && bash start_here.sh${NC}"
+    echo -e "${YELLOW}      Logs will still be written under: ${GRINTA_LOG_ROOT}${NC}"
+    echo ""
+fi
+
+PROJECT_PATH=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -p|--project)
+            PROJECT_PATH="${2:-}"
+            shift 2
+            ;;
+        *)
+            if [[ -z "$PROJECT_PATH" ]]; then
+                PROJECT_PATH="$1"
+            fi
+            shift
+            ;;
+    esac
+done
+
 # Step 0: Pre-flight checks
 echo -e "${YELLOW}Step 0: Pre-flight checks...${NC}"
 
-# Check Python version (no external bc dependency)
 if ! command -v python3 &> /dev/null; then
     echo -e "${RED}python3 not found.${NC}"
     exit 1
@@ -34,7 +62,6 @@ fi
 PYTHON_VERSION=$(python3 -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')
 echo -e "${GREEN}Python version ok: ${PYTHON_VERSION}${NC}"
 
-# Check for uv
 if ! command -v uv &> /dev/null; then
     echo -e "${YELLOW}uv not found. Installing...${NC}"
     curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -44,23 +71,35 @@ if ! command -v uv &> /dev/null; then
 fi
 echo -e "${GREEN}uv found!${NC}"
 
-# Step 1: Install dependencies
 echo -e "${YELLOW}Step 1: Syncing dependencies (dev-test profile)...${NC}"
 python3 scripts/bootstrap_env.py dev-test
 
-# Step 1.5: Report local model provider status (optional; does not modify settings)
 echo -e "${YELLOW}Step 1.5: Checking local model servers (Ollama/LM Studio/vLLM)...${NC}"
 uv run python -m backend.inference.discover_models status || \
     echo -e "${YELLOW}Local model status check failed; continuing.${NC}"
 
-# Step 1.75: First-run configuration
 if [ ! -f "settings.json" ]; then
     echo -e "${YELLOW}Step 1.75: No settings.json found. Starting first-run wizard...${NC}"
     uv run python -m backend.cli.entry init
 fi
 
-echo -e "\n${GREEN}Setup complete! Launching Grinta CLI...${NC}"
-echo -e "${CYAN}   Runtime state will be stored under ~/.grinta/workspaces/<id>/storage.${NC}"
+echo -e "${YELLOW}Step 2: Running doctor...${NC}"
+if ! uv run python -m backend.cli.entry doctor; then
+    echo -e "${RED}Doctor found problems. Fix settings/.env then re-run start_here.sh${NC}"
+    echo -e "${CYAN}Logs directory: ${GRINTA_LOG_ROOT}${NC}"
+    exit 1
+fi
+
+LAUNCH_ARGS=()
+if [[ -n "$PROJECT_PATH" ]]; then
+    LAUNCH_ARGS=( -p "$PROJECT_PATH" )
+    echo -e "${GREEN}Opening workspace: ${PROJECT_PATH}${NC}"
+fi
+
+echo ""
+echo -e "${GREEN}Setup complete! Launching Grinta...${NC}"
+echo -e "${CYAN}   Logs: ${GRINTA_LOG_ROOT}/workspaces/...${NC}"
+echo -e "${CYAN}   Session data: ~/.grinta/workspaces/<id>/storage${NC}"
 echo ""
 
-uv run python -m backend.cli.entry
+uv run python -m backend.cli.entry "${LAUNCH_ARGS[@]}"

@@ -1101,30 +1101,28 @@ class ContextMemory:
     def _ensure_initial_user_message(
         self, events: list[Event], initial_user_action: MessageAction
     ) -> None:
-        """Ensure the initial user message is present and positioned consistently.
+        """Ensure the initial user message is present at index 1.
 
-        Idempotent logic:
-        - If the exact initial_user_action object already exists anywhere in the list:
-          * If it's at index 1 and correctly sourced, leave as-is.
-          * If it's elsewhere and index 1 is not a user-sourced MessageAction, move it to index 1.
-        - If it does not exist, insert at index 1 (or append if list length == 0).
-        This avoids duplicate insertions across repeated calls (important for tests invoking
-        the pipeline multiple times with the same underlying history list).
+        Follow-up USER messages elsewhere in *events* are left untouched so they
+        can be rendered as additional ``role=user`` turns.
         """
         if not events:
             self._append_initial_user_action(events, initial_user_action)
             return
 
         existing_index = self._find_existing_initial_action(events, initial_user_action)
-        if self._handle_existing_initial_action(
-            events, initial_user_action, existing_index
-        ):
+        if existing_index == 1:
             return
 
-        if self._has_user_message_at_index_one(events):
+        if existing_index > 1:
+            events.pop(existing_index)
+            events.insert(1, initial_user_action)
+            logger.debug('Repositioned existing initial user action to index 1')
             return
 
-        self._insert_initial_user_at_index(events, initial_user_action)
+        insert_pos = 1 if events else 0
+        events.insert(insert_pos, initial_user_action)
+        logger.info('Inserted initial user action at index %s', insert_pos)
 
     @staticmethod
     def _append_initial_user_action(
@@ -1141,36 +1139,6 @@ class ContextMemory:
             if event is initial_user_action:
                 return idx
         return -1
-
-    def _handle_existing_initial_action(
-        self,
-        events: list[Event],
-        initial_user_action: MessageAction,
-        existing_index: int,
-    ) -> bool:
-        if existing_index == -1:
-            return False
-        if existing_index == 1 and self._is_user_message(events[1]):
-            return True
-        if len(events) > 1 and self._is_user_message(events[1]):
-            return True
-        events.pop(existing_index)
-        insert_pos = 1 if events else 0
-        events.insert(insert_pos, initial_user_action)
-        logger.debug(
-            'Repositioned existing initial user action to index %s', insert_pos
-        )
-        return True
-
-    def _has_user_message_at_index_one(self, events: list[Event]) -> bool:
-        return len(events) > 1 and self._is_user_message(events[1])
-
-    def _insert_initial_user_at_index(
-        self, events: list[Event], initial_user_action: MessageAction
-    ) -> None:
-        insert_pos = 1 if events else 0
-        events.insert(insert_pos, initial_user_action)
-        logger.info('Inserted initial user action at index %s', insert_pos)
 
     def _is_user_message(self, event: Event) -> bool:
         if not is_instance_of(event, MessageAction):
