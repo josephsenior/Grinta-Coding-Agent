@@ -289,6 +289,14 @@ def _user_request_context(
         turn for turn in user_turns if not _turn_is_present(turn, prompt_turns)
     ]
     if not missing_turns:
+        history_user_count = len(_user_turns_from_events(history))
+        if history_user_count > 1 and prompt_turns:
+            logger.debug(
+                'User request context skipped: history has %d user turn(s) and '
+                'all appear present in prompt (%d prompt user turn(s))',
+                history_user_count,
+                len(prompt_turns),
+            )
         return ''
 
     selected = missing_turns[-6:]

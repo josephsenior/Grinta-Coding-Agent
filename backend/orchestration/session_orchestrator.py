@@ -221,6 +221,23 @@ class SessionOrchestrator(
         self.services.autonomy.initialize(config.agent)
         self.services.retry.initialize()
 
+        try:
+            from backend.core.logging.session_context import register_runtime_context
+            from backend.core.logging.session_event_logger import (
+                emit_session_context_if_changed,
+            )
+
+            llm_config = None
+            agent = config.agent
+            if agent is not None:
+                llm = getattr(agent, 'llm', None)
+                if llm is not None:
+                    llm_config = getattr(llm, 'config', None)
+            register_runtime_context(controller=self, llm_config=llm_config)
+            emit_session_context_if_changed()
+        except Exception:
+            logger.debug('Session runtime context registration failed', exc_info=True)
+
     def step(self) -> None:
         """Trigger agent to take one step asynchronously.
 

@@ -1,45 +1,24 @@
-"""Generate stripped session logs and audit reports from ``app.log``."""
+"""Generate session.audit.txt and session.txt from ``session.jsonl``."""
 
 from __future__ import annotations
 
 import json
 import os
 import re
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
-NOISE_PATTERNS = (
-    re.compile(r'on_event received StreamingChunkAction\b'),
-    re.compile(r'\[streaming-dbg\]'),
-    re.compile(r'\[TUI\] _dispatch_to_agent: poll #'),
-    re.compile(r'_dispatch_to_agent: \d+ consecutive polls'),
-    re.compile(r'dispatching via run_or_schedule$'),
+from backend.core.logging.session_event_logger import (
+    AUDIT_FILENAME,
+    SESSION_LOG_FILENAME,
+    TRANSCRIPT_FILENAME,
 )
+from backend.core.logging.session_log_renderer import write_session_transcript
 
 ISSUE_LEVELS = frozenset({'WARNING', 'ERROR', 'CRITICAL'})
-
-ISSUE_MSG_PATTERNS = (
-    re.compile(r'pending action timed out', re.I),
-    re.compile(r'HARD TIMEOUT', re.I),
-    re.compile(r'AGENT_HARD_TIMEOUT', re.I),
-    re.compile(r'STALL TIMEOUT', re.I),
-    re.compile(r'stuck_detection', re.I),
-    re.compile(r'recover|retry|backoff', re.I),
-    re.compile(r'exception|traceback|failed', re.I),
-    re.compile(r'dropped while the renderer was backlogged', re.I),
-    re.compile(r'Memory pressure', re.I),
-    re.compile(r'circuit.?breaker', re.I),
-    re.compile(r'no.step.progress', re.I),
-)
-
-STATE_RE = re.compile(
-    r'Setting agent\([^)]+\) state from AgentState\.(\w+) to AgentState\.(\w+)'
-)
-ACTION_RE = re.compile(r'obtained action=ActionType\.(\w+)')
-LLM_DONE_RE = re.compile(r'OrchestratorExecutor\.async_execute done in ([\d.]+)s')
-FILE_EVENT_RE = re.compile(r'(FileWrite|FileEdit|FileRead)(Action|Observation)')
 
 
 @dataclass(frozen=True)
@@ -62,167 +41,128 @@ def parse_ts(raw: str | None) -> datetime | None:
     if not raw:
         return None
     try:
-        if 'T' in raw:
-            return datetime.fromisoformat(raw.replace('Z', '+00:00'))
-        return datetime.strptime(raw.split(',')[0], '%Y-%m-%d %H:%M:%S')
+        return datetime.fromisoformat(str(raw).replace('Z', '+00:00'))
     except ValueError:
         return None
-
-
-def is_noise(message: str) -> bool:
-    return any(p.search(message) for p in NOISE_PATTERNS)
-
-
-def is_issue(level: str, message: str) -> bool:
-    if level in ISSUE_LEVELS:
-        return True
-    return any(p.search(message) for p in ISSUE_MSG_PATTERNS)
-
-
-def format_line(obj: dict) -> str:
-    ts = obj.get('asctime') or obj.get('timestamp') or ''
-    level = obj.get('level', 'INFO')
-    msg = obj.get('message', '')
-    extra = []
-    for key in ('msg_type', 'conversation_id'):
-        if key in obj and key != 'message':
-            extra.append(f'{key}={obj[key]}')
-    suffix = f' [{", ".join(extra)}]' if extra else ''
-    return f'{ts} [{level}] {msg}{suffix}'
 
 
 @dataclass
 class _AuditAccumulator:
     total: int = 0
-    kept: int = 0
-    stripped: int = 0
+    events: list[dict[str, Any]] = field(default_factory=list)
     levels: Counter[str] = field(default_factory=Counter)
+    event_types: Counter[str] = field(default_factory=Counter)
     issue_lines: list[str] = field(default_factory=list)
-    state_transitions: list[tuple[str, str, str, int]] = field(default_factory=list)
-    actions: list[tuple[str, str, int]] = field(default_factory=list)
-    llm_calls: list[tuple[float, str, int]] = field(default_factory=list)
+    state_transitions: list[tuple[str, str, int]] = field(default_factory=list)
+    llm_latencies_ms: list[int] = field(default_factory=list)
     file_events: list[tuple[str, str, int]] = field(default_factory=list)
+    tool_outcomes: Counter[str] = field(default_factory=Counter)
     end_state: str | None = None
     first_ts: datetime | None = None
     last_ts: datetime | None = None
     pending_timeouts: int = 0
     retries: int = 0
-    on_event_types: Counter[str] = field(default_factory=Counter)
+    by_model: Counter[str] = field(default_factory=Counter)
+    by_mode: Counter[str] = field(default_factory=Counter)
+    by_autonomy: Counter[str] = field(default_factory=Counter)
+    issues_by_model: Counter[str] = field(default_factory=Counter)
+    tool_fail_by_model: Counter[str] = field(default_factory=Counter)
+    first_issue_ctx: dict[str, Any] | None = None
+    runtime_msg_types: Counter[str] = field(default_factory=Counter)
 
 
-def _update_timestamps(acc: _AuditAccumulator, obj: dict) -> None:
-    ts = parse_ts(obj.get('timestamp') or obj.get('asctime'))
+def _ctx_model(record: dict[str, Any]) -> str:
+    ctx = record.get('ctx')
+    if isinstance(ctx, dict):
+        return str(ctx.get('model') or 'unknown')
+    return 'unknown'
+
+
+def _ctx_mode(record: dict[str, Any]) -> str:
+    ctx = record.get('ctx')
+    if isinstance(ctx, dict):
+        return str(ctx.get('active_run_mode') or ctx.get('mode') or 'unknown')
+    return 'unknown'
+
+
+def _ctx_autonomy(record: dict[str, Any]) -> str:
+    ctx = record.get('ctx')
+    if isinstance(ctx, dict):
+        return str(ctx.get('autonomy') or 'unknown')
+    return 'unknown'
+
+
+def _process_event(line_no: int, record: dict[str, Any], acc: _AuditAccumulator) -> None:
+    acc.total += 1
+    acc.events.append(record)
+    level = str(record.get('level', 'INFO'))
+    acc.levels[level] += 1
+    event = str(record.get('event', 'UNKNOWN'))
+    acc.event_types[event] += 1
+
+    ts = parse_ts(record.get('ts'))
     if ts:
         acc.first_ts = acc.first_ts or ts
         acc.last_ts = ts
 
+    model = _ctx_model(record)
+    mode = _ctx_mode(record)
+    autonomy = _ctx_autonomy(record)
+    acc.by_model[model] += 1
+    acc.by_mode[mode] += 1
+    acc.by_autonomy[autonomy] += 1
 
-def _extract_state_transition(msg: str, line_no: int, acc: _AuditAccumulator) -> None:
-    m = STATE_RE.search(msg)
-    if m:
-        acc.state_transitions.append((m.group(1), m.group(2), msg, line_no))
-        acc.end_state = m.group(2)
+    payload = record.get('payload')
+    if not isinstance(payload, dict):
+        payload = {}
 
+    if event == 'STATE_CHANGE':
+        a, b = payload.get('from'), payload.get('to')
+        if a and b:
+            acc.state_transitions.append((str(a), str(b), line_no))
+            acc.end_state = str(b)
 
-def _extract_action(msg: str, line_no: int, acc: _AuditAccumulator) -> None:
-    m = ACTION_RE.search(msg)
-    if m:
-        acc.actions.append((m.group(1), msg, line_no))
+    if event == 'TOOL_RESULT':
+        ok = payload.get('ok')
+        if ok is True:
+            acc.tool_outcomes['ok'] += 1
+        elif ok is False:
+            acc.tool_outcomes['fail'] += 1
+            acc.tool_fail_by_model[model] += 1
 
+    if event in {'WIRE_RESPONSE', 'AGENT_STEP'}:
+        lat = payload.get('latency_ms')
+        if isinstance(lat, (int, float)):
+            acc.llm_latencies_ms.append(int(lat))
 
-def _extract_llm_call(msg: str, line_no: int, acc: _AuditAccumulator) -> None:
-    m = LLM_DONE_RE.search(msg)
-    if m:
-        acc.llm_calls.append((float(m.group(1)), msg, line_no))
+    if event == 'FILE_EVENT':
+        kind = str(payload.get('kind', 'FILE'))
+        path_preview = str(payload.get('path', ''))[:120]
+        acc.file_events.append((kind, path_preview, line_no))
 
+    if event in {'ISSUE', 'RUNTIME'}:
+        msg = str(payload.get('message', ''))
+        msg_type = payload.get('msg_type')
+        if msg_type:
+            acc.runtime_msg_types[str(msg_type)] += 1
+        if re.search(r'pending action timed out', msg, re.I):
+            acc.pending_timeouts += 1
+        if re.search(r'\bretry\b|\bbackoff\b|recover', msg, re.I):
+            acc.retries += 1
 
-def _extract_file_event(msg: str, line_no: int, acc: _AuditAccumulator) -> None:
-    m = FILE_EVENT_RE.search(msg)
-    if m:
-        acc.file_events.append((m.group(1) + m.group(2), msg[:120], line_no))
-
-
-def _extract_on_event_type(msg: str, acc: _AuditAccumulator) -> None:
-    if 'on_event received ' in msg and 'StreamingChunkAction' not in msg:
-        evt = msg.split('on_event received ', 1)[-1].split(' (id=', 1)[0]
-        acc.on_event_types[evt] += 1
-
-
-def _extract_health_signals(msg: str, acc: _AuditAccumulator) -> None:
-    if re.search(r'pending action timed out', msg, re.I):
-        acc.pending_timeouts += 1
-    if re.search(r'\bretry\b|\bbackoff\b|recover', msg, re.I):
-        acc.retries += 1
-
-
-def _process_log_line(
-    line_no: int,
-    line: str,
-    acc: _AuditAccumulator,
-    out,
-) -> None:
-    acc.total += 1
-    line = line.strip()
-    if not line:
-        return
-    try:
-        obj = json.loads(line)
-    except json.JSONDecodeError:
-        out.write(f'# L{line_no} (non-json) {line}\n')
-        acc.kept += 1
-        return
-
-    msg = obj.get('message', '')
-    level = obj.get('level', 'INFO')
-    acc.levels[level] += 1
-
-    _update_timestamps(acc, obj)
-
-    if is_noise(msg):
-        acc.stripped += 1
-        return
-
-    acc.kept += 1
-    out.write(format_line(obj) + '\n')
-
-    if is_issue(level, msg):
-        acc.issue_lines.append(f'L{line_no}: {format_line(obj)}')
-
-    _extract_state_transition(msg, line_no, acc)
-    _extract_action(msg, line_no, acc)
-    _extract_llm_call(msg, line_no, acc)
-    _extract_file_event(msg, line_no, acc)
-    _extract_on_event_type(msg, acc)
-    _extract_health_signals(msg, acc)
+    if event == 'ISSUE' or level in ISSUE_LEVELS:
+        acc.issue_lines.append(
+            f'L{line_no}: [{event}] {payload.get("message", payload)}'
+        )
+        acc.issues_by_model[model] += 1
+        if acc.first_issue_ctx is None and isinstance(record.get('ctx'), dict):
+            acc.first_issue_ctx = dict(record['ctx'])
 
 
-def _compute_duration(acc: _AuditAccumulator) -> float:
-    if acc.first_ts and acc.last_ts:
-        return (acc.last_ts - acc.first_ts).total_seconds() / 60.0
-    return 0.0
+def _compute_verdict(acc: _AuditAccumulator) -> tuple[str, list[str]]:
+    verdict = 'CLEAN'
+    notes: list[str] = []
 
-
-def _extract_llm_stats(
-    acc: _AuditAccumulator,
-) -> tuple[list[float], list[tuple[float, int, str]]]:
-    llm_times = [t for t, _, _ in acc.llm_calls]
-    slow_llm = [(t, ln, m) for t, m, ln in acc.llm_calls if t >= 60.0]
-    return llm_times, slow_llm
-
-
-def _find_suspicious_states(
-    acc: _AuditAccumulator,
-) -> list[tuple[str, str, str, int]]:
-    return [
-        (a, b, m, ln)
-        for a, b, m, ln in acc.state_transitions
-        if b in {'ERROR', 'STOPPED'} or (a == 'ERROR' and b != 'AWAITING_USER_INPUT')
-    ]
-
-
-def _assess_end_state(
-    acc: _AuditAccumulator, verdict: str, notes: list[str]
-) -> tuple[str, list[str]]:
     if acc.end_state == 'FINISHED':
         notes.append('Session ended in FINISHED (success).')
     elif acc.end_state == 'AWAITING_USER_INPUT':
@@ -230,248 +170,213 @@ def _assess_end_state(
     elif acc.end_state in {'ERROR', 'STOPPED'}:
         verdict = 'ISSUES FOUND'
         notes.append(f'Session ended in {acc.end_state}.')
-    return verdict, notes
 
-
-def _assess_health_signals(
-    acc: _AuditAccumulator,
-    suspicious_states: list,
-    verdict: str,
-    notes: list[str],
-) -> tuple[str, list[str]]:
     if acc.pending_timeouts:
         verdict = 'ISSUES FOUND'
         notes.append(f'{acc.pending_timeouts} pending-action timeout(s) detected.')
-    if suspicious_states:
+
+    suspicious = [
+        (a, b, ln)
+        for a, b, ln in acc.state_transitions
+        if b in {'ERROR', 'STOPPED'}
+    ]
+    if suspicious:
         verdict = 'ISSUES FOUND'
-        notes.append(f'{len(suspicious_states)} error/stop state transition(s).')
-    return verdict, notes
+        notes.append(f'{len(suspicious)} error/stop state transition(s).')
 
-
-def _assess_log_levels(
-    acc: _AuditAccumulator, verdict: str, notes: list[str]
-) -> tuple[str, list[str]]:
-    warn_count = acc.levels.get('WARNING', 0)
     err_count = acc.levels.get('ERROR', 0) + acc.levels.get('CRITICAL', 0)
     if err_count:
         verdict = 'ISSUES FOUND'
-        notes.append(f'{err_count} ERROR/CRITICAL log line(s).')
-    elif warn_count and warn_count <= 5:
-        notes.append(f'{warn_count} WARNING(s) — review below (may be benign).')
-    elif warn_count:
+        notes.append(f'{err_count} ERROR/CRITICAL event(s).')
+    elif acc.levels.get('WARNING', 0) > 5:
         verdict = 'REVIEW'
-        notes.append(f'{warn_count} WARNING(s) — worth scanned.')
+        notes.append(f'{acc.levels.get("WARNING", 0)} WARNING(s) — worth scanning.')
+
     return verdict, notes
 
 
-def _compute_verdict(
-    acc: _AuditAccumulator,
-) -> tuple[
-    str,
-    list[str],
-    float,
-    list[float],
-    list[tuple[float, int, str]],
-    list[tuple[str, str, str, int]],
-]:
-    duration_min = _compute_duration(acc)
-    llm_times, slow_llm = _extract_llm_stats(acc)
-    suspicious_states = _find_suspicious_states(acc)
-    verdict = 'CLEAN'
-    notes: list[str] = []
-    verdict, notes = _assess_end_state(acc, verdict, notes)
-    verdict, notes = _assess_health_signals(acc, suspicious_states, verdict, notes)
-    verdict, notes = _assess_log_levels(acc, verdict, notes)
-    return verdict, notes, duration_min, llm_times, slow_llm, suspicious_states
-
-
-def _write_report_header(
-    rep, acc: _AuditAccumulator, log_path: Path, stripped_path: Path
-) -> None:
-    rep.write('SESSION LOG AUDIT\n')
-    rep.write('=' * 72 + '\n')
-    rep.write(f'Source: {log_path}\n')
-    rep.write(f'Stripped log: {stripped_path}\n')
-    rep.write(f'Total lines: {acc.total:,}\n')
-    rep.write(
-        f'Stripped (noise): {acc.stripped:,} ({100 * acc.stripped / max(acc.total, 1):.1f}%)\n'
-    )
-    rep.write(f'Kept lines: {acc.kept:,}\n')
-    if acc.first_ts and acc.last_ts:
-        duration_min = (acc.last_ts - acc.first_ts).total_seconds() / 60.0
-        rep.write(
-            f'Duration: {duration_min:.1f} min '
-            f'({acc.first_ts.isoformat()} -> {acc.last_ts.isoformat()})\n'
-        )
-    rep.write(f'Final agent state: {acc.end_state or "unknown"}\n')
-    rep.write('\n')
-
-
-def _write_report_level_counts(rep, acc: _AuditAccumulator) -> None:
-    rep.write('LEVEL COUNTS (all lines)\n')
+def _write_metadata_breakdowns(rep, acc: _AuditAccumulator) -> None:
+    rep.write('METADATA BREAKDOWN\n')
     rep.write('-' * 40 + '\n')
-    for lvl, cnt in acc.levels.most_common():
-        rep.write(f'  {lvl}: {cnt:,}\n')
-    rep.write('\n')
-
-
-def _write_report_health_signals(rep, acc: _AuditAccumulator, llm_times: list) -> None:
-    rep.write('HEALTH SIGNALS\n')
-    rep.write('-' * 40 + '\n')
-    rep.write(f'  Pending action timeouts: {acc.pending_timeouts}\n')
-    rep.write(f'  Retry/recovery mentions: {acc.retries}\n')
-    rep.write(f'  LLM calls completed: {len(acc.llm_calls)}\n')
-    if llm_times:
-        rep.write(
-            f'  LLM latency — min={min(llm_times):.1f}s '
-            f'median={sorted(llm_times)[len(llm_times) // 2]:.1f}s '
-            f'max={max(llm_times):.1f}s\n'
-        )
-    rep.write(f'  File operations logged: {len(acc.file_events)}\n')
-    rep.write(f'  Agent actions obtained: {len(acc.actions)}\n')
-    rep.write('\n')
-
-
-def _write_report_verdict(rep, verdict: str, notes: list[str]) -> None:
-    rep.write(f'VERDICT: {verdict}\n')
-    for note in notes:
-        rep.write(f'  • {note}\n')
-    rep.write('\n')
-
-
-def _write_report_issues(rep, acc: _AuditAccumulator) -> None:
-    if not acc.issue_lines:
-        return
-    rep.write(f'ISSUES / WARNINGS ({len(acc.issue_lines)} lines)\n')
-    rep.write('-' * 40 + '\n')
-    for item in acc.issue_lines[:200]:
-        rep.write(item + '\n')
-    if len(acc.issue_lines) > 200:
-        rep.write(f'... and {len(acc.issue_lines) - 200} more\n')
-    rep.write('\n')
-
-
-def _write_report_suspicious_states(rep, suspicious_states: list) -> None:
-    if not suspicious_states:
-        return
-    rep.write('SUSPICIOUS STATE TRANSITIONS\n')
-    rep.write('-' * 40 + '\n')
-    for a, b, m, ln in suspicious_states:
-        rep.write(f'L{ln}: {a} -> {b}\n')
-    rep.write('\n')
-
-
-def _write_report_slow_llm(rep, slow_llm: list) -> None:
-    if not slow_llm:
-        return
-    rep.write(f'SLOW LLM CALLS (>=60s) — {len(slow_llm)}\n')
-    rep.write('-' * 40 + '\n')
-    for t, ln, m in sorted(slow_llm, reverse=True)[:30]:
-        rep.write(f'L{ln}: {t:.1f}s\n')
-    rep.write('\n')
-
-
-def _write_report_state_timeline(rep, acc: _AuditAccumulator) -> None:
-    rep.write('STATE TRANSITION TIMELINE (deduped consecutive)\n')
-    rep.write('-' * 40 + '\n')
-    last_pair = None
-    for a, b, _, ln in acc.state_transitions:
-        pair = (a, b)
-        if pair != last_pair:
-            rep.write(f'L{ln}: {a} -> {b}\n')
-            last_pair = pair
-    rep.write('\n')
-
-
-def _write_report_event_types(rep, acc: _AuditAccumulator) -> None:
-    rep.write('TOP NON-CHUNK EVENT TYPES\n')
-    rep.write('-' * 40 + '\n')
-    for evt, cnt in acc.on_event_types.most_common(25):
-        rep.write(f'  {cnt:5d}  {evt}\n')
-    rep.write('\n')
-
-
-def _write_report_action_breakdown(rep, acc: _AuditAccumulator) -> None:
-    rep.write('ACTION TYPE BREAKDOWN\n')
-    rep.write('-' * 40 + '\n')
-    action_counts = Counter(a for a, _, _ in acc.actions)
-    for act, cnt in action_counts.most_common():
-        rep.write(f'  {cnt:4d}  {act}\n')
-    rep.write('\n')
-
-
-def _write_report_file_events(rep, acc: _AuditAccumulator) -> None:
-    if not acc.file_events:
-        return
-    rep.write(f'FILE EVENTS (first 40 of {len(acc.file_events)})\n')
-    rep.write('-' * 40 + '\n')
-    for kind, msg, ln in acc.file_events[:40]:
-        rep.write(f'L{ln} [{kind}] {msg}\n')
+    rep.write('By model:\n')
+    for key, cnt in acc.by_model.most_common(10):
+        rep.write(f'  {cnt:5d}  {key}\n')
+    rep.write('By mode:\n')
+    for key, cnt in acc.by_mode.most_common(10):
+        rep.write(f'  {cnt:5d}  {key}\n')
+    rep.write('By autonomy:\n')
+    for key, cnt in acc.by_autonomy.most_common(10):
+        rep.write(f'  {cnt:5d}  {key}\n')
+    if acc.issues_by_model:
+        rep.write('Issues by model:\n')
+        for key, cnt in acc.issues_by_model.most_common(10):
+            rep.write(f'  {cnt:5d}  {key}\n')
+    if acc.tool_fail_by_model:
+        rep.write('Tool failures by model:\n')
+        for key, cnt in acc.tool_fail_by_model.most_common(10):
+            rep.write(f'  {cnt:5d}  {key}\n')
     rep.write('\n')
 
 
 def _write_report(
-    rep,
     acc: _AuditAccumulator,
     log_path: Path,
-    stripped_path: Path,
+    transcript_path: Path,
     verdict: str,
     notes: list[str],
-    llm_times: list,
-    slow_llm: list,
-    suspicious_states: list,
-) -> None:
-    _write_report_header(rep, acc, log_path, stripped_path)
-    _write_report_level_counts(rep, acc)
-    _write_report_health_signals(rep, acc, llm_times)
-    _write_report_verdict(rep, verdict, notes)
-    _write_report_issues(rep, acc)
-    _write_report_suspicious_states(rep, suspicious_states)
-    _write_report_slow_llm(rep, slow_llm)
-    _write_report_state_timeline(rep, acc)
-    _write_report_event_types(rep, acc)
-    _write_report_action_breakdown(rep, acc)
-    _write_report_file_events(rep, acc)
+) -> str:
+    lines: list[str] = []
+    w = lines.append
+    w('SESSION LOG AUDIT')
+    w('=' * 72)
+    w(f'Source: {log_path}')
+    w(f'Transcript: {transcript_path}')
+    w(f'Total events: {acc.total:,}')
+    if acc.first_ts and acc.last_ts:
+        duration = (acc.last_ts - acc.first_ts).total_seconds() / 60.0
+        w(
+            f'Duration: {duration:.1f} min '
+            f'({acc.first_ts.isoformat()} -> {acc.last_ts.isoformat()})'
+        )
+    w(f'Final agent state: {acc.end_state or "unknown"}')
+    w('')
+    w('LEVEL COUNTS')
+    w('-' * 40)
+    for lvl, cnt in acc.levels.most_common():
+        w(f'  {lvl}: {cnt:,}')
+    w('')
+    w('HEALTH SIGNALS')
+    w('-' * 40)
+    w(f'  Pending action timeouts: {acc.pending_timeouts}')
+    w(f'  Retry/recovery mentions: {acc.retries}')
+    w(f'  LLM steps (wire/agent): {acc.event_types.get("WIRE_RESPONSE", 0) + acc.event_types.get("AGENT_STEP", 0)}')
+    if acc.llm_latencies_ms:
+        sorted_lat = sorted(acc.llm_latencies_ms)
+        w(
+            f'  LLM latency ms — min={min(sorted_lat)} '
+            f'median={sorted_lat[len(sorted_lat) // 2]} '
+            f'max={max(sorted_lat)}'
+        )
+    w(f'  File events: {len(acc.file_events)}')
+    if acc.tool_outcomes:
+        w(
+            f'  Tool outcomes: ok={acc.tool_outcomes.get("ok", 0)} '
+            f'fail={acc.tool_outcomes.get("fail", 0)}'
+        )
+    w('')
+    w(f'VERDICT: {verdict}')
+    for note in notes:
+        w(f'  • {note}')
+    w('')
+    if acc.first_issue_ctx:
+        w('CONFIG AT FIRST ISSUE')
+        w('-' * 40)
+        w(json.dumps(acc.first_issue_ctx, indent=2, default=str))
+        w('')
+    if acc.issue_lines:
+        w(f'ISSUES / WARNINGS ({len(acc.issue_lines)} lines)')
+        w('-' * 40)
+        for item in acc.issue_lines[:200]:
+            w(item)
+        if len(acc.issue_lines) > 200:
+            w(f'... and {len(acc.issue_lines) - 200} more')
+        w('')
+    w('EVENT TYPE BREAKDOWN')
+    w('-' * 40)
+    for evt, cnt in acc.event_types.most_common(40):
+        w(f'  {cnt:5d}  {evt}')
+    w('')
+    if acc.runtime_msg_types:
+        w('RUNTIME MSG_TYPE BREAKDOWN')
+        w('-' * 40)
+        for mt, cnt in acc.runtime_msg_types.most_common(40):
+            w(f'  {cnt:5d}  {mt}')
+        w('')
+    if acc.state_transitions:
+        w('STATE TRANSITION TIMELINE')
+        w('-' * 40)
+        last = None
+        for a, b, ln in acc.state_transitions:
+            pair = (a, b)
+            if pair != last:
+                w(f'L{ln}: {a} -> {b}')
+                last = pair
+        w('')
+    _write_metadata_breakdowns_to_lines(lines, acc)
+    if acc.file_events:
+        w(f'FILE EVENTS (first 40 of {len(acc.file_events)})')
+        w('-' * 40)
+        for kind, msg, ln in acc.file_events[:40]:
+            w(f'L{ln} [{kind}] {msg}')
+        w('')
+    return '\n'.join(lines)
+
+
+def _write_metadata_breakdowns_to_lines(lines: list[str], acc: _AuditAccumulator) -> None:
+    lines.append('METADATA BREAKDOWN')
+    lines.append('-' * 40)
+    lines.append('By model:')
+    for key, cnt in acc.by_model.most_common(10):
+        lines.append(f'  {cnt:5d}  {key}')
+    lines.append('By mode:')
+    for key, cnt in acc.by_mode.most_common(10):
+        lines.append(f'  {cnt:5d}  {key}')
+    lines.append('By autonomy:')
+    for key, cnt in acc.by_autonomy.most_common(10):
+        lines.append(f'  {cnt:5d}  {key}')
+    if acc.issues_by_model:
+        lines.append('Issues by model:')
+        for key, cnt in acc.issues_by_model.most_common(10):
+            lines.append(f'  {cnt:5d}  {key}')
+    if acc.tool_fail_by_model:
+        lines.append('Tool failures by model:')
+        for key, cnt in acc.tool_fail_by_model.most_common(10):
+            lines.append(f'  {cnt:5d}  {key}')
+    lines.append('')
+
+
+def load_session_events(log_path: Path) -> list[dict[str, Any]]:
+    events: list[dict[str, Any]] = []
+    if not log_path.is_file():
+        return events
+    with log_path.open(encoding='utf-8', errors='replace') as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(obj, dict):
+                events.append(obj)
+    return events
 
 
 def analyze_session(
     log_path: Path,
-    stripped_path: Path,
+    transcript_path: Path,
     report_path: Path,
 ) -> SessionAuditResult:
     acc = _AuditAccumulator()
+    events = load_session_events(log_path)
+    for line_no, record in enumerate(events, 1):
+        _process_event(line_no, record, acc)
 
-    with (
-        log_path.open(encoding='utf-8', errors='replace') as src,
-        stripped_path.open('w', encoding='utf-8') as out,
-    ):
-        for line_no, line in enumerate(src, 1):
-            _process_log_line(line_no, line, acc, out)
-
-    verdict, notes, duration_min, llm_times, slow_llm, suspicious_states = (
-        _compute_verdict(acc)
+    verdict, notes = _compute_verdict(acc)
+    write_session_transcript(events, transcript_path)
+    report_path.write_text(
+        _write_report(acc, log_path, transcript_path, verdict, notes),
+        encoding='utf-8',
     )
-
-    with report_path.open('w', encoding='utf-8') as rep:
-        _write_report(
-            rep,
-            acc,
-            log_path,
-            stripped_path,
-            verdict,
-            notes,
-            llm_times,
-            slow_llm,
-            suspicious_states,
-        )
 
     return SessionAuditResult(
         log_path=log_path,
-        stripped_path=stripped_path,
+        stripped_path=transcript_path,
         report_path=report_path,
         total_lines=acc.total,
-        kept_lines=acc.kept,
-        stripped_lines=acc.stripped,
+        kept_lines=acc.total,
+        stripped_lines=0,
         verdict=verdict,
     )
 
@@ -479,28 +384,23 @@ def analyze_session(
 def generate_session_audit_artifacts(
     log_dir: str | Path,
     *,
-    log_name: str = 'app.log',
+    log_name: str = SESSION_LOG_FILENAME,
 ) -> SessionAuditResult | None:
-    """Write ``app.stripped.log`` and ``app.audit.txt`` beside ``app.log``."""
     if not session_audit_enabled():
         return None
-
     directory = Path(log_dir)
     log_path = directory / log_name
-    if not log_path.is_file():
+    if not log_path.is_file() or log_path.stat().st_size <= 0:
         return None
-    if log_path.stat().st_size <= 0:
-        return None
-
-    stem = log_path.stem
-    stripped_path = directory / f'{stem}.stripped.log'
-    report_path = directory / f'{stem}.audit.txt'
-    return analyze_session(log_path, stripped_path, report_path)
+    transcript_path = directory / TRANSCRIPT_FILENAME
+    report_path = directory / AUDIT_FILENAME
+    return analyze_session(log_path, transcript_path, report_path)
 
 
 __all__ = [
     'SessionAuditResult',
     'analyze_session',
     'generate_session_audit_artifacts',
+    'load_session_events',
     'session_audit_enabled',
 ]

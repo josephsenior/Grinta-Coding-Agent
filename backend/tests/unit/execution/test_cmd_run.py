@@ -176,9 +176,15 @@ async def test_cmd_run_background_spawns_session(mock_executor):
 
 @pytest.mark.asyncio
 async def test_windows_prefers_powershell_rewrites_python3_when_both_available(
-    mock_executor,
+    mock_executor, monkeypatch
 ):
     """When both shells exist on Windows, PowerShell-first contract rewrites python3."""
+    for key in ('MSYSTEM', 'MINGW_PREFIX', 'MSYSTEM_CHOST', 'SHELL'):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv('SECURITY_WINDOWS_SHELL', 'powershell')
+    from backend.execution.utils.tool_registry import _configured_windows_shell
+
+    _configured_windows_shell.cache_clear()
     mock_session = MagicMock(spec=BaseShellSession)
     mock_obs = CmdOutputObservation(
         content='ok',
@@ -197,6 +203,35 @@ async def test_windows_prefers_powershell_rewrites_python3_when_both_available(
         await mock_executor.run(action)
 
     assert action.command == 'python --version'
+
+
+@pytest.mark.asyncio
+async def test_windows_bash_default_keeps_python3_when_both_available(
+    mock_executor, monkeypatch
+):
+    """Default windows_shell=bash should not rewrite python3 to python."""
+    monkeypatch.delenv('SECURITY_WINDOWS_SHELL', raising=False)
+    from backend.execution.utils.tool_registry import _configured_windows_shell
+
+    _configured_windows_shell.cache_clear()
+    mock_session = MagicMock(spec=BaseShellSession)
+    mock_obs = CmdOutputObservation(
+        content='ok',
+        command='python3 --version',
+        metadata={'exit_code': 0},
+    )
+    mock_session.execute.return_value = mock_obs
+    mock_executor.session_manager.get_session.return_value = mock_session
+    mock_executor.session_manager.tool_registry = MagicMock(
+        has_bash=True,
+        has_powershell=True,
+    )
+
+    action = CmdRunAction(command='python3 --version')
+    with override_os_capabilities(replace(OS_CAPS, is_windows=True)):
+        await mock_executor.run(action)
+
+    assert action.command == 'python3 --version'
 
 
 @pytest.mark.asyncio

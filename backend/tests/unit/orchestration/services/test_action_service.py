@@ -295,6 +295,81 @@ class TestActionService(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsNone(result)
 
+    async def test_awaiting_confirmation_defers_stream_emission(self):
+        """Runnable shell actions publish only after apply_user_decision."""
+        from backend.ledger.action import ActionConfirmationStatus, CmdRunAction
+
+        action = CmdRunAction(command='ls')
+        action.confirmation_state = ActionConfirmationStatus.AWAITING_CONFIRMATION
+        action.source = None
+
+        mock_ctx = MagicMock()
+        mock_ctx.blocked = False
+        mock_ctx.action_id = None
+
+        mock_pipeline = MagicMock()
+        mock_pipeline.run_execute = AsyncMock()
+        self.mock_controller.operation_pipeline = mock_pipeline
+        self.mock_controller.event_stream = MagicMock()
+
+        await self.service.run(action, mock_ctx)
+
+        self.mock_controller.event_stream.add_event.assert_not_called()
+        self.mock_pending_service.set.assert_called_once_with(action)
+
+    async def test_awaiting_confirmation_file_edit_defers_stream_emission(self):
+        """File edits publish only after apply_user_decision, like shell commands."""
+        from backend.ledger.action import ActionConfirmationStatus, FileEditAction
+
+        action = FileEditAction(
+            path='README.md',
+            command='str_replace',
+            old_string='a',
+            new_str='b',
+        )
+        action.confirmation_state = ActionConfirmationStatus.AWAITING_CONFIRMATION
+        action.source = None
+
+        mock_ctx = MagicMock()
+        mock_ctx.blocked = False
+        mock_ctx.action_id = None
+
+        mock_pipeline = MagicMock()
+        mock_pipeline.run_execute = AsyncMock()
+        self.mock_controller.operation_pipeline = mock_pipeline
+        self.mock_controller.event_stream = MagicMock()
+
+        await self.service.run(action, mock_ctx)
+
+        self.mock_controller.event_stream.add_event.assert_not_called()
+        self.mock_pending_service.set.assert_called_once_with(action)
+
+    async def test_awaiting_confirmation_create_file_defers_stream_emission(self):
+        """create_file must not reach the stream (or disk) before approval."""
+        from backend.ledger.action import ActionConfirmationStatus, FileEditAction
+
+        action = FileEditAction(
+            path='backend/schemas.py',
+            command='create_file',
+            file_text='class Schema:\n    pass\n',
+        )
+        action.confirmation_state = ActionConfirmationStatus.AWAITING_CONFIRMATION
+        action.source = None
+
+        mock_ctx = MagicMock()
+        mock_ctx.blocked = False
+        mock_ctx.action_id = None
+
+        mock_pipeline = MagicMock()
+        mock_pipeline.run_execute = AsyncMock()
+        self.mock_controller.operation_pipeline = mock_pipeline
+        self.mock_controller.event_stream = MagicMock()
+
+        await self.service.run(action, mock_ctx)
+
+        self.mock_controller.event_stream.add_event.assert_not_called()
+        self.mock_pending_service.set.assert_called_once_with(action)
+
 
 if __name__ == '__main__':
     unittest.main()

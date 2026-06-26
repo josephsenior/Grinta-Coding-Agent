@@ -1,4 +1,4 @@
-"""Dev-only helpers to correlate LLM prompt shape (per astep) with CLI reasoning updates."""
+"""Helpers to correlate LLM prompt shape (per astep) with CLI reasoning updates."""
 
 from __future__ import annotations
 
@@ -6,17 +6,14 @@ import time
 from collections import Counter
 from typing import Any
 
-from backend.core.constants import (
-    APP_DEBUG_PROMPT_ROLES,
-    APP_DEBUG_REASONING_ASTEP,
-)
-from backend.core.logging.logger import app_logger as logger
+from backend.core.constants import APP_DEBUG_REASONING_ASTEP
+from backend.core.logging.session_event_logger import emit_session_event
 
 _CURRENT_ASTEP_ID = 0
 
 
 def env_prompt_roles_debug() -> bool:
-    return APP_DEBUG_PROMPT_ROLES
+    return True
 
 
 def env_reasoning_astep_debug() -> bool:
@@ -46,8 +43,6 @@ def log_prompt_roles_after_build_messages(
     pending_condensation: bool,
     history_event_count: int,
 ) -> None:
-    if not env_prompt_roles_debug():
-        return
     roles: Counter[str] = Counter()
     for m in messages:
         r = getattr(m, 'role', None)
@@ -57,26 +52,26 @@ def log_prompt_roles_after_build_messages(
         for m in messages
         if getattr(m, 'role', None) == 'assistant' and getattr(m, 'tool_calls', None)
     )
-    tool_role_count = roles.get('tool', 0)
-    user_role_count = roles.get('user', 0)
-    logger.info(
-        'APP_DEBUG_PROMPT_ROLES astep_id=%s roles=%s condensed_events=%d '
-        'pending_condensation=%s history_events=%d assistant_with_tool_calls=%d '
-        'tool_msgs=%d user_msgs=%d',
-        astep_id,
-        dict(roles),
-        condensed_event_count,
-        pending_condensation,
-        history_event_count,
-        assistant_with_tools,
-        tool_role_count,
-        user_role_count,
+    emit_session_event(
+        'PROMPT_SHAPE',
+        {
+            'astep_id': astep_id,
+            'roles': dict(roles),
+            'condensed_events': condensed_event_count,
+            'pending_condensation': pending_condensation,
+            'history_events': history_event_count,
+            'assistant_with_tool_calls': assistant_with_tools,
+            'tool_msgs': roles.get('tool', 0),
+            'user_msgs': roles.get('user', 0),
+        },
     )
 
 
 def log_reasoning_transition(kind: str, detail: str = '') -> None:
     if not env_reasoning_astep_debug():
         return
+    from backend.core.logging.logger import app_logger as logger
+
     preview = (detail or '')[:160]
     logger.info(
         'APP_DEBUG_REASONING_ASTEP t=%.3f astep_id=%s kind=%s detail=%r',

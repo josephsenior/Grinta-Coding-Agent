@@ -83,7 +83,9 @@ pylint_*.txt
 pip/cache/
 
 # Grinta runtime logs (always under install tree ``logs/``, not workspace cwd)
-logs/
+logs/*
+!logs/README.md
+!logs/.gitkeep
 
 # Debug/error logs
 *.out

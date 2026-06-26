@@ -134,6 +134,26 @@ class EnhancedJSONFormatter(JsonFormatter):
         if duration_ms is not None:
             log_record['duration_ms'] = duration_ms
 
+        latency_ms = getattr(record, 'latency_ms', None)
+        if latency_ms is not None:
+            log_record['latency_ms'] = latency_ms
+
+        for key in (
+            'msg_type',
+            'astep_id',
+            'tool',
+            'ok',
+            'step_id',
+            'trace_id',
+            'goal_id',
+            'action_id',
+            'call_id',
+            'observation',
+        ):
+            value = getattr(record, key, None)
+            if value is not None:
+                log_record[key] = value
+
         log_record['thread_name'] = record.threadName
         log_record['process_id'] = record.process
         log_record['location'] = f'{record.filename}:{record.lineno}'
@@ -260,3 +280,15 @@ file_formatter = NoColorFormatter(
     '%(asctime)s - %(name)s:%(levelname)s: %(filename)s:%(lineno)s - %(message)s',
     datefmt='%H:%M:%S',
 )
+
+
+def file_json_formatter() -> EnhancedJSONFormatter:
+    """JSON formatter for ``app.log`` with structured reliability/tuning fields."""
+    from backend.core.constants import LOG_JSON_LEVEL_KEY
+
+    return EnhancedJSONFormatter(
+        '{asctime} {message} {levelname}',
+        style='{',
+        rename_fields={'levelname': LOG_JSON_LEVEL_KEY},
+        timestamp=True,
+    )

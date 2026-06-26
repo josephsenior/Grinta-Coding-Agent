@@ -92,7 +92,6 @@ class TestFinalization:
         cfg = AppConfig()
         cfg.cache_dir = str(tmp_path / 'cache')
         cfg.llms = {'default': MagicMock()}
-        cfg.llms['default'].log_completions_folder = 'logs'
 
         with patch('backend.persistence.get_file_store') as mock_get_store:
             with patch('pathlib.Path.mkdir') as mock_mkdir:
@@ -102,9 +101,7 @@ class TestFinalization:
 
                 finalize_config(cfg)
 
-                # assert os.path.exists(cfg.cache_dir) # Replaced by mock
                 assert mock_mkdir.called
-                assert os.path.isabs(cfg.llms['default'].log_completions_folder)
                 assert cast(Any, cfg.jwt_secret).get_secret_value() == 'secret'
 
     def test_finalize_config_binds_context_pipeline_to_active_llm(self, tmp_path):

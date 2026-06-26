@@ -32,7 +32,6 @@ from backend.core.constants import (
     DEFAULT_LLM_TOP_P,
 )
 from backend.core.logging.logger import app_logger as logger
-from backend.core.logging.logger import get_log_dir
 
 
 @contextmanager
@@ -76,8 +75,6 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         modify_params: Modify params allows the SDK to do transformations like adding a default message.
         disable_vision: If model is vision capable, this option allows to disable image processing.
         caching_prompt: Use the prompt caching feature if provided by the LLM and supported by the provider.
-        log_completions: Whether to log LLM completions to the state.
-        log_completions_folder: The folder to log LLM completions to.
         custom_tokenizer: A custom tokenizer to use for token counting.
         native_tool_calling: Whether to use native tool calling if supported by the model.
         reasoning_effort: The effort to put into reasoning ('low', 'medium', 'high', 'none').
@@ -245,14 +242,6 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         default=True,
         description='Use the prompt caching feature if provided by the LLM',
     )
-    log_completions: bool = Field(
-        default=False, description='Whether to log LLM completions to the state'
-    )
-    log_completions_folder: str = Field(
-        default_factory=lambda: os.path.join(get_log_dir(), 'completions'),
-        min_length=1,
-        description='The folder to log LLM completions to',
-    )
     custom_tokenizer: str | None = Field(
         default=None, description='A custom tokenizer to use for token counting'
     )
@@ -306,13 +295,6 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             return None
         s = str(v).strip()
         return s or None
-
-    @field_validator('log_completions_folder')
-    @classmethod
-    def validate_log_completions_folder(cls, v: str) -> str:
-        from backend.core.type_safety.type_safety import validate_non_empty_string
-
-        return validate_non_empty_string(v, name='log_completions_folder')
 
     @field_validator('base_url')
     @classmethod

@@ -9,8 +9,9 @@ from unittest.mock import MagicMock, patch
 
 
 def test_logger_init_json_and_file(tmp_path):
-    """Test logger initialization with JSON logging and file logging enabled."""
+    """File logging defers handler attach until session bind; JSON via get_file_handler."""
     log_dir = os.path.join(tmp_path, 'logs')
+    os.makedirs(log_dir, exist_ok=True)
 
     with patch.dict(
         os.environ,
@@ -23,7 +24,6 @@ def test_logger_init_json_and_file(tmp_path):
             'LOG_SHIPPING_ENABLED': 'true',
         },
     ):
-        # Mock dependencies for log shipping
         mock_shipper = MagicMock()
         with patch(
             'backend.core.logging.log_shipping.get_log_shipper',
@@ -37,19 +37,13 @@ def test_logger_init_json_and_file(tmp_path):
                 importlib.reload(logger_mod)
 
                 logger_mod.configure_file_logging()
+                assert logger_mod._file_logging_configured is True
 
-                # Check if handlers were added
-                assert any(
-                    isinstance(h, logging.FileHandler)
-                    for h in logger_mod.app_logger.handlers
-                )
-                # Check for JSON formatter (should be applied to console handler in JSON mode)
                 from pythonjsonlogger.json import JsonFormatter
 
-                assert any(
-                    isinstance(h.formatter, JsonFormatter)
-                    for h in logger_mod.app_logger.handlers
-                )
+                file_handler = logger_mod.get_file_handler(log_dir, logging.DEBUG)
+                assert isinstance(file_handler.formatter, JsonFormatter)
+                file_handler.close()
 
 
 def test_logger_init_shipping_failure(tmp_path):

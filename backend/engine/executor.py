@@ -7,7 +7,6 @@ from collections import OrderedDict
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from backend.core.constants import APP_DEBUG_MODE
 from backend.core.errors import ModelProviderError
 from backend.core.logging.logger import app_logger as logger
 from backend.engine.streaming_checkpoint import StreamingCheckpoint
@@ -100,20 +99,20 @@ class OrchestratorExecutor(
         call_params = dict(params)
         call_params = self._apply_context_window_preflight(call_params)
 
-        # Log tools sent to LLM when APP_DEBUG_MODE is enabled (default on).
-        if APP_DEBUG_MODE:
-            tool_list = call_params.get('tools', [])
-            tool_names = (
-                [t.get('function', {}).get('name', '?') for t in tool_list]
-                if tool_list
-                else []
-            )
-            active_mode = getattr(self, '_active_run_mode', 'N/A')
-            logger.info(
-                '[APP_DEBUG_MODE] executor.execute: mode=%r tools=%r',
-                active_mode,
-                tool_names,
-            )
+        # Log tools sent to LLM for session.jsonl RUNTIME correlation.
+        tool_list = call_params.get('tools', [])
+        tool_names = (
+            [t.get('function', {}).get('name', '?') for t in tool_list]
+            if tool_list
+            else []
+        )
+        active_mode = getattr(self, '_active_run_mode', 'N/A')
+        logger.info(
+            'executor.execute: mode=%r tools=%r',
+            active_mode,
+            tool_names,
+            extra={'msg_type': 'EXECUTOR_TOOLS'},
+        )
 
         # NOTE: Grinta's DirectLLMClient implementations intentionally expose
         # deterministic *non-streaming* completion for all providers. Native
@@ -212,10 +211,30 @@ class OrchestratorExecutor(
         if response is None:
             raise ModelProviderError('LLM returned no response')
 
-        logger.info(
-            'OrchestratorExecutor.async_execute done in %.3fs', time.time() - start_time
-        )
         execution_time = time.time() - start_time
+        from backend.core.logging.session_event_logger import emit_session_event
+        from backend.core.prompt_role_debug import current_astep_id
+
+        latency_ms = int(execution_time * 1000)
+        emit_session_event(
+            'AGENT_STEP',
+            {
+                'astep_id': current_astep_id() or None,
+                'latency_ms': latency_ms,
+                'partial': True,
+                'text': state.content_accumulate or '',
+                'thinking': state.thinking_accumulate or '',
+            },
+        )
+        logger.info(
+            'OrchestratorExecutor.async_execute done in %.3fs',
+            execution_time,
+            extra={
+                'msg_type': 'LLM_STEP_DONE',
+                'astep_id': current_astep_id() or None,
+                'latency_ms': latency_ms,
+            },
+        )
         actions = self._without_blank_agent_messages(
             self._response_to_actions(response)
         )
@@ -236,8 +255,6 @@ class OrchestratorExecutor(
         return self._apply_context_window_preflight(call_params)
 
     def _log_debug_mode_tools(self, call_params: dict) -> None:
-        if not APP_DEBUG_MODE:
-            return
         tool_list = call_params.get('tools', [])
         tool_names = (
             [t.get('function', {}).get('name', '?') for t in tool_list]
@@ -245,9 +262,10 @@ class OrchestratorExecutor(
             else []
         )
         logger.info(
-            '[APP_DEBUG_MODE] async_execute: mode=%r tools=%r',
+            'async_execute: mode=%r tools=%r',
             getattr(self, '_active_run_mode', 'N/A'),
             tool_names,
+            extra={'msg_type': 'EXECUTOR_TOOLS'},
         )
 
     async def _execute_stream(

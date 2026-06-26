@@ -23,6 +23,8 @@ def test_workspace_logs_dir_under_repo_logs_not_backend_logs(
 ):
     monkeypatch.setenv('PROJECT_ROOT', str(tmp_path))
     monkeypatch.delenv('APP_PROJECT_ROOT', raising=False)
+    monkeypatch.delenv('GRINTA_LOG_ROOT', raising=False)
+    monkeypatch.delenv('GRINTA_REPO_ROOT', raising=False)
     ws_dir = logger_mod._workspace_logs_dir()
     assert ws_dir is not None
     install_root = Path(logger_mod._grinta_install_tree_root())
@@ -30,6 +32,12 @@ def test_workspace_logs_dir_under_repo_logs_not_backend_logs(
         Path(ws_dir)
         == install_root / 'logs' / 'workspaces' / logger_mod._workspace_logs_segment()
     )
+
+
+def test_grinta_log_base_honors_override(monkeypatch: pytest.MonkeyPatch, tmp_path):
+    custom = tmp_path / 'custom_logs'
+    monkeypatch.setenv('GRINTA_LOG_ROOT', str(custom))
+    assert logger_mod._grinta_log_base() == str(custom.resolve())
 
 
 def test_workspace_logs_segment_uses_project_root(
@@ -78,7 +86,7 @@ def test_workspace_logs_segment_none_when_cwd_unusable(monkeypatch: pytest.Monke
     assert logger_mod._workspace_logs_segment() is None
 
 
-def test_bind_session_logging_skips_without_workspace(
+def test_bind_session_logging_uses_fallback_without_workspace(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.setattr(logger_mod, 'LOG_TO_FILE', True)
@@ -86,7 +94,29 @@ def test_bind_session_logging_skips_without_workspace(
 
     logger_mod.bind_session_logging('test-session-id')
 
-    assert logger_mod._LOG_SESSION_ID is None
+    assert logger_mod._LOG_SESSION_ID == 'test-session-id'
+    assert 'unbound_logs' in (logger_mod._ACTIVE_SESSION_LOG_DIR or '')
+
+
+def test_bind_session_logging_creates_session_jsonl(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    install_root = tmp_path / 'install'
+    ws_root = install_root / 'logs' / 'workspaces' / 'sample_ws'
+    ws_root.mkdir(parents=True)
+    monkeypatch.setattr(logger_mod, 'LOG_TO_FILE', True)
+    monkeypatch.setattr(logger_mod, '_workspace_logs_dir', lambda: str(ws_root))
+    monkeypatch.setattr(logger_mod, '_workspace_logs_segment', lambda: 'sample_ws')
+    monkeypatch.setattr(logger_mod, '_LOG_SESSION_ID', None)
+    monkeypatch.setattr(logger_mod, '_ACTIVE_SESSION_LOG_DIR', None)
+
+    logger_mod.bind_session_logging('my-session-123')
+
+    session_dir = ws_root / 'sessions' / 'my-session-123'
+    assert session_dir.is_dir()
+    jsonl = session_dir / 'session.jsonl'
+    assert jsonl.is_file()
+    assert 'SESSION_START' in jsonl.read_text(encoding='utf-8')
 
 
 def test_workspace_logs_dir_migrates_legacy_backend_logs(
@@ -134,3 +164,5 @@ def test_workspace_logs_dir_migration_keeps_existing_canonical_files(
     legacy_copies = sorted(canonical_ws.glob('app.legacy-*.log'))
     assert len(legacy_copies) == 1
     assert legacy_copies[0].read_text(encoding='utf-8') == 'legacy\n'
+    assert not legacy_ws.exists()
+    assert not (install_root / 'backend' / 'logs').exists()

@@ -4,7 +4,6 @@ import os
 from typing import TYPE_CHECKING, Any
 
 from backend.core import json_compat as json
-from backend.core.constants import APP_DEBUG_MODE
 from backend.core.interaction_modes import (
     CHAT_MODE_ALLOWED_TOOLS,
     PLAN_MODE,
@@ -160,14 +159,14 @@ class OrchestratorPlanner:
         mode = self._current_mode()
         tools = self._filter_tools_for_mode(tools, mode)
 
-        if APP_DEBUG_MODE:
-            tool_names = [self._tool_name(t) for t in tools]
-            logger.info(
-                '[APP_DEBUG_MODE] build_toolset: mode=%r config.mode=%r tools=%r',
-                mode,
-                getattr(self._config, 'mode', 'N/A'),
-                tool_names,
-            )
+        tool_names = [self._tool_name(t) for t in tools]
+        logger.info(
+            'build_toolset: mode=%r config.mode=%r tools=%r',
+            mode,
+            getattr(self._config, 'mode', 'N/A'),
+            tool_names,
+            extra={'msg_type': 'PLANNER_TOOLSET'},
+        )
 
         from backend.engine.tools.param_defs import relax_security_risk_in_tools
 
@@ -523,8 +522,6 @@ class OrchestratorPlanner:
             return 0
 
     def _log_debug_mode_info(self, messages: list, state: State, mode: str) -> None:
-        if not APP_DEBUG_MODE:
-            return
         mode_injected = None
         for i in range(len(messages) - 1, -1, -1):
             content = messages[i].get('content', '')
@@ -532,10 +529,11 @@ class OrchestratorPlanner:
                 mode_injected = content[:200]
                 break
         logger.info(
-            '[APP_DEBUG_MODE] turn mode=%s active_run_mode=%s | injected_msg=%r',
+            'turn mode=%s active_run_mode=%s | injected_msg=%r',
             mode,
             (getattr(state, 'extra_data', {}) or {}).get('active_run_mode', 'N/A'),
             mode_injected,
+            extra={'msg_type': 'PLANNER_TURN'},
         )
 
     def _configure_tool_routing(
@@ -715,19 +713,17 @@ class OrchestratorPlanner:
         )
         mode = normalize_interaction_mode(active_run_mode) if active_run_mode else None
         if mode:
-            if APP_DEBUG_MODE:
-                logger.info(
-                    '[APP_DEBUG_MODE] _active_mode_for_state: found active_run_mode=%r in state.extra_data -> returning %r',
-                    active_run_mode,
-                    mode,
-                )
+            logger.debug(
+                '_active_mode_for_state: active_run_mode=%r -> %r',
+                active_run_mode,
+                mode,
+            )
             return mode
         fallback = normalize_interaction_mode(getattr(self._config, 'mode', 'agent'))
-        if APP_DEBUG_MODE:
-            logger.info(
-                '[APP_DEBUG_MODE] _active_mode_for_state: no active_run_mode in extra_data, falling back to config.mode=%r',
-                fallback,
-            )
+        logger.debug(
+            '_active_mode_for_state: fallback config.mode=%r',
+            fallback,
+        )
         return fallback
 
     def _inject_mode_instructions(

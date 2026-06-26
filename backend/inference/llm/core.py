@@ -161,6 +161,16 @@ class LLM(RetryMixin, DebugMixin):
             self.runtime_profile.source,
             self.runtime_profile.context_limits.usable_input_tokens,
         )
+        try:
+            from backend.core.logging.session_context import register_runtime_context
+            from backend.core.logging.session_event_logger import (
+                emit_session_context_if_changed,
+            )
+
+            register_runtime_context(llm_config=self.config)
+            emit_session_context_if_changed()
+        except Exception:
+            logger.debug('Session context registration failed', exc_info=True)
 
     @property
     def features(self) -> ModelFeatures:
@@ -339,6 +349,26 @@ class LLM(RetryMixin, DebugMixin):
             response_id=response.id,
             usage_estimated=usage_estimated,
         )
+        try:
+            from backend.core.logging.session_event_logger import emit_session_event
+
+            emit_session_event(
+                'METRICS',
+                {
+                    'model': self.config.model,
+                    'tokens': {
+                        'prompt': prompt_tokens,
+                        'completion': completion_tokens,
+                        'cache_read': cache_read,
+                        'cache_write': cache_write,
+                    },
+                    'cost_usd': cost,
+                    'duration_ms': int(latency * 1000),
+                    'response_id': getattr(response, 'id', None),
+                },
+            )
+        except Exception:
+            logger.debug('METRICS session event failed', exc_info=True)
 
     def _get_context_window_for_metrics(self) -> int:
         """Return a best-effort context window (total tokens) for the active model.
@@ -400,10 +430,14 @@ class LLM(RetryMixin, DebugMixin):
         def _completion_with_retry(**kwargs):
             start_time = time.time()
             try:
-                self.log_prompt(messages)
+                self.log_prompt(messages, call_params=_safe_call_kwargs_for_log(kwargs))
                 response = self.client.completion(messages=messages, **kwargs)
-                self._record_response_metrics(response, time.time() - start_time)
-                self.log_response(response.to_dict())
+                latency = time.time() - start_time
+                self._record_response_metrics(response, latency)
+                self.log_response(
+                    response.to_dict(),
+                    latency_ms=int(latency * 1000),
+                )
                 return response
             except Exception as e:
                 # Map provider SDK exceptions to our unified hierarchy
@@ -443,10 +477,14 @@ class LLM(RetryMixin, DebugMixin):
             if await self._check_cancelled():
                 raise LLMNoResponseError('Request cancelled before start')
 
-            self.log_prompt(messages)
+            self.log_prompt(messages, call_params=_safe_call_kwargs_for_log(kwargs))
             response = await self.client.acompletion(messages=messages, **kwargs)
-            self._record_response_metrics(response, time.time() - start_time)
-            self.log_response(response.to_dict())
+            latency = time.time() - start_time
+            self._record_response_metrics(response, latency)
+            self.log_response(
+                response.to_dict(),
+                latency_ms=int(latency * 1000),
+            )
 
             # Plugin hook: llm_post
             try:

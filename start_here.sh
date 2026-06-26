@@ -44,7 +44,7 @@ if [[ -z "$use_pipx" ]]; then
 fi
 
 if [[ "$use_pipx" -eq 1 ]]; then
-  exec "$LAUNCH/start_here_pipx.sh" "${args[@]}"
+  exec bash "$LAUNCH/start_here_pipx.sh" "${args[@]}"
 else
-  exec "$LAUNCH/start_here.sh" "${args[@]}"
+  exec bash "$LAUNCH/start_here.sh" "${args[@]}"
 fi

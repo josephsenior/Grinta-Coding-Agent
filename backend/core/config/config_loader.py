@@ -599,7 +599,6 @@ def finalize_config(cfg: AppConfig) -> None:
 
     cfg.enable_browser = browser_tool_enabled(cfg)
     extend_mcp_servers_with_bundled_defaults(cfg.mcp.servers)
-    _configure_llm_logging(cfg)
     _ensure_cache_directory(cfg)
     _configure_jwt_secret(cfg)
     # Persist the effective store root on the config object so reload paths (e.g.
@@ -607,11 +606,6 @@ def finalize_config(cfg: AppConfig) -> None:
     from backend.persistence.locations import get_local_data_root
 
     cfg.local_data_root = get_local_data_root(cfg)
-
-
-def _configure_llm_logging(cfg: AppConfig) -> None:
-    for llm in cfg.llms.values():
-        llm.log_completions_folder = os.path.abspath(llm.log_completions_folder)
 
 
 def _ensure_cache_directory(cfg: AppConfig) -> None:

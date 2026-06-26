@@ -133,15 +133,12 @@ check-uv:
 	fi
 
 check-tmux:
-	@echo "$(YELLOW)Checking tmux installation...$(RESET)"
+	@echo "$(YELLOW)Ensuring tmux is installed (Linux/WSL)...$(RESET)"
+	@uv run python -c "from backend.utils.linux_host_tools import ensure_linux_host_tools; ensure_linux_host_tools()" 2>/dev/null || true
 	@if command -v tmux > /dev/null; then \
-		echo "$(BLUE)$(shell tmux -V) is already installed.$(RESET)"; \
+		echo "$(BLUE)$(shell tmux -V) is ready.$(RESET)"; \
 	else \
-		echo "$(YELLOW)╔════════════════════════════════════════════════════════════════════════════╗$(RESET)"; \
-		echo "$(YELLOW)║ OPTIONAL: tmux is not installed.                                          ║$(RESET)"; \
-		echo "$(YELLOW)║ Some advanced terminal features may not work without tmux.                ║$(RESET)"; \
-		echo "$(YELLOW)║ You can install it if needed, but it's not required for development.      ║$(RESET)"; \
-		echo "$(YELLOW)╚════════════════════════════════════════════════════════════════════════════╝$(RESET)"; \
+		echo "$(YELLOW)tmux is not available yet; Grinta will retry on launch.$(RESET)"; \
 	fi
 
 .PHONY: bootstrap-base

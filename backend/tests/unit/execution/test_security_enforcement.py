@@ -72,15 +72,15 @@ class TestCheckActionConfirmation:
         assert result is not None
         assert result.__class__.__name__ == 'NullObservation'
 
-    def test_awaiting_confirmation_file_edit_allowed(self):
+    def test_awaiting_confirmation_file_edit_blocked(self):
         from backend.ledger.action import ActionConfirmationStatus, FileEditAction
 
         rt = _FakeRuntime()
         action = MagicMock(spec=FileEditAction)
         action.confirmation_state = ActionConfirmationStatus.AWAITING_CONFIRMATION
         result = rt._check_action_confirmation(action)
-        # FileEditAction is allowed through for dry-run preview
-        assert result is None
+        assert result is not None
+        assert result.__class__.__name__ == 'NullObservation'
 
     def test_rejected_returns_user_reject(self):
         from backend.ledger.action import ActionConfirmationStatus

@@ -138,11 +138,21 @@ class TestEnhancedJSONFormatter:
         rec.tokens_consumed = 100
         rec.cost_usd = 0.05
         rec.duration_ms = 200
+        rec.msg_type = 'TOOL_OBSERVATION_RESOLVED'
+        rec.astep_id = 7
+        rec.tool = 'create'
+        rec.ok = True
+        rec.latency_ms = 150
         output = fmt.format(rec)
         assert 'req-123' in output
         assert 'conv-456' in output
         assert 'Orchestrator' in output
         assert 'gpt-4' in output
+        assert 'TOOL_OBSERVATION_RESOLVED' in output
+        assert '"astep_id": 7' in output
+        assert '"tool": "create"' in output
+        assert '"ok": true' in output
+        assert '"latency_ms": 150' in output
 
 
 # ===================================================================

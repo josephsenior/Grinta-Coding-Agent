@@ -9,7 +9,6 @@ from unittest.mock import patch
 
 from backend.core.logging.logger import (
     AppLoggerAdapter,
-    LlmFileHandler,
     RollingLogger,
     bind_context,
     clear_trace_context,
@@ -238,30 +237,6 @@ class TestLogUncaughtExceptions:
         mock_logging.error.assert_called()
 
 
-# ── LlmFileHandler ───────────────────────────────────────────────────
-
-
-class TestLlmFileHandler:
-    def test_message_counter_increments(self, tmp_path):
-        with patch('backend.core.logging.logger.LOG_DIR', str(tmp_path)):
-            handler = LlmFileHandler('prompt', delay=True)
-            assert handler.message_counter == 1
-            record = logging.LogRecord(
-                name='test',
-                level=logging.INFO,
-                pathname='',
-                lineno=0,
-                msg='test message',
-                args=None,
-                exc_info=None,
-            )
-            handler.emit(record)
-            assert handler.message_counter == 2
-            # Stream is already closed by emit(); just remove the handler
-            # to avoid ValueError on flush of closed file.
-            cast(Any, handler).stream = None
-
-
 # ── Trace context Errors ─────────────────────────────────────────────
 
 
@@ -282,67 +257,6 @@ class TestTraceContextErrors:
         with patch('backend.core.logging.logger.TRACE_LOCAL', spec=[]):
             # Should return empty dict
             assert get_trace_context() == {}
-
-
-# ── LlmFileHandler Extra ──────────────────────────────────────────────
-
-
-class TestLlmFileHandlerExtra:
-    @patch('backend.core.logging.logger.DEBUG', False)
-    def test_initialization_no_debug(self, tmp_path):
-        # Create a dummy file in the directory to test unlinking
-        session_dir = os.path.join(tmp_path, 'llm', 'default')
-        os.makedirs(session_dir, exist_ok=True)
-        dummy_file = os.path.join(session_dir, 'old.log')
-        with open(dummy_file, 'w', encoding='utf-8') as f:
-            f.write('old content')
-
-        with patch('backend.core.logging.logger.LOG_DIR', str(tmp_path)):
-            handler = LlmFileHandler('prompt', delay=True)
-            assert handler.session == 'default'
-            # Should have unlinked the file
-            assert not os.path.exists(dummy_file)
-
-    @patch('backend.core.logging.logger.DEBUG', False)
-    @patch('os.unlink', side_effect=Exception('unlink failed'))
-    def test_initialization_unlink_failure_handled(self, mock_unlink, tmp_path):
-        session_dir = os.path.join(tmp_path, 'llm', 'default')
-        os.makedirs(session_dir, exist_ok=True)
-        dummy_file = os.path.join(session_dir, 'old.log')
-        with open(dummy_file, 'w', encoding='utf-8') as f:
-            f.write('old content')
-
-        with patch('backend.core.logging.logger.LOG_DIR', str(tmp_path)):
-            # Should not raise
-            LlmFileHandler('prompt', delay=True)
-            assert os.path.exists(dummy_file)
-
-    @patch('backend.core.logging.logger.DEBUG', True)
-    def test_initialization_debug(self, tmp_path):
-        with patch('backend.core.logging.logger.LOG_DIR', str(tmp_path)):
-            handler = LlmFileHandler('prompt', delay=True)
-            assert handler.session != 'default'
-            assert handler.session
-
-    def test_emit_logic(self, tmp_path):
-        with patch('backend.core.logging.logger.LOG_DIR', str(tmp_path)):
-            handler = LlmFileHandler('prompt', delay=True)
-            record = logging.LogRecord(
-                name='test',
-                level=logging.INFO,
-                pathname='',
-                lineno=0,
-                msg='test message',
-                args=None,
-                exc_info=None,
-            )
-            handler.emit(record)
-
-            # Check file exists
-            log_file = os.path.join(handler.log_directory, 'prompt_001.log')
-            assert os.path.exists(log_file)
-            with open(log_file, 'r', encoding='utf-8') as f:
-                assert 'test message' in f.read()
 
 
 # ── Extra Coverage ────────────────────────────────────────────────────

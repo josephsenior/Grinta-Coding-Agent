@@ -99,6 +99,14 @@ class ScreenSettingsMixin:
             pass
         self._hud.update_autonomy(level)
         self._render_hud_bar()
+        try:
+            from backend.core.logging.session_event_logger import (
+                emit_session_context_if_changed,
+            )
+
+            emit_session_context_if_changed()
+        except Exception:
+            pass
         if runtime != level or persisted != level:
             self.notify(f'Autonomy: {level}', severity='information', timeout=2.0)
 
@@ -132,6 +140,14 @@ class ScreenSettingsMixin:
         self._config = load_app_config()
         runtime_status = self._apply_llm_config_to_active_session(self._config)
         self._render_hud_bar()
+        try:
+            from backend.core.logging.session_event_logger import (
+                emit_session_context_if_changed,
+            )
+
+            emit_session_context_if_changed()
+        except Exception:
+            pass
         label = effort or 'default'
         self.notify(
             f'Reasoning: {label} ({runtime_status})',

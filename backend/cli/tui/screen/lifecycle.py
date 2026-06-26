@@ -163,11 +163,18 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
             except Exception as exc:
                 _tui_logger.debug(f'background bootstrap failed: {exc}')
                 logger.exception('TUI background bootstrap failed')
-                if self._controller is not None:
-                    self._hud.update_agent_state('error')
-                else:
-                    self._hud.update_agent_state('error')
+                self._hud.update_agent_state('error')
                 self._render_hud_bar()
+                try:
+                    from backend.core.logging.logger import format_active_session_log_path
+
+                    log_path = format_active_session_log_path()
+                    detail = f'{type(exc).__name__}: {exc}'
+                    if log_path:
+                        detail = f'{detail}\nLog: {log_path}'
+                    self.notify_error(f'Startup failed — {detail}', timeout=12.0)
+                except Exception:
+                    pass
 
         self._bootstrap_task = asyncio.create_task(_bg(), name='grinta-tui-bootstrap')
 

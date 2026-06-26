@@ -602,6 +602,9 @@ def main(
         str(Path(project).resolve()) if project else str(Path.cwd().resolve())  # noqa: ASYNC240
     )
     os.environ['PROJECT_ROOT'] = resolved_project
+    from backend.core.runtime_paths import pin_grinta_runtime_paths
+
+    repo_root = pin_grinta_runtime_paths()
     from backend.core.logging.logger import configure_file_logging
 
     configure_file_logging()

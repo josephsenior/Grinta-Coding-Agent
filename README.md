@@ -69,7 +69,44 @@ pipx install "grinta-ai[browser]"  # adds browser-use for web automation
 pipx install "grinta-ai[all]"      # rag + browser
 ```
 
-The base install includes PDF, DOCX, PPTX, and LaTeX parsing. RAG and browser automation stay opt-in. Disk and memory footprint targets are documented in [docs/PERFORMANCE.md](docs/PERFORMANCE.md) (measured on a clean pipx install; optional extras add more). The `grinta init` wizard configures provider, model, and key; local Ollama, LM Studio, and vLLM servers are probed during setup (no API key required for local providers). Installed runs use `~/.grinta/settings.json`; source checkouts use the repository `settings.json`; `APP_ROOT` can intentionally override that root. Other install paths (uv, Homebrew, Scoop, and experimental Docker image usage) are in [docs/INSTALL.md](docs/INSTALL.md).
+The base install includes PDF, DOCX, PPTX, and LaTeX parsing. RAG and browser automation stay opt-in. Details: [docs/INSTALL.md](docs/INSTALL.md).
+
+## Command cheat sheet
+
+**Consumer** = installed app (`pipx`). **Dev** = source checkout. Replace `<Grinta-repo>` with your clone path (e.g. `~/Grinta`, `C:\Users\you\Grinta`).
+
+### Consumer mode (Windows · WSL/Linux · macOS)
+
+| Step | Command |
+|------|---------|
+| Install once | `pipx install grinta-ai` |
+| Setup once | `grinta init` |
+| Run from project folder | `cd /path/to/project` → `grinta` |
+| Explicit project path | `grinta -p /path/to/project` |
+| Check setup | `grinta doctor` |
+
+Settings: `~/.grinta/settings.json` (Windows: `%USERPROFILE%\.grinta\settings.json`).
+
+### Dev mode (Windows · WSL/Linux · macOS)
+
+| Step | Windows (PowerShell) | WSL / Linux / macOS |
+|------|----------------------|---------------------|
+| Setup once | `.\START_HERE.ps1` | `bash start_here.sh` |
+| Run from project | `cd C:\path\to\project` then `uv run --directory <Grinta-repo> python -m backend.cli.entry -p .` | `cd /path/to/project` then `uv run --directory <Grinta-repo> python -m backend.cli.entry -p .` |
+| Re-run init | `uv run --directory <Grinta-repo> python -m backend.cli.entry init --force` | same |
+| Unit tests | `cd <Grinta-repo>` → `uv run pytest backend/tests/unit/ -q` | same |
+
+Settings: `<Grinta-repo>/settings.json` · Logs: `<Grinta-repo>/logs/` (see [logs/README.md](logs/README.md)).
+
+### Dev shortcut — type `grinta` anywhere (optional)
+
+```bash
+pipx install -e <Grinta-repo>
+```
+
+Then use the **consumer** commands from any project folder while running your local code.
+
+Full walkthrough: [docs/QUICK_START.md](docs/QUICK_START.md).
 
 ## What you get
 
@@ -139,45 +176,7 @@ Contributors: Linux PR gates shard the **unit** corpus (`backend/tests/unit`) wi
 
 Grinta is a single-author project, written and rewritten in public. The journey — what was killed, what was wrong, what got rebuilt — is **The Book of Grinta**: start at [Preface](docs/journey/preface-why-this-story-matters.md) → [00 · Meaning of Grinta](docs/journey/00-the-meaning-of-grinta.md) through the numbered chapters to [45 · The Product Surface Became Real](docs/journey/45-the-product-surface-became-real.md) and [46 · The Decomposition Wave](docs/journey/46-the-decomposition-wave.md), then the epilogue [07 · The Road Ahead](docs/journey/07-the-road-ahead.md). Full index and act structure: [docs/journey/README.md](docs/journey/README.md). Stable shortcut from the repo root: [BOOK_OF_GRINTA.md](BOOK_OF_GRINTA.md).
 
-## Quick start (from source)
-
-### Windows (recommended)
-
-```powershell
-.\START_HERE.ps1
-```
-
-### Linux / macOS (recommended)
-
-```bash
-./start_here.sh
-```
-
-### Linux / macOS / manual
-
-1. Install dependencies **in this repo's environment only** (creates/updates `.venv/`; do not rely on a global `pip install` mixed with unrelated tools):
-
-```bash
-python scripts/bootstrap_env.py dev-test
-```
-
-Profiles: `base` (runtime only), `dev-test` (contributor default), `browser` / `dev-test-browser` when working on browser automation.
-
-2. Create local settings:
-
-```bash
-uv run python -m backend.cli.entry init
-```
-
-3. Start the CLI:
-
-```bash
-uv run python -m backend.cli.entry
-```
-
-If you previously installed `grinta-ai` with `pip` into a **global** interpreter, remove it (`pip uninstall grinta-ai`) and use `uv run` from this repository so dependencies stay isolated.
-
-### Docker (community / experimental)
+## Docker (community / experimental)
 
 Use the container image directly (no official compose stack in this repo):
 
@@ -187,29 +186,9 @@ docker run -it --rm -v "$PWD:/work" -w /work \
   ghcr.io/josephsenior/grinta:latest
 ```
 
-## LLM Setup (`settings.json`)
+## LLM setup
 
-When installed through `pipx`, Homebrew, or Scoop, settings are resolved from `~/.grinta/settings.json`. When running from a source checkout, settings resolve from the repository root unless `APP_ROOT` is set.
-
-Minimal config:
-
-```json
-{
-  "llm_provider": "openai",
-  "llm_model": "openai/gpt-5.1",
-  "llm_api_key": "${LLM_API_KEY}",
-  "llm_base_url": ""
-}
-```
-
-For manual setup, put the real value in a sibling `.env` file (next to `settings.json`) or your shell environment as `LLM_API_KEY`; reference it from JSON with `"llm_api_key": "${LLM_API_KEY}"`. Avoid keeping the only copy of a secret directly in `settings.json`. Grinta resolves `${VAR}` placeholders via `backend/core/config/api_key_manager.py`; OS keychain storage is not implemented yet.
-
-Common model ids:
-
-- `openai/gpt-5.1`
-- `anthropic/claude-sonnet-4.6`
-- `google/gemini-3-flash`
-- `ollama/llama3.2`
+Run `grinta init` or see [docs/SETTINGS.md](docs/SETTINGS.md).
 
 ## Core Concepts
 

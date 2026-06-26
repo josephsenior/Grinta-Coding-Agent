@@ -7,3 +7,4 @@ if ! command -v uv >/dev/null 2>&1; then
 fi
 
 python scripts/bootstrap_env.py dev-test
+sudo apt-get update && sudo apt-get install -y tmux

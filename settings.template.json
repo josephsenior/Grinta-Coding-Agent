@@ -10,6 +10,7 @@
     }
   },
   "security": {
+    "windows_shell": "bash",
     "execution_profile": "standard",
     "enforce_security": true,
     "block_high_risk": false,

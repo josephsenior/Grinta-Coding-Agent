@@ -1,79 +1,54 @@
 # Quick Start
 
-## Prerequisites
+Prerequisites: Python 3.12+ and `uv` (dev) or `pipx` (consumer).
 
-- Python 3.12+
-- `uv` (required)
+Replace `<Grinta-repo>` with your clone path (e.g. `~/Grinta`, `C:\Users\you\Grinta`).
 
-## Option 1: Direct source startup (recommended)
+## Consumer mode (Windows · WSL/Linux · macOS)
 
-From the repo root:
+Installed app — same commands on all platforms.
 
-```powershell
-python scripts/bootstrap_env.py dev-test
-uv run python -m backend.cli.entry init
-uv run python -m backend.cli.entry
+| Step | Command |
+|------|---------|
+| Install once | `pipx install grinta-ai` |
+| Setup once | `grinta init` |
+| Run from project folder | `cd /path/to/project` → `grinta` |
+| Explicit project path | `grinta -p /path/to/project` |
+| Check setup | `grinta doctor` |
+
+Settings: `~/.grinta/settings.json`
+
+## Dev mode (Windows · WSL/Linux · macOS)
+
+Source checkout — contributors and local hacking.
+
+| Step | Windows (PowerShell) | WSL / Linux / macOS |
+|------|----------------------|---------------------|
+| Setup once | `.\START_HERE.ps1` | `bash start_here.sh` |
+| Run from project | `cd C:\path\to\project` → `uv run --directory <Grinta-repo> python -m backend.cli.entry -p .` | `cd /path/to/project` → `uv run --directory <Grinta-repo> python -m backend.cli.entry -p .` |
+| Re-run init | `uv run --directory <Grinta-repo> python -m backend.cli.entry init --force` | same |
+| Unit tests | `cd <Grinta-repo>` → `uv run pytest backend/tests/unit/ -q` | same |
+
+Settings: `<Grinta-repo>/settings.json`  
+Logs: `<Grinta-repo>/logs/` ([logs/README.md](../logs/README.md))
+
+## Dev shortcut — type `grinta` anywhere
+
+```bash
+pipx install -e <Grinta-repo>
 ```
 
-That is the canonical contributor path. It creates or updates the project-local
-`.venv`, writes source-checkout settings to `settings.json`, and starts the
-interactive terminal app. If stdin is not a TTY, Grinta uses the non-interactive
-runner instead of the Textual app.
+Then use **consumer** commands from any project folder while running local code.
 
-For a minimal runtime-only sync (no dev/test tools), use `python scripts/bootstrap_env.py base`.
+## Other install paths
 
-## Option 2: Windows convenience script
-
-From PowerShell in the repo root:
-
-```powershell
-.\START_HERE.ps1
-```
-
-This script is a convenience wrapper around dependency sync and startup:
-
-- Checks for `uv` and Python versions
-- Syncs dependencies with the `dev-test` profile
-- Checks local model server status (`discover_models status`)
-- Runs `grinta init` when `settings.json` is missing
-- Starts the Grinta terminal app
-
-## Optional: local model discovery
-
-If you run Ollama, LM Studio, or vLLM locally, start the local server and run:
-
-```powershell
-uv run python -m backend.inference.discover_models
-uv run python -m backend.inference.discover_models status
-```
-
-Then use a provider-qualified model id such as `ollama/llama3.2`,
-`lm_studio/qwen2.5-coder`, or `vllm/mistral-small` in `settings.json` or
-`/model`.
-
-## Useful source commands
-
-```powershell
-uv run python -m backend.cli.entry
-uv run python -m backend.cli.entry --help
-uv run python -m backend.cli.entry sessions list
-```
+Homebrew, Scoop, Docker: [INSTALL.md](INSTALL.md)
 
 ## Common issues
 
-### uv not found
-
-Install `uv` via the official installer:
-
-```powershell
-powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
-
-### Locally hosted models
-
-Ensure **Ollama**, **LM Studio**, or **vLLM** is running, then use the discovery
-commands above or choose the provider-qualified model id during setup.
-
-### Port already in use
-
-For the CLI itself, this usually points to another local tool, not Grinta.
+| Problem | Fix |
+|---------|-----|
+| `uv` not found | https://docs.astral.sh/uv/ |
+| `grinta` not found (dev) | Use full `uv run --directory <Grinta-repo> ...` or `pipx install -e` |
+| Local models | Start Ollama/LM Studio/vLLM; pick provider in `grinta init` |
+| More help | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) |

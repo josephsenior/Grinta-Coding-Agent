@@ -79,47 +79,59 @@ class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
 
     @staticmethod
     def _record_agent_transcript(event: Event) -> None:
-        try:
-            from backend.core.agent_transcript import (
-                record_agent_message,
-                record_stream_final,
-                record_think_action,
-                record_user_message,
-            )
-        except Exception:
-            return
+        from backend.core.logging.session_event_logger import emit_session_event
 
         event_id = getattr(event, 'id', None)
+        eid = event_id if isinstance(event_id, int) else None
+
         if isinstance(event, StreamingChunkAction):
             if event.is_final:
-                record_stream_final(
-                    event.accumulated,
-                    thinking=event.thinking_accumulated or '',
-                    event_id=event_id,
-                    suppress_live_response=bool(
-                        getattr(event, 'suppress_live_response', False)
-                    ),
+                emit_session_event(
+                    'AGENT_STEP',
+                    {
+                        'text': str(getattr(event, 'accumulated', '') or ''),
+                        'thinking': str(
+                            getattr(event, 'thinking_accumulated', '') or ''
+                        ),
+                        'event_id': eid,
+                        'stream_final': True,
+                        'suppress_live_response': bool(
+                            getattr(event, 'suppress_live_response', False)
+                        ),
+                    },
                 )
             return
 
         if isinstance(event, AgentThinkAction):
-            record_think_action(
-                str(getattr(event, 'thought', '') or ''),
-                event_id=event_id,
-            )
+            thought = str(getattr(event, 'thought', '') or '')
+            if thought.strip():
+                emit_session_event(
+                    'AGENT_THINK',
+                    {'thought': thought, 'event_id': eid},
+                )
             return
 
         if isinstance(event, MessageAction):
             content = str(getattr(event, 'content', '') or '')
+            if not content.strip():
+                return
             if event.source == EventSource.USER:
-                record_user_message(content, event_id=event_id)
+                emit_session_event(
+                    'USER_TURN',
+                    {'text': content, 'event_id': eid},
+                )
             elif event.source == EventSource.AGENT:
-                record_agent_message(
-                    content,
-                    thought=str(getattr(event, 'thought', '') or ''),
-                    event_id=event_id,
-                    final_response=bool(getattr(event, 'final_response', False)),
-                    tool_step=bool(getattr(event, 'transcript_only', False)),
+                emit_session_event(
+                    'AGENT_STEP',
+                    {
+                        'text': content,
+                        'thinking': str(getattr(event, 'thought', '') or ''),
+                        'event_id': eid,
+                        'final_response': bool(
+                            getattr(event, 'final_response', False)
+                        ),
+                        'tool_step': bool(getattr(event, 'transcript_only', False)),
+                    },
                 )
 
     async def route_event(self, event: Event) -> None:

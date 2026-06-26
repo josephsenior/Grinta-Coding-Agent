@@ -123,6 +123,17 @@ class StateTransitionService:
         if new_state == old_state:
             return
 
+        from backend.core.logging.session_event_logger import emit_session_event
+
+        emit_session_event(
+            'STATE_CHANGE',
+            {
+                'from': old_state.value,
+                'to': new_state.value,
+                'agent': self._context.controller_name,
+            },
+        )
+
         # ── Transition validation ──────────────────────────────────────
         allowed = VALID_TRANSITIONS.get(old_state)
         if allowed is not None and new_state not in allowed:
