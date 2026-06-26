@@ -186,11 +186,13 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
             self._environment_probe_task.cancel()
             self._environment_probe_task = None
         if self._renderer:
-            if self._renderer._event_stream:
-                self._renderer._event_stream.unsubscribe(
-                    EventStreamSubscriber.CLI, self._renderer._event_stream.sid
+            renderer_stream = getattr(self._renderer, '_event_stream', None)
+            if renderer_stream is not None:
+                renderer_stream.unsubscribe(
+                    EventStreamSubscriber.CLI, renderer_stream.sid
                 )
-            self._renderer._event_stream = None
+            if hasattr(self._renderer, '_event_stream'):
+                self._renderer._event_stream = None
         if self._event_stream is not None:
             try:
                 self._event_stream.unsubscribe(

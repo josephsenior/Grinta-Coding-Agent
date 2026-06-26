@@ -2101,7 +2101,8 @@ async def test_fake_prompt_single_path_narrow_and_wide_match() -> None:
     assert 'MCP:' in wide
     assert 'Running' in narrow
     assert 'google/gemini-3-flash-preview' in narrow
-    assert 'Autonomy: Balanced' in narrow
+    compact_narrow = ' '.join(narrow.split())
+    assert 'Autonomy: Balanced' in compact_narrow
     assert 'GRINTA' not in narrow
     assert 'MCP:' not in narrow
 
