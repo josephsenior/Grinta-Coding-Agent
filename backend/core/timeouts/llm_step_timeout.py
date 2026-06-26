@@ -36,27 +36,3 @@ def llm_step_timeout_seconds_from_env() -> float | None:
     if f <= 0:
         return None
     return f
-
-
-def resolve_step_task_liveness_seconds(
-    agent: object | None = None,
-    *,
-    default_liveness_seconds: float = 600.0,
-) -> float:
-    """Return the wall-clock cap for a single ``_step_inner`` drain iteration.
-
-    Must cover at least two capped ``astep`` attempts (each may retry once)
-    plus time for condensation / message building between attempts.
-    """
-    if agent is None:
-        step_timeout = llm_step_timeout_seconds_from_env()
-    else:
-        from backend.orchestration.services.action_execution_service import (
-            _resolve_llm_step_timeout_seconds,
-        )
-
-        step_timeout = _resolve_llm_step_timeout_seconds(agent)
-
-    if step_timeout is None:
-        return default_liveness_seconds
-    return max(default_liveness_seconds, (2.0 * step_timeout) + 120.0)

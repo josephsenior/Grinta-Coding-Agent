@@ -1,4 +1,4 @@
-"""Tests for the bounded-pipeline plan (Layers 1, 2, 5).
+"""Tests for the bounded-pipeline plan (Layers 1, 2).
 
 These tests verify the orchestrator's hot path has bounded stall points
 without interrupting active LLM streams:
@@ -7,8 +7,6 @@ without interrupting active LLM streams:
   via ``APP_LLM_STEP_TIMEOUT_SECONDS``. Streaming liveness is handled by
   first-chunk and per-chunk stall timeouts instead of a blind outer cap.
 - Layer 2: Observation handler is bounded with a 10s ceiling.
-- Layer 5: Step drain loop has a 600s ceiling per iteration; force-clears
-  pending state and emits a visible error on timeout.
 """
 
 from __future__ import annotations
@@ -219,70 +217,3 @@ class TestObservationHandlerTimeout:
 
         # Normal handler completed; no forced trigger needed.
         router._ctrl.step.assert_not_called()
-
-
-# ── Layer 5: step task liveness watchdog ─────────────────────────────
-
-
-class TestStepTaskLivenessWatchdog:
-    """The _step drain loop must bound each _step_inner call."""
-
-    @pytest.mark.asyncio
-    async def test_hung_step_inner_is_force_cleared(self):
-        """A hung _step_inner is cancelled and pending state is cleared."""
-        # The real bound is 600s; too long for a unit test.  Patch the
-        # source-of-truth constant in backend.core.constants.
-        with patch(
-            'backend.core.constants.DEFAULT_STEP_TASK_LIVENESS_SECONDS',
-            0.2,
-        ):
-            from backend.core.constants import DEFAULT_STEP_TASK_LIVENESS_SECONDS
-
-            class _HangingOrchestrator:
-                """Minimal stub matching the API used by the _step loop."""
-
-                _closed = False
-                _step_request: asyncio.Event
-                _step_owner_task: object = None
-                _draining_batch = False
-
-                def __init__(self):
-                    self._step_request = asyncio.Event()
-                    self.step_prerequisites = MagicMock()
-                    self.step_prerequisites.can_step = MagicMock(return_value=False)
-                    self.services = MagicMock()
-                    self.services.pending_action = MagicMock()
-                    self.event_stream = MagicMock()
-
-                async def _step_inner(self) -> None:
-                    await asyncio.sleep(60)  # hang forever
-
-                @property
-                def _step_lock(self) -> asyncio.Lock:
-                    return self.__dict__.setdefault('_lock', asyncio.Lock())
-
-                # Replicate the bound from the real _step method.
-                async def _step_bounded(self) -> None:
-                    async with self._step_lock:
-                        self._step_owner_task = asyncio.current_task()
-                        try:
-                            drained_count = 0
-                            while drained_count < 1:  # one iteration only
-                                drained_count += 1
-                                try:
-                                    await asyncio.wait_for(
-                                        self._step_inner(),
-                                        timeout=DEFAULT_STEP_TASK_LIVENESS_SECONDS,
-                                    )
-                                except asyncio.TimeoutError:
-                                    break
-                        finally:
-                            self._step_owner_task = None
-
-            orch = _HangingOrchestrator()
-            start = time.monotonic()
-            await orch._step_bounded()
-            elapsed = time.monotonic() - start
-
-            # The hang would take 60s; the 0.2s ceiling must cut it.
-            assert elapsed < 1.0, f'bound took {elapsed:.2f}s; ceiling was 0.2s.'

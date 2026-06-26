@@ -71,19 +71,21 @@ class OrchestratorExecutor(
         """Signal the current (or next) streaming step to abort early."""
         self._step_cancelled = True
         task = self._active_stream_task
+        stream_iter = self._active_stream_iter
         if task is not None and not task.done():
             task.cancel()
-            return
-
-        stream_iter = self._active_stream_iter
-        aclose = getattr(stream_iter, 'aclose', None)
-        if not callable(aclose):
-            return
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            return
-        loop.create_task(aclose())
+        else:
+            aclose = getattr(stream_iter, 'aclose', None)
+            if callable(aclose):
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    pass
+                else:
+                    loop.create_task(aclose())
+        # Dropped stream handles must not suppress no-step-progress watchdogs.
+        self._active_stream_task = None
+        self._active_stream_iter = None
 
     def execute(
         self,
