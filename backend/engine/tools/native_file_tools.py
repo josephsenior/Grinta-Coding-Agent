@@ -47,7 +47,7 @@ def create_read_file_tool() -> ChatCompletionToolParam:
     )
 
 
-def create_read_symbol_tool() -> ChatCompletionToolParam:
+def create_read_symbols_tool() -> ChatCompletionToolParam:
     return create_tool_definition(
         name=READ_SYMBOL_TOOL_NAME,
         description=(
@@ -212,7 +212,7 @@ __all__ = [
     'create_find_symbols_tool',
     'create_multiedit_tool',
     'create_read_file_tool',
-    'create_read_symbol_tool',
+    'create_read_symbols_tool',
     'create_replace_string_tool',
     'create_undo_last_edit_tool',
 ]

@@ -15,7 +15,6 @@ from backend.core.tools.tool_names import (
     CREATE_FILE_TOOL_NAME,
     MULTIEDIT_TOOL_NAME,
     READ_FILE_TOOL_NAME,
-    READ_SYMBOL_TOOL_NAME,
     REPLACE_STRING_TOOL_NAME,
 )
 from backend.engine.function_calling.helpers import (
@@ -55,7 +54,7 @@ def _handle_read_file_tool(arguments: Mapping[str, Any]) -> Action:
     return _build_read_file_action(str(path), {})
 
 
-def _handle_read_symbol_tool(arguments: Mapping[str, Any]) -> Action:
+def _handle_read_symbols_tool(arguments: Mapping[str, Any]) -> Action:
     return _handle_read_symbols_public(arguments)
 
 

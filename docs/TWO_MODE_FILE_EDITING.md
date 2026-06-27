@@ -3,7 +3,7 @@
 Grinta exposes a single native tool-call surface for file and code work:
 
 - `read_file` reads a file, optionally a line range.
-- `read_symbol` reads one or more symbol bodies.
+- `read_symbols` reads one or more symbol bodies.
 - `find_symbols` discovers symbol candidates without reading full bodies.
 - `create_file` creates new files.
 - `replace_string` performs exact one-file text replacement, insertion by anchor, and deletion.

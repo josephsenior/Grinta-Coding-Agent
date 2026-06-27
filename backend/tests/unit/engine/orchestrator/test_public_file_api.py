@@ -13,7 +13,7 @@ from backend.engine.function_calling.dispatch import (
     _handle_multi_edit_command,
     _handle_multiedit_tool,
     _handle_read_file_tool,
-    _handle_read_symbol_tool,
+    _handle_read_symbols_tool,
     _handle_replace_string_tool,
 )
 from backend.engine.tools._file_edits import execute_find_symbols, execute_read_symbols
@@ -107,7 +107,7 @@ def test_read_symbols_accepts_legacy_flat_qualified_name(monkeypatch, tmp_path):
         'def login():\n    return True\n', encoding='utf-8'
     )
 
-    action = _handle_read_symbol_tool(
+    action = _handle_read_symbols_tool(
         {
             'qualified_name': 'login',
             'security_risk': 'LOW',
@@ -121,7 +121,7 @@ def test_read_symbols_requires_symbol_target(monkeypatch, tmp_path):
     _use_tmp_workspace(monkeypatch, tmp_path)
 
     with pytest.raises(FunctionCallValidationError, match='symbols\\[\\]'):
-        _handle_read_symbol_tool(
+        _handle_read_symbols_tool(
             {
                 'security_risk': 'LOW',
             }
@@ -134,7 +134,7 @@ def test_read_symbols_auto_resolves_unique_symbol(monkeypatch, tmp_path):
         'def login():\n    return True\n', encoding='utf-8'
     )
 
-    action = _handle_read_symbol_tool(
+    action = _handle_read_symbols_tool(
         {
             'symbols': [{'symbol_name': 'login'}],
             'security_risk': 'LOW',
@@ -164,7 +164,7 @@ def test_find_symbols_discovers_candidates_and_read_symbols_reports_ambiguity(
     find_action = _handle_find_symbols_tool({'query': 'run', 'security_risk': 'LOW'})
     assert isinstance(find_action, FindSymbolsAction)
     candidates = _payload(execute_find_symbols(find_action))
-    read_action = _handle_read_symbol_tool(
+    read_action = _handle_read_symbols_tool(
         {
             'symbols': [{'symbol_name': 'run'}],
             'security_risk': 'LOW',
@@ -198,7 +198,7 @@ def test_read_symbols_resolves_each_requested_symbol_independently(
         encoding='utf-8',
     )
 
-    action = _handle_read_symbol_tool(
+    action = _handle_read_symbols_tool(
         {
             'symbols': [
                 {'symbol_name': 'authenticate_user'},
@@ -231,7 +231,7 @@ def test_read_symbols_accepts_qualified_names_without_path(monkeypatch, tmp_path
         encoding='utf-8',
     )
 
-    action = _handle_read_symbol_tool(
+    action = _handle_read_symbols_tool(
         {
             'symbols': [{'qualified_name': 'UserService.login'}],
             'security_risk': 'LOW',
@@ -253,7 +253,7 @@ def test_read_symbol_infers_symbols_from_symbols_array(monkeypatch, tmp_path):
         'def login():\n    return True\n', encoding='utf-8'
     )
 
-    action = _handle_read_symbol_tool(
+    action = _handle_read_symbols_tool(
         {
             'symbols': [{'symbol_name': 'login'}],
             'security_risk': 'LOW',
@@ -269,7 +269,7 @@ def test_read_symbol_infers_from_flat_qualified_name(monkeypatch, tmp_path):
         'def login():\n    return True\n', encoding='utf-8'
     )
 
-    action = _handle_read_symbol_tool(
+    action = _handle_read_symbols_tool(
         {
             'qualified_name': 'login',
             'security_risk': 'LOW',

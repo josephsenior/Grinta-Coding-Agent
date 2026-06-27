@@ -67,7 +67,7 @@ def _render_tool_reference(
             '- Discovery: follow `<DISCOVERY_ROUTING>` — `grep` (files_with_matches → content), '
             '`glob`, `find_symbols`, `analyze_project_structure`.\n'
             '- Context: `read_file(path=...)` for files; add `start_line`/`end_line` together on large files '
-            '(1-based; `end_line=-1` = EOF; omit both for whole file). `read_symbol(symbols=[...])` for symbol bodies.\n'
+            '(1-based; `end_line=-1` = EOF; omit both for whole file). `read_symbols(symbols=[...])` for symbol bodies.\n'
             f'{checkpoint_hint}'
             '</EDITOR_AND_FILE_OPERATIONS>'
         )
@@ -81,7 +81,7 @@ def _render_tool_reference(
             '`glob`, `find_symbols`, `analyze_project_structure`; prefer `callers` before `semantic_search`.\n'
             '- Context: `read_file(path=...)` for files; add `start_line`/`end_line` together on large files '
             'instead of whole-file reads (1-based; `end_line=-1` = EOF; omit both for whole file). '
-            '`read_symbol(symbols=[...])` returns each target as resolved, ambiguous, or not_found.\n'
+            '`read_symbols(symbols=[...])` returns each target as resolved, ambiguous, or not_found.\n'
             '- Creation: `create_file` for new files. Fails if the file already exists; use `replace_string` or `multiedit` to modify an existing file.\n'
             '- Editing: `replace_string` (one exact text replacement per call); add by anchor -> anchor + content, delete with `new_string=""`.\n'
             '- Prefer surgical targeted edits for existing files; full-file overwrites are not recommended unless a full rewrite is genuinely necessary.\n'
