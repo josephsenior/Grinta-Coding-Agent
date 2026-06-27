@@ -160,7 +160,7 @@ _print_next_steps() {
     echo -e "${YELLOW}Next — open your project (not the Grinta repo):${NC}"
     if [[ -n "$PROJECT_PATH" ]]; then
         echo -e "  cd \"${PROJECT_PATH}\""
-        echo -e "  uv run --directory \"${repo_root}\" grinta"
+        echo -e "  uv run --directory \"${repo_root}\" grinta -p \"\$(pwd)\""
         echo ""
         echo -e "${YELLOW}Or without cd:${NC}"
         echo -e "  uv run --directory \"${repo_root}\" grinta -p \"${PROJECT_PATH}\""

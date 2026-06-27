@@ -23,6 +23,7 @@ import hashlib
 import json
 import logging
 import os
+import sys
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
@@ -233,3 +234,105 @@ def require_effective_workspace_root() -> Path:
     if p is None:
         raise ValueError(WORKSPACE_NOT_OPEN_MESSAGE)
     return p
+
+
+def _proc_cwd(pid: int) -> Path | None:
+    try:
+        return Path(os.readlink(f'/proc/{pid}/cwd')).resolve()
+    except OSError:
+        return None
+
+
+def _proc_ppid(pid: int) -> int | None:
+    try:
+        with open(f'/proc/{pid}/status', encoding='utf-8') as handle:
+            for line in handle:
+                if line.startswith('PPid:'):
+                    return int(line.split()[1])
+    except OSError:
+        return None
+    return None
+
+
+def _proc_comm(pid: int) -> str:
+    try:
+        raw = Path(f'/proc/{pid}/comm').read_text(encoding='utf-8').strip()
+        return raw.strip('\x00')
+    except OSError:
+        return ''
+
+
+def infer_workspace_from_uv_style_launch(install_root: Path) -> Path | None:
+    """Infer the real project when ``uv run --directory <install>`` reset cwd to the install.
+
+    ``uv --directory`` changes the child process cwd to the Grinta checkout, so a launch
+    like ``cd <project> && uv run --directory ~/Grinta grinta`` would otherwise bind
+    the install tree as the workspace. Walk ``/proc`` ancestors: after ``uv`` chdir'd to
+    *install_root*, use the first ancestor cwd that is not the install root.
+    """
+    if not sys.platform.startswith('linux'):
+        return None
+
+    install = install_root.expanduser().resolve()
+    try:
+        if Path.cwd().resolve() != install:
+            return None
+    except OSError:
+        return None
+
+    pid = os.getppid()
+    saw_uv = False
+    for _ in range(10):
+        comm = _proc_comm(pid)
+        cwd = _proc_cwd(pid)
+        if comm == 'uv':
+            saw_uv = True
+        if (
+            saw_uv
+            and cwd is not None
+            and cwd != install
+            and cwd.is_dir()
+            and not is_reserved_user_app_data_dir(cwd)
+        ):
+            return cwd
+        next_pid = _proc_ppid(pid)
+        if next_pid is None or next_pid <= 1:
+            break
+        pid = next_pid
+    return None
+
+
+def resolve_launch_project_directory(project: str | None = None) -> Path:
+    """Resolve the open project for a CLI launch (before config load).
+
+    Order: explicit ``--project`` / ``-p``, ``GRINTA_INVOCATION_CWD``, process cwd,
+    then (when cwd is the Grinta install) parent-shell inference for ``uv --directory``,
+    then last persisted workspace, else cwd.
+    """
+    if project:
+        return Path(project).expanduser().resolve()
+
+    hint = os.environ.get('GRINTA_INVOCATION_CWD', '').strip()
+    if hint:
+        hinted = _workspace_path_from_raw(hint)
+        if hinted is not None:
+            return hinted
+
+    cwd = Path.cwd().resolve()
+    from backend.core.runtime_paths import resolve_grinta_repo_root
+
+    install = resolve_grinta_repo_root().resolve()
+    if cwd != install:
+        return cwd
+
+    inferred = infer_workspace_from_uv_style_launch(install)
+    if inferred is not None:
+        return inferred
+
+    persisted = load_persisted_workspace_path()
+    if persisted:
+        saved = _workspace_path_from_raw(persisted)
+        if saved is not None and saved.resolve() != install:
+            return saved.resolve()
+
+    return cwd
