@@ -71,7 +71,7 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
             with Vertical(id='sidebar'):
                 with InfoSidebar(id='sidebar-container'):
                     yield CollapsibleSection(
-                        title='Tasks (0)',
+                        title='Tasks',
                         content=EMPTY_TASKS,
                         collapsed=False,
                         accent_color=NAVY_BRAND,
@@ -214,6 +214,21 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
         if self._environment_probe_task and not self._environment_probe_task.done():
             self._environment_probe_task.cancel()
             self._environment_probe_task = None
+
+        # Tear down the MCP live-reload plumbing (file watcher + bus
+        # adapter). Done best-effort; a failure here must not stop the
+        # rest of unmount.
+        stop_watcher = getattr(self, '_stop_settings_watcher', None)
+        if callable(stop_watcher):
+            try:
+                import asyncio as _asyncio
+
+                _asyncio.create_task(stop_watcher())
+            except Exception:
+                _tui_logger.debug(
+                    'on_unmount: settings watcher stop dispatch failed', exc_info=True
+                )
+
         if self._renderer:
             renderer_stream = getattr(self._renderer, '_event_stream', None)
             if renderer_stream is not None:
