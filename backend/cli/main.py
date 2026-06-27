@@ -369,6 +369,12 @@ def _resolve_invocation(
     return args.model, args.project, False, args.no_splash
 
 
+def _resolve_launch_project(project: str | None) -> str:
+    from backend.core.workspace_resolution import resolve_launch_project_directory
+
+    return str(resolve_launch_project_directory(project))
+
+
 async def _async_main(
     *,
     model: str | None = None,
@@ -383,9 +389,7 @@ async def _async_main(
     from backend.core.logging.logger import configure_file_logging
     from backend.persistence.locations import get_project_local_data_root
 
-    resolved_project = (
-        str(Path(project).resolve()) if project else str(Path.cwd().resolve())  # noqa: ASYNC240
-    )
+    resolved_project = _resolve_launch_project(project)
     os.environ['PROJECT_ROOT'] = resolved_project
     # configure_file_logging is idempotent — caller in main() may have already
     # set it up so we can log as early as possible.
@@ -598,9 +602,7 @@ def main(
 
     # Resolve project root early so file logging targets the right workspace
     # directory before any diagnostic or REPL code runs.
-    resolved_project = (
-        str(Path(project).resolve()) if project else str(Path.cwd().resolve())  # noqa: ASYNC240
-    )
+    resolved_project = _resolve_launch_project(project)
     os.environ['PROJECT_ROOT'] = resolved_project
     from backend.core.runtime_paths import pin_grinta_runtime_paths
 

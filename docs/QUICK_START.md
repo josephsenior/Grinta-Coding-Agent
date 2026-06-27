@@ -36,12 +36,14 @@ After big dependency changes: `pipx reinstall -e .` (from repo root).
 
 ### B. `uv run` (no global install)
 
+`uv run --directory` changes cwd to the Grinta clone — pass your project explicitly:
+
 ```bash
 cd "<project>"
-uv run --directory /path/to/Grinta grinta
+uv run --directory /path/to/Grinta grinta -p "$(pwd)"
 ```
 
-Use the real path to your clone instead of `/path/to/Grinta`.
+On WSL/Linux, Grinta also infers the project from your shell when you `cd` first (no `-p` needed in most cases).
 
 ### C. Open `<project>` without `cd`
 

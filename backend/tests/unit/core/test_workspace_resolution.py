@@ -419,3 +419,61 @@ def test_require_effective_workspace_root_returns_resolved_path(monkeypatch) -> 
     )
 
     assert require_effective_workspace_root() == expected
+
+
+def test_resolve_launch_project_directory_uses_explicit_project(
+    tmp_path, monkeypatch
+) -> None:
+    project = tmp_path / 'app'
+    other = tmp_path / 'other'
+    project.mkdir()
+    other.mkdir()
+    monkeypatch.chdir(other)
+    assert (
+        workspace_resolution.resolve_launch_project_directory(str(project))
+        == project.resolve()
+    )
+
+
+def test_resolve_launch_project_directory_uses_invocation_cwd_hint(
+    tmp_path, monkeypatch
+) -> None:
+    install = tmp_path / 'Grinta'
+    project = tmp_path / 'my-app'
+    install.mkdir()
+    project.mkdir()
+    monkeypatch.chdir(install)
+    monkeypatch.setenv('GRINTA_INVOCATION_CWD', str(project))
+
+    assert (
+        workspace_resolution.resolve_launch_project_directory(None) == project.resolve()
+    )
+
+
+def test_resolve_launch_project_directory_infers_parent_after_uv(
+    tmp_path, monkeypatch
+) -> None:
+    install = tmp_path / 'Grinta'
+    project = tmp_path / 'my-app'
+    install.mkdir()
+    project.mkdir()
+    monkeypatch.chdir(install)
+    monkeypatch.delenv('GRINTA_INVOCATION_CWD', raising=False)
+
+    def _fake_infer(root: Path) -> Path | None:
+        assert root == install.resolve()
+        return project.resolve()
+
+    monkeypatch.setattr(
+        workspace_resolution,
+        'infer_workspace_from_uv_style_launch',
+        _fake_infer,
+    )
+    monkeypatch.setattr(
+        'backend.core.runtime_paths.resolve_grinta_repo_root',
+        lambda: install,
+    )
+
+    assert (
+        workspace_resolution.resolve_launch_project_directory(None) == project.resolve()
+    )
