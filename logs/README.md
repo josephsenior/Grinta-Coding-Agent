@@ -8,7 +8,7 @@ All runtime logs live here — **same folder as `backend/`**, never inside your 
 | `workspaces/<name>/sessions/<id>/session.jsonl` | Full session event log |
 | `workspaces/<name>/sessions/<id>/session.audit.txt` | Human-readable session summary (on exit) |
 
-**WSL:** if you run Grinta from `~/Grinta`, logs are in `/home/<you>/Grinta/logs/` — not on the Windows Desktop copy unless you launch from there.
+**WSL:** logs live under `~/Grinta/logs/` when you launch from a source checkout — not inside `<project>`.
 
 Quick check:
 

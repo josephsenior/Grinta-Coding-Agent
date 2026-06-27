@@ -31,7 +31,7 @@ for check in checks:
 
 if layout in {WslLayout.REPO_ON_DRVFS, WslLayout.BOTH_ON_DRVFS}:
     raise SystemExit(
-        "FAIL: repo on /mnt/* — clone to ~/Grinta (see docs/QUICK_START.md#wsl-ubuntu)"
+        "FAIL: repo on /mnt/* — clone to Linux home (see docs/QUICK_START.md#wsl-ubuntu)"
     )
 
 print("WSL2 layout smoke passed")

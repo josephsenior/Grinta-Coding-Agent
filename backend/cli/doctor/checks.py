@@ -384,7 +384,7 @@ def check_wsl_filesystem_perf(*, workspace: Path | None = None) -> DoctorCheck:
         return DoctorCheck(
             'wsl_filesystem_perf',
             False,
-            f'slow I/O on {ws} — expected on /mnt/c; keep Grinta repo on ~/Grinta',
+            f'slow I/O on {ws} — expected on /mnt/c; keep the Grinta clone on Linux home',
             critical=False,
         )
     return DoctorCheck(
@@ -447,7 +447,7 @@ def print_wsl_layout_hints(console: Any, *, workspace: Path | None = None) -> No
     layout = classify_wsl_layout(workspace=ws)
     if layout in {WslLayout.REPO_ON_DRVFS, WslLayout.BOTH_ON_DRVFS}:
         console.print(
-            f'  [{CLR_STATUS_WARN}]⚠[/] WSL: move Grinta repo to ~/Grinta '
+            f'  [{CLR_STATUS_WARN}]⚠[/] WSL: move Grinta repo to Linux home (not /mnt/c). '
             f'(project on /mnt/c is OK). Run `grinta doctor`.'
         )
     elif layout == WslLayout.SUPPORTED_SPLIT:

@@ -16,7 +16,7 @@ For CI gates and layer-boundary checks, see [`backend/scripts/`](../backend/scri
 
 | Script | Purpose |
 | --- | --- |
-| [`launch/start_here.ps1`](launch/start_here.ps1) / [`launch/start_here.sh`](launch/start_here.sh) | Source-checkout onboarding: sync deps, optional init wizard, launch CLI. |
+| [`launch/start_here.ps1`](launch/start_here.ps1) / [`launch/start_here.sh`](launch/start_here.sh) | Source-checkout bootstrap: sync deps, init wizard, doctor (does not launch TUI). |
 | [`launch/start_here_pipx.ps1`](launch/start_here_pipx.ps1) / [`launch/start_here_pipx.sh`](launch/start_here_pipx.sh) | pipx-installed `grinta` flow (no `uv`/bootstrap). |
 | Root [`START_HERE.ps1`](../START_HERE.ps1) / [`start_here.sh`](../start_here.sh) | Unified entry: auto-picks source vs pipx (`-Pipx` / `--pipx` to override). |
 | [`docker/docker_start.ps1`](docker/docker_start.ps1) / [`docker/docker_start.sh`](docker/docker_start.sh) | Optional Docker helper; exits with guidance when no `docker-compose.yml` / `compose.yml` exists in the repo (experimental GHCR image path is documented in [QUICK_START.md](../docs/QUICK_START.md)). Root `DOCKER_START.ps1` / `docker_start.sh` are thin stubs. |
