@@ -9,7 +9,16 @@ from textual.app import ComposeResult
 from textual.containers import Container
 from textual.widgets import Static
 
-from backend.cli.theme import CLR_REASONING_SNAP
+from backend.cli.theme import (
+    CLR_REASONING_SNAP,
+    NAVY_BG_TRANSCRIPT_ACTIVE,
+    NAVY_BG_TRANSCRIPT_BLOCK,
+    NAVY_BG_USER,
+    NAVY_TEXT_BODY,
+    NAVY_TEXT_LIVE,
+    NAVY_TEXT_LIVE_ACTIVE,
+    NAVY_TEXT_USER,
+)
 from backend.cli.tui.image_attachments import image_attachment_status_text
 from backend.cli.tui.transcript_typography import (
     THINKING_LABEL,
@@ -21,17 +30,17 @@ from backend.cli.tui.transcript_typography import (
 class UserMessage(Static):
     """User message display in the transcript."""
 
-    DEFAULT_CSS = """
-    UserMessage {
+    DEFAULT_CSS = f"""
+    UserMessage {{
         width: 100%;
         height: auto;
         margin: 1 0 2 0;
         padding: 1 2 2 2;
-        background: #151d32;
+        background: {NAVY_BG_USER};
         border: transparent;
-        border-right: wide #91abec;
-        color: #f2f6ff;
-    }
+        border-right: wide {USER_PIPE};
+        color: {NAVY_TEXT_USER};
+    }}
     """
 
     def __init__(
@@ -71,16 +80,16 @@ class UserMessage(Static):
 class AgentMessage(Static):
     """Agent response display in the transcript — plain text, no card chrome."""
 
-    DEFAULT_CSS = """
-    AgentMessage {
+    DEFAULT_CSS = f"""
+    AgentMessage {{
         width: 100%;
         height: auto;
         margin: 0 0 1 0;
         padding: 0;
         border: none;
         background: transparent;
-        color: #c8d4e8;
-    }
+        color: {NAVY_TEXT_BODY};
+    }}
     """
 
     def __init__(
@@ -111,23 +120,23 @@ class AgentMessage(Static):
 class LiveResponse(Container):
     """In-flight assistant response — streams with the same markdown richness as finals."""
 
-    DEFAULT_CSS = """
-    LiveResponse {
+    DEFAULT_CSS = f"""
+    LiveResponse {{
         width: 100%;
         height: auto;
         margin: 0 0 1 0;
         padding: 0;
         border: none;
         background: transparent;
-    }
-    LiveResponse > #live-content {
+    }}
+    LiveResponse > #live-content {{
         width: 100%;
         height: auto;
-        color: #b8c4d8;
-    }
-    LiveResponse.-streaming > #live-content {
-        color: #d5dee8;
-    }
+        color: {NAVY_TEXT_LIVE};
+    }}
+    LiveResponse.-streaming > #live-content {{
+        color: {NAVY_TEXT_LIVE_ACTIVE};
+    }}
     """
 
     def __init__(self, *, id: str | None = None) -> None:
@@ -213,7 +222,7 @@ class ThinkingIndicator(Container):
         height: auto;
         margin: 0 0 1 0;
         border: transparent;
-        background: #090d18;
+        background: {NAVY_BG_TRANSCRIPT_BLOCK};
         border-left: solid {THINKING_LABEL};
         padding: 0 1 0 2;
     }}
@@ -221,7 +230,7 @@ class ThinkingIndicator(Container):
         display: none;
     }}
     ThinkingIndicator.-streaming {{
-        background: #0a101c;
+        background: {NAVY_BG_TRANSCRIPT_ACTIVE};
     }}
     ThinkingIndicator > #thinking-content {{
         width: 100%;

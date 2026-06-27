@@ -18,6 +18,13 @@ from textual.widgets import (
 from backend.app.setup import (
     generate_sid,
 )
+from backend.cli.theme import (
+    NAVY_BRAND,
+    NAVY_DOMAIN_MCP,
+    NAVY_DOMAIN_SKILLS,
+    NAVY_FOCUS_ACCENT,
+    NAVY_RUNNING,
+)
 from backend.cli.tui.constants import _tui_logger
 from backend.cli.tui.dialogs import ConfirmWidget, GrintaHelpDialog
 from backend.cli.tui.screen.lifecycle_bootstrap import ScreenLifecycleBootstrapMixin
@@ -59,7 +66,7 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
                         title='Tasks (0)',
                         content='No tasks yet',
                         collapsed=False,
-                        accent_color='#91abec',
+                        accent_color=NAVY_BRAND,
                         section_icon='▣',
                         id='sidebar-tasks',
                     )
@@ -67,7 +74,7 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
                         title='MCP Servers',
                         content='No servers configured',
                         collapsed=False,
-                        accent_color='#eacb8a',
+                        accent_color=NAVY_DOMAIN_MCP,
                         section_icon='⬡',
                         action_label='Edit',
                         action_button_class='-mcp',
@@ -77,7 +84,7 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
                         title='LSP Servers',
                         content='Scanning local PATH...',
                         collapsed=False,
-                        accent_color='#5eead4',
+                        accent_color=NAVY_FOCUS_ACCENT,
                         section_icon='◈',
                         id='sidebar-lsp',
                     )
@@ -85,7 +92,7 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
                         title='Debug Adapters',
                         content='Scanning local PATH...',
                         collapsed=False,
-                        accent_color='#f6a657',
+                        accent_color=NAVY_RUNNING,
                         section_icon='◆',
                         id='sidebar-dap',
                     )
@@ -93,7 +100,7 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
                         title='Skills',
                         content='No custom skills',
                         collapsed=False,
-                        accent_color='#c792ea',
+                        accent_color=NAVY_DOMAIN_SKILLS,
                         section_icon='✦',
                         action_label='Edit',
                         action_button_class='-skill',

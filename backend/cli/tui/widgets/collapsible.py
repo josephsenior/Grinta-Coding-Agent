@@ -15,14 +15,24 @@ from textual.containers import Container, Horizontal, Vertical
 from textual.message import Message
 from textual.widgets import Static, Switch
 
+from backend.cli.theme import (
+    NAVY_BRAND,
+    NAVY_DOMAIN_SKILLS,
+    NAVY_ERROR,
+    NAVY_READY,
+    NAVY_RUNNING,
+    NAVY_TEXT_MUTED,
+    NAVY_WAITING,
+)
+
 STATUS_COLORS = {
-    'ok': '#54efae',
-    'err': '#fd8383',
-    'warn': '#f6ff8f',
-    'info': '#91abec',
-    'neutral': '#969aad',
-    'running': '#5eead4',
-    'skill': '#c792ea',
+    'ok': NAVY_READY,
+    'err': NAVY_ERROR,
+    'warn': NAVY_WAITING,
+    'info': NAVY_BRAND,
+    'neutral': NAVY_TEXT_MUTED,
+    'running': NAVY_RUNNING,
+    'skill': NAVY_DOMAIN_SKILLS,
 }
 
 STATUS_ICONS = {
