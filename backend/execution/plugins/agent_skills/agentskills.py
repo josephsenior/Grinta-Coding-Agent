@@ -41,4 +41,8 @@ for func_name in exported_names:
     cur_doc = '\n'.join(' ' * 4 + x for x in cur_doc.split('\n'))
     fn_signature = f'{func.__name__}{signature(func)!s}'
     DOCUMENTATION += f'{fn_signature}:\n{cur_doc}\n\n'
-__all__ = ['file_editor']
+__all__ = [
+    'file_editor',
+    *FILE_OPS_EXPORTS,
+    *FILE_READER_EXPORTS,
+]

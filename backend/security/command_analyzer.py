@@ -109,17 +109,54 @@ def _reduce_trivial_substitution(inner: str) -> str | None:
     return None
 
 
+# IFS and ${IFS} family — used to split arguments without a literal space
+# (e.g. ``rm${IFS}-rf${IFS}/``). The shell expands IFS to a literal space,
+# tab, or newline, but only when unquoted.  We replace any IFS-like token
+# with a space so the regex tiers can match the de-obfuscated form.
+_IFS_TOKEN_RE = re.compile(
+    r'\$\{?\s*IFS\s*\}?|\$\(\s*printf\s+%s\s+["\']?\s*[\t\n ]+["\']?\s*\)',
+    re.I,
+)
+
+# Empty-quote injection used to break tokens apart: ``rm -r''f /``. The
+# shell strips the empty quotes, concatenating ``-r''f`` to ``-rf``. We
+# drop standalone empty single- and double-quote pairs so the regex tiers
+# can match the concatenated form.
+_EMPTY_QUOTE_PAIR_RE = re.compile(r"''|\"\"")
+
+
+def _collapse_ifs_and_empty_quotes(cmd: str) -> str:
+    """Replace ``${IFS}`` and ``''`` / ``""`` with their shell-collapsed form.
+
+    These are the two most common low-effort obfuscation patterns used to
+    hide ``rm -rf /``, ``curl … | sh``, and similar payloads from simple
+    regex matchers. We replace them with literal whitespace / nothing so
+    downstream tiers can match the de-obfuscated form. The original command
+    is still classified alongside the collapsed one (see
+    :meth:`CommandAnalyzer.analyze`) so the worst-case risk wins.
+    """
+    if '${IFS}' not in cmd and '$IFS' not in cmd and "''" not in cmd and '""' not in cmd:
+        return cmd
+    out = _IFS_TOKEN_RE.sub(' ', cmd)
+    out = _EMPTY_QUOTE_PAIR_RE.sub('', out)
+    return out
+
+
 def _normalize_command(cmd: str, *, max_iterations: int = 5) -> str:
     """Best-effort de-obfuscation of trivial shell substitutions.
 
     Iteratively replaces ``$(echo X)``/``$(printf %s X)`` and the
-    equivalent backtick form with their literal output. Stops after
-    ``max_iterations`` to bound work on adversarial inputs. Anything we
-    can't safely reduce is left alone — the caller still classifies the
-    raw command, so this is purely additive.
+    equivalent backtick form with their literal output, then collapses
+    ``${IFS}`` and empty-quote injection (``rm -r''f /``) to their
+    shell-expanded form. Stops after ``max_iterations`` to bound work
+    on adversarial inputs. Anything we can't safely reduce is left
+    alone — the caller still classifies the raw command, so this is
+    purely additive.
     """
     if '$(' not in cmd and '`' not in cmd:
-        return cmd
+        # Cheaper fast-path: no command substitution, only IFS / empty-quote
+        # collapse to consider.
+        return _collapse_ifs_and_empty_quotes(cmd)
     out = cmd
     for _ in range(max_iterations):
         prev = out
@@ -136,6 +173,7 @@ def _normalize_command(cmd: str, *, max_iterations: int = 5) -> str:
         out = _BACKTICK_RE.sub(_sub_backtick, out)
         if out == prev:
             break
+    out = _collapse_ifs_and_empty_quotes(out)
     return out
 
 

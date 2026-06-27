@@ -620,6 +620,24 @@ def _looks_like_mcp_validation_error(message: str) -> bool:
     )
 
 
+def _mcp_arg_repair_enabled() -> bool:
+    """Return True when the user has opted in to silent MCP arg coercion.
+
+    Gated on ``security.allow_mcp_arg_repair`` in ``settings.json``. Defaults
+    to False: a validation error is surfaced to the model so it can
+    self-correct on the next turn, rather than us silently mutating the
+    arguments (which can produce wrong values for tools that take IDs,
+    version numbers, etc.).
+    """
+    try:
+        from backend.core.config import load_app_config
+
+        security = getattr(load_app_config(), 'security', None)
+        return bool(getattr(security, 'allow_mcp_arg_repair', False))
+    except Exception:
+        return False
+
+
 def _coerce_string_value(value: Any) -> tuple[Any, bool]:
     if isinstance(value, str):
         return value, False
@@ -848,7 +866,7 @@ async def _execute_direct_tool(
         err_text = str(e)
         logger.error('MCP error when calling tool %s: %s', action.name, err_text)
 
-        if _looks_like_mcp_validation_error(err_text):
+        if _looks_like_mcp_validation_error(err_text) and _mcp_arg_repair_enabled():
             resolved_name = (
                 _resolve_exposed_tool_name(matching_client, action.name) or action.name
             )
@@ -878,8 +896,19 @@ async def _execute_direct_tool(
                         action.name,
                         retry_exc,
                     )
+        elif _looks_like_mcp_validation_error(err_text):
+            # Repair is disabled (security.allow_mcp_arg_repair=False):
+            # surface the validation error to the caller so the model can
+            # self-correct on the next turn instead of us silently mutating
+            # arguments.
+            logger.debug(
+                'MCP validation failed for %s; mcp_arg_repair disabled, '
+                'returning raw error to caller',
+                action.name,
+            )
 
-            code = _extract_mcp_jsonrpc_error_code(err_text) or '-32602'
+        code = _extract_mcp_jsonrpc_error_code(err_text) or '-32602'
+        if _looks_like_mcp_validation_error(err_text):
             return _make_mcp_observation(
                 action,
                 _build_mcp_error_payload(

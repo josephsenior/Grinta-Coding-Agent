@@ -132,6 +132,16 @@ class SecurityConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             'allow_read_outside_workspace is True (for example ~/.config/git).'
         ),
     )
+    allow_mcp_arg_repair: bool = Field(
+        default=False,
+        description=(
+            'When True, the MCP layer may silently coerce argument types '
+            '(e.g. int -> str, numeric string truncation) to satisfy a tool '
+            'schema and retry the call once. Defaults to False: an invalid '
+            'argument is surfaced to the model so it can self-correct, rather '
+            'than being mutated under the hood.'
+        ),
+    )
     model_config = ConfigDict(extra='ignore')
 
     @classmethod

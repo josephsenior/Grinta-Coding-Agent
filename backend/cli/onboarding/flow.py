@@ -6,11 +6,15 @@ import json
 import logging
 import os
 from pathlib import Path
+from typing import Any
 
 from rich.console import Console
 
 from backend.cli.onboarding.connection_check import _test_llm_call
-from backend.cli.onboarding.settings_defaults import build_init_settings
+from backend.cli.onboarding.settings_defaults import (
+    build_init_settings,
+    settings_api_key_value,
+)
 from backend.cli.theme import (
     CLR_STATUS_ERR,
     no_color_enabled,
@@ -132,16 +136,62 @@ def auto_detect_api_keys(config: AppConfig) -> str | None:
 
 
 def _settings_file_needs_env_persist(settings_path: Path) -> bool:
-    """Return True when env-detected credentials should be written to disk."""
+    """Return True when env-detected credentials should be written to disk.
+
+    A malformed existing file is treated as a hard stop: we refuse to overwrite
+    it, because the user may have intentional customisations in other sections
+    (security, mcp_config, agent, …) that env-detection would silently clobber.
+    """
     if not settings_path.is_file():
         return True
     try:
         data = json.loads(settings_path.read_text(encoding='utf-8'))
-    except (OSError, json.JSONDecodeError):
-        return True
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning(
+            'Refusing to overwrite malformed settings.json at %s (%s). '
+            'Fix the file manually or run `grinta init` to rebuild it.',
+            settings_path,
+            exc,
+        )
+        return False
+    if not isinstance(data, dict):
+        logger.warning(
+            'Refusing to overwrite settings.json at %s: top-level value is %s, '
+            'not an object.',
+            settings_path,
+            type(data).__name__,
+        )
+        return False
     provider = str(data.get('llm_provider') or '').strip()
     model = str(data.get('llm_model') or '').strip()
     return not provider and not model
+
+
+def _read_existing_settings(settings_path: Path) -> dict[str, Any] | None:
+    """Return parsed settings.json or None when missing / unparseable."""
+    if not settings_path.is_file():
+        return None
+    try:
+        data = json.loads(settings_path.read_text(encoding='utf-8'))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _resolve_persisted_api_key(
+    config: AppConfig,
+    explicit: str | None,
+) -> str:
+    secret = explicit
+    if secret is None:
+        llm_cfg = config.get_llm_config()
+        if llm_cfg.api_key is not None:
+            secret = (
+                llm_cfg.api_key.get_secret_value()
+                if hasattr(llm_cfg.api_key, 'get_secret_value')
+                else str(llm_cfg.api_key)
+            )
+    return (secret or '').strip()
 
 
 def persist_env_detected_settings(
@@ -152,8 +202,15 @@ def persist_env_detected_settings(
 ) -> bool:
     """Persist minimal ``settings.json`` after env key auto-detection.
 
-    Writes only when the canonical settings file is missing or has no provider/model
-    yet, so ``grinta doctor`` and restarts see a stable on-disk configuration.
+    Behaviour:
+    * Missing file → write the full init-shaped settings so first-run users
+      have a complete ``security`` / ``mcp_config`` / ``agent`` baseline.
+    * Existing valid file → merge only the LLM-related top-level fields
+      (``llm_provider`` / ``llm_model`` / ``llm_api_key`` placeholder /
+      ``llm_base_url``). Other sections are preserved so user
+      customisations are never clobbered.
+    * Existing malformed file → refuse to write (see
+      :func:`_settings_file_needs_env_persist`).
     """
     from backend.cli.onboarding.init_wizard import (
         _atomic_json_write,
@@ -174,35 +231,41 @@ def persist_env_detected_settings(
     if not model:
         model = _default_model_for_provider(provider)
     base_url = (getattr(llm_cfg, 'base_url', None) or '').strip()
+    secret = _resolve_persisted_api_key(config, api_key)
 
-    secret = api_key
-    if secret is None and llm_cfg.api_key is not None:
-        secret = (
-            llm_cfg.api_key.get_secret_value()
-            if hasattr(llm_cfg.api_key, 'get_secret_value')
-            else str(llm_cfg.api_key)
+    existing = _read_existing_settings(settings_path)
+    if existing is None:
+        # First run — emit a complete init-shaped file.
+        settings = build_init_settings(
+            provider=provider,
+            model=model,
+            api_key=secret,
+            base_url=base_url,
+            requires_api_key=True,
         )
+    else:
+        # Subsequent run — merge only the LLM-related keys.
+        settings: dict[str, Any] = dict(existing)
+        settings['llm_provider'] = provider
+        settings['llm_model'] = model
+        settings['llm_api_key'] = settings_api_key_value(
+            provider, secret, requires_key=True
+        )
+        if base_url:
+            settings['llm_base_url'] = base_url
+        # Never blank out a user-configured base_url when env has none.
 
-    settings = build_init_settings(
-        provider=provider,
-        model=model,
-        api_key=secret or '',
-        base_url=base_url,
-        requires_api_key=True,
-    )
     try:
         _atomic_json_write(settings_path, settings)
     except OSError:
         logger.warning('Failed to write env-detected settings', exc_info=True)
         return False
 
-    if secret and secret.strip():
+    if secret:
         try:
             from backend.core.config.dotenv_keys import persist_llm_api_key_to_dotenv
 
-            persist_llm_api_key_to_dotenv(
-                secret.strip(), settings_json_path=settings_path
-            )
+            persist_llm_api_key_to_dotenv(secret, settings_json_path=settings_path)
         except OSError:
             logger.warning(
                 'Failed to persist env-detected API key to .env', exc_info=True

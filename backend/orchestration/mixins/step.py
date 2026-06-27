@@ -76,9 +76,23 @@ class _SessionOrchestratorStepMixin:
         the only one that schedules us, and it has already verified that
         ``_step_task`` is None or done before calling.  This method just
         resets the request event and creates a fresh task.
+
+        Idempotent guard: if another ``_create_step_task`` has already
+        fired in the same scheduling tick (e.g. a ``_request_step`` raced
+        with ``_step``'s finally block) and a live task is now installed,
+        we do not spawn a second one.  Without this guard the finally
+        block and a concurrent ``_request_step`` would both call
+        ``_create_step_task`` and orphan the first task in
+        ``create_tracked_task``.
         """
         from backend.utils.async_helpers.async_utils import create_tracked_task
 
+        if (
+            self._step_task is not None
+            and not self._step_task.done()
+            and not self._closed
+        ):
+            return
         self._step_request_count = 0
         self._step_task = create_tracked_task(
             self._step_with_exception_handling(),

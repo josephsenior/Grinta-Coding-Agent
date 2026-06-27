@@ -19,6 +19,7 @@
     "allow_background_processes": false,
     "allow_sensitive_path_access": false,
     "allow_read_outside_workspace": false,
+    "allow_mcp_arg_repair": false,
     "additional_read_roots": []
   },
   "mcp_config": {

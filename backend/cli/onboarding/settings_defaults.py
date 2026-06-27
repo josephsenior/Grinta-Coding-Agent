@@ -19,6 +19,7 @@ def default_init_security_block() -> dict[str, Any]:
         'allow_background_processes': False,
         'allow_sensitive_path_access': False,
         'allow_read_outside_workspace': False,
+        'allow_mcp_arg_repair': False,
         'additional_read_roots': [],
     }
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import uuid4
@@ -17,6 +18,41 @@ if TYPE_CHECKING:
 from backend.core.logging.logger import app_logger as logger
 from backend.ledger.action import ActionSecurityRisk
 from backend.telemetry.models import AuditEntry
+
+
+# Patterns for credentials that may end up in `str(action)` for non-typed
+# actions. Matches are deliberately conservative — false positives are cheap
+# (we replace with a placeholder), false negatives leak secrets to disk.
+_CREDENTIAL_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r'sk-[A-Za-z0-9_-]{16,}'),
+    re.compile(r'sk_live_[A-Za-z0-9]{8,}'),
+    re.compile(r'sk_test_[A-Za-z0-9]{8,}'),
+    re.compile(r'gho_[A-Za-z0-9]{16,}'),
+    re.compile(r'ghp_[A-Za-z0-9]{16,}'),
+    re.compile(r'ghs_[A-Za-z0-9]{16,}'),
+    re.compile(r'ghr_[A-Za-z0-9]{16,}'),
+    re.compile(r'xox[baprs]-[A-Za-z0-9-]{8,}'),
+    re.compile(r'eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}'),
+    re.compile(r'AKIA[0-9A-Z]{12,}'),
+    re.compile(r'AIza[0-9A-Za-z_-]{32,}'),
+    re.compile(r'-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]+?-----END [A-Z ]*PRIVATE KEY-----'),
+    re.compile(r'(?i)(?:password|passwd|token|secret|api[_-]?key|auth)\s*[:=]\s*["\']?([^\s,"\']{6,})'),
+    re.compile(r'(?i)bearer\s+[A-Za-z0-9._-]{16,}'),
+)
+_CREDENTIAL_PLACEHOLDER = '<credential_redacted>'
+
+
+def _redact_credentials(text: str) -> str:
+    """Return *text* with any obvious credential pattern masked.
+
+    Used by the audit logger so action ``str()`` dumps for non-typed actions
+    don't leak secrets into the on-disk JSONL trail.
+    """
+    if not text:
+        return text
+    for pattern in _CREDENTIAL_PATTERNS:
+        text = pattern.sub(_CREDENTIAL_PLACEHOLDER, text)
+    return text
 
 
 class AuditLogger:
@@ -118,7 +154,7 @@ class AuditLogger:
             action: The action
 
         Returns:
-            Action content string (truncated if too long)
+            Action content string (credentials redacted, truncated if too long)
 
         """
         from backend.ledger.action import (
@@ -131,7 +167,10 @@ class AuditLogger:
         elif isinstance(action, FileEditAction):
             content = f'Edit {action.path}'
         else:
-            content = str(action)
+            # ``str(action)`` for browser / message / custom actions can include
+            # form values, cookies, PII, or leaked secrets. Scrub common
+            # credential shapes before persisting.
+            content = _redact_credentials(str(action))
 
         # Truncate if too long
         max_length = 1000
