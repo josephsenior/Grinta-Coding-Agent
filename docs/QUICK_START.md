@@ -1,53 +1,137 @@
 # Quick Start
 
-## Consumer
+Replace placeholders with **your** paths:
 
-Needs **Python 3.12+** and **pipx** (or Homebrew / Scoop — no manual Python).
+| Placeholder | Meaning |
+| --- | --- |
+| `<Grinta-repo>` | Grinta source checkout (contains `pyproject.toml`) |
+| `<project>` | Folder you want the agent to work in |
 
-```bash
+**Dev mode uses both.** Consumer mode only needs `<project>`. Quote paths that contain spaces.
+
+First `grinta` runs setup. No `grinta init` required.
+
+---
+
+## Windows (PowerShell)
+
+### Consumer
+
+```powershell
 pipx install grinta-ai
-cd /path/to/project
+cd "<project>"
 grinta
 ```
 
-First `grinta` runs setup. No `grinta init` required. Settings: `~/.grinta/settings.json`, secrets in `~/.grinta/.env`.
+### Dev
 
-**Windows / WSL:** [WINDOWS_AND_WSL.md](WINDOWS_AND_WSL.md) — WSL needs its own install.
+```powershell
+cd "<Grinta-repo>"
+.\START_HERE.ps1
 
-**Other installs:** `brew install grinta` · `scoop install grinta` · Docker: `ghcr.io/josephsenior/grinta:latest`
+uv run --directory "<Grinta-repo>" python -m backend.cli.entry -p "<project>"
+```
 
-**Extras:** `pipx install "grinta-ai[rag]"` · `"grinta-ai[browser]"` · `"grinta-ai[all]"`
+Settings: `<Grinta-repo>\settings.json`
 
-**Uninstall:** `pipx uninstall grinta-ai`
+---
 
-## Dev (source)
+## WSL (Ubuntu)
 
-No prerequisites — start scripts install `uv` + Python 3.12.
+Install inside WSL — Windows `pipx` does not apply.
 
-| Platform | Command |
-| --- | --- |
-| Windows | `.\START_HERE.ps1` |
-| Unix / WSL | `bash start_here.sh` |
+**Windows path → WSL:** `C:\foo\bar` → `/mnt/c/foo/bar` (lowercase drive letter, forward slashes, quote spaces).
 
-On a project: `uv run --directory <Grinta-repo> python -m backend.cli.entry -p .`
+### Consumer
+
+```bash
+sudo apt install -y python3.12 python3.12-venv pipx
+pipx ensurepath && source ~/.bashrc
+pipx install grinta-ai
+cd "<wsl-project>"
+grinta
+```
+
+(`<wsl-project>` = WSL form of `<project>`, e.g. `/mnt/c/Users/Alice/code/my-app`)
+
+Settings: `~/.grinta/settings.json`
+
+### Dev
+
+```bash
+cd "<wsl-grinta-repo>"
+bash start_here.sh
+
+uv run --directory "<wsl-grinta-repo>" python -m backend.cli.entry -p "<wsl-project>"
+```
+
+Settings: `<wsl-grinta-repo>/settings.json`
+
+---
+
+## Linux
+
+### Consumer
+
+```bash
+pipx install grinta-ai
+cd "<project>"
+grinta
+```
+
+### Dev
+
+```bash
+cd "<Grinta-repo>"
+bash start_here.sh
+
+uv run --directory "<Grinta-repo>" python -m backend.cli.entry -p "<project>"
+```
 
 Settings: `<Grinta-repo>/settings.json`
+
+---
+
+## macOS
+
+### Consumer (pipx)
+
+```bash
+pipx install grinta-ai
+cd "<project>"
+grinta
+```
+
+### Consumer (Homebrew)
+
+```bash
+brew tap josephsenior/grinta https://github.com/josephsenior/Grinta-Coding-Agent
+brew install grinta
+cd "<project>"
+grinta
+```
+
+### Dev
+
+```bash
+cd "<Grinta-repo>"
+bash start_here.sh
+
+uv run --directory "<Grinta-repo>" python -m backend.cli.entry -p "<project>"
+```
+
+Settings: `<Grinta-repo>/settings.json`
+
+---
 
 ## Optional
 
 | Command | When |
 | --- | --- |
 | `grinta init` | Reconfigure without TUI; `--non-interactive` for CI |
-| `grinta doctor` | Install / settings / `rg` checks |
-| `grinta -p <path>` | Open project without `cd` |
+| `grinta doctor` | Install / settings checks |
+| `grinta -p <path>` | Consumer: open project without `cd` |
 
-## Problems
+**Extras:** `pipx install "grinta-ai[rag]"` · `"grinta-ai[browser]"` · `"grinta-ai[all]"`
 
-| Problem | Fix |
-| --- | --- |
-| `grinta` not found in WSL | Install inside Ubuntu — [WINDOWS_AND_WSL.md](WINDOWS_AND_WSL.md) |
-| `uv` not found (dev) | Run `START_HERE.ps1` / `start_here.sh` |
-| WSL path | `C:\foo` → `"/mnt/c/foo"` |
-| More | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) |
-
-Config reference: [SETTINGS.md](SETTINGS.md) · modes & slash commands: [USER_GUIDE.md](USER_GUIDE.md)
+**Windows / WSL pitfalls:** [WINDOWS_AND_WSL.md](WINDOWS_AND_WSL.md) · **Problems:** [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
