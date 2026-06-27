@@ -383,14 +383,20 @@ def test_build_python_exec_command_includes_shell_fallbacks_for_powershell():
     assert command.startswith('python -c "import base64;exec')
 
 
-def test_active_tool_registry_visible_from_worker_thread():
+def test_active_tool_registry_visible_from_worker_thread(monkeypatch):
     """Regression: ThreadPoolExecutor workers must see the runtime ToolRegistry."""
     from concurrent.futures import ThreadPoolExecutor
     from dataclasses import replace
     from unittest.mock import MagicMock
 
     from backend.core.os_capabilities import OS_CAPS, override_os_capabilities
+    from backend.execution.utils import tool_registry
     from backend.utils.terminal import terminal_contract as prompt_mod
+
+    # Force the windows_shell preference to "powershell" so the mock registry's
+    # has_powershell=True actually decides the result. The default is "bash"
+    # which would mask the cross-thread visibility check.
+    monkeypatch.setattr(tool_registry, '_configured_windows_shell', lambda: 'powershell')
 
     prompt_mod.set_active_tool_registry(None)
     prompt_mod._get_global_tool_registry.cache_clear()

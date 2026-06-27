@@ -28,12 +28,14 @@ def test_dap_log_renames_reserved_logrecord_extra_keys(monkeypatch: Any) -> None
     """``logging`` forbids ``extra`` keys that collide with ``LogRecord`` attributes."""
     captured: dict[str, Any] = {}
 
-    def fake_log(level: int, msg: str, extra: dict[str, Any] | None = None) -> None:
-        captured['level'] = level
-        captured['msg'] = msg
-        captured['extra'] = dict(extra or {})
+    from backend.execution.dap import _dap_logging
 
-    monkeypatch.setattr(debugger_module.logger, 'log', fake_log)
+    def fake_emit(event: str, payload: dict[str, Any], *, level: str = 'INFO') -> None:
+        captured['event'] = event
+        captured['level'] = level
+        captured['payload'] = dict(payload)
+
+    monkeypatch.setattr(_dap_logging, 'emit_session_event', fake_emit)
     debugger_module._dap_log(
         logging.INFO,
         'probe',
@@ -41,11 +43,12 @@ def test_dap_log_renames_reserved_logrecord_extra_keys(monkeypatch: Any) -> None
         filename='would_collide.py',
         module='also_collides',
     )
-    extra = captured['extra']
-    assert 'filename' not in extra
-    assert 'module' not in extra
-    assert extra.get('dap_filename') == 'would_collide.py'
-    assert extra.get('dap_module') == 'also_collides'
+    payload = captured['payload']
+    assert 'filename' not in payload
+    assert 'module' not in payload
+    assert payload.get('dap_filename') == 'would_collide.py'
+    assert payload.get('dap_module') == 'also_collides'
+    assert payload.get('msg_type') == 'TEST'
 
 
 def test_dap_client_send_request_frames_content_length() -> None:

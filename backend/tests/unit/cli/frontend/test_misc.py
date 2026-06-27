@@ -559,6 +559,10 @@ async def test_async_main_defaults_workspace_to_cwd(
     sim_home.mkdir()
     monkeypatch.setenv('HOME', str(sim_home))
     monkeypatch.setenv('USERPROFILE', str(sim_home))
+    # Clear any stale workspace env vars left by earlier tests so the
+    # "default to cwd" path is actually exercised here.
+    for stale_key in ('PROJECT_ROOT', 'APP_PROJECT_ROOT', 'GRINTA_INVOCATION_CWD'):
+        monkeypatch.delenv(stale_key, raising=False)
 
     stdin_mock = MagicMock()
     stdin_mock.isatty.return_value = True
