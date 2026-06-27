@@ -4,7 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.12–3.13](https://img.shields.io/badge/Python-3.12--3.13-3776AB?logo=python&logoColor=white)](https://python.org)
-[![Install: pipx](https://img.shields.io/badge/install-pipx-brightgreen)](docs/INSTALL.md)
+[![Install: pipx](https://img.shields.io/badge/install-pipx-brightgreen)](docs/QUICK_START.md)
 [![mypy: checked](https://img.shields.io/badge/mypy-checked-2A6DB2.svg)](https://mypy-lang.org/)
 [![code style: Ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://github.com/astral-sh/ruff)
 [![Tests](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/py-tests.yml/badge.svg)](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/py-tests.yml)
@@ -52,7 +52,7 @@ The pitch in one sentence: **a local-first coding agent with deeper built-in too
 
 ## Install
 
-Prerequisites: Python 3.12 or 3.13 and `pipx`. See [docs/INSTALL.md](docs/INSTALL.md) for all paths.
+Prerequisites: Python 3.12+ and `pipx`. See [docs/QUICK_START.md](docs/QUICK_START.md).
 
 ```bash
 pipx install grinta-ai
@@ -68,7 +68,7 @@ pipx install "grinta-ai[browser]"  # adds browser-use for web automation
 pipx install "grinta-ai[all]"      # rag + browser
 ```
 
-The base install includes PDF, DOCX, PPTX, and LaTeX parsing. RAG and browser automation stay opt-in. Details: [docs/INSTALL.md](docs/INSTALL.md).
+RAG and browser stay opt-in — [docs/QUICK_START.md](docs/QUICK_START.md).
 
 **Windows users:** native Windows (PowerShell / Git Bash) and **WSL/Ubuntu are separate installs** — see [docs/WINDOWS_AND_WSL.md](docs/WINDOWS_AND_WSL.md).
 
@@ -186,7 +186,7 @@ Optional completion-quality validation surfaces advisory warnings when tracked w
 
 **Start here (end users):**
 
-- [Install](docs/INSTALL.md) · [User Guide](docs/USER_GUIDE.md) · [settings.json reference](docs/SETTINGS.md) · [Troubleshooting](docs/TROUBLESHOOTING.md)
+- [Quick Start](docs/QUICK_START.md) · [User Guide](docs/USER_GUIDE.md) · [Settings](docs/SETTINGS.md) · [Troubleshooting](docs/TROUBLESHOOTING.md)
 
 **Contributors:**
 

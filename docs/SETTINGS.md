@@ -57,7 +57,7 @@ The default agent name is `Orchestrator`. Common overrides:
 | `enable_hybrid_retrieval` | Hybrid search with `[rag]` (default on; same gating as vector memory). |
 | `enable_task_tracker_tool` | Structured plan tracking in Plan mode |
 
-**Disabled in v1.0 (not user-configurable today):** `enable_blackboard` and `enable_swarming` remain in the schema with default `false` but are not wired to the live tool surface. See [USER_GUIDE.md](USER_GUIDE.md#autonomy-levels-autonomy).
+**Disabled in v1.0:** `enable_blackboard` and `enable_swarming` — schema only, not wired. Autonomy: [USER_GUIDE.md](USER_GUIDE.md).
 
 See `backend/core/config/agent_config.py` for the full schema.
 
@@ -115,6 +115,6 @@ Enable MCP when you need external tool servers; base install does not require `n
 ## Related docs
 
 - [USER_GUIDE.md](USER_GUIDE.md)
-- [INSTALL.md](INSTALL.md)
+- [QUICK_START.md](QUICK_START.md)
 - [SECURITY_CHECKLIST.md](SECURITY_CHECKLIST.md)
 - [PERFORMANCE.md](PERFORMANCE.md)

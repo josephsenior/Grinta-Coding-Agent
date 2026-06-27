@@ -2,7 +2,7 @@
 # Automated smoke for the contributor / source-checkout onboarding path.
 #
 # Validates dependency sync, CLI entry --help, and non-interactive grinta init
-# behavior. Interactive init + first task remain manual (see docs/FRESH_MACHINE_ONBOARDING.md).
+# behavior. Interactive init + first task remain manual (see docs/onboarding_reports/).
 #
 # Usage (from repo root):
 #   ./scripts/smoke_source_onboarding.sh

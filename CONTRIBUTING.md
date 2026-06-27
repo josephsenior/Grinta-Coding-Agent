@@ -140,7 +140,7 @@ WHEEL_DIR=./dist ./scripts/smoke_install.sh
 ./scripts/smoke_source_onboarding.sh
 ```
 
-Maintainers: see [docs/FRESH_MACHINE_ONBOARDING.md](docs/FRESH_MACHINE_ONBOARDING.md) for the GA fresh-machine checklist.
+Maintainers: see [docs/onboarding_reports/](docs/onboarding_reports/) for GA fresh-machine evidence.
 
 ### Code Standards
 
