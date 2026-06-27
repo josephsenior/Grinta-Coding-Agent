@@ -10,6 +10,8 @@ from textual.containers import Container, Horizontal
 from textual.widgets import Static
 
 from backend.cli.theme import NAVY_RUNNING
+from backend.cli.tui._a11y import ascii_glyphs_enabled
+from backend.cli.tui.widgets.glyphs import glyph
 
 if TYPE_CHECKING:
     from backend.cli.tui.screens.detail.base import DetailScreen
@@ -22,6 +24,26 @@ SCAN_LINE_BORDER_COLORS: dict[str, str] = {
     'done': '#639922',
     'failed': '#E24B4A',
 }
+
+
+# State word shown next to the expand affordance in accessible mode so the
+# state isn't color-only.
+_STATE_WORDS: dict[str, str] = {
+    'queued': 'queued',
+    'running': 'running',
+    'background': 'background',
+    'done': 'done',
+    'failed': 'failed',
+}
+
+
+def _expand_label(state: str) -> str:
+    """Return the expand-slot text honoring accessible mode."""
+    expand = glyph('⤢')
+    if ascii_glyphs_enabled():
+        word = _STATE_WORDS.get(state, state)
+        return f'[{word}] {expand}'
+    return expand
 
 
 class ScanLineCard(Container):
@@ -115,14 +137,6 @@ class ScanLineCard(Container):
 
     # ── state management ────────────────────────────────────────────
 
-    def set_state(self, state: str) -> None:
-        """Transition to *state* and update CSS classes."""
-        for cls in ('queued', 'running', 'background', 'done', 'failed'):
-            self.remove_class(cls)
-        self._state = state
-        self.add_class(state)
-        self._refresh_line()
-
     @property
     def state_border_color(self) -> str:
         """Left-pipe color for the current card state."""
@@ -203,7 +217,24 @@ class ScanLineCard(Container):
         with Horizontal():
             yield Static(self._line_text(), id='scan-summary')
             yield Static(self._delta_text(), id='scan-delta')
-            yield Static('⤢', id='scan-expand')
+            yield Static(_expand_label(self._state), id='scan-expand')
+
+    def _refresh_expand_label(self) -> None:
+        """Refresh the expand-slot text to reflect the current state."""
+        try:
+            widget = self.query_one('#scan-expand', Static)
+        except Exception:
+            return
+        widget.update(_expand_label(self._state))
+
+    def set_state(self, state: str) -> None:
+        """Transition to *state* and update CSS classes."""
+        for cls in ('queued', 'running', 'background', 'done', 'failed'):
+            self.remove_class(cls)
+        self._state = state
+        self.add_class(state)
+        self._refresh_line()
+        self._refresh_expand_label()
 
     def on_mount(self) -> None:
         if self._state == 'failed':
