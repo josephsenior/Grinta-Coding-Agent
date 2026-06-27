@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # ============================================
-# GRINTA - Quick Start Script (Unix/macOS/WSL)
+# GRINTA - Dev bootstrap (Unix/macOS/WSL)
 # ============================================
+# Syncs deps, runs init + doctor. Does NOT launch the TUI — cd to your project and run grinta.
 set -e
 
 # Colors
@@ -25,7 +26,7 @@ mkdir -p "$GRINTA_LOG_ROOT"
 if [[ "$ROOT" == /mnt/* ]]; then
     echo -e "${YELLOW}WSL2: Grinta repo is on a Windows drive (${ROOT}).${NC}"
     echo -e "${YELLOW}      Official supported layout: clone repo to Linux home, project may stay on /mnt/c:${NC}"
-    echo -e "${YELLOW}        git clone ${ROOT} ~/Grinta && cd ~/Grinta && bash start_here.sh${NC}"
+    echo -e "${YELLOW}        git clone ${ROOT} \"\$HOME/Grinta\" && cd \"\$HOME/Grinta\" && bash start_here.sh${NC}"
     echo -e "${YELLOW}      See docs/QUICK_START.md#wsl-ubuntu${NC}"
     echo ""
 elif [[ -n "${WSL_DISTRO_NAME:-}" ]] && [[ "$ROOT" != /mnt/* ]]; then
@@ -119,16 +120,29 @@ if ! uv run python -m backend.cli.entry doctor; then
     exit 1
 fi
 
-LAUNCH_ARGS=()
-if [[ -n "$PROJECT_PATH" ]]; then
-    LAUNCH_ARGS=( -p "$PROJECT_PATH" )
-    echo -e "${GREEN}Opening workspace: ${PROJECT_PATH}${NC}"
-fi
+_print_next_steps() {
+    local repo_root
+    repo_root="$(pwd)"
+    echo ""
+    echo -e "${GREEN}Bootstrap complete.${NC}"
+    echo -e "${CYAN}Settings: ${repo_root}/settings.json${NC}"
+    echo -e "${CYAN}Logs: ${GRINTA_LOG_ROOT}/workspaces/...${NC}"
+    echo ""
+    echo -e "${YELLOW}Next — open your project (not the Grinta repo):${NC}"
+    if [[ -n "$PROJECT_PATH" ]]; then
+        echo -e "  cd \"${PROJECT_PATH}\""
+        echo -e "  uv run --directory \"${repo_root}\" grinta"
+        echo ""
+        echo -e "${YELLOW}Or without cd:${NC}"
+        echo -e "  uv run --directory \"${repo_root}\" grinta -p \"${PROJECT_PATH}\""
+    else
+        echo -e "  cd \"<project>\""
+        echo -e "  uv run --directory \"${repo_root}\" grinta"
+    fi
+    echo ""
+    echo -e "${YELLOW}Optional: pipx install -e .  (from repo root) then run grinta from any directory${NC}"
+    echo -e "${CYAN}Docs: docs/QUICK_START.md${NC}"
+    echo ""
+}
 
-echo ""
-echo -e "${GREEN}Setup complete! Launching Grinta...${NC}"
-echo -e "${CYAN}   Logs: ${GRINTA_LOG_ROOT}/workspaces/...${NC}"
-echo -e "${CYAN}   Session data: ~/.grinta/workspaces/<id>/storage${NC}"
-echo ""
-
-uv run python -m backend.cli.entry "${LAUNCH_ARGS[@]}"
+_print_next_steps

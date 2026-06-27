@@ -38,7 +38,7 @@ def test_classify_wsl_layout_repo_on_drvfs(monkeypatch: pytest.MonkeyPatch) -> N
     assert (
         classify_wsl_layout(
             workspace='/home/me/project',
-            repo_root='/mnt/c/Users/GIGABYTE/Desktop/Grinta',
+            repo_root='/mnt/c/example/Grinta',
         )
         == WslLayout.REPO_ON_DRVFS
     )
@@ -49,7 +49,7 @@ def test_classify_wsl_layout_both_on_drvfs(monkeypatch: pytest.MonkeyPatch) -> N
     assert (
         classify_wsl_layout(
             workspace='/mnt/c/Users/foo',
-            repo_root='/mnt/c/Users/GIGABYTE/Desktop/Grinta',
+            repo_root='/mnt/c/example/Grinta',
         )
         == WslLayout.BOTH_ON_DRVFS
     )

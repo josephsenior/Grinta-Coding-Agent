@@ -12,8 +12,8 @@ Thank you for your interest in contributing to Grinta! This guide will help you 
 ### Getting Started
 
 ```bash
-git clone https://github.com/josephsenior/Grinta-Coding-Agent.git
-cd Grinta-Coding-Agent
+git clone https://github.com/josephsenior/Grinta-Coding-Agent.git Grinta
+cd Grinta
 bash start_here.sh
 ```
 

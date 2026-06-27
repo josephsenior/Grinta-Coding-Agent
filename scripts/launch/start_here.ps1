@@ -1,7 +1,7 @@
 # ============================================
-# GRINTA - Quick Start Script (source checkout)
+# GRINTA - Dev bootstrap (source checkout)
 # ============================================
-# Run this script in PowerShell to start Grinta
+# Syncs deps, runs init + doctor. Does NOT launch the TUI — cd to your project and run grinta.
 
 $ErrorActionPreference = 'Stop'
 
@@ -61,7 +61,7 @@ function Ensure-Python {
     exit 1
 }
 
-Write-Host 'Starting Grinta...' -ForegroundColor Cyan
+Write-Host 'Starting Grinta bootstrap...' -ForegroundColor Cyan
 
 # Change to repository root (this script lives in scripts/launch/)
 Set-Location -Path (Resolve-Path (Join-Path $PSScriptRoot '..\..'))
@@ -100,13 +100,24 @@ if (-not (Test-Path 'settings.json')) {
     }
 }
 
-# Step 2: Launch Grinta CLI
-Write-Host 'Step 2: Starting Grinta CLI...' -ForegroundColor Yellow
-Write-Host 'Settings for this source checkout: settings.json in the repository root.' -ForegroundColor Cyan
-Write-Host 'Session runtime state: ~/.grinta/workspaces/<id>/storage (pipx installs use ~/.grinta/settings.json).' -ForegroundColor Cyan
+Write-Host 'Step 2: Running doctor...' -ForegroundColor Yellow
+& uv run python -m backend.cli.entry doctor
+if ($LASTEXITCODE -ne 0) {
+    Write-Host '[ERROR] Doctor found problems. Fix settings/.env then re-run START_HERE.ps1' -ForegroundColor Red
+    Read-Host 'Press Enter to exit'
+    exit $LASTEXITCODE
+}
 
-& uv run python -m backend.cli.entry
-
+$repoRoot = (Get-Location).Path
 Write-Host ''
-Write-Host '[OK] Grinta session ended.' -ForegroundColor Green
-Read-Host 'Press Enter to exit'
+Write-Host '[OK] Bootstrap complete.' -ForegroundColor Green
+Write-Host "Settings: $repoRoot\settings.json" -ForegroundColor Cyan
+Write-Host 'Logs: logs\workspaces\...' -ForegroundColor Cyan
+Write-Host ''
+Write-Host 'Next — open your project (not the Grinta repo):' -ForegroundColor Yellow
+Write-Host '  cd "<project>"'
+Write-Host "  uv run --directory `"$repoRoot`" grinta"
+Write-Host ''
+Write-Host 'Optional: pipx install -e .  (from repo root) then run grinta from any directory' -ForegroundColor Yellow
+Write-Host 'Docs: docs\QUICK_START.md' -ForegroundColor Cyan
+Write-Host ''

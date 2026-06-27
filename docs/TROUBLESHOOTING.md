@@ -32,7 +32,7 @@ Install paths: [QUICK_START.md](QUICK_START.md).
 
 ## WSL2
 
-- **Slow startup / agent stalls:** repo on `/mnt/c` — clone to `~/Grinta`; run `grinta doctor`
+- **Slow startup / agent stalls:** clone on `/mnt/c` — move repo to Linux home; run `grinta doctor`
 - **Wrong install:** use `pipx` inside Ubuntu, not Windows PowerShell
 - **`grinta` not found in WSL:** install inside Ubuntu ([QUICK_START.md](QUICK_START.md#wsl-ubuntu))
 - **Project on `/mnt/c` is slow:** expected; see [QUICK_START.md — WSL](QUICK_START.md#wsl-ubuntu)

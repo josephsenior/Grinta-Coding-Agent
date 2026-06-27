@@ -1,7 +1,7 @@
 """WSL2 detection and layout helpers for the official supported tier.
 
 Official WSL2 layout:
-- Grinta repo + venv on Linux home (``~/Grinta``)
+- Grinta repo + venv on Linux home (not ``/mnt/c``)
 - Project workspace may live on a Windows mount (``/mnt/c/...``)
 """
 
