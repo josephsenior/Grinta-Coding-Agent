@@ -239,13 +239,13 @@ class OrchestratorPlanner:
         from backend.engine.tools.native_file_tools import (
             create_find_symbols_tool,
             create_read_file_tool,
-            create_read_symbol_tool,
+            create_read_symbols_tool,
         )
 
         tools.append(create_cmd_run_tool())
         tools.append(create_ask_user_tool())
         tools.append(create_read_file_tool())
-        tools.append(create_read_symbol_tool())
+        tools.append(create_read_symbols_tool())
         tools.append(create_find_symbols_tool())
 
     def _add_edit_and_search_tools(self, tools: list) -> None:

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 # ── File API ────────────────────────────────────────────────────────
 READ_FILE_TOOL_NAME = 'read_file'
-READ_SYMBOL_TOOL_NAME = 'read_symbol'
+READ_SYMBOL_TOOL_NAME = 'read_symbols'
 FIND_SYMBOLS_TOOL_NAME = 'find_symbols'
 CREATE_FILE_TOOL_NAME = 'create_file'
 REPLACE_STRING_TOOL_NAME = 'replace_string'

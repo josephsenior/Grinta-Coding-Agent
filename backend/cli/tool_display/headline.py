@@ -66,7 +66,7 @@ _SIMPLE_VERB_MAP = {
     'glob': 'Globbed',
     'lsp': 'Analyzed',
     'analyze_project_structure': 'Analyzed',
-    'read_symbol': 'Read',
+    'read_symbols': 'Read',
     'browser': 'Browser',
     'delegate_task': 'Delegated',
     'shared_task_board': 'Checked',
@@ -176,12 +176,12 @@ def _stats_debugger(args: dict[str, Any]) -> str | None:
 
 
 def _stats_read_symbol(args: dict[str, Any]) -> str | None:
-    entities = args.get('entity_names')
-    if isinstance(entities, list) and entities:
-        first = str(entities[0])
-        if len(entities) == 1:
+    symbols = args.get('symbols')
+    if isinstance(symbols, list) and symbols:
+        first = str(symbols[0].get('qualified_name', symbols[0].get('symbol_name', str(symbols[0]))))
+        if len(symbols) == 1:
             return first
-        return f'{first} (+{len(entities) - 1} more)'
+        return f'{first} (+{len(symbols) - 1} more)'
     return None
 
 
@@ -189,7 +189,7 @@ _STATS_HANDLERS: dict[str, Callable[[dict[str, Any]], str | None]] = {
     'grep': _stats_grep,
     'glob': _stats_glob,
     'analyze_project_structure': _stats_analyze_project,
-    'read_symbol': _stats_read_symbol,
+    'read_symbols': _stats_read_symbol,
     'task_tracker': _stats_task_tracker,
     'terminal_manager': _stats_terminal_manager,
     'debugger': _stats_debugger,

@@ -97,7 +97,7 @@ def _render_critical(
                 [
                     '`task_tracker`' if tracker_on and is_plan_mode(mode) else None,
                     '`read_file`',
-                    '`read_symbol`',
+                    '`read_symbols`',
                     '`grep`',
                     '`glob`',
                     '`ask_user`',

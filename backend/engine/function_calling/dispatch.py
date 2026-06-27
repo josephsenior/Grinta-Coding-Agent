@@ -62,7 +62,7 @@ from backend.engine.tools import (
     create_find_symbols_tool,
     create_multiedit_tool,
     create_read_file_tool,
-    create_read_symbol_tool,
+    create_read_symbols_tool,
     create_replace_string_tool,
 )
 from backend.ledger.action import Action, AgentThinkAction
@@ -105,8 +105,8 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
             str, create_read_file_tool().get('function', {}).get('name', '')
         ): _handle_read_file_tool,
         cast(
-            str, create_read_symbol_tool().get('function', {}).get('name', '')
-        ): _handle_read_symbol_tool,
+            str, create_read_symbols_tool().get('function', {}).get('name', '')
+        ): _handle_read_symbols_tool,
         cast(
             str, create_find_symbols_tool().get('function', {}).get('name', '')
         ): _handle_find_symbols_tool,
@@ -279,7 +279,7 @@ from backend.engine.tools._file_edits import (  # noqa: E402, F401
     _handle_multiedit_tool,
     _handle_read_file_tool,
     _handle_read_range_public,
-    _handle_read_symbol_tool,
+    _handle_read_symbols_tool,
     _handle_read_symbols_public,
     _handle_replace_string_tool,
     _multi_edit_raise,

@@ -264,10 +264,7 @@ def _summary_read_file(args: dict[str, Any]) -> str:
 
 def _summary_create(args: dict[str, Any]) -> str:
     path = _arg_str(args, 'path')
-    create_type = _arg_str(args, 'type')
-    if path and create_type:
-        return f'{path} · new {create_type}'
-    return path or 'create'
+    return path or 'create_file'
 
 
 def _summary_replace_string(args: dict[str, Any]) -> str:
@@ -365,10 +362,10 @@ def _summary_analyze_project(args: dict[str, Any]) -> str:
 
 def _summary_read_symbol(args: dict[str, Any]) -> str:
     path = _arg_str(args, 'path')
-    entities = args.get('entity_names')
+    symbols = args.get('symbols')
     parts: list[str] = []
-    if isinstance(entities, list) and entities:
-        count = len(entities)
+    if isinstance(symbols, list) and symbols:
+        count = len(symbols)
         parts.append(f'{count} symbol{"s" if count != 1 else ""}')
     if path:
         parts.append(f'in {_orient_path(path)}')
@@ -428,7 +425,7 @@ _TOOL_SUMMARIZERS: dict[str, Callable[[dict[str, Any]], str]] = {
     'glob': _summary_glob,
     'lsp': _summary_lsp,
     'analyze_project_structure': _summary_analyze_project,
-    'read_symbol': _summary_read_symbol,
+    'read_symbols': _summary_read_symbol,
     'verify_file_lines': _summary_verify_file,
     'delegate_task': _summary_delegate_task,
     'ask_user': _summary_ask_user,

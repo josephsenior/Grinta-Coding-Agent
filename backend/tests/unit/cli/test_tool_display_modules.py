@@ -109,7 +109,7 @@ class TestFriendlyVerbForTool(unittest.TestCase):
 
     def test_simple_map_tools(self) -> None:
         self.assertEqual(friendly_verb_for_tool('read_file', {}), 'Read')
-        self.assertEqual(friendly_verb_for_tool('create', {}), 'Created')
+        self.assertEqual(friendly_verb_for_tool('create_file', {}), 'Created')
         self.assertEqual(friendly_verb_for_tool('replace_string', {}), 'Edited')
         self.assertEqual(friendly_verb_for_tool('multiedit', {}), 'Edited')
         self.assertEqual(friendly_verb_for_tool('find_symbols', {}), 'Found')
@@ -305,9 +305,8 @@ class TestSummarizeToolArguments(unittest.TestCase):
         self.assertIn('foo.py', s)
 
     def test_create(self) -> None:
-        s = summarize_tool_arguments('create', {'type': 'file', 'path': 'foo.py'})
+        s = summarize_tool_arguments('create_file', {'path': 'foo.py'})
         self.assertIn('foo.py', s)
-        self.assertIn('new file', s)
 
     def test_multiedit(self) -> None:
         s = summarize_tool_arguments(
