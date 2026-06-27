@@ -15,6 +15,7 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Static
 
+from backend.cli.tui._a11y import animations_enabled as _animations_enabled
 from backend.cli.tui.constants import (
     _WELCOME_SUGGESTION_DETAILS,
     _WELCOME_SUGGESTIONS,
@@ -106,6 +107,10 @@ class WelcomeWidget(Vertical):
             self._highlight(self._selected)
             return
         self._items[idx].display = True
+        if not _animations_enabled():
+            # Accessible mode: reveal all items immediately, no stagger.
+            self._cascade(idx + 1)
+            return
         timer = self.set_timer(0.15, lambda i=idx: self._cascade(i + 1))
         self._cascade_timers.append(timer)
 

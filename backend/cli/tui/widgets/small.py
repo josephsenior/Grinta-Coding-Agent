@@ -440,12 +440,17 @@ class Transcript(VerticalScroll):
     def append_widget(self, widget: Widget, *, animate: bool | None = None) -> None:
         """Mount a widget and auto-scroll unless user scrolled up."""
         should_follow = self.should_follow_tail()
+        from backend.cli.tui._a11y import animations_enabled
+
         use_animation = (
             animate
             if animate is not None
-            else not (
-                getattr(self, '_suppress_mount_animation', False)
-                or getattr(self, '_under_backpressure', False)
+            else (
+                animations_enabled(self.app)
+                and not (
+                    getattr(self, '_suppress_mount_animation', False)
+                    or getattr(self, '_under_backpressure', False)
+                )
             )
         )
         if use_animation:

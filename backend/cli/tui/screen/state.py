@@ -218,8 +218,18 @@ class ScreenStateMixin:
             if pct < 95
             else NAVY_RED_ACCENT
         )
+        from backend.cli.tui._a11y import ascii_glyphs_enabled
+        from backend.cli.tui.widgets.glyphs import glyph
+
         used_label = HUDBar._format_tokens(max(0, used))
         limit_label = HUDBar._format_tokens(display_limit)
+        if ascii_glyphs_enabled():
+            word = 'low' if pct < 80 else 'med' if pct < 95 else 'high'
+            return (
+                f'[{NAVY_TEXT_DIM}]Ctx: {used_label}/{limit_label} '
+                f'({pct}% {word})  '
+                f'[{ctx_color}]{glyph("●")}[/][/]'
+            )
         return (
             f'[{NAVY_TEXT_DIM}]Ctx: {used_label}/{limit_label} ({pct}%)  '
             f'[{ctx_color}]●[/][/]'

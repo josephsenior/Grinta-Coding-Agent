@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from backend.cli.theme import NAVY_RUNNING
+from backend.cli.tui.widgets.glyphs import glyph as _glyph
 from backend.cli.tui.widgets.scan_line.card import ScanLineCard
 
 if TYPE_CHECKING:
@@ -98,15 +99,16 @@ def _status_indicator_markup(
     if state == 'background':
         return '[#6B9FD4]detached[/]'
     if state == 'done':
-        return '[#639922]✓[/]'
+        return f'[scan-line-state-done]{_glyph("✓")}[/]'
     if state == 'failed':
         if exit_code is not None:
-            return f'[#E24B4A]✗ {exit_code}[/]'
-        return '[#E24B4A]✗[/]'
+            return f'[scan-line-state-failed]{_glyph("✗")} {exit_code}[/]'
+        return f'[scan-line-state-failed]{_glyph("✗")}[/]'
     return ''
 
 
 # One unique icon per scan-line verb — no sharing between card kinds.
+# When accessible mode is active, _glyph() substitutes ASCII equivalents.
 _SCAN_LINE_ICONS: dict[str, str] = {
     'Agent': '◎',
     'Created': '+',
@@ -131,7 +133,7 @@ def _scan_label_with_icon(label: str) -> str:
     icon = _SCAN_LINE_ICONS.get(label, '')
     if not icon:
         return label
-    return f'{icon} {label}'
+    return f'{_glyph(icon)} {label}'
 
 
 # ── AgentMessageCard ───────────────────────────────────────────────────

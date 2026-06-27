@@ -25,6 +25,7 @@ from backend.cli.theme import (
     NAVY_FOCUS_ACCENT,
     NAVY_RUNNING,
 )
+from backend.cli.tui._a11y import animations_enabled
 from backend.cli.tui.constants import _tui_logger
 from backend.cli.tui.dialogs import ConfirmWidget, GrintaHelpDialog
 from backend.cli.tui.screen.lifecycle_bootstrap import ScreenLifecycleBootstrapMixin
@@ -114,11 +115,17 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
         self._render_hud_bar()
         self.call_after_refresh(self._mark_hud_controls_ready)
         self._update_input_identity()
+        # HUD content refresh (1Hz) always runs — it updates cost, tokens,
+        # retry countdown. The 0.5Hz pulse and 0.25Hz scan-line refresh are
+        # *visual* animations; skip them in accessible mode.
         self._hud_tick = self.set_interval(1.0, self._refresh_runtime_feedback)
-        self._hud_pulse_tick = self.set_interval(0.5, self._tick_hud_running_pulse)
-        self._scanline_refresh_tick = self.set_interval(
-            0.25, self._refresh_scanline_cards
-        )
+        if animations_enabled(self):
+            self._hud_pulse_tick = self.set_interval(
+                0.5, self._tick_hud_running_pulse
+            )
+            self._scanline_refresh_tick = self.set_interval(
+                0.25, self._refresh_scanline_cards
+            )
         ta = self.query_one('#input', TextArea)
         ta.text = ''
         ta.focus()

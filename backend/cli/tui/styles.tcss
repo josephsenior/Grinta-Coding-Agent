@@ -417,7 +417,7 @@ WelcomeWidget {
     width: auto;
     height: auto;
     color: #ff007f;
-    text-style: bold blink;
+    text-style: bold;
 }
 
 #welcome-slogan {
