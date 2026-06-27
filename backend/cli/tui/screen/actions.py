@@ -38,7 +38,7 @@ class ScreenActionsMixin:
         if sidebar.has_class('-hidden'):
             sidebar.remove_class('-hidden')
             transcript = self.query_one('#main-display', Transcript)
-            transcript.styles.width = '70%'
+            transcript.styles.width = '78%'
         else:
             sidebar.add_class('-hidden')
             transcript = self.query_one('#main-display', Transcript)
@@ -179,13 +179,15 @@ class ScreenActionsMixin:
         action_type_raw = type(pending).__name__ if pending else 'Unknown'
         action_type = self._ACTION_TYPE_LABELS.get(action_type_raw, action_type_raw)
         target, risk_raw = self._extract_pending_details(pending)
-        risk_label, risk_class = self._RISK_LABELS.get(risk_raw, ('Unknown', 'dim'))
+        risk_label, risk_style, risk_css_class = self._RISK_LABELS.get(
+            risk_raw, ('Unknown', 'dim', 'confirm-risk-unknown')
+        )
 
         options = self._build_confirm_options()
 
         widget = self.query_one('#confirm-widget', ConfirmWidget)
         widget.configure(
-            action_type, risk_label, risk_class, target, options, recommended=0
+            action_type, risk_label, risk_style, risk_css_class, target, options, recommended=0
         )
         widget.show()
         try:

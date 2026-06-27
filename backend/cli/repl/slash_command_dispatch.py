@@ -105,3 +105,23 @@ def render_unknown_command(host: Any, raw_cmd: str) -> None:
         'Type `/help` to list commands, or press Tab after `/` to autocomplete.',
         title='warning',
     )
+
+
+def _render_unknown_noninteractive(host: Any, raw_cmd: str) -> None:
+    """Compact unknown-command message for piped (non-interactive) mode.
+
+    Mirrors :func:`render_unknown_command` but skips the autocomplete hint,
+    since Tab doesn't apply when stdin is not a TTY.
+    """
+    from backend.cli.repl.slash_command_registry import _closest_command_names
+
+    suggestion_text = _closest_command_names(raw_cmd)
+    suffix = ''
+    if suggestion_text:
+        rendered_suggestions = ' or '.join(f'`{item}`' for item in suggestion_text)
+        suffix = f' Did you mean {rendered_suggestions}?'
+    host._renderer.add_system_message(
+        f'Unknown command: `{raw_cmd}`.{suffix} '
+        'Type `/help` to list available commands.',
+        title='warning',
+    )

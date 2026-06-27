@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import logging
 import sys
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 
@@ -82,6 +83,18 @@ async def run_noninteractive(
     import time
 
     from backend.cli.event_renderer import CLIEventRenderer
+    from backend.cli.repl.slash_command_status import (
+        cmd_status,
+        cmd_cost,
+        cmd_health,
+    )
+    from backend.cli.repl.slash_command_actions import (
+        cmd_clear,
+        cmd_model,
+        cmd_diff,
+        cmd_copy,
+        cmd_help,
+    )
     from backend.core.enums import AgentState
     from backend.ledger.action import MessageAction
 
@@ -90,6 +103,10 @@ async def run_noninteractive(
     renderer = CLIEventRenderer(console=console, hud=hud, reasoning=reasoning)
 
     renderer.add_system_message('Initializing engine...', title='system')
+
+    host = _NonInteractiveHost(
+        config=config, console=console, hud=hud, renderer=renderer
+    )
 
     try:
         if initial_input:
@@ -109,7 +126,7 @@ async def run_noninteractive(
             if not text:
                 continue
             if text.startswith('/'):
-                _handle_slash_command(text, console, renderer)
+                _handle_slash_command(text, host)
                 continue
 
             console.print(f'[bold #2dd4bf]>[+] [dim]you[/dim][/] {text}')
@@ -118,6 +135,7 @@ async def run_noninteractive(
             renderer.add_system_message('Starting agent...', title='system')
 
             initial_action = MessageAction(content=text)
+            host._last_user_message = text
 
             state = await _run_controller_with_renderer(
                 config,
@@ -163,19 +181,121 @@ async def run_noninteractive(
         await aclose_shared_http_clients()
 
 
-def _handle_slash_command(text: str, console: Console, renderer: object) -> None:
+def _handle_slash_command(text: str, host: '_NonInteractiveHost') -> None:
+    """Dispatch a slash command in non-interactive mode.
+
+    Routes through the central ``COMMAND_DISPATCH`` table. Read-only-safe
+    commands (``/status``, ``/cost``, ``/health``, ``/model``, ``/diff``,
+    ``/clear``, ``/copy``, ``/help``) are supported. Commands that
+    require a TTY (``/settings``, ``/sessions``, ``/resume``) and any
+    playbook / mutating command print a not-available message. Unknown
+    commands are reported with a compact suggestion.
+    """
+    from backend.cli.repl.slash_command_dispatch import (
+        COMMAND_DISPATCH,
+        _render_unknown_noninteractive,
+    )
+
+    from backend.cli.repl.slash_registry_parsing import parse_slash_command
+    from backend.cli.repl.slash_registry_models import SlashCommandParseError
+
     cmd = text.lower().strip()
     if cmd in ('/quit', '/q', '/exit'):
         sys.exit(0)
-    elif cmd in ('/help', '/h', '/?'):
-        add = getattr(renderer, 'add_system_message', None)
-        if callable(add):
-            add('Available commands: /help, /clear, /quit', title='help')
-        else:
-            console.print('[dim]Available commands: /help, /clear, /quit[/dim]')
-    elif cmd in ('/clear', '/c'):
-        add = getattr(renderer, 'add_system_message', None)
-        if callable(add):
-            add('(clear not available in non-interactive mode)', title='system')
-    else:
-        console.print(f'[bold #f87171]Unknown command: {text}[/]')
+
+    try:
+        parsed = parse_slash_command(text)
+    except SlashCommandParseError as exc:
+        host._warn(str(exc))
+        return
+
+    if parsed.name in ('/settings', '/sessions', '/resume'):
+        host._warn(
+            f'`{parsed.name.lstrip("/")}` is not available in piped '
+            '(non-interactive) mode. Run `grinta` in a TTY for the full '
+            'slash surface.'
+        )
+        return
+
+    method_name = COMMAND_DISPATCH.get(parsed.name)
+    if method_name is None:
+        _render_unknown_noninteractive(host, parsed.raw_name)
+        return
+
+    PIPED_MODE_COMMANDS = {
+        '_cmd_status': cmd_status,
+        '_cmd_cost': cmd_cost,
+        '_cmd_health': cmd_health,
+        '_cmd_model': cmd_model,
+        '_cmd_diff': cmd_diff,
+        '_cmd_copy': cmd_copy,
+        '_cmd_clear': cmd_clear,
+        '_cmd_help': cmd_help,
+    }
+    func = PIPED_MODE_COMMANDS.get(method_name)
+    if func is None:
+        host._warn(
+            f'`{parsed.name}` requires an interactive TTY session. '
+            'Run `grinta` (no pipe) to use it.'
+        )
+        return
+    _invoke(func, host, parsed)
+
+
+def _invoke(func: Any, host: Any, parsed: Any) -> bool:
+    try:
+        return func(host, parsed)
+    except Exception as exc:
+        host._warn(f'Command failed: {type(exc).__name__}: {exc}')
+        return True
+
+
+class _NonInteractiveHost:
+    """Minimal host adapter for slash commands in piped mode.
+
+    Satisfies the attribute subset of :class:`SlashCommandsMixin` that
+    the read-only-safe commands (``/status``, ``/cost``, ``/health``,
+    ``/model``, ``/diff``, ``/clear``, ``/copy``, ``/help``) touch.
+    Anything that requires a controller/event-stream is left as ``None``
+    and a ``_warn`` message is shown instead.
+    """
+
+    def __init__(
+        self,
+        *,
+        config: Any,
+        console: Console,
+        hud: HUDBar,
+        renderer: Any,
+    ) -> None:
+        self._config = config
+        self._console = console
+        self._hud = hud
+        self._renderer = renderer
+        self._controller = None
+        self._event_stream = None
+        self._next_action = None
+        self._pending_resume = None
+        self._last_user_message = None
+
+    def _warn(self, msg: str) -> None:
+        self._renderer.add_system_message(msg, title='warning')
+
+    def _usage(self, name: str) -> str:
+        from backend.cli.repl.slash_registry_commands import (
+            _SLASH_COMMANDS,
+        )
+
+        for spec in _SLASH_COMMANDS:
+            if spec.name == name:
+                return spec.usage
+        return name
+
+    def _reject_extra_args(self, parsed: Any) -> bool:
+        if parsed.args:
+            self._warn(f'Usage: {self._usage(parsed.name)}')
+            return True
+        return False
+
+    def _command_project_root(self) -> Path:
+        return Path.cwd()

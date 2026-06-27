@@ -43,11 +43,14 @@ class GrintaTUIApp(App):
         config: AppConfig,
         console: RichConsole,
         loop: asyncio.AbstractEventLoop,
+        *,
+        accessible: bool = False,
     ) -> None:
         super().__init__()
         self._config = config
         self._console = console
         self._loop = loop
+        self._accessible_mode = accessible
         self._hud = HUDBar()
         self._reasoning = ReasoningDisplay()
         self._session_running = True
@@ -70,6 +73,7 @@ class GrintaTUIApp(App):
                 hud=self._hud,
                 reasoning=self._reasoning,
                 app=self,
+                accessible=self._accessible_mode,
             )
         )
         self.call_after_refresh(
@@ -134,11 +138,14 @@ async def run_tui(
     console: RichConsole,
     *,
     verbose: bool = False,
+    accessible: bool = False,
 ) -> None:
     """Run the Grinta TUI (interactive default when stdin is a TTY)."""
     loop = asyncio.get_running_loop()
 
-    app = GrintaTUIApp(config=config, console=console, loop=loop)
+    app = GrintaTUIApp(
+        config=config, console=console, loop=loop, accessible=accessible
+    )
     app._hud.update_model(config.get_llm_config().model or '(not set)')
     model = config.get_llm_config().model or '(not set)'
     app._hud.update_tokens(0, HUDBar.resolve_context_limit_for_model(model))
@@ -194,4 +201,4 @@ async def _async_main_tui(
 
         update_model(model)
 
-    await run_tui(config, console, verbose=verbose)
+    await run_tui(config, console, verbose=verbose, accessible=accessible)

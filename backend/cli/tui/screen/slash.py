@@ -20,8 +20,6 @@ class _TUIRendererAdapter:
         severity = 'information'
         if title in {'warning', 'error'}:
             severity = title
-        elif title == 'error':
-            severity = 'error'
         timeout = 8.0 if len(msg) > 200 else 6.0
         prefix = (
             f'[{title}] ' if title and title not in {'grinta', 'mode', 'status'} else ''
