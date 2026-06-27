@@ -208,7 +208,7 @@ class HUDBar:
         parts.append(f'{fields.token_display_compact}t')
 
         if fields.cost_usd > 0:
-            parts.append(f'${fields.cost_usd:.2f}')
+            parts.append(f'${fields.cost_usd:.3f}')
 
         parts.append(fields.agent_state_label)
 

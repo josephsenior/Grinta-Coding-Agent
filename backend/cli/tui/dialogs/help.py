@@ -17,14 +17,15 @@ class GrintaHelpDialog(ModalDialog[str | None]):
     def compose(self) -> ComposeResult:
         from backend.cli.tui.app import GrintaScreen
         from backend.cli.tui.widgets.command_list import (
-            KEYBOARD_SHORTCUTS,
             CommandListPanel,
             CommandListRow,
             CommandListSection,
+            build_help_shortcuts,
             build_slash_command_rows,
         )
 
         slash_rows = build_slash_command_rows(GrintaScreen._SLASH_HINTS)
+        shortcut_rows = build_help_shortcuts(GrintaScreen.BINDINGS)
         with Vertical(id='dialog-container'):
             yield Label('Help', id='dialog-title')
             yield Static(
@@ -46,7 +47,7 @@ class GrintaHelpDialog(ModalDialog[str | None]):
                     'Agent', 'Full task loop (default); autonomy applies here'
                 )
                 yield CommandListSection('Keyboard shortcuts')
-                for key, detail in KEYBOARD_SHORTCUTS:
+                for key, detail in shortcut_rows:
                     yield CommandListRow(key, detail)
             with Horizontal(id='dialog-buttons'):
                 yield Button('Close', id='help-close', variant='primary')

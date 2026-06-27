@@ -26,6 +26,13 @@ from backend.cli.theme import (
     NAVY_RUNNING,
 )
 from backend.cli.tui._a11y import animations_enabled
+from backend.cli.tui.strings import (
+    EMPTY_MCP,
+    EMPTY_SKILLS,
+    EMPTY_TASKS,
+    LOADING_DAP,
+    LOADING_LSP,
+)
 from backend.cli.tui.constants import _tui_logger
 from backend.cli.tui.dialogs import ConfirmWidget, GrintaHelpDialog
 from backend.cli.tui.screen.lifecycle_bootstrap import ScreenLifecycleBootstrapMixin
@@ -65,7 +72,7 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
                 with InfoSidebar(id='sidebar-container'):
                     yield CollapsibleSection(
                         title='Tasks (0)',
-                        content='No tasks yet',
+                        content=EMPTY_TASKS,
                         collapsed=False,
                         accent_color=NAVY_BRAND,
                         section_icon='▣',
@@ -73,7 +80,7 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
                     )
                     yield CollapsibleSection(
                         title='MCP Servers',
-                        content='No servers configured',
+                        content=EMPTY_MCP,
                         collapsed=False,
                         accent_color=NAVY_DOMAIN_MCP,
                         section_icon='⬡',
@@ -83,7 +90,7 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
                     )
                     yield CollapsibleSection(
                         title='LSP Servers',
-                        content='Scanning local PATH...',
+                        content=LOADING_LSP,
                         collapsed=False,
                         accent_color=NAVY_FOCUS_ACCENT,
                         section_icon='◈',
@@ -91,7 +98,7 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
                     )
                     yield CollapsibleSection(
                         title='Debug Adapters',
-                        content='Scanning local PATH...',
+                        content=LOADING_DAP,
                         collapsed=False,
                         accent_color=NAVY_RUNNING,
                         section_icon='◆',
@@ -99,7 +106,7 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
                     )
                     yield CollapsibleSection(
                         title='Skills',
-                        content='No custom skills',
+                        content=EMPTY_SKILLS,
                         collapsed=False,
                         accent_color=NAVY_DOMAIN_SKILLS,
                         section_icon='✦',

@@ -579,6 +579,11 @@ class HudModeSelect(Select):
 class HUD(Vertical):
     """Multi-line status bar at the very bottom."""
 
+    # Below this width (columns) the HUD drops into compact mode:
+    # reasoning/mode labels + reasoning select are hidden, leaving the
+    # model · context · cost essentials only.
+    COMPACT_THRESHOLD = 90
+
     def compose(self) -> ComposeResult:
         with Horizontal(id='hud-line-2-row'):
             yield Label(id='hud-line-2-ws')
@@ -615,6 +620,22 @@ class HUD(Vertical):
                 id='hud-hint-interrupt',
             )
             yield Label(id='hud-line-1-help')
+
+    def on_resize(self, event: events.Resize) -> None:
+        """Toggle compact mode when the terminal gets too narrow."""
+        compact = event.size.width < self.COMPACT_THRESHOLD
+        for widget_id in (
+            'hud-label-reasoning',
+            'hud-reasoning',
+        ):
+            try:
+                w = self.query_one(f'#{widget_id}')
+            except Exception:
+                continue
+            if compact:
+                w.add_class('-hidden')
+            else:
+                w.remove_class('-hidden')
 
 
 class RendererDrainRequested(Message):

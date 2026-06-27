@@ -102,9 +102,15 @@ class ScreenMessagesMixin:
             self._renderer.commit_live_thinking()
 
     def add_system_message(self, text: str) -> None:
-        body = _rich_text(text)
-        body.stylize(NAVY_TEXT_MUTED)
-        self._write_log(body)
+        """Render a system-level message using the unified soft-notice chrome.
+
+        This gives system messages the same visual treatment as
+        :meth:`_emit_transcript_notice` so the feed reads consistently.
+        Toasts (which are ephemeral popups) remain separate — they're
+        the right surface for transient feedback that doesn't belong in
+        the transcript history.
+        """
+        self._emit_transcript_notice(text)
 
     def _emit_transcript_notice(self, text: str) -> None:
         """Render a unified soft notice for recoverable issues and tool feedback."""

@@ -1127,3 +1127,9 @@ Toast.-error { border-left: wide #f05757; }
 
 /* ── Utility ───────────────────────────────────────── */
 .hidden { display: none; }
+
+/* HUD compact mode: hide the reasoning label + select on narrow terminals. */
+#hud-label-reasoning.-hidden,
+#hud-reasoning.-hidden {
+    display: none;
+}
