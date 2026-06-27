@@ -36,7 +36,7 @@ from backend.cli.event_rendering.renderer_constants import (  # noqa: E402
 )
 
 
-class _EventRendererStateMixin(CLIEventRenderer if TYPE_CHECKING else object):
+class StateMixin(CLIEventRenderer if TYPE_CHECKING else object):
     """Mixin class — see module docstring."""
 
     @classmethod

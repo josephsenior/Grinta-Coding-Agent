@@ -37,7 +37,7 @@ from backend.cli.event_rendering.renderer_constants import (  # noqa: E402
 from backend.cli.event_rendering.renderer_constants import SUBSCRIBER as _SUBSCRIBER  # noqa: E402
 
 
-class _EventRendererSubscriptionMixin(CLIEventRenderer if TYPE_CHECKING else object):
+class SubscriptionMixin(CLIEventRenderer if TYPE_CHECKING else object):
     """Mixin class — see module docstring."""
 
     async def handle_event(self, event: Any) -> None:
