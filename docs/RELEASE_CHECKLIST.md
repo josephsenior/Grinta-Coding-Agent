@@ -46,7 +46,7 @@ Run these on the release commit (or the PR branch right before merge) in additio
 - [ ] **Linux unit + coverage (optional local mirror):**
 
 ```bash
-python scripts/bootstrap_env.py dev-test
+uv run python scripts/bootstrap_env.py dev-test
 PYTHONPATH=. uv run pytest --cov=backend --cov-fail-under=75 backend/tests/unit
 ```
 
@@ -55,7 +55,7 @@ CI already shards unit coverage across six Linux jobs and enforces 75% in `gates
 - [ ] **Windows unit smoke (optional local mirror):**
 
 ```bash
-python scripts/bootstrap_env.py dev-test
+uv run python scripts/bootstrap_env.py dev-test
 PYTHONPATH=. uv run pytest backend/tests/unit
 ```
 

@@ -6,42 +6,38 @@ Thank you for your interest in contributing to Grinta! This guide will help you 
 
 ### Prerequisites
 
-- Python 3.12+
-- Git
-- `uv` (for source development)
+- **Git** (to clone and contribute)
+- **No manual Python or `uv`** — `START_HERE.ps1` / `start_here.sh` install the toolchain when missing
 
 ### Getting Started
 
 ```bash
-# Clone
 git clone https://github.com/josephsenior/Grinta-Coding-Agent.git
 cd Grinta-Coding-Agent
-
-# Install dependencies
-python scripts/bootstrap_env.py dev-test
-
-# First-run LLM setup (interactive; writes settings.json + .env)
-uv run python -m backend.cli.entry init
-
-# Start the CLI
-uv run python -m backend.cli.entry
+bash start_here.sh
 ```
 
-On Windows PowerShell you can use the convenience wrapper instead:
+Windows PowerShell:
 
 ```powershell
 .\START_HERE.ps1
 ```
 
-That script syncs `dev-test` dependencies, checks local model servers, runs `init`
-when `settings.json` is missing, then launches the CLI.
+That installs `uv` and Python 3.12 if needed, syncs `dev-test` dependencies, runs setup when `settings.json` is missing, then launches the CLI.
+
+Manual equivalent:
+
+```bash
+uv python install 3.12
+uv run python scripts/bootstrap_env.py dev-test
+uv run python -m backend.cli.entry
+```
 
 **Windows note:** `make` targets in the Makefile are aimed at macOS, Linux, and WSL.
-On native Windows, use `START_HERE.ps1` (or the `scripts/launch/` scripts) for the
-same happy path, and run pytest directly:
+On native Windows, use `START_HERE.ps1` for the same happy path, and run pytest directly:
 
 ```powershell
-python scripts/bootstrap_env.py dev-test
+uv run python scripts/bootstrap_env.py dev-test
 $env:PYTHONPATH = '.'
 uv run pytest backend/tests/unit/ --tb=short -q
 ```
@@ -68,8 +64,8 @@ uv run pytest backend/tests/unit/ --tb=short -q
   of the repo root unless `APP_ROOT` is set.
 
 Launching `grinta` or `uv run python -m backend.cli.entry` without a configured
-key runs the same shared setup wizard as `grinta init`. Prefer `init` for an
-explicit first-time setup step.
+key runs the same setup wizard as `grinta init` on first interactive launch.
+Use `grinta init` when you want to configure without the TUI, or for `--non-interactive` / CI.
 
 See also [docs/QUICK_START.md](docs/QUICK_START.md) and [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 
@@ -102,14 +98,14 @@ See also [docs/QUICK_START.md](docs/QUICK_START.md) and [docs/USER_GUIDE.md](doc
 - **Linux (`gates-on-linux`):** unit corpus with coverage — match locally with:
 
 ```bash
-python scripts/bootstrap_env.py dev-test
+uv run python scripts/bootstrap_env.py dev-test
 PYTHONPATH=. uv run pytest --cov=backend --cov-fail-under=75 backend/tests/unit
 ```
 
 - **Windows (`gates-on-windows` + `gates-on-windows-extended`):** unit corpus, then integration/e2e/stress — match locally with:
 
 ```bash
-python scripts/bootstrap_env.py dev-test
+uv run python scripts/bootstrap_env.py dev-test
 PYTHONPATH=. uv run pytest backend/tests/unit
 PYTHONPATH=. uv run pytest backend/tests/integration backend/tests/e2e backend/tests/stress
 ```

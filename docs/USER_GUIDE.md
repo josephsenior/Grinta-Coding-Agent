@@ -20,37 +20,16 @@ Canonical startup:
 
 ## Installation
 
-### Prerequisites
+Install paths and minimal commands: [QUICK_START.md](QUICK_START.md) · full reference: [INSTALL.md](INSTALL.md) · Windows/WSL: [WINDOWS_AND_WSL.md](WINDOWS_AND_WSL.md).
 
-- Python 3.12+
-- uv
-- Git
+| Path | Prerequisites | First run |
+| --- | --- | --- |
+| Consumer (`pipx install grinta-ai`) | Python 3.12+ and `pipx` | `grinta` — setup wizard on first interactive launch |
+| Source checkout | none — `START_HERE.ps1` / `start_here.sh` install `uv` + Python 3.12 | same scripts sync deps and launch Grinta |
 
-### Install
+`grinta init` runs the **same wizard** without opening the TUI — use for reconfiguration, `--non-interactive`, or CI. You do **not** need it before the first `grinta`.
 
-For a normal user install:
-
-```bash
-pipx install grinta-ai
-grinta init
-grinta
-```
-
-For source development:
-
-```bash
-python scripts/bootstrap_env.py dev-test
-uv run python -m backend.cli.entry init
-uv run python -m backend.cli.entry
-```
-
-`grinta init` and the first-run wizard shown when you launch `grinta` without
-configuration use the same shared setup flow (provider picker, optional
-connection check, `settings.json` + `.env`).
-
-Interactive TTY sessions start the Textual app. If you pipe input into Grinta,
-it uses the non-interactive runner so scripts can call it without a full-screen
-terminal.
+Interactive TTY sessions start the Textual app. Piped stdin uses the non-interactive runner.
 
 ### Create or update local settings
 
@@ -287,10 +266,10 @@ See also [SECURITY_CHECKLIST.md](SECURITY_CHECKLIST.md).
 
 ## Useful Commands
 
-Install + run:
+Source checkout — sync and run:
 
 ```bash
-python scripts/bootstrap_env.py dev-test
+uv run python scripts/bootstrap_env.py dev-test
 uv run python -m backend.cli.entry
 ```
 

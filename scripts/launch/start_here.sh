@@ -46,33 +46,56 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Step 0: Pre-flight checks
-echo -e "${YELLOW}Step 0: Pre-flight checks...${NC}"
+_refresh_uv_path() {
+    export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+}
 
-if ! command -v python3 &> /dev/null; then
-    echo -e "${RED}python3 not found.${NC}"
-    exit 1
-fi
+_ensure_uv() {
+    _refresh_uv_path
+    if command -v uv &> /dev/null; then
+        echo -e "${GREEN}uv found: $(command -v uv)${NC}"
+        return 0
+    fi
 
-if ! python3 -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 12) else 1)'; then
-    PYTHON_VERSION=$(python3 -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')
-    echo -e "${RED}Python 3.12+ required. Found: ${PYTHON_VERSION}${NC}"
-    exit 1
-fi
-PYTHON_VERSION=$(python3 -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')
-echo -e "${GREEN}Python version ok: ${PYTHON_VERSION}${NC}"
-
-if ! command -v uv &> /dev/null; then
-    echo -e "${YELLOW}uv not found. Installing...${NC}"
+    echo -e "${YELLOW}uv not found. Installing via Astral installer...${NC}"
     curl -LsSf https://astral.sh/uv/install.sh | sh
-    # shellcheck disable=SC1091
-    source "$HOME/.cargo/env" 2>/dev/null || true
-    export PATH="$HOME/.local/bin:$PATH"
-fi
-echo -e "${GREEN}uv found!${NC}"
+    _refresh_uv_path
+
+    if ! command -v uv &> /dev/null; then
+        echo -e "${RED}uv install finished but 'uv' is still not on PATH.${NC}"
+        echo -e "${RED}Add ~/.local/bin to PATH, open a new terminal, and rerun start_here.sh${NC}"
+        echo -e "${RED}Manual install: https://docs.astral.sh/uv/${NC}"
+        exit 1
+    fi
+    echo -e "${GREEN}uv installed.${NC}"
+}
+
+_ensure_python() {
+    echo -e "${YELLOW}Ensuring Python 3.12 via uv (no system Python required)...${NC}"
+    if ! uv python install 3.12; then
+        echo -e "${RED}Failed to install Python 3.12 with uv.${NC}"
+        echo -e "${RED}Try manually: uv python install 3.12${NC}"
+        echo -e "${RED}Docs: https://docs.astral.sh/uv/guides/install-python/${NC}"
+        exit 1
+    fi
+
+    PYTHON_VERSION="$(uv run python --version 2>&1 || true)"
+    if [[ "$PYTHON_VERSION" =~ Python\ 3\.(1[2-9]|[2-9][0-9]) ]]; then
+        echo -e "${GREEN}Python ok (via uv): ${PYTHON_VERSION}${NC}"
+        return 0
+    fi
+
+    echo -e "${RED}Python 3.12+ required. uv reported: ${PYTHON_VERSION}${NC}"
+    exit 1
+}
+
+# Step 0: Toolchain (uv + Python managed by uv)
+echo -e "${YELLOW}Step 0: Toolchain...${NC}"
+_ensure_uv
+_ensure_python
 
 echo -e "${YELLOW}Step 1: Syncing dependencies (dev-test profile)...${NC}"
-python3 scripts/bootstrap_env.py dev-test
+uv run python scripts/bootstrap_env.py dev-test
 
 echo -e "${YELLOW}Step 1.5: Checking local model servers (Ollama/LM Studio/vLLM)...${NC}"
 uv run python -m backend.inference.discover_models status || \

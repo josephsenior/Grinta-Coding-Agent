@@ -51,9 +51,9 @@ asciinema rec docs/grinta-demo.cast
 pipx install grinta-ai
 clear
 
-# 0:08–0:15  — Init: wizard auto-detects Ollama
+# 0:08–0:15  — Setup wizard (`grinta init` keeps the recording split; first `grinta` also runs setup)
 grinta init
-# (accept all defaults — Ollama is auto-detected)
+# Accept defaults if Ollama is auto-detected.
 clear
 
 # 0:15–0:22  — Launch

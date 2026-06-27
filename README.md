@@ -55,10 +55,9 @@ The pitch in one sentence: **a local-first coding agent with deeper built-in too
 Prerequisites: Python 3.12 or 3.13 and `pipx`. See [docs/INSTALL.md](docs/INSTALL.md) for all paths.
 
 ```bash
-pipx install grinta-ai          # base install; optional extras stay opt-in
-grinta init                     # one-time wizard: pick provider + paste key
-grinta doctor                   # verify settings, git, ripgrep, and model setup
-grinta                          # launch the terminal app in the current directory
+pipx install grinta-ai
+cd /path/to/your/project
+grinta                # first run opens setup wizard automatically
 ```
 
 Optional extras (install only what you need):
@@ -71,42 +70,17 @@ pipx install "grinta-ai[all]"      # rag + browser
 
 The base install includes PDF, DOCX, PPTX, and LaTeX parsing. RAG and browser automation stay opt-in. Details: [docs/INSTALL.md](docs/INSTALL.md).
 
+**Windows users:** native Windows (PowerShell / Git Bash) and **WSL/Ubuntu are separate installs** — see [docs/WINDOWS_AND_WSL.md](docs/WINDOWS_AND_WSL.md).
+
+Full minimal paths + optional commands: [docs/QUICK_START.md](docs/QUICK_START.md).
+
 ## Command cheat sheet
 
-**Consumer** = installed app (`pipx`). **Dev** = source checkout. Replace `<Grinta-repo>` with your clone path (e.g. `~/Grinta`, `C:\Users\you\Grinta`).
+See [docs/QUICK_START.md](docs/QUICK_START.md) for consumer vs dev paths, optional commands, and platform fixes.
 
-### Consumer mode (Windows · WSL/Linux · macOS)
+**Consumer:** `pipx install grinta-ai` → `grinta` (setup on first run).
 
-| Step | Command |
-|------|---------|
-| Install once | `pipx install grinta-ai` |
-| Setup once | `grinta init` |
-| Run from project folder | `cd /path/to/project` → `grinta` |
-| Explicit project path | `grinta -p /path/to/project` |
-| Check setup | `grinta doctor` |
-
-Settings: `~/.grinta/settings.json` (Windows: `%USERPROFILE%\.grinta\settings.json`).
-
-### Dev mode (Windows · WSL/Linux · macOS)
-
-| Step | Windows (PowerShell) | WSL / Linux / macOS |
-|------|----------------------|---------------------|
-| Setup once | `.\START_HERE.ps1` | `bash start_here.sh` |
-| Run from project | `cd C:\path\to\project` then `uv run --directory <Grinta-repo> python -m backend.cli.entry -p .` | `cd /path/to/project` then `uv run --directory <Grinta-repo> python -m backend.cli.entry -p .` |
-| Re-run init | `uv run --directory <Grinta-repo> python -m backend.cli.entry init --force` | same |
-| Unit tests | `cd <Grinta-repo>` → `uv run pytest backend/tests/unit/ -q` | same |
-
-Settings: `<Grinta-repo>/settings.json` · Logs: `<Grinta-repo>/logs/` (see [logs/README.md](logs/README.md)).
-
-### Dev shortcut — type `grinta` anywhere (optional)
-
-```bash
-pipx install -e <Grinta-repo>
-```
-
-Then use the **consumer** commands from any project folder while running your local code.
-
-Full walkthrough: [docs/QUICK_START.md](docs/QUICK_START.md).
+**Dev:** `.\START_HERE.ps1` or `bash start_here.sh` (installs `uv` + Python when missing).
 
 ## What you get
 
@@ -188,7 +162,7 @@ docker run -it --rm -v "$PWD:/work" -w /work \
 
 ## LLM setup
 
-Run `grinta init` or see [docs/SETTINGS.md](docs/SETTINGS.md).
+Run `grinta` (first interactive launch runs setup) or see [docs/SETTINGS.md](docs/SETTINGS.md).
 
 ## Core Concepts
 

@@ -19,37 +19,64 @@ This guide targets the current Grinta runtime:
 
 ## Installation Issues
 
-### uv not found
+### Consumer: `pipx` or `grinta` not found
 
 Symptom:
 
-- `uv` is not recognized
+- `pipx: command not found` or `grinta: command not found` after install
 
 Fix:
+
+1. Install **Python 3.12+** and **pipx** (see [INSTALL.md](INSTALL.md)).
+2. Run `pipx ensurepath` and open a new terminal.
+3. `pipx install grinta-ai` then `grinta`.
+
+Alternatives without manual Python/pipx: Homebrew, Scoop, or Docker — [INSTALL.md](INSTALL.md).
+
+### Dev: `uv` not found
+
+Symptom:
+
+- `uv` is not recognized (source checkout)
+
+Fix:
+
+Run the start script — it installs `uv` and Python 3.12 automatically:
+
+```powershell
+.\START_HERE.ps1
+```
+
+```bash
+bash start_here.sh
+```
+
+Or install manually:
 
 ```powershell
 powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-Restart your terminal, then verify:
-
 ```bash
-uv --version
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-### Python version mismatch
+Restart your terminal, then verify: `uv --version`
+
+### Python version mismatch (dev / source)
 
 Symptom:
 
-- startup says Python 3.12+ is required
+- startup says Python 3.12+ is required (source checkout)
 
 Fix:
 
 ```bash
-python --version
+uv python install 3.12
+uv run python --version
 ```
 
-Install Python 3.12+ and re-run `uv sync`.
+Or re-run `START_HERE.ps1` / `start_here.sh`.
 
 ### Dependency resolution failed
 
@@ -204,6 +231,47 @@ If strict local policy is active, risky commands may be blocked. This is expecte
 
 ## Windows-Specific Issues
 
+Full guide (Git Bash vs PowerShell vs WSL, path mapping, separate installs): **[WINDOWS_AND_WSL.md](WINDOWS_AND_WSL.md)**.
+
+### `grinta: command not found` in WSL / Ubuntu
+
+Symptom:
+
+- You opened an Ubuntu/WSL terminal, `cd`'d to a folder, ran `grinta`, and the shell says command not found.
+
+Cause:
+
+- WSL is Linux. A Windows `pipx install` does not install into WSL.
+
+Fix (inside Ubuntu):
+
+```bash
+sudo apt update && sudo apt install -y python3.12 python3.12-venv pipx
+pipx ensurepath && source ~/.bashrc
+pipx install grinta-ai
+grinta
+```
+
+First interactive run runs setup automatically.
+
+### `cd` to a Windows folder in WSL
+
+`C:\Users\you\Desktop\New folder` becomes:
+
+```bash
+cd "/mnt/c/Users/you/Desktop/New folder"
+```
+
+### Agent uses PowerShell instead of bash on Windows
+
+Set in `settings.json`:
+
+```json
+"security": { "windows_shell": "bash" }
+```
+
+See [SETTINGS.md](SETTINGS.md).
+
 ### Long path problems
 
 Enable long paths (admin PowerShell):
@@ -214,9 +282,9 @@ New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name
 
 ### Shell behavior differences
 
-Use PowerShell for bootstrap and CLI scripts:
+Native Windows: use `.\START_HERE.ps1` (PowerShell) or Git Bash with `grinta` after a Windows install.
 
-- `./START_HERE.ps1`
+WSL: use `bash start_here.sh` after installing **inside** the distro — not the Windows install.
 
 ---
 

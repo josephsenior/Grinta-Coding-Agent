@@ -41,7 +41,9 @@ by host OS. Treat this table as the honest parity contract.
 
 When a feature is **limited** rather than **absent**, the runtime logs a warning
 and the agent prompt layer (`terminal_contract`) steers the model toward the
-active shell contract (PowerShell vs bash).
+active shell contract (`security.windows_shell` on Windows: `bash` vs `powershell`).
+
+**WSL on Windows:** WSL is Linux, not a Windows shell mode. Install and run Grinta inside the distro; see [WINDOWS_AND_WSL.md](WINDOWS_AND_WSL.md).
 
 ## Python
 

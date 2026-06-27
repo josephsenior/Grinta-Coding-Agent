@@ -72,7 +72,7 @@ may be present in the user's working directory. The resolved path runs
 `backend.cli.entry` handles global flags and subcommands:
 
 - `grinta` starts the app in the current project.
-- `grinta init` writes user configuration.
+- `grinta init` (or first interactive `grinta`) writes user configuration.
 - `grinta sessions ...` lists, shows, exports, deletes, and prunes persisted sessions.
 - `--project`, `--model`, `--theme`, `--minimal`, `--accessible`, and `--cleanup-storage` customize startup.
 
