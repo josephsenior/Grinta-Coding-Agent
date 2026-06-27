@@ -48,6 +48,15 @@ Grinta is **local-first** and runs with **your** user privileges. It is **not** 
 - [ ] Pin Grinta to a known version in production-adjacent workflows; track `CHANGELOG.md`
 - [ ] Disable network-using commands when working offline (`security.allow_network_commands: false` in `settings.json`)
 
+## Trust boundary: `settings.json` and plugins
+
+Grinta reads `settings.json` and any installed plugin source at startup and trusts them as part of the trusted compute base. Two surfaces in particular execute Python code on import:
+
+* **`agent.classpath`** — when an `agent` block has a `classpath` field, Grinta does `importlib.import_module(<classpath>)` to load the agent class. Any Python module whose dotted path you put in `classpath` will have its top-level code run at config load. Treat `settings.json` like a Python file: only let trusted sources write it.
+* **`agentskills` plugin loader** — Grinta's plugin loader (`backend/execution/plugins/agent_skills/`) statically imports skill modules. There is no permission model or sandbox. A skill is a Python function with full process privileges. Do not install skills from untrusted sources.
+
+The same rule applies to the MCP servers you enable under `mcp_config.servers`: each `command` is spawned as a child process. The risk is the server itself, not Grinta's loader, but the trust boundary is identical — only enable MCP servers you have read the source of.
+
 ## Reporting a vulnerability
 
 See [`SECURITY.md`](../SECURITY.md). Do **not** open a public issue.

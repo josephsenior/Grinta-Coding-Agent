@@ -109,10 +109,12 @@ class SessionOrchestrator(
     _step_task: asyncio.Task[None] | None = None
     # Counter incremented by ``_request_step`` to request another step iteration.
     # ``_step``'s drain loop decrements it.  All mutations happen on the main
-    # event loop, so the counter is implicitly thread-safe via the
-    # call_soon_threadsafe funnel.  Using an integer counter instead of an
-    # asyncio.Event eliminates the lost-wakeup race where the finally block
-    # clears the event between an external set() and the scheduled
+    # event loop (cross-thread callers funnel through ``call_soon_threadsafe``),
+    # so the counter is safe under both the GIL and PEP 703 free-threaded
+    # Python — asyncio's single-threaded execution model is the actual
+    # synchronisation mechanism, not the GIL.  Using an integer counter instead
+    # of an asyncio.Event eliminates the lost-wakeup race where the finally
+    # block clears the event between an external set() and the scheduled
     # _create_step_task.
     _step_request_count: int = 0
     rate_governor: LLMRateGovernor
@@ -303,8 +305,17 @@ class SessionOrchestrator(
                 await self._drain_steps()
             finally:
                 self._step_owner_task = None
+                # Clear the step task reference *before* scheduling the
+                # next one so a concurrent ``_request_step`` (and our
+                # own ``_create_step_task`` idempotency guard) sees a
+                # consistent view.  Without this clear, a ``step()``
+                # arriving during the finally would race with our
+                # ``call_soon(_create_step_task)`` and orphan the first
+                # created task.
+                self._step_task = None
                 if not self._closed and self._step_request_count > 0:
-                    asyncio.get_event_loop().call_soon(self._create_step_task)
+                    loop = asyncio.get_running_loop()
+                    loop.call_soon(self._create_step_task)
 
     async def _drain_steps(self) -> None:
         drained_count = 0

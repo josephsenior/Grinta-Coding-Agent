@@ -279,7 +279,7 @@ class TestLogShipper:
     @pytest.mark.asyncio
     async def test_stop_closes_session_and_flushes(self):
         shipper = LogShipper(endpoint='http://x', enabled=True)
-        future: asyncio.Future[Any] = asyncio.get_event_loop().create_future()
+        future: asyncio.Future[Any] = asyncio.get_running_loop().create_future()
         future.set_result(None)
         cast(Any, shipper)._ship_task = future
 

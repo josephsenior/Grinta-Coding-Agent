@@ -98,6 +98,58 @@ class TestExtractActionContent:
         content = al._extract_action_content(action)
         assert isinstance(content, str)
 
+    def test_redacts_openai_key_in_str(self, tmp_path):
+        al = AuditLogger(str(tmp_path))
+        action = MagicMock()
+        leaked = 'ctx token=sk-abcdefghijklmnopqrstuv end'
+        cast(Any, action).__str__ = MagicMock(return_value=leaked)
+        type(action).__name__ = 'OtherAction'
+        content = al._extract_action_content(action)
+        assert 'sk-abcdefghijklmnopqrstuv' not in content
+        assert '<credential_redacted>' in content
+
+    def test_redacts_jwt_in_str(self, tmp_path):
+        al = AuditLogger(str(tmp_path))
+        action = MagicMock()
+        leaked = (
+            'Authorization header.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.'
+            'eyJzdWIiOiIxMjM0NTY3ODkwIn0.signaturevalue12345 end'
+        )
+        cast(Any, action).__str__ = MagicMock(return_value=leaked)
+        type(action).__name__ = 'OtherAction'
+        content = al._extract_action_content(action)
+        assert 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9' not in content
+        assert '<credential_redacted>' in content
+
+    def test_redacts_bearer_in_str(self, tmp_path):
+        al = AuditLogger(str(tmp_path))
+        action = MagicMock()
+        leaked = 'Authorization: Bearer abcdefghijklmnop1234'
+        cast(Any, action).__str__ = MagicMock(return_value=leaked)
+        type(action).__name__ = 'OtherAction'
+        content = al._extract_action_content(action)
+        assert 'abcdefghijklmnop1234' not in content
+        assert '<credential_redacted>' in content
+
+    def test_redacts_password_pair_in_str(self, tmp_path):
+        al = AuditLogger(str(tmp_path))
+        action = MagicMock()
+        leaked = 'connection password=hunter2hunter2'
+        cast(Any, action).__str__ = MagicMock(return_value=leaked)
+        type(action).__name__ = 'OtherAction'
+        content = al._extract_action_content(action)
+        assert 'hunter2hunter2' not in content
+        assert '<credential_redacted>' in content
+
+    def test_does_not_redact_benign_str(self, tmp_path):
+        al = AuditLogger(str(tmp_path))
+        action = MagicMock()
+        benign = 'browsed https://example.com/page'
+        cast(Any, action).__str__ = MagicMock(return_value=benign)
+        type(action).__name__ = 'OtherAction'
+        content = al._extract_action_content(action)
+        assert content == benign
+
 
 # ── _get_session_log_file ────────────────────────────────────────────
 
