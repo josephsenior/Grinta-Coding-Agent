@@ -128,9 +128,10 @@ class TestFeatureFlagToolPresence:
     def test_editor_enabled(self):
         names = _build_toolset(enable_editor=True)
         public_file_tools = {
-            'read',
+            'read_file',
+            'read_symbol',
             'find_symbols',
-            'create',
+            'create_file',
             'replace_string',
             'multiedit',
         }
@@ -141,9 +142,7 @@ class TestFeatureFlagToolPresence:
             'section_edit',
             'raw_write',
             'overwrite_file',
-            'read_file',
             'read_range',
-            'read_symbol',
             'replace_symbol',
             'append_text',
             'file_editor',
@@ -154,7 +153,7 @@ class TestFeatureFlagToolPresence:
 
     def test_editor_disabled(self):
         names = _build_toolset(enable_editor=False)
-        assert 'create' not in names
+        assert 'create_file' not in names
         assert 'replace_string' not in names
         assert 'multiedit' not in names
 
@@ -296,7 +295,8 @@ class TestModeToolVisibility:
             )
 
         assert names == {
-            'read',
+            'read_file',
+            'read_symbol',
             'find_symbols',
             'grep',
             'glob',
@@ -310,7 +310,7 @@ class TestModeToolVisibility:
             'task_tracker',
         }
         assert {
-            'create',
+            'create_file',
             'replace_string',
             'multiedit',
             'execute_bash',
@@ -337,7 +337,7 @@ class TestModeToolVisibility:
             enable_working_memory=False,
             enable_debugger=False,
         )
-        assert {'create', 'replace_string', 'multiedit'} <= names
+        assert {'create_file', 'replace_string', 'multiedit'} <= names
         assert {'execute_bash', 'execute_powershell'} & names
         assert 'ask_user' in names
         assert 'terminal_manager' in names
@@ -372,7 +372,8 @@ class TestModeToolVisibility:
             )
 
         assert names == {
-            'read',
+            'read_file',
+            'read_symbol',
             'find_symbols',
             'grep',
             'glob',
@@ -386,7 +387,7 @@ class TestModeToolVisibility:
         }
         assert {
             'task_tracker',
-            'create',
+            'create_file',
             'replace_string',
             'multiedit',
             'execute_bash',

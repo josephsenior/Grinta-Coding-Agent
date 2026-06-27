@@ -54,7 +54,7 @@ _DEBUGGER_VERBS = {
 
 _SIMPLE_VERB_MAP = {
     'read_file': 'Read',
-    'create': 'Created',
+    'create_file': 'Created',
     'replace_string': 'Edited',
     'multiedit': 'Edited',
     'find_symbols': 'Found',

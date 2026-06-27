@@ -8,13 +8,14 @@ from backend.core.tools.tool_names import (
     ANALYZE_PROJECT_STRUCTURE_TOOL_NAME,
     ASK_USER_TOOL_NAME,
     CODE_INTELLIGENCE_TOOL_NAME,
-    CREATE_TOOL_NAME,
+    CREATE_FILE_TOOL_NAME,
     FIND_SYMBOLS_TOOL_NAME,
     GLOB_TOOL_NAME,
     GREP_TOOL_NAME,
     MEMORY_TOOL_NAME,
     MULTIEDIT_TOOL_NAME,
-    READ_TOOL_NAME,
+    READ_FILE_TOOL_NAME,
+    READ_SYMBOL_TOOL_NAME,
     REPLACE_STRING_TOOL_NAME,
     TASK_TRACKER_TOOL_NAME,
     UNDO_LAST_EDIT_TOOL_NAME,
@@ -40,7 +41,7 @@ def _build_search_tools(*, lsp_available: bool) -> str:
 
 def _build_edit_tools() -> str:
     return (
-        f'{_tool_ref(CREATE_TOOL_NAME)} / {_tool_ref(REPLACE_STRING_TOOL_NAME)} / '
+        f'{_tool_ref(CREATE_FILE_TOOL_NAME)} / {_tool_ref(REPLACE_STRING_TOOL_NAME)} / '
         f'{_tool_ref(MULTIEDIT_TOOL_NAME)}'
     )
 
@@ -57,9 +58,10 @@ def _build_available_tools_summary(
         GREP_TOOL_NAME,
         GLOB_TOOL_NAME,
         FIND_SYMBOLS_TOOL_NAME,
-        READ_TOOL_NAME,
+        READ_FILE_TOOL_NAME,
+        READ_SYMBOL_TOOL_NAME,
         ANALYZE_PROJECT_STRUCTURE_TOOL_NAME,
-        CREATE_TOOL_NAME,
+        CREATE_FILE_TOOL_NAME,
         REPLACE_STRING_TOOL_NAME,
         MULTIEDIT_TOOL_NAME,
         UNDO_LAST_EDIT_TOOL_NAME,
@@ -126,7 +128,7 @@ def _render_examples(
         available_tools_summary=available_tools_summary,
         search_tools=search_tools,
         edit_tools=edit_tools,
-        read_tool=_tool_ref(READ_TOOL_NAME),
+        read_tool=_tool_ref(READ_FILE_TOOL_NAME),
         analyze_tool=_tool_ref(ANALYZE_PROJECT_STRUCTURE_TOOL_NAME),
         multiedit_tool=_tool_ref(MULTIEDIT_TOOL_NAME),
         replace_string_tool=_tool_ref(REPLACE_STRING_TOOL_NAME),

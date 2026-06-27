@@ -52,7 +52,7 @@ def _tool_name_for_action(action: object) -> str:
     return getattr(tcm, 'function_name', '') or ''
 
 
-_FILE_EDIT_TOOL_NAMES = {'create', 'replace_string', 'multiedit'}
+_FILE_EDIT_TOOL_NAMES = {'create_file', 'replace_string', 'multiedit'}
 
 
 def _effective_error_tool_name(tool_name: str, content: str) -> str:

@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   was complex (six optional disambiguation fields plus `new_content`),
   and `replace_string` covers the same ground with a simpler schema the
   model already uses confidently. Symbol discovery stays in
-  `find_symbols` and `read(type="symbols")`.
+  `find_symbols` and `read_symbol`.
 - **`create(type="symbol")` mode removed.** `create` is now file-only.
   Insert new symbols via `replace_string` with an anchor line.
 - **`multiedit` `edit_symbol` command removed.** `multiedit` now
@@ -31,10 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   debugging is auto-detected when `debugpy` is installed in the active
   environment (`pip install debugpy`), consistent with other DAP adapters and
   LSP servers. Contributor dev deps still include `debugpy`.
-- **Model-facing file API:** public editing tools are consolidated to
-  `read`, `find_symbols`, `create`, `edit_symbol`, `replace_string`, and
-  `multiedit`. Legacy public editor factories and compatibility handlers were
-  removed; lower-level editor primitives remain internal.
+- **Model-facing file API:** `read` renamed to `read_file`, `create` renamed
+  to `create_file`, new `read_symbol` tool replaces the old `read(type="symbols")`
+  mode. Public tools: `read_file`, `read_symbol`, `find_symbols`, `create_file`,
+  `replace_string`, `multiedit`, `undo_last_edit`.
 - **CI:** `py-tests` required jobs on Linux and Windows run the full
   `backend/tests/unit` corpus (fast PR gates), not a fixed nine-file slice.
   [docs/CI.md](docs/CI.md) documents the tiers.

@@ -17,7 +17,7 @@ EXPECTED_EXPORTS = [
     'CALL_MCP_TOOL_NAME',
     'CHECKPOINT_TOOL_NAME',
     'CODE_INTELLIGENCE_TOOL_NAME',
-    'CREATE_TOOL_NAME',
+    'CREATE_FILE_TOOL_NAME',
     'DEBUGGER_TOOL_NAME',
     'DELEGATE_TASK_TOOL_NAME',
     'DOCS_QUERY_TOOL_NAME',
@@ -33,7 +33,8 @@ EXPECTED_EXPORTS = [
     'MEMORY_TOOL_NAME',
     'MULTIEDIT_TOOL_NAME',
     'NOTE_TOOL_NAME',
-    'READ_TOOL_NAME',
+    'READ_FILE_TOOL_NAME',
+    'READ_SYMBOL_TOOL_NAME',
     'RECALL_TOOL_NAME',
     'REPLACE_STRING_TOOL_NAME',
     'SHARED_TASK_BOARD_TOOL_NAME',
@@ -60,14 +61,14 @@ class TestToolNames(TestCase):
         """Test that constants can be imported from tool_names."""
         from backend.core.tools.tool_names import (
             CALL_MCP_TOOL_NAME,
-            CREATE_TOOL_NAME,
+            CREATE_FILE_TOOL_NAME,
             GREP_TOOL_NAME,
             LSP_TOOL_NAME,
             TASK_TRACKER_TOOL_NAME,
         )
 
         self.assertIsNotNone(CALL_MCP_TOOL_NAME)
-        self.assertIsNotNone(CREATE_TOOL_NAME)
+        self.assertIsNotNone(CREATE_FILE_TOOL_NAME)
         self.assertIsNotNone(GREP_TOOL_NAME)
         self.assertIsNotNone(LSP_TOOL_NAME)
         self.assertIsNotNone(TASK_TRACKER_TOOL_NAME)
@@ -94,11 +95,12 @@ class TestToolNames(TestCase):
     def test_tool_names_consistency_with_core_constants(self):
         """Canonical file/memory tool names are defined in tool_names."""
         for name in (
-            'CREATE_TOOL_NAME',
+            'CREATE_FILE_TOOL_NAME',
             'FIND_SYMBOLS_TOOL_NAME',
             'MULTIEDIT_TOOL_NAME',
             'NOTE_TOOL_NAME',
-            'READ_TOOL_NAME',
+            'READ_FILE_TOOL_NAME',
+            'READ_SYMBOL_TOOL_NAME',
             'RECALL_TOOL_NAME',
             'REPLACE_STRING_TOOL_NAME',
             'TASK_TRACKER_TOOL_NAME',

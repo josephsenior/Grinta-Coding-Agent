@@ -238,12 +238,14 @@ class OrchestratorPlanner:
         from backend.engine.tools.meta_cognition import create_ask_user_tool
         from backend.engine.tools.native_file_tools import (
             create_find_symbols_tool,
-            create_read_tool,
+            create_read_file_tool,
+            create_read_symbol_tool,
         )
 
         tools.append(create_cmd_run_tool())
         tools.append(create_ask_user_tool())
-        tools.append(create_read_tool())
+        tools.append(create_read_file_tool())
+        tools.append(create_read_symbol_tool())
         tools.append(create_find_symbols_tool())
 
     def _add_edit_and_search_tools(self, tools: list) -> None:
@@ -352,13 +354,13 @@ class OrchestratorPlanner:
     def _add_editor_tools(self, tools: list) -> None:
         if getattr(self._config, 'enable_editor', True):
             from backend.engine.tools.native_file_tools import (
-                create_create_tool,
+                create_create_file_tool,
                 create_multiedit_tool,
                 create_replace_string_tool,
                 create_undo_last_edit_tool,
             )
 
-            tools.append(create_create_tool())
+            tools.append(create_create_file_tool())
             tools.append(create_replace_string_tool())
             tools.append(create_multiedit_tool())
             tools.append(create_undo_last_edit_tool())

@@ -8,9 +8,10 @@ declaring parallel ``*_TOOL_NAME`` literals.
 from __future__ import annotations
 
 # ── File API ────────────────────────────────────────────────────────
-READ_TOOL_NAME = 'read'
+READ_FILE_TOOL_NAME = 'read_file'
+READ_SYMBOL_TOOL_NAME = 'read_symbol'
 FIND_SYMBOLS_TOOL_NAME = 'find_symbols'
-CREATE_TOOL_NAME = 'create'
+CREATE_FILE_TOOL_NAME = 'create_file'
 REPLACE_STRING_TOOL_NAME = 'replace_string'
 MULTIEDIT_TOOL_NAME = 'multiedit'
 UNDO_LAST_EDIT_TOOL_NAME = 'undo_last_edit'
@@ -62,7 +63,7 @@ __all__ = [
     'CALL_MCP_TOOL_NAME',
     'CHECKPOINT_TOOL_NAME',
     'CODE_INTELLIGENCE_TOOL_NAME',
-    'CREATE_TOOL_NAME',
+    'CREATE_FILE_TOOL_NAME',
     'DEBUGGER_TOOL_NAME',
     'DOCS_QUERY_TOOL_NAME',
     'DOCS_RESOLVE_TOOL_NAME',
@@ -78,7 +79,8 @@ __all__ = [
     'MEMORY_TOOL_NAME',
     'MULTIEDIT_TOOL_NAME',
     'NOTE_TOOL_NAME',
-    'READ_TOOL_NAME',
+    'READ_FILE_TOOL_NAME',
+    'READ_SYMBOL_TOOL_NAME',
     'RECALL_TOOL_NAME',
     'REPLACE_STRING_TOOL_NAME',
     'SHARED_TASK_BOARD_TOOL_NAME',

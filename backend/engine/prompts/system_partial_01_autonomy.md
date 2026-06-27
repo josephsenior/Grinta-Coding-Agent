@@ -18,7 +18,8 @@ Read errors quickly. If path is uncertain: {path_discovery_hint}
 
 On tool failure:
 - `replace_string` ambiguity → re-read nearby context and make `old_string` more specific, or use `replace_all=true` only when every exact occurrence must change
-- `read` argument error → always set `type` to `"file"` or `"symbols"`; for line ranges pass both `start_line` and `end_line` (`end_line=-1` for EOF)
+- `read_file` argument error → pass `path`; for line ranges add both `start_line` and `end_line` (`end_line=-1` for EOF)
+- `read_symbol` argument error → pass `symbols[]` array; each item needs `qualified_name` or `symbol_name`
 - multi-file edit failure → split the refactor only if atomicity is not required; otherwise fix the failing `multiedit` operation and retry
 {error_recovery_pivot_lines}
 

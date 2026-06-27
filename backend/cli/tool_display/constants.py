@@ -37,7 +37,7 @@ _TOOL_HEADLINE: dict[str, tuple[str, str]] = {
     'execute_bash': ('', 'Shell'),
     'execute_powershell': ('', 'Shell'),
     'read_file': ('↳', 'Read'),
-    'create': ('', 'Files'),
+    'create_file': ('', 'Files'),
     'replace_string': ('', 'Files'),
     'multiedit': ('', 'Files'),
     'find_symbols': ('ƒ', 'Found'),

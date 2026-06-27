@@ -13,7 +13,7 @@ can paste into the REPL after `START_HERE.ps1` (Windows) or `./start_here.sh`
 
 Expected behaviour:
 
-* `read` + `grep` to find current callers
+* `read_file`/`read_symbol` + `grep` to find current callers
 * one or two `replace_string` actions (or a `multiedit` batch)
 * one `terminal_run` invocation that exits 0
 * `/cost` afterwards reports a small (< $0.05 with default model) spend

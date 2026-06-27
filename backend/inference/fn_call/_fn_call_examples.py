@@ -49,7 +49,7 @@ import logging
 from threading import Lock
 
 from backend.core.tools.tool_names import (
-    CREATE_TOOL_NAME,
+    CREATE_FILE_TOOL_NAME,
 )
 
 logger = logging.getLogger(__name__)
@@ -166,7 +166,7 @@ TOOL_EXAMPLES = {
         'run_server_again': '\nASSISTANT:\nRunning the updated file:\n<function=execute_bash>\n<parameter=command>\npython3 app.py > server.log 2>&1 &\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [execute_bash]:\n[1] 126\n\nASSISTANT:\nThe server is running on port 5000 with PID 126. You can access the list of numbers in a table format by visiting http://127.0.0.1:5000.\n',
     },
     'create': {
-        'file': "\nASSISTANT:\nThere is no app.py in the current directory. Let me create it:\n<function=create>\n<parameter=type>file</parameter>\n<parameter=path>app.py</parameter>\n<parameter=security_risk>LOW</parameter>\n<parameter=content>\nfrom flask import Flask\napp = Flask(__name__)\n\n@app.route('/')\ndef index():\n    numbers = list(range(1, 11))\n    return str(numbers)\n\nif __name__ == '__main__':\n    app.run(port=5000)\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [create]:\nFile created successfully at: app.py",
+        'file': "\nASSISTANT:\nThere is no app.py in the current directory. Let me create it:\n<function=create_file>\n<parameter=path>app.py</parameter>\n<parameter=security_risk>LOW</parameter>\n<parameter=content>\nfrom flask import Flask\napp = Flask(__name__)\n\n@app.route('/')\ndef index():\n    numbers = list(range(1, 11))\n    return str(numbers)\n\nif __name__ == '__main__':\n    app.run(port=5000)\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [create_file]:\nFile created successfully at: app.py",
     },
     'browser': {
         'view_page': "\nASSISTANT:\nLet me check how the page looks in the browser:\n<function=browser>\n<parameter=code>\ngoto('http://127.0.0.1:5000')\nnoop(1000)  # Wait for page to load\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [browser]:\n[Browser shows the numbers in a table format]\n",
@@ -253,7 +253,7 @@ def _get_tool_name_mapping() -> dict[str, str]:
         get_terminal_tool_name(): TERMINAL_EXAMPLE_KEY,
         'execute_bash': TERMINAL_EXAMPLE_KEY,
         'execute_powershell': TERMINAL_EXAMPLE_KEY,
-        CREATE_TOOL_NAME: 'create',
+        CREATE_FILE_TOOL_NAME: 'create',
     }
 
 

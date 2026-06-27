@@ -12,9 +12,10 @@ from typing import Any
 from backend.core.enums import FileEditSource
 from backend.core.errors import FunctionCallValidationError
 from backend.core.tools.tool_names import (
-    CREATE_TOOL_NAME,
+    CREATE_FILE_TOOL_NAME,
     MULTIEDIT_TOOL_NAME,
-    READ_TOOL_NAME,
+    READ_FILE_TOOL_NAME,
+    READ_SYMBOL_TOOL_NAME,
     REPLACE_STRING_TOOL_NAME,
 )
 from backend.engine.function_calling.helpers import (
@@ -28,7 +29,6 @@ from backend.engine.tools._file_edits_symbols import (
     _build_read_file_action,
     _handle_read_range_public,
     _handle_read_symbols_public,
-    _resolve_read_type,
 )
 from backend.engine.tools._file_ops import (
     _guard_content_arguments,
@@ -42,32 +42,27 @@ from backend.ledger.action import (
 )
 
 
-def _handle_read_tool(arguments: Mapping[str, Any]) -> Action:
-    read_type = _resolve_read_type(arguments)
-    if read_type == 'range':
-        raise FunctionCallValidationError(
-            'read type=range was removed. Use type=file with path, start_line, and end_line.'
-        )
-    if read_type == 'file':
-        path = require_tool_argument(arguments, 'path', READ_TOOL_NAME)
-        has_start = arguments.get('start_line') is not None
-        has_end = arguments.get('end_line') is not None
-        if has_start or has_end:
-            if not (has_start and has_end):
-                raise FunctionCallValidationError(
-                    'read type=file line range requires both start_line and end_line.'
-                )
-            return _handle_read_range_public(arguments)
-        return _build_read_file_action(str(path), {})
-    if read_type == 'symbols':
-        return _handle_read_symbols_public(arguments)
-    raise FunctionCallValidationError("read type must be one of 'file' or 'symbols'.")
+def _handle_read_file_tool(arguments: Mapping[str, Any]) -> Action:
+    path = require_tool_argument(arguments, 'path', READ_FILE_TOOL_NAME)
+    has_start = arguments.get('start_line') is not None
+    has_end = arguments.get('end_line') is not None
+    if has_start or has_end:
+        if not (has_start and has_end):
+            raise FunctionCallValidationError(
+                'read_file line range requires both start_line and end_line.'
+            )
+        return _handle_read_range_public(arguments)
+    return _build_read_file_action(str(path), {})
 
 
-def _handle_create_tool(arguments: Mapping[str, Any]) -> Action:
-    validate_security_risk(arguments, CREATE_TOOL_NAME)
-    path = require_tool_argument(arguments, 'path', CREATE_TOOL_NAME)
-    content = require_tool_argument(arguments, 'content', CREATE_TOOL_NAME)
+def _handle_read_symbol_tool(arguments: Mapping[str, Any]) -> Action:
+    return _handle_read_symbols_public(arguments)
+
+
+def _handle_create_file_tool(arguments: Mapping[str, Any]) -> Action:
+    validate_security_risk(arguments, CREATE_FILE_TOOL_NAME)
+    path = require_tool_argument(arguments, 'path', CREATE_FILE_TOOL_NAME)
+    content = require_tool_argument(arguments, 'content', CREATE_FILE_TOOL_NAME)
     normalized_args = dict(arguments)
     normalized_args['file_text'] = str(content)
     _guard_content_arguments(normalized_args)
