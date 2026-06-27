@@ -20,7 +20,7 @@ if [[ -n "${WSL_DISTRO_NAME:-}" ]]; then
     if pwd | grep -q '^/mnt/'; then
         echo -e "${YELLOW}WSL2: running from a Windows mount. Prefer: cd ~/... before grinta.${NC}"
         echo -e "${YELLOW}      Official layout: pipx install inside Ubuntu; repo on ~/Grinta; project on /mnt/c OK.${NC}"
-        echo -e "${YELLOW}      See docs/WINDOWS_AND_WSL.md${NC}"
+        echo -e "${YELLOW}      See docs/QUICK_START.md#wsl-ubuntu${NC}"
         echo ""
     fi
 fi
