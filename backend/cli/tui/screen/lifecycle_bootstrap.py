@@ -248,11 +248,12 @@ class ScreenLifecycleBootstrapMixin:
         config: Any,
         conversation_stats: Any,
     ) -> Any:
-        controller, _initial_state = create_controller(
+        controller = create_controller(
             agent=agent,
             runtime=runtime,
             config=config,
             conversation_stats=conversation_stats,
             headless_mode=True,
-        )
+            defer_init_checkpoint=True,
+        )[0]
         return controller

@@ -19,6 +19,7 @@ def get_ignore_spec(root: str) -> pathspec.PathSpec:
         '.ruff_cache/',
         '__pycache__/',
         'node_modules/',
+        'logs/',
         '.tmp_cli_manual/',
         'build/',
         'dist/',

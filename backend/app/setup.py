@@ -433,6 +433,8 @@ def create_controller(
     conversation_stats: ConversationStats,
     headless_mode: bool = True,
     replay_events: list[Event] | None = None,
+    *,
+    defer_init_checkpoint: bool = False,
 ) -> tuple[SessionOrchestrator, State | None]:
     """Create agent controller with optional state restoration.
 
@@ -498,7 +500,8 @@ def create_controller(
     # Snapshot post-init state once the rollback middleware can resolve the
     # runtime workspace. Doing this in SessionOrchestrator.__init__ is too
     # early because controller.runtime is assigned here.
-    controller._create_phase_boundary_checkpoint('init_to_active')
+    if not defer_init_checkpoint:
+        controller._create_phase_boundary_checkpoint('init_to_active')
     try:
         from backend.execution.drivers.local.local_runtime_inprocess import (
             LocalRuntimeInProcess,

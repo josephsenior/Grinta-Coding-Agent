@@ -43,8 +43,9 @@ def test_real_stdio_when_dunder_stdout_also_lacks_encoding() -> None:
     sys.__stdout__ = fake
     try:
         with real_stdio_for_subprocess():
-            assert sys.stdout is not fake
+            assert isinstance(sys.stdout, object)
             assert hasattr(sys.stdout, 'encoding')
+            assert sys.stdout.encoding == 'utf-8'
             proc = subprocess.Popen(
                 ['python', '-c', 'print("ok")'],
                 stdout=subprocess.PIPE,

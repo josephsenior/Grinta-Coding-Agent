@@ -69,6 +69,11 @@ def _prepare_tmux_tmpdir(orch: BashSession) -> None:
     del orch  # instance kept for API uniformity; reads the env directly
     tmpdir = os.environ.get('TMUX_TMPDIR', '').strip()
     if not tmpdir:
+        if OS_CAPS.is_linux and os.path.isdir('/mnt/c'):
+            # WSL: keep tmux sockets off the Windows mount for reliability.
+            tmpdir = os.path.join('/tmp', 'grinta-tmux')
+            os.environ['TMUX_TMPDIR'] = tmpdir
+    if not tmpdir:
         return
     try:
         os.makedirs(tmpdir, exist_ok=True)
