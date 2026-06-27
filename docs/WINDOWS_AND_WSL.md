@@ -1,34 +1,31 @@
 # Windows and WSL
 
-**Windows install ≠ WSL install.** `pipx install` on Windows does not put `grinta` in an Ubuntu terminal.
+**Windows install ≠ WSL install.** Commands: [QUICK_START.md](QUICK_START.md).
 
-## Native Windows
+## Rules
 
-```powershell
-pipx install grinta-ai
-grinta
-```
+| Terminal | Install where |
+| --- | --- |
+| PowerShell / cmd / Git Bash | Windows |
+| Ubuntu / WSL | Inside WSL (separate `pipx` or `uv`) |
 
-Dev: `.\START_HERE.ps1` (installs `uv` + Python if missing).
+## WSL path conversion
 
-Default agent shell is bash (`execute_bash`). To use PowerShell instead, in `settings.json`:
+| Windows | WSL |
+| --- | --- |
+| `D:\code\my-app` | `/mnt/d/code/my-app` |
+| `C:\path with spaces\app` | `"/mnt/c/path with spaces/app"` |
+
+Rule: `/mnt/<drive>/` + path with `\` → `/`. Quote if spaces.
+
+Dev: `--directory` = `<wsl-grinta-repo>` · `-p` = `<wsl-project>` (WSL forms of `<Grinta-repo>` and `<project>`).
+
+## Native Windows shell tool
+
+Default: `execute_bash` (Git Bash). For PowerShell:
 
 ```json
 "security": { "windows_shell": "powershell" }
 ```
 
-## WSL
-
-Install **inside** Ubuntu:
-
-```bash
-sudo apt install -y python3.12 python3.12-venv pipx
-pipx ensurepath && source ~/.bashrc
-pipx install grinta-ai
-```
-
-Open a Windows folder: `C:\Users\you\project` → `cd "/mnt/c/Users/you/project"`
-
-Dev: `bash start_here.sh` in the repo (prefer `~/` over `/mnt/c/` for speed).
-
-Settings: `~/.grinta/` in WSL — separate from Windows `%USERPROFILE%\.grinta`.
+Settings: Windows consumer `~/.grinta/` (Windows home) · WSL consumer `~/.grinta/` (Linux home) — not shared.

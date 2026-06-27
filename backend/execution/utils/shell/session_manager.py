@@ -105,7 +105,10 @@ class SessionManager:
                 security_config=self.security_config,
                 workspace_root=self.work_dir,
             )
-            session.initialize()
+            from backend.utils.stdio_restore import real_stdio_for_subprocess
+
+            with real_stdio_for_subprocess():
+                session.initialize()
             self.sessions[session_id] = session
             logger.info('Session %s initialized successfully', session_id)
             return session

@@ -76,11 +76,9 @@ Full minimal paths + optional commands: [docs/QUICK_START.md](docs/QUICK_START.m
 
 ## Command cheat sheet
 
-See [docs/QUICK_START.md](docs/QUICK_START.md) for consumer vs dev paths, optional commands, and platform fixes.
+Per-platform commands (consumer + dev): [docs/QUICK_START.md](docs/QUICK_START.md)
 
-**Consumer:** `pipx install grinta-ai` → `grinta` (setup on first run).
-
-**Dev:** `.\START_HERE.ps1` or `bash start_here.sh` (installs `uv` + Python when missing).
+**Windows / WSL:** separate installs — [docs/WINDOWS_AND_WSL.md](docs/WINDOWS_AND_WSL.md)
 
 ## What you get
 
