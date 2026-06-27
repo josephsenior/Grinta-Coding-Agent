@@ -256,7 +256,7 @@ class OrchestratorPlanner:
             create_task_tracker_tool,
         )
 
-        if getattr(self._config, 'enable_task_tracker_tool', False):
+        if getattr(self._config, 'enable_task_tracker_tool', True):
             tools.append(create_task_tracker_tool())
         tools.append(create_grep_tool())
         tools.append(create_glob_tool())
@@ -275,7 +275,7 @@ class OrchestratorPlanner:
             )
 
             tools.append(create_terminal_manager_tool())
-        if getattr(self._config, 'enable_debugger', False):
+        if getattr(self._config, 'enable_debugger', True):
             from backend.utils.runtime_detect import has_any_debug_adapter
 
             if not has_any_debug_adapter():
@@ -373,7 +373,7 @@ class OrchestratorPlanner:
         tools.append(create_execute_mcp_tool_tool())
 
     def _add_memory_and_checkpoint_tools(self, tools: list) -> None:
-        if getattr(self._config, 'enable_checkpoints', False):
+        if getattr(self._config, 'enable_checkpoints', True):
             from backend.engine.tools.checkpoint import create_checkpoint_tool
 
             tools.append(create_checkpoint_tool())

@@ -41,7 +41,7 @@ def _render_routing(
     lsp_available = _lsp_available(config)
     debugger_available = can_edit and _debugger_available(config)
     working_memory_on = getattr(config, 'enable_working_memory', True)
-    tracker_on = getattr(config, 'enable_task_tracker_tool', False)
+    tracker_on = getattr(config, 'enable_task_tracker_tool', True)
     if not is_windows:
         env_line = 'Use **bash** for environment actions (install, build, test, git, processes). '
     elif windows_with_bash:

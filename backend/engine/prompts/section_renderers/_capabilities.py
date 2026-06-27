@@ -45,7 +45,7 @@ def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
     line so the capability block omits the tool entirely (no \"DISABLED\" bullet).
     """
     lsp_enabled = bool(getattr(config, 'enable_lsp_query', True))
-    debugger_enabled = bool(getattr(config, 'enable_debugger', False))
+    debugger_enabled = bool(getattr(config, 'enable_debugger', True))
     try:
         from backend.utils.runtime_detect import (
             detection_summary,
@@ -179,7 +179,7 @@ def _render_system_capabilities(
         )
 
     checkpoint_line = ''
-    if bool(getattr(config, 'enable_checkpoints', False)) and can_edit:
+    if bool(getattr(config, 'enable_checkpoints', True)) and can_edit:
         checkpoint_line = (
             '- **Checkpoints (`checkpoint`)**: risky edits/commands get automatic pre-action snapshots '
             '(rollback middleware). Use `save` for named phase milestones, `view` to list checkpoints, '

@@ -25,9 +25,6 @@ from backend.ledger.serialization.event import event_to_dict
 from backend.orchestration.agent import Agent
 from backend.orchestration.state.state import State
 
-# FIXME: There are a few problems this surfaced
-# * Browser not working
-
 
 class ActionObs(TypedDict):
     """Structure pairing a deterministic action with expected observations."""

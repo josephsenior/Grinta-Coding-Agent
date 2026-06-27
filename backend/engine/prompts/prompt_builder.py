@@ -527,7 +527,7 @@ def _collect_system_prompt_sections(
                 'system_partial_05_examples',
                 _render_examples(
                     terminal_command_tool=resolved_terminal_tool,
-                    tracker_on=bool(getattr(config, 'enable_task_tracker_tool', False)),
+                    tracker_on=bool(getattr(config, 'enable_task_tracker_tool', True)),
                     working_memory_on=bool(
                         getattr(config, 'enable_working_memory', True)
                     ),
@@ -535,7 +535,7 @@ def _collect_system_prompt_sections(
                         getattr(config, 'enable_meta_cognition', False)
                     ),
                     lsp_available=lsp_available,
-                    checkpoints_on=bool(getattr(config, 'enable_checkpoints', False)),
+                    checkpoints_on=bool(getattr(config, 'enable_checkpoints', True)),
                     web_on=bool(getattr(config, 'enable_web', True)),
                 ),
             )
@@ -549,8 +549,8 @@ def _collect_system_prompt_sections(
                 terminal_manager_available=bool(
                     getattr(config, 'enable_terminal', True)
                 ),
-                tracker_on=bool(getattr(config, 'enable_task_tracker_tool', False)),
-                checkpoints_on=bool(getattr(config, 'enable_checkpoints', False)),
+                tracker_on=bool(getattr(config, 'enable_task_tracker_tool', True)),
+                checkpoints_on=bool(getattr(config, 'enable_checkpoints', True)),
                 meta_cognition_on=bool(getattr(config, 'enable_meta_cognition', False)),
                 mode=mode,
             ),
@@ -896,11 +896,7 @@ def _cli_measure_default() -> None:
 
     cfg = SimpleNamespace(
         autonomy_level='balanced',
-        enable_checkpoints=False,
         enable_lsp_query=False,
-        enable_task_tracker_tool=False,
-        enable_permissions=False,
-        enable_meta_cognition=False,
     )
 
     report = measure_system_prompt_sections(

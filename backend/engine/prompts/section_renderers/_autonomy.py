@@ -138,10 +138,10 @@ def _render_autonomy(
     )
 
     mode = normalize_interaction_mode(getattr(config, 'mode', 'agent'))
-    checkpoints_on = bool(getattr(config, 'enable_checkpoints', False))
+    checkpoints_on = bool(getattr(config, 'enable_checkpoints', True))
     working_memory_on = bool(getattr(config, 'enable_working_memory', True))
     condensation_on = bool(getattr(config, 'enable_condensation_request', False))
-    tracker_on = bool(getattr(config, 'enable_task_tracker_tool', False))
+    tracker_on = bool(getattr(config, 'enable_task_tracker_tool', True))
 
     autonomy_block = _build_autonomy_block(mode, checkpoints_on=checkpoints_on)
     context_discipline = _build_context_discipline_section(

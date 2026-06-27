@@ -61,13 +61,6 @@ class MyPlugin(AppPlugin):
     async def on_session_end(self, session_id: str, metadata: dict[str, Any]):
         logger.info('[%s] session ended: %s', self.name, session_id)
 
-    # ── Validation ──────────────────────────────────────
-
-    # def validate(self) -> list[str]:
-    #     """Add your own checks here and return a list of warnings."""
-    #     warnings = super().validate()
-    #     return warnings
-
 
 def register(registry: PluginRegistry) -> None:
     """Entry point called by Grinta's plugin discovery."""
