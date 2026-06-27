@@ -296,8 +296,15 @@ class RollbackManager:
         if use_git and self.vcs_available:
             git_commit_sha = self._create_git_snapshot()
 
-        # Create file snapshot as fallback or if git is not available
-        file_snapshots = self._create_file_snapshot(checkpoint_id)
+        # Phase-boundary and drvfs workspaces: skip full file snapshots (slow on WSL /mnt/c).
+        from backend.core.wsl import is_windows_mount
+
+        if checkpoint_type == 'phase_boundary' or is_windows_mount(
+            self.workspace_path
+        ):
+            file_snapshots: dict[str, str] = {}
+        else:
+            file_snapshots = self._create_file_snapshot(checkpoint_id)
 
         # Create checkpoint object
         checkpoint = Checkpoint(

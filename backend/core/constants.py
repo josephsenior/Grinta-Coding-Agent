@@ -135,6 +135,10 @@ LLM_HTTP_POOL_TIMEOUT_SECONDS = float(
 LLM_STREAM_CHUNK_TIMEOUT_SECONDS = float(
     os.getenv('APP_LLM_STREAM_CHUNK_TIMEOUT_SECONDS', '120')
 )
+# Time to wait for the first streamed token before timeout/fallback.
+LLM_FIRST_CHUNK_TIMEOUT_SECONDS = float(
+    os.getenv('APP_LLM_FIRST_CHUNK_TIMEOUT_SECONDS', '120')
+)
 # Hard cap on how long the TUI ``_dispatch_to_agent`` poll loop will wait
 # without progress before forcing ERROR.  0 = disabled.  Set
 # GRINTA_TUI_DISPATCH_TIMEOUT_SECONDS=1800 to re-enable a 30-min stall guard.
@@ -696,6 +700,11 @@ ENV_VAR_REGISTRY: dict[str, tuple[str, str]] = {
         '120',
         'Max seconds between streamed LLM chunks before timeout; also sets httpx read '
         'timeout for streaming and the executor chunk watchdog',
+    ),
+    'APP_LLM_FIRST_CHUNK_TIMEOUT_SECONDS': (
+        '120',
+        'Max seconds to wait for the first streamed LLM chunk before timeout or '
+        'non-streaming fallback',
     ),
     # API versioning
     'APP_PERMISSIVE_API': (

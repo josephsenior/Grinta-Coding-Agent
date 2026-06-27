@@ -84,7 +84,7 @@ grinta
 Without `pipx install -e`: `uv run --directory "<Grinta-repo>" grinta` (from `<project>`).  
 Use `-p "<project>"` only when you do **not** `cd` into the project first.
 
-**Windows / WSL:** separate installs — [docs/WINDOWS_AND_WSL.md](docs/WINDOWS_AND_WSL.md)
+**Windows / WSL:** separate installs — WSL2 is supported (repo on `~/`, project may be `/mnt/c`) — [docs/WINDOWS_AND_WSL.md](docs/WINDOWS_AND_WSL.md)
 
 Optional extras:
 

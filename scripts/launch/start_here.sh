@@ -23,10 +23,16 @@ export GRINTA_LOG_ROOT="$ROOT/logs"
 mkdir -p "$GRINTA_LOG_ROOT"
 
 if [[ "$ROOT" == /mnt/* ]]; then
-    echo -e "${YELLOW}Note: Grinta is on a Windows drive (${ROOT}).${NC}"
-    echo -e "${YELLOW}      For faster setup, clone to Linux home instead:${NC}"
+    echo -e "${YELLOW}WSL2: Grinta repo is on a Windows drive (${ROOT}).${NC}"
+    echo -e "${YELLOW}      Official supported layout: clone repo to Linux home, project may stay on /mnt/c:${NC}"
     echo -e "${YELLOW}        git clone ${ROOT} ~/Grinta && cd ~/Grinta && bash start_here.sh${NC}"
-    echo -e "${YELLOW}      Logs will still be written under: ${GRINTA_LOG_ROOT}${NC}"
+    echo -e "${YELLOW}      See docs/WINDOWS_AND_WSL.md${NC}"
+    echo ""
+elif [[ -n "${WSL_DISTRO_NAME:-}" ]] && [[ "$ROOT" != /mnt/* ]]; then
+    echo -e "${GREEN}WSL2: repo on Linux filesystem (recommended).${NC}"
+    if [[ -n "$PROJECT_PATH" ]] && [[ "$PROJECT_PATH" == /mnt/* ]]; then
+        echo -e "${GREEN}      Supported split layout: project on Windows mount is OK.${NC}"
+    fi
     echo ""
 fi
 

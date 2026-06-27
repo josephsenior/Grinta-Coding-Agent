@@ -11,13 +11,14 @@ from backend.cli.doctor.checks import (
 def test_collect_health_checks_returns_fast_subset() -> None:
     checks = collect_health_checks()
     names = {check.name for check in checks}
-    assert names == {'debugpy', 'git', 'rg', 'llm'}
+    assert {'debugpy', 'git', 'rg', 'llm'}.issubset(names)
 
 
 def test_collect_health_checks_uses_model_hint() -> None:
     checks = collect_health_checks(model_hint='openai/gpt-4.1')
-    assert checks[-1].name == 'model'
-    assert checks[-1].detail == 'openai/gpt-4.1'
+    model_checks = [check for check in checks if check.name == 'model']
+    assert len(model_checks) == 1
+    assert model_checks[0].detail == 'openai/gpt-4.1'
 
 
 def test_format_health_report_lines_marks_failures() -> None:

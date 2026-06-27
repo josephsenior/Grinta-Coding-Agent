@@ -19,6 +19,7 @@ from typing import Literal
 
 from backend.core.logging.logger import app_logger as logger
 from backend.core.os_capabilities import OS_CAPS
+from backend.core.wsl import is_wsl_runtime
 
 _WINDOWS_SHELL_BASH = frozenset({'bash', 'git-bash', 'gitbash', 'posix'})
 _WINDOWS_SHELL_POWERSHELL = frozenset({'powershell', 'pwsh', 'ps'})
@@ -96,7 +97,7 @@ class ToolRegistry:
 
         self._tools: dict[str, ToolInfo] = {}
         self._is_container = self._detect_container_runtime()
-        self._is_wsl = self._detect_wsl_runtime()
+        self._is_wsl = is_wsl_runtime()
         self._detect_all_tools()
         self._initialized = True
 
@@ -111,18 +112,6 @@ class ToolRegistry:
         if os.getenv('container', '').strip():
             return True
         return os.path.exists('/.dockerenv') or os.path.exists('/run/.containerenv')
-
-    def _detect_wsl_runtime(self) -> bool:
-        platform_name = getattr(sys, 'platform', '')
-        if not str(platform_name).startswith('linux'):
-            return False
-        if os.getenv('WSL_DISTRO_NAME') or os.getenv('WSL_INTEROP'):
-            return True
-        try:
-            with open('/proc/version', encoding='utf-8') as f:
-                return 'microsoft' in f.read().lower()
-        except OSError:
-            return False
 
     def _detect_all_tools(self) -> None:
         """Detect all tools at once during initialization."""

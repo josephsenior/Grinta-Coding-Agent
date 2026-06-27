@@ -94,7 +94,7 @@ class ChromaDBBackend(VectorBackend):
         except ImportError as exc:
             raise RuntimeError(
                 'Vector memory requires the optional [rag] extra. '
-                "Install with: pip install 'grinta-ai[rag]'"
+                'Install with: pip install ".[rag]" (source) or pip install "grinta-ai[rag]" (PyPI).'
             ) from exc
 
         self.client = chromadb.PersistentClient(

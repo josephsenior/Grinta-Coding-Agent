@@ -183,6 +183,30 @@ class TestRollbackManager:
         assert cp is not None
         assert cp.checkpoint_type == 'before_risky'
 
+    def test_phase_boundary_checkpoint_skips_file_snapshot(self, workspace):
+        rm = RollbackManager(str(workspace))
+        (workspace / 'app.py').write_text('print(1)', encoding='utf-8')
+        cp_id = rm.create_checkpoint(
+            'phase boundary: init_to_active',
+            checkpoint_type='phase_boundary',
+            use_git=False,
+        )
+        cp = rm.get_checkpoint(cp_id)
+        assert cp is not None
+        assert cp.file_snapshots == {}
+        assert not (rm.checkpoints_dir / cp_id / 'files').exists()
+
+    def test_drvfs_workspace_skips_manual_file_snapshot(self, workspace, monkeypatch):
+        from backend.core import wsl as wsl_mod
+
+        monkeypatch.setattr(wsl_mod, 'is_windows_mount', lambda _path: True)
+        rm = RollbackManager(str(workspace))
+        (workspace / 'app.py').write_text('print(1)', encoding='utf-8')
+        cp_id = rm.create_checkpoint('manual on drvfs', use_git=False)
+        cp = rm.get_checkpoint(cp_id)
+        assert cp is not None
+        assert cp.file_snapshots == {}
+
     def test_checkpoint_metadata(self, workspace):
         rm = RollbackManager(str(workspace))
         cp_id = rm.create_checkpoint('meta', metadata={'action': 'delete'})

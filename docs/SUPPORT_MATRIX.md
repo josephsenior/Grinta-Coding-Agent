@@ -9,6 +9,7 @@ This matrix defines what Grinta currently supports for official OSS releases.
 | Linux | Supported | Required CI gate runs full unit corpus with coverage, then integration/e2e/stress (`gates-on-linux-*`). |
 | Windows | Supported | Required CI gate runs `backend/tests/unit`, then integration/e2e/stress (`gates-on-windows`, `gates-on-windows-extended`). |
 | macOS | Supported | Required CI gate runs `backend/tests/unit`, then integration/e2e/stress (`gates-on-macos`, `gates-on-macos-extended`). |
+| WSL2 (Ubuntu in Windows) | Supported | Linux install inside the distro; repo on `~/`; project may be `/mnt/c`. Not the same as native Windows. See [WINDOWS_AND_WSL.md](WINDOWS_AND_WSL.md). |
 
 ### macOS platform policy
 
@@ -43,7 +44,7 @@ When a feature is **limited** rather than **absent**, the runtime logs a warning
 and the agent prompt layer (`terminal_contract`) steers the model toward the
 active shell contract (`security.windows_shell` on Windows: `bash` vs `powershell`).
 
-**WSL on Windows:** WSL is Linux, not a Windows shell mode. Install and run Grinta inside the distro; see [WINDOWS_AND_WSL.md](WINDOWS_AND_WSL.md).
+**WSL on Windows:** WSL2 is a **supported Linux tier** inside Ubuntu — repo on `~/`, project may be `/mnt/c`. Separate install from native Windows; see [WINDOWS_AND_WSL.md](WINDOWS_AND_WSL.md).
 
 ## Python
 

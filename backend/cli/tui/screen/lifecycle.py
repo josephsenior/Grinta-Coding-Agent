@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 
 from textual.app import ComposeResult
 from textual.containers import (
@@ -344,6 +345,7 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
                 ensure_worker()
 
             await self._bootstrap_setup_renderer(event_stream, controller)
+            self._show_wsl_startup_warnings()
             self._start_environment_probe(agent, runtime, memory)
             _tui_logger.debug('_bootstrap: done')
         except BaseException:
@@ -366,3 +368,25 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
                 and self._environment_probe_task is None
             ):
                 ready.set()
+
+    def _show_wsl_startup_warnings(self) -> None:
+        """One-shot WSL2 layout warnings after bootstrap (official supported tier)."""
+        if getattr(self, '_wsl_startup_warnings_shown', False):
+            return
+        from backend.cli.doctor.checks import check_wsl_layout
+        from backend.core.wsl import WslLayout, classify_wsl_layout, is_wsl_runtime
+
+        if not is_wsl_runtime():
+            return
+        self._wsl_startup_warnings_shown = True
+        layout = classify_wsl_layout(workspace=Path.cwd())
+        if layout in {WslLayout.REPO_ON_DRVFS, WslLayout.BOTH_ON_DRVFS}:
+            check = check_wsl_layout(workspace=Path.cwd())
+            self.notify_error(check.detail, timeout=12.0)
+            return
+        if layout == WslLayout.SUPPORTED_SPLIT:
+            self.notify_warning(
+                'Project on Windows drive (/mnt/c) — file tools may be slower. '
+                'Run /health to verify WSL layout.',
+                timeout=8.0,
+            )

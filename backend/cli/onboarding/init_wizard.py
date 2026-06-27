@@ -620,6 +620,9 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
         return 3
     provider, model, api_key, base_url = choices
     _print_toolchain_hints(console)
+    from backend.cli.doctor.checks import print_wsl_layout_hints
+
+    print_wsl_layout_hints(console)
     _print_success(console, settings_file, provider, model, project_root, api_key)
     return 0
 

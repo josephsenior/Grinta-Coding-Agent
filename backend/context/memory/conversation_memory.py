@@ -215,7 +215,7 @@ class ContextMemory:
             logger.warning(
                 'Failed to initialize vector memory: %s\n'
                 'Continuing without persistent memory. To enable:\n'
-                '  pip install "grinta-ai[rag]"',
+                '  pip install ".[rag]" (source) or pip install "grinta-ai[rag]" (PyPI)',
                 e,
             )
             return None
