@@ -98,8 +98,8 @@ class GrintaTUIApp(App):
                 event = _events.Paste(cleaned)
         # When self.focused is None (e.g., focus lost on Alt+Tab), Textual's
         # default handler forwards the Paste event to the Screen, which has no
-        # _on_paste handler — the event is silently dropped.  Detect this and
-        # route the paste directly to the input TextArea.
+        # _on_paste handler — the event is silently dropped. Route the paste
+        # text directly to the input TextArea via its public ``insert`` API.
         if (
             isinstance(event, _events.Paste)
             and not event.is_forwarded
@@ -107,7 +107,8 @@ class GrintaTUIApp(App):
         ):
             try:
                 textarea = self.screen.query_one('#input')
-                textarea._forward_event(event)
+                if event.text:
+                    textarea.insert(event.text)
                 return
             except Exception:
                 pass

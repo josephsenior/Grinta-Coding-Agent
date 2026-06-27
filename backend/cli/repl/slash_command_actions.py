@@ -316,7 +316,9 @@ def cmd_playbook_passthrough(host: Any, parsed: Any) -> bool:
 
 
 def cmd_copy(host: Any, parsed: Any) -> bool:
-    from backend.cli.repl.slash_command_registry import _copy_to_system_clipboard
+    from backend.cli.repl.slash_registry_clipboard import (
+        copy_to_system_clipboard as _copy_to_system_clipboard,
+    )
 
     if host._reject_extra_args(parsed):
         return True
@@ -400,7 +402,7 @@ def cmd_search(host: Any, parsed: Any) -> bool:
 
 
 def cmd_help(host: Any, parsed: Any) -> bool:
-    from backend.cli.repl.slash_command_registry import (
+    from backend.cli.repl.slash_registry_help import (
         _build_help_markdown,
         _build_help_table,
     )

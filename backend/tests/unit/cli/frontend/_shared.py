@@ -29,11 +29,17 @@ from backend.cli.main import (
     show_grinta_splash,
 )
 from backend.cli.repl.slash_command_registry import (
-    _build_command_completer,
-    _build_help_markdown,
-    _parse_slash_command,
     _prompt_toolkit_available,
     _supports_prompt_session,
+)
+from backend.cli.repl.slash_registry_help import (
+    _build_help_markdown,
+)
+from backend.cli.repl.slash_registry_parsing import (
+    _parse_slash_command,
+)
+from backend.cli.repl.slash_registry_prompt import (
+    _build_command_completer,
 )
 from backend.cli.settings.confirmation import _risk_label
 from backend.cli.tui.helpers import _render_thinking_with_diff

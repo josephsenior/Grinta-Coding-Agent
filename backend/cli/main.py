@@ -252,7 +252,7 @@ def _build_splash_lines() -> list[Any]:
 
 def _is_returning_user() -> bool:
     """Check if the user has run grinta before (history file exists)."""
-    from backend.cli.repl.slash_command_registry import _HISTORY_FILE
+    from backend.cli.repl.slash_registry_parsing import _HISTORY_FILE
 
     return _HISTORY_FILE.exists()
 
