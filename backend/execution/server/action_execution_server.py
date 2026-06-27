@@ -236,9 +236,11 @@ class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
             # Update session manager with memory limit
             self.session_manager.max_memory_gb = self.max_memory_gb
 
-            # Step 1: Initialize bash session
+            # Step 1: Initialize bash session (thread pool avoids blocking the TUI loop)
             logger.info('Step 1/4: Initializing default shell session...')
-            self.session_manager.create_session(session_id='default')
+            await asyncio.to_thread(
+                self.session_manager.create_session, session_id='default'
+            )
 
             # Step 2: Initialize plugins
             logger.info('Step 2/4: Initializing plugins...')

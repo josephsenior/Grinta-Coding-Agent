@@ -91,23 +91,25 @@ class SessionManager:
             interactive,
         )
 
-        try:
-            session = create_shell_session(
-                work_dir=cwd or self.work_dir,
-                tools=self.tool_registry,
-                username=self.username,
-                no_change_timeout_seconds=int(
-                    os.environ.get('NO_CHANGE_TIMEOUT_SECONDS', 30)
-                ),
-                max_memory_mb=self.max_memory_gb * 1024 if self.max_memory_gb else None,
-                cancellation_service=self.cancellation_service,
-                interactive=interactive,
-                security_config=self.security_config,
-                workspace_root=self.work_dir,
-            )
-            from backend.utils.stdio_restore import real_stdio_for_subprocess
+        from backend.utils.stdio_restore import real_stdio_for_subprocess
 
+        try:
             with real_stdio_for_subprocess():
+                session = create_shell_session(
+                    work_dir=cwd or self.work_dir,
+                    tools=self.tool_registry,
+                    username=self.username,
+                    no_change_timeout_seconds=int(
+                        os.environ.get('NO_CHANGE_TIMEOUT_SECONDS', 30)
+                    ),
+                    max_memory_mb=self.max_memory_gb * 1024
+                    if self.max_memory_gb
+                    else None,
+                    cancellation_service=self.cancellation_service,
+                    interactive=interactive,
+                    security_config=self.security_config,
+                    workspace_root=self.work_dir,
+                )
                 session.initialize()
             self.sessions[session_id] = session
             logger.info('Session %s initialized successfully', session_id)
