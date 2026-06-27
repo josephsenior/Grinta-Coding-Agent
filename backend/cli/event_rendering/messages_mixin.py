@@ -58,7 +58,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class _EventRendererMessagesMixin(CLIEventRenderer if TYPE_CHECKING else object):
+class MessagesMixin(CLIEventRenderer if TYPE_CHECKING else object):
     """Mixin class — see module docstring."""
 
     async def add_user_message(self, text: str) -> None:

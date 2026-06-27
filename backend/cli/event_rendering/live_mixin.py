@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class _EventRendererLiveMixin(CLIEventRenderer if TYPE_CHECKING else object):
+class LiveMixin(CLIEventRenderer if TYPE_CHECKING else object):
     """Mixin class — see module docstring."""
 
     def start_live(self) -> None:

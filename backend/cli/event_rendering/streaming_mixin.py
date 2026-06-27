@@ -57,7 +57,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class _EventRendererStreamingMixin(CLIEventRenderer if TYPE_CHECKING else object):
+class StreamingMixin(CLIEventRenderer if TYPE_CHECKING else object):
     """Mixin class — see module docstring."""
 
     def _handle_streaming_chunk(self, action: StreamingChunkAction) -> None:

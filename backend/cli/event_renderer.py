@@ -47,38 +47,38 @@ if TYPE_CHECKING:
     from backend.cli.display.reasoning_display import ReasoningDisplay
 
 from backend.cli.event_rendering.activity_mixin import (
-    _EventRendererActivityMixin,  # noqa: F401, E402
+    ActivityMixin,  # noqa: F401, E402
 )
 from backend.cli.event_rendering.live_mixin import (
-    _EventRendererLiveMixin,  # noqa: F401, E402
+    LiveMixin,  # noqa: F401, E402
 )
 from backend.cli.event_rendering.messages_mixin import (
-    _EventRendererMessagesMixin,  # noqa: F401, E402
+    MessagesMixin,  # noqa: F401, E402
 )
 from backend.cli.event_rendering.panels_mixin import (
-    _EventRendererPanelsMixin,  # noqa: F401, E402
+    PanelsMixin,  # noqa: F401, E402
 )
 from backend.cli.event_rendering.state_mixin import (
-    _EventRendererStateMixin,  # noqa: F401, E402
+    StateMixin,  # noqa: F401, E402
 )
 from backend.cli.event_rendering.streaming_mixin import (
-    _EventRendererStreamingMixin,  # noqa: F401, E402
+    StreamingMixin,  # noqa: F401, E402
 )
 from backend.cli.event_rendering.subscription_mixin import (
-    _EventRendererSubscriptionMixin,
+    SubscriptionMixin,
 )  # noqa: F401, E402
 
 
 class CLIEventRenderer(
     ActionRenderersMixin,
     ObservationRenderersMixin,
-    _EventRendererLiveMixin,
-    _EventRendererSubscriptionMixin,
-    _EventRendererStateMixin,
-    _EventRendererMessagesMixin,
-    _EventRendererStreamingMixin,
-    _EventRendererActivityMixin,
-    _EventRendererPanelsMixin,
+    LiveMixin,
+    SubscriptionMixin,
+    StateMixin,
+    MessagesMixin,
+    StreamingMixin,
+    ActivityMixin,
+    PanelsMixin,
 ):
     @property
     def last_assistant_message_text(self) -> str:

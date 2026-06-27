@@ -43,7 +43,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class _EventRendererPanelsMixin(CLIEventRenderer if TYPE_CHECKING else object):
+class PanelsMixin(CLIEventRenderer if TYPE_CHECKING else object):
     """Mixin class — see module docstring."""
 
     def _set_task_panel(self, task_list: list[dict[str, Any]]) -> None:

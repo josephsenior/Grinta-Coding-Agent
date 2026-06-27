@@ -40,18 +40,18 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class _EventRendererActivityMixin(CLIEventRenderer if TYPE_CHECKING else object):
+class ActivityMixin(CLIEventRenderer if TYPE_CHECKING else object):
     """Mixin class — see module docstring."""
 
     @staticmethod
     def _summarize_search_results_block(s: str) -> str:
-        payload = _EventRendererActivityMixin._search_results_payload(s)
-        lines = _EventRendererActivityMixin._search_result_lines(payload)
+        payload = ActivityMixin._search_results_payload(s)
+        lines = ActivityMixin._search_result_lines(payload)
         if not lines:
             return 'No matches found.'
-        if _EventRendererActivityMixin._search_head_says_no_match(lines):
+        if ActivityMixin._search_head_says_no_match(lines):
             return 'No matches found.'
-        return _EventRendererActivityMixin._format_match_count(lines)
+        return ActivityMixin._format_match_count(lines)
 
     @staticmethod
     def _search_results_payload(s: str) -> str:
@@ -71,7 +71,7 @@ class _EventRendererActivityMixin(CLIEventRenderer if TYPE_CHECKING else object)
         head_blob = '\n'.join(lines[:5])
         return any(
             frag in head_blob
-            for frag in _EventRendererActivityMixin._NO_MATCH_FRAGMENTS
+            for frag in ActivityMixin._NO_MATCH_FRAGMENTS
         )
 
     _PLAIN_RG_LOCATION_LINE = re.compile(r'^[^:]+:\d+:')
@@ -80,7 +80,7 @@ class _EventRendererActivityMixin(CLIEventRenderer if TYPE_CHECKING else object)
     @staticmethod
     def _linkify_ripgrep_line(line: str, *, accent_style: str) -> Text:
         """Hyperlink the file path in ``path:line:text`` ripgrep output."""
-        m = _EventRendererActivityMixin._RG_PATH_LINE_COLON.match(line.strip())
+        m = ActivityMixin._RG_PATH_LINE_COLON.match(line.strip())
         base = Style.parse(accent_style)
         if not m:
             return linkify_plain(  # type: ignore[unreachable]
@@ -104,7 +104,7 @@ class _EventRendererActivityMixin(CLIEventRenderer if TYPE_CHECKING else object)
         match_count = sum(
             1
             for line in lines
-            if _EventRendererActivityMixin._PLAIN_RG_LOCATION_LINE.match(line)
+            if ActivityMixin._PLAIN_RG_LOCATION_LINE.match(line)
         ) or len(lines)
         return f'Found {match_count} match{"es" if match_count != 1 else ""}.'
 
@@ -113,7 +113,7 @@ class _EventRendererActivityMixin(CLIEventRenderer if TYPE_CHECKING else object)
         plain_lines = [ln for ln in s.splitlines() if ln.strip()]
         if not plain_lines:
             return None
-        rg = _EventRendererActivityMixin._PLAIN_RG_LOCATION_LINE
+        rg = ActivityMixin._PLAIN_RG_LOCATION_LINE
         if not any(rg.match(ln) for ln in plain_lines[:5]):
             return None
         match_count = sum(1 for line in plain_lines if rg.match(line)) or len(
