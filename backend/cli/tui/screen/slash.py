@@ -57,7 +57,7 @@ class ScreenSlashMixin(SlashCommandsMixin):
         self._renderer.add_system_message(msg, title='warning')
 
     def _usage(self, name: str) -> str:
-        from backend.cli.repl.slash_command_registry import _find_command_spec
+        from backend.cli.repl.slash_registry_help import _find_command_spec
 
         spec = _find_command_spec(name)
         if spec is not None:

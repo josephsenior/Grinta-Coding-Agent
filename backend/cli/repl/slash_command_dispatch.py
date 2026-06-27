@@ -68,8 +68,8 @@ COMMAND_DISPATCH: dict[str, str] = {
 
 def handle_command(host: Any, text: str) -> bool:
     """Handle a /command. Returns True to continue REPL, False to exit."""
-    from backend.cli.repl.slash_command_registry import (
-        SlashCommandParseError,
+    from backend.cli.repl.slash_registry_models import SlashCommandParseError
+    from backend.cli.repl.slash_registry_parsing import (
         _parse_slash_command,
     )
 
@@ -91,7 +91,7 @@ def handle_parsed_command(host: Any, parsed: Any) -> bool:
 
 
 def render_unknown_command(host: Any, raw_cmd: str) -> None:
-    from backend.cli.repl.slash_command_registry import _closest_command_names
+    from backend.cli.repl.slash_registry_help import _closest_command_names
 
     if host._renderer is None:
         return
@@ -113,7 +113,7 @@ def _render_unknown_noninteractive(host: Any, raw_cmd: str) -> None:
     Mirrors :func:`render_unknown_command` but skips the autocomplete hint,
     since Tab doesn't apply when stdin is not a TTY.
     """
-    from backend.cli.repl.slash_command_registry import _closest_command_names
+    from backend.cli.repl.slash_registry_help import _closest_command_names
 
     suggestion_text = _closest_command_names(raw_cmd)
     suffix = ''

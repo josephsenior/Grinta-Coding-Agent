@@ -117,7 +117,7 @@ async def _read_repl_input(host: RunHelpersHost, session: Any | None) -> str | N
 
 
 def _discard_terminal_noise(host: RunHelpersHost, text: str) -> bool:
-    from backend.cli.repl.slash_command_registry import (
+    from backend.cli.repl.slash_registry_terminal import (
         _looks_like_terminal_selection_noise,
     )
 
@@ -144,8 +144,8 @@ async def _process_slash_command(
     end_states: list[AgentState],
 ) -> tuple[bool, Any, asyncio.Task[Any] | None] | None:
     """Handle /command. Returns (continue_loop, controller, agent_task) or None to break."""
-    from backend.cli.repl.slash_command_registry import (
-        SlashCommandParseError,
+    from backend.cli.repl.slash_registry_models import SlashCommandParseError
+    from backend.cli.repl.slash_registry_parsing import (
         _parse_slash_command,
     )
 

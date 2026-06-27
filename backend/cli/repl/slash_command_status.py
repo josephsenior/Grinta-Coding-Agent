@@ -182,7 +182,7 @@ def get_current_autonomy(host: Any) -> str:
 
 
 def show_current_autonomy(host: Any, valid_levels: tuple[str, ...]) -> None:
-    from backend.cli.repl.slash_command_registry import _AUTONOMY_LEVEL_HINTS
+    from backend.cli.repl.slash_registry_commands import _AUTONOMY_LEVEL_HINTS
 
     level = get_current_autonomy(host)
     if host._renderer is None:
@@ -258,7 +258,7 @@ def apply_autonomy_level(host: Any, new_level: str) -> None:
 
 def handle_autonomy_command(host: Any, parsed: Any) -> None:
     """View or change the autonomy level."""
-    from backend.cli.repl.slash_command_registry import _AUTONOMY_LEVEL_HINTS
+    from backend.cli.repl.slash_registry_commands import _AUTONOMY_LEVEL_HINTS
 
     valid_levels = tuple(_AUTONOMY_LEVEL_HINTS)
 
@@ -334,7 +334,7 @@ def get_current_interaction_mode(host: Any) -> str:
 
 
 def show_current_interaction_mode(host: Any, valid_modes: tuple[str, ...]) -> None:
-    from backend.cli.repl.slash_command_registry import _INTERACTION_MODE_HINTS
+    from backend.cli.repl.slash_registry_commands import _INTERACTION_MODE_HINTS
 
     mode = get_current_interaction_mode(host)
     if host._renderer is None:
@@ -404,7 +404,7 @@ def apply_interaction_mode(host: Any, new_mode: str) -> None:
 
 
 def handle_interaction_mode_command(host: Any, parsed: Any) -> None:
-    from backend.cli.repl.slash_command_registry import _INTERACTION_MODE_HINTS
+    from backend.cli.repl.slash_registry_commands import _INTERACTION_MODE_HINTS
 
     valid_modes = tuple(_INTERACTION_MODE_HINTS)
 
