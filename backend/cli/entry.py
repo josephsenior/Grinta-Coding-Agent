@@ -374,6 +374,11 @@ def main() -> None:
         rc = _run_sessions(args) or 0
         sys.exit(int(rc))
 
+    if args.subcommand is None:
+        from backend.core.workspace_resolution import resolve_launch_project_directory
+
+        _pin_project(str(resolve_launch_project_directory(args.project)))
+
     repl_main = importlib.import_module('backend.cli.main').main
     call_kwargs = {
         'model': args.model,

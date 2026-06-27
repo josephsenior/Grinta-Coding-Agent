@@ -166,7 +166,8 @@ _print_next_steps() {
         echo -e "  uv run --directory \"${repo_root}\" grinta -p \"${PROJECT_PATH}\""
     else
         echo -e "  cd \"<project>\""
-        echo -e "  uv run --directory \"${repo_root}\" grinta"
+        echo -e "  bash \"${repo_root}/scripts/launch/grinta-dev.sh\""
+        echo -e "  # or: uv run --directory \"${repo_root}\" grinta -p \"\$(pwd)\""
     fi
     echo ""
     echo -e "${YELLOW}Optional: pipx install -e .  (from repo root) then run grinta from any directory${NC}"
