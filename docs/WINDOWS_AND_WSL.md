@@ -18,7 +18,7 @@
 
 Rule: `/mnt/<drive>/` + path with `\` → `/`. Quote if spaces.
 
-Dev: `--directory` = `<wsl-grinta-repo>` · `-p` = `<wsl-project>` (WSL forms of `<Grinta-repo>` and `<project>`).
+Dev: `--directory` = `<wsl-grinta-repo>` · `-p` = `<wsl-project>` only if you skip `cd`. Daily: `pipx install -e "<repo>"` then `cd "<project>"` && `grinta` — [QUICK_START.md](QUICK_START.md#dev-daily-use-after-bootstrap).
 
 ## Native Windows shell tool
 

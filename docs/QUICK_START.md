@@ -1,15 +1,53 @@
 # Quick Start
 
-Replace placeholders with **your** paths:
-
 | Placeholder | Meaning |
 | --- | --- |
-| `<Grinta-repo>` | Grinta source checkout (contains `pyproject.toml`) |
-| `<project>` | Folder you want the agent to work in |
+| `<Grinta-repo>` | Grinta source checkout (`pyproject.toml` lives here) |
+| `<project>` | Folder the agent should work in (your code) |
 
-**Dev mode uses both.** Consumer mode only needs `<project>`. Quote paths that contain spaces.
+Quote paths with spaces. First `grinta` runs setup — no `grinta init` required.
 
-First `grinta` runs setup. No `grinta init` required.
+## Consumer vs dev
+
+| | **Consumer** | **Dev (source)** |
+| --- | --- | --- |
+| Install | `pipx install grinta-ai` (PyPI) | Bootstrap `<Grinta-repo>` once (below) |
+| Settings | `~/.grinta/settings.json` | `<Grinta-repo>/settings.json` |
+| Folders | `<project>` only | `<Grinta-repo>` **and** `<project>` (often different) |
+| Daily command | `cd "<project>"` → `grinta` | See **Dev daily use** |
+
+`-p <path>` — only when the project is **not** your current directory. If you `cd` into `<project>` first, plain `grinta` uses the cwd.
+
+---
+
+## Dev daily use (after bootstrap)
+
+Pick **one** way to run local code on `<project>`:
+
+### A. `grinta` on PATH (recommended for daily dev)
+
+```bash
+pipx install -e "<Grinta-repo>"    # once per machine
+cd "<project>"
+grinta
+```
+
+Re-run after big dependency changes: `pipx reinstall -e "<Grinta-repo>"`.
+
+### B. `uv run` (no global `grinta` install)
+
+```bash
+cd "<project>"
+uv run --directory "<Grinta-repo>" grinta
+```
+
+### C. Open a project without `cd`
+
+```bash
+uv run --directory "<Grinta-repo>" grinta -p "<project>"
+```
+
+Long form (same as B/C): `uv run --directory "<Grinta-repo>" python -m backend.cli.entry` (add `-p "<project>"` only for C).
 
 ---
 
@@ -23,24 +61,28 @@ cd "<project>"
 grinta
 ```
 
-### Dev
+### Dev — bootstrap once
 
 ```powershell
 cd "<Grinta-repo>"
 .\START_HERE.ps1
-
-uv run --directory "<Grinta-repo>" python -m backend.cli.entry -p "<project>"
+pipx install -e "<Grinta-repo>"    # optional; enables daily `grinta` (way A)
 ```
 
-Settings: `<Grinta-repo>\settings.json`
+### Dev — every day
+
+```powershell
+cd "<project>"
+grinta
+# or: uv run --directory "<Grinta-repo>" grinta
+```
 
 ---
 
 ## WSL (Ubuntu)
 
-Install inside WSL — Windows `pipx` does not apply.
-
-**Windows path → WSL:** `C:\foo\bar` → `/mnt/c/foo/bar` (lowercase drive letter, forward slashes, quote spaces).
+Windows `pipx` does not apply — install inside WSL.  
+`C:\foo\bar` → `/mnt/c/foo/bar`
 
 ### Consumer
 
@@ -52,20 +94,21 @@ cd "<wsl-project>"
 grinta
 ```
 
-(`<wsl-project>` = WSL form of `<project>`, e.g. `/mnt/c/Users/Alice/code/my-app`)
-
-Settings: `~/.grinta/settings.json`
-
-### Dev
+### Dev — bootstrap once
 
 ```bash
 cd "<wsl-grinta-repo>"
 bash start_here.sh
-
-uv run --directory "<wsl-grinta-repo>" python -m backend.cli.entry -p "<wsl-project>"
+pipx install -e "<wsl-grinta-repo>"    # optional; enables daily `grinta` (way A)
 ```
 
-Settings: `<wsl-grinta-repo>/settings.json`
+### Dev — every day
+
+```bash
+cd "<wsl-project>"
+grinta
+# or: uv run --directory "<wsl-grinta-repo>" grinta
+```
 
 ---
 
@@ -79,16 +122,21 @@ cd "<project>"
 grinta
 ```
 
-### Dev
+### Dev — bootstrap once
 
 ```bash
 cd "<Grinta-repo>"
 bash start_here.sh
-
-uv run --directory "<Grinta-repo>" python -m backend.cli.entry -p "<project>"
+pipx install -e "<Grinta-repo>"
 ```
 
-Settings: `<Grinta-repo>/settings.json`
+### Dev — every day
+
+```bash
+cd "<project>"
+grinta
+# or: uv run --directory "<Grinta-repo>" grinta
+```
 
 ---
 
@@ -111,16 +159,21 @@ cd "<project>"
 grinta
 ```
 
-### Dev
+### Dev — bootstrap once
 
 ```bash
 cd "<Grinta-repo>"
 bash start_here.sh
-
-uv run --directory "<Grinta-repo>" python -m backend.cli.entry -p "<project>"
+pipx install -e "<Grinta-repo>"
 ```
 
-Settings: `<Grinta-repo>/settings.json`
+### Dev — every day
+
+```bash
+cd "<project>"
+grinta
+# or: uv run --directory "<Grinta-repo>" grinta
+```
 
 ---
 
@@ -130,8 +183,7 @@ Settings: `<Grinta-repo>/settings.json`
 | --- | --- |
 | `grinta init` | Reconfigure without TUI; `--non-interactive` for CI |
 | `grinta doctor` | Install / settings checks |
-| `grinta -p <path>` | Consumer: open project without `cd` |
+| `grinta -p <path>` | Open project without `cd` first |
+| `pipx install "grinta-ai[rag]"` | Vector memory extra |
 
-**Extras:** `pipx install "grinta-ai[rag]"` · `"grinta-ai[browser]"` · `"grinta-ai[all]"`
-
-**Windows / WSL pitfalls:** [WINDOWS_AND_WSL.md](WINDOWS_AND_WSL.md) · **Problems:** [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+**Windows / WSL:** [WINDOWS_AND_WSL.md](WINDOWS_AND_WSL.md) · **Problems:** [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
