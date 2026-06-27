@@ -84,7 +84,7 @@ CI’s `gates-on-linux-extended`, `gates-on-windows-extended`, and `gates-on-mac
 - [ ] **Stress suite (spot-check):** `make test-stress` or `PYTHONPATH=. uv run pytest backend/tests/stress -m stress -q`.
 - [ ] **Integration suite (spot-check):** `make test-integration` or `PYTHONPATH=. uv run pytest backend/tests/integration -m integration -q`.
 - [ ] **Fresh-machine onboarding evidence:** keep reports in [onboarding_reports/](onboarding_reports/) current (3× pipx, 3× source). Track in [GA_GATE_STATUS.md](onboarding_reports/GA_GATE_STATUS.md). CI smoke does not cover interactive first run — **do not tag `v1.0.0` until GA gate is green.**
-- [ ] **WSL2 certification (when claiming WSL support):** repo on `~/Grinta`, project on `/mnt/c`, `scripts/smoke/smoke_wsl_layout.sh` + interactive report per [WINDOWS_AND_WSL.md](WINDOWS_AND_WSL.md).
+- [ ] **WSL2 certification (when claiming WSL support):** repo on `~/Grinta`, project on `/mnt/c`, `scripts/smoke/smoke_wsl_layout.sh` + interactive report per [QUICK_START.md — WSL](QUICK_START.md#wsl-ubuntu).
 - [ ] **Evaluation (when behavior-sensitive):** run [run-eval workflow](../.github/workflows/run-eval.yml) manually if the release touches autonomy, prompts, safety, or orchestration.
 
 ### Optional — full Python test tree

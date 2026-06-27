@@ -1,5 +1,7 @@
 # Quick Start
 
+Single install guide for all platforms (consumer, dev, Windows, WSL2, Linux, macOS).
+
 | Placeholder | Meaning |
 | --- | --- |
 | `<Grinta-repo>` | Grinta source checkout (`pyproject.toml` lives here) |
@@ -53,6 +55,8 @@ Long form (same as B/C): `uv run --directory "<Grinta-repo>" python -m backend.c
 
 ## Windows (PowerShell)
 
+Native Windows and WSL are **separate installs** (different `grinta` binaries, different `~/.grinta/`).
+
 ### Consumer
 
 ```powershell
@@ -77,14 +81,48 @@ grinta
 # or: uv run --directory "<Grinta-repo>" grinta
 ```
 
+### Shell tool (native Windows only)
+
+Default: `execute_bash` (Git Bash). For PowerShell in `settings.json`:
+
+```json
+"security": { "windows_shell": "powershell" }
+```
+
 ---
 
 ## WSL (Ubuntu)
 
-Windows `pipx` does not apply — install **inside Ubuntu** (Linux Grinta, not PowerShell).  
-`C:\foo\bar` → `/mnt/c/foo/bar`
+**Windows `pipx` does not apply** — install and run Grinta **inside Ubuntu** (Linux app), not PowerShell.
 
-**Official supported layout:** repo on `~/Grinta`, project may be on `/mnt/c`. See [WINDOWS_AND_WSL.md](WINDOWS_AND_WSL.md).
+| Terminal | Install where |
+| --- | --- |
+| PowerShell / cmd / Git Bash | Windows (section above) |
+| Ubuntu / WSL | Inside WSL (`pipx` or `uv`) |
+
+### Official WSL2 layout
+
+| Component | Where | Notes |
+| --- | --- | --- |
+| Grinta install | Inside WSL Ubuntu | Separate from native Windows |
+| Grinta repo + venv (dev) | Linux home, e.g. `~/Grinta` | **Required** — not on `/mnt/c` |
+| Your project | `~/project` or `/mnt/c/Users/...` | On Windows drive is OK (slower I/O) |
+| Settings | `~/.grinta/` in Ubuntu | Not shared with `C:\Users\...\.grinta\` |
+
+```text
+Windows
+  └── WSL Ubuntu
+        ├── ~/Grinta      ← repo + venv (fast)
+        └── /mnt/c/...    ← project workspace (supported, slower)
+```
+
+**Path conversion:** `C:\foo\bar` → `/mnt/c/foo/bar` · `D:\code\app` → `/mnt/d/code/app` (quote if spaces).
+
+**Performance:** repo on `/mnt/c` is slow (checkpoints, MCP, pytest) — use `~/Grinta`. Project on `/mnt/c` is slower but supported. tmux sockets use `/tmp/grinta-tmux` on WSL.
+
+**Preflight:** `grinta doctor` (full) or `/health` in the TUI (fast). Fix `wsl_layout` warnings before large tasks.
+
+**Prefer native Windows?** If you do not need Linux-only tooling, PowerShell + `pipx install grinta-ai` is simpler — see **Windows** above.
 
 ### Consumer
 
@@ -100,8 +138,7 @@ grinta
 ### Dev — bootstrap once
 
 ```bash
-# Clone to Linux home (not /mnt/c)
-git clone "<wsl-grinta-repo-source>" ~/Grinta
+git clone /mnt/c/Users/you/Desktop/Grinta ~/Grinta   # Linux home, not /mnt/c
 cd ~/Grinta
 bash start_here.sh
 pipx install -e ~/Grinta    # optional; enables daily `grinta` (way A)
@@ -187,8 +224,8 @@ grinta
 | Command | When |
 | --- | --- |
 | `grinta init` | Reconfigure without TUI; `--non-interactive` for CI |
-| `grinta doctor` | Install / settings checks |
+| `grinta doctor` | Install / settings / WSL layout checks |
 | `grinta -p <path>` | Open project without `cd` first |
 | `pipx install "grinta-ai[rag]"` | Vector memory extra |
 
-**Windows / WSL:** [WINDOWS_AND_WSL.md](WINDOWS_AND_WSL.md) · **Problems:** [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+**Problems:** [TROUBLESHOOTING.md](TROUBLESHOOTING.md)

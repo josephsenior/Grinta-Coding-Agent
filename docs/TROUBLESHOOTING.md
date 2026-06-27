@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Install paths: [QUICK_START.md](QUICK_START.md). Windows/WSL: [WINDOWS_AND_WSL.md](WINDOWS_AND_WSL.md).
+Install paths: [QUICK_START.md](QUICK_START.md).
 
 ## Install
 
@@ -35,7 +35,7 @@ Install paths: [QUICK_START.md](QUICK_START.md). Windows/WSL: [WINDOWS_AND_WSL.m
 - **Slow startup / agent stalls:** repo on `/mnt/c` — clone to `~/Grinta`; run `grinta doctor`
 - **Wrong install:** use `pipx` inside Ubuntu, not Windows PowerShell
 - **`grinta` not found in WSL:** install inside Ubuntu ([QUICK_START.md](QUICK_START.md#wsl-ubuntu))
-- **Project on `/mnt/c` is slow:** expected; official supported layout — see [WINDOWS_AND_WSL.md](WINDOWS_AND_WSL.md)
+- **Project on `/mnt/c` is slow:** expected; see [QUICK_START.md — WSL](QUICK_START.md#wsl-ubuntu)
 - **tmux / shell errors:** ensure `TMUX_TMPDIR` writable; run `grinta doctor` on WSL
 
 ## Checks

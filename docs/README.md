@@ -2,7 +2,7 @@
 
 **Users:** [QUICK_START.md](QUICK_START.md) → [SETTINGS.md](SETTINGS.md) → [USER_GUIDE.md](USER_GUIDE.md)
 
-**Windows / WSL:** [WINDOWS_AND_WSL.md](WINDOWS_AND_WSL.md)
+**Windows / WSL:** [QUICK_START.md](QUICK_START.md)
 
 **Problems:** [TROUBLESHOOTING.md](TROUBLESHOOTING.md) · [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md)
 

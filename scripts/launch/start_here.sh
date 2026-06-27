@@ -26,7 +26,7 @@ if [[ "$ROOT" == /mnt/* ]]; then
     echo -e "${YELLOW}WSL2: Grinta repo is on a Windows drive (${ROOT}).${NC}"
     echo -e "${YELLOW}      Official supported layout: clone repo to Linux home, project may stay on /mnt/c:${NC}"
     echo -e "${YELLOW}        git clone ${ROOT} ~/Grinta && cd ~/Grinta && bash start_here.sh${NC}"
-    echo -e "${YELLOW}      See docs/WINDOWS_AND_WSL.md${NC}"
+    echo -e "${YELLOW}      See docs/QUICK_START.md#wsl-ubuntu${NC}"
     echo ""
 elif [[ -n "${WSL_DISTRO_NAME:-}" ]] && [[ "$ROOT" != /mnt/* ]]; then
     echo -e "${GREEN}WSL2: repo on Linux filesystem (recommended).${NC}"

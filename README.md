@@ -52,57 +52,13 @@ The pitch in one sentence: **a local-first coding agent with deeper built-in too
 
 ## Install
 
-Full per-platform guide: [docs/QUICK_START.md](docs/QUICK_START.md)
-
-### Consumer (use the published app)
-
-Needs Python 3.12+ and `pipx`.
+**Consumer, dev, Windows, WSL2, Linux, macOS:** [docs/QUICK_START.md](docs/QUICK_START.md)
 
 ```bash
-pipx install grinta-ai
-cd "<project>"
-grinta                # first run opens setup wizard
+pipx install grinta-ai    # consumer — then cd "<project>" && grinta
 ```
 
-Settings: `~/.grinta/settings.json`
-
-### Dev (work from a source checkout)
-
-**Two folders:** `<Grinta-repo>` (Grinta code + settings) and `<project>` (your workspace). Bootstrap once, then `cd` + `grinta` every day.
-
-```bash
-# once
-cd "<Grinta-repo>"
-bash start_here.sh          # or .\START_HERE.ps1 on Windows
-pipx install -e "<Grinta-repo>"   # puts `grinta` on PATH for local code
-
-# every day
-cd "<project>"
-grinta
-```
-
-Without `pipx install -e`: `uv run --directory "<Grinta-repo>" grinta` (from `<project>`).  
-Use `-p "<project>"` only when you do **not** `cd` into the project first.
-
-**Windows / WSL:** separate installs — WSL2 is supported (repo on `~/`, project may be `/mnt/c`) — [docs/WINDOWS_AND_WSL.md](docs/WINDOWS_AND_WSL.md)
-
-Optional extras:
-
-```bash
-pipx install "grinta-ai[rag]"      # adds chromadb + embeddings for vector memory
-pipx install "grinta-ai[browser]"  # adds browser-use for web automation
-pipx install "grinta-ai[all]"      # rag + browser
-```
-
-RAG and browser stay opt-in — [docs/QUICK_START.md](docs/QUICK_START.md).
-
-**Windows users:** native Windows (PowerShell / Git Bash) and **WSL/Ubuntu are separate installs** — see [docs/WINDOWS_AND_WSL.md](docs/WINDOWS_AND_WSL.md).
-
-Full minimal paths + optional commands: [docs/QUICK_START.md](docs/QUICK_START.md).
-
-## Command cheat sheet
-
-[docs/QUICK_START.md](docs/QUICK_START.md) — consumer vs dev, daily `grinta` workflow, all platforms.
+Optional extras: `pipx install "grinta-ai[rag]"` · `"grinta-ai[browser]"` · `"grinta-ai[all]"` — details in [Quick Start](docs/QUICK_START.md).
 
 ## What you get
 
