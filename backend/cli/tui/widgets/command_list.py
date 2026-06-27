@@ -32,6 +32,85 @@ KEYBOARD_SHORTCUTS: list[tuple[str, str]] = [
 ]
 
 
+# Aliases so the help dialog shows what the user actually presses, even
+# when Textual's binding key string uses symbols or canonical form.
+_BINDING_KEY_ALIASES: dict[str, str] = {
+    'ctrl+c': 'Ctrl+C',
+    'ctrl+shift+c': 'Ctrl+Shift+C',
+    'escape': 'Esc',
+    'ctrl+l': 'Ctrl+L',
+    'ctrl+space': 'Ctrl+Space',
+    'ctrl+z': 'Ctrl+Z',
+    'tab': 'Tab',
+    'enter': 'Enter',
+    'pageup': 'PageUp',
+    'pagedown': 'PageDown',
+    'home': 'Home',
+    'end': 'End',
+    'ctrl+b': 'Ctrl+B',
+    'f1': 'F1',
+    'ctrl+j': 'Ctrl+J',
+    'ctrl+k': 'Ctrl+K',
+    'ctrl+p': 'Ctrl+P',
+    'ctrl+n': 'Ctrl+N',
+}
+
+
+def shortcuts_from_bindings(
+    bindings: list[tuple[str, str]],
+    *,
+    also_document: tuple[str, ...] = ('Enter', 'Esc'),
+) -> list[tuple[str, str]]:
+    """Derive the help-dialog shortcuts list from a (key, action) binding table.
+
+    ``also_document`` is an allowlist of canonical names that should
+    always appear even if the binding is ``show=False`` and the action
+    isn't user-discoverable from a footer. ``Enter`` and ``Esc`` are the
+    most common.
+    """
+    seen: set[str] = set()
+    rows: list[tuple[str, str]] = []
+    for key, action in bindings:
+        label = _BINDING_KEY_ALIASES.get(key.lower(), key)
+        if label in seen:
+            continue
+        seen.add(label)
+        rows.append((label, action))
+    for label in also_document:
+        if label not in seen:
+            seen.add(label)
+            rows.append((label, '(see BINDINGS)'))
+    return rows
+
+
+def build_help_shortcuts(
+    screen_bindings: list | None = None,
+) -> list[tuple[str, str]]:
+    """Public entry point — pulls the live bindings from ``GrintaScreen``.
+
+    Falls back to the static ``KEYBOARD_SHORTCUTS`` list if the import
+    fails (e.g. when this module is used outside the TUI, like in tests
+    that import ``command_list`` without the full app).
+    """
+    if screen_bindings is None:
+        try:
+            from backend.cli.tui.app import GrintaScreen
+
+            screen_bindings = GrintaScreen.BINDINGS
+        except Exception:
+            return list(KEYBOARD_SHORTCUTS)
+
+    bindings_as_tuples: list[tuple[str, str]] = []
+    for b in screen_bindings:
+        try:
+            bindings_as_tuples.append((b.key, b.action))
+        except AttributeError:
+            bindings_as_tuples.append((b[0], b[1]))
+    return shortcuts_from_bindings(
+        bindings_as_tuples, also_document=('Enter', 'Esc', 'Tab')
+    )
+
+
 # Slash commands that need arguments before they can run.
 _SLASH_COMMANDS_REQUIRING_ARGS = frozenset({'/resume'})
 
