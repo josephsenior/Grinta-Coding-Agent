@@ -343,6 +343,7 @@ class RendererDisplayMixin:
     def _refresh_tasks_sidebar(self) -> None:
         """Keep task rows live even while transcript streaming is throttled."""
         from backend.cli.tui.widgets.collapsible import CollapsibleSection, SidebarRow
+        from backend.core.tasks.task_status import TASK_STATUS_DONE
 
         task_signature = task_panel_signature(self._task_list)
         signature_key = tuple(task_signature)
@@ -350,9 +351,17 @@ class RendererDisplayMixin:
             return
 
         task_items = self._build_task_sidebar_items(task_signature)
+        total = len(task_signature)
+        done = sum(1 for _tid, status, _desc in task_signature if status == TASK_STATUS_DONE)
+        if total == 0:
+            title = 'Tasks'
+        elif done >= total:
+            title = f'Tasks · {done}/{total} done'
+        else:
+            title = f'Tasks · {done}/{total} done'
         if not self._update_sidebar_section(
             '#sidebar-tasks',
-            f'Tasks ({len(task_signature)})',
+            title,
             task_items,
         ):
             return
@@ -437,18 +446,23 @@ class RendererDisplayMixin:
             return False
 
     def _build_task_sidebar_items(self, task_signature):
-        _TASK_TO_SIDEBAR_STATUS = {
-            'done': 'ok',
-            'in_progress': 'running',
-            'blocked': 'err',
-            'todo': 'neutral',
-            'skipped': 'warn',
-        }
+        # Map task-tracker statuses to sidebar status keys. The sidebar uses
+        # the canonical 'todo' / 'in_progress' / 'done' / 'skipped' / 'blocked'
+        # names directly so the SidebarRow can pick up the matching
+        # TASK_STATUS_PLAN_ICONS glyph (text-readable, not just color).
         task_items = []
-        for task_id, status, desc in task_signature:
-            item_status = _TASK_TO_SIDEBAR_STATUS.get(status, 'neutral')
-            meta = task_id if task_id and task_id != '?' else None
-            task_items.append((desc, f'task:{task_id}', False, item_status, meta))
+        for index, (task_id, status, desc) in enumerate(task_signature, start=1):
+            task_items.append(
+                (
+                    desc,
+                    f'task:{task_id}',
+                    False,
+                    status,
+                    None,
+                    True,
+                    {'prefix': f'{index}.'},
+                )
+            )
         return task_items
 
     def _build_mcp_sidebar_items(self, mcp_servers):

@@ -21,6 +21,7 @@ from backend.cli.theme import (
     NAVY_ERROR,
     NAVY_READY,
     NAVY_RUNNING,
+    NAVY_TEXT_DIM,
     NAVY_TEXT_MUTED,
     NAVY_WAITING,
 )
@@ -33,6 +34,13 @@ STATUS_COLORS = {
     'neutral': NAVY_TEXT_MUTED,
     'running': NAVY_RUNNING,
     'skill': NAVY_DOMAIN_SKILLS,
+    # Task-tracker statuses (kept distinct from generic "warn" so a
+    # blocked task isn't visually identical to a generic warning).
+    'todo': NAVY_TEXT_DIM,
+    'in_progress': NAVY_RUNNING,
+    'done': NAVY_READY,
+    'skipped': NAVY_TEXT_MUTED,
+    'blocked': NAVY_WAITING,
 }
 
 STATUS_ICONS = {
@@ -86,10 +94,12 @@ class SidebarRow(Static):
         toggleable: bool = False,
         disabled: bool = False,
         view_only: bool = False,
+        prefix: str | None = None,
     ) -> None:
         self._label = label
         self._status = status or 'neutral'
         self._meta = meta
+        self._prefix = prefix
         self.interactive = interactive
         self.item_id = item_id
         self.deletable = deletable
@@ -118,15 +128,23 @@ class SidebarRow(Static):
         return STATUS_COLORS.get(self._status, '#969aad')
 
     def _bullet_glyph(self) -> str:
-        if self._status == 'skill' and not self._disabled:
-            return SIDEBAR_BULLET
         if self._disabled or self.view_only:
             return SIDEBAR_BULLET_DIM
+        if self._status == 'skill':
+            return SIDEBAR_BULLET
+        # Task-tracker statuses use the canonical plan-style glyphs
+        # so the state is legible from the text, not just from color.
+        from backend.core.tasks.task_status import TASK_STATUS_PLAN_ICONS
+
+        task_glyph = TASK_STATUS_PLAN_ICONS.get(self._status)
+        if task_glyph is not None:
+            return task_glyph
         return SIDEBAR_BULLET
 
     def _build_markup(self) -> str:
         color = self._bullet_color()
         bullet_part = f'[{color}]{self._bullet_glyph()}[/]'
+        prefix_part = f'[{color}]{self._prefix}[/]  ' if self._prefix else ''
         if self._disabled:
             label_part = f'[#54597b][strike]{self._label}[/][/]'
         elif self.view_only:
@@ -134,7 +152,7 @@ class SidebarRow(Static):
         else:
             label_part = f'[#c8d4e8]{self._label}[/]'
         meta_part = f'  [#54597b]{self._meta}[/]' if self._meta else ''
-        return f'{bullet_part} {label_part}{meta_part}'
+        return f'{bullet_part} {prefix_part}{label_part}{meta_part}'
 
     def _refresh_row_markup(self) -> None:
         self.update(self._build_markup())
@@ -497,6 +515,7 @@ class CollapsibleSection(Container):
             toggleable=item.get('toggleable', False),
             disabled=item.get('disabled', False),
             view_only=item.get('view_only', False),
+            prefix=item.get('prefix'),
         )
 
     def compose(self) -> ComposeResult:
@@ -632,6 +651,7 @@ class CollapsibleSection(Container):
         meta = item[4] if len(item) >= 5 else None
         interactive = bool(item[5]) if len(item) >= 6 else True
         options = item[6] if len(item) >= 7 and isinstance(item[6], dict) else {}
+        prefix = options.get('prefix') if options else None
         return {
             'label': label,
             'item_id': item_id,
@@ -642,6 +662,7 @@ class CollapsibleSection(Container):
             'toggleable': bool(options.get('toggleable', False)),
             'disabled': bool(options.get('disabled', False)),
             'view_only': bool(options.get('view_only', False)),
+            'prefix': prefix,
         }
 
     def set_items(
