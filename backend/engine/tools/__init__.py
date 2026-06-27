@@ -15,10 +15,11 @@ from .meta_cognition import (
     create_ask_user_tool,
 )
 from .native_file_tools import (
-    create_create_tool,
+    create_create_file_tool,
     create_find_symbols_tool,
     create_multiedit_tool,
-    create_read_tool,
+    create_read_file_tool,
+    create_read_symbol_tool,
     create_replace_string_tool,
     create_undo_last_edit_tool,
 )
@@ -29,10 +30,11 @@ __all__ = [
     'create_checkpoint_tool',
     'create_ask_user_tool',
     'create_lsp_query_tool',
-    'create_create_tool',
+    'create_create_file_tool',
     'create_find_symbols_tool',
     'create_multiedit_tool',
-    'create_read_tool',
+    'create_read_file_tool',
+    'create_read_symbol_tool',
     'create_replace_string_tool',
     'create_undo_last_edit_tool',
     'create_memory_tool',

@@ -58,10 +58,11 @@ from backend.engine.function_calling.helpers import combine_thought
 from backend.engine.response_processing import common_response_to_actions
 from backend.engine.tools import (
     create_cmd_run_tool,
-    create_create_tool,
+    create_create_file_tool,
     create_find_symbols_tool,
     create_multiedit_tool,
-    create_read_tool,
+    create_read_file_tool,
+    create_read_symbol_tool,
     create_replace_string_tool,
 )
 from backend.ledger.action import Action, AgentThinkAction
@@ -101,14 +102,17 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
             str, create_cmd_run_tool().get('function', {}).get('name', '')
         ): _handle_cmd_run_tool,
         cast(
-            str, create_read_tool().get('function', {}).get('name', '')
-        ): _handle_read_tool,
+            str, create_read_file_tool().get('function', {}).get('name', '')
+        ): _handle_read_file_tool,
+        cast(
+            str, create_read_symbol_tool().get('function', {}).get('name', '')
+        ): _handle_read_symbol_tool,
         cast(
             str, create_find_symbols_tool().get('function', {}).get('name', '')
         ): _handle_find_symbols_tool,
         cast(
-            str, create_create_tool().get('function', {}).get('name', '')
-        ): _handle_create_tool,
+            str, create_create_file_tool().get('function', {}).get('name', '')
+        ): _handle_create_file_tool,
         cast(
             str, create_replace_string_tool().get('function', {}).get('name', '')
         ): _handle_replace_string_tool,
@@ -210,7 +214,7 @@ def _validate_tool_mode(
         ):
             raise FunctionCallValidationError(
                 f'Tool `{tool_name}` is not available in Chat Mode. '
-                'Use discovery tools (read, grep, glob, find_symbols, lsp, analyze_project_structure) or ask_user only.'
+                'Use discovery tools (read_file, read_symbol, grep, glob, find_symbols, lsp, analyze_project_structure) or ask_user only.'
             )
     if normalized_mode == PLAN_MODE and tool_name not in PLAN_MODE_ALLOWED_TOOLS:
         raise FunctionCallValidationError(
@@ -222,7 +226,7 @@ def _validate_tool_mode(
 def _validate_tool_exists(tool_name: str) -> None:
     if tool_name == 'file_editor':
         raise FunctionCallValidationError(
-            'The legacy file_editor tool has been removed. Use read, create, replace_string, or multiedit.'
+            'The legacy file_editor tool has been removed. Use read_file, create_file, replace_string, or multiedit.'
         )
 
 
@@ -269,13 +273,14 @@ from backend.engine.tools._file_edits import (  # noqa: E402, F401
     _build_create_file_action,
     _build_read_file_action,
     _coerce_read_symbol_targets,
-    _handle_create_tool,
+    _handle_create_file_tool,
     _handle_find_symbols_tool,
     _handle_multi_edit_command,
     _handle_multiedit_tool,
+    _handle_read_file_tool,
     _handle_read_range_public,
+    _handle_read_symbol_tool,
     _handle_read_symbols_public,
-    _handle_read_tool,
     _handle_replace_string_tool,
     _multi_edit_raise,
     _multi_edit_relative_path,

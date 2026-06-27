@@ -54,8 +54,8 @@ These are the main implementation files in `backend/engine/` today:
 The exact tool list is **configuration-dependent**. A typical Orchestrator session exposes a mix of:
 
 - reasoning and control tools: `think`, `finish`, `task_tracker`
-- project exploration tools: `grep`, `glob`, `analyze_project_structure`, `read`, `find_symbols`
-- editing tools: `create`, `replace_string`, `multiedit`
+- project exploration tools: `grep`, `glob`, `analyze_project_structure`, `read_file`, `read_symbol`, `find_symbols`
+- editing tools: `create_file`, `replace_string`, `multiedit`
 - execution tools: `bash`, `terminal_manager`
 - memory tool: `memory` (`working` | `persist` | `recall`)
 - external capability bridge: `call_mcp_tool`

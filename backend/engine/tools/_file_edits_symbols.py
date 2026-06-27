@@ -15,7 +15,7 @@ from backend.core.enums import FileEditSource, FileReadSource
 from backend.core.errors import FunctionCallValidationError
 from backend.core.tools.tool_names import (
     FIND_SYMBOLS_TOOL_NAME,
-    READ_TOOL_NAME,
+    READ_FILE_TOOL_NAME,
 )
 from backend.engine.function_calling.helpers import (
     parse_bool_argument,
@@ -71,9 +71,9 @@ def _build_read_file_action(
 
 
 def _handle_read_range_public(arguments: Mapping[str, Any]) -> Action:
-    path = require_tool_argument(arguments, 'path', READ_TOOL_NAME)
-    start_line = require_tool_argument(arguments, 'start_line', READ_TOOL_NAME)
-    end_line = require_tool_argument(arguments, 'end_line', READ_TOOL_NAME)
+    path = require_tool_argument(arguments, 'path', READ_FILE_TOOL_NAME)
+    start_line = require_tool_argument(arguments, 'start_line', READ_FILE_TOOL_NAME)
+    end_line = require_tool_argument(arguments, 'end_line', READ_FILE_TOOL_NAME)
     try:
         start_i = int(start_line)
         end_i = int(end_line)
@@ -379,32 +379,6 @@ def _coerce_read_symbol_targets(
         'or qualified_name, symbol_name, or symbol_id.'
     )
 
-
-def _infer_read_type(arguments: Mapping[str, Any]) -> str | None:
-    """Infer read kind from argument shape when type is omitted."""
-    if _coerce_symbols_list_argument(arguments.get('symbols')) is not None:
-        return 'symbols'
-    for key in ('qualified_name', 'symbol_name', 'symbol_id'):
-        if str(arguments.get(key) or '').strip():
-            return 'symbols'
-    if arguments.get('start_line') is not None or arguments.get('end_line') is not None:
-        return 'file'
-    if str(arguments.get('path') or '').strip():
-        return 'file'
-    return None
-
-
-def _resolve_read_type(arguments: Mapping[str, Any]) -> str:
-    explicit = str(arguments.get('type', '') or '').strip().lower()
-    if explicit:
-        return explicit
-    inferred = _infer_read_type(arguments)
-    if inferred:
-        return inferred
-    raise FunctionCallValidationError(
-        'read requires type ("file" or "symbols") or inferrable arguments '
-        '(path, symbols[], or qualified_name/symbol_name/symbol_id).'
-    )
 
 
 def _build_read_symbols_payload(action: ReadSymbolsAction) -> dict[str, Any]:

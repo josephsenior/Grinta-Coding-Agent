@@ -1,18 +1,18 @@
 """Native public file tools for the agent.
 
-The public file API separates creation from editing: ``create`` creates new
-files, while editing existing content is limited to ``replace_string`` and
-``multiedit`` (a batch of ``replace_string`` operations). Symbol discovery
-lives in ``find_symbols`` and ``read(type=symbols)``.
+The public file API separates discovery from editing: ``read_file`` and
+``read_symbol`` for reading, ``create_file`` for new files, ``replace_string``
+and ``multiedit`` for edits, ``find_symbols`` for symbol discovery.
 """
 
 from __future__ import annotations
 
 from backend.core.tools.tool_names import (
-    CREATE_TOOL_NAME,
+    CREATE_FILE_TOOL_NAME,
     FIND_SYMBOLS_TOOL_NAME,
     MULTIEDIT_TOOL_NAME,
-    READ_TOOL_NAME,
+    READ_FILE_TOOL_NAME,
+    READ_SYMBOL_TOOL_NAME,
     REPLACE_STRING_TOOL_NAME,
     UNDO_LAST_EDIT_TOOL_NAME,
 )
@@ -24,43 +24,41 @@ from backend.engine.tools.param_defs import (
 )
 
 
-def create_read_tool() -> ChatCompletionToolParam:
+def create_read_file_tool() -> ChatCompletionToolParam:
     return create_tool_definition(
-        name=READ_TOOL_NAME,
+        name=READ_FILE_TOOL_NAME,
         description=(
-            'Read a file, a line range within a file, or one or more symbol bodies. '
-            'For files: use type=file with path; add start_line and end_line for a range. '
-            'For symbols: use type=symbols with symbols[] (one or more targets). Unique '
-            'symbols auto-resolve; ambiguous symbols return candidates, not guessed bodies. '
-            'When type is omitted: path-only or line bounds infer file; symbols[] or '
-            'qualified_name/symbol_name/symbol_id infer symbols.'
+            'Read a file, optionally a line range. '
+            'Add start_line and end_line for a range (1-based; end_line=-1 for EOF). '
+            'Omit both start_line and end_line for the whole file.'
         ),
         properties={
-            'type': {
-                'type': 'string',
-                'enum': ['file', 'symbols'],
-                'description': (
-                    'Read kind: file (optionally a line range) or symbol bodies. '
-                    'Optional when path, symbols[], or symbol identifiers make the intent clear.'
-                ),
-            },
-            'path': get_path_param(
-                'Project-relative path. Required for type=file; optional default for all symbols[].'
-            ),
+            'path': get_path_param('Project-relative path. Required.'),
             'start_line': {
                 'type': 'integer',
-                'description': '1-based inclusive start line for type=file line-range reads.',
+                'description': '1-based inclusive start line for line-range reads.',
             },
             'end_line': {
                 'type': 'integer',
-                'description': '1-based inclusive end line for type=file line-range reads. Use -1 for EOF.',
+                'description': '1-based inclusive end line. Use -1 for EOF.',
             },
+        },
+        required=['path'],
+    )
+
+
+def create_read_symbol_tool() -> ChatCompletionToolParam:
+    return create_tool_definition(
+        name=READ_SYMBOL_TOOL_NAME,
+        description=(
+            'Read one or more symbol bodies from a file. '
+            'Each item in symbols[] needs qualified_name or symbol_name; '
+            'unique symbols auto-resolve; ambiguous symbols return candidates.'
+        ),
+        properties={
             'symbols': {
                 'type': 'array',
-                'description': (
-                    'Required for type=symbols. Each item needs qualified_name or symbol_name; '
-                    'optional per-item path, symbol_kind, parent_symbol, occurrence, or symbol_id.'
-                ),
+                'description': 'One or more symbol targets.',
                 'items': {
                     'type': 'object',
                     'properties': {
@@ -74,12 +72,15 @@ def create_read_tool() -> ChatCompletionToolParam:
                     },
                 },
             },
+            'path': get_path_param(
+                'Optional default project-relative path for all symbols[].'
+            ),
             'symbol_kind': {
                 'type': 'string',
                 'description': 'Default symbol kind for all symbols[] items (function, class, method).',
             },
         },
-        required=[],
+        required=['symbols'],
     )
 
 
@@ -111,9 +112,9 @@ def create_find_symbols_tool() -> ChatCompletionToolParam:
     )
 
 
-def create_create_tool() -> ChatCompletionToolParam:
+def create_create_file_tool() -> ChatCompletionToolParam:
     return create_tool_definition(
-        name=CREATE_TOOL_NAME,
+        name=CREATE_FILE_TOOL_NAME,
         description=(
             'Create a new file. Fails if the file already exists; use replace_string '
             'or multiedit to modify an existing file.'
@@ -207,10 +208,11 @@ def create_multiedit_tool() -> ChatCompletionToolParam:
 
 
 __all__ = [
-    'create_create_tool',
+    'create_create_file_tool',
     'create_find_symbols_tool',
     'create_multiedit_tool',
-    'create_read_tool',
+    'create_read_file_tool',
+    'create_read_symbol_tool',
     'create_replace_string_tool',
     'create_undo_last_edit_tool',
 ]

@@ -2,9 +2,10 @@
 
 Grinta exposes a single native tool-call surface for file and code work:
 
-- `read` inspects files, ranges, or one or more symbol bodies.
+- `read_file` reads a file, optionally a line range.
+- `read_symbol` reads one or more symbol bodies.
 - `find_symbols` discovers symbol candidates without reading full bodies.
-- `create` creates new files.
+- `create_file` creates new files.
 - `replace_string` performs exact one-file text replacement, insertion by anchor, and deletion.
 - `multiedit` stages coordinated `replace_string` changes across one or more files and commits them atomically.
 - `undo_last_edit` reverts the last content edit on an existing file.

@@ -76,7 +76,7 @@ def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
             '- **Language servers (LSP / `lsp`)**: detected on PATH → '
             f'{", ".join(lsp_available)}. Use `lsp` for definition / '
             'references / hover / diagnostics on these languages. '
-            'For file edits use the public file API tools; `lsp` is read-only. For file reads use `read`.'
+            'For file edits use the public file API tools; `lsp` is read-only. For file reads use `read_file` / `read_symbol`.'
         )
     else:
         lsp_line = ''

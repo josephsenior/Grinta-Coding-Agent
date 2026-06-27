@@ -442,9 +442,9 @@ class TestProcessSingleToolCall:
             _process_single_tool_call(tc, {'summary': 'done'})
 
     def test_plan_mode_rejects_mutating_file_tool_call(self):
-        from backend.engine.tools.native_file_tools import create_create_tool
+        from backend.engine.tools.native_file_tools import create_create_file_tool
 
-        tool_name = create_create_tool()['function']['name']
+        tool_name = create_create_file_tool()['function']['name']
         tc = self._make_tool_call(tool_name)
         with pytest.raises(FunctionCallValidationError, match='Plan Mode'):
             _process_single_tool_call(

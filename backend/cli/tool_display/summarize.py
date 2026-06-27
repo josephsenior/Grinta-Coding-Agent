@@ -415,7 +415,7 @@ _TOOL_SUMMARIZERS: dict[str, Callable[[dict[str, Any]], str]] = {
     'execute_bash': _summary_shell,
     'execute_powershell': _summary_shell,
     'read_file': _summary_read_file,
-    'create': _summary_create,
+    'create_file': _summary_create,
     'replace_string': _summary_replace_string,
     'multiedit': _summary_multiedit,
     'find_symbols': _summary_find_symbol,
