@@ -49,13 +49,14 @@ Before **1.0.0 GA**, and again after onboarding-affecting changes, keep **at lea
 
 ### A. `pipx` install (required ×3)
 
-Prerequisites: Python 3.12+, [pipx](https://pipx.pypa.io/).
+See [QUICK_START.md](QUICK_START.md#consumer-mode-use-the-app). Prerequisites: Python 3.12+ and `pipx`.
 
 ```bash
 pipx install grinta-ai
-grinta init
 grinta
 ```
+
+Record whether setup completed during first `grinta` launch or via optional `grinta init`.
 
 First task example (after the TUI loads):
 
@@ -67,7 +68,7 @@ Record:
 
 - OS and version (Linux or Windows)
 - Python version
-- Provider chosen in `grinta init`
+- Provider chosen during setup (first `grinta` or `grinta init`)
 - Pass / fail for: install, init, TUI launch, first task
 - Notes (errors, friction, screenshots)
 
@@ -75,23 +76,21 @@ File each report under [onboarding_reports/](onboarding_reports/) using [REPORT_
 
 ### B. Source `uv` checkout (required ×3)
 
-Prerequisites: Python 3.12+, [uv](https://docs.astral.sh/uv/).
+See [QUICK_START.md](QUICK_START.md#dev-mode-source-checkout). Prerequisites: none — start scripts install `uv` and Python 3.12 when missing.
 
 ```bash
 git clone https://github.com/josephsenior/Grinta-Coding-Agent.git
 cd Grinta-Coding-Agent
-python scripts/bootstrap_env.py dev-test
-uv run python -m backend.cli.entry init
-uv run python -m backend.cli.entry
+bash start_here.sh    # Windows: .\START_HERE.ps1
 ```
 
-Windows alternative:
+First task example (after the TUI loads):
 
-```powershell
-.\START_HERE.ps1
+```text
+Run /health and tell me whether git and ripgrep are detected.
 ```
 
-Same first-task prompt as above. Record the same fields.
+Same fields as section A.
 
 ### C. Docker (optional ×1)
 
@@ -130,7 +129,7 @@ Copy into a release issue, RC feedback issue, or internal GA doc:
 ## Related docs
 
 - [INSTALL.md](INSTALL.md) — install paths
-- [QUICK_START.md](QUICK_START.md) — contributor quick start
+- [QUICK_START.md](QUICK_START.md) — minimal consumer and dev commands
 - [USER_GUIDE.md](USER_GUIDE.md) — configuration and first run
 - [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) — full GA gates
 - [CI.md](CI.md) — how Smoke Install fits in CI

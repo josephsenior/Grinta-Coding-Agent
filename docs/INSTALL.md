@@ -8,33 +8,48 @@ Requires Python 3.12+ and `pipx`.
 
 ```bash
 pipx install grinta-ai
-grinta init           # First-run wizard: pick provider, paste key
-grinta                # Start the terminal app
+cd /path/to/your/project
+grinta
 ```
 
-**Windows convenience (pipx):** after `pipx install grinta-ai`, run
-[`START_HERE.ps1`](START_HERE.ps1) with `-Pipx` from a source checkout (or run
-[`scripts/launch/start_here_pipx.ps1`](scripts/launch/start_here_pipx.ps1)
-directly) to probe local model servers, run `grinta init` when
-`~/.grinta/settings.json` is missing, and launch the TUI. Unix/macOS pipx users:
-[`start_here.sh --pipx`](start_here.sh).
+First interactive run runs the setup wizard automatically (provider + key). You do **not** need `grinta init` before the first `grinta`.
 
-Works on Windows, macOS, Linux. Requires Python 3.12+. Installed runs store settings at `~/.grinta/settings.json` and runtime state under `~/.grinta/workspaces/<id>/storage`.
+**Optional:** `grinta init` — reconfigure without the TUI; `grinta init --non-interactive` for CI. `grinta doctor` — troubleshoot install.
+
+**Windows convenience (pipx):** [`START_HERE.ps1 -Pipx`](../START_HERE.ps1) or [`start_here.sh --pipx`](../start_here.sh) — probe local models and launch the TUI (setup runs on first launch if settings are missing).
+
+Works on Windows, macOS, Linux. Settings: `~/.grinta/settings.json`.
+
+**Windows + WSL:** separate install inside WSL — [WINDOWS_AND_WSL.md](WINDOWS_AND_WSL.md).
 
 ## 2. From source with `uv` (recommended for contributors)
 
-Requires Python 3.12+ and `uv`.
+**Prerequisites:** none for the start scripts — they install `uv` and Python 3.12 automatically when missing. Consumer `pipx` still needs Python 3.12+ and `pipx` on PATH.
+
+**Minimal (first time):**
+
+| Platform | Command |
+| --- | --- |
+| Windows | `.\START_HERE.ps1` |
+| WSL / Linux / macOS | `bash start_here.sh` |
+
+**On a project after setup:**
 
 ```bash
-git clone https://github.com/josephsenior/Grinta-Coding-Agent.git
-cd Grinta-Coding-Agent
-python scripts/bootstrap_env.py dev-test
-uv run python -m backend.cli.entry init
+uv run --directory <Grinta-repo> python -m backend.cli.entry -p .
+```
+
+Manual bootstrap (equivalent to what `START_HERE` does):
+
+```bash
+uv python install 3.12
+uv run python scripts/bootstrap_env.py dev-test
 uv run python -m backend.cli.entry
 ```
 
-Source checkouts use the repository `settings.json` by default so contributors can keep project-local development config.
-Interactive TTY sessions launch the Textual UI; piped stdin uses the non-interactive runner.
+First run runs setup automatically if no provider/key is configured. Optional: `uv run python -m backend.cli.entry init` to configure without launching the TUI.
+
+Source checkouts use `<Grinta-repo>/settings.json`. Interactive TTY → Textual UI; piped stdin → non-interactive runner.
 
 Optional local model discovery from source:
 
@@ -48,7 +63,7 @@ uv run python -m backend.inference.discover_models status
 ```bash
 brew tap josephsenior/grinta https://github.com/josephsenior/Grinta-Coding-Agent
 brew install grinta
-grinta init
+grinta
 ```
 
 The formula lives in [`packaging/homebrew/grinta.rb`](../packaging/homebrew/grinta.rb).
@@ -58,7 +73,7 @@ The formula lives in [`packaging/homebrew/grinta.rb`](../packaging/homebrew/grin
 ```powershell
 scoop bucket add grinta https://github.com/josephsenior/Grinta-Coding-Agent
 scoop install grinta
-grinta init
+grinta
 ```
 
 The manifest lives in [`packaging/scoop/grinta.json`](../packaging/scoop/grinta.json).
@@ -105,7 +120,8 @@ When an extra is installed, matching tools appear automatically (config defaults
 
 ## After installation
 
-- Run `grinta init` to configure your LLM provider interactively.
+- Run `grinta` from a project folder — setup runs automatically on first interactive launch.
+- Optional: `grinta init` to reconfigure without the TUI; `grinta doctor` to troubleshoot.
 - For manual settings, reference secrets as `${LLM_API_KEY}` and put the real value in `.env` next to `settings.json` or in your shell environment.
 - Run `grinta --help` to see CLI flags and subcommands.
 - Inside the terminal app, type `/help` for slash commands.

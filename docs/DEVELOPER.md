@@ -122,7 +122,7 @@ Important entrypoints:
 
 `settings.json` is the default user-facing local config file in a source checkout. Installed CLI runs use `~/.grinta/settings.json`; `APP_ROOT` can intentionally override the settings root.
 
-Copy [settings.template.json](../settings.template.json) or run `grinta init`. The template matches the init wizard output shape:
+Copy [settings.template.json](../settings.template.json), run `grinta init`, or let first `grinta` launch write settings. The template matches the init wizard output shape:
 
 | Block | Purpose |
 | --- | --- |

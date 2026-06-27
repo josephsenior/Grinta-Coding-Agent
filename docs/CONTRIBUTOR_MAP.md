@@ -7,13 +7,15 @@ Task-oriented entry points for navigating Grinta. Use this before diving into
 ## Bootstrap (first 30 minutes)
 
 ```bash
-python scripts/bootstrap_env.py dev-test
-uv run python -m backend.cli.entry init   # optional: configure a model
+bash start_here.sh          # or .\START_HERE.ps1 — installs uv + Python when missing
+# Or manually:
+uv run python scripts/bootstrap_env.py dev-test
+uv run python -m backend.cli.entry          # setup wizard on first launch if unconfigured
 PYTHONPATH=. uv run pytest backend/tests/unit -q
 ```
 
-Install path for end users: `pipx install grinta-ai`. Contributors should use
-`uv run` from a source checkout so dependencies stay isolated.
+Install path for end users: `pipx install grinta-ai` → `grinta`. See [QUICK_START.md](QUICK_START.md).
+Contributors should use `uv run` from a source checkout so dependencies stay isolated.
 
 ## Where to start by task
 
