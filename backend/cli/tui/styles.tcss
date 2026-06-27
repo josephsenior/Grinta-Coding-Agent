@@ -287,7 +287,6 @@ SidebarManageButton.-skill:focus {
 GrintaManageMCPDialog > #dialog-container,
 GrintaManageSkillsDialog > #dialog-container {
     width: 88;
-    min-width: 88;
     max-width: 96%;
 }
 

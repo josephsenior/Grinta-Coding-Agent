@@ -68,7 +68,8 @@ async def test_tui_confirmation_widget_renders_visible_content(
         widget.configure(
             'Run Command',
             'High',
-            'bold red',
+            'bold #fd8383',
+            'confirm-risk-high',
             'rm -rf /',
             [('approve', 'Accept'), ('reject', 'Reject')],
             recommended=0,
@@ -115,7 +116,8 @@ async def test_tui_confirmation_widget_acceptance_decision_survives_hide(
         widget.configure(
             'Run Command',
             'High',
-            'bold red',
+            'bold #fd8383',
+            'confirm-risk-high',
             'rm -rf /',
             [('approve', 'Accept'), ('always', 'Always'), ('reject', 'Reject')],
             recommended=0,

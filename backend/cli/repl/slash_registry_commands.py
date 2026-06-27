@@ -273,7 +273,11 @@ _SLASH_COMMANDS = (
         help_section='control',
     ),
     SlashCommandSpec(
-        '/clear', 'Clear the visible transcript', '/clear', help_section='control'
+        '/clear',
+        'Clear the visible transcript',
+        '/clear',
+        aliases=('/c',),
+        help_section='control',
     ),
     SlashCommandSpec(
         '/exit', 'Quit grinta', '/exit', aliases=('/quit',), help_section='system'
@@ -283,7 +287,13 @@ _SLASH_COMMANDS = (
 
 
 def _load_known_models() -> tuple[tuple[str, str], ...]:
-    """Load provider/model completions from the catalog."""
+    """Load provider/model completions from the catalog.
+
+    If the catalog cannot be loaded (e.g. before first-run setup, or in a
+    minimal install), we return an empty list rather than guessing at model
+    IDs. The /model command will display a "catalog unavailable" message in
+    that case.
+    """
     try:
         from backend.inference.catalog.catalog_loader import (
             get_catalog,
@@ -296,11 +306,7 @@ def _load_known_models() -> tuple[tuple[str, str], ...]:
             if entry.featured
         )
     except Exception:
-        return (
-            ('openai/gpt-5.1', 'openai'),
-            ('anthropic/claude-sonnet-4-6', 'anthropic'),
-            ('google/gemini-3-flash', 'google'),
-        )
+        return ()
 
 
 # Known models surfaced in `/model` tab-completion.
@@ -335,5 +341,4 @@ def slash_hints_from_registry() -> dict[str, str]:
     hints['/quit'] = '/quit'
     hints['/exit'] = '/exit'
     hints['/clear'] = '/clear'
-    hints['/c'] = '/clear'
     return hints

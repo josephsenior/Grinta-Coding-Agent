@@ -112,8 +112,6 @@ def _add_common_args(parser: argparse.ArgumentParser) -> None:
         choices=[
             'default',
             'dark',
-            'light',
-            'high-contrast',
             'ocean',
             'mono',
             'deep-system-instrumentation',

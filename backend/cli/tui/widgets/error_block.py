@@ -10,7 +10,7 @@ from textual.app import ComposeResult
 from textual.containers import Container
 from textual.widgets import Static
 
-from backend.cli.theme import CLR_ERROR_BODY, CLR_ERROR_PIPE, CLR_ERROR_PREFIX
+from backend.cli.theme import CLR_ERROR_BODY, CLR_ERROR_PREFIX
 
 
 class ErrorBlock(Container):
@@ -35,7 +35,6 @@ class ErrorBlock(Container):
     def __init__(self, renderable: Any, *, id: str | None = None) -> None:
         super().__init__(id=id)
         self._renderable = renderable
-        self.styles.border_left = ('solid', CLR_ERROR_PIPE)
 
     def compose(self) -> ComposeResult:
         yield Static(self._renderable, id='error-content')

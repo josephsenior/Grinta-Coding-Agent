@@ -115,7 +115,8 @@ class ConfirmWidget(Widget):
         self,
         action_type: str,
         risk_label: str,
-        risk_class: str,
+        risk_style: str,
+        risk_css_class: str,
         target: str,
         options: list[tuple[str, str]],
         recommended: int | None = None,
@@ -127,12 +128,23 @@ class ConfirmWidget(Widget):
             info = (
                 f'[dim]Agent wants to {verb}[/] '
                 f'[white]{truncated}[/] '
-                f'[{risk_class}]({risk_label} risk)[/]'
+                f'[{risk_style}]({risk_label} risk)[/]'
             )
         else:
-            info = f'[dim]Agent wants to {verb}[/] [{risk_class}]({risk_label} risk)[/]'
+            info = (
+                f'[dim]Agent wants to {verb}[/] '
+                f'[{risk_style}]({risk_label} risk)[/]'
+            )
 
         info_static = self.query_one('#confirm-info', Static)
+        for cls in (
+            'confirm-risk-low',
+            'confirm-risk-medium',
+            'confirm-risk-high',
+            'confirm-risk-unknown',
+        ):
+            info_static.remove_class(cls)
+        info_static.add_class(risk_css_class)
         info_static.update(info)
 
         actions = self.query_one('#confirm-actions', Horizontal)

@@ -92,6 +92,7 @@ class GrintaScreen(
         Binding('escape', 'interrupt_agent', 'Interrupt', show=False),
         Binding('ctrl+l', 'clear_transcript', 'Clear', show=True),
         Binding('ctrl+space', 'complete_command', 'Complete', show=False),
+        Binding('tab', 'complete_command', 'Complete', show=False),
         Binding('ctrl+z', 'suspend', 'Suspend', show=False),
         Binding('enter', 'submit_input', 'Send', show=False, priority=True),
         Binding('pageup', 'scroll_up', 'Scroll Up', show=False, priority=True),
@@ -155,11 +156,11 @@ class GrintaScreen(
         'SystemMessageAction': 'System',
         'NoteAction': 'Note',
     }
-    _RISK_LABELS: dict[str, tuple[str, str]] = {
-        'UNKNOWN': ('Unknown', 'dim'),
-        'LOW': ('Low', 'green'),
-        'MEDIUM': ('Medium', 'yellow'),
-        'HIGH': ('High', 'red'),
+    _RISK_LABELS: dict[str, tuple[str, str, str]] = {
+        'UNKNOWN': ('Unknown', 'dim', 'confirm-risk-unknown'),
+        'LOW': ('Low', 'CLR_RISK_LOW', 'confirm-risk-low'),
+        'MEDIUM': ('Medium', 'CLR_RISK_MEDIUM', 'confirm-risk-medium'),
+        'HIGH': ('High', 'CLR_RISK_HIGH', 'confirm-risk-high'),
     }
 
     def __init__(
@@ -170,6 +171,8 @@ class GrintaScreen(
         hud: HUDBar,
         reasoning: ReasoningDisplay,
         app: App,
+        *,
+        accessible: bool = False,
     ) -> None:
         super().__init__()
         self._config = config
@@ -178,6 +181,7 @@ class GrintaScreen(
         self._hud = hud
         self._reasoning = reasoning
         self._main_app = app
+        self._accessible_mode = accessible
         self._renderer: TUIRenderer | None = None
         self._event_stream: Any | None = None
         self._controller: Any | None = None
