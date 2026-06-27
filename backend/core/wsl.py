@@ -12,7 +12,7 @@ import sys
 import tempfile
 import time
 from enum import Enum
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 
 class WslLayout(str, Enum):
@@ -50,11 +50,12 @@ def wsl_distro_name() -> str | None:
 
 def is_windows_mount(path: Path | str) -> bool:
     """True for WSL drvfs paths such as ``/mnt/c/Users/...``."""
+    expanded = os.path.expanduser(os.path.expandvars(str(path)))
+    normalized = expanded.replace('\\', '/')
     try:
-        resolved = Path(path).expanduser().resolve()
-    except OSError:
-        resolved = Path(path)
-    parts = resolved.parts
+        parts = PurePosixPath(normalized).parts
+    except (OSError, ValueError):
+        return False
     return len(parts) >= 2 and parts[0] == '/' and parts[1] == 'mnt'
 
 
