@@ -38,6 +38,20 @@ class TestWorkspaceCheckpoint:
             "print('hello')"
         )
 
+    def test_save_checkpoint_skips_venv_and_git(self, tmp_path):
+        workspace = tmp_path / 'workspace'
+        workspace.mkdir()
+        (workspace / 'app.py').write_text("print('hello')", encoding='utf-8')
+        (workspace / '.venv').mkdir()
+        (workspace / '.venv' / 'lib.py').write_text('big', encoding='utf-8')
+        (workspace / '.git').mkdir()
+        (workspace / '.git' / 'config').write_text('ignored', encoding='utf-8')
+
+        checkpoint_dir = tmp_path / 'checkpoint'
+        manifest = save_checkpoint(workspace, checkpoint_dir, label='lean')
+
+        assert [entry.path for entry in manifest.files] == ['app.py']
+
     def test_restore_checkpoint_restores_files_and_quarantines_extras(self, tmp_path):
         workspace = tmp_path / 'workspace'
         workspace.mkdir()

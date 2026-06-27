@@ -314,6 +314,14 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
             self._memory_stub = memory
             self._controller = controller
 
+            asyncio.create_task(
+                asyncio.to_thread(
+                    controller._create_phase_boundary_checkpoint,
+                    'init_to_active',
+                ),
+                name='grinta-init-checkpoint',
+            )
+
             from backend.cli.settings.bootstrap_sync import (
                 sync_controller_persisted_settings,
             )

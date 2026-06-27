@@ -179,13 +179,26 @@ def load_checkpoint_manifest(
 
 
 def _iter_workspace_files(workspace_root: Path):
-    for file_path in sorted(workspace_root.rglob('*')):
-        if not file_path.is_file() or file_path.is_symlink():
-            continue
-        rel_path = file_path.relative_to(workspace_root)
-        if _is_reserved_relative_path(rel_path):
-            continue
-        yield file_path
+    from backend.engine.tools.ignore_filter import (
+        get_ignore_spec,
+        is_ignored_file,
+        prune_ignored_dirs,
+    )
+
+    root = str(workspace_root)
+    spec = get_ignore_spec(root)
+    for dirpath, dirnames, filenames in os.walk(root):
+        prune_ignored_dirs(root, dirpath, dirnames, spec)
+        for name in filenames:
+            if is_ignored_file(root, dirpath, name, spec):
+                continue
+            file_path = Path(dirpath) / name
+            if file_path.is_symlink():
+                continue
+            rel_path = file_path.relative_to(workspace_root)
+            if _is_reserved_relative_path(rel_path):
+                continue
+            yield file_path
 
 
 def _legacy_snapshot_files(snapshot_root: Path, workspace_root: Path) -> set[Path]:
