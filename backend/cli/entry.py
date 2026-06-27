@@ -346,6 +346,12 @@ def _ensure_linux_host_tools_early() -> None:
         ensure_linux_host_tools()
     except Exception:
         pass
+    try:
+        from backend.core.wsl import ensure_tmux_tmpdir
+
+        ensure_tmux_tmpdir()
+    except Exception:
+        pass
 
 
 def main() -> None:

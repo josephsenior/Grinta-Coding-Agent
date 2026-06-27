@@ -71,9 +71,10 @@ def _prepare_tmux_tmpdir(orch: BashSession) -> None:
     tmpdir = os.environ.get('TMUX_TMPDIR', '').strip()
     if not tmpdir:
         if OS_CAPS.is_linux and is_wsl_runtime():
-            # WSL2: keep tmux sockets off the Windows mount for reliability.
-            tmpdir = os.path.join('/tmp', 'grinta-tmux')
-            os.environ['TMUX_TMPDIR'] = tmpdir
+            from backend.core.wsl import ensure_tmux_tmpdir
+
+            ensure_tmux_tmpdir()
+            return
     if not tmpdir:
         return
     try:

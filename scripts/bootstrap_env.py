@@ -69,7 +69,9 @@ def main(argv: list[str] | None = None) -> int:
         '-c',
         (
             'from backend.utils.linux_host_tools import ensure_linux_host_tools; '
+            'from backend.core.wsl import ensure_tmux_tmpdir; '
             'result = ensure_linux_host_tools(); '
+            'ensure_tmux_tmpdir(); '
             'print('
             'f"[bootstrap] linux_host_tools tmux={result.tmux_installed} '
             'libtmux={result.libtmux_available} ({result.message})"'

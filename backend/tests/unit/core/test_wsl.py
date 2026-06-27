@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -76,3 +77,23 @@ def test_is_wsl_runtime_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv('WSL_DISTRO_NAME', 'Ubuntu-24.04')
     assert wsl_mod.is_wsl_runtime() is True
     assert wsl_mod.wsl_distro_name() == 'Ubuntu-24.04'
+
+
+def test_ensure_tmux_tmpdir_creates_default_on_wsl(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(wsl_mod, 'is_wsl_runtime', lambda: True)
+    monkeypatch.delenv('TMUX_TMPDIR', raising=False)
+    target = tmp_path / 'grinta-tmux'
+    monkeypatch.setattr(wsl_mod, '_DEFAULT_TMUX_TMPDIR', str(target))
+    result = wsl_mod.ensure_tmux_tmpdir()
+    assert result == str(target)
+    assert target.is_dir()
+    if sys.platform != 'win32':
+        assert (target.stat().st_mode & 0o777) == 0o700
+
+
+def test_ensure_tmux_tmpdir_noop_off_wsl(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(wsl_mod, 'is_wsl_runtime', lambda: False)
+    monkeypatch.delenv('TMUX_TMPDIR', raising=False)
+    assert wsl_mod.ensure_tmux_tmpdir() == ''
