@@ -56,7 +56,6 @@ _SIMPLE_VERB_MAP = {
     'read_file': 'Read',
     'create': 'Created',
     'replace_string': 'Edited',
-    'edit_symbol': 'Edited',
     'multiedit': 'Edited',
     'find_symbols': 'Found',
     'agent_think': 'Thinking',

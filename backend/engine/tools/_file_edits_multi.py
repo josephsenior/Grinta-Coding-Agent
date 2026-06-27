@@ -11,7 +11,7 @@ import tempfile
 from collections.abc import Mapping
 from contextlib import ExitStack
 from pathlib import Path
-from typing import Any, NoReturn, cast
+from typing import Any, NoReturn
 
 from backend.core.errors import FunctionCallValidationError, ToolExecutionError
 from backend.core.logging.logger import app_logger as logger
@@ -22,14 +22,7 @@ from backend.engine.tools._file_edits_common import (
     _MAX_MULTI_EDIT_FILES,
     _multi_edit_raise,
 )
-from backend.engine.tools._file_edits_handlers import (
-    _resolve_symbol_by_id,
-    _select_and_validate_symbol,
-)
 from backend.engine.tools._file_ops import (
-    _coerce_optional_int,
-    _filter_symbol_candidates,
-    _find_symbol_candidates_in_file,
     _guard_content_arguments,
 )
 from backend.ledger.action import (
@@ -67,158 +60,13 @@ def _parse_multi_edit_operation(
     idx: int,
 ) -> tuple[str, dict[str, Any]]:
     operation = str(raw_item.get('operation') or '').strip().lower()
-    if operation == 'edit_symbol_deferred':
-        path = raw_item.get('path')
-        edits = raw_item.get('edits')
-        if not isinstance(path, str) or not path.strip():
-            raise FunctionCallValidationError(
-                f'multi_edit item {idx} edit_symbol_deferred is missing path.'
-            )
-        if not isinstance(edits, list) or not edits:
-            raise FunctionCallValidationError(
-                f'multi_edit item {idx} edit_symbol_deferred requires edits.'
-            )
-        return operation, dict(raw_item)
-    allowed = {
-        'replace_string',
-        'symbol_body_replacement',
-    }
+    allowed = {'replace_string'}
     if operation not in allowed:
         raise FunctionCallValidationError(
             f'multi_edit item {idx}: unsupported internal operation {operation!r}. '
-            f'Allowed operations: {sorted(allowed | {"edit_symbol_deferred"})}.'
+            f'Allowed operations: {sorted(allowed)}.'
         )
     return operation, dict(raw_item)
-
-
-def _resolve_symbol_edit_on_temp_file(
-    temp_path: Path,
-    display_path: str,
-    item: Mapping[str, Any],
-    index: int,
-) -> dict[str, Any]:
-    """Resolve one edit_symbol target against the current temp-file contents."""
-    new_content = item.get('new_content')
-    if not isinstance(new_content, str):
-        raise FunctionCallValidationError(
-            f'multiedit edit_symbol edits[{index}] requires new_content.'
-        )
-
-    symbol_id = str(item.get('symbol_id') or '').strip()
-    symbol_name = str(
-        item.get('qualified_name') or item.get('symbol_name') or ''
-    ).strip()
-    symbol_kind = cast(str | None, item.get('symbol_kind'))
-    parent_symbol = cast(str | None, item.get('parent_symbol'))
-    occurrence = _coerce_optional_int(
-        item.get('occurrence'), f'edits[{index}].occurrence'
-    )
-    requested_start: int | None = None
-    requested_end: int | None = None
-
-    if symbol_id:
-        _raw_path, symbol_name, requested_start, requested_end = _resolve_symbol_by_id(
-            symbol_id
-        )
-        occurrence = None
-
-    if not symbol_name:
-        raise FunctionCallValidationError(
-            f'multiedit edit_symbol edits[{index}] requires qualified_name, '
-            'symbol_name, or symbol_id.'
-        )
-
-    lookup_name = symbol_name.rsplit('.', 1)[-1]
-    if not parent_symbol and '.' in symbol_name:
-        maybe_parent, _, maybe_name = symbol_name.rpartition('.')
-        parent_symbol = maybe_parent or None
-        lookup_name = maybe_name
-
-    candidates = _find_symbol_candidates_in_file(
-        temp_path,
-        lookup_name,
-        symbol_kind=symbol_kind,
-        include_private=True,
-    )
-    candidates = _filter_symbol_candidates(
-        candidates,
-        symbol_name=lookup_name,
-        parent_symbol=parent_symbol,
-        occurrence=occurrence,
-    )
-    if requested_start is not None:
-        candidates = [
-            c
-            for c in candidates
-            if c.get('start_line') == requested_start
-            and c.get('end_line') == requested_end
-        ]
-
-    candidate = _select_and_validate_symbol(
-        candidates,
-        symbol_id,
-        symbol_name,
-        requested_start,
-        requested_end,
-        index,
-        path=display_path,
-    )
-    return {
-        'path': display_path,
-        'operation': 'symbol_body_replacement',
-        'start_line': int(candidate['start_line']),
-        'end_line': int(candidate['end_line']),
-        'content': new_content,
-    }
-
-
-def _resolve_deferred_edit_symbol(
-    temp_path: Path,
-    display_path: str,
-    edits: list[Mapping[str, Any]],
-) -> list[dict[str, Any]]:
-    resolved = [
-        _resolve_symbol_edit_on_temp_file(temp_path, display_path, item, index)
-        for index, item in enumerate(edits)
-    ]
-    return sorted(resolved, key=lambda item: -int(item.get('start_line', 0)))
-
-
-def _validate_symbol_range_on_temp(
-    temp_path: Path,
-    start_line: int,
-    end_line: int,
-    rel_path: str,
-    *,
-    failed_op_index: int | None = None,
-    total_ops: int | None = None,
-) -> None:
-    """Reject stale line ranges after prior batch edits on the temp copy."""
-    if not temp_path.exists():
-        _multi_edit_raise(
-            'edit_symbol failed: file not found.',
-            error_code='FILE_NOT_FOUND',
-            path=rel_path,
-            operation='edit_symbol',
-            failed_op_index=failed_op_index,
-            total_ops=total_ops,
-            retryable=True,
-        )
-    line_count = len(temp_path.read_text(encoding='utf-8').splitlines())
-    if start_line < 1 or end_line < start_line or end_line > line_count:
-        _multi_edit_raise(
-            'edit_symbol failed: symbol line range is invalid after prior batch edits.',
-            error_code='INVALID_SYMBOL_RANGE',
-            path=rel_path,
-            operation='edit_symbol',
-            failed_op_index=failed_op_index,
-            total_ops=total_ops,
-            detail=(
-                f'range {start_line}-{end_line} invalid for {line_count} lines; '
-                'use edit_symbol instead of line ranges when combining edits.'
-            ),
-            retryable=True,
-        )
 
 
 def _raise_multi_edit_syntax_failure(
@@ -301,35 +149,6 @@ def _apply_multi_edit_operation(
 ) -> None:
     from backend.core.errors.structured_edit_errors import summarize_editor_error
 
-    if operation == 'edit_symbol_deferred':
-        edits = item.get('edits')
-        if not isinstance(edits, list) or not edits:
-            raise FunctionCallValidationError(
-                'multi_edit edit_symbol_deferred requires a non-empty edits array.'
-            )
-        if not temp_path.exists():
-            _multi_edit_raise(
-                'edit_symbol failed: file not found.',
-                error_code='FILE_NOT_FOUND',
-                path=rel_path,
-                operation='edit_symbol',
-                failed_op_index=failed_op_index,
-                total_ops=total_ops,
-                retryable=True,
-            )
-        resolved_ops = _resolve_deferred_edit_symbol(temp_path, rel_path, edits)
-        for resolved in resolved_ops:
-            _apply_multi_edit_operation(
-                rel_path=rel_path,
-                temp_path=temp_path,
-                operation='symbol_body_replacement',
-                item=resolved,
-                temp_editor=temp_editor,
-                failed_op_index=failed_op_index,
-                total_ops=total_ops,
-            )
-        return
-
     if operation == 'replace_string':
         old_string = item.get('old_string')
         new_string = item.get('new_string')
@@ -360,46 +179,9 @@ def _apply_multi_edit_operation(
             )
         return
 
-    if operation == 'symbol_body_replacement':
-        start_line = item.get('start_line')
-        end_line = item.get('end_line')
-        content = item.get('content')
-        if start_line is None or end_line is None or not isinstance(content, str):
-            raise FunctionCallValidationError(
-                "multi_edit symbol_body_replacement operation requires 'start_line', 'end_line', and 'content'."
-            )
-        start = int(start_line)
-        end = int(end_line)
-        _validate_symbol_range_on_temp(
-            temp_path,
-            start,
-            end,
-            rel_path,
-            failed_op_index=failed_op_index,
-            total_ops=total_ops,
-        )
-        result = temp_editor(
-            command='edit',
-            path=rel_path,
-            edit_mode='range',
-            start_line=start,
-            end_line=end,
-            new_str=content,
-        )
-        if result.error:
-            error_code, summary, retryable, extra = summarize_editor_error(result)
-            _multi_edit_raise(
-                summary,
-                error_code=error_code,
-                path=rel_path,
-                operation='edit_symbol',
-                failed_op_index=failed_op_index,
-                total_ops=total_ops,
-                retryable=retryable,
-                detail=extra.get('detail'),
-                line=extra.get('line'),
-            )
-        return
+    raise FunctionCallValidationError(
+        f'multi_edit: unsupported internal operation {operation!r}.'
+    )
 
 
 def _validate_multi_edit_arguments(raw_edits: Any) -> None:
@@ -448,7 +230,7 @@ def _apply_multi_edit_to_temp_files(
     """Apply multi_edit operations in declaration order against per-file temp copies.
 
     Each operation sees the temp file as left by all prior operations in the batch.
-    ``edit_symbol`` targets are resolved at apply time (identity-based). Syntax is validated once per file after all operations complete.
+    Syntax is validated once per file after all operations complete.
     """
     original_snapshots: dict[str, str | None] = {}
     final_contents: dict[str, str] = {}
@@ -579,8 +361,7 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
     """Apply an atomic multi-file batch edit via :class:`AtomicRefactor`.
 
     All edits commit together or all are rolled back from per-file backups.
-    Side effects run synchronously inside this handler (same pattern as
-    ``edit_symbol``); the returned ``MessageAction`` summarizes the outcome.
+    The returned ``MessageAction`` summarizes the outcome.
     """
     raw_edits = arguments.get('file_edits')
     _validate_multi_edit_arguments(raw_edits)

@@ -1,13 +1,13 @@
 # File Editing Surface
 
-Grinta now exposes a single native tool-call surface for file and code work:
+Grinta exposes a single native tool-call surface for file and code work:
 
 - `read` inspects files, ranges, or one or more symbol bodies.
 - `find_symbols` discovers symbol candidates without reading full bodies.
-- `create` creates new files or new symbols.
-- `edit_symbol` modifies or deletes existing symbols.
+- `create` creates new files.
 - `replace_string` performs exact one-file text replacement, insertion by anchor, and deletion.
-- `multiedit` stages coordinated `edit_symbol` / `replace_string` changes and commits them atomically.
+- `multiedit` stages coordinated `replace_string` changes across one or more files and commits them atomically.
+- `undo_last_edit` reverts the last content edit on an existing file.
 
 The model should choose intent, not transport format. Raw editor modes and
 file-edit blocks are not part of the public protocol. The runtime remains

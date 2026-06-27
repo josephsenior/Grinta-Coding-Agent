@@ -132,7 +132,6 @@ class TestFeatureFlagToolPresence:
             'find_symbols',
             'create',
             'replace_string',
-            'edit_symbol',
             'multiedit',
         }
         assert public_file_tools <= names
@@ -157,7 +156,6 @@ class TestFeatureFlagToolPresence:
         names = _build_toolset(enable_editor=False)
         assert 'create' not in names
         assert 'replace_string' not in names
-        assert 'edit_symbol' not in names
         assert 'multiedit' not in names
 
     def test_checkpoints_enabled(self):
@@ -314,7 +312,6 @@ class TestModeToolVisibility:
         assert {
             'create',
             'replace_string',
-            'edit_symbol',
             'multiedit',
             'execute_bash',
             'execute_powershell',
@@ -340,7 +337,7 @@ class TestModeToolVisibility:
             enable_working_memory=False,
             enable_debugger=False,
         )
-        assert {'create', 'edit_symbol', 'replace_string', 'multiedit'} <= names
+        assert {'create', 'replace_string', 'multiedit'} <= names
         assert {'execute_bash', 'execute_powershell'} & names
         assert 'ask_user' in names
         assert 'terminal_manager' in names
@@ -391,7 +388,6 @@ class TestModeToolVisibility:
             'task_tracker',
             'create',
             'replace_string',
-            'edit_symbol',
             'multiedit',
             'execute_bash',
             'execute_powershell',

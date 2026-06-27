@@ -16,7 +16,6 @@ from .meta_cognition import (
 )
 from .native_file_tools import (
     create_create_tool,
-    create_edit_symbol_tool,
     create_find_symbols_tool,
     create_multiedit_tool,
     create_read_tool,
@@ -31,7 +30,6 @@ __all__ = [
     'create_ask_user_tool',
     'create_lsp_query_tool',
     'create_create_tool',
-    'create_edit_symbol_tool',
     'create_find_symbols_tool',
     'create_multiedit_tool',
     'create_read_tool',

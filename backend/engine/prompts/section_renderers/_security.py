@@ -31,7 +31,7 @@ def _render_security(
     if security_risk_required_for_autonomy(autonomy_level):
         requirement = (
             '`security_risk` is **required** on every call to `execute_bash`/`execute_powershell`, '
-            'and the file write tools `create`, `replace_string`, `edit_symbol`, and `multiedit`. '
+            'and the file write tools `create`, `replace_string`, and `multiedit`. '
             f'Read-only observation tools ({read_only_tools}) do **not** require it. '
             'Pick one of `LOW` / `MEDIUM` / `HIGH` based on the action you are about to take. '
             'The server may escalate your risk label; it never lowers it. Missing or invalid values '
@@ -40,7 +40,7 @@ def _render_security(
     else:
         requirement = (
             '`security_risk` is **optional** in full autonomy on `execute_bash`/`execute_powershell`, '
-            'file write tools (`create`, `replace_string`, `edit_symbol`, `multiedit`), and '
+            'file write tools (`create`, `replace_string`, `multiedit`), and '
             '`terminal_manager` open. '
             f'Read-only observation tools ({read_only_tools}) never need it. '
             'When omitted, the runtime classifies risk server-side. If you provide '

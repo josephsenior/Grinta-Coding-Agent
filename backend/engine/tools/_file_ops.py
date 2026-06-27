@@ -6,7 +6,6 @@ that module under the 40 KB file-size cap. No logic changes.
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
@@ -352,43 +351,3 @@ def _resolve_symbol_candidates(
         candidates = [candidates[occurrence - 1]]
 
     return safe_path, content, candidates
-
-
-def _symbol_action_ambiguity_error(
-    symbol_name: str, candidates: list[dict[str, Any]]
-) -> str:
-    from backend.core.errors.structured_edit_errors import (
-        compact_symbol_candidates,
-        symbol_ambiguity_summary,
-    )
-
-    compact = compact_symbol_candidates(candidates)
-    return f'{symbol_ambiguity_summary(symbol_name, candidates)}\n' + json.dumps(
-        {'candidates': compact}, separators=(',', ':')
-    )
-
-
-def _single_symbol_candidate(
-    *,
-    path: str,
-    symbol_name: str,
-    symbol_kind: str | None = None,
-    parent_symbol: str | None = None,
-    occurrence: int | None = None,
-) -> tuple[Path, str, dict[str, Any]]:
-    safe_path, content, candidates = _resolve_symbol_candidates(
-        path=path,
-        symbol_name=symbol_name,
-        symbol_kind=symbol_kind,
-        parent_symbol=parent_symbol,
-        occurrence=occurrence,
-    )
-    if not candidates:
-        raise FunctionCallValidationError(
-            f'edit_symbol failed: symbol not found.\nFile: {path}\nSymbol: {symbol_name}'
-        )
-    if len(candidates) > 1:
-        raise FunctionCallValidationError(
-            _symbol_action_ambiguity_error(symbol_name, candidates)
-        )
-    return safe_path, content, candidates[0]
