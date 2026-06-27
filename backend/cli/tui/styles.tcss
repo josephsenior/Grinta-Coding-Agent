@@ -594,6 +594,20 @@ HUD,
     margin-left: 3;
 }
 
+/* ── HUD per-Select accents ───────────────────────────
+ *
+ * The three HUD <Select> widgets each get a distinct accent so the
+ * user can disambiguate at a glance. The hex values are tokenized
+ * in backend/cli/theme/navy.py as:
+ *   - reasoning (gold)   : NAVY_HUD_SELECT_REASONING / _FOCUS / _OVERLAY
+ *   - autonomy  (blue)   : NAVY_HUD_SELECT_AUTONOMY  / _FOCUS / _OVERLAY
+ *   - mode      (teal)   : NAVY_HUD_SELECT_MODE      / _FOCUS / _OVERLAY
+ *
+ * Note: the historical mode-overlay border #5a3a2a (a brown) was a
+ * copy-paste error from the reasoning (gold) family; corrected to
+ * match the mode (teal) family.
+ */
+
 #hud-reasoning {
     width: 18;
     margin-right: 1;
@@ -754,7 +768,7 @@ HUD,
 
 #hud-mode SelectOverlay {
     background: #0d1a30;
-    border: solid #5a3a2a;
+    border: solid #1f6d64;
     min-width: 14;
 }
 
@@ -1101,70 +1115,15 @@ Toast {
 Toast.-success { border-left: wide #5bd088; }
 Toast.-error { border-left: wide #f05757; }
 
-/* ── Transcript Messages ────────────────────────────── */
-UserMessage {
-    width: 100%;
-    height: auto;
-    margin: 1 0 2 0;
-    padding: 1 2 2 2;
-    background: #151d32;
-    border: transparent;
-    border-right: wide #91abec;
-    color: #f2f6ff;
-}
-
-AgentMessage {
-    width: 100%;
-    height: auto;
-    margin: 0 0 1 0;
-    padding: 0;
-    border: none;
-    background: transparent;
-    color: #c8d4e8;
-}
-
-LiveResponse {
-    width: 100%;
-    height: auto;
-    margin: 0 0 1 0;
-    padding: 0;
-    border: none;
-    background: transparent;
-}
-
-LiveResponse > #live-content {
-    width: 100%;
-    height: auto;
-    color: #b8c4d8;
-}
-
-LiveResponse.-streaming > #live-content {
-    color: #d5dee8;
-}
-
-ThinkingIndicator {
-    width: 100%;
-    height: auto;
-    margin: 0 0 2 0;
-    padding: 1 1 1 2;
-}
-
-ErrorBlock {
-    width: 100%;
-    height: auto;
-    margin: 0 0 2 0;
-    padding: 0 1 0 2;
-}
-
-TranscriptNotice {
-    width: 100%;
-    height: auto;
-    margin: 0 0 2 0;
-    padding: 0 1;
-    background: #12161f;
-    border: none;
-    color: #7a8299;
-}
+/* ── Transcript Messages ──────────────────────────────
+ *
+ * Transcript widget chrome is defined co-located in DEFAULT_CSS on each
+ * widget class (see backend/cli/tui/widgets/activity_card/message_widgets.py
+ * and backend/cli/tui/widgets/error_block.py and transcript_notice.py).
+ * Do not duplicate these rules here. The styles below are reserved for
+ * contextual selectors (pseudo-classes, parent-relative rules) that need
+ * to live in the global sheet.
+ */
 
 /* ── Utility ───────────────────────────────────────── */
 .hidden { display: none; }

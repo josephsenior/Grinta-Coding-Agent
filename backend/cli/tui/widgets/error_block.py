@@ -10,26 +10,31 @@ from textual.app import ComposeResult
 from textual.containers import Container
 from textual.widgets import Static
 
-from backend.cli.theme import CLR_ERROR_BODY, CLR_ERROR_PREFIX
+from backend.cli.theme import (
+    CLR_ERROR_BODY,
+    CLR_ERROR_PIPE,
+    CLR_ERROR_PREFIX,
+    NAVY_BG_TRANSCRIPT_BLOCK,
+)
 
 
 class ErrorBlock(Container):
     """Inline error row with left pipe — same layout as thinking/exploration blocks."""
 
-    DEFAULT_CSS = """
-    ErrorBlock {
+    DEFAULT_CSS = f"""
+    ErrorBlock {{
         width: 100%;
         height: auto;
         margin: 0 0 1 0;
         border: transparent;
-        background: #090d18;
-        border-left: solid #5a2d2d;
+        background: {NAVY_BG_TRANSCRIPT_BLOCK};
+        border-left: solid {CLR_ERROR_PIPE};
         padding: 0 1 0 2;
-    }
-    ErrorBlock > #error-content {
+    }}
+    ErrorBlock > #error-content {{
         width: 100%;
         height: auto;
-    }
+    }}
     """
 
     def __init__(self, renderable: Any, *, id: str | None = None) -> None:
