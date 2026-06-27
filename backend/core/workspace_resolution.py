@@ -262,13 +262,21 @@ def _proc_comm(pid: int) -> str:
         return ''
 
 
+def _is_uv_runner_comm(comm: str) -> bool:
+    return comm == 'uv' or comm.startswith('uv')
+
+
+def _is_shell_comm(comm: str) -> bool:
+    return comm in {'bash', 'zsh', 'sh', 'fish', 'dash'} or comm.endswith('sh')
+
+
 def infer_workspace_from_uv_style_launch(install_root: Path) -> Path | None:
     """Infer the real project when ``uv run --directory <install>`` reset cwd to the install.
 
     ``uv --directory`` changes the child process cwd to the Grinta checkout, so a launch
     like ``cd <project> && uv run --directory ~/Grinta grinta`` would otherwise bind
-    the install tree as the workspace. Walk ``/proc`` ancestors: after ``uv`` chdir'd to
-    *install_root*, use the first ancestor cwd that is not the install root.
+    the install tree as the workspace. Walk ``/proc`` ancestors: after a ``uv`` runner
+    chdir'd to *install_root*, use the first shell ancestor cwd that is not the install.
     """
     if not sys.platform.startswith('linux'):
         return None
@@ -282,13 +290,14 @@ def infer_workspace_from_uv_style_launch(install_root: Path) -> Path | None:
 
     pid = os.getppid()
     saw_uv = False
-    for _ in range(10):
+    for _ in range(12):
         comm = _proc_comm(pid)
         cwd = _proc_cwd(pid)
-        if comm == 'uv':
+        if _is_uv_runner_comm(comm):
             saw_uv = True
         if (
             saw_uv
+            and _is_shell_comm(comm)
             and cwd is not None
             and cwd != install
             and cwd.is_dir()
@@ -311,6 +320,11 @@ def resolve_launch_project_directory(project: str | None = None) -> Path:
     """
     if project:
         return Path(project).expanduser().resolve()
+
+    for key in ('PROJECT_ROOT', 'APP_PROJECT_ROOT'):
+        env_path = _workspace_path_from_raw(os.environ.get(key))
+        if env_path is not None:
+            return env_path
 
     hint = os.environ.get('GRINTA_INVOCATION_CWD', '').strip()
     if hint:
