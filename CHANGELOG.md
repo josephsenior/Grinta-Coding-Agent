@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **`edit_symbol` tool removed.** The model was not using it; the schema
+  was complex (six optional disambiguation fields plus `new_content`),
+  and `replace_string` covers the same ground with a simpler schema the
+  model already uses confidently. Symbol discovery stays in
+  `find_symbols` and `read(type="symbols")`.
+- **`create(type="symbol")` mode removed.** `create` is now file-only.
+  Insert new symbols via `replace_string` with an anchor line.
+- **`multiedit` `edit_symbol` command removed.** `multiedit` now
+  supports `replace_string` operations only. The `allOf`/`if-then`
+  conditional schema is gone; the operation shape is just
+  `path`, `old_string`, `new_string`, `replace_all`.
+
 ### Changed
 
 - **Packaging:** PDF/DOCX/PPTX/LaTeX parsers (`pypdf`, `python-docx`,

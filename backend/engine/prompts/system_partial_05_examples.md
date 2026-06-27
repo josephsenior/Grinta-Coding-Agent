@@ -3,7 +3,7 @@ Runtime tools: {available_tools_summary}
 
 1. **Bug fix**: {search_tools} -> {read_tool} -> {edit_tools} -> Verify -> final summary.
 2. **Feature**: {planning_hint} -> {analyze_tool} -> {edit_tools} -> {terminal_tool} (tests/lint) -> final summary.
-3. **Single symbol edit**: {search_tools} -> {read_tool} -> {edit_symbol_tool} -> Verify -> final summary.
+3. **Targeted text edit**: {search_tools} -> {read_tool} -> {replace_string_tool} -> Verify -> final summary.
 4. **Atomic batch edit**: inspect targets -> {multiedit_tool} -> Verify -> final summary.
 5. **Docs/config addition**: {read_tool} -> {replace_string_tool} with anchor plus inserted content -> Verify if applicable -> final summary.
 6. **Investigation**: {search_tools} -> {analyze_tool} -> {read_tool} -> Answer plain text.

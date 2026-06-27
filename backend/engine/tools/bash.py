@@ -53,7 +53,7 @@ _DETAILED_BASH_DESCRIPTION = (
     '* Persistent: env vars, venvs, cwd survive across calls.\n'
     '* Do NOT use `set -e` / `set -eu` / `set -euo pipefail`.\n'
     '* Long-running: pass an explicit `timeout` or use `is_background=true`.\n'
-    '* Do NOT create/write files — use `create`, `replace_string`, `edit_symbol`, or `multiedit`.\n'
+    '* Do NOT create/write files — use `create`, `replace_string`, or `multiedit`.\n'
     '* Shell cwd is the **project root**. Prefer relative paths (`./script`). '
     'There is no `/workspace` alias.\n'
     '* In bash, never glue a folder name to a Windows drive: use `dir/C:/path`, not `dirC:/path`.\n'

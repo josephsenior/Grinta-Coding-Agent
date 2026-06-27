@@ -24,7 +24,7 @@ SYSTEM_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
         ErrorGuidance(
             summary='A range edit is missing start_line or end_line.',
             steps=(
-                'Use `replace_string` for exact text or `edit_symbol` for code symbols.',
+                'Use `replace_string` for exact text edits.',
                 'Re-read the target context if you need a more specific anchor.',
             ),
             omit_summary_in_recovery=False,

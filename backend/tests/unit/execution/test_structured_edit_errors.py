@@ -1,4 +1,4 @@
-"""Tests for compact multi_edit / edit_symbol error formatting."""
+"""Tests for compact multi_edit and read(symbols) error formatting."""
 
 from __future__ import annotations
 

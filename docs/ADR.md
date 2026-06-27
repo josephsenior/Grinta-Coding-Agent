@@ -401,6 +401,6 @@ semantics cleanly without implying that only world-state mutations matter.
 - ✅ Deterministic edits with stronger constraints than raw substring replacement
 - ✅ Better behavior under text drift and repeated phrases
 - ✅ Clear failure modes for ambiguous anchors/hunks
-- ✅ Legacy text-editor variants removed from the tool surface; prefer `replace_string`, `edit_symbol`, and `multiedit` for file work
+- ✅ Legacy text-editor variants removed from the tool surface; prefer `replace_string` and `multiedit` for file work
 - ⚠️ More implementation complexity in file-editor runtime
 - ⚠️ Additional parser dependency risk for YAML/TOML paths

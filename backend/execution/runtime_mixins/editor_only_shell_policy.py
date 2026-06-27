@@ -154,9 +154,9 @@ def evaluate_editor_only_shell_block(
 _BLOCK_MSG = (
     'SECURITY POLICY: Shell-based file writes to project source files are restricted to prevent '
     'accidental corruption and bypass of validation. Please use the dedicated editor tools instead:\n'
-    '- `create` for new files or symbols.\n'
+    '- `create` for new files.\n'
     '- `replace_string` for exact text edits, insertions by anchor, and deletions.\n'
-    '- `edit_symbol` or `multiedit` for code changes.\n'
+    '- `multiedit` for atomic batch refactors across one or more files.\n'
     'Direct shell commands like `Set-Content`, `Out-File`, `tee`, or `>` / `>>` are only allowed for '
     '`.log` / `.tmp` files or files in temporary directories. To allow shell-level writes, set '
     'env var `GRINTA_ALLOW_SHELL_WRITES=1`.'

@@ -171,7 +171,7 @@ class EditCard(ScanLineCard):
     """1-line file edit summary — full diff in detail screen.
 
     Shared across ``create_file``, ``insert_text``, ``replace_string``,
-    ``edit_symbol``, ``multi_edit``, and ``undo_last_edit``.  Only the file
+    ``multiedit``, and ``undo_last_edit``.  Only the file
     path + delta appear in the 1-line summary.
     """
 

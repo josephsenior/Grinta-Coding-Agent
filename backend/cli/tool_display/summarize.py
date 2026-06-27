@@ -275,13 +275,6 @@ def _summary_replace_string(args: dict[str, Any]) -> str:
     return path or 'replace string'
 
 
-def _summary_edit_symbol(args: dict[str, Any]) -> str:
-    path = _arg_str(args, 'path')
-    symbol = _arg_str(args, 'qualified_name', 'symbol_name', 'symbol_id')
-    bits = [b for b in (path, symbol) if b]
-    return ' · '.join(bits) if bits else path or 'edit symbol'
-
-
 def _summary_multiedit(args: dict[str, Any]) -> str:
     operations = args.get('operations')
     if isinstance(operations, list):
@@ -424,7 +417,6 @@ _TOOL_SUMMARIZERS: dict[str, Callable[[dict[str, Any]], str]] = {
     'read_file': _summary_read_file,
     'create': _summary_create,
     'replace_string': _summary_replace_string,
-    'edit_symbol': _summary_edit_symbol,
     'multiedit': _summary_multiedit,
     'find_symbols': _summary_find_symbol,
     'think': _summary_think,

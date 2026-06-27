@@ -9,7 +9,6 @@ import pytest
 from backend.core.errors import FunctionCallValidationError, ToolExecutionError
 from backend.engine.function_calling.dispatch import (
     _handle_create_tool,
-    _handle_edit_symbol_tool,
     _handle_find_symbols_tool,
     _handle_multi_edit_command,
     _handle_multiedit_tool,
@@ -376,29 +375,6 @@ def test_create_file_public_action_overwrites_by_default_and_rejects_serialized(
         )
 
 
-def test_create_symbol_adds_a_new_symbol(monkeypatch, tmp_path):
-    _use_tmp_workspace(monkeypatch, tmp_path)
-    (tmp_path / 'mod.py').write_text(
-        'def login():\n    return True\n', encoding='utf-8'
-    )
-
-    action = _handle_create_tool(
-        {
-            'type': 'symbol',
-            'path': 'mod.py',
-            'target_symbol': 'login',
-            'position': 'after',
-            'content': 'def logout():\n    return True\n',
-            'security_risk': 'LOW',
-        }
-    )
-
-    assert isinstance(action, FileEditAction)
-    assert action.command == 'insert_text'
-    assert action.insert_line == 3
-    assert action.new_str == 'def logout():\n    return True\n'
-
-
 def test_replace_string_public_action_supports_replace_add_and_delete(
     monkeypatch, tmp_path
 ):
@@ -438,136 +414,6 @@ def test_replace_string_public_action_supports_replace_add_and_delete(
     assert replace.replace_all is False
 
 
-def test_edit_symbol_normalizes_to_deferred_multi_edit(monkeypatch, tmp_path):
-    _use_tmp_workspace(monkeypatch, tmp_path)
-    (tmp_path / 'mod.py').write_text('def a():\n    return 1\n', encoding='utf-8')
-
-    action = _handle_edit_symbol_tool(
-        {
-            'path': 'mod.py',
-            'symbol_name': 'a',
-            'new_content': 'def a():\n    return 10\n',
-            'security_risk': 'LOW',
-        }
-    )
-
-    assert isinstance(action, FileEditAction)
-    assert action.command == 'multi_edit'
-    assert action.structured_payload == {
-        'file_edits': [
-            {
-                'path': 'mod.py',
-                'operation': 'edit_symbol_deferred',
-                'edits': [
-                    {
-                        'symbol_name': 'a',
-                        'new_content': 'def a():\n    return 10\n',
-                    }
-                ],
-            }
-        ]
-    }
-
-
-def test_edit_symbol_rejects_legacy_edits_array(monkeypatch, tmp_path):
-    _use_tmp_workspace(monkeypatch, tmp_path)
-    (tmp_path / 'mod.py').write_text('def a():\n    return 1\n', encoding='utf-8')
-
-    with pytest.raises(FunctionCallValidationError, match='use multiedit'):
-        _handle_edit_symbol_tool(
-            {
-                'path': 'mod.py',
-                'edits': [
-                    {'symbol_name': 'a', 'new_content': 'def a():\n    return 10\n'},
-                ],
-                'security_risk': 'LOW',
-            }
-        )
-
-
-def test_edit_symbol_rejects_ambiguous_write_target(monkeypatch, tmp_path):
-    _use_tmp_workspace(monkeypatch, tmp_path)
-    (tmp_path / 'mod.py').write_text(
-        'class A:\n    def run(self):\n        return 1\n\n'
-        'class B:\n    def run(self):\n        return 2\n',
-        encoding='utf-8',
-    )
-
-    with pytest.raises(ToolExecutionError, match='ambiguous'):
-        _handle_multi_edit_command(
-            '.',
-            {
-                'file_edits': [
-                    {
-                        'path': 'mod.py',
-                        'operation': 'edit_symbol_deferred',
-                        'edits': [
-                            {
-                                'symbol_name': 'run',
-                                'new_content': 'def run(self):\n    return 3\n',
-                            }
-                        ],
-                    }
-                ]
-            },
-        )
-
-
-def test_edit_symbol_accepts_path_qualified_name_and_kind(monkeypatch, tmp_path):
-    _use_tmp_workspace(monkeypatch, tmp_path)
-    (tmp_path / 'auth.py').write_text(
-        'class UserService:\n'
-        '    def login(self):\n'
-        '        return "user"\n\n'
-        'class AdminService:\n'
-        '    def login(self):\n'
-        '        return "admin"\n',
-        encoding='utf-8',
-    )
-
-    action = _handle_edit_symbol_tool(
-        {
-            'path': 'auth.py',
-            'qualified_name': 'AdminService.login',
-            'symbol_kind': 'method',
-            'new_content': '    def login(self):\n        return "root"\n',
-            'security_risk': 'LOW',
-        }
-    )
-
-    assert action.command == 'multi_edit'
-    assert action.structured_payload == {
-        'file_edits': [
-            {
-                'path': 'auth.py',
-                'operation': 'edit_symbol_deferred',
-                'edits': [
-                    {
-                        'qualified_name': 'AdminService.login',
-                        'symbol_kind': 'method',
-                        'new_content': '    def login(self):\n        return "root"\n',
-                    }
-                ],
-            }
-        ]
-    }
-
-
-def test_edit_symbol_rejects_serialized_payload(monkeypatch, tmp_path):
-    _use_tmp_workspace(monkeypatch, tmp_path)
-    (tmp_path / 'mod.py').write_text('def a():\n    return 1\n', encoding='utf-8')
-
-    with pytest.raises(FunctionCallValidationError, match='CONTENT_APPEARS_SERIALIZED'):
-        _handle_edit_symbol_tool(
-            {
-                'path': 'mod.py',
-                'symbol_name': 'a',
-                'new_content': '"def a():\\n    return 2\\n"',
-                'security_risk': 'LOW',
-            }
-        )
-
-
 def test_multiedit_public_action_normalizes_supported_operations_and_guards_content(
     monkeypatch, tmp_path
 ):
@@ -581,20 +427,14 @@ def test_multiedit_public_action_normalizes_supported_operations_and_guards_cont
         {
             'operations': [
                 {
-                    'command': 'replace_string',
                     'path': 'README.md',
                     'old_string': 'old',
                     'new_string': 'new',
                 },
                 {
-                    'command': 'edit_symbol',
                     'path': 'mod.py',
-                    'edits': [
-                        {
-                            'symbol_name': 'login',
-                            'new_content': 'def login():\n    return False\n',
-                        }
-                    ],
+                    'old_string': 'def login():\n    return True\n',
+                    'new_string': 'def login():\n    return False\n',
                 },
             ],
             'security_risk': 'LOW',
@@ -610,21 +450,19 @@ def test_multiedit_public_action_normalizes_supported_operations_and_guards_cont
         'new_string': 'new',
         'replace_all': False,
     }
-    assert (
-        action.structured_payload['file_edits'][1]['operation']
-        == 'edit_symbol_deferred'
-    )
-    assert action.structured_payload['file_edits'][1]['path'] == 'mod.py'
-    assert (
-        action.structured_payload['file_edits'][1]['edits'][0]['symbol_name'] == 'login'
-    )
+    assert action.structured_payload['file_edits'][1] == {
+        'operation': 'replace_string',
+        'path': 'mod.py',
+        'old_string': 'def login():\n    return True\n',
+        'new_string': 'def login():\n    return False\n',
+        'replace_all': False,
+    }
 
     with pytest.raises(FunctionCallValidationError, match='CONTENT_APPEARS_SERIALIZED'):
         _handle_multiedit_tool(
             {
                 'operations': [
                     {
-                        'command': 'replace_string',
                         'path': 'a.py',
                         'old_string': 'A = 1\n',
                         'new_string': '"A = 2\\n"',
@@ -660,23 +498,7 @@ def test_multiedit_schema_requires_path_on_operations() -> None:
 
     params = create_multiedit_tool()['function']['parameters']
     items = params['properties']['operations']['items']
-    assert items['required'] == ['command', 'path']
-
-
-def test_multiedit_rejects_old_public_aliases(monkeypatch, tmp_path):
-    _use_tmp_workspace(monkeypatch, tmp_path)
-
-    with pytest.raises(
-        FunctionCallValidationError, match='Use replace_string or edit_symbol'
-    ):
-        _handle_multiedit_tool(
-            {
-                'operations': [
-                    {'command': 'create_file', 'path': 'a.py', 'content': 'A = 1\n'}
-                ],
-                'security_risk': 'LOW',
-            }
-        )
+    assert items['required'] == ['path', 'old_string', 'new_string']
 
 
 def test_multiedit_commits_no_changes_when_one_operation_fails(monkeypatch, tmp_path):

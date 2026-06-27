@@ -19,8 +19,6 @@ _FILE_EDIT_OPERATIONS = frozenset(
         'edit',
         'insert_text',
         'multi_edit',
-        'symbol_body_replacement',
-        'edit_symbol_deferred',
         'edit_noop',
         'edit_preview',
         'edit_validate',

@@ -111,7 +111,6 @@ class TestFriendlyVerbForTool(unittest.TestCase):
         self.assertEqual(friendly_verb_for_tool('read_file', {}), 'Read')
         self.assertEqual(friendly_verb_for_tool('create', {}), 'Created')
         self.assertEqual(friendly_verb_for_tool('replace_string', {}), 'Edited')
-        self.assertEqual(friendly_verb_for_tool('edit_symbol', {}), 'Edited')
         self.assertEqual(friendly_verb_for_tool('multiedit', {}), 'Edited')
         self.assertEqual(friendly_verb_for_tool('find_symbols', {}), 'Found')
         self.assertEqual(friendly_verb_for_tool('grep', {}), 'Grepped')

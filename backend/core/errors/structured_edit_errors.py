@@ -32,7 +32,7 @@ def compact_symbol_candidates(
 def symbol_ambiguity_summary(symbol_name: str, candidates: list[dict[str, Any]]) -> str:
     count = len(candidates)
     return (
-        f"edit_symbol failed: symbol '{symbol_name}' is ambiguous ({count} matches).\n"
+        f"symbol '{symbol_name}' is ambiguous ({count} matches).\n"
         f'{_SYMBOL_AMBIGUITY_HINT}'
     )
 
