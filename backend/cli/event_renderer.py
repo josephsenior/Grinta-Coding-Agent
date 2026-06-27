@@ -27,13 +27,6 @@ from backend.cli.theme import (
     accessible_mode_enabled,
 )
 from backend.core.enums import AgentState
-from backend.ledger import EventStreamSubscriber
-from backend.ledger.action import (
-    NullAction,
-)
-from backend.ledger.observation import (
-    NullObservation,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -52,20 +45,6 @@ from backend.cli.event_rendering.sidebar import (
 
 if TYPE_CHECKING:
     from backend.cli.display.reasoning_display import ReasoningDisplay
-
-# Events to silently skip (mirrors gateway filtering).
-_SKIP_ACTIONS = (NullAction,)
-_SKIP_OBSERVATIONS = (NullObservation,)
-_IDLE_STATES = {
-    AgentState.AWAITING_USER_INPUT,
-    AgentState.FINISHED,
-    AgentState.ERROR,
-    AgentState.STOPPED,
-    AgentState.REJECTED,
-}
-# Subscriber ID for the CLI renderer.
-_SUBSCRIBER = EventStreamSubscriber.CLI
-
 
 from backend.cli.event_rendering.activity_mixin import (
     _EventRendererActivityMixin,  # noqa: F401, E402

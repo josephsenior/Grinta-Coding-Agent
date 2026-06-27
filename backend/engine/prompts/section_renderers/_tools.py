@@ -46,9 +46,7 @@ def _render_tool_reference(
             'kill: `Stop-Process -Id <PID>`.'
         )
 
-    checkpoints_on = (
-        bool(getattr(config, 'enable_checkpoints', False)) if config else False
-    )
+    checkpoints_on = bool(getattr(config, 'enable_checkpoints', True))
     checkpoint_hint = ''
     if checkpoints_on:
         checkpoint_hint = (

@@ -31,7 +31,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-from backend.cli.event_renderer import _IDLE_STATES  # noqa: F401, E402
+from backend.cli.event_rendering.renderer_constants import (  # noqa: E402
+    IDLE_STATES as _IDLE_STATES,
+)
 
 
 class _EventRendererStateMixin(CLIEventRenderer if TYPE_CHECKING else object):

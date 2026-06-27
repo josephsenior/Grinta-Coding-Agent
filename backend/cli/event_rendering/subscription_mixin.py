@@ -28,11 +28,13 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-from backend.cli.event_renderer import (  # noqa: F401, E402
-    _SKIP_ACTIONS,
-    _SKIP_OBSERVATIONS,
-    _SUBSCRIBER,
+from backend.cli.event_rendering.renderer_constants import (  # noqa: E402, I001
+    SKIP_ACTIONS as _SKIP_ACTIONS,
 )
+from backend.cli.event_rendering.renderer_constants import (  # noqa: E402
+    SKIP_OBSERVATIONS as _SKIP_OBSERVATIONS,
+)
+from backend.cli.event_rendering.renderer_constants import SUBSCRIBER as _SUBSCRIBER  # noqa: E402
 
 
 class _EventRendererSubscriptionMixin(CLIEventRenderer if TYPE_CHECKING else object):

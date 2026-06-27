@@ -39,36 +39,40 @@ _MISSING_PARSER_HINT = (
 )
 
 
-def parse_pdf(file_path: str) -> None:
-    """Parses the content of a PDF file and prints it.
+def parse_pdf(file_path: str) -> str:
+    """Parse the content of a PDF file and return it as a string.
 
     Args:
         file_path: str: The path to the file to open.
+
+    Returns:
+        str: The parsed PDF content.
 
     """
-    output_lines = [f'[Reading PDF file from {file_path}]', extract_pdf_text(file_path)]
-    print('\n'.join(output_lines) + '\n')
+    return f'[Reading PDF file from {file_path}]\n{extract_pdf_text(file_path)}'
 
 
-def parse_docx(file_path: str) -> None:
-    """Parses the content of a DOCX file and prints it.
+def parse_docx(file_path: str) -> str:
+    """Parse the content of a DOCX file and return it as a string.
 
     Args:
         file_path: str: The path to the file to open.
+
+    Returns:
+        str: The parsed DOCX content.
 
     """
-    output_lines = [
-        f'[Reading DOCX file from {file_path}]',
-        extract_docx_text(file_path),
-    ]
-    print('\n'.join(output_lines) + '\n')
+    return f'[Reading DOCX file from {file_path}]\n{extract_docx_text(file_path)}'
 
 
-def parse_latex(file_path: str) -> None:
-    """Parses the content of a LaTex file and prints it.
+def parse_latex(file_path: str) -> str:
+    """Parse the content of a LaTex file and return it as a string.
 
     Args:
         file_path: str: The path to the file to open.
+
+    Returns:
+        str: The parsed LaTeX content.
 
     """
     try:
@@ -80,8 +84,7 @@ def parse_latex(file_path: str) -> None:
     with open(file_path, encoding='utf-8') as f:
         data = f.read()
     text = LatexNodes2Text().latex_to_text(data).strip()
-    print(f'[Reading LaTex file from {file_path}]')
-    print(text)
+    return f'[Reading LaTex file from {file_path}]\n{text}'
 
 
 def _base64_img(file_path: str) -> str:
@@ -194,15 +197,17 @@ def parse_video(
             pass
 
 
-def parse_pptx(file_path: str) -> None:
-    """Parses the content of a pptx file and prints it.
+def parse_pptx(file_path: str) -> str:
+    """Parse the content of a pptx file and return it as a string.
 
     Args:
         file_path: str: The path to the file to open.
 
+    Returns:
+        str: The parsed PowerPoint content.
+
     """
     try:
-        output = f'[Reading PowerPoint file from {file_path}]\n{extract_pptx_text(file_path)}'
-        print(f'{output.rstrip()}\n')
+        return f'[Reading PowerPoint file from {file_path}]\n{extract_pptx_text(file_path)}'
     except Exception:
-        pass
+        return f'[Error reading PowerPoint file from {file_path}]'

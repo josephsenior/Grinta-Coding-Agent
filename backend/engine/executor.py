@@ -99,27 +99,8 @@ class OrchestratorExecutor(
         call_params = dict(params)
         call_params = self._apply_context_window_preflight(call_params)
 
-        # Log tools sent to LLM for session.jsonl RUNTIME correlation.
-        tool_list = call_params.get('tools', [])
-        tool_names = (
-            [t.get('function', {}).get('name', '?') for t in tool_list]
-            if tool_list
-            else []
-        )
-        active_mode = getattr(self, '_active_run_mode', 'N/A')
-        logger.info(
-            'executor.execute: mode=%r tools=%r',
-            active_mode,
-            tool_names,
-            extra={'msg_type': 'EXECUTOR_TOOLS'},
-        )
+        self._log_tool_names(call_params)
 
-        # NOTE: Grinta's DirectLLMClient implementations intentionally expose
-        # deterministic *non-streaming* completion for all providers. Native
-        # streaming support varies widely across SDKs and tends to be the
-        # source of flakiness. To keep UX responsive without relying on
-        # provider-specific streaming, we always fetch a complete response
-        # and then emit StreamingChunkAction events derived from the final text.
         ckpt_token = checkpoint.begin(
             call_params,
             anchor_event_id=self._checkpoint_anchor_event_id(event_stream),
@@ -143,14 +124,7 @@ class OrchestratorExecutor(
         if response is None:
             raise ModelProviderError('LLM returned no response')
 
-        # Emit synthetic streaming events from the final response text
-        # (post-hoc streaming). This is deterministic and provider-agnostic.
-        try:
-            if response is not None and event_stream is not None:
-                response_text = self._extract_response_text(response)
-                self._emit_streaming_actions(response_text, event_stream, response)
-        except Exception as exc:  # pragma: no cover - streaming is best-effort
-            logger.debug('Failed to emit streaming actions: %s', exc)
+        self._emit_synthetic_streaming(response, event_stream)
 
         execution_time = time.time() - start_time
         actions = self._without_blank_agent_messages(
@@ -165,11 +139,37 @@ class OrchestratorExecutor(
                 actions,
                 streamed_visible_text=self._extract_response_text(response),
             )
-        # Commit only after the model response has been converted into durable
-        # actions. If conversion fails, the WAL remains as an explicit recovery
-        # fence instead of making an incomplete turn look successful.
         checkpoint.commit(ckpt_token)
         return ExecutionResult(actions, response, execution_time, error_message)
+
+    def _log_tool_names(self, call_params: dict) -> None:
+        """Log tool names sent to LLM for session.jsonl correlation."""
+        tool_list = call_params.get('tools', [])
+        tool_names = (
+            [t.get('function', {}).get('name', '?') for t in tool_list]
+            if tool_list
+            else []
+        )
+        active_mode = getattr(self, '_active_run_mode', 'N/A')
+        logger.info(
+            'executor.execute: mode=%r tools=%r',
+            active_mode,
+            tool_names,
+            extra={'msg_type': 'EXECUTOR_TOOLS'},
+        )
+
+    def _emit_synthetic_streaming(
+        self,
+        response: Any,
+        event_stream: EventStream | None,
+    ) -> None:
+        """Emit synthetic streaming events from a completed response."""
+        try:
+            if response is not None and event_stream is not None:
+                response_text = self._extract_response_text(response)
+                self._emit_streaming_actions(response_text, event_stream, response)
+        except Exception as exc:
+            logger.debug('Failed to emit streaming actions: %s', exc)
 
     async def async_execute(
         self,

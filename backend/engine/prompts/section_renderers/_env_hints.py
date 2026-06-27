@@ -24,7 +24,7 @@ def _lsp_available(config: Any = None) -> bool:
 
 def _debugger_available(config: Any = None) -> bool:
     """Return whether the debugger tool should be considered available."""
-    if not getattr(config, 'enable_debugger', False):
+    if not getattr(config, 'enable_debugger', True):
         return False
     try:
         from backend.utils.runtime_detect import has_any_debug_adapter
