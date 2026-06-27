@@ -17,6 +17,7 @@ import libtmux
 
 from backend.core.logging.logger import app_logger as logger
 from backend.core.os_capabilities import OS_CAPS
+from backend.core.wsl import is_wsl_runtime
 from backend.execution.utils.shell.bash_support import (
     escape_bash_special_chars,
     remove_command_prefix,
@@ -69,8 +70,8 @@ def _prepare_tmux_tmpdir(orch: BashSession) -> None:
     del orch  # instance kept for API uniformity; reads the env directly
     tmpdir = os.environ.get('TMUX_TMPDIR', '').strip()
     if not tmpdir:
-        if OS_CAPS.is_linux and os.path.isdir('/mnt/c'):
-            # WSL: keep tmux sockets off the Windows mount for reliability.
+        if OS_CAPS.is_linux and is_wsl_runtime():
+            # WSL2: keep tmux sockets off the Windows mount for reliability.
             tmpdir = os.path.join('/tmp', 'grinta-tmux')
             os.environ['TMUX_TMPDIR'] = tmpdir
     if not tmpdir:

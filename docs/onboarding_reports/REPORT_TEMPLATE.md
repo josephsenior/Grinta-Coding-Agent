@@ -6,7 +6,7 @@
 | --- | --- |
 | Date | YYYY-MM-DD |
 | Install path | pipx / source uv / docker |
-| OS | Linux / Windows / macOS + version |
+| OS | Linux / Windows / macOS / WSL2 Ubuntu + version |
 | Python version | |
 | Grinta version | `grinta --version` or PyPI tag |
 | Machine | Fresh VM / hardware (no prior `~/.grinta`) |
@@ -30,6 +30,7 @@
 | `grinta` TUI launch | | |
 | First agent task (`/health` or starter prompt) | | |
 | `grinta doctor` (optional) | | |
+| WSL2 layout (`grinta doctor` wsl_* checks, or `scripts/smoke/smoke_wsl_layout.sh`) | | WSL2 only |
 
 ## Friction log
 

@@ -30,6 +30,14 @@ Install paths: [QUICK_START.md](QUICK_START.md). Windows/WSL: [WINDOWS_AND_WSL.m
 - **PowerShell instead of bash:** `"security": { "windows_shell": "bash" }` in settings (default is bash)
 - **Long paths:** enable Windows long paths (registry `LongPathsEnabled=1`)
 
+## WSL2
+
+- **Slow startup / agent stalls:** repo on `/mnt/c` — clone to `~/Grinta`; run `grinta doctor`
+- **Wrong install:** use `pipx` inside Ubuntu, not Windows PowerShell
+- **`grinta` not found in WSL:** install inside Ubuntu ([QUICK_START.md](QUICK_START.md#wsl-ubuntu))
+- **Project on `/mnt/c` is slow:** expected; official supported layout — see [WINDOWS_AND_WSL.md](WINDOWS_AND_WSL.md)
+- **tmux / shell errors:** ensure `TMUX_TMPDIR` writable; run `grinta doctor` on WSL
+
 ## Checks
 
 ```bash

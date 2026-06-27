@@ -16,6 +16,15 @@ NC='\033[0m'
 
 echo -e "${CYAN}Starting Grinta (pipx install)...${NC}"
 
+if [[ -n "${WSL_DISTRO_NAME:-}" ]]; then
+    if pwd | grep -q '^/mnt/'; then
+        echo -e "${YELLOW}WSL2: running from a Windows mount. Prefer: cd ~/... before grinta.${NC}"
+        echo -e "${YELLOW}      Official layout: pipx install inside Ubuntu; repo on ~/Grinta; project on /mnt/c OK.${NC}"
+        echo -e "${YELLOW}      See docs/WINDOWS_AND_WSL.md${NC}"
+        echo ""
+    fi
+fi
+
 echo -e "${YELLOW}Step 0: Pre-flight checks...${NC}"
 
 if ! command -v grinta &> /dev/null; then

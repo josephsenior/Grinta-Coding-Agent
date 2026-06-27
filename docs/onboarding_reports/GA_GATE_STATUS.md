@@ -10,5 +10,7 @@ Need **3× interactive pipx** + **3× interactive source** on fresh VMs (no prio
 | pipx Windows | 1 partial | |
 | source Linux | 0 | CI only |
 | source Windows | 1 | |
+| pipx WSL2 | 0 | Run `scripts/smoke/smoke_wsl_layout.sh` inside Ubuntu; manual GA |
+| source WSL2 | 0 | Repo on `~/Grinta`, project on `/mnt/c`; `grinta doctor` + interrupt test |
 
 See [RELEASE_CHECKLIST.md](../RELEASE_CHECKLIST.md) before `v1.0.0`.

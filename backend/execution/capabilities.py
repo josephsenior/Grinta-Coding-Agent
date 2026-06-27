@@ -14,6 +14,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from backend.core.wsl import is_wsl_runtime as _is_wsl_runtime
+
 
 @dataclass(frozen=True, slots=True)
 class RuntimeCapabilities:
@@ -71,17 +73,6 @@ def _is_container_runtime() -> bool:
     return Path('/.dockerenv').exists() or Path('/run/.containerenv').exists()
 
 
-def _is_wsl_runtime(platform: str) -> bool:
-    if not platform.startswith('linux'):
-        return False
-    if os.getenv('WSL_DISTRO_NAME') or os.getenv('WSL_INTEROP'):
-        return True
-    try:
-        return 'microsoft' in Path('/proc/version').read_text(encoding='utf-8').lower()
-    except OSError:
-        return False
-
-
 def detect_capabilities(
     *,
     enable_browser: bool = False,
@@ -96,7 +87,7 @@ def detect_capabilities(
     platform = sys.platform
     is_windows = platform == 'win32'
     is_container = _is_container_runtime()
-    is_wsl = _is_wsl_runtime(platform)
+    is_wsl = _is_wsl_runtime()
 
     has_git = shutil.which('git') is not None
     has_tmux = shutil.which('tmux') is not None

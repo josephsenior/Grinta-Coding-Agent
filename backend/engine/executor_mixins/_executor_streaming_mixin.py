@@ -14,7 +14,10 @@ import time
 import uuid
 from typing import TYPE_CHECKING, Any
 
-from backend.core.constants import LLM_STREAM_CHUNK_TIMEOUT_SECONDS
+from backend.core.constants import (
+    LLM_FIRST_CHUNK_TIMEOUT_SECONDS,
+    LLM_STREAM_CHUNK_TIMEOUT_SECONDS,
+)
 from backend.core.logging.logger import app_logger as logger
 from backend.engine.executor_mixins._executor_types import (
     _INLINE_CLOSE_THINK_RE,
@@ -240,7 +243,7 @@ class _ExecutorStreamingMixin:
         stream_aiter = stream_iter.__aiter__()
         first_chunk_timeout = self._timeout_from_env(
             'APP_LLM_FIRST_CHUNK_TIMEOUT_SECONDS',
-            45.0,
+            LLM_FIRST_CHUNK_TIMEOUT_SECONDS,
             allow_disable=True,
         )
         should_continue = await self._consume_first_stream_chunk(

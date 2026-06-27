@@ -346,6 +346,17 @@ class ScreenMessagesMixin:
         if self._agent_task and not self._agent_task.done():
             self._agent_task.cancel()
 
+        # Update the TUI immediately; cleanup may take seconds on WSL / slow disks.
+        self.finalize_thinking()
+        with contextlib.suppress(Exception):
+            spinner = self.query_one('#spinner', Static)
+            spinner.add_class('-hidden')
+            self.query_one('#input-bar', InputBar).remove_class('processing')
+        if getattr(self, '_hud', None) is not None:
+            self._hud.update_agent_state('Ready')
+            with contextlib.suppress(Exception):
+                self._render_hud_bar()
+
         async def _do_interrupt() -> None:
             if self._controller is not None:
                 mark = getattr(self._controller, 'mark_user_interrupt_stop', None)
@@ -372,11 +383,6 @@ class ScreenMessagesMixin:
                 from backend.core.logging.logger import finalize_session_logging_audit
 
                 finalize_session_logging_audit()
-
-            self.finalize_thinking()
-            spinner = self.query_one('#spinner', Static)
-            spinner.add_class('-hidden')
-            self.query_one('#input-bar', InputBar).remove_class('processing')
 
         asyncio.create_task(_do_interrupt())
 

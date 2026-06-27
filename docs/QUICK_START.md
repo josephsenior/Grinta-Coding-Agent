@@ -81,8 +81,10 @@ grinta
 
 ## WSL (Ubuntu)
 
-Windows `pipx` does not apply — install inside WSL.  
+Windows `pipx` does not apply — install **inside Ubuntu** (Linux Grinta, not PowerShell).  
 `C:\foo\bar` → `/mnt/c/foo/bar`
+
+**Official supported layout:** repo on `~/Grinta`, project may be on `/mnt/c`. See [WINDOWS_AND_WSL.md](WINDOWS_AND_WSL.md).
 
 ### Consumer
 
@@ -90,24 +92,27 @@ Windows `pipx` does not apply — install inside WSL.
 sudo apt install -y python3.12 python3.12-venv pipx
 pipx ensurepath && source ~/.bashrc
 pipx install grinta-ai
-cd "<wsl-project>"
+grinta doctor
+cd "/mnt/c/Users/you/Desktop/your-project"
 grinta
 ```
 
 ### Dev — bootstrap once
 
 ```bash
-cd "<wsl-grinta-repo>"
+# Clone to Linux home (not /mnt/c)
+git clone "<wsl-grinta-repo-source>" ~/Grinta
+cd ~/Grinta
 bash start_here.sh
-pipx install -e "<wsl-grinta-repo>"    # optional; enables daily `grinta` (way A)
+pipx install -e ~/Grinta    # optional; enables daily `grinta` (way A)
 ```
 
 ### Dev — every day
 
 ```bash
-cd "<wsl-project>"
+cd "/mnt/c/Users/you/Desktop/your-project"
 grinta
-# or: uv run --directory "<wsl-grinta-repo>" grinta
+# or: uv run --directory ~/Grinta grinta
 ```
 
 ---

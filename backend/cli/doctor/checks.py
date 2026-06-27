@@ -10,6 +10,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -274,6 +275,188 @@ def check_editing_stack() -> DoctorCheck:
     return DoctorCheck('editing_stack', False, str(msg), critical=False)
 
 
+def check_wsl_runtime() -> DoctorCheck:
+    from backend.core.wsl import is_wsl_runtime, wsl_distro_name
+
+    if not is_wsl_runtime():
+        return DoctorCheck(
+            'wsl_runtime',
+            True,
+            'not WSL (native Linux/Windows/macOS)',
+            critical=False,
+        )
+    distro = wsl_distro_name() or 'Linux'
+    return DoctorCheck(
+        'wsl_runtime',
+        True,
+        f'{distro} — official tier: install Grinta inside Ubuntu, not Windows pipx',
+        critical=False,
+    )
+
+
+def check_wsl_layout(
+    *,
+    workspace: Path | None = None,
+    repo_root: Path | None = None,
+) -> DoctorCheck:
+    from backend.core.wsl import (
+        WslLayout,
+        classify_wsl_layout,
+        is_wsl_runtime,
+        recommended_repo_path_hint,
+        resolve_grinta_repo_root,
+    )
+
+    if not is_wsl_runtime():
+        return DoctorCheck('wsl_layout', True, 'n/a', critical=False)
+
+    ws = workspace or Path.cwd()
+    repo = repo_root or resolve_grinta_repo_root()
+    layout = classify_wsl_layout(workspace=ws, repo_root=repo)
+
+    if layout == WslLayout.REPO_ON_DRVFS:
+        return DoctorCheck(
+            'wsl_layout',
+            False,
+            f'Grinta repo on Windows mount — clone to {recommended_repo_path_hint()} '
+            f'(project on /mnt/c is OK)',
+            critical=False,
+        )
+    if layout == WslLayout.BOTH_ON_DRVFS:
+        return DoctorCheck(
+            'wsl_layout',
+            False,
+            f'repo and workspace on /mnt/* — move repo to {recommended_repo_path_hint()}',
+            critical=False,
+        )
+    if layout == WslLayout.SUPPORTED_SPLIT:
+        return DoctorCheck(
+            'wsl_layout',
+            True,
+            f'supported split layout (repo on Linux home, workspace on Windows mount)',
+            critical=False,
+        )
+    return DoctorCheck(
+        'wsl_layout',
+        True,
+        'repo and workspace on Linux filesystem (ideal)',
+        critical=False,
+    )
+
+
+def check_wsl_workspace_mount(*, workspace: Path | None = None) -> DoctorCheck:
+    from backend.core.wsl import is_windows_mount, is_wsl_runtime
+
+    if not is_wsl_runtime():
+        return DoctorCheck('wsl_workspace_mount', True, 'n/a', critical=False)
+
+    ws = workspace or Path.cwd()
+    if is_windows_mount(ws):
+        return DoctorCheck(
+            'wsl_workspace_mount',
+            True,
+            f'workspace on Windows mount ({ws}) — file tools may be slower',
+            critical=False,
+        )
+    return DoctorCheck(
+        'wsl_workspace_mount',
+        True,
+        'workspace on Linux filesystem',
+        critical=False,
+    )
+
+
+def check_wsl_filesystem_perf(*, workspace: Path | None = None) -> DoctorCheck:
+    from backend.core.wsl import is_drvfs_slow, is_windows_mount, is_wsl_runtime
+
+    if not is_wsl_runtime():
+        return DoctorCheck('wsl_filesystem_perf', True, 'n/a', critical=False)
+
+    ws = workspace or Path.cwd()
+    if not is_windows_mount(ws):
+        return DoctorCheck(
+            'wsl_filesystem_perf',
+            True,
+            'workspace not on /mnt/*',
+            critical=False,
+        )
+    if is_drvfs_slow(ws):
+        return DoctorCheck(
+            'wsl_filesystem_perf',
+            False,
+            f'slow I/O on {ws} — expected on /mnt/c; keep Grinta repo on ~/Grinta',
+            critical=False,
+        )
+    return DoctorCheck(
+        'wsl_filesystem_perf',
+        True,
+        'Windows mount I/O within expected range',
+        critical=False,
+    )
+
+
+def check_tmux_tmpdir() -> DoctorCheck:
+    import os
+
+    from backend.core.wsl import is_wsl_runtime
+
+    if not is_wsl_runtime():
+        return DoctorCheck('tmux_tmpdir', True, 'n/a', critical=False)
+
+    tmpdir = os.environ.get('TMUX_TMPDIR', '').strip() or '/tmp/grinta-tmux'
+    path = Path(tmpdir)
+    if path.is_dir() and os.access(path, os.W_OK):
+        return DoctorCheck('tmux_tmpdir', True, f'writable {tmpdir}', critical=False)
+    return DoctorCheck(
+        'tmux_tmpdir',
+        False,
+        f'TMUX_TMPDIR not writable: {tmpdir}',
+        critical=False,
+    )
+
+
+def collect_wsl_checks(*, workspace: Path | None = None) -> list[DoctorCheck]:
+    """WSL2 preflight checks (no-op when not on WSL)."""
+    from backend.core.wsl import is_wsl_runtime
+
+    if not is_wsl_runtime():
+        return []
+    ws = workspace or Path.cwd()
+    return [
+        check_wsl_runtime(),
+        check_wsl_layout(workspace=ws),
+        check_wsl_workspace_mount(workspace=ws),
+        check_wsl_filesystem_perf(workspace=ws),
+        check_tmux_tmpdir(),
+    ]
+
+
+def print_wsl_layout_hints(console: Any, *, workspace: Path | None = None) -> None:
+    """Non-blocking WSL layout hints for init wizard success panel."""
+    from rich.console import Console
+
+    from backend.cli.theme import CLR_STATUS_OK, CLR_STATUS_WARN
+    from backend.core.wsl import WslLayout, classify_wsl_layout, is_wsl_runtime
+
+    if not is_wsl_runtime():
+        return
+    if not isinstance(console, Console):
+        return
+
+    ws = workspace or Path.cwd()
+    layout = classify_wsl_layout(workspace=ws)
+    if layout in {WslLayout.REPO_ON_DRVFS, WslLayout.BOTH_ON_DRVFS}:
+        console.print(
+            f'  [{CLR_STATUS_WARN}]⚠[/] WSL: move Grinta repo to ~/Grinta '
+            f'(project on /mnt/c is OK). Run `grinta doctor`.'
+        )
+    elif layout == WslLayout.SUPPORTED_SPLIT:
+        console.print(
+            f'  [{CLR_STATUS_OK}]✓[/] WSL supported layout: repo on Linux home, '
+            f'project on Windows mount.'
+        )
+
+
 def collect_doctor_checks(*, verbose: bool = False) -> list[DoctorCheck]:
     """Run the full ``grinta doctor`` check suite."""
     checks: list[DoctorCheck] = [
@@ -288,6 +471,7 @@ def collect_doctor_checks(*, verbose: bool = False) -> list[DoctorCheck]:
         check_binary('rg'),
         check_debugpy(),
         check_optional_imports(),
+        *collect_wsl_checks(),
     ]
     if verbose:
         checks.append(check_editing_stack())
@@ -301,6 +485,7 @@ def collect_health_checks(*, model_hint: str | None = None) -> list[DoctorCheck]
         check_binary('git'),
         check_binary('rg'),
         check_llm_config(model_hint=model_hint),
+        *collect_wsl_checks(),
     ]
 
 
@@ -325,8 +510,15 @@ __all__ = [
     'check_python',
     'check_settings_file',
     'check_settings_schema',
+    'check_tmux_tmpdir',
     'check_version',
+    'check_wsl_filesystem_perf',
+    'check_wsl_layout',
+    'check_wsl_runtime',
+    'check_wsl_workspace_mount',
     'collect_doctor_checks',
     'collect_health_checks',
+    'collect_wsl_checks',
     'format_health_report_lines',
+    'print_wsl_layout_hints',
 ]

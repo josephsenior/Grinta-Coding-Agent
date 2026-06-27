@@ -202,6 +202,12 @@ def build_coding_preflight_block(
     if root is not None:
         result = explore_context(task, root)
         lines.append(f'- Workspace: {result.workspace}')
+        from backend.core.wsl import is_windows_mount, is_wsl_runtime
+
+        if is_wsl_runtime() and is_windows_mount(root):
+            lines.append(
+                '- WSL: workspace is on /mnt/c — use Linux paths in shell commands'
+            )
         lines.append(_format_list('Dirty files', git_status_lines(root)))
         lines.extend(_format_candidate_lines(result.candidates))
     else:
