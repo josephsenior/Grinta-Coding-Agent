@@ -26,6 +26,7 @@ class WslLayout(str, Enum):
 
 
 _DRVFS_SLOW_MS = 200.0
+_DEFAULT_TMUX_TMPDIR = '/tmp/grinta-tmux'
 
 
 def is_wsl_runtime() -> bool:
@@ -134,9 +135,29 @@ def recommended_repo_path_hint() -> str:
     return '~/Grinta'
 
 
+def default_tmux_tmpdir() -> str:
+    """Return the default tmux socket directory on WSL."""
+    return _DEFAULT_TMUX_TMPDIR
+
+
+def ensure_tmux_tmpdir() -> str:
+    """Create ``TMUX_TMPDIR`` on WSL so tmux is ready before the first shell session."""
+    if not is_wsl_runtime():
+        return os.environ.get('TMUX_TMPDIR', '').strip()
+
+    tmpdir = os.environ.get('TMUX_TMPDIR', '').strip() or _DEFAULT_TMUX_TMPDIR
+    os.environ['TMUX_TMPDIR'] = tmpdir
+    os.makedirs(tmpdir, mode=0o700, exist_ok=True)
+    if not os.access(tmpdir, os.W_OK):
+        raise OSError(f'TMUX_TMPDIR not writable: {tmpdir}')
+    return tmpdir
+
+
 __all__ = [
     'WslLayout',
     'classify_wsl_layout',
+    'default_tmux_tmpdir',
+    'ensure_tmux_tmpdir',
     'is_drvfs_slow',
     'is_windows_mount',
     'is_wsl_runtime',

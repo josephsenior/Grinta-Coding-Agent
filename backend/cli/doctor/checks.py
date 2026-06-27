@@ -396,23 +396,21 @@ def check_wsl_filesystem_perf(*, workspace: Path | None = None) -> DoctorCheck:
 
 
 def check_tmux_tmpdir() -> DoctorCheck:
-    import os
-
-    from backend.core.wsl import is_wsl_runtime
+    from backend.core.wsl import ensure_tmux_tmpdir, is_wsl_runtime
 
     if not is_wsl_runtime():
         return DoctorCheck('tmux_tmpdir', True, 'n/a', critical=False)
 
-    tmpdir = os.environ.get('TMUX_TMPDIR', '').strip() or '/tmp/grinta-tmux'
-    path = Path(tmpdir)
-    if path.is_dir() and os.access(path, os.W_OK):
-        return DoctorCheck('tmux_tmpdir', True, f'writable {tmpdir}', critical=False)
-    return DoctorCheck(
-        'tmux_tmpdir',
-        False,
-        f'TMUX_TMPDIR not writable: {tmpdir}',
-        critical=False,
-    )
+    try:
+        tmpdir = ensure_tmux_tmpdir()
+    except OSError as exc:
+        return DoctorCheck(
+            'tmux_tmpdir',
+            False,
+            str(exc),
+            critical=False,
+        )
+    return DoctorCheck('tmux_tmpdir', True, f'writable {tmpdir}', critical=False)
 
 
 def collect_wsl_checks(*, workspace: Path | None = None) -> list[DoctorCheck]:
@@ -459,6 +457,8 @@ def print_wsl_layout_hints(console: Any, *, workspace: Path | None = None) -> No
 
 def collect_doctor_checks(*, verbose: bool = False) -> list[DoctorCheck]:
     """Run the full ``grinta doctor`` check suite."""
+    from backend.core.wsl import is_wsl_runtime
+
     checks: list[DoctorCheck] = [
         check_version(),
         check_python(),
@@ -469,10 +469,17 @@ def collect_doctor_checks(*, verbose: bool = False) -> list[DoctorCheck]:
         check_execution_profile(),
         check_binary('git'),
         check_binary('rg'),
+    ]
+    if sys.platform.startswith('linux') or is_wsl_runtime():
+        checks.append(check_binary('tmux'))
+        checks.append(check_binary('bash', critical=False))
+    checks.extend(
+        [
         check_debugpy(),
         check_optional_imports(),
         *collect_wsl_checks(),
-    ]
+        ]
+    )
     if verbose:
         checks.append(check_editing_stack())
     return checks

@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from backend.cli.doctor.checks import (
+    check_tmux_tmpdir,
     check_wsl_layout,
     collect_wsl_checks,
 )
@@ -50,3 +51,16 @@ def test_collect_wsl_checks_on_wsl(monkeypatch: pytest.MonkeyPatch) -> None:
     assert 'wsl_runtime' in names
     assert 'wsl_layout' in names
     assert 'tmux_tmpdir' in names
+
+
+def test_check_tmux_tmpdir_provisions_directory(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(wsl_mod, 'is_wsl_runtime', lambda: True)
+    target = tmp_path / 'grinta-tmux'
+    monkeypatch.setattr(wsl_mod, '_DEFAULT_TMUX_TMPDIR', str(target))
+    monkeypatch.delenv('TMUX_TMPDIR', raising=False)
+    check = check_tmux_tmpdir()
+    assert check.ok is True
+    assert str(target) in check.detail
+    assert target.is_dir()

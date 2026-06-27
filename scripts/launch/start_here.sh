@@ -96,8 +96,37 @@ _ensure_python() {
     exit 1
 }
 
+_ensure_wsl_tmux_ready() {
+    if [[ -z "${WSL_DISTRO_NAME:-}" ]]; then
+        return 0
+    fi
+
+    export TMUX_TMPDIR="${TMUX_TMPDIR:-/tmp/grinta-tmux}"
+    mkdir -p "$TMUX_TMPDIR"
+    chmod 700 "$TMUX_TMPDIR" 2>/dev/null || true
+
+    if command -v tmux &>/dev/null; then
+        echo -e "${GREEN}tmux found: $(command -v tmux)${NC}"
+        return 0
+    fi
+
+    if ! command -v apt-get &>/dev/null; then
+        echo -e "${YELLOW}tmux not found. Install it with your distro package manager.${NC}"
+        return 0
+    fi
+
+    echo -e "${YELLOW}Installing tmux (required for shell sessions)...${NC}"
+    if sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y tmux 2>/dev/null \
+        || env DEBIAN_FRONTEND=noninteractive apt-get install -y tmux 2>/dev/null; then
+        echo -e "${GREEN}tmux installed.${NC}"
+    else
+        echo -e "${YELLOW}Could not auto-install tmux. Run: sudo apt install tmux${NC}"
+    fi
+}
+
 # Step 0: Toolchain (uv + Python managed by uv)
 echo -e "${YELLOW}Step 0: Toolchain...${NC}"
+_ensure_wsl_tmux_ready
 _ensure_uv
 _ensure_python
 
