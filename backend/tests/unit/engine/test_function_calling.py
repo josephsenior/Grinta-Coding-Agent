@@ -173,11 +173,11 @@ class TestModeToolValidation:
             )
 
     def test_chat_mode_allows_read_tool_call(self):
-        tool_call = SimpleNamespace(function=SimpleNamespace(name='read'))
+        tool_call = SimpleNamespace(function=SimpleNamespace(name='read_file'))
 
         action = _process_single_tool_call(
             tool_call,
-            {'type': 'file', 'path': 'demo.txt', 'security_risk': 'LOW'},
+            {'path': 'demo.txt', 'security_risk': 'LOW'},
             mode='chat',
         )
 
