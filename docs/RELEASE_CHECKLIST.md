@@ -1,6 +1,6 @@
 # Release and GA checklist
 
-Use this list before cutting a **release candidate**, **patch/minor**, or **GA** tag and before publishing to PyPI. It aligns with the jobs in [CI](CI.md) and the promotion flow in [PROMOTION.md](PROMOTION.md).
+Use this list before cutting a **release candidate**, **patch/minor**, or **GA** tag and before publishing to PyPI. Aligns with [CI.md](CI.md).
 
 **Do not tag while `main` is red.** Wait for required checks on the commit you intend to ship.
 
@@ -83,8 +83,8 @@ CI’s `gates-on-linux-extended`, `gates-on-windows-extended`, and `gates-on-mac
 - [ ] **Reliability gate + integration/stress:** `make reliability-gate-integration` (adds integration and stress suites).
 - [ ] **Stress suite (spot-check):** `make test-stress` or `PYTHONPATH=. uv run pytest backend/tests/stress -m stress -q`.
 - [ ] **Integration suite (spot-check):** `make test-integration` or `PYTHONPATH=. uv run pytest backend/tests/integration -m integration -q`.
-- [ ] **Fresh-machine onboarding evidence:** keep the reports in [FRESH_MACHINE_ONBOARDING.md](FRESH_MACHINE_ONBOARDING.md) current for supported install paths (3× pipx, 3× source `uv`; Docker optional). Track honest progress in [onboarding_reports/GA_GATE_STATUS.md](onboarding_reports/GA_GATE_STATUS.md). CI smoke install still does not cover interactive `init` or a first real agent task — **do not tag `v1.0.0` until the GA gate status is green.**
-- [ ] **Evaluation (when behavior-sensitive):** run [run-eval workflow](../.github/workflows/run-eval.yml) manually or via release trigger if the release touches autonomy, prompts, safety, or orchestration. See [PROMOTION.md](PROMOTION.md#6-run-evaluation-when-the-release-deserves-it).
+- [ ] **Fresh-machine onboarding evidence:** keep reports in [onboarding_reports/](onboarding_reports/) current (3× pipx, 3× source). Track in [GA_GATE_STATUS.md](onboarding_reports/GA_GATE_STATUS.md). CI smoke does not cover interactive first run — **do not tag `v1.0.0` until GA gate is green.**
+- [ ] **Evaluation (when behavior-sensitive):** run [run-eval workflow](../.github/workflows/run-eval.yml) manually if the release touches autonomy, prompts, safety, or orchestration.
 
 ### Optional — full Python test tree
 
@@ -113,7 +113,7 @@ When verification above is green:
 
 ## Tag and publish
 
-1. **Tag from `main`** (see [PROMOTION.md](PROMOTION.md)):
+1. **Tag from `main`:**
 
 ```bash
 git checkout main
@@ -143,7 +143,7 @@ gaps in release notes (see [Support Matrix](SUPPORT_MATRIX.md)).
 Use this when deciding whether to move from a public RC to an official GA tag:
 
 - [ ] **Required CI stays green for a sustained window:** Linux, Windows, and macOS required jobs plus lint are green on `main` for at least 7 consecutive days.
-- [ ] **CLI onboarding confidence:** current successful fresh-machine reports exist across supported install paths (`pipx` required; source `uv run` required; Docker optional) and are refreshed whenever onboarding-affecting changes land. Table in [FRESH_MACHINE_ONBOARDING.md](FRESH_MACHINE_ONBOARDING.md); partial automation in [smoke-install workflow](../.github/workflows/smoke-install.yml).
+- [ ] **CLI onboarding confidence:** fresh-machine reports in [onboarding_reports/](onboarding_reports/); CI: [smoke-install workflow](../.github/workflows/smoke-install.yml).
 - [ ] **RC feedback triage complete:** all high-severity RC feedback issues are fixed and verified or explicitly documented as post-GA follow-up.
 - [ ] **Docs match real behavior:** `README.md`, `docs/USER_GUIDE.md`, `docs/TROUBLESHOOTING.md`, and `docs/SUPPORT_MATRIX.md` reflect current CLI UX, platform support, and completion-validation behavior.
 - [ ] **Packaging artifacts validated:** PyPI install path, Scoop, and Homebrew metadata verified against published artifacts for the target version.

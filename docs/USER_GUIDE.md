@@ -1,301 +1,44 @@
-# Grinta User Guide
+# User Guide
 
-This guide reflects the current terminal-first Grinta workflow.
+Install: [QUICK_START.md](QUICK_START.md). Config keys: [SETTINGS.md](SETTINGS.md).
 
-Canonical startup:
+## Run
 
-- Installed CLI: `grinta`
-- Source checkout: `uv run python -m backend.cli.entry`
+- Installed: `grinta`
+- Source: `uv run python -m backend.cli.entry`
+- Interactive TTY → Textual UI. Piped stdin → non-interactive (one line = one turn; use TUI for multi-turn).
 
-## Table of Contents
+## Modes (`/mode`)
 
-1. Installation
-2. Interface and configuration
-3. First Task
-4. LLM Provider Setup
-5. Safety and Runtime Model
-6. Useful Commands
+| Mode | Does |
+| --- | --- |
+| **Chat** | Read-only Q&A |
+| **Plan** | Read-only investigation |
+| **Agent** | Full edit + shell loop (default) |
 
----
+## Autonomy (`/autonomy`)
 
-## Installation
+Only matters in **Agent** mode. Controls confirmation prompts, not execution policy.
 
-Install paths and minimal commands: [QUICK_START.md](QUICK_START.md) · full reference: [INSTALL.md](INSTALL.md) · Windows/WSL: [WINDOWS_AND_WSL.md](WINDOWS_AND_WSL.md).
+| Level | Behavior |
+| --- | --- |
+| conservative | Confirm most actions |
+| balanced | Confirm high-risk (default) |
+| full | No prompts; CRITICAL blocks still apply |
 
-| Path | Prerequisites | First run |
-| --- | --- | --- |
-| Consumer (`pipx install grinta-ai`) | Python 3.12+ and `pipx` | `grinta` — setup wizard on first interactive launch |
-| Source checkout | none — `START_HERE.ps1` / `start_here.sh` install `uv` + Python 3.12 | same scripts sync deps and launch Grinta |
+Execution hardening: `security.execution_profile` in [SETTINGS.md](SETTINGS.md).
 
-`grinta init` runs the **same wizard** without opening the TUI — use for reconfiguration, `--non-interactive`, or CI. You do **not** need it before the first `grinta`.
-
-Interactive TTY sessions start the Textual app. Piped stdin uses the non-interactive runner.
-
-### Create or update local settings
-
-```bash
-uv run python -m backend.cli.entry init
-```
-
-Non-interactive bootstrap (CI, smoke scripts, no TTY):
-
-```bash
-export LLM_API_KEY=sk-...
-export LLM_PROVIDER=openai
-grinta init --non-interactive --force
-```
-
-Or with explicit flags: `grinta init --non-interactive --provider ollama --model ollama/llama3.2 --force`. Secrets should come from the environment (`LLM_API_KEY` or provider-specific vars), not the command line.
-
-On Windows PowerShell:
-
-```powershell
-uv run python -m backend.cli.entry init
-$env:LLM_API_KEY = 'sk-...'
-$env:LLM_PROVIDER = 'openai'
-uv run python -m backend.cli.entry init --non-interactive --force
-```
-
----
-
-## Interface and Configuration
-
-### Terminal surfaces
-
-Grinta has two runtime surfaces:
-
-- **Interactive TTY:** `grinta` or `uv run python -m backend.cli.entry` opens the Textual terminal app with transcript cards, HUD, dialogs, and slash commands.
-- **Non-interactive stdin:** piped input runs through `backend.cli.repl.noninteractive` and prints results without the Textual app.
-
-**Piped input semantics:** each non-empty line starts a **new** controller lifecycle. Context does not carry across lines in a pipe or here-doc. For multi-turn work, use the interactive TUI. Supported slash commands in piped mode are `/help`, `/clear`, and `/quit`; use the TUI for the full command set (`/diff`, `/autonomy`, playbooks, etc.).
-
-The same orchestrator, safety checks, provider routing, and event stream back both surfaces.
-
-## Configuration
-
-Grinta supports layered configuration. Installed runs use `~/.grinta/settings.json`; source checkouts use the repository `settings.json`; `APP_ROOT` can intentionally override the settings root.
-
-### Minimal settings.json
-
-```json
-{
-  "llm_provider": "openai",
-  "llm_model": "openai/gpt-5.1",
-  "llm_api_key": "${LLM_API_KEY}",
-  "llm_base_url": ""
-}
-```
-
-Notes:
-
-- `llm_provider` can be omitted when `llm_model` includes a provider prefix.
-- `llm_base_url` is optional and useful for OpenAI-compatible proxies.
-- Put the real key in a sibling `.env` file or your shell environment as `LLM_API_KEY`.
-- Environment variables provide defaults that `settings.json` can override for the same keys.
-
-Common environment variables:
-
-- `LLM_API_KEY`
-- `LLM_MODEL`
-- `APP_ROOT` (intentionally overrides where `settings.json` is resolved)
-
-### Pending actions and the terminal manager
-
-The default `pending_action_timeout` (in `settings.json`) is the base watchdog for
-how long the orchestration waits for a tool’s observation. Interactive shell
-commands (`cmd_run`) and `terminal_manager` (PTY) actions use a **higher built-in
-floor** (aligned with long-running installs and slow PTY startup), so they are
-less likely to hit a spurious “pending action” timeout at the default.
-
-If you still see timeouts for other tools, or you need an even longer global
-window, increase `pending_action_timeout` in `settings.json` (or set it to `0` to
-disable the watchdog, which is not recommended for routine use).
-
-### Textual app: Ctrl+C and interruption
-
-In the Textual app, Ctrl+C is bound to copy-or-interrupt behavior and Escape is
-available for interrupting the active agent run. Use `/exit` to leave the app.
-The prompt-toolkit fallback may handle Ctrl+C differently depending on terminal
-and platform.
-
-### Stop, Ctrl+C, and in-flight tool calls
-
-If you press **Stop** or **Ctrl+C** while a tool call is still running, the
-orchestration may show an error such as “Run cancelled … before this tool
-finished.” That means **you interrupted the step**, not that the tool (or
-`terminal_manager`) is broken. A separate message is used when the **runtime**
-crashes or restarts without you cancelling.
-
-Multi-step tools (for example `terminal_manager`: **open** → **read** / **input**)
-need each step to complete unless you intend to cancel; stopping mid-sequence
-leaves tasks incomplete and can show that message for the interrupted call.
-
----
-
-## First Task
-
-### Start the CLI
-
-```bash
-uv run python -m backend.cli.entry
-```
-
-### Ask for work
-
-Example:
-
-```text
-Add tests for backend/inference/provider_resolver.py and run them.
-```
-
-The agent will plan, execute tools, validate progress, and surface completion-quality signals before finishing. In the current release line, completion validation is advisory guidance rather than a hard finish blocker.
-
-### Runtime state
-
-Session and runtime state are stored under:
-
-- `~/.grinta/workspaces/<id>/storage`
-
----
-
-## LLM Provider Setup
-
-Grinta supports direct SDK routing plus OpenAI-compatible endpoints.
-
-### Examples
-
-OpenAI:
-
-```json
-{
-  "llm_model": "openai/gpt-5.1",
-  "llm_api_key": "${LLM_API_KEY}"
-}
-```
-
-Anthropic:
-
-```json
-{
-  "llm_model": "anthropic/claude-sonnet-4.6",
-  "llm_api_key": "${LLM_API_KEY}"
-}
-```
-
-Google:
-
-```json
-{
-  "llm_model": "google/gemini-3-flash",
-  "llm_api_key": "${LLM_API_KEY}"
-}
-```
-
-Ollama local:
-
-```json
-{
-  "llm_model": "ollama/llama3.2",
-  "llm_api_key": ""
-}
-```
-
-If you use local providers, start them first (for example `ollama serve`).
-
-From a source checkout, you can inspect local provider availability with:
-
-```bash
-uv run python -m backend.inference.discover_models
-uv run python -m backend.inference.discover_models status
-```
-
----
-
-## Safety and Runtime Model
-
-Grinta executes locally on your host machine.
-
-- Default mode is local execution.
-- `security.execution_profile="hardened_local"` adds stricter policy checks for command cwd, package installs, network-capable commands, background processes, and sensitive workspace paths.
-- `security.execution_profile="sandboxed_local"` adds those same checks plus OS-native process isolation for non-interactive command execution.
-- `hardened_local` is not sandboxing or process isolation. Interactive terminal sessions also bypass process isolation under `sandboxed_local`.
-
-Use Grinta in trusted repositories and environments.
-
-### Interaction modes
-
-Grinta has three interaction modes that change the conversational contract:
-
-- **Chat** — grounded Q&A and discussion. Use discovery tools (`grep`, `glob`, `find_symbols`, `read`, `lsp`, `analyze_project_structure`) and `ask_user` when needed. No edits or shell execution.
-- **Plan** — read-only investigation; may use `task_tracker` for a structured plan when enabled, or prose only. Switch to Agent mode to execute.
-- **Agent** — full task execution. The agent plans, runs tools, validates results, and finishes. This is the default mode when you give a direct task.
-
-In the Textual app, the current mode is visible and selectable in the HUD. Use
-`/mode chat|plan|agent` in the prompt or TUI input. The mode is stored in
-`settings.json` under `agent.Orchestrator.mode`.
-
-### Reading sibling packages (monorepos)
-
-By default, file-read tools only access the open workspace. To read **specific**
-paths outside it (sibling packages, shared libraries, `~/.config/git`) without
-allowing writes there:
-
-1. Keep `security.allow_read_outside_workspace` at `false` unless you need this.
-2. Set it to `true` and list absolute paths in `security.additional_read_roots`.
-
-Writes remain workspace-scoped. Shell commands (`cat`, `Get-Content`, …) are **not**
-limited by file-read boundaries in the `standard` profile — use `hardened_local`
-or conservative autonomy on unfamiliar repos. See [SETTINGS.md](SETTINGS.md) and
-[SECURITY_CHECKLIST.md](SECURITY_CHECKLIST.md).
-
-### Autonomy levels (`/autonomy`)
-
-There are three stored levels: **conservative**, **balanced**, and **full**. They differ only in **when the agent asks you before running an action**; execution, retries, and prompts are otherwise the same.
-
-- **Conservative** — confirm before every command, mutation, terminal/browser action, MCP call, or worker-coordination action in the confirmation flow.
-- **Balanced** (default) — confirm for high-risk or high-impact actions, including declared `HIGH` risk, dangerous commands, file edits (except `create_file`), browser actions, MCP calls, and worker delegation.
-- **Full** — never prompt for confirmation; hard safety blocks (for example CRITICAL-classified commands) still apply.
-
-Autonomy level is only meaningful in **Agent** mode. Chat and Plan modes have their own interaction contracts independent of autonomy.
-
-Autonomy is separate from `security.execution_profile`: autonomy controls prompts, while the execution profile controls runtime hardening.
-
-See also [SECURITY_CHECKLIST.md](SECURITY_CHECKLIST.md).
-
----
-
-## Useful Commands
-
-Source checkout — sync and run:
-
-```bash
-uv run python scripts/bootstrap_env.py dev-test
-uv run python -m backend.cli.entry
-```
-
-CLI help:
-
-```bash
-uv run python -m backend.cli.entry --help
-```
-
-Common slash commands:
+## Slash commands
 
 | Command | Purpose |
 | --- | --- |
-| `/help [command|--all]` | Show commands and shortcuts |
-| `/settings` | Open model, API key, and MCP settings |
-| `/sessions` / `/resume <N|id>` | List or resume past sessions |
-| `/model [provider/model]` | Show or switch the active model |
-| `/autonomy [conservative|balanced|full]` | View or set confirmation behavior |
-| `/status [verbose]` | Show HUD state and optional diagnostics |
-| `/health` | Check debug adapters (e.g. debugpy), ripgrep, git, and model setup |
-| `/diff [--stat|--name-only|--patch] [path]` | Show workspace git changes |
-| `/checkpoint [label]` | Save a manual workspace checkpoint |
-| `/compact` / `/retry` | Compact context or resend the last message |
+| `/help` | Commands list |
+| `/settings` | Model, API key, MCP |
+| `/sessions` `/resume` | Past sessions |
+| `/model` `/mode` `/autonomy` | HUD controls |
+| `/health` | Fast env check in TUI (`grinta doctor` outside TUI) |
+| `/diff` `/checkpoint` `/compact` | Workspace tools |
 
----
+## Safety
 
-For architecture internals, see `docs/ARCHITECTURE.md`.
-For contributor-facing internals, see `docs/DEVELOPER.md`.
-For debugging issues, see `docs/TROUBLESHOOTING.md`.
+Runs on your machine. See [SECURITY_CHECKLIST.md](SECURITY_CHECKLIST.md) for untrusted code.
