@@ -32,9 +32,11 @@ def _handle_cmd_run_action(
 def _handle_cmd_output_observation(
     orch: 'RendererEventProcessorMixin', event: CmdOutputObservation
 ) -> None:
+    cmd = (getattr(event, 'command', '') or '').strip().lower()
+    if cmd.startswith('browser '):
+        return
     output = (event.content or '').strip()
     exit_code = getattr(event, 'exit_code', None)
-    cmd = getattr(event, 'command', '') or ''
     cwd = resolve_cmd_output_cwd(event)
     output = sanitize_cmd_output(output)
     is_background = cmd_output_is_background_detached(event)
