@@ -44,6 +44,8 @@ _DAP_ADAPTER_RECIPES: dict[str, dict[str, Any]] = {
         'build': lambda exe, port: [exe, 'dap', f'--listen=127.0.0.1:{port}'],
         'transport': 'tcp',
         'extensions': ('.go',),
+        'install_hint': 'go install github.com/go-delve/delve/cmd/dlv@latest',
+        'docs': 'https://github.com/go-delve/delve/tree/master/Documentation/dap',
     },
     'rust': {
         'probe': 'codelldb',
@@ -54,6 +56,8 @@ _DAP_ADAPTER_RECIPES: dict[str, dict[str, Any]] = {
             ('lldb-vscode', lambda exe: [exe], 'stdio'),
         ],
         'extensions': ('.rs',),
+        'install_hint': 'Install CodeLLDB via VS Code marketplace or codelldb extension',
+        'docs': 'https://github.com/vadimcn/codelldb',
     },
     'cpp': {
         'probe': 'codelldb',
@@ -65,6 +69,8 @@ _DAP_ADAPTER_RECIPES: dict[str, dict[str, Any]] = {
             ('OpenDebugAD7', lambda exe: [exe], 'stdio'),
         ],
         'extensions': ('.cpp', '.cc', '.cxx', '.hpp'),
+        'install_hint': 'Install CodeLLDB via VS Code marketplace or build gdbus/gdb from source',
+        'docs': 'https://github.com/vadimcn/codelldb',
     },
     'c': {
         'probe': 'lldb-dap',
@@ -76,12 +82,16 @@ _DAP_ADAPTER_RECIPES: dict[str, dict[str, Any]] = {
             ('OpenDebugAD7', lambda exe: [exe], 'stdio'),
         ],
         'extensions': ('.c', '.h'),
+        'install_hint': 'Install lldb-dap: brew install llvm (macOS) or apt install lld (Debian/Ubuntu)',
+        'docs': 'https://github.com/llvm/llvm-project/tree/main/lldb/tools/lldb-dap',
     },
     'csharp': {
         'probe': 'netcoredbg',
         'build': lambda exe: [exe, '--interpreter=vscode'],
         'transport': 'stdio',
         'extensions': ('.cs',),
+        'install_hint': 'Install netcoredbg from https://github.com/nickel-lang/netcoredbg',
+        'docs': 'https://github.com/nickel-lang/netcoredbg',
     },
     'javascript': {
         'probe': 'js-debug-adapter',
@@ -92,6 +102,8 @@ _DAP_ADAPTER_RECIPES: dict[str, dict[str, Any]] = {
             ('node-debug2', lambda exe: [exe], 'stdio'),
         ],
         'extensions': ('.js', '.mjs', '.cjs', '.jsx'),
+        'install_hint': 'npm install -g @vscode/js-debug',
+        'docs': 'https://github.com/nickel-lang/js-debug-adapter',
     },
     'typescript': {
         'probe': 'js-debug-adapter',
@@ -102,27 +114,32 @@ _DAP_ADAPTER_RECIPES: dict[str, dict[str, Any]] = {
             ('node-debug2', lambda exe: [exe], 'stdio'),
         ],
         'extensions': ('.ts', '.tsx'),
+        'install_hint': 'npm install -g @vscode/js-debug',
+        'docs': 'https://github.com/nickel-lang/js-debug-adapter',
     },
     'java': {
         'probe': 'java-debug-adapter',
         'build': lambda exe: [exe],
         'transport': 'stdio',
         'extensions': ('.java',),
+        'install_hint': 'Install via VS Code Java extension pack or download from https://github.com/microsoft/vscode-java-debug',
+        'docs': 'https://github.com/microsoft/vscode-java-debug',
     },
     'ruby': {
         'probe': 'rdbg',
         'build': lambda exe: [exe, '--open', '--stop-at-load'],
-        # ``rdbg --open`` is a TCP debug server, but not a direct DAP adapter
-        # process that this client can currently drive without the VS Code
-        # rdbg adapter layer.
         'transport': 'ruby-debug',
         'extensions': ('.rb',),
+        'install_hint': 'gem install debug',
+        'docs': 'https://github.com/ruby/debug',
     },
     'php': {
         'probe': 'php-debug-adapter',
         'build': lambda exe: [exe],
         'transport': 'stdio',
         'extensions': ('.php',),
+        'install_hint': 'Install PHP Debug extension via VS Code marketplace',
+        'docs': 'https://github.com/xdebug/vscode-php-debug',
     },
 }
 

@@ -51,11 +51,9 @@ def _handle_browser_screenshot_observation(
     orch: 'RendererEventProcessorMixin', event: BrowserScreenshotObservation
 ) -> None:
     content = (event.content or '').strip()
-    image_path = getattr(event, 'image_path', '') or ''
-    url = image_path or ''
-    domain = orch._extract_browser_domain(url)
+    domain = orch._extract_browser_domain(content)
     orch._create_browser_scan_card(
         action=content or 'screenshot captured',
         domain=domain,
-        full_url=url,
+        full_url='',
     )

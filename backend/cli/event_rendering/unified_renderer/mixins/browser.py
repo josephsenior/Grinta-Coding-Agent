@@ -10,7 +10,7 @@ from backend.cli.event_rendering.unified_renderer.utils import (
     _BROWSER_OUTCOMES,
     _exploration_meta_line,
 )
-from backend.cli.theme import NAVY_ERROR, NAVY_TEXT_DIM
+from backend.cli.theme import NAVY_ERROR
 
 
 class _BrowserMixin:
@@ -20,8 +20,6 @@ class _BrowserMixin:
         url: str = '',
         result: str | None = None,
         error: str | None = None,
-        *,
-        image_path: str = '',
     ) -> ActivityCard:
         """Create an activity card for a browser action."""
         from backend.cli.tool_display.renderers.browser import (
@@ -51,10 +49,6 @@ class _BrowserMixin:
             rich_lines = render_browser_navigation(action_key, url)
         for line in rich_lines[1:]:
             extra_lines.append(ActivityLine(str(line), indent=0))
-        if image_path:
-            extra_lines.append(
-                ActivityLine(f'Screenshot: {image_path}', style=NAVY_TEXT_DIM, indent=0)
-            )
         if error:
             extra_lines.append(
                 ActivityLine(f'Error: {error}', style=NAVY_ERROR, indent=0)
@@ -63,8 +57,6 @@ class _BrowserMixin:
         meta_tokens: list[str] = []
         if url:
             meta_tokens.append(f'url: {url[:60]}')
-        if image_path:
-            meta_tokens.append('screenshot saved')
 
         return ActivityCard(
             verb=action_name.title(),

@@ -164,8 +164,7 @@ def validate_debugger_start(
 
     if not _debugpy_importable():
         raise DAPError(
-            'debugpy is not installed in the active Python environment. '
-            'Install it with: pip install debugpy'
+            'debugpy is not installed in the active Python environment.'
         )
 
     program = str(getattr(action, 'program', '') or '').strip()
@@ -196,6 +195,5 @@ def validate_debugger_start(
     if not debugpy_spawn_probe(command, cwd=adapter_cwd):
         raise DAPError(
             f'Failed to spawn debugpy adapter ({command!r}, cwd={adapter_cwd!r}). '
-            'Install debugpy in the active Python environment (pip install debugpy) '
-            'or pass a valid `python` argument.'
+            'Pass a valid `python` argument.'
         )

@@ -11,9 +11,8 @@ from backend.ledger.observation.observation import Observation
 
 @dataclass
 class BrowserScreenshotObservation(Observation):
-    """Screenshot saved to disk with optional base64 payload for vision models."""
+    """Inline base64 screenshot for vision models (no disk persistence)."""
 
-    image_path: str = ''
     image_b64: str = ''
     image_mime: str = 'image/jpeg'
     width: int | None = None
@@ -27,7 +26,6 @@ class BrowserScreenshotObservation(Observation):
         self,
         content: str,
         *,
-        image_path: str = '',
         image_b64: str = '',
         image_mime: str = 'image/jpeg',
         width: int | None = None,
@@ -36,9 +34,8 @@ class BrowserScreenshotObservation(Observation):
         inject_skipped_reason: str | None = None,
         truncation_strategy: str | None = None,
     ) -> None:
-        """Initialize with ``content`` as the human-readable caption (path + size)."""
+        """Initialize with ``content`` as the human-readable caption."""
         super().__init__(content, truncation_strategy=truncation_strategy)
-        self.image_path = image_path
         self.image_b64 = image_b64
         self.image_mime = image_mime
         self.width = width

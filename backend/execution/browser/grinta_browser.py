@@ -127,17 +127,14 @@ class GrintaNativeBrowser:
 
     def __init__(
         self,
-        downloads_dir: Path | str,
         *,
         workspace_root: Path | str | None = None,
     ) -> None:
-        self._downloads = Path(downloads_dir)
-        self._downloads.mkdir(parents=True, exist_ok=True)
         self._session: Any = None
         self._workspace_root = (
             Path(workspace_root).resolve()
             if workspace_root is not None
-            else self._downloads.resolve().parent
+            else Path.cwd().resolve()
         )
         self._last_diff_lines: set[str] | None = None
         self._structured_extract: StructuredExtractFn | None = None

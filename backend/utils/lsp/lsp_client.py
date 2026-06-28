@@ -127,6 +127,8 @@ class LspResult:
     def format_text(self, command: str) -> str:
         """Return a human-readable summary for the LLM."""
         if not self.available:
+            if self.error:
+                return f'LSP is not available. {self.error}'
             return f'LSP is not available. {_UNAVAILABLE_HINT}'
         if self.error:
             return f'LSP error: {self.error}'
@@ -225,49 +227,6 @@ class LspClient:
 
     def _get_context(self, file_path: str) -> LspFileContext | None:
         try:
-            ctx = lsp_context_for_file(file_path)
-        except Exception:
-            return None
-        if ctx is not None:
-            return ctx
-        return self._try_auto_install(file_path)
-
-    def _try_auto_install(self, file_path: str) -> LspFileContext | None:
-        """Install the canonical server for *file_path*, then re-resolve."""
-        from backend.utils.lsp.lsp_installer import (
-            install_server,
-            is_auto_install_enabled,
-        )
-        from backend.utils.lsp.lsp_project_routing import (
-            find_project_root,
-            resolve_language_key,
-        )
-        from backend.utils.runtime_detect import (
-            CANONICAL_LSP_SERVERS,
-            reset_detection_cache,
-        )
-
-        if not is_auto_install_enabled():
-            return None
-        path = Path(file_path)
-        ext = path.suffix.lower()
-        if not ext:
-            return None
-        try:
-            root = find_project_root(path)
-            language_key = resolve_language_key(ext, root)
-            if language_key is None:
-                return None
-            spec = CANONICAL_LSP_SERVERS.get(language_key)
-            if spec is None:
-                return None
-            if not install_server(
-                spec.name,
-                spec.install,
-                spec.install_method,
-            ):
-                return None
-            reset_detection_cache()
             return lsp_context_for_file(file_path)
         except Exception:
             return None
@@ -277,10 +236,39 @@ class LspClient:
         return list(ctx.command) if ctx is not None else None
 
     def _unavailable(self, file_path: str) -> LspResult:
+        from backend.utils.lsp.lsp_project_routing import (
+            find_project_root,
+            resolve_language_key,
+        )
+        from backend.utils.runtime_detect import (
+            CANONICAL_LSP_SERVERS,
+            detect_lsp_servers,
+        )
+
         suffix = Path(file_path).suffix or 'this file type'
+        try:
+            root = find_project_root(Path(file_path))
+            lang_key = resolve_language_key(suffix, root)
+        except Exception:
+            lang_key = None
+
+        if lang_key:
+            spec = CANONICAL_LSP_SERVERS.get(lang_key)
+            if spec:
+                tool = detect_lsp_servers().get(spec.name)
+                if tool and tool.available:
+                    return LspResult(
+                        available=False,
+                        error=(
+                            f'{spec.name} is installed but failed to start or '
+                            f'connect. Try restarting the language server or '
+                            f'check stderr for details.'
+                        ),
+                    )
+
         return LspResult(
             available=False,
-            error=f'No LSP server configured for {suffix}. {_UNAVAILABLE_HINT}',
+            error=f'No language server available for {suffix}.',
         )
 
     def query(

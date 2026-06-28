@@ -13,7 +13,7 @@ Two registries are exposed:
   no priority tuples — each language has exactly one canonical server.
   Marker-disambiguated ecosystems (Deno, Ansible, Helm) are treated as
   distinct languages so they still get the right specialised server.
-* ``DEBUG_ADAPTERS`` — DAP adapters (debugpy, delve, codelldb, js-debug, …)
+* ``_DAP_ADAPTER_RECIPES`` — DAP adapters (debugpy, delve, codelldb, js-debug, …)
 
 IDE-style debugger labels (e.g. ``pwa-node``) are normalized via
 :func:`backend.execution.dap.dap_aliases.normalize_debug_adapter_name` and
@@ -62,14 +62,10 @@ class ToolSpec:
     probe: tuple[str, ...] | None = None
     # If true, also attempt a ``python -m <module>`` style probe before failing.
     python_module: str | None = None
-    # Command that installs the server globally when auto-install is enabled
-    # (``lsp_auto_install`` / ``GRINTA_LSP_AUTO_INSTALL``).  Global scope
-    # (``npm install -g``, ``gem install``, etc.) — one install per machine
-    # serves all projects.
-    install: tuple[str, ...] | None = None
-    # Package manager / install strategy: "npm", "pip", "go", "cargo",
-    # "gem", "rustup", "dotnet", "cpan", "binary" (manual binary release).
-    install_method: str = 'binary'
+    # Human-readable install command for the user (e.g. "npm install -g pyright").
+    install_hint: str | None = None
+    # URL to the server's documentation / README.
+    docs: str | None = None
 
 
 @dataclass
@@ -100,24 +96,24 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.py', '.pyw', '.pyi'),
         command=('pyright-langserver', '--stdio'),
         probe=('pyright-langserver', '--version'),
-        install=('npm', 'install', '-g', 'pyright'),
-        install_method='npm',
+        install_hint='pip install pyright',
+        docs='https://github.com/microsoft/pyright/blob/main/README.md',
     ),
     'typescript': ToolSpec(
         name='typescript-language-server',
         language='typescript',
         extensions=('.ts', '.tsx', '.mts', '.cts'),
         command=('typescript-language-server', '--stdio'),
-        install=('npm', 'install', '-g', 'typescript-language-server', 'typescript'),
-        install_method='npm',
+        install_hint='npm install -g typescript-language-server typescript',
+        docs='https://github.com/typescript-language-server/typescript-language-server',
     ),
     'javascript': ToolSpec(
         name='typescript-language-server',
         language='javascript',
         extensions=('.js', '.jsx', '.mjs', '.cjs'),
         command=('typescript-language-server', '--stdio'),
-        install=('npm', 'install', '-g', 'typescript-language-server', 'typescript'),
-        install_method='npm',
+        install_hint='npm install -g typescript-language-server typescript',
+        docs='https://github.com/typescript-language-server/typescript-language-server',
     ),
     'deno': ToolSpec(
         name='deno',
@@ -125,45 +121,45 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.ts', '.tsx', '.js', '.jsx', '.mjs', '.mts', '.cts'),
         command=('deno', 'lsp'),
         probe=('deno', '--version'),
-        install_method='binary',
+        docs='https://deno.land/manual@latest/tools/language_server',
     ),
     'json': ToolSpec(
         name='vscode-json-languageserver',
         language='json',
         extensions=('.json',),
         command=('vscode-json-languageserver', '--stdio'),
-        install=('npm', 'install', '-g', 'vscode-json-languageserver'),
-        install_method='npm',
+        install_hint='npm install -g vscode-json-languageserver',
+        docs='https://github.com/hrsh7th/vscode-langservers-extracted',
     ),
     'go': ToolSpec(
         name='gopls',
         language='go',
         extensions=('.go',),
         command=('gopls',),
-        install=('go', 'install', 'golang.org/x/tools/gopls@latest'),
-        install_method='go',
+        install_hint='go install golang.org/x/tools/gopls@latest',
+        docs='https://github.com/golang/tools/blob/master/gopls/README.md',
     ),
     'rust': ToolSpec(
         name='rust-analyzer',
         language='rust',
         extensions=('.rs',),
         command=('rust-analyzer',),
-        install=('rustup', 'component', 'add', 'rust-analyzer'),
-        install_method='rustup',
+        install_hint='rustup component add rust-analyzer',
+        docs='https://rust-analyzer.github.io/',
     ),
     'cpp': ToolSpec(
         name='clangd',
         language='cpp',
         extensions=('.c', '.cc', '.cpp', '.cxx', '.h', '.hpp', '.m', '.mm'),
         command=('clangd',),
-        install_method='binary',
+        docs='https://clangd.llvm.org/installation',
     ),
     'lua': ToolSpec(
         name='lua-language-server',
         language='lua',
         extensions=('.lua',),
         command=('lua-language-server',),
-        install_method='binary',
+        docs='https://github.com/LuaLS/lua-language-server',
     ),
     'ruby': ToolSpec(
         name='ruby-lsp',
@@ -171,16 +167,16 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.rb', '.rake', '.gemspec', '.ru'),
         command=('ruby-lsp',),
         probe=('ruby-lsp', '--version'),
-        install=('gem', 'install', 'ruby-lsp'),
-        install_method='gem',
+        install_hint='gem install ruby-lsp',
+        docs='https://github.com/Shopify/ruby-lsp',
     ),
     'php': ToolSpec(
         name='intelephense',
         language='php',
         extensions=('.php',),
         command=('intelephense', '--stdio'),
-        install=('npm', 'install', '-g', 'intelephense'),
-        install_method='npm',
+        install_hint='npm install -g intelephense',
+        docs='https://github.com/nicolo-ribaudo/intelephense',
     ),
     'java': ToolSpec(
         name='jdtls',
@@ -188,7 +184,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.java',),
         command=('jdtls',),
         probe=('jdtls', '--help'),
-        install_method='binary',
+        docs='https://github.com/eclipse/eclipse.jdt.ls',
     ),
     'kotlin': ToolSpec(
         name='kotlin-language-server',
@@ -196,7 +192,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.kt', '.kts'),
         command=('kotlin-language-server',),
         probe=('kotlin-language-server', '--version'),
-        install_method='binary',
+        docs='https://github.com/fwcd/kotlin-language-server',
     ),
     'csharp': ToolSpec(
         name='csharp-ls',
@@ -204,8 +200,8 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.cs', '.csx'),
         command=('csharp-ls',),
         probe=('csharp-ls', '--version'),
-        install=('dotnet', 'tool', 'install', '-g', 'csharp-ls'),
-        install_method='dotnet',
+        install_hint='dotnet tool install -g csharp-ls',
+        docs='https://github.com/razzmatazz/csharp-language-server',
     ),
     'fsharp': ToolSpec(
         name='fsautocomplete',
@@ -213,8 +209,8 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.fs', '.fsi', '.fsx', '.fsscript'),
         command=('fsautocomplete',),
         probe=('fsautocomplete', '--version'),
-        install=('dotnet', 'tool', 'install', '-g', 'fsautocomplete'),
-        install_method='dotnet',
+        install_hint='dotnet tool install -g fsautocomplete',
+        docs='https://github.com/fsharp/FsAutoComplete',
     ),
     'bash': ToolSpec(
         name='bash-language-server',
@@ -222,32 +218,32 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.sh', '.bash', '.zsh', '.ksh'),
         command=('bash-language-server', 'start'),
         probe=('bash-language-server', '--version'),
-        install=('npm', 'install', '-g', 'bash-language-server'),
-        install_method='npm',
+        install_hint='npm install -g bash-language-server',
+        docs='https://github.com/mads-hartmann/bash-language-server',
     ),
     'html': ToolSpec(
         name='vscode-html-language-server',
         language='html',
         extensions=('.html', '.htm'),
         command=('vscode-html-language-server', '--stdio'),
-        install=('npm', 'install', '-g', 'vscode-html-languageserver-bin'),
-        install_method='npm',
+        install_hint='npm install -g vscode-html-languageserver-bin',
+        docs='https://github.com/hrsh7th/vscode-langservers-extracted',
     ),
     'css': ToolSpec(
         name='vscode-css-language-server',
         language='css',
         extensions=('.css', '.scss', '.less'),
         command=('vscode-css-language-server', '--stdio'),
-        install=('npm', 'install', '-g', 'vscode-css-languageserver-bin'),
-        install_method='npm',
+        install_hint='npm install -g vscode-css-languageserver-bin',
+        docs='https://github.com/hrsh7th/vscode-langservers-extracted',
     ),
     'yaml': ToolSpec(
         name='yaml-language-server',
         language='yaml',
         extensions=('.yaml', '.yml'),
         command=('yaml-language-server', '--stdio'),
-        install=('npm', 'install', '-g', 'yaml-language-server'),
-        install_method='npm',
+        install_hint='npm install -g yaml-language-server',
+        docs='https://github.com/redhat-developer/yaml-language-server',
     ),
     'ansible': ToolSpec(
         name='ansible-language-server',
@@ -255,8 +251,8 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.yml', '.yaml'),
         command=('ansible-language-server', '--stdio'),
         probe=('ansible-language-server', '--version'),
-        install=('npm', 'install', '-g', '@ansible/ansible-language-server'),
-        install_method='npm',
+        install_hint='npm install -g @ansible/ansible-language-server',
+        docs='https://github.com/ansible/ansible-language-server',
     ),
     'helm': ToolSpec(
         name='helm-ls',
@@ -264,7 +260,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.yaml', '.yml', '.tpl'),
         command=('helm-ls', 'serve'),
         probe=('helm-ls', 'version'),
-        install_method='binary',
+        docs='https://github.com/mrjosh/helm-ls',
     ),
     'terraform': ToolSpec(
         name='terraform-ls',
@@ -272,7 +268,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.tf', '.tfvars'),
         command=('terraform-ls', 'serve'),
         probe=('terraform-ls', 'version'),
-        install_method='binary',
+        docs='https://github.com/hashicorp/terraform-ls',
     ),
     'toml': ToolSpec(
         name='taplo',
@@ -280,7 +276,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.toml',),
         command=('taplo', 'lsp', 'stdio'),
         probe=('taplo', '--version'),
-        install_method='binary',
+        docs='https://github.com/tamasfe/taplo',
     ),
     'dart': ToolSpec(
         name='dart',
@@ -288,14 +284,14 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.dart',),
         command=('dart', 'language-server'),
         probe=('dart', '--version'),
-        install_method='binary',
+        docs='https://dart.dev/tools/language-server',
     ),
     'swift': ToolSpec(
         name='sourcekit-lsp',
         language='swift',
         extensions=('.swift',),
         command=('sourcekit-lsp',),
-        install_method='binary',
+        docs='https://github.com/swiftlang/sourcekit-lsp',
     ),
     'zig': ToolSpec(
         name='zls',
@@ -303,7 +299,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.zig', '.zon'),
         command=('zls',),
         probe=('zls', 'version'),
-        install_method='binary',
+        docs='https://github.com/zigtools/zls',
     ),
     'haskell': ToolSpec(
         name='haskell-language-server',
@@ -311,14 +307,14 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.hs', '.lhs'),
         command=('haskell-language-server-wrapper', '--lsp'),
         probe=('haskell-language-server-wrapper', '--version'),
-        install_method='binary',
+        docs='https://github.com/haskell/haskell-language-server',
     ),
     'elixir': ToolSpec(
         name='elixir-ls',
         language='elixir',
         extensions=('.ex', '.exs'),
         command=('elixir-ls',),
-        install_method='binary',
+        docs='https://github.com/elixir-ls/elixir-ls',
     ),
     'erlang': ToolSpec(
         name='erlang_ls',
@@ -326,7 +322,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.erl', '.hrl'),
         command=('erlang_ls',),
         probe=('erlang_ls', 'version'),
-        install_method='binary',
+        docs='https://github.com/erlang-ls/erlang_ls',
     ),
     'clojure': ToolSpec(
         name='clojure-lsp',
@@ -334,7 +330,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.clj', '.cljs', '.cljc', '.edn'),
         command=('clojure-lsp',),
         probe=('clojure-lsp', 'version'),
-        install_method='binary',
+        docs='https://github.com/clojure-lsp/clojure-lsp',
     ),
     'gleam': ToolSpec(
         name='gleam',
@@ -342,31 +338,31 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.gleam',),
         command=('gleam', 'lsp'),
         probe=('gleam', '--version'),
-        install_method='binary',
+        docs='https://github.com/gleam-lang/gleam',
     ),
     'vue': ToolSpec(
         name='vue-language-server',
         language='vue',
         extensions=('.vue',),
         command=('vue-language-server', '--stdio'),
-        install=('npm', 'install', '-g', '@vue/language-server'),
-        install_method='npm',
+        install_hint='npm install -g @vue/language-server',
+        docs='https://github.com/vuejs/language-tools',
     ),
     'svelte': ToolSpec(
         name='svelteserver',
         language='svelte',
         extensions=('.svelte',),
         command=('svelteserver', '--stdio'),
-        install=('npm', 'install', '-g', 'svelte-language-server'),
-        install_method='npm',
+        install_hint='npm install -g svelte-language-server',
+        docs='https://github.com/sveltejs/language-tools',
     ),
     'astro': ToolSpec(
         name='astro-ls',
         language='astro',
         extensions=('.astro',),
         command=('astro-ls', '--stdio'),
-        install=('npm', 'install', '-g', '@astrojs/language-server'),
-        install_method='npm',
+        install_hint='npm install -g @astrojs/language-server',
+        docs='https://github.com/withastro/language-tools',
     ),
     'graphql': ToolSpec(
         name='graphql-lsp',
@@ -374,8 +370,8 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.graphql', '.gql'),
         command=('graphql-lsp', 'server', '-m', 'stream'),
         probe=('graphql-lsp', '--version'),
-        install=('npm', 'install', '-g', 'graphql-language-service-cli'),
-        install_method='npm',
+        install_hint='npm install -g graphql-language-service-cli',
+        docs='https://github.com/graphql/graphiql/tree/main/packages/graphql-language-service-cli',
     ),
     'sql': ToolSpec(
         name='sqls',
@@ -383,7 +379,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.sql',),
         command=('sqls',),
         probe=('sqls', '--version'),
-        install_method='binary',
+        docs='https://github.com/lighttiger2505/sqls',
     ),
     'latex': ToolSpec(
         name='texlab',
@@ -391,14 +387,14 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.tex',),
         command=('texlab',),
         probe=('texlab', '--version'),
-        install_method='binary',
+        docs='https://github.com/latex-lsp/texlab',
     ),
     'xml': ToolSpec(
         name='lemminx',
         language='xml',
         extensions=('.xml',),
         command=('lemminx',),
-        install_method='binary',
+        docs='https://github.com/eclipse-lemminx/lemminx',
     ),
     'cmake': ToolSpec(
         name='cmake-language-server',
@@ -406,8 +402,8 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.cmake',),
         command=('cmake-language-server',),
         probe=('cmake-language-server', '--version'),
-        install=('pip', 'install', 'cmake-language-server'),
-        install_method='pip',
+        install_hint='pip install cmake-language-server',
+        docs='https://github.com/cmake-language-server/cmake-language-server',
     ),
     'dockerfile': ToolSpec(
         name='docker-langserver',
@@ -415,8 +411,8 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.dockerfile',),
         command=('docker-langserver', '--stdio'),
         probe=('docker-langserver', '--version'),
-        install=('npm', 'install', '-g', 'dockerfile-language-server-nodejs'),
-        install_method='npm',
+        install_hint='npm install -g dockerfile-language-server-nodejs',
+        docs='https://github.com/rcjsuen/dockerfile-language-server-nodejs',
     ),
     'markdown': ToolSpec(
         name='marksman',
@@ -424,7 +420,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.md', '.markdown'),
         command=('marksman', 'server'),
         probe=('marksman', '--version'),
-        install_method='binary',
+        docs='https://github.com/artempykh/marksman',
     ),
     'proto': ToolSpec(
         name='buf',
@@ -432,7 +428,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.proto',),
         command=('buf', 'lsp', 'serve', '--timeout', '0'),
         probe=('buf', '--version'),
-        install_method='binary',
+        docs='https://buf.build/docs/language-server/',
     ),
     'prisma': ToolSpec(
         name='prisma-language-server',
@@ -440,8 +436,8 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.prisma',),
         command=('prisma-language-server', '--stdio'),
         probe=('prisma-language-server', '--version'),
-        install=('npm', 'install', '-g', '@prisma/language-server'),
-        install_method='npm',
+        install_hint='npm install -g @prisma/language-server',
+        docs='https://github.com/prisma/language-tools',
     ),
     'nix': ToolSpec(
         name='nixd',
@@ -449,7 +445,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.nix',),
         command=('nixd',),
         probe=('nixd', '--version'),
-        install_method='binary',
+        docs='https://github.com/nix-community/nixd',
     ),
     'ocaml': ToolSpec(
         name='ocamllsp',
@@ -457,7 +453,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.ml', '.mli'),
         command=('ocamllsp',),
         probe=('ocamllsp', '--version'),
-        install_method='binary',
+        docs='https://github.com/ocaml/ocaml-lsp',
     ),
     'typst': ToolSpec(
         name='tinymist',
@@ -465,7 +461,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.typ', '.typc'),
         command=('tinymist',),
         probe=('tinymist', '--version'),
-        install_method='binary',
+        docs='https://github.com/Enter-tainer/tinymist',
     ),
     'razor': ToolSpec(
         name='rzls',
@@ -473,7 +469,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.razor', '.cshtml'),
         command=('rzls',),
         probe=('rzls', '--version'),
-        install_method='binary',
+        docs='https://github.com/dotnet/razor',
     ),
     'scala': ToolSpec(
         name='metals',
@@ -481,7 +477,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.scala', '.sc'),
         command=('metals',),
         probe=('metals', '--version'),
-        install_method='binary',
+        docs='https://scalameta.org/metals/',
     ),
     'solidity': ToolSpec(
         name='solidity-ls',
@@ -489,7 +485,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.sol',),
         command=('solidity-ls', '--stdio'),
         probe=('solidity-ls', '--version'),
-        install_method='npm',
+        docs='https://github.com/ethereum/solidity/blob/develop/docs/miscellaneous.rst',
     ),
     'purescript': ToolSpec(
         name='purescript-language-server',
@@ -497,8 +493,8 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.purs',),
         command=('purescript-language-server', '--stdio'),
         probe=('purescript-language-server', '--version'),
-        install=('npm', 'install', '-g', 'purescript-language-server'),
-        install_method='npm',
+        install_hint='npm install -g purescript-language-server',
+        docs='https://github.com/nwolverson/purescript-language-server',
     ),
     'reason': ToolSpec(
         name='reason-language-server',
@@ -506,7 +502,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.re', '.rei'),
         command=('reason-language-server',),
         probe=('reason-language-server', '--version'),
-        install_method='binary',
+        docs='https://github.com/jaredly/reason-language-server',
     ),
     'rescript': ToolSpec(
         name='rescript-language-server',
@@ -514,8 +510,8 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.res', '.resi'),
         command=('rescript-language-server',),
         probe=('rescript-language-server', '--version'),
-        install=('npm', 'install', '-g', '@rescript/language-server'),
-        install_method='npm',
+        install_hint='npm install -g @rescript/language-server',
+        docs='https://github.com/rescript-lang/rescript-editor-support',
     ),
     'perl': ToolSpec(
         name='pls',
@@ -523,8 +519,8 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.pl', '.pm', '.t'),
         command=('pls',),
         probe=('pls', '--version'),
-        install=('cpan', 'PLS'),
-        install_method='cpan',
+        install_hint='cpan PLS',
+        docs='https://github.com/bscan/PerlNavigator',
     ),
     'smithy': ToolSpec(
         name='smithy-language-server',
@@ -532,7 +528,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.smithy',),
         command=('smithy-language-server',),
         probe=('smithy-language-server', '--version'),
-        install_method='binary',
+        docs='https://smithy.io',
     ),
     'fortran': ToolSpec(
         name='fortls',
@@ -540,8 +536,8 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.f', '.for', '.f90', '.f95', '.f03'),
         command=('fortls',),
         probe=('fortls', '--version'),
-        install=('pip', 'install', 'fortls'),
-        install_method='pip',
+        install_hint='pip install fortls',
+        docs='https://github.com/fortran-lang/fortls',
     ),
     'nim': ToolSpec(
         name='nimlangserver',
@@ -549,8 +545,8 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.nim', '.nims'),
         command=('nimlangserver',),
         probe=('nimlangserver', '--version'),
-        install=('pip', 'install', 'nimlangserver'),
-        install_method='pip',
+        install_hint='pip install nimlangserver',
+        docs='https://github.com/PMunch/nimlanguageclient',
     ),
     'crystal': ToolSpec(
         name='crystalline',
@@ -558,7 +554,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.cr',),
         command=('crystalline',),
         probe=('crystalline', '--version'),
-        install_method='binary',
+        docs='https://github.com/elbywan/crystalline',
     ),
     'd': ToolSpec(
         name='serve-d',
@@ -566,7 +562,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.d',),
         command=('serve-d',),
         probe=('serve-d', '--version'),
-        install_method='binary',
+        docs='https://github.com/Pure-D/serve-d',
     ),
     'lean': ToolSpec(
         name='lean',
@@ -574,7 +570,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.lean',),
         command=('lean', '--server'),
         probe=('lean', '--version'),
-        install_method='binary',
+        docs='https://github.com/leanprover/lean4',
     ),
     'idris': ToolSpec(
         name='idris2-lsp',
@@ -582,7 +578,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.idr',),
         command=('idris2', 'lsp'),
         probe=('idris2', '--version'),
-        install_method='binary',
+        docs='https://github.com/idris-lang/Idris2',
     ),
     'roc': ToolSpec(
         name='roc-lsp',
@@ -590,7 +586,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.roc',),
         command=('roc', 'lsp'),
         probe=('roc', '--version'),
-        install_method='binary',
+        docs='https://www.roc-lang.org/',
     ),
     'slint': ToolSpec(
         name='slint-lsp',
@@ -598,7 +594,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.slint',),
         command=('slint-lsp',),
         probe=('slint-lsp', '--version'),
-        install_method='binary',
+        docs='https://slint.dev/',
     ),
     'wgsl': ToolSpec(
         name='wgsl-analyzer',
@@ -606,8 +602,8 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.wgsl',),
         command=('wgsl-analyzer',),
         probe=('wgsl-analyzer', '--version'),
-        install=('cargo', 'install', 'wgsl_analyzer'),
-        install_method='cargo',
+        install_hint='cargo install wgsl_analyzer',
+        docs='https://github.com/wgsl-analyzer/wgsl-analyzer',
     ),
     'vhdl': ToolSpec(
         name='vhdl-ls',
@@ -615,8 +611,8 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.vhd', '.vhdl'),
         command=('vhdl_ls',),
         probe=('vhdl_ls', '--version'),
-        install=('cargo', 'install', 'vhdl_ls'),
-        install_method='cargo',
+        install_hint='cargo install vhdl_ls',
+        docs='https://github.com/VHDL-LS/rust_hdl',
     ),
     'systemverilog': ToolSpec(
         name='svls',
@@ -624,8 +620,8 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.sv', '.svh'),
         command=('svls',),
         probe=('svls', '--version'),
-        install=('cargo', 'install', 'svls'),
-        install_method='cargo',
+        install_hint='cargo install svls',
+        docs='https://github.com/dalance/svls',
     ),
     'rego': ToolSpec(
         name='regal',
@@ -633,8 +629,8 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.rego',),
         command=('regal', 'language-server'),
         probe=('regal', 'version'),
-        install=('go', 'install', 'github.com/styrainc/regal/cmd/regal@latest'),
-        install_method='go',
+        install_hint='go install github.com/styrainc/regal/cmd/regal@latest',
+        docs='https://github.com/StyraInc/regal',
     ),
     'openscad': ToolSpec(
         name='openscad-lsp',
@@ -642,8 +638,8 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.scad',),
         command=('openscad-lsp',),
         probe=('openscad-lsp', '--version'),
-        install=('cargo', 'install', 'openscad-lsp'),
-        install_method='cargo',
+        install_hint='cargo install openscad-lsp',
+        docs='https://github.com/openscad/openscad-language-server',
     ),
     'nickel': ToolSpec(
         name='nickel',
@@ -651,7 +647,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.ncl',),
         command=('nickel', 'lsp'),
         probe=('nickel', '--version'),
-        install_method='binary',
+        docs='https://github.com/nickel-lang/nickel',
     ),
     'cairo': ToolSpec(
         name='cairo-language-server',
@@ -659,7 +655,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.cairo',),
         command=('cairo-language-server',),
         probe=('cairo-language-server', '--version'),
-        install_method='binary',
+        docs='https://github.com/starkware-libs/cairo',
     ),
     'move': ToolSpec(
         name='move-analyzer',
@@ -667,7 +663,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.move',),
         command=('move-analyzer',),
         probe=('move-analyzer', '--version'),
-        install_method='binary',
+        docs='https://github.com/move-language/move-analyzer',
     ),
     'pascal': ToolSpec(
         name='pasls',
@@ -675,7 +671,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.pas', '.pp'),
         command=('pasls',),
         probe=('pasls', '--version'),
-        install_method='binary',
+        docs='https://github.com/nicolo-ribaudo/pasls',
     ),
     'futhark': ToolSpec(
         name='futhark-lsp',
@@ -683,7 +679,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.fut',),
         command=('futhark-lsp',),
         probe=('futhark-lsp', '--version'),
-        install_method='binary',
+        docs='https://github.com/athas/futhark',
     ),
     'wat': ToolSpec(
         name='wasm-language-tools',
@@ -691,8 +687,8 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.wat', '.wast'),
         command=('wasm-language-tools', 'server'),
         probe=('wasm-language-tools', '--version'),
-        install=('npm', 'install', '-g', '@vscode/wasm-wasi-lsp'),
-        install_method='npm',
+        install_hint='npm install -g @vscode/wasm-wasi-lsp',
+        docs='https://github.com/nicolo-ribaudo/vscode-wasm-wasi-lsp',
     ),
     'v': ToolSpec(
         name='v-analyzer',
@@ -700,7 +696,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.v',),
         command=('v-analyzer',),
         probe=('v-analyzer', '--version'),
-        install_method='binary',
+        docs='https://github.com/nicolo-ribaudo/v-analyzer',
     ),
     'erg': ToolSpec(
         name='erg-language-server',
@@ -708,7 +704,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.e', '.ej'),
         command=('erg-language-server',),
         probe=('erg-language-server', '--version'),
-        install_method='binary',
+        docs='https://github.com/erg-lang/erg',
     ),
     'starlark': ToolSpec(
         name='starlark',
@@ -716,7 +712,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.bzl', '.star'),
         command=('starlark',),
         probe=('starlark', '--version'),
-        install_method='binary',
+        docs='https://github.com/nicolo-ribaudo/starlark-lsp',
     ),
     'glsl': ToolSpec(
         name='glsl_analyzer',
@@ -724,7 +720,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
         extensions=('.glsl', '.vert', '.frag', '.comp'),
         command=('glsl_analyzer',),
         probe=('glsl_analyzer', '--version'),
-        install_method='binary',
+        docs='https://github.com/nicolo-ribaudo/glsl-analyzer',
     ),
     'julia': ToolSpec(
         name='julials',
@@ -737,7 +733,7 @@ CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
             'using LanguageServer; LanguageServer.runserver()',
         ),
         probe=('julia', '--version'),
-        install_method='binary',
+        docs='https://github.com/JuliaEditorSupport/LanguageServer.jl',
     ),
 }
 

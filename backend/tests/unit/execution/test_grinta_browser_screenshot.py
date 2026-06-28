@@ -2,8 +2,8 @@
 
 The screenshot command delegates to ``browser.take_screenshot()`` (browser-use's
 built-in), which handles CDP session management and focus validation internally.
-These tests verify the wrapper logic: timeout enforcement, file saving, base64
-injection, and error handling.
+These tests verify the wrapper logic: timeout enforcement, base64 injection,
+and error handling. Screenshots are inline base64 — no disk persistence.
 """
 
 from __future__ import annotations
@@ -12,7 +12,6 @@ import asyncio
 import base64
 import sys
 import types
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -63,50 +62,48 @@ class _FakeBrowser:
 def _assert_screenshot_result(
     obs: BrowserScreenshotObservation,
     browser: _FakeBrowser,
-    tmp_path: Path,
     *,
     full_page: bool = False,
 ) -> None:
-    assert 'Screenshot saved to' in obs.content
+    assert 'Screenshot captured' in obs.content
     assert obs.image_b64
     assert browser.take_screenshot_calls, 'take_screenshot was never called'
     call = browser.take_screenshot_calls[0]
     assert call['format'] == 'jpeg'
     assert call['quality'] == 80
     assert call['full_page'] is full_page
-    saved = list(tmp_path.glob('browser_*.jpg'))
-    assert len(saved) == 1, saved
-    assert saved[0].read_bytes() == b'PNGDATA'
+    decoded = base64.b64decode(obs.image_b64)
+    assert decoded == b'PNGDATA'
 
 
 @pytest.mark.asyncio
-async def test_screenshot_returns_image_on_success(tmp_path: Path) -> None:
+async def test_screenshot_returns_image_on_success() -> None:
     browser = _FakeBrowser()
-    shot_tool = gb.GrintaNativeBrowser(tmp_path)
+    shot_tool = gb.GrintaNativeBrowser()
     shot_tool._session = browser
 
     obs = await shot_tool.execute('screenshot', {})
 
     assert isinstance(obs, BrowserScreenshotObservation), getattr(obs, 'content', obs)
-    _assert_screenshot_result(obs, browser, tmp_path)
+    _assert_screenshot_result(obs, browser)
 
 
 @pytest.mark.asyncio
-async def test_screenshot_full_page_passes_through(tmp_path: Path) -> None:
+async def test_screenshot_full_page_passes_through() -> None:
     browser = _FakeBrowser()
-    shot_tool = gb.GrintaNativeBrowser(tmp_path)
+    shot_tool = gb.GrintaNativeBrowser()
     shot_tool._session = browser
 
     obs = await shot_tool.execute('screenshot', {'full_page': True})
 
     assert isinstance(obs, BrowserScreenshotObservation), getattr(obs, 'content', obs)
-    _assert_screenshot_result(obs, browser, tmp_path, full_page=True)
+    _assert_screenshot_result(obs, browser, full_page=True)
 
 
 @pytest.mark.asyncio
-async def test_screenshot_inject_image_false_omits_b64(tmp_path: Path) -> None:
+async def test_screenshot_inject_image_false_omits_b64() -> None:
     browser = _FakeBrowser()
-    shot_tool = gb.GrintaNativeBrowser(tmp_path)
+    shot_tool = gb.GrintaNativeBrowser()
     shot_tool._session = browser
 
     obs = await shot_tool.execute('screenshot', {'inject_image': False})
@@ -114,14 +111,11 @@ async def test_screenshot_inject_image_false_omits_b64(tmp_path: Path) -> None:
     assert isinstance(obs, BrowserScreenshotObservation)
     assert obs.image_b64 == ''
     assert obs.inject_skipped_reason == 'inject_image=false'
-    saved = list(tmp_path.glob('browser_*.jpg'))
-    assert len(saved) == 1
 
 
 def test_screenshot_observation_round_trips_through_event_serialization() -> None:
     obs = BrowserScreenshotObservation(
-        content='Screenshot saved to: browser.jpg (3 bytes)',
-        image_path='browser.jpg',
+        content='Screenshot captured (3 bytes)',
         image_b64=base64.b64encode(b'ABC').decode('ascii'),
         image_mime='image/jpeg',
         truncation_strategy='tail_heavy',
@@ -131,28 +125,26 @@ def test_screenshot_observation_round_trips_through_event_serialization() -> Non
 
     assert isinstance(restored, BrowserScreenshotObservation)
     assert restored.content == obs.content
-    assert restored.image_path == obs.image_path
     assert restored.image_b64 == obs.image_b64
     assert restored.truncation_strategy == 'tail_heavy'
 
 
 @pytest.mark.asyncio
-async def test_screenshot_returns_error_on_failure(tmp_path: Path) -> None:
+async def test_screenshot_returns_error_on_failure() -> None:
     browser = _FakeBrowser(raise_exc=RuntimeError('page wedged'))
-    shot_tool = gb.GrintaNativeBrowser(tmp_path)
+    shot_tool = gb.GrintaNativeBrowser()
     shot_tool._session = browser
 
     obs = await shot_tool.execute('screenshot', {})
 
     assert isinstance(obs, ErrorObservation), obs
     assert 'RuntimeError' in obs.content
-    assert list(tmp_path.glob('browser_*.jpg')) == []
 
 
 @pytest.mark.asyncio
-async def test_screenshot_returns_error_on_no_data(tmp_path: Path) -> None:
+async def test_screenshot_returns_error_on_no_data() -> None:
     browser = _FakeBrowser(screenshot_data=None)
-    shot_tool = gb.GrintaNativeBrowser(tmp_path)
+    shot_tool = gb.GrintaNativeBrowser()
     shot_tool._session = browser
 
     obs = await shot_tool.execute('screenshot', {})
@@ -162,7 +154,7 @@ async def test_screenshot_returns_error_on_no_data(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_screenshot_timeout_returns_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_screenshot_timeout_returns_error(monkeypatch: pytest.MonkeyPatch) -> None:
     import backend.execution.browser._browser_snapshot as snap_mod
 
     monkeypatch.setattr(snap_mod, 'BROWSER_SCREENSHOT_TIMEOUT_SEC', 2.0)
@@ -173,7 +165,7 @@ async def test_screenshot_timeout_returns_error(tmp_path: Path, monkeypatch: pyt
             return b''
 
     browser = _SlowBrowser()
-    shot_tool = gb.GrintaNativeBrowser(tmp_path)
+    shot_tool = gb.GrintaNativeBrowser()
     shot_tool._session = browser
 
     obs = await asyncio.wait_for(
@@ -186,4 +178,4 @@ async def test_screenshot_timeout_returns_error(tmp_path: Path, monkeypatch: pyt
 
 
 if __name__ == '__main__':  # pragma: no cover
-    asyncio.run(test_screenshot_returns_image_on_success(Path('.')))
+    asyncio.run(test_screenshot_returns_image_on_success())

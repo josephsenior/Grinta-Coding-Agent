@@ -439,7 +439,6 @@ async def test_tui_browser_screenshot_merges_with_action_card(mock_config):
         )
         renderer._process_event(
             BrowserScreenshotObservation(
-                image_path='/tmp/snap.png',
                 content='page captured',
             )
         )

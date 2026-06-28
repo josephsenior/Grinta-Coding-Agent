@@ -209,15 +209,19 @@ async def test_lsp_query_success_and_failure(tmp_path: Path) -> None:
     py.write_text('x = 1\n', encoding='utf-8')
     ex = aes.RuntimeExecutor([], str(tmp_path), 'u', 1, False)
     action = LspQueryAction(file=str(py), command='hover', line=1, column=1)
-    with patch('backend.utils.lsp.lsp_client.LspClient') as LC:
-        LC.return_value.query.return_value = LspResult(
-            available=True, hover_text='docs'
-        )
+    mock_client = MagicMock()
+    mock_client.query.return_value = LspResult(
+        available=True, hover_text='docs'
+    )
+    with patch(
+        'backend.utils.lsp.lsp_client.get_lsp_client',
+        return_value=mock_client,
+    ):
         obs = await ex.lsp_query(action)
     assert 'docs' in obs.content
 
     with patch(
-        'backend.utils.lsp.lsp_client.LspClient',
+        'backend.utils.lsp.lsp_client.get_lsp_client',
         side_effect=RuntimeError('boom'),
     ):
         err_obs = await ex.lsp_query(action)
