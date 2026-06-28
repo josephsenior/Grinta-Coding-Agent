@@ -273,9 +273,9 @@ def _evaluate_lsp_result(
 def _known_lsp_extension(path: Path) -> bool:
     ext = path.suffix.lower()
     try:
-        from backend.utils.runtime_detect import LSP_SERVERS
+        from backend.utils.runtime_detect import CANONICAL_LSP_SERVERS
 
-        return any(ext in spec.extensions for spec in LSP_SERVERS)
+        return any(ext in spec.extensions for spec in CANONICAL_LSP_SERVERS.values())
     except Exception:
         return False
 

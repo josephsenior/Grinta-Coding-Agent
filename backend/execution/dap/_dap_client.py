@@ -23,6 +23,7 @@ from backend.execution.dap._dap_spawn_utils import (
     format_adapter_spawn_error,
     resolve_adapter_cwd,
 )
+from backend.utils.path_normalize import to_native_path
 
 
 class DAPClient:
@@ -130,8 +131,9 @@ class DAPClient:
         stdin = subprocess.PIPE if self.transport == 'stdio' else subprocess.DEVNULL
         cwd = resolve_adapter_cwd(self.cwd)
         self.cwd = cwd
+        command = [to_native_path(str(c)) for c in self.adapter_command]
         return subprocess.Popen(
-            self.adapter_command,
+            command,
             cwd=cwd,
             stdin=stdin,
             stdout=subprocess.PIPE,

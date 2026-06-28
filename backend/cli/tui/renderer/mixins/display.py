@@ -209,11 +209,7 @@ class RendererDisplayMixin:
         cache = getattr(self, '_lsp_servers_cache', None)
         if cache is None:
             return ('pending',)
-        languages: set[str] = set()
-        for _name, tool in cache.items():
-            if tool.available:
-                languages.add(tool.spec.language)
-        return tuple(sorted(languages))
+        return tuple(sorted(name for name, tool in cache.items() if tool.available))
 
     def _refresh_lsp_sidebar(self) -> None:
         from textual.widgets import Static
@@ -252,20 +248,15 @@ class RendererDisplayMixin:
             section.set_content('No language servers detected on PATH')
 
     def _build_lsp_sidebar_items(self, servers: dict[str, Any]) -> list[tuple]:
-        seen_languages: set[str] = set()
+        from backend.utils.runtime_detect import CANONICAL_LSP_SERVERS
+
         items: list[tuple] = []
-        for _name, tool in sorted(
-            servers.items(),
-            key=lambda pair: (not pair[1].available, pair[1].spec.language, pair[0]),
-        ):
-            if not tool.available:
+        for key, spec in sorted(CANONICAL_LSP_SERVERS.items()):
+            tool = servers.get(spec.name)
+            if tool is None or not tool.available:
                 continue
-            language = tool.spec.language
-            if language in seen_languages:
-                continue
-            seen_languages.add(language)
-            label = f'{language} ({_name})'
-            items.append((label, f'lsp:{language}', False, 'ok', None, False))
+            label = f'{key} ({spec.name})'
+            items.append((label, f'lsp:{key}', False, 'ok', None, False))
         return items
 
     def _dap_sidebar_signature(self) -> tuple[Any, ...]:
@@ -353,7 +344,9 @@ class RendererDisplayMixin:
 
         task_items = self._build_task_sidebar_items(task_signature)
         total = len(task_signature)
-        done = sum(1 for _tid, status, _desc in task_signature if status == TASK_STATUS_DONE)
+        done = sum(
+            1 for _tid, status, _desc in task_signature if status == TASK_STATUS_DONE
+        )
         if total == 0:
             title = 'Tasks'
         elif done >= total:

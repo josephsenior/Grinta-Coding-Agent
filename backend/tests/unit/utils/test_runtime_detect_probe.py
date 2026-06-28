@@ -7,7 +7,7 @@ import sys
 from unittest.mock import MagicMock, patch
 
 from backend.utils.runtime_detect import (
-    LSP_SERVERS,
+    CANONICAL_LSP_SERVERS,
     DetectedTool,
     ToolSpec,
     _detect_all,
@@ -77,7 +77,11 @@ def test_probe_returns_unavailable_when_not_found() -> None:
 
 def test_probe_skips_python_exe_false_positive_for_pylsp() -> None:
     """``python.exe`` on PATH must not imply ``python -m pylsp`` works."""
-    spec = next(s for s in LSP_SERVERS if s.name == 'pylsp')
+    spec = _spec(
+        name='pylsp',
+        command=(sys.executable, '-m', 'pylsp'),
+        python_module='pylsp',
+    )
     with (
         patch('shutil.which', return_value=sys.executable),
         patch('subprocess.run', return_value=MagicMock(returncode=1)),
@@ -128,7 +132,9 @@ def test_detect_all_catches_probe_exceptions() -> None:
 
 def test_detect_lsp_servers_uses_cache() -> None:
     reset_detection_cache()
-    fake = DetectedTool(spec=LSP_SERVERS[0], available=True, detail='ok')
+    fake = DetectedTool(
+        spec=CANONICAL_LSP_SERVERS['python'], available=True, detail='ok'
+    )
     with patch(
         'backend.utils.runtime_detect._detect_all', return_value={'pylsp': fake}
     ) as detect:

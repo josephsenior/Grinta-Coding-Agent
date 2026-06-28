@@ -11,7 +11,6 @@ SLOW_LSP_SERVERS: frozenset[str] = frozenset(
         'haskell-language-server',
         'elixir-ls',
         'csharp-ls',
-        'omnisharp',
         'fsautocomplete',
         'julials',
         'dart',

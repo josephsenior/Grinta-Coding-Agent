@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import importlib.util
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -12,6 +11,7 @@ from typing import Any
 
 from backend.core.constants import DEBUGGER_START_TIMEOUT_SECONDS
 from backend.execution.dap._dap_errors import DAPError
+from backend.utils.path_normalize import to_native_path, which_normalized
 
 _PYTHON_ADAPTERS = frozenset({'python', 'debugpy'})
 _PYTHON_PROGRAM_SUFFIXES = frozenset({'.py', '.pyw'})
@@ -23,12 +23,12 @@ def resolve_python_executable(explicit: str | None = None) -> str:
     if explicit:
         candidates.append(explicit)
     candidates.append(sys.executable)
-    candidates.append(shutil.which('python') or '')
-    candidates.append(shutil.which('python3') or '')
+    candidates.append(which_normalized('python') or '')
+    candidates.append(which_normalized('python3') or '')
     try:
         from backend.core.os_capabilities import OS_CAPS
 
-        candidates.append(shutil.which(OS_CAPS.default_python_exec) or '')
+        candidates.append(which_normalized(OS_CAPS.default_python_exec) or '')
     except Exception:
         pass
 
@@ -38,6 +38,7 @@ def resolve_python_executable(explicit: str | None = None) -> str:
         if not candidate or candidate in seen:
             continue
         seen.add(candidate)
+        candidate = to_native_path(candidate)
         path = Path(candidate)
         if path.is_file():
             return str(path.resolve())
@@ -53,6 +54,7 @@ def resolve_adapter_cwd(
     for candidate in (cwd, fallback, os.getcwd()):
         if candidate is None:
             continue
+        candidate = to_native_path(str(candidate))
         path = Path(candidate)
         try:
             if path.is_dir():
@@ -169,7 +171,7 @@ def validate_debugger_start(
     program = str(getattr(action, 'program', '') or '').strip()
     if not program:
         raise DAPError(
-            "debugger start with the Python adapter requires `program` "
+            'debugger start with the Python adapter requires `program` '
             'pointing to an existing .py or .pyw file'
         )
 

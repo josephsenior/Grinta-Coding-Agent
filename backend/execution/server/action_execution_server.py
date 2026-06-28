@@ -315,14 +315,14 @@ class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
 
     async def lsp_query(self, action: LspQueryAction) -> Observation:
         """Execute an LSP query using the lsp_client."""
-        from backend.utils.lsp.lsp_client import LspClient
+        from backend.utils.lsp.lsp_client import get_lsp_client
 
         start = time.perf_counter()
         try:
             # Same pattern as :meth:`RuntimeExecutorIOAndTerminalMixin.debugger`:
             # ``LspClient.query`` blocks on subprocess I/O; keep the event loop responsive.
             result = await asyncio.to_thread(
-                lambda: LspClient().query(
+                lambda: get_lsp_client().query(
                     command=action.command,
                     file=action.file,
                     line=action.line,

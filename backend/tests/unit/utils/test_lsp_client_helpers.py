@@ -8,22 +8,6 @@ from unittest.mock import MagicMock, patch
 from backend.utils.lsp import lsp_client as lc
 
 
-def test_detect_any_lsp_server_true() -> None:
-    with patch(
-        'backend.utils.runtime_detect.has_any_lsp_server',
-        return_value=True,
-    ):
-        assert lc._detect_any_lsp_server() is True
-
-
-def test_detect_any_lsp_server_false_on_import_error() -> None:
-    with patch(
-        'backend.utils.runtime_detect.has_any_lsp_server',
-        side_effect=RuntimeError('boom'),
-    ):
-        assert lc._detect_any_lsp_server() is False
-
-
 def test_lsp_location_and_symbol_str() -> None:
     loc = lc.LspLocation(file='/a/b.py', line=2, column=3)
     assert str(loc).endswith('b.py:2:3')
@@ -105,37 +89,16 @@ def test_get_server_command_returns_none_when_not_detected(tmp_path: Path) -> No
     assert cmd is None
 
 
-def test_detect_pylsp_cached_skips_detect() -> None:
-    lc._PYLSP_AVAILABLE = True  # noqa: SLF001
-    try:
-        with patch(
-            'backend.utils.runtime_detect.detect_lsp_servers',
-            side_effect=AssertionError('should not run'),
-        ):
-            assert lc._detect_pylsp() is True
-    finally:
-        lc._PYLSP_AVAILABLE = None  # noqa: SLF001
-
-
-def test_detect_pylsp_uncached_empty_servers() -> None:
-    lc._PYLSP_AVAILABLE = None  # noqa: SLF001
-    try:
-        with patch(
-            'backend.utils.runtime_detect.lsp_command_for_file',
-            return_value=None,
-        ):
-            assert lc._detect_pylsp() is False
-    finally:
-        lc._PYLSP_AVAILABLE = None  # noqa: SLF001
-
-
 def test_parse_document_symbols_hierarchical() -> None:
     client = lc.LspClient()
     payload = [
         {
             'name': 'Outer',
             'kind': 5,
-            'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 2, 'character': 0}},
+            'range': {
+                'start': {'line': 0, 'character': 0},
+                'end': {'line': 2, 'character': 0},
+            },
             'children': [
                 {
                     'name': 'inner',
@@ -178,7 +141,11 @@ def test_build_init_msgs_uses_workspace_and_language_id(tmp_path: Path) -> None:
 def test_error_from_response_extracts_message_and_code() -> None:
     client = lc.LspClient()
     err = client._error_from_response(  # noqa: SLF001
-        {'jsonrpc': '2.0', 'id': 5, 'error': {'code': -32601, 'message': 'method not found'}}
+        {
+            'jsonrpc': '2.0',
+            'id': 5,
+            'error': {'code': -32601, 'message': 'method not found'},
+        }
     )
     assert err is not None
     assert 'method not found' in err

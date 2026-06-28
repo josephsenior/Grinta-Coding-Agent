@@ -434,12 +434,13 @@ UTILS_ASYNC_HELPERS_IMPORTS: list[tuple[str, str]] = [
 
 UTILS_LSP_MOVES: dict[str, str] = {
     'lsp_client.py': 'lsp/lsp_client.py',
-    'language_tool_aliases.py': 'lsp/language_tool_aliases.py',
+    'language_tool_aliases.py': 'dap/dap_aliases.py',
 }
 
 UTILS_LSP_IMPORTS: list[tuple[str, str]] = [
     ('backend.utils.lsp_client', 'backend.utils.lsp.lsp_client'),
-    ('backend.utils.language_tool_aliases', 'backend.utils.lsp.language_tool_aliases'),
+    ('backend.utils.language_tool_aliases', 'backend.execution.dap.dap_aliases'),
+    ('backend.utils.lsp.language_tool_aliases', 'backend.execution.dap.dap_aliases'),
 ]
 
 # --- utils/http ---

@@ -15,8 +15,13 @@ from backend.utils.http.stdio_json_rpc import (
     encode_json_rpc_message,
     feed_content_length_buffer,
 )
+from backend.utils.lsp.lsp_capabilities import (
+    CLIENT_CAPABILITIES,
+    METHOD_CAPABILITY_KEYS,
+)
 from backend.utils.lsp.lsp_project_routing import LspFileContext
 from backend.utils.lsp.lsp_timeouts import init_timeout_for_server
+from backend.utils.path_normalize import to_native_path
 
 _STDERR_RING_CAPACITY = 64
 _STDERR_FAILURE_SNIPPET_LINES = 24
@@ -29,36 +34,6 @@ def _stderr_debug_enabled() -> bool:
         'yes',
         'on',
     }
-
-_CLIENT_CAPABILITIES: dict[str, Any] = {
-    'textDocument': {
-        'publishDiagnostics': {'relatedInformation': True},
-        'documentSymbol': {'hierarchicalDocumentSymbolSupport': True},
-        'hover': {'contentFormat': ['markdown', 'plaintext']},
-        'definition': {'linkSupport': True},
-        'references': {},
-        'codeAction': {
-            'codeActionLiteralSupport': {
-                'codeActionKind': {
-                    'valueSet': [
-                        'quickfix',
-                        'refactor',
-                        'source',
-                        'source.organizeImports',
-                    ]
-                }
-            }
-        },
-    }
-}
-
-_METHOD_CAPABILITY_KEYS: dict[str, str] = {
-    'textDocument/hover': 'hoverProvider',
-    'textDocument/definition': 'definitionProvider',
-    'textDocument/references': 'referencesProvider',
-    'textDocument/documentSymbol': 'documentSymbolProvider',
-    'textDocument/codeAction': 'codeActionProvider',
-}
 
 
 def _sessions_disabled() -> bool:
@@ -100,12 +75,26 @@ class LspSession:
             if self.is_alive():
                 return True
             try:
+                self._closed = False
+                self._initialized = False
+                self._server_capabilities = {}
+                self._next_id = 2
+                self._doc_versions.clear()
+                self._stdout_buffer = b''
+                self._stderr_ring.clear()
+                while not self._inbox.empty():
+                    try:
+                        self._inbox.get_nowait()
+                    except queue.Empty:
+                        break
+                command = [to_native_path(c) for c in self.ctx.command]
+                cwd = to_native_path(str(self.ctx.workspace_root))
                 self._process = subprocess.Popen(
-                    list(self.ctx.command),
+                    command,
                     stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    cwd=str(self.ctx.workspace_root),
+                    cwd=cwd,
                 )
                 self._reader_thread = threading.Thread(
                     target=self._read_stdout,
@@ -206,7 +195,9 @@ class LspSession:
                     for message in messages:
                         self._inbox.put(message)
         except Exception:
-            logger.debug('LSP reader stopped for %s', self.ctx.server_name, exc_info=True)
+            logger.debug(
+                'LSP reader stopped for %s', self.ctx.server_name, exc_info=True
+            )
 
     def _read_stderr(self) -> None:
         """Append server stderr lines to a bounded ring buffer.
@@ -253,6 +244,11 @@ class LspSession:
         proc = self._process
         if proc is None or proc.stdin is None:
             raise OSError('LSP process stdin is not available')
+        if proc.poll() is not None:
+            raise OSError(
+                f'LSP process {self.ctx.server_name} exited with code '
+                f'{proc.returncode} before write'
+            )
         proc.stdin.write(encode_json_rpc_message(message))
         proc.stdin.flush()
 
@@ -336,53 +332,78 @@ class LspSession:
             init_timeout = timeout or init_timeout_for_server(self.ctx.server_name)
             init_id = 1
             root_uri = self.ctx.workspace_root.as_uri()
-            self._write_message(
-                {
-                    'jsonrpc': '2.0',
-                    'id': init_id,
-                    'method': 'initialize',
-                    'params': {
-                        'processId': os.getpid(),
-                        'rootUri': root_uri,
-                        'workspaceFolders': [
-                            {
-                                'uri': root_uri,
-                                'name': self.ctx.workspace_root.name or 'workspace',
-                            }
-                        ],
-                        'capabilities': _CLIENT_CAPABILITIES,
-                    },
-                }
+            try:
+                self._write_message(
+                    {
+                        'jsonrpc': '2.0',
+                        'id': init_id,
+                        'method': 'initialize',
+                        'params': {
+                            'processId': os.getpid(),
+                            'rootUri': root_uri,
+                            'workspaceFolders': [
+                                {
+                                    'uri': root_uri,
+                                    'name': self.ctx.workspace_root.name or 'workspace',
+                                }
+                            ],
+                            'capabilities': CLIENT_CAPABILITIES,
+                        },
+                    }
+                )
+            except OSError as exc:
+                logger.warning(
+                    'LSP initialize write failed for %s: %s. stderr:\n%s',
+                    self.ctx.server_name,
+                    exc,
+                    self._format_stderr_snippet(),
+                )
+                self.close()
+                return False
+
+        # Lock released — reader thread can now parse and enqueue the response.
+        # Holding the lock here was the root cause of init always timing out:
+        # _read_stdout needs the same lock to feed_content_length_buffer and
+        # put messages into _inbox, so the initialize response was stranded
+        # in the stdout buffer until the 20s timeout expired.
+        response = self._wait_for_response(init_id, init_timeout)
+        if response is None:
+            logger.warning(
+                'LSP initialize timed out for %s. stderr:\n%s',
+                self.ctx.server_name,
+                self._format_stderr_snippet(),
             )
-            response = self._wait_for_response(init_id, init_timeout)
-            if response is None:
-                logger.warning(
-                    'LSP initialize timed out for %s. stderr:\n%s',
-                    self.ctx.server_name,
-                    self._format_stderr_snippet(),
-                )
+            with self._lock:
                 self.close()
-                return False
-            err = response.get('error')
-            if isinstance(err, dict):
-                logger.warning(
-                    'LSP initialize rejected by %s: %s',
-                    self.ctx.server_name,
-                    err.get('message') or err,
-                )
+            return False
+        err = response.get('error')
+        if isinstance(err, dict):
+            logger.warning(
+                'LSP initialize rejected by %s: %s',
+                self.ctx.server_name,
+                err.get('message') or err,
+            )
+            with self._lock:
                 self.close()
-                return False
-            result = response.get('result')
-            if not isinstance(result, dict):
-                logger.warning(
-                    'LSP initialize returned no result for %s. stderr:\n%s',
-                    self.ctx.server_name,
-                    self._format_stderr_snippet(),
-                )
+            return False
+        result = response.get('result')
+        if not isinstance(result, dict):
+            logger.warning(
+                'LSP initialize returned no result for %s. stderr:\n%s',
+                self.ctx.server_name,
+                self._format_stderr_snippet(),
+            )
+            with self._lock:
                 self.close()
-                return False
+            return False
+        with self._lock:
             self._server_capabilities = result.get('capabilities') or {}
-            self._write_message({'jsonrpc': '2.0', 'method': 'initialized', 'params': {}})
+            try:
+                self._write_message(
+                    {'jsonrpc': '2.0', 'method': 'initialized', 'params': {}}
+                )
+            except OSError:
+                pass
             self._initialized = True
             return True
 
@@ -400,7 +421,7 @@ class LspSession:
         (documentSelector). Absent or ``False`` means not supported.
         """
         capabilities = self.capabilities()
-        key = _METHOD_CAPABILITY_KEYS.get(method)
+        key = METHOD_CAPABILITY_KEYS.get(method)
         if key is None:
             return True
         provider = capabilities.get(key)
@@ -452,15 +473,19 @@ class LspSession:
         with self._lock:
             request_id = self._next_id
             self._next_id += 1
-            self._write_message(
-                {
-                    'jsonrpc': '2.0',
-                    'id': request_id,
-                    'method': method,
-                    'params': params,
-                }
-            )
-            return self._wait_for_response(request_id, timeout)
+            try:
+                self._write_message(
+                    {
+                        'jsonrpc': '2.0',
+                        'id': request_id,
+                        'method': method,
+                        'params': params,
+                    }
+                )
+            except OSError:
+                return None
+        # Lock released so the reader thread can parse and enqueue the response.
+        return self._wait_for_response(request_id, timeout)
 
     def prepare_document(
         self,
@@ -470,11 +495,11 @@ class LspSession:
         *,
         init_timeout: float | None = None,
     ) -> bool:
+        if not self.ensure_initialized(timeout=init_timeout):
+            return False
         with self._lock:
-            if not self.ensure_initialized(timeout=init_timeout):
-                return False
             self.sync_document(uri, language_id, source)
-            return True
+        return True
 
     def wait_publish_diagnostics(
         self, uri: str, *, timeout: float

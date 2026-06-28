@@ -215,10 +215,22 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         default=True,
         description=(
             'Expose the lsp (LSP) tool. The runtime detector probes the '
-            'machine for installed language servers (pylsp, gopls, rust-analyzer, '
+            'machine for installed language servers (pyright, gopls, rust-analyzer, '
             'typescript-language-server, clangd, …). When none are present the tool is '
             'silently skipped, so leaving this on is safe even on minimal images.'
         ),
+    )
+    lsp_auto_install: bool = Field(
+        default=True,
+        description=(
+            'When the canonical LSP server for a language is missing, install it '
+            'automatically on first query via the appropriate package manager '
+            '(npm, pip, go, cargo, …). Set GRINTA_LSP_AUTO_INSTALL=0 to disable.'
+        ),
+    )
+    lsp_install_timeout_sec: float = Field(
+        default=120.0,
+        description='Timeout in seconds for a single LSP server auto-install.',
     )
     enable_swarming: bool = Field(default=False)
     enable_blackboard: bool = Field(default=False)
