@@ -22,7 +22,10 @@ from backend.execution.dap._dap_adapters import (
 )
 from backend.execution.dap._dap_errors import DAPError
 from backend.execution.dap._dap_logging import _dap_log
-from backend.execution.dap._dap_spawn_utils import resolve_python_executable
+from backend.execution.dap._dap_spawn_utils import (
+    resolve_python_executable,
+    validate_debugger_start,
+)
 from backend.execution.dap._dap_session import DAPDebugSession
 from backend.ledger.action.debugger import DebuggerAction
 from backend.ledger.observation import ErrorObservation
@@ -171,6 +174,9 @@ class DAPDebugManager:
             raise DAPError(f'Debug session already exists: {session_id}')
 
         adapter = self._adapter_name(action)
+        validate_debugger_start(
+            action, adapter=adapter, workspace_root=self.workspace_root
+        )
         adapter_spec = self._adapter_spec(action, adapter)
         _dap_log(
             logging.INFO,

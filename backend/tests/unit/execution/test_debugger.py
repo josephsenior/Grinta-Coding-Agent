@@ -186,6 +186,7 @@ def test_manager_infers_python_preset_for_py_program(monkeypatch, tmp_path) -> N
         'backend.execution.dap._dap_manager.DAPDebugSession', FakeSession
     )
     manager = DAPDebugManager(str(tmp_path))
+    (tmp_path / 'app.py').write_text('print("ok")\n', encoding='utf-8')
 
     start_obs = manager.handle(
         DebuggerAction(debug_action='start', program='app.py', session_id='dbg-python')
@@ -201,6 +202,36 @@ def test_manager_requires_adapter_command_for_non_python(tmp_path) -> None:
     obs = manager.handle(DebuggerAction(debug_action='start', adapter='node'))
     assert isinstance(obs, ErrorObservation)
     assert 'adapter_command' in obs.content
+
+
+def test_manager_start_rejects_non_python_program_fast(tmp_path) -> None:
+    bad_program = 'sample.txt'
+    (tmp_path / bad_program).write_text('not python\n', encoding='utf-8')
+    manager = DAPDebugManager(str(tmp_path))
+    obs = manager.handle(
+        DebuggerAction(
+            debug_action='start',
+            adapter='python',
+            program=bad_program,
+        )
+    )
+    assert isinstance(obs, ErrorObservation)
+    assert 'not a Python file' in obs.content
+    assert manager.sessions == {}
+
+
+def test_manager_start_rejects_missing_python_program(tmp_path) -> None:
+    manager = DAPDebugManager(str(tmp_path))
+    obs = manager.handle(
+        DebuggerAction(
+            debug_action='start',
+            adapter='python',
+            program='missing.py',
+        )
+    )
+    assert isinstance(obs, ErrorObservation)
+    assert 'does not exist' in obs.content
+    assert manager.sessions == {}
 
 
 def test_manager_maps_pwa_node_adapter_to_js_recipe(monkeypatch, tmp_path) -> None:
@@ -546,6 +577,7 @@ def test_manager_start_error_includes_startup_phase_metadata(
         'backend.execution.dap._dap_manager.DAPDebugSession', FakeSession
     )
     manager = DAPDebugManager(str(tmp_path))
+    (tmp_path / 'app.py').write_text('print("ok")\n', encoding='utf-8')
     obs = manager.handle(
         DebuggerAction(debug_action='start', program='app.py', session_id='dbg-phase')
     )
