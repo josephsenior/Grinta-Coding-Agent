@@ -365,6 +365,50 @@ async def test_tui_delegate_task_merges_action_and_observation_into_single_card(
         assert 'Delegated' in line
         assert 'Investigate flaky test' in line
 
+
+@pytest.mark.asyncio
+async def test_tui_browser_cmd_output_does_not_create_shell_card(mock_config):
+    """Browser tool emits CmdOutputObservation; it must not produce a ShellCard."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+        from backend.cli.tui.widgets.scan_line import BrowserCard, ShellCard
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+
+        renderer._process_event(
+            BrowserToolAction(
+                command='navigate',
+                params={'url': 'https://example.com'},
+            )
+        )
+        renderer._process_event(
+            CmdOutputObservation(
+                'Navigated to https://example.com',
+                command='browser navigate',
+                exit_code=0,
+            )
+        )
+        await pilot.pause()
+
+        browser_cards = list(s.query(BrowserCard).results())
+        shell_cards = list(s.query(ShellCard).results())
+        assert len(browser_cards) >= 1, 'Expected a BrowserCard'
+        assert len(shell_cards) == 0, f'Expected no ShellCard, got {len(shell_cards)}'
+
+
 @pytest.mark.asyncio
 async def test_tui_browser_screenshot_merges_with_action_card(mock_config):
     console = RichConsole()

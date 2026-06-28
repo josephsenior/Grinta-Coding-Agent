@@ -26,10 +26,7 @@ from typing import Any
 from backend.core.constants import BROWSER_SESSION_START_TIMEOUT_SEC
 from backend.core.logging.logger import app_logger as logger
 from backend.execution.browser._browser_cdp import (
-    _capture_via_cdp,
     _navigate_direct_cdp,
-    _prepare_target_for_screenshot,
-    _resolve_page_target_id,
 )
 from backend.execution.browser._browser_interaction import (
     dispatch_bus_event_impl as _dispatch_bus_event_impl,
@@ -100,9 +97,6 @@ from backend.execution.browser._browser_shared import (
     _finalize_observation,
 )
 from backend.execution.browser._browser_snapshot import (
-    capture_screenshot_with_retry_impl as _capture_screenshot_with_retry_impl,
-)
-from backend.execution.browser._browser_snapshot import (
     execute_screenshot_impl as _execute_screenshot_impl,
 )
 from backend.execution.browser._browser_snapshot import (
@@ -110,12 +104,6 @@ from backend.execution.browser._browser_snapshot import (
 )
 from backend.execution.browser._browser_snapshot import (
     maybe_append_page_state_impl as _maybe_append_page_state_impl,
-)
-from backend.execution.browser._browser_snapshot import (
-    screenshot_attach_error_impl as _screenshot_attach_error_impl,
-)
-from backend.execution.browser._browser_snapshot import (
-    screenshot_failure_error_impl as _screenshot_failure_error_impl,
 )
 from backend.execution.browser._browser_snapshot import (
     snapshot_formatted_impl as _snapshot_formatted_impl,
@@ -129,9 +117,6 @@ __all__ = [
     'GrintaNativeBrowser',
     'StructuredExtractFn',
     # Re-exports for tests that import these as module-level functions.
-    '_resolve_page_target_id',
-    '_capture_via_cdp',
-    '_prepare_target_for_screenshot',
     '_navigate_direct_cdp',
     '_finalize_observation',
 ]
@@ -172,7 +157,7 @@ class GrintaNativeBrowser:
                 '(`python scripts/bootstrap_env.py browser`) and run `uvx browser-use install` to '
                 'download Chromium.'
             ) from e
-        browser = BrowserCls()
+        browser = BrowserCls(headless=True)
         t0 = time.monotonic()
         _browser_trace(
             f'starting Chromium (budget {BROWSER_SESSION_START_TIMEOUT_SEC:.0f}s; '
@@ -250,53 +235,6 @@ class GrintaNativeBrowser:
 
     async def _execute_snapshot(self, cmd: str, params: dict[str, Any]) -> Observation:
         return await _execute_snapshot_impl(self, cmd, params)
-
-    @staticmethod
-    def _screenshot_attach_error(cmd: str) -> Observation:
-        return _screenshot_attach_error_impl(cmd)
-
-    @staticmethod
-    def _screenshot_failure_error(
-        cmd: str,
-        *,
-        started_at: float,
-        first_error: Exception | None,
-        retry_error: Exception,
-    ) -> Observation:
-        return _screenshot_failure_error_impl(
-            cmd,
-            started_at=started_at,
-            first_error=first_error,
-            retry_error=retry_error,
-        )
-
-    async def _capture_screenshot_with_retry(
-        self,
-        browser: Any,
-        *,
-        cmd: str,
-        target_id: Any,
-        cdp: Any,
-        full_page: bool,
-        jpeg_quality: int,
-        primary_budget: float,
-        retry_budget: float,
-        fallback_budget: float,
-        started_at: float,
-    ) -> tuple[bytes | None, Observation | None]:
-        return await _capture_screenshot_with_retry_impl(
-            self,
-            browser,
-            cmd=cmd,
-            target_id=target_id,
-            cdp=cdp,
-            full_page=full_page,
-            jpeg_quality=jpeg_quality,
-            primary_budget=primary_budget,
-            retry_budget=retry_budget,
-            fallback_budget=fallback_budget,
-            started_at=started_at,
-        )
 
     async def _execute_screenshot(
         self, cmd: str, params: dict[str, Any]
