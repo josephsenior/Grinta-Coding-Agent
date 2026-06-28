@@ -12,7 +12,7 @@ Run this checklist before a release candidate or quarterly reliability review.
           backend/tests/integration/test_event_stream_persistence_integration.py \
           backend/tests/integration/test_trajectory_regression_harness.py \
           backend/tests/integration/test_reliability_lifecycle_integration.py \
-          backend/tests/unit/orchestration/test_orchestration_health.py
+          backend/tests/unit/orchestration/test_health.py
    ```
 
 2. **Full unit suite** (no new failures vs baseline)

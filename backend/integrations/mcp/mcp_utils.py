@@ -289,6 +289,7 @@ async def _connect_stdio_server(server: MCPServerConfig) -> MCPClient | None:
     if resolved_env is not server.env:
         server = server.model_copy(update={'env': resolved_env})
 
+    # Rigour MCP requires rigour.yml; write a minimal stub only (no full CLI init).
     if server.name == 'rigour':
         from backend.integrations.mcp.rigour_bootstrap import ensure_rigour_yml_for_mcp
 
@@ -1037,15 +1038,24 @@ async def _call_mcp_raw(mcps: list[MCPClient], action) -> dict:
 
 async def add_mcp_tools_to_agent(
     agent: Agent, runtime: Runtime, memory: Memory
-) -> MCPConfig | None:
-    """Add MCP tools to an agent."""
+) -> tuple[MCPConfig | None, dict[str, list[str]]]:
+    """Add MCP tools to an agent, diffing against any previously registered set.
+
+    Safe to call multiple times in a session: prior tools that are no
+    longer in the new fetch are removed via
+    :meth:`Agent.set_mcp_tools` (which is now diff-aware). Playbook
+    servers are merged in identically to the original implementation.
+
+    Returns:
+        ``(updated_mcp_config, diff)`` where ``diff`` has the keys
+        ``added`` / ``removed`` / ``unchanged`` (lists of tool names).
+    """
     assert runtime.runtime_initialized, (
         'Runtime must be initialized before adding MCP tools'
     )
     extra_servers = []
     playbook_mcp_configs = memory.get_playbook_mcp_tools()
     for mcp_config in playbook_mcp_configs:
-        # Convert playbook servers to unified format
         for server in mcp_config.servers:
             if server not in extra_servers:
                 extra_servers.append(server)
@@ -1060,6 +1070,17 @@ async def add_mcp_tools_to_agent(
     reserved = frozenset(_extract_tool_names(agent.tools))
     if updated_mcp_config is not None:
         updated_mcp_config.mcp_exposed_name_reserved = reserved
+
+    # Reset the bootstrap status before re-fetching so any TUI widget
+    # reading ``get_mcp_bootstrap_status()`` between the call and the
+    # fetch sees a stale-but-not-leaked snapshot from the previous
+    # connection. ``fetch_mcp_tools_from_config`` re-sets it.
+    from backend.integrations.mcp.mcp_bootstrap_status import (
+        reset_mcp_bootstrap_status,
+    )
+
+    reset_mcp_bootstrap_status()
+
     mcp_tools = await fetch_mcp_tools_from_config(
         updated_mcp_config,
         use_stdio=isinstance(runtime, LocalRuntimeInProcess),
@@ -1067,6 +1088,32 @@ async def add_mcp_tools_to_agent(
     )
     tool_names = [tool['function']['name'] for tool in mcp_tools]
     logger.info('Loaded %s MCP tools: %s', len(mcp_tools), tool_names)
-    agent.set_mcp_tools(mcp_tools)
+    diff = agent.set_mcp_tools(mcp_tools)
     agent.mcp_capability_status = get_mcp_bootstrap_status()
-    return updated_mcp_config
+
+    # Rebuild the prompt manager's exposed-name → server map so the
+    # renderer can hide any tool from a native server (context7, exa,
+    # fetch) regardless of how the alias preparer renamed the tool.
+    pm = getattr(agent, '_prompt_manager', None)
+    if pm is not None and hasattr(pm, 'mcp_tool_server_map'):
+        new_map: dict[str, str] = {}
+        for client in getattr(runtime, '_mcp_clients', None) or []:
+            srv_cfg = getattr(client, '_server_config', None)
+            srv_name = (getattr(srv_cfg, 'name', None) or '').strip()
+            if not srv_name:
+                continue
+            exposed_map = getattr(client, 'exposed_to_protocol', {}) or {}
+            for exposed_name in exposed_map.keys():
+                new_map[exposed_name] = srv_name
+        # Drop entries for tools that are no longer in the agent's set.
+        current_exposed = set(agent.mcp_tools.keys())
+        for exposed_name in list(new_map.keys()):
+            if exposed_name not in current_exposed:
+                new_map.pop(exposed_name, None)
+        pm.mcp_tool_server_map = new_map
+
+    if diff.get('removed'):
+        logger.info('MCP tools removed mid-session: %s', diff['removed'])
+    if diff.get('added'):
+        logger.info('MCP tools added mid-session: %s', diff['added'])
+    return updated_mcp_config, diff

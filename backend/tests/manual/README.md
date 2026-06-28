@@ -19,6 +19,7 @@ expect.
 | `chess_e2e_verify.py` | End-to-end check that over-escaped HTML/CSS tool payloads are repaired and written via `FileEditor`. Not a TUI script; exercises `content_escape_repair` + execution. |
 | `provider_connection_check.py` | Manual cloud-provider ping (`vercel`, `nvidia`). Requires the matching API key in the environment or `.env`. |
 | `verify_rich_markup_crash.py` | Ad-hoc Rich markup probe for middle-dot / timing suffix edge cases. |
+| `cli_entry_smoke.py` | Launches the real CLI via subprocess and checks `/help` output. Requires API key env vars. |
 
 ## How to run
 
@@ -32,6 +33,7 @@ uv run python backend/tests/manual/tui_dot_smoke.py
 uv run python backend/tests/manual/chess_e2e_verify.py
 uv run python backend/tests/manual/provider_connection_check.py vercel
 uv run python backend/tests/manual/verify_rich_markup_crash.py
+uv run python backend/tests/manual/cli_entry_smoke.py
 ```
 
 Each script is self-contained and runs headlessly. If a script needs UTF-8

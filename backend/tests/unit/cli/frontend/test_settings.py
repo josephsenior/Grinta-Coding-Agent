@@ -1,14 +1,11 @@
 """CLI frontend — settings."""
 
-from backend.tests.unit.cli.frontend import _shared
-from backend.tests.unit.cli.frontend._shared import *  # noqa: F403
-
-for _name in dir(_shared):
-    if _name.startswith('_') and not _name.startswith('__'):
-        globals()[_name] = getattr(_shared, _name)
-
-from backend.tests.unit.cli.frontend._shared import _console_output, _make_console
-
+from backend.tests.unit.cli.frontend._shared import (
+    MagicMock,
+    _console_output,
+    _make_console,
+    patch,
+)
 
 def test_settings_ai_tab_shows_provider_and_model_separately() -> None:
     from backend.cli.settings.settings_tui import _render_ai_tab

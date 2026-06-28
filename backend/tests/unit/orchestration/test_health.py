@@ -1,6 +1,7 @@
 """Tests for backend.orchestration.health module."""
 
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -445,6 +446,27 @@ class TestCollectControllerHealth:
         assert result['severity'] == 'red'
         assert 'circuit_breaker_open' in result['warnings']
 
+    def test_persistence_degraded_warning_from_unit(self):
+        mock_controller = MagicMock()
+        mock_controller.sid = 'session-persist'
+        mock_state = MagicMock()
+        mock_state.agent_state.value = 'running'
+        mock_state.iteration_flag.current_value = 1
+        mock_state.iteration_flag.max_value = 100
+        mock_state.budget_flag.current_value = 0
+        mock_state.budget_flag.max_value = 10.0
+        mock_state.metrics.accumulated_cost = 0
+        mock_controller.state = mock_state
+        mock_controller.circuit_breaker_service.state.name = 'CLOSED'
+        mock_controller.circuit_breaker_service.failure_count = 0
+        mock_controller.retry_service.pending_retry = False
+        mock_controller.event_stream = MagicMock()
+        mock_controller.event_stream.persistence_health = 'degraded'
+
+        result = collect_orchestration_health(mock_controller)
+        assert result['persistence_health'] == 'degraded'
+        assert 'persistence_degraded' in result['warnings']
+
     def test_handles_missing_attributes_gracefully(self):
         """Test handles missing attributes with defaults."""
         mock_controller = MagicMock()
@@ -459,6 +481,12 @@ class TestCollectControllerHealth:
         assert 'timestamp' in result
         assert result['state']['agent_state'] == 'unknown'
         assert result['severity'] in ['green', 'yellow', 'red']
+
+    def test_missing_attributes_simple_namespace_from_unit(self):
+        controller = SimpleNamespace(sid='x')
+        result = collect_orchestration_health(controller)
+        assert 'severity' in result
+        assert 'state' in result
 
     def test_includes_timestamp(self):
         """Test includes ISO timestamp."""

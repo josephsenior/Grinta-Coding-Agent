@@ -1,27 +1,22 @@
 """Headless TUI — input_sanitize."""
 
-from backend.tests.unit.cli.tui import _shared
-from backend.tests.unit.cli.tui._shared import *  # noqa: F403
-
-for _name in dir(_shared):
-    if _name.startswith('_') and not _name.startswith('__'):
-        globals()[_name] = getattr(_shared, _name)
-
 from backend.tests.unit.cli.tui._shared import (
+    GrintaTUIApp,
+    RichConsole,
+    TextArea,
     _get_screen,
     _strip_terminal_control_literals,
+    asyncio,
+    pytest,
 )
-
 
 def test_tui_strips_leaked_mouse_reports_from_input_text() -> None:
     leaked = '[<35;73;29M[<35;73;30Mhello\x1b[<35;74;31M'
     assert _strip_terminal_control_literals(leaked) == 'hello'
 
-
 def test_tui_strips_leaked_mouse_reports_without_sgr_marker() -> None:
     leaked = 'PS> [444444;32;15M[555;31;16Mhello'
     assert _strip_terminal_control_literals(leaked) == 'PS> hello'
-
 
 def test_tui_strips_screenshot_style_mouse_stream() -> None:
     leaked = (
@@ -31,7 +26,6 @@ def test_tui_strips_screenshot_style_mouse_stream() -> None:
     assert _strip_terminal_control_literals(leaked) == (
         'PS C:\\Users\\GIGABYTE\\Desktop\\New folder (3)> python'
     )
-
 
 @pytest.mark.asyncio
 async def test_tui_headless_exit_restores_terminal_modes(mock_config, monkeypatch):
@@ -53,7 +47,6 @@ async def test_tui_headless_exit_restores_terminal_modes(mock_config, monkeypatc
 
     assert restore_calls
 
-
 @pytest.mark.asyncio
 async def test_tui_input_removes_leaked_mouse_reports_live(mock_config):
     console = RichConsole()
@@ -69,7 +62,6 @@ async def test_tui_input_removes_leaked_mouse_reports_live(mock_config):
         await pilot.pause()
 
         assert ta.text == 'hello'
-
 
 @pytest.mark.asyncio
 async def test_tui_input_poll_strips_leaked_mouse_reports(mock_config):

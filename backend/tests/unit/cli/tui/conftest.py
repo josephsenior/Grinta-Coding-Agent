@@ -4,9 +4,6 @@ from unittest.mock import MagicMock, PropertyMock
 
 import pytest
 
-from backend.tests.unit.cli.tui._shared import *  # noqa: F403
-
-
 @pytest.fixture(autouse=True)
 def isolate_repo_settings(tmp_path, monkeypatch):
     """Never let headless TUI tests read or write repo-root settings.json."""
@@ -19,7 +16,6 @@ def isolate_repo_settings(tmp_path, monkeypatch):
         'backend.cli.settings.storage._settings_path',
         lambda: settings_file,
     )
-
 
 @pytest.fixture
 def mock_config():

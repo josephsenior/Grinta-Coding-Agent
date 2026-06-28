@@ -124,3 +124,27 @@ class TestOtherFilenames:
     def test_checkpoints_dir_user(self):
         result = get_conversation_checkpoints_dir('s1', 'u1')
         assert 'u1' in result
+
+
+# ---------------------------------------------------------------------------
+# Path consistency (from test_storage_locations_unit)
+# ---------------------------------------------------------------------------
+
+
+class TestPathConsistency:
+    """Verify helper paths nest correctly under conversation_dir."""
+
+    def test_events_under_conversation(self):
+        conv_dir = get_conversation_dir('s1')
+        events_dir = get_conversation_events_dir('s1')
+        assert events_dir.startswith(conv_dir)
+
+    def test_metadata_under_conversation(self):
+        conv_dir = get_conversation_dir('s1')
+        meta = get_conversation_metadata_filename('s1')
+        assert meta.startswith(conv_dir)
+
+    def test_event_file_under_events(self):
+        events_dir = get_conversation_events_dir('s1')
+        event_file = get_conversation_event_filename('s1', 10)
+        assert event_file.startswith(events_dir)

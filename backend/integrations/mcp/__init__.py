@@ -19,6 +19,7 @@ __all__ = [
     'convert_mcps_to_tools',
     'create_mcps',
     'fetch_mcp_tools_from_config',
+    'get_mcp_config_bus',
     'mcp_error_collector',
 ]
 
@@ -42,6 +43,10 @@ _EXPORTS = {
     'fetch_mcp_tools_from_config': (
         'backend.integrations.mcp.mcp_utils',
         'fetch_mcp_tools_from_config',
+    ),
+    'get_mcp_config_bus': (
+        'backend.integrations.mcp.config_bus',
+        'get_mcp_config_bus',
     ),
     'mcp_error_collector': (
         'backend.integrations.mcp.error_collector',

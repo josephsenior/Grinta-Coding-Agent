@@ -105,6 +105,10 @@ class TestRetryErrors:
     def test_exhausted_is_retry_error(self):
         assert issubclass(RetryExhaustedError, RetryError)
 
+    def test_retry_exhausted_none_exception_from_unit(self):
+        e = RetryExhaustedError(1, None)
+        assert e.last_exception is None
+
 
 # ---------------------------------------------------------------------------
 # retry decorator — sync
@@ -193,6 +197,16 @@ class TestRetrySyncDecorator:
         # The callback is called with (attempt_number, exception)
         fail_once()
         assert callback.call_count >= 1
+
+    def test_with_config_from_unit(self):
+        cfg = RetryConfig(max_attempts=1, initial_delay=0.0)
+
+        @retry(config=cfg)
+        def fail():
+            raise ValueError('fail')
+
+        with pytest.raises(RetryExhaustedError):
+            fail()
 
 
 # ---------------------------------------------------------------------------
@@ -336,3 +350,12 @@ class TestRetryAsyncDecorator:
 
         with pytest.raises(TypeError):
             await raises_type_error()
+
+    @pytest.mark.asyncio
+    async def test_async_non_retryable_from_unit(self):
+        @retry(max_attempts=3, base_delay=0.0, allowed_exceptions=(ValueError,))
+        async def raises_type():
+            raise TypeError('wrong')
+
+        with pytest.raises(TypeError):
+            await raises_type()

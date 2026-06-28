@@ -234,6 +234,46 @@ class ActionExecutionClient(Runtime):
         self._mcp_servers_resolved = servers
         return observation
 
+    async def reload_mcp(self) -> dict[str, list[str]]:
+        """Reconcile live MCP clients against the current ``AppConfig``.
+
+        Subscribes the bus to the next emission, then reads the latest
+        ``self.config.mcp`` and reuses :func:`reload_mcp_servers` to
+        diff against the currently-cached client pool. Updates the
+        cached pool in place. Returns a summary dict so the caller can
+        surface what changed in the TUI.
+
+        The function is a no-op (with an empty summary) when there is
+        no cached client pool and the new config also has no servers,
+        or when called before the first MCP call.
+        """
+        from backend.execution.utils.mcp_runtime import reload_mcp_servers
+
+        new_cfg = getattr(self.config, 'mcp', None)
+        new_servers = list(getattr(new_cfg, 'servers', []) or [])
+        reserved = getattr(new_cfg, 'mcp_exposed_name_reserved', None) or frozenset()
+
+        clients, servers, summary = await reload_mcp_servers(
+            new_servers=new_servers,
+            current_clients=self._mcp_clients,
+            current_servers_resolved=self._mcp_servers_resolved,
+            reserved_tool_names=frozenset(reserved),
+        )
+        self._mcp_clients = clients
+        self._mcp_servers_resolved = servers
+        return summary
+
+    async def close_mcp(self) -> None:
+        """Disconnect every cached MCP client without tearing the runtime down."""
+        clients = self._mcp_clients or []
+        for client in clients:
+            try:
+                await client.disconnect()
+            except Exception as exc:
+                logger.debug('MCP client disconnect: %s', exc, exc_info=True)
+        self._mcp_clients = None
+        self._mcp_servers_resolved = None
+
     def check_if_alive(self) -> None:
         self._send_action_server_request('GET', '/ping')
 
