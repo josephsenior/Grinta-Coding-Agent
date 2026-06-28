@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from backend.engine.function_calling.dispatch import _create_tool_dispatch_map
@@ -220,7 +221,8 @@ class TestFeatureFlagToolPresence:
         from unittest.mock import patch
 
         with patch(
-            'backend.utils.runtime_detect.has_any_lsp_server', return_value=True
+            'backend.utils.runtime_detect.detect_lsp_servers',
+            return_value={'pylsp': SimpleNamespace(available=True)},
         ):
             names = _build_toolset(enable_lsp_query=True)
         assert 'lsp' in names
@@ -230,7 +232,8 @@ class TestFeatureFlagToolPresence:
         from unittest.mock import patch
 
         with patch(
-            'backend.utils.runtime_detect.has_any_lsp_server', return_value=False
+            'backend.utils.runtime_detect.detect_lsp_servers',
+            return_value={},
         ):
             names = _build_toolset(enable_lsp_query=True)
         assert 'lsp' not in names
@@ -257,7 +260,8 @@ class TestFeatureFlagToolPresence:
         from unittest.mock import patch
 
         with patch(
-            'backend.utils.runtime_detect.has_any_lsp_server', return_value=True
+            'backend.utils.runtime_detect.detect_lsp_servers',
+            return_value={'pylsp': SimpleNamespace(available=True)},
         ):
             names = _build_toolset(
                 enable_terminal=True,
@@ -279,7 +283,8 @@ class TestModeToolVisibility:
         from unittest.mock import patch
 
         with patch(
-            'backend.utils.runtime_detect.has_any_lsp_server', return_value=True
+            'backend.utils.runtime_detect.detect_lsp_servers',
+            return_value={'pylsp': SimpleNamespace(available=True)},
         ):
             names = _build_toolset(
                 mode='plan',
@@ -356,7 +361,8 @@ class TestModeToolVisibility:
         from unittest.mock import patch
 
         with patch(
-            'backend.utils.runtime_detect.has_any_lsp_server', return_value=True
+            'backend.utils.runtime_detect.detect_lsp_servers',
+            return_value={'pylsp': SimpleNamespace(available=True)},
         ):
             names = _build_toolset(
                 mode='chat',

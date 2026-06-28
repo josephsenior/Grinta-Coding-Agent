@@ -7,12 +7,28 @@ import queue
 import subprocess
 import threading
 import time
+from collections import deque
 from typing import Any
 
 from backend.core.logging.logger import app_logger as logger
-from backend.utils.http.stdio_json_rpc import encode_json_rpc_message, feed_content_length_buffer
+from backend.utils.http.stdio_json_rpc import (
+    encode_json_rpc_message,
+    feed_content_length_buffer,
+)
 from backend.utils.lsp.lsp_project_routing import LspFileContext
 from backend.utils.lsp.lsp_timeouts import init_timeout_for_server
+
+_STDERR_RING_CAPACITY = 64
+_STDERR_FAILURE_SNIPPET_LINES = 24
+
+
+def _stderr_debug_enabled() -> bool:
+    return os.getenv('GRINTA_LSP_DEBUG_STDERR', '').strip().lower() in {
+        '1',
+        'true',
+        'yes',
+        'on',
+    }
 
 _CLIENT_CAPABILITIES: dict[str, Any] = {
     'textDocument': {
@@ -36,6 +52,14 @@ _CLIENT_CAPABILITIES: dict[str, Any] = {
     }
 }
 
+_METHOD_CAPABILITY_KEYS: dict[str, str] = {
+    'textDocument/hover': 'hoverProvider',
+    'textDocument/definition': 'definitionProvider',
+    'textDocument/references': 'referencesProvider',
+    'textDocument/documentSymbol': 'documentSymbolProvider',
+    'textDocument/codeAction': 'codeActionProvider',
+}
+
 
 def _sessions_disabled() -> bool:
     return os.getenv('GRINTA_DISABLE_LSP_SESSION', '').strip().lower() in {
@@ -54,9 +78,12 @@ class LspSession:
         self._lock = threading.RLock()
         self._process: subprocess.Popen[bytes] | None = None
         self._reader_thread: threading.Thread | None = None
+        self._stderr_thread: threading.Thread | None = None
         self._inbox: queue.Queue[dict[str, Any]] = queue.Queue()
         self._stdout_buffer = b''
+        self._stderr_ring: deque[str] = deque(maxlen=_STDERR_RING_CAPACITY)
         self._initialized = False
+        self._server_capabilities: dict[str, Any] = {}
         self._next_id = 2
         self._doc_versions: dict[str, int] = {}
         self._closed = False
@@ -77,7 +104,7 @@ class LspSession:
                     list(self.ctx.command),
                     stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
-                    stderr=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
                     cwd=str(self.ctx.workspace_root),
                 )
                 self._reader_thread = threading.Thread(
@@ -86,6 +113,12 @@ class LspSession:
                     daemon=True,
                 )
                 self._reader_thread.start()
+                self._stderr_thread = threading.Thread(
+                    target=self._read_stderr,
+                    name=f'lsp-stderr-{self.ctx.server_name}',
+                    daemon=True,
+                )
+                self._stderr_thread.start()
                 return True
             except Exception as exc:
                 logger.warning(
@@ -100,7 +133,8 @@ class LspSession:
                 return
             self._closed = True
             proc = self._process
-            if proc and proc.stdin and self._initialized:
+            was_initialized = self._initialized
+            if proc and proc.stdin and was_initialized:
                 try:
                     self._write_message(
                         {
@@ -112,11 +146,37 @@ class LspSession:
                     )
                 except Exception:
                     pass
+            exit_code: int | None = None
             if proc and proc.poll() is None:
                 try:
                     proc.kill()
                 except Exception:
                     pass
+            if proc is not None:
+                try:
+                    exit_code = proc.wait(timeout=1.0)
+                except Exception:
+                    exit_code = proc.poll()
+            # Surface stderr when the server died unexpectedly (non-zero exit or
+            # crash before a clean shutdown). Helps diagnose startup failures
+            # and mid-query crashes that were previously swallowed by DEVNULL.
+            if was_initialized and exit_code not in (None, 0):
+                snippet = self._format_stderr_snippet()
+                if snippet:
+                    logger.warning(
+                        'LSP server %s exited with code %s. Recent stderr:\n%s',
+                        self.ctx.server_name,
+                        exit_code,
+                        snippet,
+                    )
+            elif _stderr_debug_enabled():
+                snippet = self._format_stderr_snippet()
+                if snippet:
+                    logger.debug(
+                        'LSP server %s closing. Stderr tail:\n%s',
+                        self.ctx.server_name,
+                        snippet,
+                    )
             self._process = None
 
     def _read_stdout(self) -> None:
@@ -147,6 +207,47 @@ class LspSession:
                         self._inbox.put(message)
         except Exception:
             logger.debug('LSP reader stopped for %s', self.ctx.server_name, exc_info=True)
+
+    def _read_stderr(self) -> None:
+        """Append server stderr lines to a bounded ring buffer.
+
+        Always captured (no longer DEVNULL) so post-mortem debugging is possible.
+        Logged live only when ``GRINTA_LSP_DEBUG_STDERR=1`` is set; otherwise the
+        ring is surfaced via :meth:`recent_stderr` and on unexpected exit in
+        :meth:`close`.
+        """
+        proc = self._process
+        if proc is None or proc.stderr is None:
+            return
+        debug = _stderr_debug_enabled()
+        try:
+            while proc.poll() is None:
+                line = proc.stderr.readline()
+                if not line:
+                    break
+                text = line.rstrip(b'\r\n').decode('utf-8', errors='replace')
+                with self._lock:
+                    self._stderr_ring.append(text)
+                if debug:
+                    logger.debug('LSP stderr %s: %s', self.ctx.server_name, text)
+        except Exception:
+            logger.debug(
+                'LSP stderr reader stopped for %s', self.ctx.server_name, exc_info=True
+            )
+
+    def recent_stderr(self, max_lines: int = _STDERR_FAILURE_SNIPPET_LINES) -> str:
+        """Return up to *max_lines* of recent stderr output, newest last."""
+        with self._lock:
+            lines = list(self._stderr_ring)
+        if not lines:
+            return ''
+        return '\n'.join(lines[-max_lines:])
+
+    def _format_stderr_snippet(self) -> str:
+        snippet = self.recent_stderr()
+        if not snippet:
+            return ''
+        return snippet[:2000]
 
     def _write_message(self, message: dict[str, Any]) -> None:
         proc = self._process
@@ -186,19 +287,40 @@ class LspSession:
         *,
         timeout: float,
         uri: str | None = None,
+        grace: float = 0.25,
     ) -> list[dict[str, Any]]:
+        """Collect ``method`` notifications up to *timeout*.
+
+        Once at least one matching notification has been seen, a *grace* quiet
+        window (default 0.25s) gates early return: if no new match arrives
+        within the grace window, we return immediately rather than waiting the
+        full timeout. This lets warm servers that flush diagnostics promptly
+        return fast while still coalescing multi-part diagnostic bursts.
+        """
         deadline = time.monotonic() + timeout
         matched: list[dict[str, Any]] = []
         deferred: list[dict[str, Any]] = []
+        grace_deadline: float | None = None
         while time.monotonic() < deadline:
             remaining = deadline - time.monotonic()
-            message = self._poll_inbox(min(0.2, max(0.01, remaining)))
+            if matched and grace_deadline is not None:
+                poll_timeout = min(grace, max(0.01, remaining))
+            else:
+                poll_timeout = min(0.2, max(0.01, remaining))
+            message = self._poll_inbox(poll_timeout)
             if message is None:
+                if (
+                    matched
+                    and grace_deadline is not None
+                    and time.monotonic() >= grace_deadline
+                ):
+                    break
                 continue
             if message.get('method') == method:
                 params = message.get('params') or {}
                 if uri is None or params.get('uri') == uri:
                     matched.append(message)
+                    grace_deadline = time.monotonic() + grace
                     continue
             deferred.append(message)
         for item in deferred:
@@ -233,12 +355,60 @@ class LspSession:
                 }
             )
             response = self._wait_for_response(init_id, init_timeout)
-            if response is None or 'result' not in response:
+            if response is None:
+                logger.warning(
+                    'LSP initialize timed out for %s. stderr:\n%s',
+                    self.ctx.server_name,
+                    self._format_stderr_snippet(),
+                )
                 self.close()
                 return False
+            err = response.get('error')
+            if isinstance(err, dict):
+                logger.warning(
+                    'LSP initialize rejected by %s: %s',
+                    self.ctx.server_name,
+                    err.get('message') or err,
+                )
+                self.close()
+                return False
+            result = response.get('result')
+            if not isinstance(result, dict):
+                logger.warning(
+                    'LSP initialize returned no result for %s. stderr:\n%s',
+                    self.ctx.server_name,
+                    self._format_stderr_snippet(),
+                )
+                self.close()
+                return False
+            self._server_capabilities = result.get('capabilities') or {}
             self._write_message({'jsonrpc': '2.0', 'method': 'initialized', 'params': {}})
             self._initialized = True
             return True
+
+    def capabilities(self) -> dict[str, Any]:
+        """Return the server's advertised capabilities (empty until initialized)."""
+        with self._lock:
+            return dict(self._server_capabilities)
+
+    def supports(self, method: str) -> bool:
+        """Return True when the server advertises support for *method*.
+
+        ``method`` is the full LSP method name, e.g.
+        ``textDocument/hover``. A capability is considered supported when its
+        provider entry is truthy (bool), a dict (options), or a list
+        (documentSelector). Absent or ``False`` means not supported.
+        """
+        capabilities = self.capabilities()
+        key = _METHOD_CAPABILITY_KEYS.get(method)
+        if key is None:
+            return True
+        provider = capabilities.get(key)
+        if isinstance(provider, bool):
+            return provider
+        if isinstance(provider, (dict, list)):
+            return True
+        return provider is not None
 
     def sync_document(self, uri: str, language_id: str, source: str) -> None:
         with self._lock:

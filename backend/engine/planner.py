@@ -296,10 +296,14 @@ class OrchestratorPlanner:
         tools.append(create_analyze_project_structure_tool())
 
         if getattr(self._config, 'enable_lsp_query', True):
-            from backend.utils.runtime_detect import has_any_lsp_server
+            from backend.utils.runtime_detect import detect_lsp_servers
 
-            if has_any_lsp_server():
-                tools.append(create_lsp_query_tool())
+            detected = detect_lsp_servers()
+            available_names = sorted(
+                name for name, tool in detected.items() if tool.available
+            )
+            if available_names:
+                tools.append(create_lsp_query_tool(detected_servers=available_names))
 
     def _add_lazy_import_tools(
         self, tools: list, specs: list[tuple[str, bool, str, str]]
