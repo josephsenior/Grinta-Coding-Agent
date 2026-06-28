@@ -48,11 +48,10 @@ def test_create_memory_tool_omits_recall_when_disabled() -> None:
     assert 'recall' not in tool['function']['description'].lower()
 
 
-def test_memory_recall_without_vector_store() -> None:
-    action = _handle_memory_tool({'action': 'recall', 'key': 'auth decision'})
-    assert isinstance(action, MemoryRecallAction)
-    obs = execute_memory_recall(action)
-    assert 'not available' in obs.content.lower()
+def test_memory_recall_rejected_when_semantic_recall_unregistered() -> None:
+    with patch.dict(_semantic_recall_registry, {}, clear=True):
+        with pytest.raises(FunctionCallValidationError, match='not available'):
+            _handle_memory_tool({'action': 'recall', 'key': 'auth decision'})
 
 
 def test_memory_recall_formats_vector_excerpts() -> None:

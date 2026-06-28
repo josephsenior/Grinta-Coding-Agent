@@ -19,6 +19,10 @@ from typing import Any
 from backend.core.logging.logger import app_logger as logger
 from backend.execution.dap._dap_errors import DAPError
 from backend.execution.dap._dap_logging import _dap_log
+from backend.execution.dap._dap_spawn_utils import (
+    format_adapter_spawn_error,
+    resolve_adapter_cwd,
+)
 
 
 class DAPClient:
@@ -94,7 +98,11 @@ class DAPClient:
             # ``FileNotFoundError`` deep in the stack.
             self.process = None
             raise DAPError(
-                f'Failed to start DAP adapter {self.adapter_command[0]!r}: {exc}'
+                format_adapter_spawn_error(
+                    exc,
+                    command=self.adapter_command,
+                    cwd=self.cwd,
+                )
             ) from exc
         except Exception:
             self.close()
@@ -120,9 +128,11 @@ class DAPClient:
 
     def _spawn_adapter(self) -> subprocess.Popen[bytes]:
         stdin = subprocess.PIPE if self.transport == 'stdio' else subprocess.DEVNULL
+        cwd = resolve_adapter_cwd(self.cwd)
+        self.cwd = cwd
         return subprocess.Popen(
             self.adapter_command,
-            cwd=self.cwd,
+            cwd=cwd,
             stdin=stdin,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

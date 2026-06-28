@@ -214,6 +214,12 @@ def _handle_memory_tool(arguments: Mapping[str, Any]) -> Action:
             raise FunctionCallValidationError(
                 'Missing search phrase "key" in memory(recall)'
             )
+        if get_semantic_recall_fn() is None:
+            raise FunctionCallValidationError(
+                'memory(recall) is not available in this session. Install optional '
+                'RAG support with pip install "grinta-ai[rag]" or set '
+                'enable_vector_memory to false in settings.'
+            )
         return MemoryRecallAction(query=query)
 
     if action == 'persist':

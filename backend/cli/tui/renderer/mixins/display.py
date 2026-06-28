@@ -264,7 +264,8 @@ class RendererDisplayMixin:
             if language in seen_languages:
                 continue
             seen_languages.add(language)
-            items.append((language, f'lsp:{language}', False, 'ok', None, False))
+            label = f'{language} ({_name})'
+            items.append((label, f'lsp:{language}', False, 'ok', None, False))
         return items
 
     def _dap_sidebar_signature(self) -> tuple[Any, ...]:

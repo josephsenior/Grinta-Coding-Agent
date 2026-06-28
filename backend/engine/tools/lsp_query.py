@@ -1,14 +1,14 @@
-"""lsp tool — code navigation via the language server.
+"""lsp tool — semantic code navigation via the language server.
 
-Supports the following commands:
+Supports the following commands (all require an installed language server):
 - ``find_definition``  locate where a symbol is defined
 - ``find_references``  find all usages of a symbol
 - ``hover``            read the docstring/type signature at a position
-- ``list_symbols``     enumerate top-level definitions in a file
+- ``list_symbols``     enumerate definitions in a file (``textDocument/documentSymbol``)
 - ``get_diagnostics``  get errors/warnings for a file (after editing)
 
-When pylsp is not installed the tool still executes but returns an
-``available=False`` flag so the LLM can fall back to grep-based search.
+When no language server is installed for a file type the tool returns
+``available=False``. Use ``find_symbols`` or ``grep`` for structure search instead.
 """
 
 from __future__ import annotations
@@ -27,8 +27,8 @@ def create_lsp_query_tool() -> dict[str, Any]:
             'name': LSP_TOOL_NAME,
             'description': (
                 'Read-only semantic code navigation via the locally-installed '
-                'language server (LSP). Auto-detects servers on PATH (pylsp, '
-                'pyright, typescript-language-server, gopls, rust-analyzer, '
+                'language server (LSP). Auto-detects servers on PATH (pyright, '
+                'pylsp, typescript-language-server, gopls, rust-analyzer, '
                 'clangd, …) — the System Capabilities block in the system prompt '
                 'lists which are actually present on this host; do NOT shell out '
                 'to discover them.\n'
@@ -42,6 +42,8 @@ def create_lsp_query_tool() -> dict[str, Any]:
                 'the chosen fix yourself via a file edit and '
                 're-run `get_diagnostics` to verify.\n'
                 'Tool boundaries (do not duplicate effort):\n'
+                '  • File/symbol structure without a language server → use '
+                '`find_symbols` or `grep`, not `lsp`.\n'
                 '  • Edit code → use `replace_string` (exact text) or `multiedit` '
                 '(batch). `lsp` is read-only and intentionally does not expose rename.\n'
                 '  • Workspace-wide text/symbol search → use `grep` or `glob` '

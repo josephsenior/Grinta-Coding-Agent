@@ -11,10 +11,14 @@ from __future__ import annotations
 from typing import Any
 
 
-def _vector_memory_runtime(config: Any) -> bool:
-    from backend.utils.optional_extras import vector_memory_enabled
+def _vector_memory_runtime(
+    config: Any, *, semantic_recall_active: bool | None = None
+) -> bool:
+    from backend.utils.optional_extras import resolve_semantic_recall_for_prompt
 
-    return vector_memory_enabled(config)
+    return resolve_semantic_recall_for_prompt(
+        config, semantic_recall_active=semantic_recall_active
+    )
 
 
 def _browser_runtime(config: Any) -> bool:
@@ -104,6 +108,7 @@ def _render_system_capabilities(
     function_calling_mode: str | None,
     parallel_tool_calls_provider_flag: bool,
     mode: str = 'agent',
+    semantic_recall_active: bool | None = None,
 ) -> str:
     """Runtime-truth capability statement.
 
@@ -126,7 +131,9 @@ def _render_system_capabilities(
 
     condensation_tiers = (
         'working / episodic / semantic'
-        if _vector_memory_runtime(config)
+        if _vector_memory_runtime(
+            config, semantic_recall_active=semantic_recall_active
+        )
         else 'working / episodic'
     )
     condensation_line = (
@@ -170,7 +177,9 @@ def _render_system_capabilities(
     if bool(getattr(config, 'enable_working_memory', True)) and can_edit:
         recall_hint = (
             ', `recall` for semantic search over indexed history'
-            if _vector_memory_runtime(config)
+            if _vector_memory_runtime(
+                config, semantic_recall_active=semantic_recall_active
+            )
             else ''
         )
         memory_line = (

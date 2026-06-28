@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 from unittest.mock import MagicMock, patch
 
 from backend.utils.runtime_detect import (
@@ -72,6 +73,33 @@ def test_probe_returns_unavailable_when_not_found() -> None:
         result = _probe(spec)
     assert result.available is False
     assert result.detail == 'not found'
+
+
+def test_probe_skips_python_exe_false_positive_for_pylsp() -> None:
+    """``python.exe`` on PATH must not imply ``python -m pylsp`` works."""
+    spec = next(s for s in LSP_SERVERS if s.name == 'pylsp')
+    with (
+        patch('shutil.which', return_value=sys.executable),
+        patch('subprocess.run', return_value=MagicMock(returncode=1)),
+    ):
+        result = _probe(spec)
+    assert result.available is False
+
+
+def test_probe_python_module_requires_successful_probe() -> None:
+    spec = _spec(
+        command=(sys.executable, '-m', 'json'),
+        python_module='json',
+        probe=(sys.executable, '-m', 'json.tool', '--help'),
+    )
+    import_ok = MagicMock(returncode=0)
+    probe_fail = MagicMock(returncode=1)
+    with (
+        patch('shutil.which', return_value=None),
+        patch('subprocess.run', side_effect=[import_ok, probe_fail]),
+    ):
+        result = _probe(spec)
+    assert result.available is False
 
 
 def test_probe_handles_subprocess_timeout() -> None:

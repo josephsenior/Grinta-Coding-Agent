@@ -17,6 +17,7 @@ from backend.core.logging.logger import app_logger as logger
 from backend.execution.dap._dap_client import DAPClient
 from backend.execution.dap._dap_errors import DAPError, DAPStartPhaseError
 from backend.execution.dap._dap_logging import _dap_log
+from backend.execution.dap._dap_spawn_utils import resolve_adapter_cwd
 
 
 class DAPDebugSession:
@@ -64,7 +65,10 @@ class DAPDebugSession:
         self.python = python
         self.client = DAPClient(
             adapter_command,
-            cwd=self.cwd or str(self.workspace_root),
+            cwd=resolve_adapter_cwd(
+                self.cwd or str(self.workspace_root),
+                fallback=str(self.workspace_root),
+            ),
             transport=adapter_transport,
             host=adapter_host,
             port=adapter_port,
@@ -533,10 +537,16 @@ class DAPDebugSession:
 
     def _resolve_cwd(self, cwd: str | None) -> str | None:
         if cwd:
-            return str(self._resolve_path(cwd))
+            return resolve_adapter_cwd(
+                str(self._resolve_path(cwd)),
+                fallback=str(self.workspace_root),
+            )
         if self.program is not None:
-            return str(self.program.parent)
-        return None
+            return resolve_adapter_cwd(
+                str(self.program.parent),
+                fallback=str(self.workspace_root),
+            )
+        return resolve_adapter_cwd(str(self.workspace_root))
 
     def _resolve_thread_id(self, thread_id: int | None, timeout: float) -> int:
         if thread_id is not None:

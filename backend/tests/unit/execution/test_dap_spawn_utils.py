@@ -1,0 +1,49 @@
+"""Tests for DAP adapter spawn helpers."""
+
+from __future__ import annotations
+
+import subprocess
+import sys
+from pathlib import Path
+
+from backend.execution.dap._dap_spawn_utils import (
+    format_adapter_spawn_error,
+    resolve_adapter_cwd,
+    resolve_python_executable,
+)
+
+
+def test_resolve_python_executable_prefers_existing_file(tmp_path: Path) -> None:
+    py = tmp_path / 'python.exe'
+    py.write_text('', encoding='utf-8')
+    assert resolve_python_executable(str(py)) == str(py.resolve())
+
+
+def test_resolve_adapter_cwd_falls_back_when_missing(tmp_path: Path) -> None:
+    missing = tmp_path / 'missing'
+    fallback = tmp_path / 'workspace'
+    fallback.mkdir()
+    assert resolve_adapter_cwd(missing, fallback=fallback) == str(fallback.resolve())
+
+
+def test_format_adapter_spawn_error_winerror_267_mentions_cwd() -> None:
+    exc = OSError('directory invalid')
+    exc.winerror = 267  # type: ignore[attr-defined]
+    message = format_adapter_spawn_error(
+        exc,
+        command=[sys.executable, '-m', 'debugpy.adapter'],
+        cwd=r'C:\missing\workspace',
+    )
+    assert 'cwd is invalid' in message
+    assert 'Python path' not in message
+
+
+def test_format_adapter_spawn_error_file_not_found_mentions_python() -> None:
+    exc = FileNotFoundError(2, 'missing', r'C:\no\python.exe')
+    message = format_adapter_spawn_error(
+        exc,
+        command=[r'C:\no\python.exe', '-m', 'debugpy.adapter'],
+        cwd=str(Path.cwd()),
+    )
+    assert 'Python path' in message
+    assert 'debugpy' in message

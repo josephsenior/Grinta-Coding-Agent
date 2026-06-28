@@ -33,7 +33,7 @@ async def test_post_edit_diagnostics_appends_passed_receipt(tmp_path) -> None:
 
     with (
         patch(
-            'backend.utils.runtime_detect.lsp_command_for_extension',
+            'backend.utils.runtime_detect.lsp_command_for_file',
             return_value=('pylsp',),
         ),
         patch('backend.utils.lsp.lsp_client.get_lsp_client', return_value=lsp),
@@ -45,7 +45,7 @@ async def test_post_edit_diagnostics_appends_passed_receipt(tmp_path) -> None:
     assert '<LSP_DIAGNOSTICS status="passed">' in obs.content
     assert obs.tool_result['lsp_diagnostics']['status'] == 'passed'
     lsp.query.assert_called_once_with(
-        'diagnostics', str(path.resolve()), process_timeout=0.25
+        'diagnostics', str(path.resolve()), process_timeout=0.25, post_edit=True
     )
 
 
@@ -69,7 +69,7 @@ async def test_post_edit_diagnostics_reports_lsp_failures(tmp_path) -> None:
 
     with (
         patch(
-            'backend.utils.runtime_detect.lsp_command_for_extension',
+            'backend.utils.runtime_detect.lsp_command_for_file',
             return_value=('pyright-langserver', '--stdio'),
         ),
         patch(
@@ -92,7 +92,7 @@ async def test_post_edit_diagnostics_reports_installed_lsp_skip(tmp_path) -> Non
     obs = FileEditObservation(content='Edited', path=str(path))
 
     with patch(
-        'backend.utils.runtime_detect.lsp_command_for_extension',
+        'backend.utils.runtime_detect.lsp_command_for_file',
         return_value=None,
     ):
         await PostEditDiagnosticsMiddleware().observe(_ctx(action), obs)
@@ -115,7 +115,7 @@ async def test_post_edit_diagnostics_uses_structured_edit_file_receipts(
 
     with (
         patch(
-            'backend.utils.runtime_detect.lsp_command_for_extension',
+            'backend.utils.runtime_detect.lsp_command_for_file',
             return_value=('pylsp',),
         ),
         patch(
@@ -141,7 +141,7 @@ async def test_post_edit_diagnostics_offloads_lsp_from_loop(tmp_path) -> None:
 
     with (
         patch(
-            'backend.utils.runtime_detect.lsp_command_for_extension',
+            'backend.utils.runtime_detect.lsp_command_for_file',
             return_value=('pylsp',),
         ),
         patch('backend.utils.lsp.lsp_client.get_lsp_client', return_value=lsp),

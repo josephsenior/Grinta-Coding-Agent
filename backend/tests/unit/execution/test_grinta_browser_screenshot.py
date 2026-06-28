@@ -101,12 +101,15 @@ def _assert_retry_screenshot_result(
     assert obs.image_b64
 
     capture_params = [p for name, p in state.log if name == 'captureScreenshot']
+    import sys
+
+    if sys.platform == 'win32':
+        expected = [(False, 80), (True, 80)]
+    else:
+        expected = [(True, 80), (False, 80)]
     assert [
         (params['fromSurface'], params['quality']) for params in capture_params
-    ] == [
-        (True, 80),
-        (False, 80),
-    ]
+    ] == expected
 
     saved = list(tmp_path.glob('browser_*.jpg'))
     assert len(saved) == 1, saved

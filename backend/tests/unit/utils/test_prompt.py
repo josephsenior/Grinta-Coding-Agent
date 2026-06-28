@@ -987,11 +987,25 @@ class TestBuildSystemPromptRenders:
             is_windows=False,
             config=_base_config(enable_working_memory=True),
             function_calling_mode='native',
+            semantic_recall_active=True,
         )
         assert '<MEMORY_AND_CONTEXT>' in result
         assert 'memory(action="working")' in result
         assert 'memory(action="persist"' in result
         assert 'memory(action="recall", key=...)' in result
+
+    def test_working_memory_enabled_omits_recall_when_rag_inactive(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(enable_working_memory=True),
+            function_calling_mode='native',
+            semantic_recall_active=False,
+        )
+        assert '<MEMORY_AND_CONTEXT>' in result
+        assert 'memory(action="working")' in result
+        assert 'memory(action="persist"' in result
+        assert 'memory(action="recall", key=...)' not in result
 
     def test_condensation_request_enabled(self) -> None:
         result = self._assert_renders_cleanly(

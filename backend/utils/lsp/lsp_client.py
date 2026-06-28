@@ -1,8 +1,8 @@
-"""Thin synchronous wrapper around python-lsp-server (pylsp).
+"""Language-server client — persistent sessions with one-shot fallback.
 
-Starts pylsp as a subprocess communicating via JSON-RPC over stdin/stdout.
-Gracefully degrades — all public methods return empty results when
-``pylsp`` is not installed, so no hard runtime dependency is required.
+Uses an ``LspSession`` pool keyed by workspace + server so slow JVM servers
+(jdtls, metals, …) amortize cold start. Set ``GRINTA_DISABLE_LSP_SESSION=1`` to
+force the legacy spawn-per-query path. No tree-sitter or AST fallbacks.
 """
 
 from __future__ import annotations
@@ -21,13 +21,17 @@ from backend.execution.utils.files.bounded_io import (
 )
 from backend.utils.async_helpers.async_utils import call_async_from_sync
 from backend.utils.http.stdio_json_rpc import parse_content_length_json_messages
+from backend.utils.lsp.lsp_project_routing import LspFileContext, lsp_context_for_file
+from backend.utils.lsp.lsp_session import LspSession, get_lsp_session_pool
+from backend.utils.lsp.lsp_timeouts import effective_query_timeout
 
-# ── Soft pylsp detection — delegates to the unified runtime detector ──────
-# ``_PYLSP_AVAILABLE`` is kept for backward-compatibility with tests that
-# monkeypatch it directly. ``_detect_pylsp`` now consults the multi-language
-# detector so other languages (gopls, typescript-language-server, …) are
-# discovered through the same mechanism.
+# Kept for tests that monkeypatch directly.
 _PYLSP_AVAILABLE: bool | None = None  # None = not yet detected
+
+_UNAVAILABLE_HINT = (
+    'No language server is installed for this file type. '
+    'Use find_symbols or grep for structure search.'
+)
 
 
 def _run_lsp_subprocess(
@@ -46,52 +50,15 @@ def _run_lsp_subprocess(
     )
 
 
-def _agent_debug_log(
-    hypothesis_id: str, location: str, message: str, data: dict
-) -> None:
-    logger.debug(
-        message,
-        extra={
-            'msg_type': 'LSP_TRACE',
-            'hypothesis_id': hypothesis_id,
-            'location': location,
-            'trace_data': data,
-        },
-    )
-
-
 def _detect_pylsp() -> bool:
-    """Return True when the Python language server is available locally."""
+    """Return True when a Python language server is installed locally."""
     global _PYLSP_AVAILABLE
     if _PYLSP_AVAILABLE is not None:
         return _PYLSP_AVAILABLE
     try:
-        from backend.utils.runtime_detect import detect_lsp_servers
+        from backend.utils.runtime_detect import lsp_command_for_file
 
-        servers = detect_lsp_servers()
-        detected = servers.get('pylsp')
-        _PYLSP_AVAILABLE = bool(detected and detected.available)
-        if _PYLSP_AVAILABLE and detected is not None:
-            # Validate the command actually runs; PATH/import probes can pass while
-            # execution still fails in this process environment.
-            try:
-                probe_cmd = list(detected.resolved_command) + ['--version']
-                result = _run_lsp_subprocess(probe_cmd, process_timeout=3.0)
-                if result.returncode != 0:
-                    _PYLSP_AVAILABLE = False
-            except Exception:
-                _PYLSP_AVAILABLE = False
-        # #region agent log
-        _agent_debug_log(
-            'H4_lsp_detection_path',
-            'backend/utils/lsp_client.py:_detect_pylsp',
-            'pylsp-detection-result',
-            {
-                'cached_value': _PYLSP_AVAILABLE,
-                'server_keys': sorted(servers.keys())[:4],
-            },
-        )
-        # #endregion
+        _PYLSP_AVAILABLE = lsp_command_for_file('_lsp_routing_placeholder.py') is not None
     except Exception:
         _PYLSP_AVAILABLE = False
     return _PYLSP_AVAILABLE
@@ -105,9 +72,6 @@ def _detect_any_lsp_server() -> bool:
         return has_any_lsp_server()
     except Exception:
         return False
-
-
-# ── Data types ─────────────────────────────────────────────────────────────
 
 
 @dataclass
@@ -138,9 +102,9 @@ class LspCodeAction:
     """A single quick-fix / refactor suggested by the language server."""
 
     title: str
-    kind: str = ''  # quickfix | refactor | source | source.organizeImports | …
+    kind: str = ''
     is_preferred: bool = False
-    diagnostic_message: str = ''  # the diagnostic this action resolves, if any
+    diagnostic_message: str = ''
 
     def __str__(self) -> str:
         prefix = '★ ' if self.is_preferred else '  '
@@ -163,9 +127,7 @@ class LspResult:
     def format_text(self, command: str) -> str:
         """Return a human-readable summary for the LLM."""
         if not self.available:
-            return (
-                'LSP is not available (pylsp not installed). Use grep or glob instead.'
-            )
+            return f'LSP is not available. {_UNAVAILABLE_HINT}'
         if self.error:
             return f'LSP error: {self.error}'
 
@@ -222,23 +184,15 @@ class LspResult:
         lines = [
             f'Available code actions ({len(self.code_actions)}; ★ = preferred):',
             '(Discovery-only — no auto-apply yet. Implement the chosen fix '
-            'and re-run `get_diagnostics` '
-            'to verify.)',
+            'and re-run `get_diagnostics` to verify.)',
         ]
         for act in self.code_actions[:25]:
             lines.append(f'  {act}')
         return '\n'.join(lines)
 
 
-# ── Core client ────────────────────────────────────────────────────────────
-
-
 class LspClient:
-    """Single-use JSON-RPC client that spawns pylsp per-query.
-
-    For simplicity we spawn a fresh process per call (no long-lived server
-    state needed for navigation). This is fast enough for file-level queries.
-    """
+    """JSON-RPC client backed by persistent language-server sessions."""
 
     _SYMBOL_KIND_MAP: dict[int, str] = {
         1: 'File',
@@ -269,31 +223,22 @@ class LspClient:
         26: 'TypeParameter',
     }
 
-    _SERVER_COMMANDS: dict[str, list[str]] = {
-        '.py': ['python', '-m', 'pylsp'],
-        '.ts': ['typescript-language-server', '--stdio'],
-        '.js': ['typescript-language-server', '--stdio'],
-        '.rs': ['rust-analyzer'],
-        '.go': ['gopls'],
-    }
+    def _get_context(self, file_path: str) -> LspFileContext | None:
+        try:
+            return lsp_context_for_file(file_path)
+        except Exception:
+            return None
 
     def _get_server_command(self, file_path: str) -> list[str] | None:
-        """Get the LSP server command based on file extension.
+        ctx = self._get_context(file_path)
+        return list(ctx.command) if ctx is not None else None
 
-        Prefers the unified runtime detector (which only returns commands
-        for tools actually installed on the machine). Falls back to the
-        legacy hard-coded mapping so existing test patches keep working.
-        """
-        ext = Path(file_path).suffix.lower()
-        try:
-            from backend.utils.runtime_detect import lsp_command_for_extension
-
-            resolved = lsp_command_for_extension(ext)
-            if resolved is not None:
-                return list(resolved)
-        except Exception:
-            pass
-        return self._SERVER_COMMANDS.get(ext)
+    def _unavailable(self, file_path: str) -> LspResult:
+        suffix = Path(file_path).suffix or 'this file type'
+        return LspResult(
+            available=False,
+            error=f'No LSP server configured for {suffix}. {_UNAVAILABLE_HINT}',
+        )
 
     def query(
         self,
@@ -304,41 +249,81 @@ class LspClient:
         symbol: str = '',
         *,
         process_timeout: float | None = None,
+        post_edit: bool = False,
     ) -> LspResult:
         """Execute a single LSP query and return structured results."""
-        # For non-python, we don't have AST fallbacks, so we check server availability
-        cmd = self._get_server_command(file)
-        if not cmd:
-            return LspResult(
-                available=False,
-                error=f'No LSP server configured for {Path(file).suffix}',
-            )
-
-        # Special-case Python hover when pylsp is not available: degrade gracefully
-        if command == 'hover' and Path(file).suffix.lower() == '.py':
-            pylsp_available = _detect_pylsp()
-            # #region agent log
-            _agent_debug_log(
-                'H5_hover_degrade_gate',
-                'backend/utils/lsp_client.py:query',
-                'hover-python-gate',
-                {
-                    'file': file,
-                    'detected_pylsp': pylsp_available,
-                    'cmd': cmd,
-                },
-            )
-            # #endregion
-            if not pylsp_available:
-                return LspResult(available=False)
+        if self._get_server_command(file) is None:
+            return self._unavailable(file)
 
         try:
             return self._run_query(
-                command, file, line, column, symbol, process_timeout=process_timeout
+                command,
+                file,
+                line,
+                column,
+                symbol,
+                process_timeout=process_timeout,
+                post_edit=post_edit,
             )
         except Exception as exc:
             logger.warning('LspClient query failed: %s', exc)
-            return LspResult(available=True, error=str(exc))
+            return LspResult(available=False, error=str(exc))
+
+    def _resolve_timeout(
+        self,
+        ctx: LspFileContext,
+        process_timeout: float | None,
+        *,
+        post_edit: bool = False,
+    ) -> float:
+        return effective_query_timeout(
+            ctx.server_name, process_timeout, post_edit=post_edit
+        )
+
+    def _use_session(
+        self,
+        ctx: LspFileContext,
+        uri: str,
+        language_id: str,
+        source: str,
+    ) -> tuple[LspSession | None, bool]:
+        """Return ``(session, allow_one_shot_fallback)``."""
+        session = get_lsp_session_pool().get(ctx)
+        if session is None:
+            return None, True
+        if not session.prepare_document(uri, language_id, source):
+            return None, False
+        return session, False
+
+    def _diagnostics_from_payload(
+        self, abs_path: str, uri: str, payload: list[dict[str, Any]]
+    ) -> list[LspLocation]:
+        errors: list[LspLocation] = []
+        for diag in payload:
+            start = diag.get('range', {}).get('start', {})
+            errors.append(
+                LspLocation(
+                    file=abs_path,
+                    line=start.get('line', 0) + 1,
+                    column=start.get('character', 0) + 1,
+                    message=str(diag.get('message') or ''),
+                    severity=diag.get('severity'),
+                )
+            )
+        return errors
+
+    def _diagnostics_from_responses(
+        self, abs_path: str, uri: str, responses: list[dict[str, Any]]
+    ) -> list[LspLocation]:
+        errors: list[LspLocation] = []
+        for resp in responses:
+            if resp.get('method') == 'textDocument/publishDiagnostics':
+                params = resp.get('params', {})
+                if params.get('uri') == uri:
+                    errors.extend(
+                        self._diagnostics_from_payload(abs_path, uri, params.get('diagnostics', []))
+                    )
+        return errors
 
     def _run_query(
         self,
@@ -349,34 +334,67 @@ class LspClient:
         symbol: str,
         *,
         process_timeout: float | None = None,
+        post_edit: bool = False,
     ) -> LspResult:
         abs_path = str(Path(file).resolve())
         try:
             source = Path(abs_path).read_text(encoding='utf-8', errors='replace')
         except FileNotFoundError:
-            return LspResult(available=True, error=f'File not found: {abs_path}')
+            return LspResult(available=False, error=f'File not found: {abs_path}')
 
         uri = Path(abs_path).as_uri()
-        # LSP protocol uses 0-based lines and columns
         lsp_line = max(0, line - 1)
         lsp_col = max(0, column - 1)
 
         if command == 'list_symbols':
-            return self._query_document_symbols(abs_path, uri, source, symbol)
-        elif command == 'hover':
-            return self._query_hover(abs_path, uri, source, lsp_line, lsp_col)
-        elif command in ('diagnostics', 'get_diagnostics'):
+            return self._query_document_symbols(
+                abs_path,
+                uri,
+                source,
+                symbol,
+                process_timeout=process_timeout,
+                post_edit=post_edit,
+            )
+        if command == 'hover':
+            return self._query_hover(
+                abs_path,
+                uri,
+                source,
+                lsp_line,
+                lsp_col,
+                process_timeout=process_timeout,
+                post_edit=post_edit,
+            )
+        if command in ('diagnostics', 'get_diagnostics'):
             return self._query_diagnostics(
-                abs_path, uri, source, process_timeout=process_timeout
+                abs_path,
+                uri,
+                source,
+                process_timeout=process_timeout,
+                post_edit=post_edit,
             )
-        elif command == 'code_action':
-            return self._query_code_actions(abs_path, uri, source, lsp_line, lsp_col)
-        elif command in ('find_definition', 'find_references'):
+        if command == 'code_action':
+            return self._query_code_actions(
+                abs_path,
+                uri,
+                source,
+                lsp_line,
+                lsp_col,
+                process_timeout=process_timeout,
+                post_edit=post_edit,
+            )
+        if command in ('find_definition', 'find_references'):
             return self._query_locations(
-                command, abs_path, uri, source, lsp_line, lsp_col
+                command,
+                abs_path,
+                uri,
+                source,
+                lsp_line,
+                lsp_col,
+                process_timeout=process_timeout,
+                post_edit=post_edit,
             )
-        else:
-            return LspResult(available=True, error=f'Unknown command: {command}')
+        return LspResult(available=False, error=f'Unknown command: {command}')
 
     def _rpc(
         self,
@@ -384,8 +402,7 @@ class LspClient:
         server_cmd: list[str],
         *,
         process_timeout: float = 15.0,
-    ) -> list[dict]:
-        """Send LSP messages and collect responses using a subprocess."""
+    ) -> tuple[list[dict], bool]:
         frames: list[bytes] = []
         for message in messages:
             body = json.dumps(message, ensure_ascii=False).encode('utf-8')
@@ -400,40 +417,64 @@ class LspClient:
             )
             if result.timed_out:
                 logger.warning('%s subprocess timed out', server_cmd[0])
-                return []
-            return parse_content_length_json_messages(result.stdout)
+                return [], False
+            responses = parse_content_length_json_messages(result.stdout)
+            if responses:
+                return responses, True
+            if result.returncode != 0:
+                return [], False
+            return [], bool(result.stdout.strip())
         except TimeoutError:
             logger.warning('%s subprocess timed out', server_cmd[0])
-            return []
+            return [], False
         except Exception as exc:
             logger.warning('%s subprocess failed: %s', server_cmd[0], exc)
-            return []
+            return [], False
 
     def _parse_lsp_responses(self, raw: str) -> list[dict[str, Any]]:
-        """Delegate to :func:`parse_content_length_json_messages` (tests, compat)."""
         return parse_content_length_json_messages(raw)
 
-    def _build_init_msgs(self, uri: str, file_path: str) -> list[dict]:
-        ext = Path(file_path).suffix.lower()
-        lang_id = {
-            '.py': 'python',
-            '.ts': 'typescript',
-            '.js': 'javascript',
-            '.rs': 'rust',
-            '.go': 'go',
-        }.get(ext, 'plaintext')
+    def _build_init_msgs(self, uri: str, file_path: str, source: str) -> list[dict]:
+        ctx = self._get_context(file_path)
+        if ctx is None:
+            raise RuntimeError(f'no LSP context for {file_path}')
 
+        root_uri = ctx.workspace_root.as_uri()
         return [
             {
                 'jsonrpc': '2.0',
                 'id': 1,
                 'method': 'initialize',
                 'params': {
-                    'processId': None,
-                    'rootUri': str(Path(file_path).parent.as_uri()),
+                    'processId': os.getpid(),
+                    'rootUri': root_uri,
+                    'workspaceFolders': [
+                        {
+                            'uri': root_uri,
+                            'name': ctx.workspace_root.name or 'workspace',
+                        }
+                    ],
                     'capabilities': {
                         'textDocument': {
-                            'publishDiagnostics': {'relatedInformation': True}
+                            'publishDiagnostics': {'relatedInformation': True},
+                            'documentSymbol': {
+                                'hierarchicalDocumentSymbolSupport': True,
+                            },
+                            'hover': {'contentFormat': ['markdown', 'plaintext']},
+                            'definition': {'linkSupport': True},
+                            'references': {},
+                            'codeAction': {
+                                'codeActionLiteralSupport': {
+                                    'codeActionKind': {
+                                        'valueSet': [
+                                            'quickfix',
+                                            'refactor',
+                                            'source',
+                                            'source.organizeImports',
+                                        ]
+                                    }
+                                }
+                            },
                         }
                     },
                 },
@@ -445,15 +486,19 @@ class LspClient:
                 'params': {
                     'textDocument': {
                         'uri': uri,
-                        'languageId': lang_id,
+                        'languageId': ctx.language_id,
                         'version': 1,
-                        'text': '',
+                        'text': source,
                     }
                 },
             },
         ]
 
-    # ── Command implementations ─────────────────────────────────────────
+    def _server_failed(self) -> LspResult:
+        return LspResult(
+            available=False,
+            error='Language server failed to start or did not respond',
+        )
 
     def _query_diagnostics(
         self,
@@ -462,41 +507,35 @@ class LspClient:
         source: str,
         *,
         process_timeout: float | None = None,
+        post_edit: bool = False,
     ) -> LspResult:
-        """Query LSP for diagnostics (errors/warnings)."""
-        server_cmd = self._get_server_command(abs_path)
-        if not server_cmd:
-            return LspResult(available=False)
+        ctx = self._get_context(abs_path)
+        if ctx is None:
+            return self._unavailable(abs_path)
 
-        msgs = self._build_init_msgs(uri, abs_path)
-        msgs[2]['params']['textDocument']['text'] = source
+        timeout = self._resolve_timeout(ctx, process_timeout, post_edit=post_edit)
+        session, use_fallback = self._use_session(ctx, uri, ctx.language_id, source)
+        if session is not None:
+            diagnostics = session.wait_publish_diagnostics(uri, timeout=timeout)
+            return LspResult(
+                available=True,
+                locations=self._diagnostics_from_payload(abs_path, uri, diagnostics),
+            )
+        if not use_fallback:
+            return self._server_failed()
 
-        # Some LSPs send diagnostics as notifications after didOpen
-        # We also send a shutdown to ensure we get all responses
+        server_cmd = list(ctx.command)
+        msgs = self._build_init_msgs(uri, abs_path, source)
         msgs.append({'jsonrpc': '2.0', 'method': 'shutdown', 'id': 99, 'params': {}})
 
-        responses = self._rpc(msgs, server_cmd, process_timeout=process_timeout or 15.0)
+        responses, server_started = self._rpc(msgs, server_cmd, process_timeout=timeout)
+        if not server_started:
+            return self._server_failed()
 
-        errors = []
-        for resp in responses:
-            if resp.get('method') == 'textDocument/publishDiagnostics':
-                params = resp.get('params', {})
-                if params.get('uri') == uri:
-                    for diag in params.get('diagnostics', []):
-                        start = diag.get('range', {}).get('start', {})
-                        errors.append(
-                            LspLocation(
-                                file=abs_path,
-                                line=start.get('line', 0) + 1,
-                                column=start.get('character', 0) + 1,
-                                message=str(diag.get('message') or ''),
-                                severity=diag.get('severity'),
-                            )
-                        )
-                        # We hijack LspLocation for diagnostics temporarily
-                        # In a real impl, we'd have a LspDiagnostic class
-
-        return LspResult(available=True, locations=errors)
+        return LspResult(
+            available=True,
+            locations=self._diagnostics_from_responses(abs_path, uri, responses),
+        )
 
     def _query_code_actions(
         self,
@@ -505,39 +544,73 @@ class LspClient:
         source: str,
         lsp_line: int,
         lsp_col: int,
+        *,
+        process_timeout: float | None = None,
+        post_edit: bool = False,
     ) -> LspResult:
-        """Query LSP for code actions / quick-fixes at the given position.
+        ctx = self._get_context(abs_path)
+        if ctx is None:
+            return self._unavailable(abs_path)
 
-        Returns a discovery-only list of suggested fixes (titles + kinds).
-        We do NOT auto-apply WorkspaceEdits — the agent reads the list and
-        implements the chosen fix manually.
-        This keeps the apply path visible and reviewable.
-        """
-        server_cmd = self._get_server_command(abs_path)
-        if not server_cmd:
-            return LspResult(available=False)
+        timeout = self._resolve_timeout(ctx, process_timeout, post_edit=post_edit)
+        session, use_fallback = self._use_session(ctx, uri, ctx.language_id, source)
+        if session is not None:
+            diagnostics_payload = session.wait_publish_diagnostics(uri, timeout=timeout)
+            req_range, relevant_diags = self._build_code_action_range_and_diags(
+                source, diagnostics_payload, lsp_line, lsp_col
+            )
+            response = session.request(
+                'textDocument/codeAction',
+                {
+                    'textDocument': {'uri': uri},
+                    'range': req_range,
+                    'context': {'diagnostics': relevant_diags},
+                },
+                timeout=timeout,
+            )
+            if response is None:
+                return self._server_failed()
+            if 'result' in response:
+                actions = self._parse_code_action_items(response.get('result') or [])
+                return LspResult(available=True, code_actions=actions)
+            return LspResult(available=True, code_actions=[])
 
+        if not use_fallback:
+            return self._server_failed()
+
+        server_cmd = list(ctx.command)
         diagnostics_payload = self._collect_diagnostics_for_code_action(
-            server_cmd, uri, abs_path, source
+            server_cmd, uri, abs_path, source, process_timeout=timeout
         )
-
         req_range, relevant_diags = self._build_code_action_range_and_diags(
             source, diagnostics_payload, lsp_line, lsp_col
         )
-
         return self._execute_code_action_request(
-            server_cmd, uri, abs_path, source, req_range, relevant_diags
+            server_cmd,
+            uri,
+            abs_path,
+            source,
+            req_range,
+            relevant_diags,
+            process_timeout=timeout,
         )
 
     def _collect_diagnostics_for_code_action(
-        self, server_cmd: list[str], uri: str, abs_path: str, source: str
+        self,
+        server_cmd: list[str],
+        uri: str,
+        abs_path: str,
+        source: str,
+        *,
+        process_timeout: float | None = None,
     ) -> list[dict[str, Any]]:
-        diag_msgs = self._build_init_msgs(uri, abs_path)
-        diag_msgs[2]['params']['textDocument']['text'] = source
+        diag_msgs = self._build_init_msgs(uri, abs_path, source)
         diag_msgs.append(
             {'jsonrpc': '2.0', 'method': 'shutdown', 'id': 99, 'params': {}}
         )
-        diag_responses = self._rpc(diag_msgs, server_cmd)
+        diag_responses, _server_started = self._rpc(
+            diag_msgs, server_cmd, process_timeout=process_timeout or 15.0
+        )
         for resp in diag_responses:
             if resp.get('method') == 'textDocument/publishDiagnostics':
                 params = resp.get('params', {})
@@ -581,9 +654,10 @@ class LspClient:
         source: str,
         req_range: dict,
         relevant_diags: list[dict[str, Any]],
+        *,
+        process_timeout: float | None = None,
     ) -> LspResult:
-        msgs = self._build_init_msgs(uri, abs_path)
-        msgs[2]['params']['textDocument']['text'] = source
+        msgs = self._build_init_msgs(uri, abs_path, source)
         msgs.append(
             {
                 'jsonrpc': '2.0',
@@ -598,7 +672,11 @@ class LspClient:
         )
         msgs.append({'jsonrpc': '2.0', 'method': 'shutdown', 'id': 31, 'params': {}})
 
-        responses = self._rpc(msgs, server_cmd)
+        responses, server_started = self._rpc(
+            msgs, server_cmd, process_timeout=process_timeout or 15.0
+        )
+        if not server_started:
+            return self._server_failed()
         for resp in responses:
             if resp.get('id') == 30 and 'result' in resp:
                 result = resp.get('result') or []
@@ -650,32 +728,134 @@ class LspClient:
         return True
 
     def _query_document_symbols(
-        self, abs_path: str, uri: str, source: str, symbol_filter: str
+        self,
+        abs_path: str,
+        uri: str,
+        source: str,
+        symbol_filter: str,
+        *,
+        process_timeout: float | None = None,
+        post_edit: bool = False,
     ) -> LspResult:
-        if abs_path.endswith('.py'):
-            return _ast_list_symbols(abs_path, source, symbol_filter)
+        ctx = self._get_context(abs_path)
+        if ctx is None:
+            return self._unavailable(abs_path)
 
-        # For other languages, could implement LSP documentSymbol query here
-        return LspResult(
-            available=True, error='list_symbols only supported for Python currently'
+        timeout = self._resolve_timeout(ctx, process_timeout, post_edit=post_edit)
+        session, use_fallback = self._use_session(ctx, uri, ctx.language_id, source)
+        if session is not None:
+            response = session.request(
+                'textDocument/documentSymbol',
+                {'textDocument': {'uri': uri}},
+                timeout=timeout,
+            )
+            if response is None:
+                return self._server_failed()
+            if 'result' in response:
+                symbols = self._parse_document_symbols(
+                    response.get('result'), symbol_filter
+                )
+                return LspResult(available=True, symbols=symbols)
+            return LspResult(available=True, symbols=[])
+
+        if not use_fallback:
+            return self._server_failed()
+
+        server_cmd = list(ctx.command)
+        msgs = self._build_init_msgs(uri, abs_path, source)
+        msgs.append(
+            {
+                'jsonrpc': '2.0',
+                'id': 20,
+                'method': 'textDocument/documentSymbol',
+                'params': {'textDocument': {'uri': uri}},
+            }
         )
+        msgs.append({'jsonrpc': '2.0', 'method': 'shutdown', 'id': 21, 'params': {}})
+
+        responses, server_started = self._rpc(msgs, server_cmd, process_timeout=timeout)
+        if not server_started:
+            return self._server_failed()
+        for resp in responses:
+            if resp.get('id') == 20 and 'result' in resp:
+                symbols = self._parse_document_symbols(resp.get('result'), symbol_filter)
+                return LspResult(available=True, symbols=symbols)
+
+        return LspResult(available=True, symbols=[])
+
+    def _parse_document_symbols(
+        self, result: Any, symbol_filter: str
+    ) -> list[LspSymbol]:
+        symbols: list[LspSymbol] = []
+
+        def walk(items: Any) -> None:
+            if not isinstance(items, list):
+                return
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                name = str(item.get('name', '')).strip()
+                kind = self._SYMBOL_KIND_MAP.get(int(item.get('kind', 0)), 'Symbol')
+                line = 1
+                if 'location' in item:
+                    start = item.get('location', {}).get('range', {}).get('start', {})
+                    line = int(start.get('line', 0)) + 1
+                elif 'range' in item:
+                    start = item.get('range', {}).get('start', {})
+                    line = int(start.get('line', 0)) + 1
+                if name and (
+                    not symbol_filter or symbol_filter.lower() in name.lower()
+                ):
+                    symbols.append(LspSymbol(name=name, kind=kind, line=line))
+                walk(item.get('children'))
+
+        walk(result)
+        symbols.sort(key=lambda s: (s.line, s.name))
+        return symbols
 
     def _query_hover(
-        self, abs_path: str, uri: str, source: str, lsp_line: int, lsp_col: int
+        self,
+        abs_path: str,
+        uri: str,
+        source: str,
+        lsp_line: int,
+        lsp_col: int,
+        *,
+        process_timeout: float | None = None,
+        post_edit: bool = False,
     ) -> LspResult:
-        if abs_path.endswith('.py'):
-            return _ast_hover(abs_path, source, lsp_line + 1)
+        ctx = self._get_context(abs_path)
+        if ctx is None:
+            return self._unavailable(abs_path)
 
-        server_cmd = self._get_server_command(abs_path)
-        if not server_cmd:
-            return LspResult(available=False)
+        timeout = self._resolve_timeout(ctx, process_timeout, post_edit=post_edit)
+        session, use_fallback = self._use_session(ctx, uri, ctx.language_id, source)
+        if session is not None:
+            response = session.request(
+                'textDocument/hover',
+                {
+                    'textDocument': {'uri': uri},
+                    'position': {'line': lsp_line, 'character': lsp_col},
+                },
+                timeout=timeout,
+            )
+            if response is None:
+                return self._server_failed()
+            if 'result' in response:
+                return self._parse_hover_response(response['result'])
+            return LspResult(available=True, hover_text='No hover info')
 
-        msgs = self._build_init_msgs(uri, abs_path)
-        msgs[2]['params']['textDocument']['text'] = source
+        if not use_fallback:
+            return self._server_failed()
+
+        server_cmd = list(ctx.command)
+        msgs = self._build_init_msgs(uri, abs_path, source)
         msgs.append(self._build_hover_request_message(uri, lsp_line, lsp_col))
         msgs.append({'jsonrpc': '2.0', 'method': 'shutdown', 'id': 11, 'params': {}})
 
-        responses = self._rpc(msgs, server_cmd)
+        responses, server_started = self._rpc(msgs, server_cmd, process_timeout=timeout)
+        if not server_started:
+            return self._server_failed()
         for resp in responses:
             if resp.get('id') == 10 and 'result' in resp:
                 return self._parse_hover_response(resp['result'])
@@ -700,7 +880,7 @@ class LspClient:
             contents = result['contents']
             if isinstance(contents, dict):
                 return LspResult(available=True, hover_text=contents.get('value', ''))
-            elif isinstance(contents, list):
+            if isinstance(contents, list):
                 return LspResult(
                     available=True,
                     hover_text='\n'.join([str(c) for c in contents]),
@@ -716,24 +896,52 @@ class LspClient:
         source: str,
         lsp_line: int,
         lsp_col: int,
+        *,
+        process_timeout: float | None = None,
+        post_edit: bool = False,
     ) -> LspResult:
-        server_cmd = self._get_server_command(abs_path)
-        if not server_cmd:
-            return LspResult(available=False)
+        ctx = self._get_context(abs_path)
+        if ctx is None:
+            return self._unavailable(abs_path)
 
-        try:
-            return self._try_lsp_locations(
-                server_cmd, command, uri, abs_path, source, lsp_line, lsp_col
+        timeout = self._resolve_timeout(ctx, process_timeout, post_edit=post_edit)
+        session, use_fallback = self._use_session(ctx, uri, ctx.language_id, source)
+        if session is not None:
+            lsp_method = (
+                'textDocument/definition'
+                if command == 'find_definition'
+                else 'textDocument/references'
             )
-        except Exception as e:
-            logger.debug('LSP RPC failed: %s', e)
+            params: dict[str, Any] = {
+                'textDocument': {'uri': uri},
+                'position': {'line': lsp_line, 'character': lsp_col},
+            }
+            if command == 'find_references':
+                params['context'] = {'includeDeclaration': True}
+            response = session.request(lsp_method, params, timeout=timeout)
+            if response is None:
+                return self._server_failed()
+            if 'result' in response:
+                return self._parse_location_response(response['result'])
+            return LspResult(available=True)
 
-        if abs_path.endswith('.py'):
-            return _ast_grep_symbol(abs_path, source, lsp_line + 1)
+        if not use_fallback:
+            return self._server_failed()
 
-        return LspResult(
-            available=True, error='LSP query failed and no fallback available'
+        server_cmd = list(ctx.command)
+        result, started = self._try_lsp_locations(
+            server_cmd,
+            command,
+            uri,
+            abs_path,
+            source,
+            lsp_line,
+            lsp_col,
+            process_timeout=timeout,
         )
+        if not started:
+            return self._server_failed()
+        return result
 
     def _try_lsp_locations(
         self,
@@ -744,10 +952,11 @@ class LspClient:
         source: str,
         lsp_line: int,
         lsp_col: int,
-    ) -> LspResult:
+        *,
+        process_timeout: float | None = None,
+    ) -> tuple[LspResult, bool]:
         msg_id = 10
-        msgs = self._build_init_msgs(uri, abs_path)
-        msgs[2]['params']['textDocument']['text'] = source
+        msgs = self._build_init_msgs(uri, abs_path, source)
         msgs.append(
             self._build_location_request_message(
                 command, msg_id, uri, lsp_line, lsp_col
@@ -757,11 +966,15 @@ class LspClient:
             {'jsonrpc': '2.0', 'method': 'shutdown', 'id': msg_id + 1, 'params': {}}
         )
 
-        responses = self._rpc(msgs, server_cmd)
+        responses, server_started = self._rpc(
+            msgs, server_cmd, process_timeout=process_timeout or 15.0
+        )
+        if not server_started:
+            return LspResult(available=False), False
         for resp in responses:
             if resp.get('id') == msg_id and 'result' in resp:
-                return self._parse_location_response(resp['result'])
-        return LspResult(available=True)
+                return self._parse_location_response(resp['result']), True
+        return LspResult(available=True), True
 
     def _build_location_request_message(
         self, command: str, msg_id: int, uri: str, lsp_line: int, lsp_col: int
@@ -815,157 +1028,6 @@ class LspClient:
         return path
 
 
-# ── AST-based fallbacks (no pylsp needed) ─────────────────────────────────
-
-
-def _ast_list_symbols(abs_path: str, source: str, symbol_filter: str) -> LspResult:
-    """Parse source with TreeSitter and return top-level definitions."""
-    from backend.utils.treesitter.treesitter_editor import TreeSitterEditor
-
-    editor = TreeSitterEditor()
-    lang = editor.detect_language(abs_path)
-    if not lang:
-        return LspResult(available=False, error='Unsupported language for fallback')
-
-    parser = editor.get_parser(lang)
-    if not parser:
-        return LspResult(available=False, error='No parser for language')
-
-    tree = parser.parse(source.encode('utf-8'))
-
-    symbols: list[LspSymbol] = []
-
-    def traverse(node):
-        if any(
-            k in node.type
-            for k in ['function', 'class', 'method', 'declaration', 'declarator']
-        ):
-            name_node = editor.get_name_node(node)
-            if name_node:
-                name = (
-                    (name_node.text.decode('utf-8') if name_node.text else '')
-                    if name_node.text
-                    else ''
-                )
-                kind = (
-                    'Class'
-                    if any(k in node.type for k in ['class', 'interface'])
-                    else 'Function'
-                )
-                if not symbol_filter or symbol_filter.lower() in name.lower():
-                    symbols.append(
-                        LspSymbol(
-                            name=name, kind=kind, line=name_node.start_point[0] + 1
-                        )
-                    )
-        for child in node.children:
-            traverse(child)
-
-    traverse(tree.root_node)
-
-    # Filter duplicates (e.g. from nested name nodes)
-    unique_symbols = []
-    seen = set()
-    for s in symbols:
-        if s.name not in seen:
-            seen.add(s.name)
-            unique_symbols.append(s)
-
-    unique_symbols.sort(key=lambda s: s.line)
-    return LspResult(available=True, symbols=unique_symbols)
-
-
-def _ast_hover(abs_path: str, source: str, line: int) -> LspResult:
-    """Extract symbol name at the given 1-based line using TreeSitter."""
-    from backend.utils.treesitter.treesitter_editor import TreeSitterEditor
-
-    editor = TreeSitterEditor()
-    lang = editor.detect_language(abs_path)
-    if not lang:
-        return LspResult(available=True, hover_text='(unsupported language)')
-
-    parser = editor.get_parser(lang)
-    if not parser:
-        return LspResult(available=True, hover_text='(no parser)')
-
-    tree = parser.parse(source.encode('utf-8'))
-    best = ''
-
-    def traverse(node):
-        nonlocal best
-        # node.start_point is 0-indexed
-        if node.start_point[0] + 1 <= line <= node.end_point[0] + 1:
-            if any(k in node.type for k in ['function', 'class', 'method']):
-                name_node = editor.get_name_node(node)
-                if name_node:
-                    kind = (
-                        'Class'
-                        if 'class' in node.type
-                        else ('Method' if 'method' in node.type else 'Function')
-                    )
-                    best = f'{kind} `{((name_node.text.decode("utf-8") if name_node.text else "") if name_node.text else "")}`'
-            for child in node.children:
-                traverse(child)
-
-    traverse(tree.root_node)
-    return LspResult(available=True, hover_text=best or 'No documentation found.')
-
-
-def _ast_grep_symbol(abs_path: str, source: str, line: int) -> LspResult:
-    """Find definition of whatever name appears at the given line (TreeSitter definition grep)."""
-    lines = source.splitlines()
-    if not lines or line < 1 or line > len(lines):
-        return LspResult(available=True)
-
-    target_line = lines[line - 1]
-    import re
-
-    tokens = set(re.findall(r'[A-Za-z_]\w*', target_line))
-    if not tokens:
-        return LspResult(available=True)
-
-    from backend.utils.treesitter.treesitter_editor import TreeSitterEditor
-
-    editor = TreeSitterEditor()
-    lang = editor.detect_language(abs_path)
-    if not lang:
-        return LspResult(available=True)
-
-    parser = editor.get_parser(lang)
-    if not parser:
-        return LspResult(available=True)
-
-    tree = parser.parse(source.encode('utf-8'))
-    locations: list[LspLocation] = []
-
-    def traverse(node):
-        if any(
-            k in node.type
-            for k in ['function', 'class', 'method', 'declaration', 'declarator']
-        ):
-            name_node = editor.get_name_node(node)
-            if name_node:
-                name = (
-                    (name_node.text.decode('utf-8') if name_node.text else '')
-                    if name_node.text
-                    else ''
-                )
-                if name in tokens:
-                    locations.append(
-                        LspLocation(
-                            file=abs_path,
-                            line=name_node.start_point[0] + 1,
-                            column=name_node.start_point[1] + 1,
-                        )
-                    )
-        for child in node.children:
-            traverse(child)
-
-    traverse(tree.root_node)
-    return LspResult(available=True, locations=locations)
-
-
-# Singleton instance
 _LSP_CLIENT = LspClient()
 
 

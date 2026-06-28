@@ -14,10 +14,14 @@ from backend.engine.prompts.section_renderers._env_hints import (
 )
 
 
-def _semantic_recall_runtime(config: Any) -> bool:
-    from backend.utils.optional_extras import vector_memory_enabled
+def _semantic_recall_runtime(
+    config: Any, *, semantic_recall_active: bool | None = None
+) -> bool:
+    from backend.utils.optional_extras import resolve_semantic_recall_for_prompt
 
-    return vector_memory_enabled(config)
+    return resolve_semantic_recall_for_prompt(
+        config, semantic_recall_active=semantic_recall_active
+    )
 
 
 def _render_routing(
@@ -28,6 +32,7 @@ def _render_routing(
     *,
     windows_with_bash: bool = False,
     shell_is_powershell: bool = False,
+    semantic_recall_active: bool | None = None,
 ) -> str:
     from backend.core.interaction_modes import (
         is_chat_mode,
@@ -70,7 +75,9 @@ def _render_routing(
     memory_kw = _routing_memory_tool_placeholders(
         working_memory_on=working_memory_on,
         tracker_on=tracker_on,
-        semantic_recall_on=_semantic_recall_runtime(config),
+        semantic_recall_on=_semantic_recall_runtime(
+            config, semantic_recall_active=semantic_recall_active
+        ),
     )
 
     web_on = bool(getattr(config, 'enable_web', True))

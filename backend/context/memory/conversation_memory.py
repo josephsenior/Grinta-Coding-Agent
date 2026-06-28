@@ -119,9 +119,11 @@ class ContextMemory:
         self.agent_config = config
         self.prompt_manager = prompt_manager
 
-        # Initialize vector memory if enabled
+        # Initialize vector memory when config + [rag] extra allow it.
         vector_store: EnhancedVectorStore | None = None
-        if bool(getattr(config, 'enable_vector_memory', False)):
+        from backend.utils.optional_extras import vector_memory_enabled
+
+        if vector_memory_enabled(config):
             vector_store = self._initialize_vector_memory()
 
         # Context tracking (decisions, anchors, vector memory)
@@ -210,9 +212,11 @@ class ContextMemory:
             An initialized EnhancedVectorStore, or None if initialization fails.
         """
         try:
+            from backend.utils.optional_extras import vector_memory_enabled
+
             hybrid_enabled = bool(
                 getattr(self.agent_config, 'enable_hybrid_retrieval', False)
-            )
+            ) and vector_memory_enabled(self.agent_config)
             store = EnhancedVectorStore(
                 collection_name='conversation_memory',
                 enable_cache=True,

@@ -100,10 +100,22 @@ class Orchestrator(Agent):
         # Protocol-typed reference for step() logic
         self.memory_manager: MemoryManagerProtocol = self._memory_manager_impl
 
-        # Register vector-memory callback when semantic recall is active
-        from backend.utils.optional_extras import vector_memory_enabled
+        # Register vector-memory callback only when the store initialized.
+        from backend.utils.optional_extras import semantic_recall_active
 
-        if self.conversation_memory is not None and vector_memory_enabled(self.config):
+        store = (
+            self.conversation_memory.vector_store
+            if self.conversation_memory is not None
+            else None
+        )
+        recall_active = semantic_recall_active(
+            self.config, vector_store=store, require_live_store=True
+        )
+        if self.prompt_manager is not None and hasattr(
+            self.prompt_manager, 'semantic_recall_active'
+        ):
+            self.prompt_manager.semantic_recall_active = recall_active
+        if recall_active and self.conversation_memory is not None:
             register_semantic_recall(self.conversation_memory.recall_from_memory)
 
         # Planner/executor wiring

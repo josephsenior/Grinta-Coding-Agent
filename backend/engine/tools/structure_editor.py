@@ -345,9 +345,9 @@ class StructureEditor:
                 return EditResult(
                     success=False,
                     message=(
-                        'Cannot undo: the only recorded change for this file was creating it. '
-                        'There is no prior version to restore. Delete the file explicitly if '
-                        'you want it removed.'
+                        'Undo is not available: the only recorded change for this file was '
+                        'creating it, so there is no earlier version to restore. '
+                        'The file was not modified. To remove it, delete the file explicitly.'
                     ),
                 )
             with open(path, 'w', encoding='utf-8') as f:

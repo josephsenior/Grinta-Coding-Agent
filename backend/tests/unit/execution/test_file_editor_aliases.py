@@ -96,7 +96,7 @@ def test_file_editor_undo_after_create_file_rejects_undo(tmp_path: Path) -> None
 
     undo = editor(command='undo_last_edit', path='new.txt')
     assert undo.error is not None
-    assert 'creating it' in undo.error.lower()
+    assert 'not modified' in undo.error.lower()
     assert undo.error_code == 'UNDO_NO_PRIOR_VERSION'
     assert p.read_text(encoding='utf-8') == 'only'
 

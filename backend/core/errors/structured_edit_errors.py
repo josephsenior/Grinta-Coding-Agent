@@ -90,7 +90,8 @@ def summarize_editor_error(result: Any) -> tuple[str, str, bool, dict[str, Any]]
         'EMPTY_OLD_STRING': 'replace_string failed: old_string must not be empty.',
         'REPLACE_STRING_ERROR': 'replace_string failed.',
         'UNDO_NO_PRIOR_VERSION': (
-            'undo failed: the only recorded change for this file was creating it.'
+            'undo is not available: the only recorded change for this file was creating it; '
+            'the file was not modified.'
         ),
     }
     summary = summaries.get(error_code)
