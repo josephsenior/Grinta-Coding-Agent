@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -25,6 +26,14 @@ if TYPE_CHECKING:
 
 SESSION_MEMORY_FILENAME = 'session_memory.md'
 _PIPELINE_STATE_KEY = 'context_pipeline_state'
+
+# Shared lock for session-memory file writes. Disk I/O on the
+# compaction hot path is the largest single source of agent-loop
+# latency, so we serialise writes here and run them off-thread.
+_SESSION_MEMORY_WRITE_LOCK = threading.Lock()
+_SESSION_MEMORY_PENDING: dict[str, tuple[str, Path, dict[str, Any]]] = {}
+_SESSION_MEMORY_WRITE_THREAD: threading.Thread | None = None
+_SESSION_MEMORY_WRITE_STOP = threading.Event()
 
 
 def _session_memory_path(state: State | None = None) -> Path:
@@ -175,28 +184,119 @@ def maybe_update(
     last_summarized = latest_id if isinstance(latest_id, int) else last_event_id
     markdown = _format_session_memory(snapshot, last_event_id=last_summarized)
     path = _session_memory_path(state)
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(markdown, encoding='utf-8')
-    except OSError:
-        logger.debug('Failed to write session memory', exc_info=True)
-        return False
+    pipeline_state_payload = {
+        'last_session_memory_event_id': last_summarized,
+        'last_session_memory_tokens': estimated,
+        'last_session_memory_updated_at': time.time(),
+    }
 
+    # Record the new pipeline state synchronously so subsequent budget
+    # decisions see the updated ``last_tokens`` / ``last_event_id`` and
+    # do not re-trigger a write on the next step.
     if state is not None:
-        _set_pipeline_state(
-            state,
-            {
-                'last_session_memory_event_id': last_summarized,
-                'last_session_memory_tokens': estimated,
-                'last_session_memory_updated_at': time.time(),
-            },
-        )
+        _set_pipeline_state(state, pipeline_state_payload)
+
+    # Dispatch the heavy I/O (file write, canonical-state reduction,
+    # working-set sync) to a background thread so the agent loop does
+    # not pay tens of milliseconds on the hot path.
+    _schedule_background_persist(
+        session_id=resolve_session_id(state=state),
+        snapshot=snapshot,
+        markdown=markdown,
+        path=path,
+        last_summarized=last_summarized,
+        state=state,
+    )
+    logger.info(
+        'Session memory queued for background write (%d events, ~%d tokens, tool_calls_since=%d)',
+        len(events),
+        estimated,
+        tool_calls,
+    )
+    return True
+
+
+def resolve_session_id(*, state: Any = None) -> str | None:
+    """Compatibility shim — re-exported for tests."""
+    from backend.context.memory.session_context import resolve_session_id as _resolve
+
+    return _resolve(state=state)
+
+
+def _schedule_background_persist(
+    *,
+    session_id: str | None,
+    snapshot: dict[str, Any],
+    markdown: str,
+    path: Path,
+    last_summarized: int | None,
+    state: Any,
+) -> None:
+    """Queue a session-memory write on a single background writer thread."""
+    global _SESSION_MEMORY_WRITE_THREAD
+    key = session_id or '__default__'
+    payload = {
+        'markdown': markdown,
+        'path': path,
+        'snapshot': snapshot,
+        'last_summarized': last_summarized,
+        'state': state,
+        'session_id': session_id,
+    }
+    with _SESSION_MEMORY_WRITE_LOCK:
+        # Latest-write-wins: replace any pending write for this session.
+        _SESSION_MEMORY_PENDING[key] = payload
+        worker = _SESSION_MEMORY_WRITE_THREAD
+        stop = _SESSION_MEMORY_WRITE_STOP
+        pending = _SESSION_MEMORY_PENDING
+
+        def _worker_loop() -> None:
+            while not stop.is_set():
+                with _SESSION_MEMORY_WRITE_LOCK:
+                    if not pending:
+                        break
+                    _next_key, next_payload = pending.popitem()
+                next_path = next_payload['path']
+                try:
+                    next_path.parent.mkdir(parents=True, exist_ok=True)
+                    next_path.write_text(next_payload['markdown'], encoding='utf-8')
+                except OSError:
+                    logger.debug(
+                        'Background session-memory write failed', exc_info=True
+                    )
+                    continue
+                _post_persist_sync(
+                    snapshot=next_payload['snapshot'],
+                    last_summarized=next_payload['last_summarized'],
+                    state=next_payload['state'],
+                    session_id=next_payload['session_id'],
+                )
+
+        if worker is None or not worker.is_alive():
+            t = threading.Thread(
+                target=_worker_loop,
+                name='session-memory-writer',
+                daemon=True,
+            )
+            _SESSION_MEMORY_WRITE_THREAD = t
+            t.start()
+
+
+def _post_persist_sync(
+    snapshot: dict[str, Any],
+    last_summarized: int | None,
+    state: Any,
+    session_id: str | None,
+) -> None:
+    """Run the canonical-state + working-set sync on the writer thread."""
     try:
         from backend.context.canonical_state import (
             reduce_snapshot_into_state,
             save_canonical_state,
         )
+        from backend.context.memory.session_context import bind_session_context
 
+        bind_session_context(session_id=session_id)
         canonical = reduce_snapshot_into_state(
             snapshot,
             latest_event_id=last_summarized,
@@ -212,13 +312,6 @@ def maybe_update(
         sync_snapshot_to_working_memory(snapshot, state=state)
     except Exception:
         logger.debug('Session memory working-set sync failed', exc_info=True)
-    logger.info(
-        'Session memory updated (%d events, ~%d tokens, tool_calls_since=%d)',
-        len(events),
-        estimated,
-        tool_calls,
-    )
-    return True
 
 
 def build_compaction_summary(
@@ -262,9 +355,35 @@ def metadata(*, state: State | None = None) -> dict[str, Any]:
 __all__ = [
     'SESSION_MEMORY_FILENAME',
     'build_compaction_summary',
+    'drain_session_memory_writer',
     'get_content_for_compaction',
     'load_session_memory',
     'maybe_update',
     'metadata',
     'session_memory_exists',
 ]
+
+
+def drain_session_memory_writer(timeout: float = 5.0) -> None:
+    """Wait for the background session-memory writer to finish its queue.
+
+    Public for tests; production code should not need to call this
+    (the writer thread is a daemon and exits when the process does).
+    """
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        with _SESSION_MEMORY_WRITE_LOCK:
+            if not _SESSION_MEMORY_PENDING:
+                # One more short sleep to let the writer's last
+                # _post_persist_sync finish.
+                pass
+            else:
+                time.sleep(0.01)
+                continue
+        # No pending work — let the worker drain any in-flight call.
+        worker = _SESSION_MEMORY_WRITE_THREAD
+        if worker is not None and worker.is_alive():
+            time.sleep(0.02)
+            continue
+        return
+    raise TimeoutError('Session-memory writer did not drain in time')

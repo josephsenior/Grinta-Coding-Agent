@@ -261,7 +261,10 @@ def _latest_summary(history: list[Event]) -> str:
             )
         ):
             continue
-        return content[:900]
+        # Truncate at a safe boundary so the LLM never sees a half-cut
+        # JSON / Markdown block in what it is told is a "validated
+        # summary".
+        return _safe_truncate(content, 900)
     return ''
 
 
@@ -391,7 +394,7 @@ def _turn_key(turn: _UserTurn) -> tuple[str, str]:
 def _clip_inline(text: str, limit: int) -> str:
     if len(text) <= limit:
         return text
-    return text[: limit - 3].rstrip() + '...'
+    return _safe_truncate(text, limit - 3).rstrip() + '...'
 
 
 def _recent_tail_summary(events: list[Event]) -> str:
@@ -432,7 +435,7 @@ def _event_detail(event: Event) -> str:
     for attr in ('command', 'path', 'session_id', 'content', 'thought', 'message'):
         value = getattr(event, attr, None)
         if isinstance(value, str) and value.strip():
-            return ' '.join(value.strip().split())[:180]
+            return _safe_truncate(' '.join(value.strip().split()), 180)
     return ''
 
 
@@ -457,7 +460,9 @@ def _restore_hints(
     lines: list[str] = []
     latest = str(snapshot.get('latest_directive', '')).strip()
     if latest and include_latest_directive:
-        lines.append(f'Latest directive before compaction: {latest[:240]}')
+        lines.append(
+            f'Latest directive before compaction: {_safe_truncate(latest, 240)}'
+        )
     tests = snapshot.get('test_results')
     if isinstance(tests, list) and tests:
         latest_test = next(
@@ -468,7 +473,7 @@ def _restore_hints(
                 'Last test before compaction: '
                 f'{str(latest_test.get("status", "?")).upper()} '
                 f'(exit={latest_test.get("exit_code")}): '
-                f'{str(latest_test.get("command", ""))[:180]}'
+                f'{_safe_truncate(str(latest_test.get("command", "")), 180)}'
             )
     tasks = snapshot.get('background_tasks')
     if isinstance(tasks, list) and tasks:
@@ -477,19 +482,55 @@ def _restore_hints(
             if isinstance(task, dict):
                 lines.append(
                     f'- {task.get("session_id", "unknown")}: '
-                    f'{str(task.get("next_action", "terminal_read"))[:160]}'
+                    f'{_safe_truncate(str(task.get("next_action", "terminal_read")), 160)}'
                 )
     errors = snapshot.get('recent_errors')
     if isinstance(errors, list) and errors:
-        lines.append(f'Recent error: {str(errors[-1])[:240]}')
+        lines.append(f'Recent error: {_safe_truncate(str(errors[-1]), 240)}')
     return '\n'.join(lines)
 
 
 def _bounded_section(title: str, body: str, limit: int) -> str:
-    text = f'<{title.upper().replace(" ", "_")}>\n{body.strip()}\n</{title.upper().replace(" ", "_")}>'
-    if len(text) <= limit:
-        return text
-    return text[: limit - 36].rstrip() + '\n... (section truncated)'
+    tag = title.upper().replace(' ', '_')
+    open_tag = f'<{tag}>'
+    close_tag = f'</{tag}>'
+    framing = f'{open_tag}\n'
+    trailer = f'\n{close_tag}'
+    framing_len = len(framing) + len(trailer)
+    marker = '\n... (section truncated)'
+    marker_len = len(marker)
+    inner = body.strip()
+    # Always render the OPENING and CLOSING tags — truncation must
+    # never clip the closing tag, otherwise downstream LLMs see
+    # unclosed structured sections and hallucinate state.
+    if limit <= framing_len + marker_len + 16:
+        return f'{framing}{marker}{trailer}'
+    full = f'{framing}{inner}{trailer}'
+    if len(full) <= limit:
+        return full
+    budget = limit - framing_len - marker_len
+    cut = _safe_truncate(inner, budget)
+    return f'{framing}{cut}{marker}{trailer}'
+
+
+def _safe_truncate(text: str, max_chars: int) -> str:
+    """Truncate *text* to *max_chars* without splitting structured tokens.
+
+    Preference order: last newline in the upper half, then last space,
+    then a hard cut. The function never returns more than *max_chars*
+    characters and always strips trailing whitespace.
+    """
+    if max_chars <= 0 or len(text) <= max_chars:
+        return text.strip() if max_chars <= 0 else text
+    chunk = text[:max_chars]
+    lower_floor = max_chars // 2
+    nl = chunk.rfind('\n')
+    if nl >= lower_floor:
+        return chunk[:nl].rstrip()
+    sp = chunk.rfind(' ')
+    if sp >= lower_floor:
+        return chunk[:sp].rstrip()
+    return chunk.rstrip()
 
 
 def _assemble_sections(
@@ -504,7 +545,14 @@ def _assemble_sections(
             remaining = char_budget - len(_render_packet(selected)) - 80
             if remaining <= 160:
                 continue
-            body = body[:remaining].rstrip() + '\n... (section truncated)'
+            # Re-wrap through ``_bounded_section`` so the closing tag
+            # is always preserved. We treat *body* as already-tagged and
+            # shrink only the inner content; the marker is added.
+            inner_budget = max(40, remaining - 40)
+            truncated_body = _safe_truncate(body, inner_budget) + (
+                '\n... (section truncated)' if len(body) > inner_budget else ''
+            )
+            body = truncated_body
         selected.append((name, body))
         lengths[name] = len(body)
     return _render_packet(selected), lengths

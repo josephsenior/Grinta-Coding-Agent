@@ -5,6 +5,8 @@ from __future__ import annotations
 import copy
 import hashlib
 import os
+import queue
+import threading
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -135,6 +137,17 @@ class ContextMemory:
             'prompt_render_cache_enabled',
             True,
         )
+
+        # Background indexer queue: keeps the synchronous prompt-assembly
+        # path free of ChromaDB / SQLite FTS5 I/O. Items are tuples of
+        # (event_id, role, content, metadata). Bounded so an unobserved
+        # session cannot grow memory unbounded.
+        self._index_queue: queue.Queue[tuple[str, str, str, dict[str, Any]]] = (
+            queue.Queue(maxsize=1024)
+        )
+        self._index_worker: threading.Thread | None = None
+        self._index_worker_lock = threading.Lock()
+        self._index_worker_stop = threading.Event()
 
     # Delegate context-tracking API to ContextTracker
     @property
@@ -556,17 +569,99 @@ class ContextMemory:
             logger.debug('Auto context tracking skipped for event', exc_info=True)
 
     def _index_event_for_semantic_recall(self, event: Event) -> None:
-        """Index durable event content into vector memory when available."""
+        """Index durable event content into vector memory when available.
+
+        This used to call :meth:`store_in_memory` directly, which performs
+        synchronous ChromaDB / SQLite FTS5 I/O on the prompt-assembly hot
+        path. We now push the record onto a bounded queue and let a
+        background worker perform the write. The dedup set is updated
+        synchronously so a re-render of the same prompt does not enqueue
+        duplicates.
+        """
         record = self._memory_record_for_event(event)
         if record is None:
             return
         event_id, role, content, metadata = record
         if event_id in self._indexed_event_ids:
             return
-        self.store_in_memory(event_id, role, content, metadata)
         self._indexed_event_ids[event_id] = None
         while len(self._indexed_event_ids) > self._indexed_event_ids_max:
             self._indexed_event_ids.popitem(last=False)
+        if self._ctx.vector_store is None:
+            return
+        try:
+            self._index_queue.put_nowait((event_id, role, content, metadata))
+        except queue.Full:
+            # Drop the oldest queue item and try again — better to lose
+            # one in-flight write than to block the prompt path.
+            try:
+                self._index_queue.get_nowait()
+            except queue.Empty:
+                pass
+            try:
+                self._index_queue.put_nowait((event_id, role, content, metadata))
+            except queue.Full:
+                logger.debug(
+                    'Semantic index queue full; dropping event %s', event_id
+                )
+                return
+        self._ensure_index_worker()
+
+    def _ensure_index_worker(self) -> None:
+        """Start the background indexer thread if it is not already running."""
+        worker = self._index_worker
+        if worker is not None and worker.is_alive():
+            return
+        with self._index_worker_lock:
+            if self._index_worker is not None and self._index_worker.is_alive():
+                return
+            stop_event = self._index_worker_stop
+            index_queue = self._index_queue
+
+            def _worker_loop() -> None:
+                while not stop_event.is_set():
+                    try:
+                        item = index_queue.get(timeout=0.25)
+                    except queue.Empty:
+                        continue
+                    try:
+                        event_id, role, content, metadata = item
+                        self.store_in_memory(event_id, role, content, metadata)
+                    except Exception:
+                        logger.debug(
+                            'Background semantic indexing failed', exc_info=True
+                        )
+                    finally:
+                        try:
+                            index_queue.task_done()
+                        except Exception:
+                            pass
+
+            thread = threading.Thread(
+                target=_worker_loop,
+                name='context-memory-indexer',
+                daemon=True,
+            )
+            self._index_worker = thread
+            thread.start()
+
+    def shutdown(self) -> None:
+        """Stop the background indexer and flush its queue (best-effort)."""
+        self._index_worker_stop.set()
+        worker = self._index_worker
+        if worker is not None:
+            worker.join(timeout=2.0)
+        # Drain any remaining items synchronously so callers that need a
+        # deterministic shutdown do not lose writes.
+        while True:
+            try:
+                event_id, role, content, metadata = self._index_queue.get_nowait()
+            except queue.Empty:
+                break
+            try:
+                self.store_in_memory(event_id, role, content, metadata)
+            except Exception:
+                logger.debug('Final semantic index drain failed', exc_info=True)
 
     def _memory_record_user_message(
         self, event: Event

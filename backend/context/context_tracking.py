@@ -134,6 +134,7 @@ class ContextTracker:
         if not self.vector_store:
             return
         try:
+            tenant_id = self._current_tenant_id()
             delete_by_ids = getattr(self.vector_store, 'delete_by_ids', None)
             if callable(delete_by_ids):
                 try:
@@ -147,6 +148,7 @@ class ContextTracker:
                 rationale=None,
                 content_text=content,
                 metadata=metadata or {},
+                tenant_id=tenant_id,
             )
             logger.debug('Stored event %s in vector memory', event_id)
         except Exception as e:
@@ -157,7 +159,10 @@ class ContextTracker:
         if not self.vector_store:
             return []
         try:
-            results = self.vector_store.search(query, k=k)
+            tenant_id = self._current_tenant_id()
+            results = self.vector_store.search(
+                query, k=k, tenant_id=tenant_id
+            )
             logger.debug(
                 'Retrieved %d relevant memories for query: %s', len(results), query[:50]
             )
@@ -165,3 +170,20 @@ class ContextTracker:
         except Exception as e:
             logger.warning('Failed to retrieve from memory: %s', e)
             return []
+
+    @staticmethod
+    def _current_tenant_id() -> str | None:
+        """Return the active session id for tenant scoping, if bound."""
+        try:
+            from backend.context.memory.session_context import (
+                bind_session_context,
+            )
+            from backend.engine.tools.working_memory import get_current_session_id
+
+            bind_session_context()
+            sid = get_current_session_id()
+            if isinstance(sid, str) and sid.strip():
+                return sid.strip()
+        except Exception:
+            return None
+        return None

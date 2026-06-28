@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 from backend.context.memory.session_memory import (
+    drain_session_memory_writer,
     get_content_for_compaction,
     maybe_update,
     session_memory_exists,
@@ -43,6 +44,9 @@ def test_maybe_update_writes_session_memory_when_threshold_crossed(
         return_value={'decisions': ['use pipeline'], 'files_touched': {}},
     ):
         assert maybe_update(state, events) is True
+    # The write now happens on a background thread — wait for the drain
+    # before asserting on the file.
+    drain_session_memory_writer()
     assert session_memory_exists()
     assert (
         'Session Memory' in get_content_for_compaction()

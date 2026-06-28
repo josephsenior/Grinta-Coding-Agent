@@ -34,6 +34,18 @@ from backend.ledger.observation.files import FileEditObservation
 from backend.ledger.observation.mcp import MCPObservation
 from backend.ledger.observation.search import GlobObservation
 
+
+@pytest.fixture(autouse=True)
+def _clear_session_id() -> None:
+    """Reset session contextvar between tests so tenants don't leak."""
+    try:
+        from backend.engine.tools.working_memory import set_current_session_id
+
+        set_current_session_id(None)
+    except Exception:
+        pass
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -763,7 +775,10 @@ class TestMemoryStoreRecall:
         cast(Any, mem._ctx).vector_store.search.return_value = [{'content': 'result'}]
         result = mem.recall_from_memory('query', k=3)
         assert len(result) == 1
-        cast(Any, mem._ctx).vector_store.search.assert_called_once_with('query', k=3)
+        cast(Any, mem._ctx).vector_store.search.assert_called_once()
+        call = cast(Any, mem._ctx).vector_store.search.call_args
+        assert call.args[0] == 'query'
+        assert call.kwargs['k'] == 3
 
     def test_process_events_indexes_high_value_events_for_semantic_recall(self):
         mem = _make_memory()
