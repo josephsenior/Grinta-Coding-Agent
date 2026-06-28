@@ -46,3 +46,33 @@ def vector_memory_enabled(config: Any) -> bool:
     return (
         bool(getattr(agent, 'enable_vector_memory', False)) and is_rag_extra_available()
     )
+
+
+def semantic_recall_active(
+    config: Any,
+    *,
+    vector_store: Any | None = None,
+    require_live_store: bool = False,
+) -> bool:
+    """Return True when semantic ``memory(recall)`` should be exposed.
+
+    When *require_live_store* is True (runtime tool/prompt assembly), the
+    vector store must have initialized successfully — config + ``[rag]`` alone
+    is not enough.
+    """
+    if not vector_memory_enabled(config):
+        return False
+    if require_live_store:
+        return vector_store is not None
+    return True
+
+
+def resolve_semantic_recall_for_prompt(
+    config: Any,
+    *,
+    semantic_recall_active: bool | None = None,
+) -> bool:
+    """Prompt-time gate: prefer runtime flag from Orchestrator when set."""
+    if semantic_recall_active is not None:
+        return bool(semantic_recall_active)
+    return vector_memory_enabled(config)

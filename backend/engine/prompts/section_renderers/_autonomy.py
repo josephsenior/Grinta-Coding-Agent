@@ -17,10 +17,14 @@ from backend.engine.prompts.section_renderers._env_hints import (
 )
 
 
-def _semantic_recall_runtime(config: Any) -> bool:
-    from backend.utils.optional_extras import vector_memory_enabled
+def _semantic_recall_runtime(
+    config: Any, *, semantic_recall_active: bool | None = None
+) -> bool:
+    from backend.utils.optional_extras import resolve_semantic_recall_for_prompt
 
-    return vector_memory_enabled(config)
+    return resolve_semantic_recall_for_prompt(
+        config, semantic_recall_active=semantic_recall_active
+    )
 
 
 def _build_context_discipline_section(
@@ -29,6 +33,7 @@ def _build_context_discipline_section(
     tracker_on: bool,
     checkpoints_on: bool,
     condensation_on: bool,
+    semantic_recall_on: bool = False,
 ) -> str:
     parts = ['<CONTEXT_DISCIPLINE>']
     parts.append(
@@ -36,10 +41,13 @@ def _build_context_discipline_section(
         'After condensation, resume from durable state without restarting broad exploration.'
     )
     if working_memory_on:
+        memory_actions = 'working/persist'
+        if semantic_recall_on:
+            memory_actions += '/recall'
         parts.extend(
             [
                 '',
-                '**memory** — see `<MEMORY_AND_CONTEXT>` for working/persist/recall; '
+                f'**memory** — see `<MEMORY_AND_CONTEXT>` for {memory_actions}; '
                 'do not duplicate task progress here.',
             ]
         )
@@ -132,6 +140,7 @@ def _render_autonomy(
     is_windows: bool,
     windows_with_bash: bool,
     shell_is_powershell: bool,
+    semantic_recall_active: bool | None = None,
 ) -> str:
     from backend.core.interaction_modes import (
         normalize_interaction_mode,
@@ -149,12 +158,17 @@ def _render_autonomy(
         tracker_on=tracker_on,
         checkpoints_on=checkpoints_on,
         condensation_on=condensation_on,
+        semantic_recall_on=_semantic_recall_runtime(
+            config, semantic_recall_active=semantic_recall_active
+        ),
     )
     when_to_use_context = _build_when_to_use_context(
         working_memory_on=working_memory_on,
         tracker_on=tracker_on,
         checkpoints_on=checkpoints_on,
-        semantic_recall_on=_semantic_recall_runtime(config),
+        semantic_recall_on=_semantic_recall_runtime(
+            config, semantic_recall_active=semantic_recall_active
+        ),
     )
     risk_preview = _build_risk_preview(tracker_on=tracker_on)
 

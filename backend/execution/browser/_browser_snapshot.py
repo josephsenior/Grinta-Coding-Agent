@@ -25,8 +25,11 @@ from backend.core.constants import (
     BROWSER_SNAPSHOT_MAX_CHARS_FULL,
     BROWSER_SNAPSHOT_MAX_CHARS_INTERACTIVE,
 )
+from backend.core.os_capabilities import OS_CAPS
 from backend.execution.browser._browser_cdp import (
+    _capture_via_browser_session,
     _capture_via_cdp,
+    _focus_page_target,
     _prepare_target_for_screenshot,
     _resolve_page_target_id,
 )
@@ -184,7 +187,7 @@ def screenshot_failure_error_impl(
         ErrorObservation(
             content=(
                 f'ERROR: Browser screenshot failed after {total:.0f}s '
-                '(tried compositor and window capture). '
+                '(tried window/compositor capture and browser.take_screenshot). '
                 f'First error: {first}. Retry error: '
                 f'{type(retry_error).__name__}. {reason}'
             )
@@ -203,63 +206,79 @@ async def capture_screenshot_with_retry_impl(
     jpeg_quality: int,
     primary_budget: float,
     retry_budget: float,
+    fallback_budget: float,
     started_at: float,
 ) -> tuple[bytes | None, Observation | None]:
-    try:
-        raw = await _capture_via_cdp(
-            cdp,
-            full_page=full_page,
-            jpeg_quality=jpeg_quality,
-            from_surface=True,
-            timeout_sec=primary_budget,
-        )
+    capture_order = (False, True) if OS_CAPS.is_windows else (True, False)
+    first_error: Exception | None = None
+
+    for idx, from_surface in enumerate(capture_order):
+        budget = primary_budget if idx == 0 else retry_budget
+        try:
+            session_cdp = cdp
+            if idx > 0:
+                session_cdp = await _prepare_target_for_screenshot(browser, target_id) or cdp
+            raw = await _capture_via_cdp(
+                session_cdp,
+                full_page=full_page,
+                jpeg_quality=jpeg_quality,
+                from_surface=from_surface,
+                timeout_sec=budget,
+            )
+            path_label = 'window' if not from_surface else 'compositor'
+            _browser_trace(
+                f'screenshot done via {path_label} in '
+                f'{(time.monotonic() - started_at) * 1000:.0f}ms'
+            )
+            return raw, None
+        except (TimeoutError, Exception) as exc:  # noqa: BLE001
+            if first_error is None:
+                first_error = exc
+            _browser_trace(
+                f'screenshot: fromSurface={from_surface} failed ({type(exc).__name__}); '
+                'trying alternate path'
+            )
+
+    raw = await _capture_via_browser_session(
+        browser,
+        full_page=full_page,
+        jpeg_quality=jpeg_quality,
+        timeout_sec=fallback_budget,
+    )
+    if raw:
         _browser_trace(
-            f'screenshot done via compositor in {(time.monotonic() - started_at) * 1000:.0f}ms'
+            f'screenshot done via browser.take_screenshot in '
+            f'{(time.monotonic() - started_at) * 1000:.0f}ms'
         )
         return raw, None
-    except (TimeoutError, Exception) as exc:  # noqa: BLE001
-        first_error = exc
-        _browser_trace(
-            f'screenshot: compositor path failed ({type(exc).__name__}); retrying with fromSurface=False'
-        )
 
-    try:
-        retry_cdp = await _prepare_target_for_screenshot(browser, target_id) or cdp
-        raw = await _capture_via_cdp(
-            retry_cdp,
-            full_page=full_page,
-            jpeg_quality=jpeg_quality,
-            from_surface=False,
-            timeout_sec=retry_budget,
-        )
-        _browser_trace(
-            f'screenshot done via fromSurface=False in {(time.monotonic() - started_at) * 1000:.0f}ms'
-        )
-        return raw, None
-    except (TimeoutError, Exception) as exc:  # noqa: BLE001
-        return None, self._screenshot_failure_error(
-            cmd,
-            started_at=started_at,
-            first_error=first_error,
-            retry_error=exc,
-        )
+    return None, self._screenshot_failure_error(
+        cmd,
+        started_at=started_at,
+        first_error=first_error,
+        retry_error=RuntimeError('browser.take_screenshot fallback returned no data'),
+    )
 
 
-async def execute_screenshot_impl(
+async def _execute_screenshot_body(
     self, cmd: str, params: dict[str, Any]
 ) -> Observation:
     browser = await self._ensure_session()
     full_page = bool(params.get('full_page', False))
     inject_image = bool(params.get('inject_image', True))
     jpeg_quality = 80
-    primary_budget = max(8.0, BROWSER_SCREENSHOT_TIMEOUT_SEC * 0.55)
-    retry_budget = max(8.0, BROWSER_SCREENSHOT_TIMEOUT_SEC * 0.45)
+    total_budget = BROWSER_SCREENSHOT_TIMEOUT_SEC
+    primary_budget = max(8.0, total_budget * 0.4)
+    retry_budget = max(8.0, total_budget * 0.35)
+    fallback_budget = max(6.0, total_budget * 0.25)
 
     started_at = time.monotonic()
     target_id = _resolve_page_target_id(browser)
     _browser_trace(
-        f'screenshot begin target={str(target_id)[:8]} full_page={full_page} budget={primary_budget:.0f}+{retry_budget:.0f}s'
+        f'screenshot begin target={str(target_id)[:8]} full_page={full_page} '
+        f'budget={primary_budget:.0f}+{retry_budget:.0f}+{fallback_budget:.0f}s'
     )
+    await _focus_page_target(browser, target_id)
     cdp = await _prepare_target_for_screenshot(browser, target_id)
     if cdp is None:
         return self._screenshot_attach_error(cmd)
@@ -273,6 +292,7 @@ async def execute_screenshot_impl(
         jpeg_quality=jpeg_quality,
         primary_budget=primary_budget,
         retry_budget=retry_budget,
+        fallback_budget=fallback_budget,
         started_at=started_at,
     )
     if error_observation is not None:
@@ -304,3 +324,24 @@ async def execute_screenshot_impl(
             inject_skipped_reason=inject_skip,
         ),
     )
+
+
+async def execute_screenshot_impl(
+    self, cmd: str, params: dict[str, Any]
+) -> Observation:
+    try:
+        return await asyncio.wait_for(
+            _execute_screenshot_body(self, cmd, params),
+            timeout=BROWSER_SCREENSHOT_TIMEOUT_SEC + 3.0,
+        )
+    except TimeoutError:
+        return _finalize_observation(
+            cmd,
+            ErrorObservation(
+                content=(
+                    f'ERROR: Browser screenshot timed out after {BROWSER_SCREENSHOT_TIMEOUT_SEC:.0f}s '
+                    '(with compositor/window/fallback retries). '
+                    'Try ``browser snapshot`` for DOM state, or ``browser navigate`` to reset the tab.'
+                )
+            ),
+        )

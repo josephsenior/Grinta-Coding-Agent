@@ -17,8 +17,10 @@ re-exported from this module for convenience.
 
 Detection follows a cheap-to-expensive ladder:
 
-1. ``shutil.which`` for an executable on PATH (fast, no subprocess).
-2. ``python -m <module> --version`` for Python-hosted tools.
+1. For Python-hosted tools (``python -m <module>``): import the module and
+   run the configured probe command — ``sys.executable`` alone is never
+   treated as proof the module exists.
+2. ``shutil.which`` for a standalone executable on PATH.
 3. Fallback ``--version`` / ``--help`` probe with a tight timeout.
 
 Results are cached in module globals; tests can call
@@ -71,26 +73,36 @@ class DetectedTool:
 
 
 # First matching available server wins for a file extension (tuple order matters).
+# Per-file routing in :mod:`lsp_project_routing` may override try-order using
+# workspace markers; Python always prefers pyright-langserver over pylsp.
 LSP_SERVERS: tuple[ToolSpec, ...] = (
+    ToolSpec(
+        name='pyright-langserver',
+        language='python',
+        extensions=('.py', '.pyw', '.pyi'),
+        command=('pyright-langserver', '--stdio'),
+        probe=('pyright-langserver', '--version'),
+    ),
     ToolSpec(
         name='pylsp',
         language='python',
-        extensions=('.py', '.pyw'),
+        extensions=('.py', '.pyw', '.pyi'),
         command=(sys.executable, '-m', 'pylsp'),
         probe=(sys.executable, '-m', 'pylsp', '--version'),
         python_module='pylsp',
     ),
     ToolSpec(
-        name='pyright-langserver',
-        language='python',
-        extensions=('.py', '.pyw'),
-        command=('pyright-langserver', '--stdio'),
-    ),
-    ToolSpec(
         name='typescript-language-server',
         language='typescript',
-        extensions=('.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'),
+        extensions=('.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts'),
         command=('typescript-language-server', '--stdio'),
+    ),
+    ToolSpec(
+        name='deno',
+        language='typescript',
+        extensions=('.ts', '.tsx', '.js', '.jsx', '.mjs', '.mts', '.cts'),
+        command=('deno', 'lsp'),
+        probe=('deno', '--version'),
     ),
     ToolSpec(
         name='vscode-json-languageserver',
@@ -125,14 +137,14 @@ LSP_SERVERS: tuple[ToolSpec, ...] = (
     ToolSpec(
         name='ruby-lsp',
         language='ruby',
-        extensions=('.rb',),
+        extensions=('.rb', '.rake', '.gemspec', '.ru'),
         command=('ruby-lsp',),
         probe=('ruby-lsp', '--version'),
     ),
     ToolSpec(
         name='solargraph',
         language='ruby',
-        extensions=('.rb',),
+        extensions=('.rb', '.rake', '.gemspec', '.ru'),
         command=('solargraph', 'stdio'),
         probe=('solargraph', '--version'),
     ),
@@ -159,7 +171,7 @@ LSP_SERVERS: tuple[ToolSpec, ...] = (
     ToolSpec(
         name='csharp-ls',
         language='csharp',
-        extensions=('.cs',),
+        extensions=('.cs', '.csx'),
         command=('csharp-ls',),
         probe=('csharp-ls', '--version'),
     ),
@@ -173,14 +185,14 @@ LSP_SERVERS: tuple[ToolSpec, ...] = (
     ToolSpec(
         name='fsautocomplete',
         language='fsharp',
-        extensions=('.fs', '.fsx'),
+        extensions=('.fs', '.fsi', '.fsx', '.fsscript'),
         command=('fsautocomplete',),
         probe=('fsautocomplete', '--version'),
     ),
     ToolSpec(
         name='bash-language-server',
         language='bash',
-        extensions=('.sh', '.bash'),
+        extensions=('.sh', '.bash', '.zsh', '.ksh'),
         command=('bash-language-server', 'start'),
         probe=('bash-language-server', '--version'),
     ),
@@ -232,7 +244,7 @@ LSP_SERVERS: tuple[ToolSpec, ...] = (
     ToolSpec(
         name='zls',
         language='zig',
-        extensions=('.zig',),
+        extensions=('.zig', '.zon'),
         command=('zls',),
         probe=('zls', 'version'),
     ),
@@ -259,7 +271,7 @@ LSP_SERVERS: tuple[ToolSpec, ...] = (
     ToolSpec(
         name='clojure-lsp',
         language='clojure',
-        extensions=('.clj', '.cljs', '.cljc'),
+        extensions=('.clj', '.cljs', '.cljc', '.edn'),
         command=('clojure-lsp',),
         probe=('clojure-lsp', 'version'),
     ),
@@ -343,6 +355,385 @@ LSP_SERVERS: tuple[ToolSpec, ...] = (
         command=('buf', 'lsp', 'serve', '--timeout', '0'),
         probe=('buf', '--version'),
     ),
+    # ── Extended registry (probe-only; install tools on the host) ───────────
+    ToolSpec(
+        name='ruff',
+        language='python',
+        extensions=('.py', '.pyw', '.pyi'),
+        command=('ruff', 'server'),
+        probe=('ruff', '--version'),
+    ),
+    ToolSpec(
+        name='basedpyright-langserver',
+        language='python',
+        extensions=('.py', '.pyw', '.pyi'),
+        command=('basedpyright-langserver', '--stdio'),
+        probe=('basedpyright-langserver', '--version'),
+    ),
+    ToolSpec(
+        name='jedi-language-server',
+        language='python',
+        extensions=('.py', '.pyw', '.pyi'),
+        command=('jedi-language-server',),
+        probe=('jedi-language-server', '--version'),
+    ),
+    ToolSpec(
+        name='eslint-language-server',
+        language='javascript',
+        extensions=(
+            '.ts',
+            '.tsx',
+            '.js',
+            '.jsx',
+            '.mjs',
+            '.cjs',
+            '.mts',
+            '.cts',
+            '.vue',
+            '.svelte',
+            '.astro',
+        ),
+        command=('eslint-language-server', '--stdio'),
+        probe=('eslint-language-server', '--version'),
+    ),
+    ToolSpec(
+        name='oxlint',
+        language='javascript',
+        extensions=(
+            '.ts',
+            '.tsx',
+            '.js',
+            '.jsx',
+            '.mjs',
+            '.cjs',
+            '.mts',
+            '.cts',
+            '.vue',
+            '.svelte',
+            '.astro',
+        ),
+        command=('oxlint', '--lsp'),
+        probe=('oxlint', '--version'),
+    ),
+    ToolSpec(
+        name='biome',
+        language='javascript',
+        extensions=(
+            '.ts',
+            '.tsx',
+            '.js',
+            '.jsx',
+            '.mjs',
+            '.cjs',
+            '.mts',
+            '.cts',
+            '.vue',
+            '.svelte',
+            '.astro',
+            '.json',
+        ),
+        command=('biome', 'lsp-proxy', '--stdio'),
+        probe=('biome', '--version'),
+    ),
+    ToolSpec(
+        name='flow',
+        language='javascript',
+        extensions=('.js', '.jsx', '.mjs', '.cjs'),
+        command=('flow', 'lsp'),
+        probe=('flow', 'version'),
+    ),
+    ToolSpec(
+        name='prisma-language-server',
+        language='prisma',
+        extensions=('.prisma',),
+        command=('prisma-language-server', '--stdio'),
+        probe=('prisma-language-server', '--version'),
+    ),
+    ToolSpec(
+        name='nixd',
+        language='nix',
+        extensions=('.nix',),
+        command=('nixd',),
+        probe=('nixd', '--version'),
+    ),
+    ToolSpec(
+        name='nil',
+        language='nix',
+        extensions=('.nix',),
+        command=('nil',),
+        probe=('nil', '--version'),
+    ),
+    ToolSpec(
+        name='ocamllsp',
+        language='ocaml',
+        extensions=('.ml', '.mli'),
+        command=('ocamllsp',),
+        probe=('ocamllsp', '--version'),
+    ),
+    ToolSpec(
+        name='tinymist',
+        language='typst',
+        extensions=('.typ', '.typc'),
+        command=('tinymist',),
+        probe=('tinymist', '--version'),
+    ),
+    ToolSpec(
+        name='rzls',
+        language='razor',
+        extensions=('.razor', '.cshtml'),
+        command=('rzls',),
+        probe=('rzls', '--version'),
+    ),
+    ToolSpec(
+        name='metals',
+        language='scala',
+        extensions=('.scala', '.sc'),
+        command=('metals',),
+        probe=('metals', '--version'),
+    ),
+    ToolSpec(
+        name='tailwindcss-language-server',
+        language='tailwind',
+        extensions=('.css', '.scss', '.less', '.html', '.htm', '.js', '.jsx', '.ts', '.tsx'),
+        command=('tailwindcss-language-server', '--stdio'),
+        probe=('tailwindcss-language-server', '--version'),
+    ),
+    ToolSpec(
+        name='ansible-language-server',
+        language='ansible',
+        extensions=('.yml', '.yaml'),
+        command=('ansible-language-server', '--stdio'),
+        probe=('ansible-language-server', '--version'),
+    ),
+    ToolSpec(
+        name='helm-ls',
+        language='helm',
+        extensions=('.yaml', '.yml', '.tpl'),
+        command=('helm-ls', 'serve'),
+        probe=('helm-ls', 'version'),
+    ),
+    ToolSpec(
+        name='solidity-ls',
+        language='solidity',
+        extensions=('.sol',),
+        command=('solidity-ls', '--stdio'),
+        probe=('solidity-ls', '--version'),
+    ),
+    ToolSpec(
+        name='purescript-language-server',
+        language='purescript',
+        extensions=('.purs',),
+        command=('purescript-language-server', '--stdio'),
+        probe=('purescript-language-server', '--version'),
+    ),
+    ToolSpec(
+        name='reason-language-server',
+        language='reason',
+        extensions=('.re', '.rei'),
+        command=('reason-language-server',),
+        probe=('reason-language-server', '--version'),
+    ),
+    ToolSpec(
+        name='rescript-language-server',
+        language='rescript',
+        extensions=('.res', '.resi'),
+        command=('rescript-language-server',),
+        probe=('rescript-language-server', '--version'),
+    ),
+    ToolSpec(
+        name='pls',
+        language='perl',
+        extensions=('.pl', '.pm', '.t'),
+        command=('pls',),
+        probe=('pls', '--version'),
+    ),
+    ToolSpec(
+        name='ltex-ls',
+        language='latex',
+        extensions=('.tex', '.md', '.markdown'),
+        command=('ltex-ls',),
+        probe=('ltex-ls', '--version'),
+    ),
+    ToolSpec(
+        name='smithy-language-server',
+        language='smithy',
+        extensions=('.smithy',),
+        command=('smithy-language-server',),
+        probe=('smithy-language-server', '--version'),
+    ),
+    ToolSpec(
+        name='fortls',
+        language='fortran',
+        extensions=('.f', '.for', '.f90', '.f95', '.f03'),
+        command=('fortls',),
+        probe=('fortls', '--version'),
+    ),
+    ToolSpec(
+        name='nimlangserver',
+        language='nim',
+        extensions=('.nim', '.nims'),
+        command=('nimlangserver',),
+        probe=('nimlangserver', '--version'),
+    ),
+    ToolSpec(
+        name='crystalline',
+        language='crystal',
+        extensions=('.cr',),
+        command=('crystalline',),
+        probe=('crystalline', '--version'),
+    ),
+    ToolSpec(
+        name='serve-d',
+        language='d',
+        extensions=('.d',),
+        command=('serve-d',),
+        probe=('serve-d', '--version'),
+    ),
+    ToolSpec(
+        name='lean',
+        language='lean',
+        extensions=('.lean',),
+        command=('lean', '--server'),
+        probe=('lean', '--version'),
+    ),
+    ToolSpec(
+        name='idris2-lsp',
+        language='idris',
+        extensions=('.idr',),
+        command=('idris2', 'lsp'),
+        probe=('idris2', '--version'),
+    ),
+    ToolSpec(
+        name='roc-lsp',
+        language='roc',
+        extensions=('.roc',),
+        command=('roc', 'lsp'),
+        probe=('roc', '--version'),
+    ),
+    ToolSpec(
+        name='slint-lsp',
+        language='slint',
+        extensions=('.slint',),
+        command=('slint-lsp',),
+        probe=('slint-lsp', '--version'),
+    ),
+    ToolSpec(
+        name='wgsl-analyzer',
+        language='wgsl',
+        extensions=('.wgsl',),
+        command=('wgsl-analyzer',),
+        probe=('wgsl-analyzer', '--version'),
+    ),
+    ToolSpec(
+        name='vhdl-ls',
+        language='vhdl',
+        extensions=('.vhd', '.vhdl'),
+        command=('vhdl_ls',),
+        probe=('vhdl_ls', '--version'),
+    ),
+    ToolSpec(
+        name='svls',
+        language='systemverilog',
+        extensions=('.sv', '.svh'),
+        command=('svls',),
+        probe=('svls', '--version'),
+    ),
+    ToolSpec(
+        name='regal',
+        language='rego',
+        extensions=('.rego',),
+        command=('regal', 'language-server'),
+        probe=('regal', 'version'),
+    ),
+    ToolSpec(
+        name='openscad-lsp',
+        language='openscad',
+        extensions=('.scad',),
+        command=('openscad-lsp',),
+        probe=('openscad-lsp', '--version'),
+    ),
+    ToolSpec(
+        name='nickel',
+        language='nickel',
+        extensions=('.ncl',),
+        command=('nickel', 'lsp'),
+        probe=('nickel', '--version'),
+    ),
+    ToolSpec(
+        name='cairo-language-server',
+        language='cairo',
+        extensions=('.cairo',),
+        command=('cairo-language-server',),
+        probe=('cairo-language-server', '--version'),
+    ),
+    ToolSpec(
+        name='move-analyzer',
+        language='move',
+        extensions=('.move',),
+        command=('move-analyzer',),
+        probe=('move-analyzer', '--version'),
+    ),
+    ToolSpec(
+        name='pasls',
+        language='pascal',
+        extensions=('.pas', '.pp'),
+        command=('pasls',),
+        probe=('pasls', '--version'),
+    ),
+    ToolSpec(
+        name='futhark-lsp',
+        language='futhark',
+        extensions=('.fut',),
+        command=('futhark-lsp',),
+        probe=('futhark-lsp', '--version'),
+    ),
+    ToolSpec(
+        name='wasm-language-tools',
+        language='wat',
+        extensions=('.wat', '.wast'),
+        command=('wasm-language-tools', 'server'),
+        probe=('wasm-language-tools', '--version'),
+    ),
+    ToolSpec(
+        name='v-analyzer',
+        language='v',
+        extensions=('.v',),
+        command=('v-analyzer',),
+        probe=('v-analyzer', '--version'),
+    ),
+    ToolSpec(
+        name='erg-language-server',
+        language='erg',
+        extensions=('.e', '.ej'),
+        command=('erg-language-server',),
+        probe=('erg-language-server', '--version'),
+    ),
+    ToolSpec(
+        name='starlark',
+        language='starlark',
+        extensions=('.bzl', '.star'),
+        command=('starlark',),
+        probe=('starlark', '--version'),
+    ),
+    ToolSpec(
+        name='glsl_analyzer',
+        language='glsl',
+        extensions=('.glsl', '.vert', '.frag', '.comp'),
+        command=('glsl_analyzer',),
+        probe=('glsl_analyzer', '--version'),
+    ),
+    ToolSpec(
+        name='julials',
+        language='julia',
+        extensions=('.jl',),
+        command=(
+            'julia',
+            '--startup-file=no',
+            '--eval',
+            'using LanguageServer; LanguageServer.runserver()',
+        ),
+        probe=('julia', '--version'),
+    ),
 )
 
 
@@ -365,9 +756,70 @@ def reset_detection_cache() -> None:
         _lsp_cache = None
 
 
+def _python_hosted_module(spec: ToolSpec) -> str | None:
+    """Return the importable module name for ``python -m`` LSP tools."""
+    if spec.python_module is not None:
+        return spec.python_module
+    if (
+        len(spec.command) >= 3
+        and os.path.normcase(spec.command[0]) == os.path.normcase(sys.executable)
+        and spec.command[1] == '-m'
+    ):
+        return spec.command[2]
+    return None
+
+
+def _run_probe_command(probe: tuple[str, ...]) -> bool:
+    try:
+        res = subprocess.run(
+            list(probe),
+            capture_output=True,
+            timeout=_PROBE_TIMEOUT_SEC,
+        )
+        return res.returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def _probe_python_hosted(spec: ToolSpec, module: str) -> DetectedTool:
+    try:
+        res = subprocess.run(
+            [sys.executable, '-c', f'import {module}'],
+            capture_output=True,
+            timeout=_PROBE_TIMEOUT_SEC,
+        )
+        if res.returncode != 0:
+            return DetectedTool(
+                spec=spec,
+                available=False,
+                detail=f'python module {module} not importable',
+            )
+    except (OSError, subprocess.TimeoutExpired):
+        return DetectedTool(
+            spec=spec, available=False, detail='python module probe failed'
+        )
+
+    if spec.probe is not None and not _run_probe_command(spec.probe):
+        return DetectedTool(
+            spec=spec,
+            available=False,
+            detail=f'probe command failed for {spec.name}',
+        )
+
+    return DetectedTool(
+        spec=spec,
+        available=True,
+        resolved_command=tuple(spec.command),
+        detail=f'python module {module} ready',
+    )
+
+
 def _probe(spec: ToolSpec) -> DetectedTool:
     """Best-effort presence check for a single tool."""
-    # Step 1: shutil.which on the head of the command.
+    module = _python_hosted_module(spec)
+    if module is not None:
+        return _probe_python_hosted(spec, module)
+
     head = spec.command[0]
     resolved = shutil.which(head)
     if resolved is not None:
@@ -378,41 +830,19 @@ def _probe(spec: ToolSpec) -> DetectedTool:
             detail=f'found on PATH at {resolved}',
         )
 
-    # Step 2: python -m <module> probe for Python-hosted tools.
-    if spec.python_module is not None:
-        try:
-            res = subprocess.run(
-                [sys.executable, '-c', f'import {spec.python_module}'],
-                capture_output=True,
-                timeout=_PROBE_TIMEOUT_SEC,
+    if spec.probe is not None:
+        probe_head = spec.probe[0]
+        probe_runnable = (
+            os.path.normcase(probe_head) == os.path.normcase(sys.executable)
+            or shutil.which(probe_head) is not None
+        )
+        if probe_runnable and _run_probe_command(spec.probe):
+            return DetectedTool(
+                spec=spec,
+                available=True,
+                resolved_command=tuple(spec.command),
+                detail='probe command succeeded',
             )
-            if res.returncode == 0:
-                return DetectedTool(
-                    spec=spec,
-                    available=True,
-                    resolved_command=tuple(spec.command),
-                    detail=f'python module {spec.python_module} importable',
-                )
-        except (OSError, subprocess.TimeoutExpired):
-            pass
-
-    # Step 3: explicit probe command (last resort).
-    if spec.probe is not None and shutil.which(spec.probe[0]) is not None:
-        try:
-            res = subprocess.run(
-                list(spec.probe),
-                capture_output=True,
-                timeout=_PROBE_TIMEOUT_SEC,
-            )
-            if res.returncode == 0:
-                return DetectedTool(
-                    spec=spec,
-                    available=True,
-                    resolved_command=tuple(spec.command),
-                    detail='probe command succeeded',
-                )
-        except (OSError, subprocess.TimeoutExpired):
-            pass
 
     return DetectedTool(spec=spec, available=False, detail='not found')
 
@@ -455,13 +885,54 @@ def detect_debug_adapters_summary() -> list[dict]:
 # ── Convenience helpers ───────────────────────────────────────────────────
 
 
-def lsp_command_for_extension(ext: str) -> tuple[str, ...] | None:
+def lsp_command_for_file(
+    file_path: str | Path,
+    *,
+    workspace_root: Path | None = None,
+) -> tuple[str, ...] | None:
+    """Return the resolved LSP command for a file path, or None."""
+    from backend.utils.lsp.lsp_project_routing import lsp_context_for_file
+
+    if workspace_root is not None:
+        from pathlib import Path as _Path
+
+        from backend.utils.lsp.lsp_project_routing import (
+            find_project_root,
+            resolve_lsp_command,
+        )
+
+        path = _Path(file_path)
+        ext = path.suffix.lower()
+        if not ext:
+            return None
+        root = workspace_root
+        return resolve_lsp_command(
+            ext,
+            detect_lsp_servers(),
+            LSP_SERVERS,
+            workspace_root=root,
+        )
+
+    ctx = lsp_context_for_file(file_path)
+    return ctx.command if ctx is not None else None
+
+
+def lsp_command_for_extension(
+    ext: str,
+    *,
+    workspace_root: Path | None = None,
+) -> tuple[str, ...] | None:
     """Return the resolved LSP command for a file extension, or None."""
-    ext = ext.lower()
-    for tool in detect_lsp_servers().values():
-        if tool.available and ext in tool.spec.extensions:
-            return tool.resolved_command
-    return None
+    from pathlib import Path as _Path
+
+    normalized = ext.lower()
+    if not normalized.startswith('.'):
+        normalized = f'.{normalized}'
+    root = workspace_root if workspace_root is not None else _Path.cwd()
+    return lsp_command_for_file(
+        _Path(f'_lsp_routing_placeholder{normalized}'),
+        workspace_root=root,
+    )
 
 
 def has_any_lsp_server() -> bool:
@@ -523,6 +994,7 @@ __all__ = [
     'has_any_debug_adapter',
     'has_any_lsp_server',
     'lsp_command_for_extension',
+    'lsp_command_for_file',
     'normalize_debug_adapter_name',
     'reset_detection_cache',
 ]

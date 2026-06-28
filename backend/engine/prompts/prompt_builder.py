@@ -144,6 +144,7 @@ def _render_routing(
     *,
     windows_with_bash: bool = False,
     shell_is_powershell: bool = False,
+    semantic_recall_active: bool | None = None,
 ) -> str:
     return _render_routing_impl(
         _render_partial,
@@ -152,6 +153,7 @@ def _render_routing(
         function_calling_mode,
         windows_with_bash=windows_with_bash,
         shell_is_powershell=shell_is_powershell,
+        semantic_recall_active=semantic_recall_active,
     )
 
 
@@ -161,6 +163,7 @@ def _render_autonomy(
     is_windows: bool,
     windows_with_bash: bool,
     shell_is_powershell: bool,
+    semantic_recall_active: bool | None = None,
 ) -> str:
     return _render_autonomy_impl(
         _render_partial,
@@ -168,6 +171,7 @@ def _render_autonomy(
         is_windows=is_windows,
         windows_with_bash=windows_with_bash,
         shell_is_powershell=shell_is_powershell,
+        semantic_recall_active=semantic_recall_active,
     )
 
 
@@ -352,6 +356,7 @@ def _collect_system_prompt_sections(
     function_calling_mode: str | None = None,
     agent_identity: str = '',
     render_mcp_inline: bool = True,
+    semantic_recall_active: bool | None = None,
 ) -> list[tuple[str, str]]:
     """Ordered (name, body) sections before joining with blank lines.
 
@@ -467,6 +472,7 @@ def _collect_system_prompt_sections(
                 function_calling_mode,
                 windows_with_bash=windows_with_bash,
                 shell_is_powershell=shell_is_powershell,
+                semantic_recall_active=semantic_recall_active,
             ),
         ),
         (
@@ -485,6 +491,7 @@ def _collect_system_prompt_sections(
                 is_windows=is_windows,
                 windows_with_bash=windows_with_bash,
                 shell_is_powershell=shell_is_powershell,
+                semantic_recall_active=semantic_recall_active,
             ),
         ),
         (
@@ -505,6 +512,7 @@ def _collect_system_prompt_sections(
                     model_id
                 ),
                 mode=mode,
+                semantic_recall_active=semantic_recall_active,
             ),
         ),
     ]
@@ -638,6 +646,7 @@ def build_system_prompt(
     function_calling_mode: str | None = None,
     agent_identity: str = '',
     render_mcp_inline: bool = True,
+    semantic_recall_active: bool | None = None,
     **_extra: object,
 ) -> str:
     """Assemble the full system prompt from partials.
@@ -660,6 +669,7 @@ def build_system_prompt(
         function_calling_mode=function_calling_mode,
         agent_identity=agent_identity,
         render_mcp_inline=render_mcp_inline,
+        semantic_recall_active=semantic_recall_active,
     )
     return '\n\n'.join(body for _, body in sections)
 

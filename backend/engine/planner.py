@@ -379,11 +379,21 @@ class OrchestratorPlanner:
             tools.append(create_checkpoint_tool())
         if getattr(self._config, 'enable_working_memory', True):
             from backend.engine.tools.memory import create_memory_tool
-            from backend.utils.optional_extras import vector_memory_enabled
+            from backend.utils.optional_extras import semantic_recall_active
 
+            store = None
+            agent = self._agent
+            if agent is not None:
+                cm = getattr(agent, 'conversation_memory', None)
+                if cm is not None:
+                    store = cm.vector_store
             tools.append(
                 create_memory_tool(
-                    include_semantic_recall=vector_memory_enabled(self._config)
+                    include_semantic_recall=semantic_recall_active(
+                        self._config,
+                        vector_store=store,
+                        require_live_store=True,
+                    )
                 )
             )
 

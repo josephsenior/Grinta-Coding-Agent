@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from backend.utils.lsp import lsp_client as lc
+from backend.utils.lsp.lsp_project_routing import LspFileContext
 
 
 def test_detect_any_lsp_server_true() -> None:
@@ -73,7 +74,14 @@ def test_lsp_query_diagnostics_accepts_process_timeout(tmp_path: Path) -> None:
     py_file = tmp_path / 'x.py'
     py_file.write_text('x = 1\n', encoding='utf-8')
     client = lc.LspClient()
-    with patch.object(client, '_run_query', return_value=lc.LspResult()) as run_query:
+    with (
+        patch.object(client, '_run_query', return_value=lc.LspResult()) as run_query,
+        patch.object(
+            client,
+            '_get_server_command',
+            return_value=['python', '-m', 'pylsp'],
+        ),
+    ):
         client.query('diagnostics', str(py_file), process_timeout=0.25)
     run_query.assert_called_once_with(
         'diagnostics',
@@ -82,20 +90,20 @@ def test_lsp_query_diagnostics_accepts_process_timeout(tmp_path: Path) -> None:
         1,
         '',
         process_timeout=0.25,
+        post_edit=False,
     )
 
 
-def test_get_server_command_runtime_then_fallback(tmp_path: Path) -> None:
+def test_get_server_command_returns_none_when_not_detected(tmp_path: Path) -> None:
     py_file = tmp_path / 'x.py'
     py_file.write_text('x', encoding='utf-8')
     client = lc.LspClient()
     with patch(
-        'backend.utils.runtime_detect.lsp_command_for_extension',
+        'backend.utils.lsp.lsp_client.lsp_context_for_file',
         return_value=None,
     ):
         cmd = client._get_server_command(str(py_file))  # noqa: SLF001
-    assert cmd is not None
-    assert 'pylsp' in cmd[-1] or cmd[0].endswith('python')
+    assert cmd is None
 
 
 def test_detect_pylsp_cached_skips_detect() -> None:
@@ -114,9 +122,52 @@ def test_detect_pylsp_uncached_empty_servers() -> None:
     lc._PYLSP_AVAILABLE = None  # noqa: SLF001
     try:
         with patch(
-            'backend.utils.runtime_detect.detect_lsp_servers',
-            return_value={},
+            'backend.utils.runtime_detect.lsp_command_for_file',
+            return_value=None,
         ):
             assert lc._detect_pylsp() is False
     finally:
         lc._PYLSP_AVAILABLE = None  # noqa: SLF001
+
+
+def test_parse_document_symbols_hierarchical() -> None:
+    client = lc.LspClient()
+    payload = [
+        {
+            'name': 'Outer',
+            'kind': 5,
+            'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 2, 'character': 0}},
+            'children': [
+                {
+                    'name': 'inner',
+                    'kind': 12,
+                    'range': {
+                        'start': {'line': 1, 'character': 4},
+                        'end': {'line': 1, 'character': 10},
+                    },
+                }
+            ],
+        }
+    ]
+    symbols = client._parse_document_symbols(payload, '')  # noqa: SLF001
+    assert [s.name for s in symbols] == ['Outer', 'inner']
+
+
+def test_build_init_msgs_uses_workspace_and_language_id(tmp_path: Path) -> None:
+    (tmp_path / 'pyproject.toml').write_text('[project]\nname="x"\n', encoding='utf-8')
+    src = tmp_path / 'pkg' / 'mod.py'
+    src.parent.mkdir()
+    src.write_text('def ok():\n    pass\n', encoding='utf-8')
+    ctx = lc.LspFileContext(
+        server_name='pyright-langserver',
+        command=('pyright-langserver', '--stdio'),
+        language_id='python',
+        workspace_root=tmp_path,
+    )
+    client = lc.LspClient()
+    with patch.object(client, '_get_context', return_value=ctx):
+        msgs = client._build_init_msgs(src.as_uri(), str(src), 'def ok():\n    pass\n')
+    init = msgs[0]['params']
+    assert init['rootUri'] == tmp_path.as_uri()
+    assert init['workspaceFolders'][0]['uri'] == tmp_path.as_uri()
+    assert msgs[2]['params']['textDocument']['languageId'] == 'python'

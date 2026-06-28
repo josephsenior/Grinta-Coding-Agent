@@ -20,8 +20,8 @@ class LspQueryObservation(Observation):
         symbol names, hover text, etc.).  The LLM should parse this text to
         extract the information it needs.
     available:
-        ``False`` when ``pylsp`` is not installed or could not start, so the
-        LLM knows the graceful-degrade path was taken.
+        ``False`` when no language server is installed for the file type or the
+        server could not start.
     """
 
     content: str = ''

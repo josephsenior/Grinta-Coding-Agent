@@ -207,6 +207,8 @@ class OrchestratorPromptManager(PromptManager):
         # tool whose server is internal / native (e.g. context7, exa,
         # fetch) regardless of how the alias preparer renamed the tool.
         self.mcp_tool_server_map: dict[str, str] = {}
+        # Set by Orchestrator after vector-memory init (live store probe).
+        self.semantic_recall_active: bool = False
 
     def _active_llm_model_id(self) -> str:
         """Model id for self-identification in the system prompt."""
@@ -300,6 +302,7 @@ class OrchestratorPromptManager(PromptManager):
             'function_calling_mode', self._resolve_function_calling_mode()
         )
         context.setdefault('render_mcp_inline', False)
+        context.setdefault('semantic_recall_active', self.semantic_recall_active)
         content = super().get_system_message(**context)
         memory_query = cast(str | None, context.get('memory_query'))
         content = self._inject_workspace_memory(content, query=memory_query)

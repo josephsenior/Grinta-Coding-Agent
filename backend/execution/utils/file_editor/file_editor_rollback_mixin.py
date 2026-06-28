@@ -37,33 +37,36 @@ class FileEditorRollbackMixin:
                 error=f'No undo history for {display_path}',
             )
         snapshot = hist.pop()
-        if not hist:
-            del self._undo_history[key]
         if snapshot is None:
-            self._undo_history[key].append(None)
+            hist.append(None)
             return ToolResult(
                 output='',
                 error=(
-                    'Cannot undo: the only recorded change for this file was creating it. '
-                    'There is no prior version to restore. Delete the file explicitly if '
-                    'you want it removed.'
+                    'Undo is not available: the only recorded change for this file was '
+                    'creating it, so there is no earlier version to restore. '
+                    'The file was not modified. To remove it, delete the file explicitly.'
                 ),
                 error_code='UNDO_NO_PRIOR_VERSION',
                 retryable=False,
                 operation='undo_last_edit',
             )
+        if not hist:
+            del self._undo_history[key]
         try:
             current_content = self._read_current_content_for_rollback(file_path)
             warning = self._validate_rollback_restore_content(file_path, snapshot)
             self._guard_rollback_disk_unchanged(file_path, current_content)
             self._write_file(file_path, snapshot)
-            output = 'Undid last edit; restored previous file contents.'
+            output = (
+                f'Undid last edit on {display_path}; restored previous file contents.'
+            )
             if warning:
                 output = f'{output}\n{warning}'
             return ToolResult(
                 output=output,
                 old_content=current_content,
                 new_content=snapshot,
+                operation='undo_last_edit',
             )
         except Exception as e:
             hist.append(snapshot)

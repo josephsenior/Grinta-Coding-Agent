@@ -1,5 +1,7 @@
 import json
 
+from unittest.mock import patch
+
 from backend.engine.tools.lsp_query import create_lsp_query_tool
 from backend.ledger.action.code_nav import LspQueryAction
 from backend.utils.lsp.lsp_client import (
@@ -53,26 +55,21 @@ def test_lsp_query_action_list_symbols():
     assert action.line == 1
 
 
-def test_lsp_client_graceful_degradation(monkeypatch):
-    """Verify the LSP client gracefully fails when pylsp is not available."""
-
-    # Mock subprocess.run to raise FileNotFoundError (command not found)
-    def mock_run(*args, **kwargs):
-        raise FileNotFoundError('pylsp not found')
-
-    monkeypatch.setattr('subprocess.run', mock_run)
-    monkeypatch.setattr('backend.utils.lsp.lsp_client._PYLSP_AVAILABLE', None)
+def test_lsp_client_graceful_degradation(monkeypatch, tmp_path):
+    """Verify the LSP client reports unavailable when no server is configured."""
+    py_file = tmp_path / 'file.py'
+    py_file.write_text('x = 1\n', encoding='utf-8')
 
     client = LspClient()
-
-    # All commands should return empty/degraded results safely
-    assert client.query('find_definition', 'file.py', 1, 1).locations == []
-    assert client.query('find_references', 'file.py', 1, 1).locations == []
-    # hover returns LspResult with available=False when pylsp is not installed
-    res = client.query('hover', 'file.py', 1, 1)
-    assert not res.available
-    assert 'LSP is not available' in res.format_text('hover')
-    assert client.query('list_symbols', 'file.py').symbols == []
+    with patch('backend.utils.lsp.lsp_client.lsp_context_for_file', return_value=None):
+        res = client.query('find_definition', str(py_file), 1, 1)
+        assert not res.available
+        assert 'find_symbols' in res.error
+        hover = client.query('hover', str(py_file), 1, 1)
+        assert not hover.available
+        symbols = client.query('list_symbols', str(py_file))
+        assert not symbols.available
+        assert symbols.symbols == []
 
 
 def test_lsp_client_parse_content_length_framing() -> None:

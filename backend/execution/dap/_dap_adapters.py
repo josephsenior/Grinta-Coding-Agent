@@ -12,10 +12,16 @@ import importlib.util
 import inspect
 import shutil
 import socket
+import subprocess
 import sys
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any
+
+from backend.execution.dap._dap_spawn_utils import (
+    resolve_adapter_cwd,
+    resolve_python_executable,
+)
 
 _LOGRECORD_EXTRA_FORBIDDEN: frozenset[str] | None = None
 
@@ -267,6 +273,26 @@ def _debugpy_available() -> bool:
         return False
 
 
+def _debugpy_spawn_probe(command: list[str]) -> bool:
+    """Verify ``debugpy.adapter`` can be spawned with a valid cwd."""
+    try:
+        proc = subprocess.Popen(
+            command,
+            cwd=resolve_adapter_cwd(None),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        proc.kill()
+        try:
+            proc.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        return True
+    except OSError:
+        return False
+
+
 def detect_debug_adapters() -> list[dict[str, Any]]:
     """Probe PATH for known DAP adapters; useful for diagnostics / UI.
 
@@ -275,7 +301,9 @@ def detect_debug_adapters() -> list[dict[str, Any]]:
     servers are detected for diagnostics without being advertised as directly
     usable by the ``debugger`` tool.
     """
-    debugpy_ok = _debugpy_available()
+    python = resolve_python_executable(None)
+    command = [python, '-m', 'debugpy.adapter']
+    debugpy_ok = _debugpy_available() and _debugpy_spawn_probe(command)
     results: list[dict[str, Any]] = [
         {
             'language': 'python',
@@ -285,9 +313,7 @@ def detect_debug_adapters() -> list[dict[str, Any]]:
             'transport': 'stdio',
             'host': None,
             'port': None,
-            'command': [sys.executable, '-m', 'debugpy.adapter']
-            if debugpy_ok
-            else None,
+            'command': command if debugpy_ok else None,
             'source': 'installed',
         }
     ]

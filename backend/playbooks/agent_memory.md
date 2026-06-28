@@ -9,7 +9,7 @@ triggers:
 
 # Long-lived project memory
 
-**Tool choice** (`memory` actions: working / persist / recall) is defined in the system prompt — use that; this playbook covers **file-based lessons** and `/remember`.
+**Tool choice** (`memory` actions: working / persist; plus `recall` only when `[rag]` is installed) is defined in the system prompt — use that; this playbook covers **file-based lessons** and `/remember`.
 
 ## `lessons.md` (project lessons)
 
@@ -21,7 +21,9 @@ triggers:
 
 ## Vector / semantic recall
 
-Past turns and fuzzy “what did we decide about X?” → use **`memory(action=recall, key="...")`** per system prompt. No manual indexing step.
+Only when the optional `[rag]` extra is installed and vector memory initialized at runtime.
+
+Past turns and fuzzy “what did we decide about X?” → use **`memory(action=recall, key="...")`** when that tool action is present in your tool list.
 
 ## `/remember` workflow
 

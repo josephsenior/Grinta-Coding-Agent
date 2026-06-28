@@ -36,3 +36,18 @@ def test_vector_memory_enabled_requires_extra_and_flag(monkeypatch) -> None:
     assert oe.vector_memory_enabled(cfg) is False
     monkeypatch.setattr(oe, 'is_rag_extra_available', lambda: True)
     assert oe.vector_memory_enabled(cfg) is True
+
+
+def test_semantic_recall_active_requires_live_store(monkeypatch) -> None:
+    cfg = SimpleNamespace(
+        default_agent='Orchestrator',
+        get_agent_config=lambda _name: SimpleNamespace(enable_vector_memory=True),
+    )
+    monkeypatch.setattr(oe, 'is_rag_extra_available', lambda: True)
+    assert (
+        oe.semantic_recall_active(cfg, vector_store=None, require_live_store=True)
+        is False
+    )
+    assert oe.semantic_recall_active(
+        cfg, vector_store=object(), require_live_store=True
+    )

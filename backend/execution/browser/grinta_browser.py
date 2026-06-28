@@ -281,6 +281,7 @@ class GrintaNativeBrowser:
         jpeg_quality: int,
         primary_budget: float,
         retry_budget: float,
+        fallback_budget: float,
         started_at: float,
     ) -> tuple[bytes | None, Observation | None]:
         return await _capture_screenshot_with_retry_impl(
@@ -293,6 +294,7 @@ class GrintaNativeBrowser:
             jpeg_quality=jpeg_quality,
             primary_budget=primary_budget,
             retry_budget=retry_budget,
+            fallback_budget=fallback_budget,
             started_at=started_at,
         )
 

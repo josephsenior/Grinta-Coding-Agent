@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import logging
-import sys
 import uuid
 from pathlib import Path
 from typing import Any
@@ -23,6 +22,7 @@ from backend.execution.dap._dap_adapters import (
 )
 from backend.execution.dap._dap_errors import DAPError
 from backend.execution.dap._dap_logging import _dap_log
+from backend.execution.dap._dap_spawn_utils import resolve_python_executable
 from backend.execution.dap._dap_session import DAPDebugSession
 from backend.ledger.action.debugger import DebuggerAction
 from backend.ledger.observation import ErrorObservation
@@ -353,8 +353,9 @@ class DAPDebugManager:
                 port=action.adapter_port,
             )
         if adapter in self._PYTHON_ADAPTERS:
+            python = resolve_python_executable(action.python)
             return DAPAdapterSpec(
-                [action.python or sys.executable, '-m', 'debugpy.adapter'],
+                [python, '-m', 'debugpy.adapter'],
                 transport='stdio',
             )
         # Auto-discovery: probe PATH for a known adapter so the model

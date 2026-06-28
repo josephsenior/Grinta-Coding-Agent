@@ -102,6 +102,55 @@ async def _prepare_target_for_screenshot(browser: Any, target_id: str | None) ->
     return cdp
 
 
+async def _focus_page_target(browser: Any, target_id: str | None) -> None:
+    """Best-effort: point browser-use focus at a top-level page before capture."""
+    from backend.execution.browser._browser_shared import _browser_trace
+
+    if not target_id:
+        return
+    try:
+        current = getattr(browser, 'agent_focus_target_id', None)
+        if current == target_id:
+            return
+        setattr(browser, 'agent_focus_target_id', target_id)
+        _browser_trace(f'screenshot focus: agent_focus_target_id={str(target_id)[:8]}')
+    except Exception as exc:  # noqa: BLE001
+        _browser_trace(f'screenshot focus skipped ({type(exc).__name__})')
+
+
+async def _capture_via_browser_session(
+    browser: Any,
+    *,
+    full_page: bool,
+    jpeg_quality: int,
+    timeout_sec: float,
+) -> bytes | None:
+    """Fallback capture via browser-use ``take_screenshot`` when CDP paths fail."""
+    from backend.execution.browser._browser_shared import _browser_trace
+
+    take_screenshot = getattr(browser, 'take_screenshot', None)
+    if not callable(take_screenshot):
+        return None
+    try:
+        raw = await asyncio.wait_for(
+            take_screenshot(
+                path=None,
+                full_page=full_page,
+                format='jpeg',
+                quality=jpeg_quality,
+            ),
+            timeout=timeout_sec,
+        )
+    except Exception as exc:  # noqa: BLE001
+        _browser_trace(
+            f'screenshot: browser.take_screenshot fallback failed ({type(exc).__name__})'
+        )
+        return None
+    if not raw:
+        return None
+    return bytes(raw)
+
+
 async def _capture_via_cdp(
     cdp: Any,
     *,

@@ -227,6 +227,7 @@ def _query_lsp(path: Path, timeout_seconds: float):
             'diagnostics',
             str(path),
             process_timeout=timeout_seconds,
+            post_edit=True,
         )
     except TypeError:
         return LspDiagnosticReceipt(
@@ -281,9 +282,9 @@ def _known_lsp_extension(path: Path) -> bool:
 
 def _installed_lsp_command(path: Path) -> tuple[str, ...] | None:
     try:
-        from backend.utils.runtime_detect import lsp_command_for_extension
+        from backend.utils.runtime_detect import lsp_command_for_file
 
-        return lsp_command_for_extension(path.suffix.lower())
+        return lsp_command_for_file(path)
     except Exception:
         return None
 
