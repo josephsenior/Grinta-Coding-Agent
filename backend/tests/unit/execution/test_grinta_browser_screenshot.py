@@ -23,6 +23,7 @@ if 'browser_use' not in sys.modules:
     sys.modules['browser_use'] = stub
 
 from backend.execution.browser import grinta_browser as gb  # noqa: E402
+from backend.ledger.serialization.event import event_from_dict, event_to_dict  # noqa: E402
 from backend.ledger.observation import (  # noqa: E402
     BrowserScreenshotObservation,
     ErrorObservation,
@@ -115,6 +116,24 @@ async def test_screenshot_inject_image_false_omits_b64(tmp_path: Path) -> None:
     assert obs.inject_skipped_reason == 'inject_image=false'
     saved = list(tmp_path.glob('browser_*.jpg'))
     assert len(saved) == 1
+
+
+def test_screenshot_observation_round_trips_through_event_serialization() -> None:
+    obs = BrowserScreenshotObservation(
+        content='Screenshot saved to: browser.jpg (3 bytes)',
+        image_path='browser.jpg',
+        image_b64=base64.b64encode(b'ABC').decode('ascii'),
+        image_mime='image/jpeg',
+        truncation_strategy='tail_heavy',
+    )
+
+    restored = event_from_dict(event_to_dict(obs))
+
+    assert isinstance(restored, BrowserScreenshotObservation)
+    assert restored.content == obs.content
+    assert restored.image_path == obs.image_path
+    assert restored.image_b64 == obs.image_b64
+    assert restored.truncation_strategy == 'tail_heavy'
 
 
 @pytest.mark.asyncio

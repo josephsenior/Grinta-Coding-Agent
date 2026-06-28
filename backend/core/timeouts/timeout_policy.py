@@ -10,6 +10,9 @@ from __future__ import annotations
 from typing import Any
 
 from backend.core.constants import (
+    BROWSER_SCREENSHOT_TIMEOUT_SEC,
+    BROWSER_SESSION_START_TIMEOUT_SEC,
+    BROWSER_TOOL_SYNC_TIMEOUT_SECONDS,
     CMD_PENDING_ACTION_TIMEOUT_FLOOR,
     TOOL_BRIDGE_TIMEOUT_BUFFER,
 )
@@ -52,7 +55,27 @@ def cmd_run_sync_bridge_timeout_seconds(action: Any) -> float:
     return float(CMD_PENDING_ACTION_TIMEOUT_FLOOR) + float(TOOL_BRIDGE_TIMEOUT_BUFFER)
 
 
+def browser_tool_sync_bridge_timeout_seconds(
+    action: Any, *, session_ready: bool = False
+) -> float:
+    """Outer sync-bridge budget for native browser tool calls.
+
+    Most browser commands keep the historical broad budget because they may cold
+    start Chromium, navigate, and return page state. Screenshot gets a tighter
+    bridge once the session is already up so a wedged CDP capture does not sit
+    behind the generic five-minute browser ceiling.
+    """
+    command = str(getattr(action, 'command', '') or '').strip().lower()
+    if command == 'screenshot':
+        budget = float(BROWSER_SCREENSHOT_TIMEOUT_SEC)
+        if not session_ready:
+            budget += float(BROWSER_SESSION_START_TIMEOUT_SEC)
+        return budget + float(TOOL_BRIDGE_TIMEOUT_BUFFER)
+    return float(BROWSER_TOOL_SYNC_TIMEOUT_SECONDS)
+
+
 __all__ = [
+    'browser_tool_sync_bridge_timeout_seconds',
     'cmd_run_sync_bridge_timeout_seconds',
     'cmd_run_timeout_candidates',
     'effective_cmd_run_pending_timeout_seconds',

@@ -9,6 +9,9 @@ from backend.core.constants import (
     BROWSER_TOOL_SYNC_TIMEOUT_SECONDS,
     DEBUGGER_PENDING_ACTION_TIMEOUT_FLOOR,
 )
+from backend.core.timeouts.timeout_policy import (
+    browser_tool_sync_bridge_timeout_seconds,
+)
 from backend.ledger.action import ActionConfirmationStatus
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.commands import CmdRunAction
@@ -470,6 +473,23 @@ class TestPendingActionService(unittest.TestCase):
         self.assertEqual(service.get(), action)
 
         mock_time.return_value = 100.0 + float(BROWSER_TOOL_SYNC_TIMEOUT_SECONDS) + 5.0
+        self.assertIsNone(service.get())
+        self.mock_controller.event_stream.add_event.assert_called_once()
+
+    @patch('time.time')
+    def test_browser_screenshot_action_uses_command_timeout(self, mock_time):
+        """Screenshot should not inherit the generic five-minute browser ceiling."""
+        service = PendingActionService(self.mock_context, timeout=120.0)
+        action = BrowserToolAction(command='screenshot', params={})
+        limit = browser_tool_sync_bridge_timeout_seconds(action)
+
+        mock_time.return_value = 100.0
+        service.set(action)
+
+        mock_time.return_value = 100.0 + limit - 1.0
+        self.assertEqual(service.get(), action)
+
+        mock_time.return_value = 100.0 + limit + 1.0
         self.assertIsNone(service.get())
         self.mock_controller.event_stream.add_event.assert_called_once()
 

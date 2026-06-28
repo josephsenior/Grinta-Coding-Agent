@@ -9,7 +9,6 @@ import time
 from typing import TYPE_CHECKING, Any, cast
 
 from backend.core.constants import (
-    BROWSER_TOOL_SYNC_TIMEOUT_SECONDS,
     DEBUGGER_PENDING_ACTION_TIMEOUT_FLOOR,
     DRAIN_STEP_BARRIER_GRACE_SECONDS,
     DRAIN_STEP_BARRIER_IDLE_DEFAULT_SECONDS,
@@ -19,6 +18,7 @@ from backend.core.constants import (
 )
 from backend.core.logging.logger import app_logger as logger
 from backend.core.timeouts.timeout_policy import (
+    browser_tool_sync_bridge_timeout_seconds,
     effective_cmd_run_pending_timeout_seconds,
 )
 from backend.ledger import EventSource
@@ -110,8 +110,8 @@ _TIMEOUT_POLICY_BY_ACTION_NAME = {
     'MCPAction': lambda base, _action: max(
         float(base), MCP_PENDING_ACTION_TIMEOUT_FLOOR
     ),
-    'BrowserToolAction': lambda base, _action: max(
-        float(base), float(BROWSER_TOOL_SYNC_TIMEOUT_SECONDS)
+    'BrowserToolAction': lambda base, action: max(
+        float(base), browser_tool_sync_bridge_timeout_seconds(action)
     ),
     'TerminalRunAction': _terminal_run_pending_timeout,
     'TerminalInputAction': _terminal_io_pending_timeout,
@@ -484,10 +484,30 @@ class PendingActionService:
             controller.event_stream.add_event(
                 timeout_observation, EventSource.ENVIRONMENT
             )
+            self._record_timeout_observation_for_prompt(
+                controller, timeout_observation
+            )
         finally:
             aid = self._int_action_id(action)
             if aid is not None:
                 self._timing_out_ids.discard(aid)
+
+    def _record_timeout_observation_for_prompt(
+        self, controller, timeout_observation: Observation
+    ) -> None:
+        """Make timeout feedback visible before async event delivery catches up."""
+        state_tracker = getattr(controller, 'state_tracker', None)
+        add_history = getattr(state_tracker, 'add_history', None)
+        if not callable(add_history):
+            return
+        try:
+            add_history(timeout_observation)
+        except Exception:
+            controller.log(
+                'warning',
+                'Pending timeout observation was emitted but not recorded in prompt history.',
+                extra={'msg_type': 'PENDING_ACTION_TIMEOUT_HISTORY_FAILED'},
+            )
 
     def get(self) -> Action | None:
         self._purge_timeouts()

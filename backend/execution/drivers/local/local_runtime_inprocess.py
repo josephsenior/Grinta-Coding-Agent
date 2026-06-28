@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING, Any
 
 from backend.core.config.security_config import SecurityConfig
 from backend.core.constants import (
-    BROWSER_TOOL_SYNC_TIMEOUT_SECONDS,
     TERMINAL_RUN_EXECUTION_TIMEOUT_SECONDS,
     TOOL_BRIDGE_TIMEOUT_BUFFER,
     TOOL_BRIDGE_TIMEOUT_FILE_IO,
@@ -29,7 +28,10 @@ from backend.core.enums import RuntimeStatus
 from backend.core.errors import AgentRuntimeDisconnectedError
 from backend.core.logging.logger import app_logger as logger
 from backend.core.os_capabilities import OS_CAPS
-from backend.core.timeouts.timeout_policy import cmd_run_sync_bridge_timeout_seconds
+from backend.core.timeouts.timeout_policy import (
+    browser_tool_sync_bridge_timeout_seconds,
+    cmd_run_sync_bridge_timeout_seconds,
+)
 from backend.execution.capabilities import detect_capabilities
 from backend.execution.drivers.action_execution.action_execution_client import (
     ActionExecutionClient,
@@ -113,6 +115,33 @@ class _PersistentAsyncLoopRunner:
                 f'call_async_from_sync timed out after {timeout}s for '
                 f'{getattr(corofn, "__name__", corofn)}'
             ) from exc
+
+    def cancel_pending(self) -> None:
+        """Cancel pending tasks on the dedicated loop after a bridge timeout."""
+        if self._loop.is_closed():
+            return
+
+        async def _cancel_pending() -> None:
+            current = asyncio.current_task()
+            tasks = [
+                task
+                for task in asyncio.all_tasks(self._loop)
+                if task is not current and not task.done()
+            ]
+            if not tasks:
+                return
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+        future = asyncio.run_coroutine_threadsafe(_cancel_pending(), self._loop)
+        try:
+            future.result(timeout=2.0)
+        except Exception:
+            logger.debug(
+                'Persistent browser loop pending-task cancellation did not finish',
+                exc_info=True,
+            )
 
     def close(self, timeout: float = 2.0) -> None:
         """Stop and close the dedicated loop thread."""
@@ -507,24 +536,38 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             raise AgentRuntimeDisconnectedError('Runtime not initialized')
         if not isinstance(action, BrowserToolAction):
             raise TypeError('expected BrowserToolAction')
+        session_ready = False
+        native_browser = getattr(self._executor, '_native_browser', None)
+        if native_browser is not None:
+            session_ready = getattr(native_browser, '_session', None) is not None
+        timeout = browser_tool_sync_bridge_timeout_seconds(
+            action,
+            session_ready=session_ready,
+        )
         try:
             if self._browser_loop_runner is None:
                 self._browser_loop_runner = _PersistentAsyncLoopRunner()
             return self._browser_loop_runner.submit(
                 self._executor.browser_tool,
-                BROWSER_TOOL_SYNC_TIMEOUT_SECONDS,
+                timeout,
                 action,
             )
-        except TimeoutError as exc:
+        except TimeoutError:
             sub = getattr(action, 'command', '') or ''
-            raise TimeoutError(
-                f'call_async_from_sync timed out after {BROWSER_TOOL_SYNC_TIMEOUT_SECONDS}s '
-                f'for browser_tool (subcommand={sub!r}). '
-                'Typical causes: Chromium first-time download inside browser.start(), '
-                'a slow CDP navigate, or async teardown blocked — use GRINTA_BROWSER_TRACE=1, '
-                'CALL_ASYNC_LOOP_SHUTDOWN_WAIT_SEC, CALL_ASYNC_LOOP_FINALIZE_WAIT_SEC; '
-                'run `uvx browser-use install` once in a normal shell if cold start is slow.'
-            ) from exc
+            if self._browser_loop_runner is not None:
+                self._browser_loop_runner.cancel_pending()
+                self._browser_loop_runner.close()
+                self._browser_loop_runner = None
+            if native_browser is not None:
+                setattr(self._executor, '_native_browser', None)
+            return ErrorObservation(
+                content=(
+                    f'ERROR: Browser tool timed out after {timeout:.0f}s '
+                    f'(subcommand={sub!r}). '
+                    'Try `browser snapshot` for DOM state, or retry the browser command; '
+                    'the local browser loop was reset after the timeout.'
+                )
+            )
 
     def list_files(self, path: str | None = None, recursive: bool = False) -> list[str]:
         """List files in the specified path."""

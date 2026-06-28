@@ -25,6 +25,7 @@ from backend.core.constants import (
     BROWSER_SNAPSHOT_MAX_CHARS_FULL,
     BROWSER_SNAPSHOT_MAX_CHARS_INTERACTIVE,
 )
+from backend.core.logging.logger import app_logger as logger
 from backend.execution.browser._browser_shared import (
     _browser_trace,
     _finalize_observation,
@@ -149,6 +150,9 @@ async def _execute_screenshot_body(
     jpeg_quality = 80
 
     started_at = time.monotonic()
+    logger.info(
+        'browser screenshot begin (full_page=%s, budget=%.0fs)', full_page, BROWSER_SCREENSHOT_TIMEOUT_SEC
+    )
     _browser_trace(
         f'screenshot begin full_page={full_page} '
         f'budget={BROWSER_SCREENSHOT_TIMEOUT_SEC:.0f}s'
@@ -165,8 +169,9 @@ async def _execute_screenshot_body(
             timeout=BROWSER_SCREENSHOT_TIMEOUT_SEC,
         )
     except Exception as exc:
-        _browser_trace(f'screenshot failed: {type(exc).__name__}: {exc}')
         total = time.monotonic() - started_at
+        logger.error('browser screenshot failed after %.1fs: %s: %s', total, type(exc).__name__, exc)
+        _browser_trace(f'screenshot failed: {type(exc).__name__}: {exc}')
         return _finalize_observation(
             cmd,
             ErrorObservation(
@@ -192,9 +197,9 @@ async def _execute_screenshot_body(
             ),
         )
 
-    _browser_trace(
-        f'screenshot done in {(time.monotonic() - started_at) * 1000:.0f}ms'
-    )
+    elapsed_ms = (time.monotonic() - started_at) * 1000
+    logger.info('browser screenshot done in %.0fms (%d bytes)', elapsed_ms, len(raw))
+    _browser_trace(f'screenshot done in {elapsed_ms:.0f}ms')
 
     name = f'browser_{uuid.uuid4().hex[:12]}.jpg'
     path = self._downloads / name
@@ -233,6 +238,9 @@ async def execute_screenshot_impl(
             timeout=BROWSER_SCREENSHOT_TIMEOUT_SEC + 3.0,
         )
     except TimeoutError:
+        logger.error(
+            'browser screenshot timed out after %.0fs', BROWSER_SCREENSHOT_TIMEOUT_SEC
+        )
         return _finalize_observation(
             cmd,
             ErrorObservation(
