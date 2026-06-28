@@ -882,7 +882,7 @@ class ContextMemory:
                     system_prompt = (
                         '[DEGRADED_MODE_SYSTEM_PROMPT] PromptManager unavailable. '
                         'Critical tool and safety guidance may be missing. '
-                        'You are Grinta, a careful senior software engineering agent.'
+                        'You are Grinta, a careful Autonomous software engineer built by Youssef Mejdi.'
                     )
                 else:
                     raise RuntimeError(

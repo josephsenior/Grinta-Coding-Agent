@@ -377,7 +377,7 @@ def _collect_system_prompt_sections(
     identity_line = (
         agent_identity.strip()
         if agent_identity.strip()
-        else 'You are Grinta, a careful senior software engineering agent built by Youssef Mejdi.'
+        else 'You are Grinta, a careful Autonomous software engineer built by Youssef Mejdi.'
     )
     sections: list[tuple[str, str]] = [
         (
@@ -391,8 +391,8 @@ def _collect_system_prompt_sections(
             '- Write production-quality code by default.\n'
             '- State your approach before implementing.\n'
             '- Calibrate confidence to evidence and the configured model capability. Be decisive when tool observations are sufficient; state uncertainty when something is unverified.\n'
-            '- Keep scope bounded to the latest user request. Avoid adjacent refactors, new abstractions, or extra investigations unless they are required to finish correctly.\n'
-            '- When the requested change is implemented and the narrowest useful verification is done, stop and give the final summary. If verification cannot run, state exactly why and stop.\n'
+            '- Keep scope anchored to the latest user request. You may act on adjacent issues that are clearly required for the requested change to be correct (for example, a bug in a helper you touched, or a broken call site your edit created). Stop at the request boundary for pure style, refactors, or unrelated investigations — note them in the final summary instead of acting on them.\n'
+            '- When the requested change is implemented and verification appropriate to the change is done, stop and give the final summary. If verification cannot run, state exactly why and stop.\n'
             '- Before final, silently check: latest request answered, no required work remains, verification status is clear, and no stale todo/in_progress task is left behind.\n'
             '</OPERATING_CONTRACT>',
         ),
@@ -444,7 +444,7 @@ def _collect_system_prompt_sections(
         sections.append(
             (
                 'simplified_agent_protocol',
-                'You are an autonomous coding agent. Work through tasks using your tools.\n\n'
+                'Drive the request through your tools.\n\n'
                 'When you need input from the user to continue, see `<ASK_USER_TOOL>`.\n\n'
                 'When your work is complete, write a comprehensive final summary covering:\n'
                 '- What you did\n'
@@ -872,32 +872,6 @@ def build_knowledge_base_info(kb_results: list[Any]) -> str:
             f'</KNOWLEDGE_BASE_INFO>'
         )
     return '\n'.join(blocks).strip()
-
-
-def build_remember_prompt_template(events: str) -> str:
-    """Render the remember-prompt template."""
-    return (
-        'You are tasked with generating a prompt that will be used by another AI to revise a special reference file. '
-        'This file contains important information and learnings that are used to carry out certain tasks. '
-        'The file can be extended over time to incorporate new knowledge and experiences.\n\n'
-        'You have been provided with a subset of new events that may require changes to the special file. '
-        'These events are:\n'
-        '<events>\n'
-        f'{events}\n'
-        '</events>\n\n'
-        'Your task is to analyze these events and determine what changes, if any, should be made to the special file. '
-        'Then, you need to generate a prompt that will instruct another AI to make these revisions correctly and efficiently.\n\n'
-        'When creating your prompt, follow these guidelines:\n'
-        '1. Clearly specify which parts of the file need to be revised or if new sections should be added.\n'
-        '2. Provide context for why these changes are necessary based on the new events.\n'
-        '3. Be specific about the information that should be added or modified.\n'
-        '4. Maintain the existing structure and formatting of the file.\n'
-        "5. Ensure that the revisions are consistent with the current content and don't contradict existing information.\n\n"
-        'Now, based on the new events provided, generate a prompt that will guide the AI in making the appropriate '
-        'revisions to the special file. Your prompt should be clear, specific, and actionable. '
-        'Include your prompt within <revision_prompt> tags.\n\n'
-        '<revision_prompt>\n\n</revision_prompt>'
-    )
 
 
 def _cli_measure_default() -> None:

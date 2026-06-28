@@ -87,6 +87,12 @@ def _build_when_to_use_context(
             parts.append(
                 '- **memory(action="recall", key=...)**: when the visible window no longer shows a prior decision.'
             )
+        parts.append(
+            '- **memory(action="persist", kind=...)**: rare, only for verified knowledge worth keeping across sessions. '
+            'Tactical kinds (`convention`/`command`/`architecture`/`lesson`) for codebase facts; '
+            'strategic kinds (`strategy`/`heuristic`/`decision`/`preference`) for higher-level knowledge. '
+            'Task progress belongs in `task_tracker`, not memory.'
+        )
     if checkpoints_on:
         parts.append(
             '- **checkpoint**: `view` before choosing a revert target; `revert` after a bad edit '
@@ -183,6 +189,7 @@ def _render_autonomy(
         task_tracker_discipline_block = (
             '<TASK_TRACKING>\n'
             '**task_tracker**: In Agent or Plan mode, use `task_tracker(update, task_list=[...])` as your first action when you commit to structured work.\n'
+            'Set `title` to the objective; define what "done" looks like before decomposing into steps.\n'
             'Use `view` to inspect the plan, `update` to replace the full `task_list`, and `update_status` for single-task status changes.\n'
             'Quick status updates: use `update_status(task_id="...", status="done")` to change a single task status by ID. Optional `result` field captures outcome.\n'
             'Allowed statuses: `todo`, `in_progress`, `done`, `skipped`, `blocked`.\n'

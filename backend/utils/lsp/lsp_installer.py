@@ -1,8 +1,15 @@
-"""Auto-installation of canonical LSP servers.
+"""Auto-installation of canonical LSP servers (global scope).
 
 When ``GRINTA_LSP_AUTO_INSTALL`` is not ``"0"`` (default: on) and the
 canonical server for a language is missing, :func:`install_server` runs the
 server's ``install`` command via the appropriate package manager.
+
+Install strategy: **global**.  One install per machine serves all projects
+(``npm install -g``, ``gem install``, ``rustup component add``,
+``go install``, ``dotnet tool install -g``, ``pip install``).  This matches
+the default mode of every supported package manager, avoids per-project
+re-installs, and works for tools that have no per-workspace equivalent
+(rustup components, gem, cargo binaries).  No per-workspace sandboxing.
 
 Per-server locks prevent double-install on concurrent queries.  Successful
 installs are remembered for the session so we never re-install.  Failed
