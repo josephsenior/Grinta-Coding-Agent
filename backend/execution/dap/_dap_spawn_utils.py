@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import shutil
 import sys
 from pathlib import Path
+from typing import Any
+
+from backend.execution.dap._dap_errors import DAPError
+
+_PYTHON_ADAPTERS = frozenset({'python', 'debugpy'})
+_PYTHON_PROGRAM_SUFFIXES = frozenset({'.py', '.pyw'})
 
 
 def resolve_python_executable(explicit: str | None = None) -> str:
@@ -75,3 +82,72 @@ def format_adapter_spawn_error(
             '`python` argument to the debugger tool.'
         )
     return f'Failed to start DAP adapter {argv0!r} (cwd={cwd!r}): {exc}'
+
+
+def _debugpy_importable() -> bool:
+    try:
+        return importlib.util.find_spec('debugpy.adapter') is not None
+    except (ImportError, ValueError):
+        return False
+
+
+def uses_python_debugpy_adapter(action: Any, adapter: str | None) -> bool:
+    """Return True when start would spawn the built-in ``debugpy`` preset."""
+    if getattr(action, 'adapter_command', None):
+        return False
+    normalized = (adapter or '').strip().lower()
+    if normalized in _PYTHON_ADAPTERS:
+        return True
+    language = str(getattr(action, 'language', '') or '').strip().lower()
+    if language == 'python':
+        return True
+    program = str(getattr(action, 'program', '') or '').strip()
+    if program and Path(program).suffix.lower() in _PYTHON_PROGRAM_SUFFIXES:
+        return not normalized or normalized in _PYTHON_ADAPTERS
+    return False
+
+
+def _resolve_program_path(program: str, workspace_root: str | Path) -> Path:
+    path = Path(program)
+    if path.is_absolute():
+        return path
+    return Path(workspace_root) / path
+
+
+def validate_debugger_start(
+    action: Any,
+    *,
+    adapter: str | None,
+    workspace_root: str | Path,
+) -> None:
+    """Reject obviously invalid Python debugger launches before spawning debugpy."""
+    request = str(getattr(action, 'request', 'launch') or 'launch').strip().lower()
+    if request != 'launch':
+        return
+    if not uses_python_debugpy_adapter(action, adapter):
+        return
+
+    if not _debugpy_importable():
+        raise DAPError(
+            'debugpy is not installed in the active Python environment. '
+            'Install it with: pip install debugpy'
+        )
+
+    program = str(getattr(action, 'program', '') or '').strip()
+    if not program:
+        raise DAPError(
+            "debugger start with the Python adapter requires `program` "
+            'pointing to an existing .py or .pyw file'
+        )
+
+    suffix = Path(program).suffix.lower()
+    if suffix not in _PYTHON_PROGRAM_SUFFIXES:
+        raise DAPError(
+            f'debugger program {program!r} is not a Python file '
+            f'(expected .py or .pyw, got {suffix!r}). '
+            'Use a valid Python script or choose a different adapter.'
+        )
+
+    resolved = _resolve_program_path(program, workspace_root)
+    if not resolved.is_file():
+        raise DAPError(f'debugger program does not exist: {resolved}')
