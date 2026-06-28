@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from backend.utils.lsp import lsp_client as lc
-from backend.utils.lsp.lsp_project_routing import LspFileContext
 
 
 def test_detect_any_lsp_server_true() -> None:
@@ -171,3 +170,141 @@ def test_build_init_msgs_uses_workspace_and_language_id(tmp_path: Path) -> None:
     assert init['rootUri'] == tmp_path.as_uri()
     assert init['workspaceFolders'][0]['uri'] == tmp_path.as_uri()
     assert msgs[2]['params']['textDocument']['languageId'] == 'python'
+
+
+# --- Patch 1: JSON-RPC error response surfacing ---
+
+
+def test_error_from_response_extracts_message_and_code() -> None:
+    client = lc.LspClient()
+    err = client._error_from_response(  # noqa: SLF001
+        {'jsonrpc': '2.0', 'id': 5, 'error': {'code': -32601, 'message': 'method not found'}}
+    )
+    assert err is not None
+    assert 'method not found' in err
+    assert '-32601' in err
+
+
+def test_error_from_response_none_for_success() -> None:
+    client = lc.LspClient()
+    assert (
+        client._error_from_response(  # noqa: SLF001
+            {'jsonrpc': '2.0', 'id': 5, 'result': None}
+        )
+        is None
+    )
+
+
+def test_error_result_surfaces_message() -> None:
+    client = lc.LspClient()
+    result = client._error_result(  # noqa: SLF001
+        {'jsonrpc': '2.0', 'id': 5, 'error': {'code': -1, 'message': 'denied'}},
+        hint='hover',
+    )
+    assert not result.available
+    assert 'denied' in result.error
+    assert 'hover' in result.error
+
+
+def test_error_result_no_result_member() -> None:
+    """A response with neither result nor error is surfaced as an error."""
+    client = lc.LspClient()
+    result = client._error_result(  # noqa: SLF001
+        {'jsonrpc': '2.0', 'id': 5}, hint='symbols'
+    )
+    assert not result.available
+    assert 'no result' in result.error
+
+
+def test_snippet_from_stderr_extracts_tail() -> None:
+    assert lc._snippet_from_stderr('') == ''
+    assert lc._snippet_from_stderr('   ') == ''
+    long = 'x' * 600
+    snippet = lc._snippet_from_stderr(long)
+    assert len(snippet) == 500
+    assert snippet == long[-500:]
+
+
+def test_lsp_query_surfaces_jsonrpc_error_in_session_path(tmp_path: Path) -> None:
+    """A JSON-RPC error from the session must be surfaced, not swallowed."""
+    py_file = tmp_path / 'f.py'
+    py_file.write_text('x = 1\n', encoding='utf-8')
+    ctx = lc.LspFileContext(
+        server_name='pyright-langserver',
+        command=('pyright-langserver', '--stdio'),
+        language_id='python',
+        workspace_root=tmp_path,
+    )
+    client = lc.LspClient()
+    fake_session = MagicMock()
+    fake_session.supports.return_value = True
+    fake_session.prepare_document.return_value = True
+    fake_session.request.return_value = {
+        'jsonrpc': '2.0',
+        'id': 2,
+        'error': {'code': -32601, 'message': 'method not supported'},
+    }
+    with (
+        patch.object(client, '_get_context', return_value=ctx),
+        patch.object(client, '_resolve_timeout', return_value=5.0),
+        patch('backend.utils.lsp.lsp_client.get_lsp_session_pool') as pool_mock,
+    ):
+        pool_mock.return_value.get.return_value = fake_session
+        result = client.query('hover', str(py_file), 1, 1)
+    assert not result.available
+    assert 'method not supported' in result.error
+
+
+# --- Patch 2: capability gating ---
+
+
+def test_lsp_query_capability_gate_blocks_unsupported(tmp_path: Path) -> None:
+    """A session that doesn't advertise a capability returns a clear error."""
+    py_file = tmp_path / 'f.py'
+    py_file.write_text('x = 1\n', encoding='utf-8')
+    ctx = lc.LspFileContext(
+        server_name='pyright-langserver',
+        command=('pyright-langserver', '--stdio'),
+        language_id='python',
+        workspace_root=tmp_path,
+    )
+    client = lc.LspClient()
+    fake_session = MagicMock()
+    fake_session.supports.return_value = False
+    fake_session.prepare_document.return_value = True
+    with (
+        patch.object(client, '_get_context', return_value=ctx),
+        patch.object(client, '_resolve_timeout', return_value=5.0),
+        patch('backend.utils.lsp.lsp_client.get_lsp_session_pool') as pool_mock,
+    ):
+        pool_mock.return_value.get.return_value = fake_session
+        result = client.query('code_action', str(py_file), 1, 1)
+    assert not result.available
+    assert 'does not advertise' in result.error
+    assert 'codeAction' in result.error
+    fake_session.request.assert_not_called()
+
+
+def test_unsupported_result_includes_server_and_method() -> None:
+    client = lc.LspClient()
+    ctx = lc.LspFileContext(
+        server_name='ruff',
+        command=('ruff',),
+        language_id='python',
+        workspace_root=Path('.'),
+    )
+    result = client._unsupported_result(ctx, 'textDocument/hover')  # noqa: SLF001
+    assert not result.available
+    assert 'ruff' in result.error
+    assert 'textDocument/hover' in result.error
+
+
+# --- Patch 4: stderr surfacing in one-shot failures ---
+
+
+def test_server_failed_includes_stderr() -> None:
+    client = lc.LspClient()
+    result = client._server_failed(stderr='boom: cannot find module')  # noqa: SLF001
+    assert not result.available
+    assert 'boom: cannot find module' in result.error
+    assert 'Server stderr' in result.error

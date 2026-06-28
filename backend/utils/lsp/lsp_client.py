@@ -23,7 +23,10 @@ from backend.utils.async_helpers.async_utils import call_async_from_sync
 from backend.utils.http.stdio_json_rpc import parse_content_length_json_messages
 from backend.utils.lsp.lsp_project_routing import LspFileContext, lsp_context_for_file
 from backend.utils.lsp.lsp_session import LspSession, get_lsp_session_pool
-from backend.utils.lsp.lsp_timeouts import effective_query_timeout
+from backend.utils.lsp.lsp_timeouts import (
+    effective_query_timeout,
+    init_timeout_for_server,
+)
 
 # Kept for tests that monkeypatch directly.
 _PYLSP_AVAILABLE: bool | None = None  # None = not yet detected
@@ -32,6 +35,16 @@ _UNAVAILABLE_HINT = (
     'No language server is installed for this file type. '
     'Use find_symbols or grep for structure search.'
 )
+
+
+def _snippet_from_stderr(stderr: str) -> str:
+    """Extract a short, non-empty tail from *stderr* for error surfacing."""
+    if not stderr:
+        return ''
+    text = stderr.strip()
+    if not text:
+        return ''
+    return text[-500:]
 
 
 def _run_lsp_subprocess(
@@ -402,7 +415,14 @@ class LspClient:
         server_cmd: list[str],
         *,
         process_timeout: float = 15.0,
-    ) -> tuple[list[dict], bool]:
+    ) -> tuple[list[dict], bool, str]:
+        """Run a one-shot LSP batch. Returns ``(responses, started, stderr_snippet)``.
+
+        ``stderr_snippet`` carries the tail of server stderr (up to ~500 chars) so
+        callers can surface it via :meth:`_server_failed` instead of the generic
+        "failed to start" message — aids debugging startup/crash failures that
+        were previously swallowed by ``stderr=DEVNULL``.
+        """
         frames: list[bytes] = []
         for message in messages:
             body = json.dumps(message, ensure_ascii=False).encode('utf-8')
@@ -417,19 +437,27 @@ class LspClient:
             )
             if result.timed_out:
                 logger.warning('%s subprocess timed out', server_cmd[0])
-                return [], False
+                return [], False, _snippet_from_stderr(result.stderr)
             responses = parse_content_length_json_messages(result.stdout)
             if responses:
-                return responses, True
+                return responses, True, ''
             if result.returncode != 0:
-                return [], False
-            return [], bool(result.stdout.strip())
+                snippet = _snippet_from_stderr(result.stderr)
+                if snippet:
+                    logger.warning(
+                        '%s subprocess exited %s. stderr:\n%s',
+                        server_cmd[0],
+                        result.returncode,
+                        snippet,
+                    )
+                return [], False, snippet
+            return [], bool(result.stdout.strip()), ''
         except TimeoutError:
             logger.warning('%s subprocess timed out', server_cmd[0])
-            return [], False
+            return [], False, ''
         except Exception as exc:
             logger.warning('%s subprocess failed: %s', server_cmd[0], exc)
-            return [], False
+            return [], False, ''
 
     def _parse_lsp_responses(self, raw: str) -> list[dict[str, Any]]:
         return parse_content_length_json_messages(raw)
@@ -494,10 +522,55 @@ class LspClient:
             },
         ]
 
-    def _server_failed(self) -> LspResult:
+    def _server_failed(self, stderr: str = '') -> LspResult:
+        message = 'Language server failed to start or did not respond'
+        if stderr:
+            message = f'{message}. Server stderr:\n{stderr[:500]}'
         return LspResult(
             available=False,
-            error='Language server failed to start or did not respond',
+            error=message,
+        )
+
+    @staticmethod
+    def _error_from_response(response: dict[str, Any]) -> str | None:
+        """Return a human-readable message if *response* carries a JSON-RPC error.
+
+        LSP servers reply to unsupported/failed requests with
+        ``{"error": {"code": ..., "message": ...}}`` instead of a ``result``
+        member. Previously such responses were silently swallowed (no ``result``
+        → callers returned an empty success). This extracts the server's error
+        message so callers can surface it as an explicit ``LspResult`` error.
+        """
+        err = response.get('error')
+        if not isinstance(err, dict):
+            return None
+        message = str(err.get('message') or '').strip()
+        code = err.get('code')
+        if message and code is not None:
+            return f'{message} (code {code})'
+        if message:
+            return message
+        if code is not None:
+            return f'LSP error code {code}'
+        return 'LSP error (no message)'
+
+    def _error_result(self, response: dict[str, Any], *, hint: str = '') -> LspResult:
+        err = self._error_from_response(response)
+        if err is None:
+            return LspResult(
+                available=False,
+                error=f'LSP response had no result{f" [{hint}]" if hint else ""}',
+            )
+        return LspResult(
+            available=False,
+            error=f'LSP error{f" [{hint}]" if hint else ""}: {err}',
+        )
+
+    @staticmethod
+    def _unsupported_result(ctx: LspFileContext, method: str) -> LspResult:
+        return LspResult(
+            available=False,
+            error=f'{ctx.server_name} does not advertise support for {method}',
         )
 
     def _query_diagnostics(
@@ -528,9 +601,17 @@ class LspClient:
         msgs = self._build_init_msgs(uri, abs_path, source)
         msgs.append({'jsonrpc': '2.0', 'method': 'shutdown', 'id': 99, 'params': {}})
 
-        responses, server_started = self._rpc(msgs, server_cmd, process_timeout=timeout)
+        # One-shot path must initialize + didOpen + receive diagnostics + shutdown
+        # in a single subprocess run. Floor the budget at the server's init
+        # timeout so a cold one-shot (no warm session) isn't starved by a small
+        # post-edit caller budget (e.g. 3-5s) that would skip diagnostics on
+        # every first edit.
+        oneshot_timeout = max(timeout, init_timeout_for_server(ctx.server_name))
+        responses, server_started, stderr_snippet = self._rpc(
+            msgs, server_cmd, process_timeout=oneshot_timeout
+        )
         if not server_started:
-            return self._server_failed()
+            return self._server_failed(stderr=stderr_snippet)
 
         return LspResult(
             available=True,
@@ -555,6 +636,8 @@ class LspClient:
         timeout = self._resolve_timeout(ctx, process_timeout, post_edit=post_edit)
         session, use_fallback = self._use_session(ctx, uri, ctx.language_id, source)
         if session is not None:
+            if not session.supports('textDocument/codeAction'):
+                return self._unsupported_result(ctx, 'textDocument/codeAction')
             diagnostics_payload = session.wait_publish_diagnostics(uri, timeout=timeout)
             req_range, relevant_diags = self._build_code_action_range_and_diags(
                 source, diagnostics_payload, lsp_line, lsp_col
@@ -570,10 +653,10 @@ class LspClient:
             )
             if response is None:
                 return self._server_failed()
-            if 'result' in response:
-                actions = self._parse_code_action_items(response.get('result') or [])
-                return LspResult(available=True, code_actions=actions)
-            return LspResult(available=True, code_actions=[])
+            if 'result' not in response:
+                return self._error_result(response, hint='code_action')
+            actions = self._parse_code_action_items(response.get('result') or [])
+            return LspResult(available=True, code_actions=actions)
 
         if not use_fallback:
             return self._server_failed()
@@ -608,7 +691,7 @@ class LspClient:
         diag_msgs.append(
             {'jsonrpc': '2.0', 'method': 'shutdown', 'id': 99, 'params': {}}
         )
-        diag_responses, _server_started = self._rpc(
+        diag_responses, _server_started, _stderr_snippet = self._rpc(
             diag_msgs, server_cmd, process_timeout=process_timeout or 15.0
         )
         for resp in diag_responses:
@@ -672,13 +755,15 @@ class LspClient:
         )
         msgs.append({'jsonrpc': '2.0', 'method': 'shutdown', 'id': 31, 'params': {}})
 
-        responses, server_started = self._rpc(
+        responses, server_started, stderr_snippet = self._rpc(
             msgs, server_cmd, process_timeout=process_timeout or 15.0
         )
         if not server_started:
-            return self._server_failed()
+            return self._server_failed(stderr=stderr_snippet)
         for resp in responses:
-            if resp.get('id') == 30 and 'result' in resp:
+            if resp.get('id') == 30:
+                if 'result' not in resp:
+                    return self._error_result(resp, hint='code_action')
                 result = resp.get('result') or []
                 actions = self._parse_code_action_items(result)
                 return LspResult(available=True, code_actions=actions)
@@ -744,6 +829,8 @@ class LspClient:
         timeout = self._resolve_timeout(ctx, process_timeout, post_edit=post_edit)
         session, use_fallback = self._use_session(ctx, uri, ctx.language_id, source)
         if session is not None:
+            if not session.supports('textDocument/documentSymbol'):
+                return self._unsupported_result(ctx, 'textDocument/documentSymbol')
             response = session.request(
                 'textDocument/documentSymbol',
                 {'textDocument': {'uri': uri}},
@@ -751,12 +838,12 @@ class LspClient:
             )
             if response is None:
                 return self._server_failed()
-            if 'result' in response:
-                symbols = self._parse_document_symbols(
-                    response.get('result'), symbol_filter
-                )
-                return LspResult(available=True, symbols=symbols)
-            return LspResult(available=True, symbols=[])
+            if 'result' not in response:
+                return self._error_result(response, hint='documentSymbol')
+            symbols = self._parse_document_symbols(
+                response.get('result'), symbol_filter
+            )
+            return LspResult(available=True, symbols=symbols)
 
         if not use_fallback:
             return self._server_failed()
@@ -773,11 +860,15 @@ class LspClient:
         )
         msgs.append({'jsonrpc': '2.0', 'method': 'shutdown', 'id': 21, 'params': {}})
 
-        responses, server_started = self._rpc(msgs, server_cmd, process_timeout=timeout)
+        responses, server_started, stderr_snippet = self._rpc(
+            msgs, server_cmd, process_timeout=timeout
+        )
         if not server_started:
-            return self._server_failed()
+            return self._server_failed(stderr=stderr_snippet)
         for resp in responses:
-            if resp.get('id') == 20 and 'result' in resp:
+            if resp.get('id') == 20:
+                if 'result' not in resp:
+                    return self._error_result(resp, hint='documentSymbol')
                 symbols = self._parse_document_symbols(resp.get('result'), symbol_filter)
                 return LspResult(available=True, symbols=symbols)
 
@@ -831,6 +922,8 @@ class LspClient:
         timeout = self._resolve_timeout(ctx, process_timeout, post_edit=post_edit)
         session, use_fallback = self._use_session(ctx, uri, ctx.language_id, source)
         if session is not None:
+            if not session.supports('textDocument/hover'):
+                return self._unsupported_result(ctx, 'textDocument/hover')
             response = session.request(
                 'textDocument/hover',
                 {
@@ -841,9 +934,9 @@ class LspClient:
             )
             if response is None:
                 return self._server_failed()
-            if 'result' in response:
-                return self._parse_hover_response(response['result'])
-            return LspResult(available=True, hover_text='No hover info')
+            if 'result' not in response:
+                return self._error_result(response, hint='hover')
+            return self._parse_hover_response(response['result'])
 
         if not use_fallback:
             return self._server_failed()
@@ -853,11 +946,15 @@ class LspClient:
         msgs.append(self._build_hover_request_message(uri, lsp_line, lsp_col))
         msgs.append({'jsonrpc': '2.0', 'method': 'shutdown', 'id': 11, 'params': {}})
 
-        responses, server_started = self._rpc(msgs, server_cmd, process_timeout=timeout)
+        responses, server_started, stderr_snippet = self._rpc(
+            msgs, server_cmd, process_timeout=timeout
+        )
         if not server_started:
-            return self._server_failed()
+            return self._server_failed(stderr=stderr_snippet)
         for resp in responses:
-            if resp.get('id') == 10 and 'result' in resp:
+            if resp.get('id') == 10:
+                if 'result' not in resp:
+                    return self._error_result(resp, hint='hover')
                 return self._parse_hover_response(resp['result'])
 
         return LspResult(available=True, hover_text='No hover info')
@@ -912,6 +1009,8 @@ class LspClient:
                 if command == 'find_definition'
                 else 'textDocument/references'
             )
+            if not session.supports(lsp_method):
+                return self._unsupported_result(ctx, lsp_method)
             params: dict[str, Any] = {
                 'textDocument': {'uri': uri},
                 'position': {'line': lsp_line, 'character': lsp_col},
@@ -921,9 +1020,9 @@ class LspClient:
             response = session.request(lsp_method, params, timeout=timeout)
             if response is None:
                 return self._server_failed()
-            if 'result' in response:
-                return self._parse_location_response(response['result'])
-            return LspResult(available=True)
+            if 'result' not in response:
+                return self._error_result(response, hint=lsp_method)
+            return self._parse_location_response(response['result'])
 
         if not use_fallback:
             return self._server_failed()
@@ -966,13 +1065,15 @@ class LspClient:
             {'jsonrpc': '2.0', 'method': 'shutdown', 'id': msg_id + 1, 'params': {}}
         )
 
-        responses, server_started = self._rpc(
+        responses, server_started, stderr_snippet = self._rpc(
             msgs, server_cmd, process_timeout=process_timeout or 15.0
         )
         if not server_started:
-            return LspResult(available=False), False
+            return self._server_failed(stderr=stderr_snippet), False
         for resp in responses:
-            if resp.get('id') == msg_id and 'result' in resp:
+            if resp.get('id') == msg_id:
+                if 'result' not in resp:
+                    return self._error_result(resp, hint=command), True
                 return self._parse_location_response(resp['result']), True
         return LspResult(available=True), True
 

@@ -19,8 +19,30 @@ from backend.core.tools.tool_names import CODE_INTELLIGENCE_TOOL_NAME, LSP_TOOL_
 from backend.ledger.action.code_nav import LspQueryAction
 
 
-def create_lsp_query_tool() -> dict[str, Any]:
-    """Return the OpenAI function-calling tool definition for lsp."""
+def create_lsp_query_tool(
+    detected_servers: list[str] | None = None,
+) -> dict[str, Any]:
+    """Return the OpenAI function-calling tool definition for lsp.
+
+    Args:
+        detected_servers: Names of language servers actually detected on this
+            host (e.g. ``['rust-analyzer', 'pylsp']``). Inlined into the
+            description so the model does not need to cross-reference a
+            separate System Capabilities block (which weak models lose track
+            of in long prompts). When empty/None, a generic fallback is used.
+    """
+    servers = [s for s in (detected_servers or []) if s]
+    if servers:
+        detected_line = (
+            f'Detected on THIS host: {", ".join(servers)}. '
+            'Do NOT shell out (which / Get-Command / where) to discover them — '
+            'this list is authoritative.'
+        )
+    else:
+        detected_line = (
+            'Do NOT shell out (which / Get-Command / where) to discover '
+            'language servers — rely on this tool directly.'
+        )
     return {
         'type': 'function',
         'function': {
@@ -28,10 +50,8 @@ def create_lsp_query_tool() -> dict[str, Any]:
             'description': (
                 'Read-only semantic code navigation via the locally-installed '
                 'language server (LSP). Auto-detects servers on PATH (pyright, '
-                'pylsp, ruff, typescript-language-server, gopls, rust-analyzer, '
-                'clangd, …) — the System Capabilities block in the system prompt '
-                'lists which are actually present on this host; do NOT shell out '
-                'to discover them.\n'
+                f'pylsp, ruff, typescript-language-server, gopls, rust-analyzer, '
+                f'clangd, …). {detected_line}\n'
                 'Commands: find_definition, find_references, hover, list_symbols, '
                 'get_diagnostics, code_action. Use get_diagnostics after editing a file to '
                 'check for errors/warnings. Use find_definition / find_references '
