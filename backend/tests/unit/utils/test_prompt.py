@@ -776,6 +776,46 @@ def test_render_runtime_detection_omits_disabled_tools() -> None:
     assert '`debugger`' in dap_on
 
 
+def test_render_runtime_detection_lsp_uses_language_server_labels() -> None:
+    """LSP capability line mirrors sidebar: ``python → ruff``, not bare ``ruff``."""
+    from types import SimpleNamespace
+
+    from backend.engine.prompts.section_renderers import _render_runtime_detection_lines
+
+    fake_servers = {
+        'ruff': SimpleNamespace(
+            available=True,
+            spec=SimpleNamespace(language='python'),
+        ),
+        'rust-analyzer': SimpleNamespace(
+            available=True,
+            spec=SimpleNamespace(language='rust'),
+        ),
+        'pylsp': SimpleNamespace(
+            available=False,
+            spec=SimpleNamespace(language='python'),
+        ),
+    }
+    with (
+        patch('backend.utils.runtime_detect.has_any_lsp_server', return_value=True),
+        patch(
+            'backend.utils.runtime_detect.detection_summary',
+            return_value={'lsp_available': ['ruff', 'rust-analyzer'], 'debug_available': []},
+        ),
+        patch(
+            'backend.utils.runtime_detect.detect_lsp_servers',
+            return_value=fake_servers,
+        ),
+    ):
+        lsp_on, _ = _render_runtime_detection_lines(
+            SimpleNamespace(enable_lsp_query=True, enable_debugger=False)
+        )
+    assert 'python → ruff' in lsp_on
+    assert 'rust → rust-analyzer' in lsp_on
+    assert 'pylsp' not in lsp_on
+    assert 'detected on PATH' not in lsp_on
+
+
 def test_system_capabilities_skips_lsp_dap_discovery_hint_when_both_gated_off() -> None:
     """No runtime-probe paragraph if there are no LSP/DAP bullets."""
     from backend.engine.prompts.section_renderers import _render_system_capabilities

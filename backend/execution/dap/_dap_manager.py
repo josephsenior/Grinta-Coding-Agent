@@ -23,6 +23,7 @@ from backend.execution.dap._dap_adapters import (
 from backend.execution.dap._dap_errors import DAPError
 from backend.execution.dap._dap_logging import _dap_log
 from backend.execution.dap._dap_spawn_utils import (
+    resolve_debugger_start_timeout,
     resolve_python_executable,
     validate_debugger_start,
 )
@@ -64,7 +65,11 @@ class DAPDebugManager:
         """Dispatch a debugger action and wrap it as an observation."""
         debug_action = (action.debug_action or '').strip().lower()
         timeout = float(action.timeout or 10.0)
-        start_timeout = max(timeout, 15.0)
+        start_timeout = (
+            resolve_debugger_start_timeout(action.timeout)
+            if debug_action == 'start'
+            else timeout
+        )
         _dap_log(
             logging.INFO,
             f'Debugger dispatch: {debug_action or "<empty>"}',

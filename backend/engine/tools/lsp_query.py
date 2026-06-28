@@ -28,7 +28,7 @@ def create_lsp_query_tool() -> dict[str, Any]:
             'description': (
                 'Read-only semantic code navigation via the locally-installed '
                 'language server (LSP). Auto-detects servers on PATH (pyright, '
-                'pylsp, typescript-language-server, gopls, rust-analyzer, '
+                'pylsp, ruff, typescript-language-server, gopls, rust-analyzer, '
                 'clangd, …) — the System Capabilities block in the system prompt '
                 'lists which are actually present on this host; do NOT shell out '
                 'to discover them.\n'

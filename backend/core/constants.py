@@ -209,6 +209,12 @@ PTY_READ_POLL_INTERVAL_SECONDS = 0.05
 DEBUGGER_PENDING_ACTION_TIMEOUT_FLOOR = float(
     os.getenv('GRINTA_DEBUGGER_PENDING_ACTION_TIMEOUT_FLOOR', '120.0')
 )
+# Wall-clock budget for debugger ``start`` only (initialize + launch + breakpoints).
+# Kept separate from the 120 s pending/step floor so tool eval and cold starts
+# fail fast with a phase-specific error instead of burning the full pending window.
+DEBUGGER_START_TIMEOUT_SECONDS = float(
+    os.getenv('GRINTA_DEBUGGER_START_TIMEOUT_SECONDS', '30.0')
+)
 # Per-tool sync-bridge timeouts. Used by ``call_async_from_sync`` wrappers in
 # ``backend/execution/drivers/local/local_runtime_inprocess.py`` so the bridge
 # matches the controller's pending-action floor for each ActionType. A small
@@ -690,6 +696,11 @@ ENV_VAR_REGISTRY: dict[str, tuple[str, str]] = {
     'GRINTA_DEBUGGER_SYNC_POOL_WORKERS': (
         '6',
         'Thread cap for dedicated DebuggerAction sync pool (isolated from general bridge EXECUTOR)',
+    ),
+    'GRINTA_DEBUGGER_START_TIMEOUT_SECONDS': (
+        '30',
+        'Max wall-clock seconds for debugger start (initialize + launch + breakpoints); '
+        'independent of the 120 s pending/step floor',
     ),
     'GRINTA_AGENT_RUN_HARD_TIMEOUT_SECONDS': (
         '0',

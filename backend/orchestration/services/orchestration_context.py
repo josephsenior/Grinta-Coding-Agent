@@ -243,6 +243,22 @@ class OrchestrationContext:
         except Exception:
             pass
 
+    def close_debugger_sessions(self) -> None:
+        """Terminate active DAP/debugpy sessions after a debugger pending timeout."""
+        try:
+            runtime = getattr(self._controller, 'runtime', None)
+            if runtime is None:
+                return
+            executor = getattr(runtime, '_executor', None)
+            if executor is None:
+                executor = runtime
+            debug_manager = getattr(executor, 'debug_manager', None)
+            if debug_manager is None:
+                return
+            debug_manager.close_all()
+        except Exception:
+            pass
+
     def close_hung_terminal_sessions(self) -> None:
         """Close interactive ``terminal_*`` PTY sessions after a terminal timeout."""
         try:

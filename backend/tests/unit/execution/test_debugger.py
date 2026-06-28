@@ -197,6 +197,45 @@ def test_manager_infers_python_preset_for_py_program(monkeypatch, tmp_path) -> N
     assert instances[0].kwargs['adapter_command'][1:] == ['-m', 'debugpy.adapter']
 
 
+def test_manager_start_caps_session_timeout_for_high_action_timeout(
+    monkeypatch, tmp_path
+) -> None:
+    seen_timeouts: list[float] = []
+
+    class FakeSession:
+        def __init__(self, session_id: str, **kwargs: Any) -> None:
+            self.session_id = session_id
+            self.kwargs = kwargs
+
+        def start(self, timeout: float = 15.0) -> dict[str, Any]:
+            seen_timeouts.append(timeout)
+            return {'session_id': self.session_id, 'state': 'started'}
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(
+        'backend.execution.dap._dap_manager.DAPDebugSession', FakeSession
+    )
+    monkeypatch.setattr(
+        'backend.execution.dap._dap_spawn_utils.DEBUGGER_START_TIMEOUT_SECONDS',
+        30.0,
+    )
+    manager = DAPDebugManager(str(tmp_path))
+    (tmp_path / 'app.py').write_text('print("ok")\n', encoding='utf-8')
+
+    obs = manager.handle(
+        DebuggerAction(
+            debug_action='start',
+            program='app.py',
+            session_id='dbg-cap',
+            timeout=120.0,
+        )
+    )
+    assert isinstance(obs, DebuggerObservation)
+    assert seen_timeouts == [30.0]
+
+
 def test_manager_requires_adapter_command_for_non_python(tmp_path) -> None:
     manager = DAPDebugManager(str(tmp_path))
     obs = manager.handle(DebuggerAction(debug_action='start', adapter='node'))

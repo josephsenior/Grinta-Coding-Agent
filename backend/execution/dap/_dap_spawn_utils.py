@@ -5,10 +5,12 @@ from __future__ import annotations
 import importlib.util
 import os
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 
+from backend.core.constants import DEBUGGER_START_TIMEOUT_SECONDS
 from backend.execution.dap._dap_errors import DAPError
 
 _PYTHON_ADAPTERS = frozenset({'python', 'debugpy'})
@@ -91,6 +93,37 @@ def _debugpy_importable() -> bool:
         return False
 
 
+def debugpy_spawn_probe(
+    command: list[str],
+    *,
+    cwd: str | Path | None = None,
+) -> bool:
+    """Verify ``debugpy.adapter`` can be spawned with a valid cwd."""
+    adapter_cwd = resolve_adapter_cwd(cwd)
+    try:
+        proc = subprocess.Popen(
+            command,
+            cwd=adapter_cwd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        proc.kill()
+        try:
+            proc.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        return True
+    except OSError:
+        return False
+
+
+def resolve_debugger_start_timeout(action_timeout: float | None) -> float:
+    """Return the wall-clock budget for debugger ``start`` (capped independently)."""
+    requested = max(float(action_timeout or 10.0), 15.0)
+    return min(requested, float(DEBUGGER_START_TIMEOUT_SECONDS))
+
+
 def uses_python_debugpy_adapter(action: Any, adapter: str | None) -> bool:
     """Return True when start would spawn the built-in ``debugpy`` preset."""
     if getattr(action, 'adapter_command', None):
@@ -151,3 +184,16 @@ def validate_debugger_start(
     resolved = _resolve_program_path(program, workspace_root)
     if not resolved.is_file():
         raise DAPError(f'debugger program does not exist: {resolved}')
+
+    python = resolve_python_executable(getattr(action, 'python', None))
+    command = [python, '-m', 'debugpy.adapter']
+    adapter_cwd = resolve_adapter_cwd(
+        getattr(action, 'cwd', None),
+        fallback=str(Path(workspace_root).resolve()),
+    )
+    if not debugpy_spawn_probe(command, cwd=adapter_cwd):
+        raise DAPError(
+            f'Failed to spawn debugpy adapter ({command!r}, cwd={adapter_cwd!r}). '
+            'Install debugpy in the active Python environment (pip install debugpy) '
+            'or pass a valid `python` argument.'
+        )
