@@ -66,7 +66,6 @@ from backend.ledger.observation import (
     LspQueryObservation,
     Observation,
 )
-from backend.persistence.locations import get_workspace_downloads_dir
 from backend.utils.regex_limits import try_compile_user_regex as _try_compile_user_regex
 
 
@@ -182,7 +181,6 @@ class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
         self.start_time = time.time()
         self.last_execution_time = time.time()
         self.downloaded_files: list[str] = []
-        self.downloads_directory = get_workspace_downloads_dir(work_dir)
         self.debug_manager = DAPDebugManager(work_dir)
 
         self._terminal_session_seq: int = 0
@@ -444,7 +442,6 @@ class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
 
         if self._native_browser is None:
             self._native_browser = GrintaNativeBrowser(
-                self.downloads_directory,
                 workspace_root=self.file_editor.workspace_root,
             )
         ctl: GrintaNativeBrowser = self._native_browser

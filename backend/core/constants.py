@@ -734,10 +734,6 @@ ENV_VAR_REGISTRY: dict[str, tuple[str, str]] = {
         '',
         'Set to 1 to disable the post-edit LSP diagnostics middleware',
     ),
-    'GRINTA_LSP_AUTO_INSTALL': (
-        '1',
-        'Set to 0 to disable auto-installation of missing LSP servers on first query',
-    ),
     # API versioning
     'APP_PERMISSIVE_API': (
         '',

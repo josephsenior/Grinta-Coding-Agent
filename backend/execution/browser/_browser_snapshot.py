@@ -15,7 +15,6 @@ from __future__ import annotations
 import asyncio
 import base64
 import time
-import uuid
 from typing import Any
 
 from backend.core.constants import (
@@ -201,11 +200,8 @@ async def _execute_screenshot_body(
     logger.info('browser screenshot done in %.0fms (%d bytes)', elapsed_ms, len(raw))
     _browser_trace(f'screenshot done in {elapsed_ms:.0f}ms')
 
-    name = f'browser_{uuid.uuid4().hex[:12]}.jpg'
-    path = self._downloads / name
-    path.write_bytes(raw)
     raw_len = len(raw)
-    body = f'Screenshot saved to: {path} ({raw_len} bytes)'
+    body = f'Screenshot captured ({raw_len} bytes)'
     b64_payload = base64.b64encode(raw).decode('ascii')
     inject_skip: str | None = None
     if not inject_image:
@@ -214,14 +210,13 @@ async def _execute_screenshot_body(
     elif raw_len > BROWSER_SCREENSHOT_MAX_INJECT_BYTES:
         inject_skip = (
             f'JPEG exceeds max inject size ({BROWSER_SCREENSHOT_MAX_INJECT_BYTES} bytes); '
-            'path-only caption preserved.'
+            'base64 payload dropped.'
         )
         b64_payload = ''
     return _finalize_observation(
         cmd,
         BrowserScreenshotObservation(
             content=body,
-            image_path=str(path),
             image_b64=b64_payload,
             image_mime='image/jpeg',
             inject_skipped_reason=inject_skip,

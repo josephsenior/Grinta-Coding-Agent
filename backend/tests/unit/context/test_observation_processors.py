@@ -180,8 +180,7 @@ class TestConvertObservation:
 
     def test_browser_screenshot_observation_injects_image_when_vision_active(self):
         obs = BrowserScreenshotObservation(
-            content='Screenshot saved to: /tmp/a.jpg (4 bytes)',
-            image_path='/tmp/a.jpg',
+            content='Screenshot captured (4 bytes)',
             image_b64='QUJDQw==',
             image_mime='image/jpeg',
         )
@@ -193,8 +192,7 @@ class TestConvertObservation:
 
     def test_browser_screenshot_observation_text_only_when_vision_off(self):
         obs = BrowserScreenshotObservation(
-            content='Screenshot saved to: /tmp/a.jpg (4 bytes)',
-            image_path='/tmp/a.jpg',
+            content='Screenshot captured (4 bytes)',
             image_b64='QUJDQw==',
         )
         msg = convert_observation_to_message(

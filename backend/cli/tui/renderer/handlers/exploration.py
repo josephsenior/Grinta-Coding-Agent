@@ -70,6 +70,7 @@ def _handle_lsp_query_action(
 ) -> None:
     model = lsp_action_model(event)
     orch._pending_lsp_card = model
+    orch._pending_lsp_file = getattr(event, 'file', '') or ''
 
 
 def _handle_grep_observation(
@@ -106,7 +107,60 @@ def _handle_lsp_query_observation(
     pending = orch._pending_lsp_card
     pending_model = pending if isinstance(pending, OrientLineModel) else None
     orch._write_orient_line(lsp_observation_model(event, pending_model))
+
+    if not getattr(event, 'available', True):
+        _show_lsp_install_hint(orch)
+
     orch._pending_lsp_card = None
+    orch._pending_lsp_file = ''
+
+
+def _show_lsp_install_hint(orch: 'RendererEventProcessorMixin') -> None:
+    """Show a non-persistent toast with install instructions for a missing LSP server."""
+    from pathlib import Path as _Path
+
+    from backend.utils.lsp.lsp_project_routing import resolve_language_key
+    from backend.utils.runtime_detect import CANONICAL_LSP_SERVERS
+
+    file_path = getattr(orch, '_pending_lsp_file', '') or ''
+    if not file_path:
+        return
+
+    suffix = _Path(file_path).suffix.lower()
+    if not suffix:
+        return
+
+    try:
+        from backend.utils.lsp.lsp_project_routing import find_project_root
+
+        root = find_project_root(_Path(file_path))
+        lang_key = resolve_language_key(suffix, root)
+    except Exception:
+        lang_key = None
+
+    if not lang_key:
+        return
+
+    # Session-level dedup: don't notify twice for the same language
+    tui = getattr(orch, '_tui', None)
+    if tui is None:
+        return
+    notified = getattr(tui, '_lsp_notified_languages', None)
+    if notified is None:
+        return
+    if lang_key in notified:
+        return
+    notified.add(lang_key)
+
+    spec = CANONICAL_LSP_SERVERS.get(lang_key)
+    if spec is None or not spec.install_hint:
+        return
+
+    hint = f'{spec.name} is not installed. Run: {spec.install_hint}'
+    if spec.docs:
+        hint += f'  ({spec.docs})'
+
+    tui.notify_warning(hint, timeout=6.0)
 
 
 def _handle_find_symbols_action(

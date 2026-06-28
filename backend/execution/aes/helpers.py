@@ -81,6 +81,12 @@ def init_shell_commands(executor: Any) -> None:
     )
 
     shell_session.execute(
+        CmdRunAction(
+            command=build_augment_path_command(use_powershell),
+        )
+    )
+
+    shell_session.execute(
         CmdRunAction(command=executor._build_env_check_command(use_powershell))
     )
 
@@ -141,6 +147,27 @@ def build_env_check_command(use_powershell: bool) -> str:
         'echo "=== MEMORY ===" && free -h 2>/dev/null || vm_stat 2>/dev/null; '
         "true'"
     )
+
+
+def build_augment_path_command(use_powershell: bool) -> str:
+    """Return a shell command that prepends common tool directories to PATH."""
+    home = Path.home()
+    extra_dirs = [
+        home / '.cargo' / 'bin',
+        home / '.local' / 'bin',
+        home / '.npm-global' / 'bin',
+        home / '.nvm' / 'default' / 'bin',
+        home / '.pyenv' / 'shims',
+    ]
+    if use_powershell:
+        entries = ';'.join(str(d) for d in extra_dirs if d.exists())
+        if not entries:
+            return ''
+        return f'$env:PATH = "{entries};$env:PATH"'
+    entries = ':'.join(str(d) for d in extra_dirs if d.exists())
+    if not entries:
+        return ''
+    return f'export PATH="{entries}:$PATH"'
 
 
 def uses_powershell_shell_contract(executor: Any) -> bool:

@@ -64,7 +64,7 @@ def test_lsp_client_graceful_degradation(monkeypatch, tmp_path):
     with patch('backend.utils.lsp.lsp_client.lsp_context_for_file', return_value=None):
         res = client.query('find_definition', str(py_file), 1, 1)
         assert not res.available
-        assert 'find_symbols' in res.error
+        assert 'No language server available' in res.error
         hover = client.query('hover', str(py_file), 1, 1)
         assert not hover.available
         symbols = client.query('list_symbols', str(py_file))

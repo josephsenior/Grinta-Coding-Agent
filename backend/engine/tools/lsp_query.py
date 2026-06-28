@@ -9,6 +9,8 @@ Supports the following commands (all require an installed language server):
 
 When no language server is installed for a file type the tool returns
 ``available=False``. Use ``find_symbols`` or ``grep`` for structure search instead.
+Servers must be installed manually by the user — do not attempt to install
+them yourself.
 """
 
 from __future__ import annotations
@@ -34,15 +36,10 @@ def create_lsp_query_tool(
     servers = [s for s in (detected_servers or []) if s]
     if servers:
         detected_line = (
-            f'Detected on THIS host: {", ".join(servers)}. '
-            'Do NOT shell out (which / Get-Command / where) to discover them — '
-            'this list is authoritative.'
+            f'Detected on THIS host: {", ".join(servers)}.'
         )
     else:
-        detected_line = (
-            'Do NOT shell out (which / Get-Command / where) to discover '
-            'language servers — rely on this tool directly.'
-        )
+        detected_line = ''
     return {
         'type': 'function',
         'function': {
@@ -72,7 +69,8 @@ def create_lsp_query_tool(
                 'formatter or linter via `execute_bash` / `execute_powershell`.\n'
                 'When no LSP server is installed this tool is hidden from the '
                 'toolset entirely — its absence here means the user has at least '
-                'one server on PATH.'
+                'one server on PATH. Do NOT attempt to install servers yourself; '
+                'servers must be installed manually by the user.'
             ),
             'parameters': {
                 'type': 'object',

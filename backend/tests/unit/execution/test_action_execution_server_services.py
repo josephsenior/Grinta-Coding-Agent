@@ -88,14 +88,19 @@ async def test_lsp_query_success_and_failure(mock_executor) -> None:
         error='',
         format_text=lambda _cmd: 'ok',
     )
-    with patch('backend.utils.lsp.lsp_client.LspClient') as cls:
-        cls.return_value.query.return_value = success_result
+    mock_client = MagicMock()
+    mock_client.query.return_value = success_result
+    with patch(
+        'backend.utils.lsp.lsp_client.get_lsp_client',
+        return_value=mock_client,
+    ):
         ok = await mock_executor.lsp_query(action)
     assert ok.__class__.__name__ == 'LspQueryObservation'
     assert ok.tool_result['available'] is True
 
     with patch(
-        'backend.utils.lsp.lsp_client.LspClient', side_effect=RuntimeError('lsp down')
+        'backend.utils.lsp.lsp_client.get_lsp_client',
+        side_effect=RuntimeError('lsp down'),
     ):
         bad = await mock_executor.lsp_query(action)
     assert isinstance(bad, ErrorObservation)

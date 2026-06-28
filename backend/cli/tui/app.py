@@ -229,6 +229,7 @@ class GrintaScreen(
         self._pending_image_urls: list[str] = []
         self._last_turn_duration: str | None = None
         self._hud_pulse_frame = 0
+        self._lsp_notified_languages: set[str] = set()
 
 
 class TUIRenderer(
@@ -320,6 +321,7 @@ class TUIRenderer(
         self._last_browser_action_card: Any | None = None
         self._last_browser_cmd: str = ''
         self._pending_lsp_card: Any | None = None
+        self._pending_lsp_file: str = ''
         self._pending_search_card: Any | None = None
         self._pending_search_tool: str = ''
         self._pending_exploration_meta: list[str] | None = None
