@@ -11,6 +11,7 @@ import pytest
 from backend.execution.dap._dap_spawn_utils import (
     format_adapter_spawn_error,
     resolve_adapter_cwd,
+    resolve_debugger_start_timeout,
     resolve_python_executable,
     uses_python_debugpy_adapter,
     validate_debugger_start,
@@ -85,3 +86,39 @@ def test_uses_python_debugpy_adapter_for_py_program_without_adapter() -> None:
     assert uses_python_debugpy_adapter(action, 'python') is True
     assert uses_python_debugpy_adapter(action, None) is True
     assert uses_python_debugpy_adapter(action, 'node') is False
+
+
+def test_resolve_debugger_start_timeout_caps_high_action_timeout(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        'backend.execution.dap._dap_spawn_utils.DEBUGGER_START_TIMEOUT_SECONDS',
+        30.0,
+    )
+    assert resolve_debugger_start_timeout(120.0) == 30.0
+    assert resolve_debugger_start_timeout(10.0) == 15.0
+    assert resolve_debugger_start_timeout(None) == 15.0
+
+
+def test_validate_debugger_start_rejects_unspawnable_debugpy(
+    monkeypatch, tmp_path: Path
+) -> None:
+    program = tmp_path / 'app.py'
+    program.write_text('print("ok")\n', encoding='utf-8')
+    action = DebuggerAction(
+        debug_action='start',
+        adapter='python',
+        program='app.py',
+    )
+    monkeypatch.setattr(
+        'backend.execution.dap._dap_spawn_utils._debugpy_importable',
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        'backend.execution.dap._dap_spawn_utils.debugpy_spawn_probe',
+        lambda *_args, **_kwargs: False,
+    )
+    with pytest.raises(DAPError, match='Failed to spawn debugpy adapter'):
+        validate_debugger_start(
+            action, adapter='python', workspace_root=tmp_path
+        )

@@ -437,6 +437,11 @@ class PendingActionService:
                 self._context.kill_running_command()
             except Exception:
                 pass
+        if action_type == 'DebuggerAction':
+            try:
+                self._context.close_debugger_sessions()
+            except Exception:
+                pass
         if action_type in {
             'TerminalRunAction',
             'TerminalInputAction',

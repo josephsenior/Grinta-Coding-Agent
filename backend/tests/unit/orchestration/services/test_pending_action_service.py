@@ -328,6 +328,23 @@ class TestPendingActionService(unittest.TestCase):
         timeout = self.service._effective_timeout_seconds(20.0, action)
         self.assertGreaterEqual(timeout, float(DEBUGGER_PENDING_ACTION_TIMEOUT_FLOOR))
 
+    @patch('time.time')
+    def test_debugger_pending_timeout_closes_debug_sessions(self, mock_time):
+        """Debugger pending timeouts should tear down wedged DAP sessions."""
+        action = DebuggerAction(
+            debug_action='start',
+            session_id='dbg-1',
+            timeout=5,
+        )
+        action.id = 42
+        mock_time.return_value = 100.0
+        self.service.set(action)
+        self.mock_context.close_debugger_sessions = MagicMock()
+        mock_time.return_value = 100.0 + 200.0
+        result = self.service.get()
+        self.assertIsNone(result)
+        self.mock_context.close_debugger_sessions.assert_called_once()
+
     def test_shutdown_clears_pending_and_cancels_watchdog(self):
         """shutdown() should clear pending state and cancel watchdog."""
         mock_action = MagicMock()

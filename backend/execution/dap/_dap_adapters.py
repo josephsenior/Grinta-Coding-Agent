@@ -275,22 +275,9 @@ def _debugpy_available() -> bool:
 
 def _debugpy_spawn_probe(command: list[str]) -> bool:
     """Verify ``debugpy.adapter`` can be spawned with a valid cwd."""
-    try:
-        proc = subprocess.Popen(
-            command,
-            cwd=resolve_adapter_cwd(None),
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        proc.kill()
-        try:
-            proc.wait(timeout=2)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-        return True
-    except OSError:
-        return False
+    from backend.execution.dap._dap_spawn_utils import debugpy_spawn_probe
+
+    return debugpy_spawn_probe(command)
 
 
 def detect_debug_adapters() -> list[dict[str, Any]]:

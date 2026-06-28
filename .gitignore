@@ -28,29 +28,6 @@ backend/~/  # Never commit JWT secrets or sensitive backend configs
 
 # Runtime config (user-specific — only template is tracked)
 settings.json
-# Debug backups
-debug_backups/
-
-dummy_eval_output_dir/
-scripts/evals/results/
-
-tmp_snippet_workspace_script*/
-
-tmp_secrets_store/
-
-tmp_snippet_debug/
-
-# Temporary test/diagnostic files
-tmp_*.txt
-tmp_*.ini
-tmp_*.py
-temp_*.py
-test_*.txt
-debug_*.txt
-debug_*.py
-!backend/inference/debug_mixin.py
-
-diag_*.txt
 
 # Test coverage reports
 coverage/

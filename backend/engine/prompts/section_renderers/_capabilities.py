@@ -42,6 +42,26 @@ def _render_parallel_scheduling_line(
     )
 
 
+def _lsp_language_server_labels() -> list[str]:
+    """Return ``language → server`` labels matching the TUI LSP sidebar."""
+    from backend.utils.runtime_detect import detect_lsp_servers
+
+    seen_languages: set[str] = set()
+    labels: list[str] = []
+    for name, tool in sorted(
+        detect_lsp_servers().items(),
+        key=lambda pair: (not pair[1].available, pair[1].spec.language, pair[0]),
+    ):
+        if not tool.available:
+            continue
+        language = tool.spec.language
+        if language in seen_languages:
+            continue
+        seen_languages.add(language)
+        labels.append(f'{language} → {name}')
+    return labels
+
+
 def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
     r"""Return ``(lsp_line, dap_line)`` summarizing detected runtimes.
 
@@ -72,14 +92,14 @@ def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
         any_dap = False
         summary = {'lsp_available': [], 'debug_available': []}
 
-    lsp_available = summary.get('lsp_available', []) if any_lsp else []
+    lsp_entries = _lsp_language_server_labels() if any_lsp else []
     if not lsp_enabled:
         lsp_line = ''
-    elif lsp_available:
+    elif lsp_entries:
         lsp_line = (
-            '- **Language servers (LSP / `lsp`)**: detected on PATH → '
-            f'{", ".join(lsp_available)}. Use `lsp` for definition / '
-            'references / hover / diagnostics on these languages. '
+            '- **Language servers (LSP / `lsp`)**: detected → '
+            f'{"; ".join(lsp_entries)}. Use `lsp` for definition / '
+            'references / hover / diagnostics on those languages. '
             'For file edits use the public file API tools; `lsp` is read-only. For file reads use `read_file` / `read_symbols`.'
         )
     else:
