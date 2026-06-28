@@ -8,11 +8,15 @@ has to ask the user to configure paths.
 
 Two registries are exposed:
 
-* ``LSP_SERVERS``   — language servers (pylsp, gopls, rust-analyzer, …)
+* ``CANONICAL_LSP_SERVERS`` — one language server per language (pyright for
+  Python, gopls for Go, rust-analyzer for Rust, …).  No fallback chains,
+  no priority tuples — each language has exactly one canonical server.
+  Marker-disambiguated ecosystems (Deno, Ansible, Helm) are treated as
+  distinct languages so they still get the right specialised server.
 * ``DEBUG_ADAPTERS`` — DAP adapters (debugpy, delve, codelldb, js-debug, …)
 
 IDE-style debugger labels (e.g. ``pwa-node``) are normalized via
-:func:`backend.utils.lsp.language_tool_aliases.normalize_debug_adapter_name` and
+:func:`backend.execution.dap.dap_aliases.normalize_debug_adapter_name` and
 re-exported from this module for convenience.
 
 Detection follows a cheap-to-expensive ladder:
@@ -30,15 +34,16 @@ Results are cached in module globals; tests can call
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
 import sys
 import threading
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Sequence
 
 from backend.core.logging.logger import app_logger as logger
-from backend.utils.lsp.language_tool_aliases import normalize_debug_adapter_name
+from backend.execution.dap.dap_aliases import normalize_debug_adapter_name
+from backend.utils.path_normalize import to_native_path, which_normalized
 
 # Probe timeout — kept tight; missing tools should fail-fast.
 _PROBE_TIMEOUT_SEC = 3.0
@@ -57,6 +62,11 @@ class ToolSpec:
     probe: tuple[str, ...] | None = None
     # If true, also attempt a ``python -m <module>`` style probe before failing.
     python_module: str | None = None
+    # Command that installs the server when auto-install is enabled (Phase 2).
+    install: tuple[str, ...] | None = None
+    # Package manager / install strategy: "npm", "pip", "go", "cargo",
+    # "gem", "rustup", "dotnet", "cpan", "binary" (manual binary release).
+    install_method: str = 'binary'
 
 
 @dataclass
@@ -69,660 +79,651 @@ class DetectedTool:
     detail: str = ''
 
 
-# ── Registries ────────────────────────────────────────────────────────────
-
-
-# First matching available server wins for a file extension (tuple order matters).
-# Per-file routing in :mod:`lsp_project_routing` may override try-order using
-# workspace markers; Python always prefers pyright-langserver over pylsp.
-LSP_SERVERS: tuple[ToolSpec, ...] = (
-    ToolSpec(
+# ── Canonical LSP registry ────────────────────────────────────────────────
+#
+# One server per language — keyed by language-resolution key.  For most
+# languages the key equals the LSP languageId.  Marker-disambiguated
+# ecosystems (deno, ansible, helm) use the ecosystem name as the key; their
+# ToolSpec.language holds the actual languageId sent in didOpen.
+#
+# Servers shared across languages (e.g. typescript-language-server handles
+# both TypeScript and JavaScript) appear once per language with the matching
+# extensions and languageId.  Detection deduplicates by server name so the
+# shared binary is probed only once.
+CANONICAL_LSP_SERVERS: dict[str, ToolSpec] = {
+    'python': ToolSpec(
         name='pyright-langserver',
         language='python',
         extensions=('.py', '.pyw', '.pyi'),
         command=('pyright-langserver', '--stdio'),
         probe=('pyright-langserver', '--version'),
+        install=('npm', 'install', '-g', 'pyright'),
+        install_method='npm',
     ),
-    ToolSpec(
-        name='pylsp',
-        language='python',
-        extensions=('.py', '.pyw', '.pyi'),
-        command=(sys.executable, '-m', 'pylsp'),
-        probe=(sys.executable, '-m', 'pylsp', '--version'),
-        python_module='pylsp',
-    ),
-    ToolSpec(
+    'typescript': ToolSpec(
         name='typescript-language-server',
         language='typescript',
-        extensions=('.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts'),
+        extensions=('.ts', '.tsx', '.mts', '.cts'),
         command=('typescript-language-server', '--stdio'),
+        install=('npm', 'install', '-g', 'typescript-language-server', 'typescript'),
+        install_method='npm',
     ),
-    ToolSpec(
+    'javascript': ToolSpec(
+        name='typescript-language-server',
+        language='javascript',
+        extensions=('.js', '.jsx', '.mjs', '.cjs'),
+        command=('typescript-language-server', '--stdio'),
+        install=('npm', 'install', '-g', 'typescript-language-server', 'typescript'),
+        install_method='npm',
+    ),
+    'deno': ToolSpec(
         name='deno',
         language='typescript',
         extensions=('.ts', '.tsx', '.js', '.jsx', '.mjs', '.mts', '.cts'),
         command=('deno', 'lsp'),
         probe=('deno', '--version'),
+        install_method='binary',
     ),
-    ToolSpec(
+    'json': ToolSpec(
         name='vscode-json-languageserver',
         language='json',
         extensions=('.json',),
         command=('vscode-json-languageserver', '--stdio'),
+        install=('npm', 'install', '-g', 'vscode-json-languageserver'),
+        install_method='npm',
     ),
-    ToolSpec(
+    'go': ToolSpec(
         name='gopls',
         language='go',
         extensions=('.go',),
         command=('gopls',),
+        install=('go', 'install', 'golang.org/x/tools/gopls@latest'),
+        install_method='go',
     ),
-    ToolSpec(
+    'rust': ToolSpec(
         name='rust-analyzer',
         language='rust',
         extensions=('.rs',),
         command=('rust-analyzer',),
+        install=('rustup', 'component', 'add', 'rust-analyzer'),
+        install_method='rustup',
     ),
-    ToolSpec(
+    'cpp': ToolSpec(
         name='clangd',
         language='cpp',
         extensions=('.c', '.cc', '.cpp', '.cxx', '.h', '.hpp', '.m', '.mm'),
         command=('clangd',),
+        install_method='binary',
     ),
-    ToolSpec(
+    'lua': ToolSpec(
         name='lua-language-server',
         language='lua',
         extensions=('.lua',),
         command=('lua-language-server',),
+        install_method='binary',
     ),
-    ToolSpec(
+    'ruby': ToolSpec(
         name='ruby-lsp',
         language='ruby',
         extensions=('.rb', '.rake', '.gemspec', '.ru'),
         command=('ruby-lsp',),
         probe=('ruby-lsp', '--version'),
+        install=('gem', 'install', 'ruby-lsp'),
+        install_method='gem',
     ),
-    ToolSpec(
-        name='solargraph',
-        language='ruby',
-        extensions=('.rb', '.rake', '.gemspec', '.ru'),
-        command=('solargraph', 'stdio'),
-        probe=('solargraph', '--version'),
-    ),
-    ToolSpec(
+    'php': ToolSpec(
         name='intelephense',
         language='php',
         extensions=('.php',),
         command=('intelephense', '--stdio'),
+        install=('npm', 'install', '-g', 'intelephense'),
+        install_method='npm',
     ),
-    ToolSpec(
+    'java': ToolSpec(
         name='jdtls',
         language='java',
         extensions=('.java',),
         command=('jdtls',),
         probe=('jdtls', '--help'),
+        install_method='binary',
     ),
-    ToolSpec(
+    'kotlin': ToolSpec(
         name='kotlin-language-server',
         language='kotlin',
         extensions=('.kt', '.kts'),
         command=('kotlin-language-server',),
         probe=('kotlin-language-server', '--version'),
+        install_method='binary',
     ),
-    ToolSpec(
+    'csharp': ToolSpec(
         name='csharp-ls',
         language='csharp',
         extensions=('.cs', '.csx'),
         command=('csharp-ls',),
         probe=('csharp-ls', '--version'),
+        install=('dotnet', 'tool', 'install', '-g', 'csharp-ls'),
+        install_method='dotnet',
     ),
-    ToolSpec(
-        name='omnisharp',
-        language='csharp',
-        extensions=('.cs',),
-        command=('OmniSharp', '--languageserver'),
-        probe=('OmniSharp', '--version'),
-    ),
-    ToolSpec(
+    'fsharp': ToolSpec(
         name='fsautocomplete',
         language='fsharp',
         extensions=('.fs', '.fsi', '.fsx', '.fsscript'),
         command=('fsautocomplete',),
         probe=('fsautocomplete', '--version'),
+        install=('dotnet', 'tool', 'install', '-g', 'fsautocomplete'),
+        install_method='dotnet',
     ),
-    ToolSpec(
+    'bash': ToolSpec(
         name='bash-language-server',
         language='bash',
         extensions=('.sh', '.bash', '.zsh', '.ksh'),
         command=('bash-language-server', 'start'),
         probe=('bash-language-server', '--version'),
+        install=('npm', 'install', '-g', 'bash-language-server'),
+        install_method='npm',
     ),
-    ToolSpec(
+    'html': ToolSpec(
         name='vscode-html-language-server',
         language='html',
         extensions=('.html', '.htm'),
         command=('vscode-html-language-server', '--stdio'),
+        install=('npm', 'install', '-g', 'vscode-html-languageserver-bin'),
+        install_method='npm',
     ),
-    ToolSpec(
+    'css': ToolSpec(
         name='vscode-css-language-server',
         language='css',
         extensions=('.css', '.scss', '.less'),
         command=('vscode-css-language-server', '--stdio'),
+        install=('npm', 'install', '-g', 'vscode-css-languageserver-bin'),
+        install_method='npm',
     ),
-    ToolSpec(
+    'yaml': ToolSpec(
         name='yaml-language-server',
         language='yaml',
         extensions=('.yaml', '.yml'),
         command=('yaml-language-server', '--stdio'),
+        install=('npm', 'install', '-g', 'yaml-language-server'),
+        install_method='npm',
     ),
-    ToolSpec(
-        name='terraform-ls',
-        language='terraform',
-        extensions=('.tf', '.tfvars'),
-        command=('terraform-ls', 'serve'),
-        probe=('terraform-ls', 'version'),
-    ),
-    ToolSpec(
-        name='taplo',
-        language='toml',
-        extensions=('.toml',),
-        command=('taplo', 'lsp', 'stdio'),
-        probe=('taplo', '--version'),
-    ),
-    ToolSpec(
-        name='dart',
-        language='dart',
-        extensions=('.dart',),
-        command=('dart', 'language-server'),
-        probe=('dart', '--version'),
-    ),
-    ToolSpec(
-        name='sourcekit-lsp',
-        language='swift',
-        extensions=('.swift',),
-        command=('sourcekit-lsp',),
-    ),
-    ToolSpec(
-        name='zls',
-        language='zig',
-        extensions=('.zig', '.zon'),
-        command=('zls',),
-        probe=('zls', 'version'),
-    ),
-    ToolSpec(
-        name='haskell-language-server',
-        language='haskell',
-        extensions=('.hs', '.lhs'),
-        command=('haskell-language-server-wrapper', '--lsp'),
-        probe=('haskell-language-server-wrapper', '--version'),
-    ),
-    ToolSpec(
-        name='elixir-ls',
-        language='elixir',
-        extensions=('.ex', '.exs'),
-        command=('elixir-ls',),
-    ),
-    ToolSpec(
-        name='erlang_ls',
-        language='erlang',
-        extensions=('.erl', '.hrl'),
-        command=('erlang_ls',),
-        probe=('erlang_ls', 'version'),
-    ),
-    ToolSpec(
-        name='clojure-lsp',
-        language='clojure',
-        extensions=('.clj', '.cljs', '.cljc', '.edn'),
-        command=('clojure-lsp',),
-        probe=('clojure-lsp', 'version'),
-    ),
-    ToolSpec(
-        name='gleam',
-        language='gleam',
-        extensions=('.gleam',),
-        command=('gleam', 'lsp'),
-        probe=('gleam', '--version'),
-    ),
-    ToolSpec(
-        name='vue-language-server',
-        language='vue',
-        extensions=('.vue',),
-        command=('vue-language-server', '--stdio'),
-    ),
-    ToolSpec(
-        name='svelteserver',
-        language='svelte',
-        extensions=('.svelte',),
-        command=('svelteserver', '--stdio'),
-    ),
-    ToolSpec(
-        name='astro-ls',
-        language='astro',
-        extensions=('.astro',),
-        command=('astro-ls', '--stdio'),
-    ),
-    ToolSpec(
-        name='graphql-lsp',
-        language='graphql',
-        extensions=('.graphql', '.gql'),
-        command=('graphql-lsp', 'server', '-m', 'stream'),
-        probe=('graphql-lsp', '--version'),
-    ),
-    ToolSpec(
-        name='sqls',
-        language='sql',
-        extensions=('.sql',),
-        command=('sqls',),
-        probe=('sqls', '--version'),
-    ),
-    ToolSpec(
-        name='texlab',
-        language='latex',
-        extensions=('.tex',),
-        command=('texlab',),
-        probe=('texlab', '--version'),
-    ),
-    ToolSpec(
-        name='lemminx',
-        language='xml',
-        extensions=('.xml',),
-        command=('lemminx',),
-    ),
-    ToolSpec(
-        name='cmake-language-server',
-        language='cmake',
-        extensions=('.cmake',),
-        command=('cmake-language-server',),
-        probe=('cmake-language-server', '--version'),
-    ),
-    ToolSpec(
-        name='docker-langserver',
-        language='dockerfile',
-        extensions=('.dockerfile',),
-        command=('docker-langserver', '--stdio'),
-        probe=('docker-langserver', '--version'),
-    ),
-    ToolSpec(
-        name='marksman',
-        language='markdown',
-        extensions=('.md', '.markdown'),
-        command=('marksman', 'server'),
-        probe=('marksman', '--version'),
-    ),
-    ToolSpec(
-        name='buf',
-        language='proto',
-        extensions=('.proto',),
-        command=('buf', 'lsp', 'serve', '--timeout', '0'),
-        probe=('buf', '--version'),
-    ),
-    # ── Extended registry (probe-only; install tools on the host) ───────────
-    ToolSpec(
-        name='ruff',
-        language='python',
-        extensions=('.py', '.pyw', '.pyi'),
-        command=('ruff', 'server'),
-        probe=('ruff', '--version'),
-    ),
-    ToolSpec(
-        name='basedpyright-langserver',
-        language='python',
-        extensions=('.py', '.pyw', '.pyi'),
-        command=('basedpyright-langserver', '--stdio'),
-        probe=('basedpyright-langserver', '--version'),
-    ),
-    ToolSpec(
-        name='jedi-language-server',
-        language='python',
-        extensions=('.py', '.pyw', '.pyi'),
-        command=('jedi-language-server',),
-        probe=('jedi-language-server', '--version'),
-    ),
-    ToolSpec(
-        name='eslint-language-server',
-        language='javascript',
-        extensions=(
-            '.ts',
-            '.tsx',
-            '.js',
-            '.jsx',
-            '.mjs',
-            '.cjs',
-            '.mts',
-            '.cts',
-            '.vue',
-            '.svelte',
-            '.astro',
-        ),
-        command=('eslint-language-server', '--stdio'),
-        probe=('eslint-language-server', '--version'),
-    ),
-    ToolSpec(
-        name='oxlint',
-        language='javascript',
-        extensions=(
-            '.ts',
-            '.tsx',
-            '.js',
-            '.jsx',
-            '.mjs',
-            '.cjs',
-            '.mts',
-            '.cts',
-            '.vue',
-            '.svelte',
-            '.astro',
-        ),
-        command=('oxlint', '--lsp'),
-        probe=('oxlint', '--version'),
-    ),
-    ToolSpec(
-        name='biome',
-        language='javascript',
-        extensions=(
-            '.ts',
-            '.tsx',
-            '.js',
-            '.jsx',
-            '.mjs',
-            '.cjs',
-            '.mts',
-            '.cts',
-            '.vue',
-            '.svelte',
-            '.astro',
-            '.json',
-        ),
-        command=('biome', 'lsp-proxy', '--stdio'),
-        probe=('biome', '--version'),
-    ),
-    ToolSpec(
-        name='flow',
-        language='javascript',
-        extensions=('.js', '.jsx', '.mjs', '.cjs'),
-        command=('flow', 'lsp'),
-        probe=('flow', 'version'),
-    ),
-    ToolSpec(
-        name='prisma-language-server',
-        language='prisma',
-        extensions=('.prisma',),
-        command=('prisma-language-server', '--stdio'),
-        probe=('prisma-language-server', '--version'),
-    ),
-    ToolSpec(
-        name='nixd',
-        language='nix',
-        extensions=('.nix',),
-        command=('nixd',),
-        probe=('nixd', '--version'),
-    ),
-    ToolSpec(
-        name='nil',
-        language='nix',
-        extensions=('.nix',),
-        command=('nil',),
-        probe=('nil', '--version'),
-    ),
-    ToolSpec(
-        name='ocamllsp',
-        language='ocaml',
-        extensions=('.ml', '.mli'),
-        command=('ocamllsp',),
-        probe=('ocamllsp', '--version'),
-    ),
-    ToolSpec(
-        name='tinymist',
-        language='typst',
-        extensions=('.typ', '.typc'),
-        command=('tinymist',),
-        probe=('tinymist', '--version'),
-    ),
-    ToolSpec(
-        name='rzls',
-        language='razor',
-        extensions=('.razor', '.cshtml'),
-        command=('rzls',),
-        probe=('rzls', '--version'),
-    ),
-    ToolSpec(
-        name='metals',
-        language='scala',
-        extensions=('.scala', '.sc'),
-        command=('metals',),
-        probe=('metals', '--version'),
-    ),
-    ToolSpec(
-        name='tailwindcss-language-server',
-        language='tailwind',
-        extensions=('.css', '.scss', '.less', '.html', '.htm', '.js', '.jsx', '.ts', '.tsx'),
-        command=('tailwindcss-language-server', '--stdio'),
-        probe=('tailwindcss-language-server', '--version'),
-    ),
-    ToolSpec(
+    'ansible': ToolSpec(
         name='ansible-language-server',
         language='ansible',
         extensions=('.yml', '.yaml'),
         command=('ansible-language-server', '--stdio'),
         probe=('ansible-language-server', '--version'),
+        install=('npm', 'install', '-g', '@ansible/ansible-language-server'),
+        install_method='npm',
     ),
-    ToolSpec(
+    'helm': ToolSpec(
         name='helm-ls',
         language='helm',
         extensions=('.yaml', '.yml', '.tpl'),
         command=('helm-ls', 'serve'),
         probe=('helm-ls', 'version'),
+        install_method='binary',
     ),
-    ToolSpec(
+    'terraform': ToolSpec(
+        name='terraform-ls',
+        language='terraform',
+        extensions=('.tf', '.tfvars'),
+        command=('terraform-ls', 'serve'),
+        probe=('terraform-ls', 'version'),
+        install_method='binary',
+    ),
+    'toml': ToolSpec(
+        name='taplo',
+        language='toml',
+        extensions=('.toml',),
+        command=('taplo', 'lsp', 'stdio'),
+        probe=('taplo', '--version'),
+        install_method='binary',
+    ),
+    'dart': ToolSpec(
+        name='dart',
+        language='dart',
+        extensions=('.dart',),
+        command=('dart', 'language-server'),
+        probe=('dart', '--version'),
+        install_method='binary',
+    ),
+    'swift': ToolSpec(
+        name='sourcekit-lsp',
+        language='swift',
+        extensions=('.swift',),
+        command=('sourcekit-lsp',),
+        install_method='binary',
+    ),
+    'zig': ToolSpec(
+        name='zls',
+        language='zig',
+        extensions=('.zig', '.zon'),
+        command=('zls',),
+        probe=('zls', 'version'),
+        install_method='binary',
+    ),
+    'haskell': ToolSpec(
+        name='haskell-language-server',
+        language='haskell',
+        extensions=('.hs', '.lhs'),
+        command=('haskell-language-server-wrapper', '--lsp'),
+        probe=('haskell-language-server-wrapper', '--version'),
+        install_method='binary',
+    ),
+    'elixir': ToolSpec(
+        name='elixir-ls',
+        language='elixir',
+        extensions=('.ex', '.exs'),
+        command=('elixir-ls',),
+        install_method='binary',
+    ),
+    'erlang': ToolSpec(
+        name='erlang_ls',
+        language='erlang',
+        extensions=('.erl', '.hrl'),
+        command=('erlang_ls',),
+        probe=('erlang_ls', 'version'),
+        install_method='binary',
+    ),
+    'clojure': ToolSpec(
+        name='clojure-lsp',
+        language='clojure',
+        extensions=('.clj', '.cljs', '.cljc', '.edn'),
+        command=('clojure-lsp',),
+        probe=('clojure-lsp', 'version'),
+        install_method='binary',
+    ),
+    'gleam': ToolSpec(
+        name='gleam',
+        language='gleam',
+        extensions=('.gleam',),
+        command=('gleam', 'lsp'),
+        probe=('gleam', '--version'),
+        install_method='binary',
+    ),
+    'vue': ToolSpec(
+        name='vue-language-server',
+        language='vue',
+        extensions=('.vue',),
+        command=('vue-language-server', '--stdio'),
+        install=('npm', 'install', '-g', '@vue/language-server'),
+        install_method='npm',
+    ),
+    'svelte': ToolSpec(
+        name='svelteserver',
+        language='svelte',
+        extensions=('.svelte',),
+        command=('svelteserver', '--stdio'),
+        install=('npm', 'install', '-g', 'svelte-language-server'),
+        install_method='npm',
+    ),
+    'astro': ToolSpec(
+        name='astro-ls',
+        language='astro',
+        extensions=('.astro',),
+        command=('astro-ls', '--stdio'),
+        install=('npm', 'install', '-g', '@astrojs/language-server'),
+        install_method='npm',
+    ),
+    'graphql': ToolSpec(
+        name='graphql-lsp',
+        language='graphql',
+        extensions=('.graphql', '.gql'),
+        command=('graphql-lsp', 'server', '-m', 'stream'),
+        probe=('graphql-lsp', '--version'),
+        install=('npm', 'install', '-g', 'graphql-language-service-cli'),
+        install_method='npm',
+    ),
+    'sql': ToolSpec(
+        name='sqls',
+        language='sql',
+        extensions=('.sql',),
+        command=('sqls',),
+        probe=('sqls', '--version'),
+        install_method='binary',
+    ),
+    'latex': ToolSpec(
+        name='texlab',
+        language='latex',
+        extensions=('.tex',),
+        command=('texlab',),
+        probe=('texlab', '--version'),
+        install_method='binary',
+    ),
+    'xml': ToolSpec(
+        name='lemminx',
+        language='xml',
+        extensions=('.xml',),
+        command=('lemminx',),
+        install_method='binary',
+    ),
+    'cmake': ToolSpec(
+        name='cmake-language-server',
+        language='cmake',
+        extensions=('.cmake',),
+        command=('cmake-language-server',),
+        probe=('cmake-language-server', '--version'),
+        install=('pip', 'install', 'cmake-language-server'),
+        install_method='pip',
+    ),
+    'dockerfile': ToolSpec(
+        name='docker-langserver',
+        language='dockerfile',
+        extensions=('.dockerfile',),
+        command=('docker-langserver', '--stdio'),
+        probe=('docker-langserver', '--version'),
+        install=('npm', 'install', '-g', 'dockerfile-language-server-nodejs'),
+        install_method='npm',
+    ),
+    'markdown': ToolSpec(
+        name='marksman',
+        language='markdown',
+        extensions=('.md', '.markdown'),
+        command=('marksman', 'server'),
+        probe=('marksman', '--version'),
+        install_method='binary',
+    ),
+    'proto': ToolSpec(
+        name='buf',
+        language='proto',
+        extensions=('.proto',),
+        command=('buf', 'lsp', 'serve', '--timeout', '0'),
+        probe=('buf', '--version'),
+        install_method='binary',
+    ),
+    'prisma': ToolSpec(
+        name='prisma-language-server',
+        language='prisma',
+        extensions=('.prisma',),
+        command=('prisma-language-server', '--stdio'),
+        probe=('prisma-language-server', '--version'),
+        install=('npm', 'install', '-g', '@prisma/language-server'),
+        install_method='npm',
+    ),
+    'nix': ToolSpec(
+        name='nixd',
+        language='nix',
+        extensions=('.nix',),
+        command=('nixd',),
+        probe=('nixd', '--version'),
+        install_method='binary',
+    ),
+    'ocaml': ToolSpec(
+        name='ocamllsp',
+        language='ocaml',
+        extensions=('.ml', '.mli'),
+        command=('ocamllsp',),
+        probe=('ocamllsp', '--version'),
+        install_method='binary',
+    ),
+    'typst': ToolSpec(
+        name='tinymist',
+        language='typst',
+        extensions=('.typ', '.typc'),
+        command=('tinymist',),
+        probe=('tinymist', '--version'),
+        install_method='binary',
+    ),
+    'razor': ToolSpec(
+        name='rzls',
+        language='razor',
+        extensions=('.razor', '.cshtml'),
+        command=('rzls',),
+        probe=('rzls', '--version'),
+        install_method='binary',
+    ),
+    'scala': ToolSpec(
+        name='metals',
+        language='scala',
+        extensions=('.scala', '.sc'),
+        command=('metals',),
+        probe=('metals', '--version'),
+        install_method='binary',
+    ),
+    'solidity': ToolSpec(
         name='solidity-ls',
         language='solidity',
         extensions=('.sol',),
         command=('solidity-ls', '--stdio'),
         probe=('solidity-ls', '--version'),
+        install_method='npm',
     ),
-    ToolSpec(
+    'purescript': ToolSpec(
         name='purescript-language-server',
         language='purescript',
         extensions=('.purs',),
         command=('purescript-language-server', '--stdio'),
         probe=('purescript-language-server', '--version'),
+        install=('npm', 'install', '-g', 'purescript-language-server'),
+        install_method='npm',
     ),
-    ToolSpec(
+    'reason': ToolSpec(
         name='reason-language-server',
         language='reason',
         extensions=('.re', '.rei'),
         command=('reason-language-server',),
         probe=('reason-language-server', '--version'),
+        install_method='binary',
     ),
-    ToolSpec(
+    'rescript': ToolSpec(
         name='rescript-language-server',
         language='rescript',
         extensions=('.res', '.resi'),
         command=('rescript-language-server',),
         probe=('rescript-language-server', '--version'),
+        install=('npm', 'install', '-g', '@rescript/language-server'),
+        install_method='npm',
     ),
-    ToolSpec(
+    'perl': ToolSpec(
         name='pls',
         language='perl',
         extensions=('.pl', '.pm', '.t'),
         command=('pls',),
         probe=('pls', '--version'),
+        install=('cpan', 'PLS'),
+        install_method='cpan',
     ),
-    ToolSpec(
-        name='ltex-ls',
-        language='latex',
-        extensions=('.tex', '.md', '.markdown'),
-        command=('ltex-ls',),
-        probe=('ltex-ls', '--version'),
-    ),
-    ToolSpec(
+    'smithy': ToolSpec(
         name='smithy-language-server',
         language='smithy',
         extensions=('.smithy',),
         command=('smithy-language-server',),
         probe=('smithy-language-server', '--version'),
+        install_method='binary',
     ),
-    ToolSpec(
+    'fortran': ToolSpec(
         name='fortls',
         language='fortran',
         extensions=('.f', '.for', '.f90', '.f95', '.f03'),
         command=('fortls',),
         probe=('fortls', '--version'),
+        install=('pip', 'install', 'fortls'),
+        install_method='pip',
     ),
-    ToolSpec(
+    'nim': ToolSpec(
         name='nimlangserver',
         language='nim',
         extensions=('.nim', '.nims'),
         command=('nimlangserver',),
         probe=('nimlangserver', '--version'),
+        install=('pip', 'install', 'nimlangserver'),
+        install_method='pip',
     ),
-    ToolSpec(
+    'crystal': ToolSpec(
         name='crystalline',
         language='crystal',
         extensions=('.cr',),
         command=('crystalline',),
         probe=('crystalline', '--version'),
+        install_method='binary',
     ),
-    ToolSpec(
+    'd': ToolSpec(
         name='serve-d',
         language='d',
         extensions=('.d',),
         command=('serve-d',),
         probe=('serve-d', '--version'),
+        install_method='binary',
     ),
-    ToolSpec(
+    'lean': ToolSpec(
         name='lean',
         language='lean',
         extensions=('.lean',),
         command=('lean', '--server'),
         probe=('lean', '--version'),
+        install_method='binary',
     ),
-    ToolSpec(
+    'idris': ToolSpec(
         name='idris2-lsp',
         language='idris',
         extensions=('.idr',),
         command=('idris2', 'lsp'),
         probe=('idris2', '--version'),
+        install_method='binary',
     ),
-    ToolSpec(
+    'roc': ToolSpec(
         name='roc-lsp',
         language='roc',
         extensions=('.roc',),
         command=('roc', 'lsp'),
         probe=('roc', '--version'),
+        install_method='binary',
     ),
-    ToolSpec(
+    'slint': ToolSpec(
         name='slint-lsp',
         language='slint',
         extensions=('.slint',),
         command=('slint-lsp',),
         probe=('slint-lsp', '--version'),
+        install_method='binary',
     ),
-    ToolSpec(
+    'wgsl': ToolSpec(
         name='wgsl-analyzer',
         language='wgsl',
         extensions=('.wgsl',),
         command=('wgsl-analyzer',),
         probe=('wgsl-analyzer', '--version'),
+        install=('cargo', 'install', 'wgsl_analyzer'),
+        install_method='cargo',
     ),
-    ToolSpec(
+    'vhdl': ToolSpec(
         name='vhdl-ls',
         language='vhdl',
         extensions=('.vhd', '.vhdl'),
         command=('vhdl_ls',),
         probe=('vhdl_ls', '--version'),
+        install=('cargo', 'install', 'vhdl_ls'),
+        install_method='cargo',
     ),
-    ToolSpec(
+    'systemverilog': ToolSpec(
         name='svls',
         language='systemverilog',
         extensions=('.sv', '.svh'),
         command=('svls',),
         probe=('svls', '--version'),
+        install=('cargo', 'install', 'svls'),
+        install_method='cargo',
     ),
-    ToolSpec(
+    'rego': ToolSpec(
         name='regal',
         language='rego',
         extensions=('.rego',),
         command=('regal', 'language-server'),
         probe=('regal', 'version'),
+        install=('go', 'install', 'github.com/styrainc/regal/cmd/regal@latest'),
+        install_method='go',
     ),
-    ToolSpec(
+    'openscad': ToolSpec(
         name='openscad-lsp',
         language='openscad',
         extensions=('.scad',),
         command=('openscad-lsp',),
         probe=('openscad-lsp', '--version'),
+        install=('cargo', 'install', 'openscad-lsp'),
+        install_method='cargo',
     ),
-    ToolSpec(
+    'nickel': ToolSpec(
         name='nickel',
         language='nickel',
         extensions=('.ncl',),
         command=('nickel', 'lsp'),
         probe=('nickel', '--version'),
+        install_method='binary',
     ),
-    ToolSpec(
+    'cairo': ToolSpec(
         name='cairo-language-server',
         language='cairo',
         extensions=('.cairo',),
         command=('cairo-language-server',),
         probe=('cairo-language-server', '--version'),
+        install_method='binary',
     ),
-    ToolSpec(
+    'move': ToolSpec(
         name='move-analyzer',
         language='move',
         extensions=('.move',),
         command=('move-analyzer',),
         probe=('move-analyzer', '--version'),
+        install_method='binary',
     ),
-    ToolSpec(
+    'pascal': ToolSpec(
         name='pasls',
         language='pascal',
         extensions=('.pas', '.pp'),
         command=('pasls',),
         probe=('pasls', '--version'),
+        install_method='binary',
     ),
-    ToolSpec(
+    'futhark': ToolSpec(
         name='futhark-lsp',
         language='futhark',
         extensions=('.fut',),
         command=('futhark-lsp',),
         probe=('futhark-lsp', '--version'),
+        install_method='binary',
     ),
-    ToolSpec(
+    'wat': ToolSpec(
         name='wasm-language-tools',
         language='wat',
         extensions=('.wat', '.wast'),
         command=('wasm-language-tools', 'server'),
         probe=('wasm-language-tools', '--version'),
+        install=('npm', 'install', '-g', '@vscode/wasm-wasi-lsp'),
+        install_method='npm',
     ),
-    ToolSpec(
+    'v': ToolSpec(
         name='v-analyzer',
         language='v',
         extensions=('.v',),
         command=('v-analyzer',),
         probe=('v-analyzer', '--version'),
+        install_method='binary',
     ),
-    ToolSpec(
+    'erg': ToolSpec(
         name='erg-language-server',
         language='erg',
         extensions=('.e', '.ej'),
         command=('erg-language-server',),
         probe=('erg-language-server', '--version'),
+        install_method='binary',
     ),
-    ToolSpec(
+    'starlark': ToolSpec(
         name='starlark',
         language='starlark',
         extensions=('.bzl', '.star'),
         command=('starlark',),
         probe=('starlark', '--version'),
+        install_method='binary',
     ),
-    ToolSpec(
+    'glsl': ToolSpec(
         name='glsl_analyzer',
         language='glsl',
         extensions=('.glsl', '.vert', '.frag', '.comp'),
         command=('glsl_analyzer',),
         probe=('glsl_analyzer', '--version'),
+        install_method='binary',
     ),
-    ToolSpec(
+    'julia': ToolSpec(
         name='julials',
         language='julia',
         extensions=('.jl',),
@@ -733,8 +734,54 @@ LSP_SERVERS: tuple[ToolSpec, ...] = (
             'using LanguageServer; LanguageServer.runserver()',
         ),
         probe=('julia', '--version'),
+        install_method='binary',
     ),
+}
+
+# Marker-disambiguated languages — their extensions are also claimed by a
+# default language; the marker check in resolve_language_key decides which
+# one wins.  Excluded from the default extension map below so the default
+# language wins when no marker is present.
+_MARKER_LANGUAGE_KEYS = frozenset({'deno', 'ansible', 'helm'})
+
+# Build the default extension → language-key map from the non-marker specs.
+_EXTENSION_TO_LANGUAGE_KEY: dict[str, str] = {}
+for _key, _spec in CANONICAL_LSP_SERVERS.items():
+    if _key in _MARKER_LANGUAGE_KEYS:
+        continue
+    for _ext in _spec.extensions:
+        _EXTENSION_TO_LANGUAGE_KEY[_ext] = _key
+del _key, _spec
+
+# Extensions shared between a default language and marker-based alternatives.
+_DENO_EXTENSIONS = frozenset(
+    {'.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts'}
 )
+_YAML_EXTENSIONS = frozenset({'.yml', '.yaml'})
+
+
+def _unique_server_specs() -> tuple[ToolSpec, ...]:
+    """Deduplicate canonical specs by server name for detection.
+
+    Servers shared across languages (e.g. typescript-language-server) appear
+    once per language in ``CANONICAL_LSP_SERVERS``; probing the same binary
+    multiple times is wasted work.
+    """
+    seen: dict[str, ToolSpec] = {}
+    for spec in CANONICAL_LSP_SERVERS.values():
+        seen.setdefault(spec.name, spec)
+    return tuple(seen.values())
+
+
+def canonical_spec_for_extension(ext: str) -> ToolSpec | None:
+    """Return the canonical ToolSpec for *ext*, or None if unsupported."""
+    normalized = ext.lower()
+    if not normalized.startswith('.'):
+        normalized = f'.{normalized}'
+    key = _EXTENSION_TO_LANGUAGE_KEY.get(normalized)
+    if key is None:
+        return None
+    return CANONICAL_LSP_SERVERS.get(key)
 
 
 # DAP adapters live in :mod:`backend.execution.debugger` (``_DAP_ADAPTER_RECIPES``
@@ -821,8 +868,9 @@ def _probe(spec: ToolSpec) -> DetectedTool:
         return _probe_python_hosted(spec, module)
 
     head = spec.command[0]
-    resolved = shutil.which(head)
+    resolved = which_normalized(head)
     if resolved is not None:
+        resolved = to_native_path(resolved)
         return DetectedTool(
             spec=spec,
             available=True,
@@ -834,7 +882,7 @@ def _probe(spec: ToolSpec) -> DetectedTool:
         probe_head = spec.probe[0]
         probe_runnable = (
             os.path.normcase(probe_head) == os.path.normcase(sys.executable)
-            or shutil.which(probe_head) is not None
+            or which_normalized(probe_head) is not None
         )
         if probe_runnable and _run_probe_command(spec.probe):
             return DetectedTool(
@@ -863,7 +911,7 @@ def detect_lsp_servers() -> dict[str, DetectedTool]:
     global _lsp_cache
     with _lock:
         if _lsp_cache is None:
-            _lsp_cache = _detect_all(LSP_SERVERS)
+            _lsp_cache = _detect_all(_unique_server_specs())
         return _lsp_cache
 
 
@@ -893,27 +941,7 @@ def lsp_command_for_file(
     """Return the resolved LSP command for a file path, or None."""
     from backend.utils.lsp.lsp_project_routing import lsp_context_for_file
 
-    if workspace_root is not None:
-        from pathlib import Path as _Path
-
-        from backend.utils.lsp.lsp_project_routing import (
-            find_project_root,
-            resolve_lsp_command,
-        )
-
-        path = _Path(file_path)
-        ext = path.suffix.lower()
-        if not ext:
-            return None
-        root = workspace_root
-        return resolve_lsp_command(
-            ext,
-            detect_lsp_servers(),
-            LSP_SERVERS,
-            workspace_root=root,
-        )
-
-    ctx = lsp_context_for_file(file_path)
+    ctx = lsp_context_for_file(file_path, workspace_root=workspace_root)
     return ctx.command if ctx is not None else None
 
 
@@ -985,9 +1013,10 @@ def detection_summary() -> dict[str, list[str]]:
 
 
 __all__ = [
+    'CANONICAL_LSP_SERVERS',
     'DetectedTool',
-    'LSP_SERVERS',
     'ToolSpec',
+    'canonical_spec_for_extension',
     'detect_debug_adapters_summary',
     'detect_lsp_servers',
     'detection_summary',

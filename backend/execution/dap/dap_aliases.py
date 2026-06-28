@@ -1,11 +1,8 @@
-"""Shared IDE / toolchain labels → Grinta canonical language adapter keys.
+"""DAP adapter name normalization.
 
 VS Code ``launch.json`` and debugger ``type`` fields use labels like ``pwa-node``
-that do not match our internal recipe keys (e.g. ``javascript``). LSP queries
-are mostly extension-driven; debugger actions often carry those IDE strings.
-
-Keep alias tables small and explicit — normalize once here, reuse from DAP and
-runtime detection helpers.
+that do not match our internal recipe keys (e.g. ``javascript``). This module
+normalizes those IDE-specific labels to canonical adapter keys.
 """
 
 from __future__ import annotations

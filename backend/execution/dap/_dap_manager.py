@@ -22,16 +22,16 @@ from backend.execution.dap._dap_adapters import (
 )
 from backend.execution.dap._dap_errors import DAPError
 from backend.execution.dap._dap_logging import _dap_log
+from backend.execution.dap._dap_session import DAPDebugSession
 from backend.execution.dap._dap_spawn_utils import (
     resolve_debugger_start_timeout,
     resolve_python_executable,
     validate_debugger_start,
 )
-from backend.execution.dap._dap_session import DAPDebugSession
+from backend.execution.dap.dap_aliases import normalize_debug_adapter_name
 from backend.ledger.action.debugger import DebuggerAction
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.debugger import DebuggerObservation
-from backend.utils.lsp.language_tool_aliases import normalize_debug_adapter_name
 
 
 class DAPDebugManager:

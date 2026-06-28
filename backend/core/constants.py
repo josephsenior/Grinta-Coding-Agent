@@ -220,7 +220,7 @@ DEBUGGER_START_TIMEOUT_SECONDS = float(
 # matches the controller's pending-action floor for each ActionType. A small
 # buffer is added on top of each tool's own ``action.timeout`` at the call site.
 TOOL_BRIDGE_TIMEOUT_FILE_IO = 30.0
-TOOL_BRIDGE_TIMEOUT_LSP_QUERY = 30.0
+TOOL_BRIDGE_TIMEOUT_READ_ONLY = 30.0
 TOOL_BRIDGE_TIMEOUT_DEBUGGER = DEBUGGER_PENDING_ACTION_TIMEOUT_FLOOR
 TOOL_BRIDGE_TIMEOUT_TERMINAL_RUN = TERMINAL_RUN_PENDING_ACTION_TIMEOUT_FLOOR
 TOOL_BRIDGE_TIMEOUT_TERMINAL_IO = TERMINAL_IO_PENDING_ACTION_TIMEOUT_FLOOR
@@ -716,6 +716,27 @@ ENV_VAR_REGISTRY: dict[str, tuple[str, str]] = {
         '120',
         'Max seconds to wait for the first streamed LLM chunk before timeout or '
         'non-streaming fallback',
+    ),
+    # LSP & diagnostics
+    'GRINTA_DISABLE_LSP_DETECTION': (
+        '',
+        'Set to 1 to skip LSP server detection entirely (has_any_lsp_server returns False)',
+    ),
+    'GRINTA_DISABLE_LSP_SESSION': (
+        '',
+        'Set to 1 to force the one-shot spawn-per-query path instead of persistent sessions',
+    ),
+    'GRINTA_LSP_DEBUG_STDERR': (
+        '',
+        'Set to 1 to live-log language-server stderr lines for debugging',
+    ),
+    'GRINTA_DISABLE_AUTO_LSP_DIAGNOSTICS': (
+        '',
+        'Set to 1 to disable the post-edit LSP diagnostics middleware',
+    ),
+    'GRINTA_LSP_AUTO_INSTALL': (
+        '1',
+        'Set to 0 to disable auto-installation of missing LSP servers on first query',
     ),
     # API versioning
     'APP_PERMISSIVE_API': (

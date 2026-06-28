@@ -10,18 +10,15 @@ from __future__ import annotations
 
 import importlib.util
 import inspect
-import shutil
 import socket
-import subprocess
-import sys
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any
 
 from backend.execution.dap._dap_spawn_utils import (
-    resolve_adapter_cwd,
     resolve_python_executable,
 )
+from backend.utils.path_normalize import to_native_path, which_normalized
 
 _LOGRECORD_EXTRA_FORBIDDEN: frozenset[str] | None = None
 
@@ -228,8 +225,9 @@ def _resolve_adapter_spec(
     for probe, build, transport in _recipe_candidates(recipe):
         if transport not in supported_transports:
             continue
-        exe = shutil.which(probe)
+        exe = which_normalized(probe)
         if exe:
+            exe = to_native_path(exe)
             return _build_adapter_spec(build, exe, transport, allocate_port=True)
     return None
 
@@ -253,7 +251,7 @@ def _unsupported_recipe_hint(language: str) -> str:
     for probe, _build, transport in _recipe_candidates(recipe):
         if transport in _SUPPORTED_DAP_TRANSPORTS:
             continue
-        if shutil.which(probe):
+        if which_normalized(probe):
             hits.append(f'{probe} ({transport})')
     return ', '.join(hits)
 
@@ -308,9 +306,10 @@ def detect_debug_adapters() -> list[dict[str, Any]]:
         first_found: dict[str, Any] | None = None
         first_supported: dict[str, Any] | None = None
         for probe, build, transport in _recipe_candidates(recipe):
-            exe = shutil.which(probe)
+            exe = which_normalized(probe)
             if not exe:
                 continue
+            exe = to_native_path(exe)
             spec = _build_adapter_spec(build, exe, transport, allocate_port=False)
             candidate = {
                 'adapter': probe,

@@ -1,8 +1,8 @@
-"""Tests for shared debugger/LSP-related alias maps."""
+"""Tests for DAP adapter name normalization."""
 
 from __future__ import annotations
 
-from backend.utils.lsp.language_tool_aliases import (
+from backend.execution.dap.dap_aliases import (
     DEBUG_ADAPTER_SYNONYMS,
     normalize_debug_adapter_name,
 )

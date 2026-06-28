@@ -43,22 +43,21 @@ def _render_parallel_scheduling_line(
 
 
 def _lsp_language_server_labels() -> list[str]:
-    """Return ``language → server`` labels matching the TUI LSP sidebar."""
-    from backend.utils.runtime_detect import detect_lsp_servers
+    """Return ``language → server`` labels matching the TUI LSP sidebar.
 
-    seen_languages: set[str] = set()
+    Iterates ``CANONICAL_LSP_SERVERS`` (one server per language) and
+    cross-references availability by server name — so the label always
+    matches the server that actually launches.
+    """
+    from backend.utils.runtime_detect import CANONICAL_LSP_SERVERS, detect_lsp_servers
+
+    detected = detect_lsp_servers()
     labels: list[str] = []
-    for name, tool in sorted(
-        detect_lsp_servers().items(),
-        key=lambda pair: (not pair[1].available, pair[1].spec.language, pair[0]),
-    ):
-        if not tool.available:
+    for key, spec in sorted(CANONICAL_LSP_SERVERS.items()):
+        tool = detected.get(spec.name)
+        if tool is None or not tool.available:
             continue
-        language = tool.spec.language
-        if language in seen_languages:
-            continue
-        seen_languages.add(language)
-        labels.append(f'{language} → {name}')
+        labels.append(f'{key} → {spec.name}')
     return labels
 
 
@@ -151,9 +150,7 @@ def _render_system_capabilities(
 
     condensation_tiers = (
         'working / episodic / semantic'
-        if _vector_memory_runtime(
-            config, semantic_recall_active=semantic_recall_active
-        )
+        if _vector_memory_runtime(config, semantic_recall_active=semantic_recall_active)
         else 'working / episodic'
     )
     condensation_line = (

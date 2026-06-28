@@ -777,30 +777,38 @@ def test_render_runtime_detection_omits_disabled_tools() -> None:
 
 
 def test_render_runtime_detection_lsp_uses_language_server_labels() -> None:
-    """LSP capability line mirrors sidebar: ``python → ruff``, not bare ``ruff``."""
+    """LSP capability line mirrors sidebar: ``python → pyright-langserver``,
+    derived from the canonical registry, not bare server names."""
     from types import SimpleNamespace
 
     from backend.engine.prompts.section_renderers import _render_runtime_detection_lines
 
     fake_servers = {
-        'ruff': SimpleNamespace(
+        'pyright-langserver': SimpleNamespace(
             available=True,
-            spec=SimpleNamespace(language='python'),
+            spec=SimpleNamespace(language='python', name='pyright-langserver'),
         ),
         'rust-analyzer': SimpleNamespace(
             available=True,
-            spec=SimpleNamespace(language='rust'),
+            spec=SimpleNamespace(language='rust', name='rust-analyzer'),
+        ),
+        'ruff': SimpleNamespace(
+            available=True,
+            spec=SimpleNamespace(language='python', name='ruff'),
         ),
         'pylsp': SimpleNamespace(
             available=False,
-            spec=SimpleNamespace(language='python'),
+            spec=SimpleNamespace(language='python', name='pylsp'),
         ),
     }
     with (
         patch('backend.utils.runtime_detect.has_any_lsp_server', return_value=True),
         patch(
             'backend.utils.runtime_detect.detection_summary',
-            return_value={'lsp_available': ['ruff', 'rust-analyzer'], 'debug_available': []},
+            return_value={
+                'lsp_available': ['pyright-langserver', 'rust-analyzer'],
+                'debug_available': [],
+            },
         ),
         patch(
             'backend.utils.runtime_detect.detect_lsp_servers',
@@ -810,8 +818,9 @@ def test_render_runtime_detection_lsp_uses_language_server_labels() -> None:
         lsp_on, _ = _render_runtime_detection_lines(
             SimpleNamespace(enable_lsp_query=True, enable_debugger=False)
         )
-    assert 'python → ruff' in lsp_on
+    assert 'python → pyright-langserver' in lsp_on
     assert 'rust → rust-analyzer' in lsp_on
+    assert 'ruff' not in lsp_on
     assert 'pylsp' not in lsp_on
     assert 'detected on PATH' not in lsp_on
 

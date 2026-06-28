@@ -28,9 +28,6 @@ from backend.utils.lsp.lsp_timeouts import (
     init_timeout_for_server,
 )
 
-# Kept for tests that monkeypatch directly.
-_PYLSP_AVAILABLE: bool | None = None  # None = not yet detected
-
 _UNAVAILABLE_HINT = (
     'No language server is installed for this file type. '
     'Use find_symbols or grep for structure search.'
@@ -63,28 +60,18 @@ def _run_lsp_subprocess(
     )
 
 
-def _detect_pylsp() -> bool:
-    """Return True when a Python language server is installed locally."""
-    global _PYLSP_AVAILABLE
-    if _PYLSP_AVAILABLE is not None:
-        return _PYLSP_AVAILABLE
-    try:
-        from backend.utils.runtime_detect import lsp_command_for_file
-
-        _PYLSP_AVAILABLE = lsp_command_for_file('_lsp_routing_placeholder.py') is not None
-    except Exception:
-        _PYLSP_AVAILABLE = False
-    return _PYLSP_AVAILABLE
-
-
-def _detect_any_lsp_server() -> bool:
-    """Return True when at least one supported LSP server is available."""
-    try:
-        from backend.utils.runtime_detect import has_any_lsp_server
-
-        return has_any_lsp_server()
-    except Exception:
-        return False
+# ── One-shot JSON-RPC request ids ──────────────────────────────────────────
+# Each one-shot query batch sends initialize (id=1) + didOpen + query +
+# shutdown in a single stdin payload to a short-lived subprocess.  Ids must
+# be unique within each batch and must not collide with the initialize id.
+_ONESHOT_ID_INIT = 1
+_ONESHOT_ID_HOVER = 10
+_ONESHOT_ID_HOVER_SHUTDOWN = 11
+_ONESHOT_ID_DOCUMENT_SYMBOL = 20
+_ONESHOT_ID_DOCUMENT_SYMBOL_SHUTDOWN = 21
+_ONESHOT_ID_CODE_ACTION = 30
+_ONESHOT_ID_CODE_ACTION_SHUTDOWN = 31
+_ONESHOT_ID_DIAGNOSTICS_SHUTDOWN = 99
 
 
 @dataclass
@@ -238,6 +225,49 @@ class LspClient:
 
     def _get_context(self, file_path: str) -> LspFileContext | None:
         try:
+            ctx = lsp_context_for_file(file_path)
+        except Exception:
+            return None
+        if ctx is not None:
+            return ctx
+        return self._try_auto_install(file_path)
+
+    def _try_auto_install(self, file_path: str) -> LspFileContext | None:
+        """Install the canonical server for *file_path*, then re-resolve."""
+        from backend.utils.lsp.lsp_installer import (
+            install_server,
+            is_auto_install_enabled,
+        )
+        from backend.utils.lsp.lsp_project_routing import (
+            find_project_root,
+            resolve_language_key,
+        )
+        from backend.utils.runtime_detect import (
+            CANONICAL_LSP_SERVERS,
+            reset_detection_cache,
+        )
+
+        if not is_auto_install_enabled():
+            return None
+        path = Path(file_path)
+        ext = path.suffix.lower()
+        if not ext:
+            return None
+        try:
+            root = find_project_root(path)
+            language_key = resolve_language_key(ext, root)
+            if language_key is None:
+                return None
+            spec = CANONICAL_LSP_SERVERS.get(language_key)
+            if spec is None:
+                return None
+            if not install_server(
+                spec.name,
+                spec.install,
+                spec.install_method,
+            ):
+                return None
+            reset_detection_cache()
             return lsp_context_for_file(file_path)
         except Exception:
             return None
@@ -334,7 +364,9 @@ class LspClient:
                 params = resp.get('params', {})
                 if params.get('uri') == uri:
                     errors.extend(
-                        self._diagnostics_from_payload(abs_path, uri, params.get('diagnostics', []))
+                        self._diagnostics_from_payload(
+                            abs_path, uri, params.get('diagnostics', [])
+                        )
                     )
         return errors
 
@@ -463,6 +495,8 @@ class LspClient:
         return parse_content_length_json_messages(raw)
 
     def _build_init_msgs(self, uri: str, file_path: str, source: str) -> list[dict]:
+        from backend.utils.lsp.lsp_capabilities import CLIENT_CAPABILITIES
+
         ctx = self._get_context(file_path)
         if ctx is None:
             raise RuntimeError(f'no LSP context for {file_path}')
@@ -471,7 +505,7 @@ class LspClient:
         return [
             {
                 'jsonrpc': '2.0',
-                'id': 1,
+                'id': _ONESHOT_ID_INIT,
                 'method': 'initialize',
                 'params': {
                     'processId': os.getpid(),
@@ -482,29 +516,7 @@ class LspClient:
                             'name': ctx.workspace_root.name or 'workspace',
                         }
                     ],
-                    'capabilities': {
-                        'textDocument': {
-                            'publishDiagnostics': {'relatedInformation': True},
-                            'documentSymbol': {
-                                'hierarchicalDocumentSymbolSupport': True,
-                            },
-                            'hover': {'contentFormat': ['markdown', 'plaintext']},
-                            'definition': {'linkSupport': True},
-                            'references': {},
-                            'codeAction': {
-                                'codeActionLiteralSupport': {
-                                    'codeActionKind': {
-                                        'valueSet': [
-                                            'quickfix',
-                                            'refactor',
-                                            'source',
-                                            'source.organizeImports',
-                                        ]
-                                    }
-                                }
-                            },
-                        }
-                    },
+                    'capabilities': CLIENT_CAPABILITIES,
                 },
             },
             {'jsonrpc': '2.0', 'method': 'initialized', 'params': {}},
@@ -599,7 +611,14 @@ class LspClient:
 
         server_cmd = list(ctx.command)
         msgs = self._build_init_msgs(uri, abs_path, source)
-        msgs.append({'jsonrpc': '2.0', 'method': 'shutdown', 'id': 99, 'params': {}})
+        msgs.append(
+            {
+                'jsonrpc': '2.0',
+                'method': 'shutdown',
+                'id': _ONESHOT_ID_DIAGNOSTICS_SHUTDOWN,
+                'params': {},
+            }
+        )
 
         # One-shot path must initialize + didOpen + receive diagnostics + shutdown
         # in a single subprocess run. Floor the budget at the server's init
@@ -689,7 +708,12 @@ class LspClient:
     ) -> list[dict[str, Any]]:
         diag_msgs = self._build_init_msgs(uri, abs_path, source)
         diag_msgs.append(
-            {'jsonrpc': '2.0', 'method': 'shutdown', 'id': 99, 'params': {}}
+            {
+                'jsonrpc': '2.0',
+                'method': 'shutdown',
+                'id': _ONESHOT_ID_DIAGNOSTICS_SHUTDOWN,
+                'params': {},
+            }
         )
         diag_responses, _server_started, _stderr_snippet = self._rpc(
             diag_msgs, server_cmd, process_timeout=process_timeout or 15.0
@@ -744,7 +768,7 @@ class LspClient:
         msgs.append(
             {
                 'jsonrpc': '2.0',
-                'id': 30,
+                'id': _ONESHOT_ID_CODE_ACTION,
                 'method': 'textDocument/codeAction',
                 'params': {
                     'textDocument': {'uri': uri},
@@ -753,7 +777,14 @@ class LspClient:
                 },
             }
         )
-        msgs.append({'jsonrpc': '2.0', 'method': 'shutdown', 'id': 31, 'params': {}})
+        msgs.append(
+            {
+                'jsonrpc': '2.0',
+                'method': 'shutdown',
+                'id': _ONESHOT_ID_CODE_ACTION_SHUTDOWN,
+                'params': {},
+            }
+        )
 
         responses, server_started, stderr_snippet = self._rpc(
             msgs, server_cmd, process_timeout=process_timeout or 15.0
@@ -761,7 +792,7 @@ class LspClient:
         if not server_started:
             return self._server_failed(stderr=stderr_snippet)
         for resp in responses:
-            if resp.get('id') == 30:
+            if resp.get('id') == _ONESHOT_ID_CODE_ACTION:
                 if 'result' not in resp:
                     return self._error_result(resp, hint='code_action')
                 result = resp.get('result') or []
@@ -853,12 +884,19 @@ class LspClient:
         msgs.append(
             {
                 'jsonrpc': '2.0',
-                'id': 20,
+                'id': _ONESHOT_ID_DOCUMENT_SYMBOL,
                 'method': 'textDocument/documentSymbol',
                 'params': {'textDocument': {'uri': uri}},
             }
         )
-        msgs.append({'jsonrpc': '2.0', 'method': 'shutdown', 'id': 21, 'params': {}})
+        msgs.append(
+            {
+                'jsonrpc': '2.0',
+                'method': 'shutdown',
+                'id': _ONESHOT_ID_DOCUMENT_SYMBOL_SHUTDOWN,
+                'params': {},
+            }
+        )
 
         responses, server_started, stderr_snippet = self._rpc(
             msgs, server_cmd, process_timeout=timeout
@@ -866,10 +904,12 @@ class LspClient:
         if not server_started:
             return self._server_failed(stderr=stderr_snippet)
         for resp in responses:
-            if resp.get('id') == 20:
+            if resp.get('id') == _ONESHOT_ID_DOCUMENT_SYMBOL:
                 if 'result' not in resp:
                     return self._error_result(resp, hint='documentSymbol')
-                symbols = self._parse_document_symbols(resp.get('result'), symbol_filter)
+                symbols = self._parse_document_symbols(
+                    resp.get('result'), symbol_filter
+                )
                 return LspResult(available=True, symbols=symbols)
 
         return LspResult(available=True, symbols=[])
@@ -944,7 +984,14 @@ class LspClient:
         server_cmd = list(ctx.command)
         msgs = self._build_init_msgs(uri, abs_path, source)
         msgs.append(self._build_hover_request_message(uri, lsp_line, lsp_col))
-        msgs.append({'jsonrpc': '2.0', 'method': 'shutdown', 'id': 11, 'params': {}})
+        msgs.append(
+            {
+                'jsonrpc': '2.0',
+                'method': 'shutdown',
+                'id': _ONESHOT_ID_HOVER_SHUTDOWN,
+                'params': {},
+            }
+        )
 
         responses, server_started, stderr_snippet = self._rpc(
             msgs, server_cmd, process_timeout=timeout
@@ -952,7 +999,7 @@ class LspClient:
         if not server_started:
             return self._server_failed(stderr=stderr_snippet)
         for resp in responses:
-            if resp.get('id') == 10:
+            if resp.get('id') == _ONESHOT_ID_HOVER:
                 if 'result' not in resp:
                     return self._error_result(resp, hint='hover')
                 return self._parse_hover_response(resp['result'])
@@ -964,7 +1011,7 @@ class LspClient:
     ) -> dict[str, Any]:
         return {
             'jsonrpc': '2.0',
-            'id': 10,
+            'id': _ONESHOT_ID_HOVER,
             'method': 'textDocument/hover',
             'params': {
                 'textDocument': {'uri': uri},
