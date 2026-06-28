@@ -146,9 +146,12 @@ class DAPDebugManager:
             action.session_id or '<new>',
             exc,
         )
-        return ErrorObservation(
+        obs = ErrorObservation(
             f'Debugger error: {type(exc).__name__}: {exc}{phase_suffix}{timeout_suffix}{suffix}'
         )
+        obs._dap_adapter = action.adapter or action.language or ''
+        obs._dap_language = action.language or ''
+        return obs
 
     def _stderr_tail_for(self, action: DebuggerAction) -> str:
         session = self.sessions.get(action.session_id) if action.session_id else None

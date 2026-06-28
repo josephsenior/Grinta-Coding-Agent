@@ -230,6 +230,7 @@ class GrintaScreen(
         self._last_turn_duration: str | None = None
         self._hud_pulse_frame = 0
         self._lsp_notified_languages: set[str] = set()
+        self._dap_notified_languages: set[str] = set()
 
 
 class TUIRenderer(

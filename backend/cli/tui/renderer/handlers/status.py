@@ -167,11 +167,60 @@ def _handle_error_observation(
         error_category = getattr(event, 'error_category', None)
         _notify_ui_only_error(orch, content, error_category, error_id=error_id or None)
         return
+
+    _show_dap_install_hint_if_needed(orch, event)
+
     add_panel = getattr(orch._tui, 'add_error_panel', None)
     if callable(add_panel):
         add_panel(content, error_category=getattr(event, 'error_category', None))
         return
     orch._tui.add_warning(content)
+
+
+def _show_dap_install_hint_if_needed(
+    orch: 'RendererEventProcessorMixin', event: ErrorObservation
+) -> None:
+    """Show a non-persistent toast with install instructions for a missing DAP adapter."""
+    adapter = getattr(event, '_dap_adapter', '') or ''
+    language = getattr(event, '_dap_language', '') or ''
+    content = event.content or ''
+
+    is_not_installed = (
+        'is not installed' in content
+        or 'No module named' in content
+        or 'not found' in content.lower()
+    )
+    if not is_not_installed:
+        return
+
+    from backend.execution.dap._dap_adapters import _DAP_ADAPTER_RECIPES
+
+    recipe = _DAP_ADAPTER_RECIPES.get(language) or _DAP_ADAPTER_RECIPES.get(adapter)
+    if not recipe:
+        return
+
+    install_hint = recipe.get('install_hint', '')
+    docs = recipe.get('docs', '')
+    if not install_hint:
+        return
+
+    # Session-level dedup
+    tui = getattr(orch, '_tui', None)
+    if tui is None:
+        return
+    notified = getattr(tui, '_dap_notified_languages', None)
+    if notified is None:
+        return
+    dedup_key = language or adapter
+    if dedup_key in notified:
+        return
+    notified.add(dedup_key)
+
+    hint = f'{adapter or language} debug adapter is not installed. Run: {install_hint}'
+    if docs:
+        hint += f'  ({docs})'
+
+    tui.notify_warning(hint, timeout=6.0)
 
 
 def _handle_success_observation(
