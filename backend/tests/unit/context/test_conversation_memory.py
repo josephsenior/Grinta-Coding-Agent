@@ -790,6 +790,10 @@ class TestMemoryStoreRecall:
         cast(Any, mem._ctx).delete_by_ids = MagicMock()
 
         mem.process_events([user_msg], initial_user_action=user_msg)
+        # The semantic indexer now writes through a background worker
+        # so the prompt-assembly hot path stays non-blocking. Flush the
+        # queue synchronously to make the test deterministic.
+        mem.shutdown()
 
         cast(Any, mem._ctx).vector_store.add.assert_called_once()
         add_kwargs = cast(Any, mem._ctx).vector_store.add.call_args.kwargs
@@ -808,5 +812,7 @@ class TestMemoryStoreRecall:
 
         mem.process_events([user_msg], initial_user_action=user_msg)
         mem.process_events([user_msg], initial_user_action=user_msg)
+        # Flush the background indexer so the assertion is deterministic.
+        mem.shutdown()
 
         cast(Any, mem._ctx).vector_store.add.assert_called_once()
