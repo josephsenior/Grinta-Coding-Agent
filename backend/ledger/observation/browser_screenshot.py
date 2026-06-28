@@ -34,9 +34,10 @@ class BrowserScreenshotObservation(Observation):
         height: int | None = None,
         command: str = 'browser screenshot',
         inject_skipped_reason: str | None = None,
+        truncation_strategy: str | None = None,
     ) -> None:
         """Initialize with ``content`` as the human-readable caption (path + size)."""
-        super().__init__(content)
+        super().__init__(content, truncation_strategy=truncation_strategy)
         self.image_path = image_path
         self.image_b64 = image_b64
         self.image_mime = image_mime

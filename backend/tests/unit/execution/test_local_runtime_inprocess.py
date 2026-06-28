@@ -9,6 +9,9 @@ from backend.core.constants import (
     TOOL_BRIDGE_TIMEOUT_BUFFER,
 )
 from backend.core.errors import AgentRuntimeDisconnectedError
+from backend.core.timeouts.timeout_policy import (
+    browser_tool_sync_bridge_timeout_seconds,
+)
 from backend.core.type_safety.path_validation import PathValidationError
 from backend.execution.drivers.local.local_runtime_inprocess import (
     LocalRuntimeInProcess,
@@ -137,6 +140,34 @@ def test_browser_tool_uses_persistent_loop_runner() -> None:
         runtime.browser_tool(action)
         runner_cls.assert_called_once()
         assert runner.submit.call_count == 2
+
+
+def test_browser_screenshot_timeout_returns_error_and_resets_runner() -> None:
+    runtime = _make_runtime()
+    executor = MagicMock()
+    executor._native_browser = MagicMock()
+    executor._native_browser._session = object()
+    runtime._executor = executor
+    runner = MagicMock()
+    runner.submit.side_effect = TimeoutError('wedged')
+    runtime._browser_loop_runner = runner
+
+    action = BrowserToolAction(command='screenshot', params={})
+
+    result = runtime.browser_tool(action)
+
+    assert isinstance(result, ErrorObservation)
+    assert 'screenshot' in result.content
+    assert 'timed out' in result.content
+    runner.submit.assert_called_once_with(
+        executor.browser_tool,
+        browser_tool_sync_bridge_timeout_seconds(action, session_ready=True),
+        action,
+    )
+    runner.cancel_pending.assert_called_once()
+    runner.close.assert_called_once()
+    assert runtime._browser_loop_runner is None
+    assert executor._native_browser is None
 
 
 def test_close_shuts_down_persistent_browser_runner() -> None:
