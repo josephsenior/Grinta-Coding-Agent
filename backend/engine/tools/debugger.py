@@ -22,7 +22,9 @@ def create_debugger_tool() -> dict[str, Any]:
                 'or a .py program uses the built-in debugpy adapter. For other languages, '
                 'the runtime can auto-resolve detected stdio and DAP-over-TCP adapters; '
                 'pass adapter_command only for a custom adapter and provide '
-                'adapter-specific launch_config as needed.'
+                'adapter-specific launch_config as needed. '
+                'Debug adapters must be installed manually by the user — '
+                'do NOT attempt to install them yourself.'
             ),
             'parameters': {
                 'type': 'object',
