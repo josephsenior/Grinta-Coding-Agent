@@ -82,6 +82,15 @@ def should_skip_compaction(
 ) -> bool:
     if force:
         return False
+    # Decay the consecutive-condensation counter if no real LLM step
+    # has been recorded recently. This defends against error paths that
+    # skip ``note_llm_step`` and would otherwise leave compaction
+    # permanently disabled.
+    from backend.context.context_pipeline.helpers import (
+        maybe_decay_consecutive_condensation_counter,
+    )
+
+    maybe_decay_consecutive_condensation_counter(state)
     pipe = _pipeline_state(state)
     if pipe.get(_CONSECUTIVE_CONDENSATION_KEY, 0) >= 2:
         return True

@@ -110,9 +110,75 @@ class TestQueryCacheHashQuery:
         h2 = QueryCache._hash_query('query B')
         assert h1 != h2
 
-    def test_hash_is_16_chars(self):
+    def test_hash_is_24_chars(self):
         h = QueryCache._hash_query('anything')
-        assert len(h) == 16
+        assert len(h) == 24
+
+    def test_tenant_changes_hash(self):
+        h_no_tenant = QueryCache._hash_query('q')
+        h_tenant_a = QueryCache._hash_query('q', tenant_id='session-a')
+        h_tenant_b = QueryCache._hash_query('q', tenant_id='session-b')
+        assert h_no_tenant != h_tenant_a
+        assert h_tenant_a != h_tenant_b
+        assert h_no_tenant != h_tenant_b
+
+    def test_filter_changes_hash(self):
+        h_no_filter = QueryCache._hash_query('q', tenant_id='s')
+        h_with_filter = QueryCache._hash_query(
+            'q', tenant_id='s', filter_metadata={'role': 'user'}
+        )
+        assert h_no_filter != h_with_filter
+
+
+class TestQueryCacheTenantIsolation:
+    """Two sessions asking the same question must not share cached results."""
+
+    def test_store_and_get_tenant_scoped(self):
+        cache = QueryCache()
+        cache.store(
+            'how to test', [{'id': 1}], tenant_id='session-a'
+        )
+        results = cache.get('how to test', tenant_id='session-a')
+        assert results == [{'id': 1}]
+        # Same query from a different tenant must miss.
+        other = cache.get('how to test', tenant_id='session-b')
+        assert other is None
+
+    def test_invalidate_by_metadata_only_drops_matching_tenant(self):
+        cache = QueryCache()
+        cache.store(
+            'q',
+            [{'step_id': '1', 'role': 'user'}],
+            tenant_id='session-a',
+        )
+        cache.store(
+            'q',
+            [{'step_id': '2', 'role': 'user'}],
+            tenant_id='session-b',
+        )
+        evicted = cache.invalidate_by_metadata({'role': 'user'})
+        assert evicted == 2
+
+    def test_clear(self):
+        cache = QueryCache()
+        cache.store('q', [{'id': 1}], tenant_id='a')
+        cache.store('q', [{'id': 2}], tenant_id='b')
+        cache.clear()
+        assert cache.get('q', tenant_id='a') is None
+        assert cache.get('q', tenant_id='b') is None
+
+    def test_lru_eviction_does_not_thundering_herd(self):
+        """Cache must evict one entry at a time, not wipe the whole map."""
+        cache = QueryCache(max_size=3)
+        cache.store('a', [{'v': 1}], tenant_id='t')
+        cache.store('b', [{'v': 2}], tenant_id='t')
+        cache.store('c', [{'v': 3}], tenant_id='t')
+        # Adding a 4th entry should evict only "a" (LRU), not all.
+        cache.store('d', [{'v': 4}], tenant_id='t')
+        assert cache.get('a', tenant_id='t') is None
+        assert cache.get('b', tenant_id='t') is not None
+        assert cache.get('c', tenant_id='t') is not None
+        assert cache.get('d', tenant_id='t') is not None
 
 
 class TestDefaultCollectionNames:

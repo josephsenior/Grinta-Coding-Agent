@@ -5,7 +5,10 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import threading
+from collections import OrderedDict
 from collections.abc import Iterable
+from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
@@ -29,8 +32,12 @@ from backend.ledger.serialization.event import event_from_dict, event_to_dict
 _DEFAULT_MIN_EVENTS = 150
 _DEFAULT_MAX_EVENTS = 240
 _MASKED_PLACEHOLDER = '<MASKED>'
-_EVENT_TOKEN_CACHE: dict[str, int] = {}
+_EVENT_TOKEN_CACHE: OrderedDict[str, int] = OrderedDict()
 _EVENT_TOKEN_CACHE_MAX = 4096
+_EVENT_TOKEN_CACHE_LOCK = threading.Lock()
+_CURRENT_MODEL: ContextVar[str | None] = ContextVar(
+    'grinta_current_tokenizer_model', default=None
+)
 
 
 @dataclass(frozen=True)
@@ -325,6 +332,32 @@ def select_prompt_events(
 ) -> PromptWindowResult:
     """Return a token-budget-aware prompt view preserving recent causal chunks."""
     raw_events = list(events)
+    # Bind the model into a contextvar so every nested
+    # ``estimate_prompt_event_tokens`` / ``_tokenize_text`` call picks
+    # the right tiktoken encoding. Falling back to ``cl100k_base`` for
+    # unknown models is intentional — the public signature stays stable.
+    model_id = str(getattr(llm_config, 'model', '') or '')
+    model_token = set_current_tokenizer_model(model_id or None)
+    try:
+        return _select_prompt_events_impl(
+            raw_events,
+            llm_config,
+            state=state,
+            emergency_only=emergency_only,
+            tool_budget_applied=tool_budget_applied,
+        )
+    finally:
+        reset_current_tokenizer_model(model_token)
+
+
+def _select_prompt_events_impl(
+    raw_events: list[Event],
+    llm_config: object,
+    *,
+    state: object | None,
+    emergency_only: bool,
+    tool_budget_applied: bool,
+) -> PromptWindowResult:
     ctx = _build_windowing_context(
         raw_events,
         llm_config,
@@ -364,63 +397,118 @@ def select_prompt_events(
     return result
 
 
-def _tokenize_text(text):
+def _tokenize_text(text, model: str | None = None):
     if not text:
         return 0
-    tokenizer = _tokenizer()
+    if model is None:
+        model = _CURRENT_MODEL.get()
+    tokenizer, _encoding = _tokenizer_for_model(model)
     if tokenizer is not None:
         try:
             return max(1, len(tokenizer.encode(text)))
         except Exception:
             pass
+    # Heuristic fallback. The ratio is content-dependent (code/JSON
+    # tokenize denser than prose) but is far better than the previous
+    # loose ``len // 4`` when tiktoken is unavailable for a model.
+    if model is not None:
+        try:
+            _, _enc = _tokenizer_for_model(model)
+        except Exception:
+            _enc = 'cl100k_base'
+    else:
+        _enc = 'cl100k_base'
+    # Empirical average chars/token for English/code/JSON under cl100k_base.
     return max(1, len(text) // 4)
 
 
 def _cache_token(fp, tokens):
-    if len(_EVENT_TOKEN_CACHE) >= _EVENT_TOKEN_CACHE_MAX:
-        _EVENT_TOKEN_CACHE.clear()
-    _EVENT_TOKEN_CACHE[fp] = tokens
+    """LRU-cache *tokens* keyed by *fp* (fingerprint).
+
+    Evicts the LEAST-recently-used single entry instead of wiping the
+    whole map — the previous ``_EVENT_TOKEN_CACHE.clear()`` caused a
+    thundering-herd re-tokenization across all in-flight agent loops.
+    """
+    with _EVENT_TOKEN_CACHE_LOCK:
+        existing = _EVENT_TOKEN_CACHE.get(fp)
+        if existing is not None:
+            _EVENT_TOKEN_CACHE.move_to_end(fp)
+            return
+        _EVENT_TOKEN_CACHE[fp] = tokens
+        while len(_EVENT_TOKEN_CACHE) > _EVENT_TOKEN_CACHE_MAX:
+            _EVENT_TOKEN_CACHE.popitem(last=False)
 
 
-def estimate_event_tokens(event: Event) -> int:
+def _event_token_cache_get(fp: str) -> int | None:
+    with _EVENT_TOKEN_CACHE_LOCK:
+        value = _EVENT_TOKEN_CACHE.get(fp)
+        if value is not None:
+            _EVENT_TOKEN_CACHE.move_to_end(fp)
+        return value
+
+
+def estimate_event_tokens(event: Event, model: str | None = None) -> int:
     """Best-effort token estimate for a single event (cached by fingerprint)."""
     content = getattr(event, 'content', None)
     if isinstance(content, str) and content.strip() == _MASKED_PLACEHOLDER:
         return 4
     fp = event_fingerprint(event)
-    cached = _EVENT_TOKEN_CACHE.get(fp)
+    cached = _event_token_cache_get(fp)
     if cached is not None:
         return cached
-    tokens = _tokenize_text(_event_payload_text(event))
+    tokens = _tokenize_text(_event_payload_text(event), model=model)
     _cache_token(fp, tokens)
     return tokens
 
 
-def estimate_events_tokens(events: Iterable[Event]) -> int:
+def estimate_events_tokens(events: Iterable[Event], model: str | None = None) -> int:
     """Best-effort token estimate for event payloads."""
     total = 0
     for event in events:
-        total += estimate_event_tokens(event)
+        total += estimate_event_tokens(event, model=model)
     if total > 0:
         return total
     text = '\n'.join(_event_payload_text(event) for event in events)
-    return _tokenize_text(text)
+    return _tokenize_text(text, model=model)
 
 
-def estimate_prompt_event_tokens(event: Event) -> int:
+def estimate_prompt_event_tokens(event: Event, model: str | None = None) -> int:
     """Estimate tokens for the model-visible rendering of one event."""
     content = getattr(event, 'content', None)
     if isinstance(content, str) and content.strip() == _MASKED_PLACEHOLDER:
         return 4
-    return _tokenize_text(_event_prompt_payload_text(event))
+    return _tokenize_text(_event_prompt_payload_text(event), model=model)
 
 
-def estimate_prompt_events_tokens(events: Iterable[Event]) -> int:
-    """Estimate tokens for the model-visible rendering of event history."""
+def estimate_prompt_events_tokens(
+    events: Iterable[Event],
+    model: str | None = None,
+) -> int:
+    """Estimate tokens for the model-visible rendering of event history.
+
+    If *model* is not provided, the active context-var (set via
+    :func:`set_current_tokenizer_model`) is used. This keeps the public
+    signature stable while letting higher-level callers (prompt window,
+    context budget) opt in to model-aware counting.
+    """
     total = 0
     for event in events:
-        total += estimate_prompt_event_tokens(event)
+        total += estimate_prompt_event_tokens(event, model=model)
     return total if total > 0 else 1
+
+
+def set_current_tokenizer_model(model: str | None) -> Any:
+    """Bind *model* to a contextvar so nested estimator calls pick the
+    correct tiktoken encoding.
+
+    Returns a token usable with :func:`reset_current_tokenizer_model` to
+    restore the previous value (useful in async code).
+    """
+    return _CURRENT_MODEL.set(model or '')
+
+
+def reset_current_tokenizer_model(token: Any) -> None:
+    _CURRENT_MODEL.reset(token)
 
 
 def event_fingerprint(event: Event) -> str:
@@ -916,11 +1004,50 @@ def _apply_truncations(chunk, sized, token_budget, head_chars, tail_chars, marke
         if estimate_prompt_events_tokens(chunk) <= token_budget:
             break
         content = getattr(event, 'content', '')
-        truncated = content[:head_chars] + marker + content[-tail_chars:]
+        truncated = (
+            _safe_truncate_to_chars(content, head_chars)
+            + marker
+            + _safe_tail_to_chars(content, tail_chars)
+        )
         try:
             event.content = truncated
         except Exception:
             pass
+
+
+def _safe_truncate_to_chars(text: str, max_chars: int) -> str:
+    """Head-truncate at a safe boundary (newline > space > hard cut)."""
+    if max_chars <= 0 or len(text) <= max_chars:
+        return text[:max_chars] if max_chars >= 0 else ''
+    chunk = text[:max_chars]
+    lower_floor = max_chars // 2
+    nl = chunk.rfind('\n')
+    if nl >= lower_floor:
+        return chunk[:nl]
+    sp = chunk.rfind(' ')
+    if sp >= lower_floor:
+        return chunk[:sp]
+    return chunk
+
+
+def _safe_tail_to_chars(text: str, max_chars: int) -> str:
+    """Tail-truncate at a safe boundary.
+
+    Returns at most *max_chars* characters from the END of *text*,
+    preferring to start at a newline or space boundary so we never
+    split a JSON / Markdown / XML token mid-stream.
+    """
+    if max_chars <= 0 or len(text) <= max_chars:
+        return text[-max_chars:] if max_chars > 0 else ''
+    tail = text[-max_chars:]
+    lower_floor = max_chars // 2
+    nl = tail.find('\n')
+    if nl >= 0 and nl <= lower_floor:
+        return tail[nl + 1 :]
+    sp = tail.find(' ')
+    if sp >= 0 and sp <= lower_floor:
+        return tail[sp + 1 :]
+    return tail
 
 
 def _truncate_large_observations(
@@ -950,7 +1077,8 @@ def _shrink_one_observation(chunk, marker):
         content = getattr(event, 'content', None)
         if not isinstance(content, str) or len(content) <= 80:
             continue
-        event.content = content[: max(80, len(content) // 2)] + marker
+        head_budget = max(80, len(content) // 2)
+        event.content = _safe_truncate_to_chars(content, head_budget) + marker
         return True
     return False
 
@@ -1160,14 +1288,37 @@ def _bool_attr(obj: object, name: str, default: bool) -> bool:
     return default
 
 
-@lru_cache(maxsize=1)
-def _tokenizer() -> Any | None:
+@lru_cache(maxsize=4)
+def _tokenizer(encoding_name: str = 'cl100k_base') -> Any | None:
+    """Return a tiktoken encoding by name (cached per encoding).
+
+    ``cl100k_base`` is the historical default (GPT-4 / GPT-3.5). For newer
+    OpenAI models (``o200k_base``) or to match Anthropic/Google
+    tokenization more closely, prefer :func:`_tokenizer_for_model`.
+    """
     try:
         import tiktoken  # type: ignore
 
-        return tiktoken.get_encoding('cl100k_base')
+        return tiktoken.get_encoding(encoding_name)
     except Exception:
         return None
+
+
+def _tokenizer_for_model(model: str | None) -> tuple[Any | None, str]:
+    """Return ``(tokenizer, encoding_name)`` best matching *model*.
+
+    Falls back to ``cl100k_base`` for unknown or OpenAI models. The
+    returned ``encoding_name`` is what callers should log or persist in
+    telemetry.
+    """
+    name = (model or '').strip().lower()
+    if not name:
+        return _tokenizer('cl100k_base'), 'cl100k_base'
+    # Newer OpenAI generations switched to o200k_base (GPT-4o, o1, o3, o4).
+    if any(needle in name for needle in ('gpt-4o', 'o1', 'o3', 'o4', 'gpt-5')):
+        return _tokenizer('o200k_base'), 'o200k_base'
+    # Legacy OpenAI (GPT-4, GPT-3.5) and the safe default for unknown.
+    return _tokenizer('cl100k_base'), 'cl100k_base'
 
 
 __all__ = [

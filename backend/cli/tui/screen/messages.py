@@ -5,6 +5,7 @@ import contextlib
 import re
 from typing import Any
 
+from rich.markup import escape as rich_escape
 from rich.rule import Rule
 from rich.text import Text
 from textual.widgets import (
@@ -190,9 +191,9 @@ class ScreenMessagesMixin:
             message = message[:257] + '...'
         notify = getattr(self, 'notify', None)
         if callable(notify):
-            notify(message, severity=severity, timeout=timeout)
+            notify(rich_escape(message), severity=severity, timeout=timeout)
             return
-        self._emit_transcript_notice(message)
+        self._emit_transcript_notice(rich_escape(message))
 
     def notify_error(self, text: str, *, timeout: float = 4.5) -> None:
         self._notify_user(text, severity='error', timeout=timeout)

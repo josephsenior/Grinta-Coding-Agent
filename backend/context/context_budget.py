@@ -45,6 +45,11 @@ class ContextBudget:
         state: State | None = None,
     ) -> ContextBudget:
         """Build a budget from post-boundary events and optional API usage."""
+        from backend.context.prompt.prompt_window import (
+            reset_current_tokenizer_model,
+            set_current_tokenizer_model,
+        )
+
         effective_window = _effective_context_window(llm_config)
         reserved = DEFAULT_COMPACTION_RESERVED_SUMMARY_TOKENS
         fixed_prompt_reserve = _fixed_prompt_reserve_tokens(state)
@@ -54,7 +59,14 @@ class ContextBudget:
             if effective_window > reserved + fixed_prompt_reserve
             else effective_window,
         )
-        estimated = _estimate_tokens(events, llm_config=llm_config, state=state)
+        model_id = str(getattr(llm_config, 'model', '') or '') if llm_config else ''
+        model_token = set_current_tokenizer_model(model_id or None)
+        try:
+            estimated = _estimate_tokens(
+                events, llm_config=llm_config, state=state
+            )
+        finally:
+            reset_current_tokenizer_model(model_token)
         return cls(
             estimated_tokens=estimated,
             effective_window=effective_window,
@@ -111,17 +123,49 @@ def _estimate_tokens(
     pipe = _pipeline_state(state)
     baseline = pipe.get(_POST_COMPACT_BASELINE_KEY)
     if isinstance(baseline, int) and baseline > 0 and len(events) <= 120:
+        # ``baseline`` was captured immediately after a compaction
+        # boundary, so it reflects the post-compaction history. After
+        # that, we add the *tail* of new events. **Critically**, the
+        # baseline can be stale if a single large tool result or user
+        # payload slipped in mid-history. We therefore add any event
+        # whose projected token count is above a "large event" floor
+        # on top of the baseline + tail.
+        large_extra = _sum_large_event_tokens(events[:-12] if len(events) > 12 else [])
         tail = estimate_prompt_events_tokens(events[-12:])
-        return baseline + tail
+        return baseline + tail + large_extra
 
     api_tokens = _last_dynamic_prompt_tokens(state)
     if api_tokens > 0:
+        large_extra = _sum_large_event_tokens(events[:-12] if len(events) > 12 else [])
         tail = estimate_prompt_events_tokens(events[-12:])
-        return api_tokens + tail
+        return api_tokens + tail + large_extra
     raw = estimate_prompt_events_tokens(events)
     model = str(getattr(llm_config, 'model', '') or '')
     factor, _ = model_token_correction(model)
     return int(raw * factor)
+
+
+_LARGE_EVENT_TOKEN_FLOOR = 1_000
+"""Any single event whose estimated token count is above this floor is
+counted individually instead of being folded into a ``baseline`` cache.
+This prevents the autocompact gate from underestimating when one large
+tool result (e.g. an 80k-token pytest log) sits in the middle of the
+history.
+"""
+
+
+def _sum_large_event_tokens(events: list[Event]) -> int:
+    """Return the sum of token estimates for events over the large floor."""
+    if not events:
+        return 0
+    total = 0
+    for event in events:
+        # Use a cheap per-event estimate to avoid double-counting tiny
+        # observations that the prompt-window already covered.
+        est = estimate_prompt_events_tokens([event])
+        if est >= _LARGE_EVENT_TOKEN_FLOOR:
+            total += est
+    return total
 
 
 def _fixed_prompt_reserve_tokens(state: State | None) -> int:

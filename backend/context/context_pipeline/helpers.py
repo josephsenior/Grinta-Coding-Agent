@@ -9,8 +9,12 @@ from backend.context.compactor.compact_boundary import project_after_compact_bou
 from backend.context.context_budget import ContextBudget
 from backend.context.context_pipeline.types import (
     _COMPACTION_TARGET_RATIO,
+    _CONSECUTIVE_CONDENSATION_DECAY_SECONDS,
+    _CONSECUTIVE_CONDENSATION_KEY,
+    _CONSECUTIVE_DECAY_SECONDS_KEY,
     _INEFFECTIVE_COMPACT_STREAK_KEY,
     _INEFFECTIVE_COMPACT_UNTIL_KEY,
+    _LAST_LLM_STEP_KEY,
     _SKIP_COMPACTION_UNTIL_KEY,
 )
 from backend.context.prompt.context_packet import (
@@ -53,6 +57,55 @@ def _drop_stale_prompt_state_artifacts(events: list[Event]) -> list[Event]:
             continue
         filtered.append(event)
     return filtered
+
+
+def reset_consecutive_condensation_counter(state: State) -> None:
+    """Reset the consecutive-condensation counter and record the LLM step.
+
+    Idempotent and safe to call from any error handler — the previous
+    behaviour skipped this when ``note_llm_step`` was bypassed, which
+    left the counter pinned and permanently disabled compaction.
+    """
+    pipe = dict(getattr(state, 'extra_data', {}).get('context_pipeline_state', {}))
+    pipe[_CONSECUTIVE_CONDENSATION_KEY] = 0
+    pipe[_LAST_LLM_STEP_KEY] = time.time()
+    state.set_extra('context_pipeline_state', pipe, source='ContextPipeline')
+
+
+def maybe_decay_consecutive_condensation_counter(
+    state: State,
+    *,
+    decay_seconds: float | None = None,
+) -> bool:
+    """Reset the counter if no real LLM step has been recorded recently.
+
+    Returns True when the counter was reset.
+    """
+    pipe = dict(getattr(state, 'extra_data', {}).get('context_pipeline_state', {}))
+    last_step = pipe.get(_LAST_LLM_STEP_KEY)
+    if not isinstance(last_step, (int, float)):
+        # No LLM step has ever been recorded for this state — treat as
+        # already-stale so the counter cannot pin compaction disabled.
+        last_step = 0.0
+    threshold = (
+        decay_seconds
+        if isinstance(decay_seconds, (int, float)) and decay_seconds > 0
+        else pipe.get(_CONSECUTIVE_DECAY_SECONDS_KEY)
+        or _CONSECUTIVE_CONDENSATION_DECAY_SECONDS
+    )
+    if (time.time() - float(last_step)) > threshold:
+        current = pipe.get(_CONSECUTIVE_CONDENSATION_KEY, 0)
+        if isinstance(current, int) and current > 0:
+            pipe[_CONSECUTIVE_CONDENSATION_KEY] = 0
+            state.set_extra(
+                'context_pipeline_state', pipe, source='ContextPipeline'
+            )
+            logger.debug(
+                'Decayed consecutive-condensation counter after %.1fs of LLM idle',
+                time.time() - float(last_step),
+            )
+            return True
+    return False
 
 
 def apply_ineffective_compaction_backoff(state: State) -> None:

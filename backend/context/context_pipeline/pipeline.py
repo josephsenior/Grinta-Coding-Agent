@@ -356,11 +356,11 @@ class ContextPipeline:
 
     def note_llm_step(self, state: State) -> None:
         """Reset condensation-loop counters after a real LLM step."""
-        pipe = dict(getattr(state, 'extra_data', {}).get('context_pipeline_state', {}))
-        from backend.context.context_pipeline.types import _CONSECUTIVE_CONDENSATION_KEY
+        from backend.context.context_pipeline.helpers import (
+            reset_consecutive_condensation_counter,
+        )
 
-        pipe[_CONSECUTIVE_CONDENSATION_KEY] = 0
-        state.set_extra('context_pipeline_state', pipe, source='ContextPipeline')
+        reset_consecutive_condensation_counter(state)
 
     def should_emit_compaction_status(self, state: State) -> bool:
         """Check if the next ``prepare_step`` is likely to compact."""

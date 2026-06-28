@@ -442,17 +442,44 @@ def get_durable_context_block(
     except Exception:
         logger.debug('Durable context assembly failed', exc_info=True)
 
-    parts.append(_WORKING_SET_MARKER)
-    if len(parts) <= 2:
+    if len(parts) <= 1:  # Only the opening marker is present.
         return ''
+    parts.append(_WORKING_SET_MARKER)
     block = '\n'.join(parts)
-    if len(block) > char_budget:
-        block = (
-            block[: char_budget - 40]
-            + '\n... (working set truncated)\n'
-            + _WORKING_SET_MARKER
-        )
-    return block
+    if len(block) <= char_budget:
+        return block
+
+    # Truncate by shrinking the INNER content while keeping both
+    # working-set markers intact. Cutting the closing marker would
+    # leave the LLM with an unterminated block, so we re-render the
+    # packet after computing a safe cut point.
+    inner_marker = '\n... (working set truncated)\n'
+    inner = '\n'.join(parts[1:-1])
+    framing = f'{parts[0]}\n{parts[-1]}'
+    framing_len = len(framing) + len(inner_marker) + 2  # newlines
+    budget = max(80, char_budget - framing_len)
+    cut = _safe_truncate(inner, budget)
+    return f'{parts[0]}\n{cut}{inner_marker}{parts[-1]}'
+
+
+def _safe_truncate(text: str, max_chars: int) -> str:
+    """Truncate *text* to *max_chars* at a safe boundary.
+
+    Prefers the last newline, then last space, then a hard cut. Used to
+    avoid splitting JSON, Markdown, or XML fragments inside the working
+    set block.
+    """
+    if max_chars <= 0 or len(text) <= max_chars:
+        return text.strip() if max_chars <= 0 else text
+    chunk = text[:max_chars]
+    lower_floor = max_chars // 2
+    nl = chunk.rfind('\n')
+    if nl >= lower_floor:
+        return chunk[:nl].rstrip()
+    sp = chunk.rfind(' ')
+    if sp >= lower_floor:
+        return chunk[:sp].rstrip()
+    return chunk.rstrip()
 
 
 def build_working_set_observation(

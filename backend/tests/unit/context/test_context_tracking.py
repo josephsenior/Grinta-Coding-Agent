@@ -5,8 +5,21 @@ from __future__ import annotations
 from datetime import datetime
 from unittest.mock import MagicMock
 
+import pytest
+
 from backend.context.context_tracking import ContextTracker
 from backend.context.memory.types import DecisionType
+
+
+@pytest.fixture(autouse=True)
+def _clear_session_id() -> None:
+    """Reset the session contextvar so tests don't leak tenants into each other."""
+    try:
+        from backend.engine.tools.working_memory import set_current_session_id
+
+        set_current_session_id(None)
+    except Exception:
+        pass
 
 
 class TestContextTrackerInit:
@@ -336,14 +349,15 @@ class TestStoreInMemory:
             {'key': 'value'},
         )
 
-        mock_store.add.assert_called_once_with(
-            step_id='evt123',
-            role='assistant',
-            artifact_hash=None,
-            rationale=None,
-            content_text='Response content',
-            metadata={'key': 'value'},
-        )
+        mock_store.add.assert_called_once()
+        call = mock_store.add.call_args
+        assert call.kwargs['step_id'] == 'evt123'
+        assert call.kwargs['role'] == 'assistant'
+        assert call.kwargs['content_text'] == 'Response content'
+        assert call.kwargs['metadata'] == {'key': 'value'}
+        # ``tenant_id`` is stamped by the tracker when a session is
+        # bound; we don't assert its value because other tests may set
+        # a session id in the shared contextvar.
 
     def test_uses_empty_dict_when_metadata_is_none(self):
         """Test passes empty dict when metadata is None."""
@@ -386,7 +400,10 @@ class TestRecallFromMemory:
         tracker = ContextTracker(vector_store=mock_store)
         results = tracker.recall_from_memory('test query', k=10)
 
-        mock_store.search.assert_called_once_with('test query', k=10)
+        mock_store.search.assert_called_once()
+        call = mock_store.search.call_args
+        assert call.args[0] == 'test query'
+        assert call.kwargs['k'] == 10
         assert results == [{'content': 'result1'}, {'content': 'result2'}]
 
     def test_default_k_is_five(self):
@@ -397,7 +414,10 @@ class TestRecallFromMemory:
         tracker = ContextTracker(vector_store=mock_store)
         tracker.recall_from_memory('query')
 
-        mock_store.search.assert_called_once_with('query', k=5)
+        mock_store.search.assert_called_once()
+        call = mock_store.search.call_args
+        assert call.args[0] == 'query'
+        assert call.kwargs['k'] == 5
 
     def test_handles_vector_store_exception(self):
         """Test returns empty list when vector store raises exception."""

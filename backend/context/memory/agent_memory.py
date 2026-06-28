@@ -50,6 +50,28 @@ GLOBAL_PLAYBOOKS_DIR = os.path.join(os.path.dirname(backend.__file__), 'playbook
 USER_PLAYBOOKS_DIR = Path.home() / '.grinta' / 'playbooks'
 
 
+# Shared, process-wide thread pool for recall side effects. Creating a
+# fresh ThreadPoolExecutor per recall (the previous behaviour) imposes
+# significant overhead — both for the kernel and for Python's import-
+# level locks. The pool grows on demand and never shrinks, so sustained
+# recall traffic amortises the cost.
+_RECALL_POOL: concurrent.futures.ThreadPoolExecutor | None = None
+_RECALL_POOL_LOCK = __import__('threading').Lock()
+
+
+def _get_recall_pool() -> concurrent.futures.ThreadPoolExecutor:
+    global _RECALL_POOL
+    if _RECALL_POOL is not None:
+        return _RECALL_POOL
+    with _RECALL_POOL_LOCK:
+        if _RECALL_POOL is None:
+            _RECALL_POOL = concurrent.futures.ThreadPoolExecutor(
+                max_workers=4,
+                thread_name_prefix='agent-recall',
+            )
+    return _RECALL_POOL
+
+
 class Memory:
     """Memory is a component that listens to the EventStream for information retrieval actions.
 
@@ -436,17 +458,17 @@ class Memory:
                 )
             return []
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
-            playbook_future = pool.submit(_find_playbooks)
-            kb_future = pool.submit(_search_kb)
-            try:
-                playbook_knowledge = playbook_future.result()
-            except Exception as e:
-                logger.error('Error finding playbook knowledge: %s', e)
-            try:
-                kb_results = kb_future.result()
-            except Exception as e:
-                logger.error('Error searching knowledge base during recall: %s', e)
+        pool = _get_recall_pool()
+        playbook_future = pool.submit(_find_playbooks)
+        kb_future = pool.submit(_search_kb)
+        try:
+            playbook_knowledge = playbook_future.result()
+        except Exception as e:
+            logger.error('Error finding playbook knowledge: %s', e)
+        try:
+            kb_results = kb_future.result()
+        except Exception as e:
+            logger.error('Error searching knowledge base during recall: %s', e)
 
         if playbook_knowledge or kb_results:
             return RecallObservation(
