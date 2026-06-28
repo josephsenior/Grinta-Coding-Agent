@@ -11,8 +11,11 @@ _MEMORY_DESCRIPTION_BASE = (
     '**working** — session-scoped cognitive state (hypothesis, findings, blockers, '
     'file_context, decisions, plan). Survives context condensation within the session. '
     'Use update_type=get|update|clear_section with section and content.\n\n'
-    '**persist** — workspace-scoped durable facts (conventions, commands, architecture, '
-    'lessons). Rare; only for verified repo facts worth keeping across sessions.'
+    '**persist** — workspace-scoped durable facts that survive across sessions. '
+    'Tactical kinds: `convention`, `command`, `architecture`, `lesson` (verified repo facts). '
+    'Strategic kinds: `strategy` (cross-cutting approach), `heuristic` (reusable "if X then Y" rule), '
+    '`decision` (recorded choice + rationale), `preference` (user working style). '
+    'Rare; only for verified knowledge worth keeping across sessions.'
 )
 
 _MEMORY_RECALL_BLOCK = (
@@ -60,7 +63,16 @@ def create_memory_tool(
             },
             'kind': {
                 'type': 'string',
-                'enum': ['convention', 'command', 'architecture', 'lesson'],
+                'enum': [
+                    'convention',
+                    'command',
+                    'architecture',
+                    'lesson',
+                    'strategy',
+                    'heuristic',
+                    'decision',
+                    'preference',
+                ],
                 'description': "Category for persist (default 'lesson').",
             },
             'value': {

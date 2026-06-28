@@ -224,8 +224,9 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         default=True,
         description=(
             'When the canonical LSP server for a language is missing, install it '
-            'automatically on first query via the appropriate package manager '
-            '(npm, pip, go, cargo, …). Set GRINTA_LSP_AUTO_INSTALL=0 to disable.'
+            'globally on first query via the appropriate package manager '
+            '(npm install -g, pip install, gem install, rustup component add, '
+            'go install, …). Set GRINTA_LSP_AUTO_INSTALL=0 to disable.'
         ),
     )
     lsp_install_timeout_sec: float = Field(

@@ -62,7 +62,10 @@ class ToolSpec:
     probe: tuple[str, ...] | None = None
     # If true, also attempt a ``python -m <module>`` style probe before failing.
     python_module: str | None = None
-    # Command that installs the server when auto-install is enabled (Phase 2).
+    # Command that installs the server globally when auto-install is enabled
+    # (``lsp_auto_install`` / ``GRINTA_LSP_AUTO_INSTALL``).  Global scope
+    # (``npm install -g``, ``gem install``, etc.) — one install per machine
+    # serves all projects.
     install: tuple[str, ...] | None = None
     # Package manager / install strategy: "npm", "pip", "go", "cargo",
     # "gem", "rustup", "dotnet", "cpan", "binary" (manual binary release).
