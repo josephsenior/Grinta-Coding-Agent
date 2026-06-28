@@ -1,31 +1,30 @@
-"""Ensure ``rigour.yml`` exists before starting the Rigour MCP server.
+"""Ensure a minimal ``rigour.yml`` exists before starting the Rigour MCP server.
 
 ``@rigour-labs/mcp`` calls ``loadConfig(cwd)`` on startup. If ``rigour.yml`` is
 missing, upstream runs ``npx rigour init``, which fails on npm (there is no
-``rigour`` executable — the CLI is ``@rigour-labs/cli``). Grinta runs the
-correct CLI init before connecting so the MCP server never hits the broken path.
+``rigour`` executable — the CLI is ``@rigour-labs/cli``) and scaffolds IDE
+rules, hooks, and other project files.
+
+Grinta writes only a tiny stub so MCP connect stays runtime-only. Users who want
+full Rigour project setup run ``npx @rigour-labs/cli init`` themselves.
 """
 
 from __future__ import annotations
 
-import os
-import shutil
-import subprocess
 from pathlib import Path
 
 from backend.core.logging.logger import app_logger as logger
 from backend.core.workspace_resolution import get_effective_workspace_root
 
-_RIGOUR_CLI_PACKAGE = '@rigour-labs/cli'
-
-
-def _rigour_init_timeout_sec() -> float:
-    raw = os.getenv('APP_RIGOUR_INIT_TIMEOUT_SEC', '90')
-    try:
-        timeout = float(raw)
-        return timeout if timeout > 0 else 90.0
-    except (TypeError, ValueError):
-        return 90.0
+# Enough for @rigour-labs/mcp to load; no IDE rules, hooks, or preset detection.
+MINIMAL_RIGOUR_YML = """\
+version: 1
+ignore:
+  - .git/**
+  - node_modules/**
+  - __pycache__/**
+  - venv/**
+"""
 
 
 def _rigour_workspace_root(env: dict[str, str] | None) -> Path | None:
@@ -43,56 +42,21 @@ def _rigour_workspace_root(env: dict[str, str] | None) -> Path | None:
         return None
 
 
-def _run_rigour_cli_init(workspace: Path) -> bool:
-    """Run ``npx -y @rigour-labs/cli init`` in *workspace*. Return True on success."""
-    npx = shutil.which('npx')
-    if not npx:
-        logger.warning(
-            'Rigour CLI init skipped: ``npx`` not found on PATH; '
-            'run `npx @rigour-labs/cli init` in the project before using Rigour MCP.'
-        )
-        return False
-
-    cmd = [npx, '-y', _RIGOUR_CLI_PACKAGE, 'init']
-    try:
-        result = subprocess.run(
-            cmd,
-            cwd=workspace,
-            capture_output=True,
-            text=True,
-            encoding='utf-8',
-            errors='replace',
-            timeout=_rigour_init_timeout_sec(),
-            check=False,
-        )
-    except OSError as exc:
-        logger.warning('Rigour CLI init failed to start (%s): %s', cmd, exc)
-        return False
-    except subprocess.TimeoutExpired:
-        logger.warning(
-            'Rigour CLI init timed out after %.0fs in %s',
-            _rigour_init_timeout_sec(),
-            workspace,
-        )
-        return False
-
+def write_minimal_rigour_yml(workspace: Path) -> bool:
+    """Write a minimal ``rigour.yml`` in *workspace*. Return True on success."""
     rigour_yml = workspace / 'rigour.yml'
-    if result.returncode == 0 and rigour_yml.is_file():
+    if rigour_yml.is_file():
         return True
-
-    detail = (result.stderr or result.stdout or '').strip()
-    if len(detail) > 500:
-        detail = detail[:500] + '...'
-    logger.warning(
-        'Rigour CLI init did not produce rigour.yml (exit=%s): %s',
-        result.returncode,
-        detail or '(no output)',
-    )
-    return False
+    try:
+        rigour_yml.write_text(MINIMAL_RIGOUR_YML, encoding='utf-8')
+    except OSError as exc:
+        logger.warning('Failed to write minimal rigour.yml at %s: %s', rigour_yml, exc)
+        return False
+    return True
 
 
 def ensure_rigour_yml_for_mcp(env: dict[str, str] | None) -> None:
-    """Ensure the workspace has a ``rigour.yml`` before starting Rigour MCP."""
+    """Ensure the workspace has a minimal ``rigour.yml`` before starting Rigour MCP."""
     workspace = _rigour_workspace_root(env)
     if workspace is None:
         return
@@ -101,9 +65,8 @@ def ensure_rigour_yml_for_mcp(env: dict[str, str] | None) -> None:
     if rigour_yml.is_file():
         return
 
-    if _run_rigour_cli_init(workspace):
+    if write_minimal_rigour_yml(workspace):
         logger.info(
-            'Initialized Rigour via `npx -y %s init` at %s',
-            _RIGOUR_CLI_PACKAGE,
+            'Wrote minimal rigour.yml at %s (run `npx @rigour-labs/cli init` for full setup)',
             rigour_yml,
         )

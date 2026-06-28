@@ -280,6 +280,39 @@ class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
         self._mcp_servers_resolved = servers
         return observation
 
+    async def reload_mcp(self) -> dict[str, list[str]]:
+        """Diff the cached MCP client pool against the current config.
+
+        See :func:`backend.execution.utils.mcp_runtime.reload_mcp_servers`
+        for the diff algorithm. Returns a summary dict for the TUI.
+        """
+        from backend.execution.utils.mcp_runtime import reload_mcp_servers
+
+        new_servers = list(getattr(self._mcp_config, 'servers', []) or [])
+        reserved = (
+            getattr(self._mcp_config, 'mcp_exposed_name_reserved', None) or frozenset()
+        )
+        clients, servers, summary = await reload_mcp_servers(
+            new_servers=new_servers,
+            current_clients=self._mcp_clients,
+            current_servers_resolved=self._mcp_servers_resolved,
+            reserved_tool_names=frozenset(reserved),
+        )
+        self._mcp_clients = clients
+        self._mcp_servers_resolved = servers
+        return summary
+
+    async def close_mcp(self) -> None:
+        """Disconnect every cached MCP client without tearing the runtime down."""
+        clients = list(self._mcp_clients or [])
+        self._mcp_clients = None
+        self._mcp_servers_resolved = None
+        for client in clients:
+            try:
+                await client.disconnect()
+            except Exception as exc:
+                logger.debug('MCP client disconnect: %s', exc, exc_info=True)
+
     async def lsp_query(self, action: LspQueryAction) -> Observation:
         """Execute an LSP query using the lsp_client."""
         from backend.utils.lsp.lsp_client import LspClient

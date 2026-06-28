@@ -202,6 +202,11 @@ class OrchestratorPromptManager(PromptManager):
         self.mcp_tool_descriptions: dict[str, str] = {}
         # Per-server usage_hint lines from app MCP config (see MCPServerConfig.usage_hint)
         self.mcp_server_hints: list[dict[str, str]] = []
+        # Map of exposed tool name → originating server name. Populated by
+        # ``add_mcp_tools_to_agent`` so the prompt renderer can hide any
+        # tool whose server is internal / native (e.g. context7, exa,
+        # fetch) regardless of how the alias preparer renamed the tool.
+        self.mcp_tool_server_map: dict[str, str] = {}
 
     def _active_llm_model_id(self) -> str:
         """Model id for self-identification in the system prompt."""

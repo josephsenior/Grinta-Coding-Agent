@@ -56,7 +56,13 @@ def _set_prompt_tier_from_recent_history(orch: Orchestrator, state: State) -> No
 
 
 def _mcp_server_prompt_hints(orch: Orchestrator) -> list[dict[str, str]]:
-    """Build ``[{"server": name, "hint": text}, ...]`` from MCP ``usage_hint`` fields."""
+    """Build ``[{"server": name, "hint": text}, ...]`` from MCP ``usage_hint`` fields.
+
+    Only *enabled* user-facing servers are included. Disabled servers
+    (e.g. Rigour, which ships disabled in :mod:`mcp_defaults`) must
+    not appear in the system prompt — otherwise the model reasons
+    about tools it cannot actually call.
+    """
     from backend.integrations.mcp.native_backends import is_user_visible_mcp_server
 
     try:
@@ -67,6 +73,8 @@ def _mcp_server_prompt_hints(orch: Orchestrator) -> list[dict[str, str]]:
         for s in servers:
             name = (getattr(s, 'name', None) or '').strip() or 'unknown'
             if not is_user_visible_mcp_server(name):
+                continue
+            if not bool(getattr(s, 'enabled', True)):
                 continue
             hint = (getattr(s, 'usage_hint', None) or '').strip()
             if not hint:
@@ -89,9 +97,28 @@ def _mcp_tool_descriptions_from_specs(mcp_tools: list[dict]) -> dict[str, str]:
 
 
 def _apply_mcp_tools(orch: Orchestrator, mcp_tools: list[dict]) -> None:
-    """Sync MCP tool names + descriptions onto the prompt manager."""
+    """Sync MCP tool names + descriptions onto the prompt manager.
+
+    The visible name set is the intersection of:
+
+    1. Every tool currently in ``orch.mcp_tools`` (live catalogue).
+    2. Excluding any tool whose originating server is in
+       :data:`NATIVE_MCP_SERVER_NAMES` (context7, exa, fetch). Native
+       servers power the ``docs_*`` / ``web_*`` facade tools; their
+       MCP-side twins must not also surface under the model-callable
+       tool list.
+    3. Excluding any tool name in
+       :data:`MCP_TOOLS_HIDDEN_BY_NATIVE_FACADES` (defense in depth
+       for the rare case where a user installs a non-native server
+       that happens to ship a tool with the same name).
+    4. Excluding tools whose server or docs/web facade is disabled in
+       the agent config.
+    """
     from backend.engine.tool_registry import (
         validate_mcp_tool_name_collisions,
+    )
+    from backend.integrations.mcp.native_backends import (
+        NATIVE_MCP_SERVER_NAMES,
     )
 
     validate_mcp_tool_name_collisions(
@@ -108,7 +135,21 @@ def _apply_mcp_tools(orch: Orchestrator, mcp_tools: list[dict]) -> None:
         native_facades_on = bool(getattr(orch.config, 'enable_web', True)) or bool(
             getattr(orch.config, 'enable_docs', True)
         )
+        server_map: dict[str, str] = (
+            dict(getattr(pm, 'mcp_tool_server_map', {}) or {})
+            if pm is not None
+            else {}
+        )
+
+        def _is_hidden_by_server(name: str) -> bool:
+            server_name = server_map.get(name, '')
+            return server_name in NATIVE_MCP_SERVER_NAMES
+
         visible_names = list(orch.mcp_tools.keys())
+        # 1. Hide by originating server (the new, robust filter).
+        visible_names = [
+            name for name in visible_names if not _is_hidden_by_server(name)
+        ]
         if native_facades_on:
             hidden = MCP_TOOLS_HIDDEN_BY_NATIVE_FACADES
             if not getattr(orch.config, 'enable_web', True):
@@ -123,6 +164,9 @@ def _apply_mcp_tools(orch: Orchestrator, mcp_tools: list[dict]) -> None:
                 )
 
                 hidden = hidden - MCP_TOOLS_HIDDEN_BY_NATIVE_DOCS
+            # 2. Hide by tool name (defense in depth, also covers the
+            #    case where the agent's tool list grew outside the
+            #    live client map).
             visible_names = [name for name in visible_names if name not in hidden]
         pm.mcp_tool_names = visible_names
         descriptions = _mcp_tool_descriptions_from_specs(mcp_tools)

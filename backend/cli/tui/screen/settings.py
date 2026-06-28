@@ -391,6 +391,10 @@ class ScreenSettingsMixin:
                 timeout=3.0,
             )
             return
+        # ``set_mcp_server_enabled`` writes settings.json; that triggers
+        # the bus → adapter chain (see ``lifecycle_bootstrap``) which
+        # re-runs ``add_mcp_tools_to_agent`` and reconnects clients.
+        # We only need to refresh the local sidebar / HUD state.
         self._config = load_app_config()
         self._reload_mcp_config_and_refresh_sidebar()
         state = 'enabled' if enabled else 'disabled'

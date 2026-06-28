@@ -184,19 +184,93 @@ class Agent(ABC):
             raise AgentNotRegisteredError
         return list(cls._registry.keys())
 
-    def set_mcp_tools(self, mcp_tools: list[dict]) -> None:
-        """Set the MCP tools for the agent."""
+    def set_mcp_tools(self, mcp_tools: list[dict]) -> dict[str, list[str]]:
+        """Register MCP tools on the agent, replacing any prior set.
+
+        Unlike the original additive implementation, this now reconciles
+        the agent's :attr:`mcp_tools` registry against ``mcp_tools``: tools
+        present in the new list are added, tools absent from the new
+        list are dropped. The agent's prompt-visible ``tools`` list is
+        rebuilt so the LLM stops seeing removed tool names on the next
+        turn.
+
+        Returns a diff summary with keys ``added``, ``removed``,
+        ``unchanged`` (lists of tool names) so callers can log it.
+        """
         self._log_tool_update_start(mcp_tools)
+
+        new_entries: list[tuple[str, dict]] = []
         for tool in mcp_tools:
             built_tool = build_tool(tool)
             if built_tool is None:
                 continue
             tool_name = built_tool['function']['name']
-            if tool_name in self.mcp_tools:
-                logger.warning('Tool %s already exists, skipping', tool_name)
+            new_entries.append((tool_name, built_tool))
+
+        new_names = {name for name, _ in new_entries}
+        prior_names = set(self.mcp_tools)
+
+        added: list[str] = []
+        for name, built_tool in new_entries:
+            if name in self.mcp_tools:
                 continue
-            self._register_tool(built_tool, tool_name)
+            self._register_tool(built_tool, name)
+            added.append(name)
+
+        removed: list[str] = []
+        for name in sorted(prior_names - new_names):
+            self.mcp_tools.pop(name, None)
+            removed.append(name)
+
+        # Refresh the prompt-visible tool list so the LLM stops seeing
+        # removed tool names on its next turn.
+        self._rebuild_visible_toolset()
+
+        unchanged = sorted(prior_names & new_names)
         self._log_tool_update_end()
+        return {
+            'added': added,
+            'removed': removed,
+            'unchanged': unchanged,
+        }
+
+    def unset_mcp_tools(self, tool_names: list[str] | None = None) -> list[str]:
+        """Remove specific MCP tools (or all of them) from the agent.
+
+        Args:
+            tool_names: Names to drop. ``None`` drops every tool currently
+                in :attr:`mcp_tools`.
+
+        Returns:
+            The list of tool names actually removed.
+        """
+        if tool_names is None:
+            targets = list(self.mcp_tools)
+        else:
+            targets = list(tool_names)
+        removed: list[str] = []
+        for name in targets:
+            if name in self.mcp_tools:
+                self.mcp_tools.pop(name, None)
+                removed.append(name)
+        if removed:
+            self._rebuild_visible_toolset()
+        return removed
+
+    def _rebuild_visible_toolset(self) -> None:
+        """Re-derive ``self.tools`` from the agent's tool registry.
+
+        MCP tools are routed through the gateway (``call_mcp_tool``) and
+        therefore must not be appended to ``self.tools`` to avoid
+        double-registration. Other tools are preserved as-is.
+        """
+        rebuilt: list[Any] = []
+        for tool in list(self.tools):
+            name = tool.get('function', {}).get('name') if isinstance(tool, dict) else None
+            if name and name in self.mcp_tools:
+                continue
+            rebuilt.append(tool)
+        self.tools = rebuilt
 
     def _log_tool_update_start(self, mcp_tools: list[dict]) -> None:
         try:

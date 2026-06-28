@@ -187,6 +187,12 @@ def _render_system_capabilities(
             'a fresh phase starts. Prefer `undo_last_edit` for the last file write.'
         )
 
+    # External MCP tool catalogue status — single source of truth for
+    # the model so it never has to guess whether MCP tools exist. When
+    # the catalogue is empty we say so explicitly, which is the only
+    # way to prevent the model from hallucinating tool names.
+    mcp_status_line = _render_mcp_status_line(config)
+
     # Runtime-detected language servers / debug adapters — only when those tools
     # are enabled in config (omit bullets entirely when gated off).
     lsp_line, dap_line = _render_runtime_detection_lines(config)
@@ -214,6 +220,8 @@ def _render_system_capabilities(
         parts.append(f'{web_line}\n')
     if docs_line:
         parts.append(f'{docs_line}\n')
+    if mcp_status_line:
+        parts.append(f'{mcp_status_line}\n')
     if browser_line:
         parts.append(f'{browser_line}\n')
     if memory_line:
@@ -224,3 +232,73 @@ def _render_system_capabilities(
         parts.append(detection_block)
 
     return '\n'.join(parts)
+
+
+def _render_mcp_status_line(config: Any) -> str:
+    """Render the ``External MCP tools`` bullet.
+
+    Reads :data:`get_mcp_bootstrap_status` (set by
+    :func:`add_mcp_tools_to_agent`) so the prompt always reflects
+    what is actually wired up — never what the operator *wished* was
+    wired up. Empty state is explicit so the model does not invent
+    tool names when the catalogue is empty.
+    """
+    mcp_status: dict[str, Any] = {}
+    bootstrap = getattr(config, 'mcp_capability_status', None)
+    if isinstance(bootstrap, dict):
+        mcp_status = bootstrap
+    else:
+        try:
+            from backend.integrations.mcp.mcp_bootstrap_status import (
+                get_mcp_bootstrap_status,
+            )
+
+            mcp_status = get_mcp_bootstrap_status() or {}
+        except Exception:
+            mcp_status = {}
+
+    state = str(mcp_status.get('state') or 'unknown')
+    remote_tool_count = int(mcp_status.get('remote_tool_param_count') or 0)
+    connected_clients = int(mcp_status.get('connected_client_count') or 0)
+    last_error = mcp_status.get('last_error')
+
+    if remote_tool_count > 0 and connected_clients > 0:
+        return (
+            f'- **External MCP tools**: {remote_tool_count} tool'
+            f'{"s" if remote_tool_count != 1 else ""} from '
+            f'{connected_clients} connected server'
+            f'{"s" if connected_clients != 1 else ""}. See the per-turn '
+            '`<MCP_TOOLS>` section for the names; route calls through '
+            '`call_mcp_tool(tool_name=..., arguments={...})`.'
+        )
+    if state == 'mcp_disabled':
+        return (
+            '- **External MCP tools**: disabled (`mcp_config.enabled=false` in '
+            '`settings.json`). Enable in **Settings → MCP Servers** to '
+            'route calls through `call_mcp_tool`.'
+        )
+    if state == 'no_servers_configured':
+        return (
+            '- **External MCP tools**: none configured. Add a server in '
+            '**Settings → MCP Servers**; connected tools appear under the '
+            'per-turn `<MCP_TOOLS>` section.'
+        )
+    if state in ('no_clients_connected', 'fetch_failed') and last_error:
+        return (
+            f'- **External MCP tools**: none reachable ({last_error}). '
+            'Check **Settings → MCP Servers** or set `APP_MCP_DEBUG=1` for '
+            'connection logs.'
+        )
+    if state in ('no_clients_connected', 'fetch_failed'):
+        return (
+            '- **External MCP tools**: none reachable. Check '
+            '**Settings → MCP Servers** for connection state.'
+        )
+    # Unknown / healthy-but-empty: same canonical message. The model
+    # needs ONE stable answer for "is MCP working?" — not a per-state
+    # essay.
+    return (
+        '- **External MCP tools**: none connected. Configure servers in '
+        '**Settings → MCP Servers**; tools appear under the per-turn '
+        '`<MCP_TOOLS>` section once a server is enabled and reachable.'
+    )

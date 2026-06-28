@@ -370,7 +370,7 @@ class OrchestratorPlanner:
             create_execute_mcp_tool_tool,
         )
 
-        tools.append(create_execute_mcp_tool_tool())
+        tools.append(create_execute_mcp_tool_tool(self._config))
 
     def _add_memory_and_checkpoint_tools(self, tools: list) -> None:
         if getattr(self._config, 'enable_checkpoints', True):

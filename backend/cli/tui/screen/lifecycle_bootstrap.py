@@ -60,6 +60,107 @@ class ScreenLifecycleBootstrapMixin:
         except Exception:
             _tui_logger.debug('_bootstrap: MCP warmup failed (non-fatal)')
             self._hud.update_mcp_servers(0)
+        finally:
+            # Always start the live-reload plumbing, even if warmup
+            # raised, so the bus is wired and the file watcher runs.
+            self._install_mcp_reload_bridge(agent, runtime, memory)
+            await self._start_settings_watcher()
+
+    def _install_mcp_reload_bridge(
+        self, agent: Any, runtime: Any, memory: Any
+    ) -> None:
+        """Subscribe the running runtime to MCP bus events.
+
+        Idempotent: calling twice replaces the previous adapter
+        (the old one is closed, so it stops receiving callbacks).
+        """
+        from backend.cli.tui.services.mcp_reload_adapter import MCPReloadAdapter
+
+        existing = getattr(self, '_mcp_reload_adapter', None)
+        if existing is not None:
+            try:
+                existing.close()
+            except Exception:
+                logger.debug('MCP reload adapter close failed', exc_info=True)
+
+        event_stream = getattr(self, '_event_stream', None)
+        es_add = getattr(event_stream, 'add_event', None) if event_stream else None
+
+        def _emit_status(status_type: str, extras: dict[str, Any]) -> None:
+            if not callable(es_add):
+                return
+            try:
+                es_add(
+                    StatusObservation(
+                        content='',
+                        status_type=status_type,
+                        extras=extras,
+                    ),
+                    EventSource.ENVIRONMENT,
+                )
+            except Exception:
+                logger.debug('MCP reload status emit failed', exc_info=True)
+
+        adapter = MCPReloadAdapter(
+            runtime=runtime,
+            agent=agent,
+            memory=memory,
+            emit_status=_emit_status if callable(es_add) else None,
+        )
+        try:
+            adapter.install()
+        except Exception:
+            logger.debug('MCP reload adapter install failed', exc_info=True)
+            return
+        self._mcp_reload_adapter = adapter
+
+    async def _start_settings_watcher(self) -> None:
+        """Start the polling-based ``settings.json`` watcher.
+
+        Skips startup when the watcher is already running or when the
+        settings file cannot be resolved.
+        """
+        watcher = getattr(self, '_settings_watcher', None)
+        if watcher is not None:
+            return
+        try:
+            from backend.cli.settings.storage import _settings_path
+            from backend.cli.tui.services.settings_watcher import (
+                SettingsFileWatcher,
+            )
+        except Exception:
+            logger.debug('Settings watcher imports failed', exc_info=True)
+            return
+        try:
+            path = _settings_path()
+        except Exception:
+            return
+        watcher = SettingsFileWatcher(path)
+        try:
+            watcher.install()
+            await watcher.start()
+        except Exception:
+            logger.debug('Settings watcher start failed', exc_info=True)
+            return
+        self._settings_watcher = watcher
+
+    async def _stop_settings_watcher(self) -> None:
+        watcher = getattr(self, '_settings_watcher', None)
+        if watcher is None:
+            return
+        try:
+            await watcher.stop()
+        except Exception:
+            logger.debug('Settings watcher stop failed', exc_info=True)
+        self._settings_watcher = None
+
+        adapter = getattr(self, '_mcp_reload_adapter', None)
+        if adapter is not None:
+            try:
+                adapter.close()
+            except Exception:
+                logger.debug('MCP reload adapter close failed', exc_info=True)
+            self._mcp_reload_adapter = None
 
     def _reset_environment_probe(self) -> None:
         """Clear env-probe state so the next session can warm tools in background."""

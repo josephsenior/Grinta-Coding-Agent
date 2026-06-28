@@ -130,6 +130,12 @@ class TestShouldReplayAndStep:
         rm.step()  # consume only action
         assert rm.should_replay() is False
 
+    def test_should_replay_finished_from_unit(self):
+        a = _make_action()
+        rm = ReplayManager(events=[a])
+        rm.replay_index = 1
+        assert rm.should_replay() is False
+
     def test_step_returns_action(self):
         a = _make_action(content='step 1')
         rm = ReplayManager(events=[a])
@@ -216,6 +222,10 @@ class TestDeterminismVerification:
         # Always returns True when disabled
         assert rm.verify_observation(None) is True
 
+    def test_verify_observation_no_events_from_unit(self):
+        rm = ReplayManager(events=None)
+        assert rm.verify_observation(None) is True
+
 
 # ---------------------------------------------------------------------------
 # Content hashing
@@ -236,6 +246,12 @@ class TestContentHash:
     def test_event_without_content(self):
         ev = MagicMock(spec=[])  # no attributes
         h = ReplayManager._content_hash(ev)
+        expected = hashlib.sha256(b'').hexdigest()
+        assert h == expected
+
+    def test_event_with_none_content_from_unit(self):
+        ev = SimpleNamespace(content=None)
+        h = ReplayManager._content_hash(cast(Event, ev))
         expected = hashlib.sha256(b'').hexdigest()
         assert h == expected
 
@@ -302,3 +318,17 @@ class TestProperties:
     def test_is_deterministic_true_initially(self):
         rm = ReplayManager(events=[_make_action()])
         assert rm.is_deterministic is True
+
+    def test_divergence_tracked_from_unit(self):
+        rm = ReplayManager(events=None)
+        rm._divergences.append(
+            ReplayDivergence(
+                index=0,
+                action_type='Test',
+                expected_hash='a',
+                actual_hash='b',
+                message='diverged',
+            )
+        )
+        assert rm.is_deterministic is False
+        assert len(rm.divergences) == 1

@@ -1,14 +1,17 @@
 """Headless TUI — commands."""
 
-from backend.tests.unit.cli.tui import _shared
-from backend.tests.unit.cli.tui._shared import *  # noqa: F403
-
-for _name in dir(_shared):
-    if _name.startswith('_') and not _name.startswith('__'):
-        globals()[_name] = getattr(_shared, _name)
-
-from backend.tests.unit.cli.tui._shared import _get_screen
-
+from backend.tests.unit.cli.tui._shared import (
+    GrintaHelpDialog,
+    GrintaSessionsDialog,
+    GrintaTUIApp,
+    Label,
+    MagicMock,
+    RichConsole,
+    TextArea,
+    _get_screen,
+    asyncio,
+    pytest,
+)
 
 @pytest.mark.asyncio
 async def test_tui_clear_command(mock_config):
@@ -27,7 +30,6 @@ async def test_tui_clear_command(mock_config):
         await pilot.pause()
 
         assert s is not None
-
 
 @pytest.mark.asyncio
 async def test_tui_help_shows(mock_config):
@@ -52,7 +54,6 @@ async def test_tui_help_shows(mock_config):
         await pilot.pause()
 
         assert isinstance(opened['dialog'], GrintaHelpDialog)
-
 
 @pytest.mark.asyncio
 async def test_tui_settings_command_dispatches(mock_config):
@@ -79,7 +80,6 @@ async def test_tui_settings_command_dispatches(mock_config):
 
         assert called['value'] is True
 
-
 @pytest.mark.asyncio
 async def test_tui_sessions_command_dispatches_with_args(mock_config):
     """Verify /sessions forwards parsed args to the session handler."""
@@ -104,7 +104,6 @@ async def test_tui_sessions_command_dispatches_with_args(mock_config):
         await pilot.pause()
 
         assert captured == ['--limit', '7']
-
 
 @pytest.mark.asyncio
 async def test_tui_resume_command_dispatches_with_args(mock_config):
@@ -131,7 +130,6 @@ async def test_tui_resume_command_dispatches_with_args(mock_config):
 
         assert captured == ['3']
 
-
 @pytest.mark.asyncio
 async def test_tui_sessions_modal_resume_handoff(mock_config):
     """Verify sessions modal selection triggers direct resume flow."""
@@ -157,7 +155,6 @@ async def test_tui_sessions_modal_resume_handoff(mock_config):
         await s._run_sessions_tui([])
 
         assert resumed['sid'] == 'session-abc123'
-
 
 @pytest.mark.asyncio
 async def test_tui_sessions_preview_shows_extended_metadata(
@@ -215,7 +212,6 @@ async def test_tui_sessions_preview_shows_extended_metadata(
         assert 'Branch' in rendered
         assert 'Tokens' in rendered
 
-
 @pytest.mark.asyncio
 async def test_tui_inline_command_hint_updates(mock_config):
     """Verify slash command typing updates the compact HUD activity line."""
@@ -233,7 +229,6 @@ async def test_tui_inline_command_hint_updates(mock_config):
         hint = s.query_one('#hud-line-1-help', Label)
         assert 'Help' in str(hint.renderable)
 
-
 @pytest.mark.asyncio
 async def test_tui_command_autocomplete_for_sessions(mock_config):
     """Verify autocomplete expands slash command prefixes."""
@@ -250,7 +245,6 @@ async def test_tui_command_autocomplete_for_sessions(mock_config):
         await pilot.pause()
 
         assert ta.text == '/sessions '
-
 
 @pytest.mark.asyncio
 async def test_tui_unknown_command(mock_config):
@@ -274,7 +268,6 @@ async def test_tui_unknown_command(mock_config):
         s.notify.assert_called_once()
         assert 'Unknown command' in s.notify.call_args.args[0]
         assert s.notify.call_args.kwargs['severity'] == 'warning'
-
 
 @pytest.mark.asyncio
 async def test_tui_message_helpers(mock_config):

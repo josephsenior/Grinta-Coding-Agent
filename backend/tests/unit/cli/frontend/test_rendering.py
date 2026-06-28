@@ -1,18 +1,22 @@
 """CLI frontend — rendering."""
 
-from backend.tests.unit.cli.frontend import _shared
-from backend.tests.unit.cli.frontend._shared import *  # noqa: F403
-
-for _name in dir(_shared):
-    if _name.startswith('_') and not _name.startswith('__'):
-        globals()[_name] = getattr(_shared, _name)
-
 from backend.tests.unit.cli.frontend._shared import (
+    CLIEventRenderer,
+    EventSource,
+    HUDBar,
+    PlanStep,
+    ReasoningDisplay,
+    TaskTrackingObservation,
+    Text,
     _console_output,
     _make_console,
     _render_thinking_with_diff,
+    asyncio,
+    build_task_list_panel,
+    patch,
+    pytest,
+    task_panel_signature,
 )
-
 
 def test_thinking_render_is_plain_text() -> None:
     """Thinking blocks should stay plain text and not become syntax-highlighted."""
@@ -21,7 +25,6 @@ def test_thinking_render_is_plain_text() -> None:
     )
     assert isinstance(text, Text)
     assert text.plain == '```xml\n<root>\n  <item>value</item>\n</root>\n```'
-
 
 @pytest.mark.asyncio
 async def test_reasoning_transcript_skips_duplicate_prefix_between_tool_steps() -> None:
@@ -49,7 +52,6 @@ async def test_reasoning_transcript_skips_duplicate_prefix_between_tool_steps() 
     assert 'Goal line' not in output
     assert 'Plan B' not in output
 
-
 @pytest.mark.skip(
     reason='elapsed time not rendered in renderable(), only in __rich_console__ which needs ConsoleOptions'
 )
@@ -67,7 +69,6 @@ def test_reasoning_display_elapsed_time() -> None:
     output = _console_output(console)
     assert '5s' in output
 
-
 def test_reasoning_display_stop_resets_timer() -> None:
     """stop() should reset the start time."""
     rd = ReasoningDisplay()
@@ -78,7 +79,6 @@ def test_reasoning_display_stop_resets_timer() -> None:
     assert rd.elapsed_seconds is not None
     rd.stop()
     assert rd.elapsed_seconds is None
-
 
 def test_format_reasoning_snapshot_appends_ellipsis_when_mid_sentence() -> None:
     """A committed reasoning block that ends mid-phrase (because the model
@@ -102,7 +102,6 @@ def test_format_reasoning_snapshot_appends_ellipsis_when_mid_sentence() -> None:
     console2.print(group2)
     assert '…' not in _console_output(console2)
 
-
 def test_task_panel_signature_accepts_planstep_payloads() -> None:
     steps = [
         PlanStep(id='1', description='Implement task tracker', status='in_progress'),
@@ -115,7 +114,6 @@ def test_task_panel_signature_accepts_planstep_payloads() -> None:
         ('1', 'in_progress', 'Implement task tracker'),
         ('2', 'done', 'Verify sidebar refresh'),
     )
-
 
 def test_task_sidebar_panel_renders_planstep_payloads() -> None:
     steps = [
@@ -130,7 +128,6 @@ def test_task_sidebar_panel_renders_planstep_payloads() -> None:
     assert 'Tasks (2)' in output
     assert 'Implement task tracker' in output
     assert 'Verify sidebar refresh' in output
-
 
 @pytest.mark.asyncio
 async def test_renderer_syncs_task_panel_from_update_action_before_observation() -> (
@@ -176,13 +173,11 @@ async def test_renderer_syncs_task_panel_from_update_action_before_observation()
     # Task panel may or may not render depending on implementation
     assert 'Analyze manifest structure' in output or output == ''
 
-
 @pytest.mark.skip(
     reason='elapsed time not rendered in renderable(), only in __rich_console__ which needs ConsoleOptions'
 )
 def test_reasoning_display_tool_icons() -> None:
     """ReasoningDisplay should show tool-specific icons."""
-
 
 def test_reasoning_display_budget_burn() -> None:
     """ReasoningDisplay should track cost for budget burn display."""
@@ -193,7 +188,6 @@ def test_reasoning_display_budget_burn() -> None:
     # Turn cost is 0.05 which is > 0.01 threshold
     panel = rd.renderable()
     assert panel is not None
-
 
 def test_reasoning_display_auto_scroll_shows_latest_lines() -> None:
     """When live thought rows are enabled, clipped viewport shows latest lines."""
@@ -209,7 +203,6 @@ def test_reasoning_display_auto_scroll_shows_latest_lines() -> None:
     assert 'showing latest thoughts' in output
     assert 'thought 15' in output
     assert 'thought 06' not in output
-
 
 def test_reasoning_display_has_no_redundant_ctrl_c_hint() -> None:
     """The reasoning panel must not repeat the Ctrl+C hint.
@@ -228,7 +221,6 @@ def test_reasoning_display_has_no_redundant_ctrl_c_hint() -> None:
     assert 'ctrl+c' not in lowered
     assert 'interrupts' not in lowered
 
-
 def test_reasoning_display_live_panel_streams_thought_bodies() -> None:
     """Streaming reasoning text appears in the live Thinking strip with a cursor."""
     rd = ReasoningDisplay()
@@ -239,7 +231,6 @@ def test_reasoning_display_live_panel_streams_thought_bodies() -> None:
     assert 'partial reasoning in flight' in output
     assert '▌' in output
 
-
 def test_reasoning_display_no_cursor_when_action_changes() -> None:
     """Starting a new action ends the streaming run; no cursor should remain."""
     rd = ReasoningDisplay()
@@ -249,7 +240,6 @@ def test_reasoning_display_no_cursor_when_action_changes() -> None:
     console.print(rd.renderable(max_width=90))
     output = _console_output(console)
     assert '▌' not in output
-
 
 def test_reasoning_display_no_breadcrumb_trail() -> None:
     """Recent-step breadcrumb was removed to reduce clutter.
@@ -267,7 +257,6 @@ def test_reasoning_display_no_breadcrumb_trail() -> None:
     assert 'then ' not in output
     assert '→' not in output
 
-
 def test_reasoning_display_live_panel_includes_long_thought_wrapped() -> None:
     """Long thoughts wrap inside the live Thinking panel instead of being dropped."""
     rd = ReasoningDisplay()
@@ -278,7 +267,6 @@ def test_reasoning_display_live_panel_includes_long_thought_wrapped() -> None:
     console.print(rd.renderable(max_width=72))
     output = _console_output(console)
     assert 'rgba(12,34,56,0.7)' in output
-
 
 @pytest.mark.asyncio
 async def test_reasoning_gets_generous_budget_when_alone() -> None:
@@ -314,7 +302,6 @@ async def test_reasoning_gets_generous_budget_when_alone() -> None:
 
     list(renderer.__rich_console__(console, options))
     assert captured['max_lines'] is None
-
 
 @pytest.mark.asyncio
 async def test_reasoning_keeps_meaningful_budget_when_alone() -> None:

@@ -1,12 +1,11 @@
 """CLI frontend — hud."""
 
-from backend.tests.unit.cli.frontend import _shared
-from backend.tests.unit.cli.frontend._shared import *  # noqa: F403
-
-for _name in dir(_shared):
-    if _name.startswith('_') and not _name.startswith('__'):
-        globals()[_name] = getattr(_shared, _name)
-
+from backend.tests.unit.cli.frontend._shared import (
+    HUDBar,
+    Metrics,
+    ResponseLatency,
+    TokenUsage,
+)
 
 def test_hud_shows_mcp_server_count_when_set() -> None:
     hud = HUDBar()
@@ -15,7 +14,6 @@ def test_hud_shows_mcp_server_count_when_set() -> None:
     assert 'M:3' in hud._format().plain
     n_skills = HUDBar.count_bundled_playbook_skills()
     assert f'S:{min(n_skills, 99)}' in hud._format().plain
-
 
 def test_hud_shows_provider_and_model_combined() -> None:
     """HUD shows 'provider/model' combined to reduce visual clutter.
@@ -37,7 +35,6 @@ def test_hud_shows_provider_and_model_combined() -> None:
     assert 'openai/google/gemini-3-flash-preview' not in bar
     assert hud._format_compact().plain == bar
 
-
 def test_hud_prefers_model_provider_over_client_prefix() -> None:
     hud = HUDBar()
     hud.update_model('openai/lightning-ai/kimi-k2.5')
@@ -47,7 +44,6 @@ def test_hud_prefers_model_provider_over_client_prefix() -> None:
     assert 'lightning-ai/kimi-k2.5' in bar
     assert 'openai/lightning-ai/kimi-k2.5' not in bar
 
-
 def test_hud_uses_client_when_model_has_no_provider_prefix() -> None:
     hud = HUDBar()
     hud.update_model('openai/gpt-4o')
@@ -56,12 +52,10 @@ def test_hud_uses_client_when_model_has_no_provider_prefix() -> None:
 
     assert 'openai/gpt-4o' in bar
 
-
 def test_hud_singular_mcp_label() -> None:
     hud = HUDBar()
     hud.update_mcp_servers(1)
     assert 'M:1' in hud._format().plain
-
 
 def test_hud_tracks_llm_call_count() -> None:
     """HUD should count the number of LLM calls from token_usages list."""
@@ -76,7 +70,6 @@ def test_hud_tracks_llm_call_count() -> None:
     hud.update_from_llm_metrics(metrics)
     assert hud.state.llm_calls == 3
     assert hud.state.cost_usd == 0.5
-
 
 def test_hud_displays_accumulated_tokens_while_preserving_context_pressure() -> None:
     hud = HUDBar()
@@ -108,7 +101,6 @@ def test_hud_displays_accumulated_tokens_while_preserving_context_pressure() -> 
     assert '430' in rendered
     assert '200/8.2K' in rendered or '430 · 200/8192' in rendered
 
-
 def test_hud_context_pressure_does_not_drop_on_smaller_later_call() -> None:
     hud = HUDBar()
     metrics = Metrics()
@@ -134,7 +126,6 @@ def test_hud_context_pressure_does_not_drop_on_smaller_later_call() -> None:
     assert hud.state.total_tokens == 3_320
     assert hud.state.context_tokens == 2_000
     assert hud.state.context_limit == 16_000
-
 
 def test_hud_context_pressure_resets_after_condensation_epoch() -> None:
     hud = HUDBar()
@@ -166,7 +157,6 @@ def test_hud_context_pressure_resets_after_condensation_epoch() -> None:
     assert hud.state.context_tokens == 2_500
     assert hud.state.context_limit == 20_000
 
-
 def test_hud_marks_estimated_token_usage() -> None:
     hud = HUDBar()
     metrics = Metrics()
@@ -185,7 +175,6 @@ def test_hud_marks_estimated_token_usage() -> None:
 
     assert hud.state.token_usage_estimated is True
     assert '~' in hud._format().plain
-
 
 def test_hud_does_not_mark_provider_reported_usage_as_estimated() -> None:
     hud = HUDBar()
@@ -206,7 +195,6 @@ def test_hud_does_not_mark_provider_reported_usage_as_estimated() -> None:
     assert hud.state.token_usage_estimated is False
     assert '~' not in hud._format().plain
 
-
 def test_hud_falls_back_to_response_latencies_for_call_count() -> None:
     hud = HUDBar()
     metrics = Metrics()
@@ -219,7 +207,6 @@ def test_hud_falls_back_to_response_latencies_for_call_count() -> None:
 
     assert hud.state.llm_calls == 1
     assert hud.state.cost_usd == 0.5
-
 
 def test_hud_single_bar_format_all_widths() -> None:
     """HUD uses one dense bar (no wide/narrow mode split)."""
@@ -240,7 +227,6 @@ def test_hud_single_bar_format_all_widths() -> None:
     assert 'M:?' in a.plain
     assert '3c' in a.plain
     assert '$0.123' in a.plain
-
 
 def test_hud_ledger_icon() -> None:
     """HUD ledger icon returns correct single-char indicators."""
