@@ -137,8 +137,80 @@ async def test_tui_shell_command_reuses_single_card(mock_config):
         await pilot.pause()
 
         cards = list(s.query(ShellCard).results())
-        assert len(cards) >= 1, f'Expected >=1 ShellCard, got {len(cards)}'
-        assert any('pytest -q' in str(c._line_text()) for c in cards)
+        assert len(cards) == 1, f'Expected 1 ShellCard, got {len(cards)}'
+        assert 'pytest -q' in str(cards[0]._line_text())
+        assert cards[0]._state == 'done'
+
+@pytest.mark.asyncio
+async def test_tui_shell_command_reuses_card_with_mixed_case_flags(mock_config):
+    """CmdRun and CmdOutput must use the same command key (no .lower() on complete)."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+
+        from backend.cli.tui.widgets.scan_line import ShellCard
+
+        command = "sed -n '168,171p' autograd/demo.py | cat -A"
+        renderer._process_event(CmdRunAction(command=command))
+        renderer._process_event(
+            CmdOutputObservation('line1$', command=command, exit_code=0)
+        )
+        await pilot.pause()
+
+        cards = list(s.query(ShellCard).results())
+        assert len(cards) == 1, f'Expected 1 ShellCard, got {len(cards)}'
+        assert cards[0]._state == 'done'
+        assert 'cat -A' in cards[0].command
+
+@pytest.mark.asyncio
+async def test_tui_shell_command_reuses_card_with_multiline_command(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+
+        from backend.cli.tui.widgets.scan_line import ShellCard
+
+        command = 'python3 -c "\nimport sys\nsys.path.insert(0, \'.\')\nprint(1)"'
+        renderer._process_event(CmdRunAction(command=command))
+        renderer._process_event(
+            CmdOutputObservation('1\n', command=command, exit_code=0)
+        )
+        await pilot.pause()
+
+        cards = list(s.query(ShellCard).results())
+        assert len(cards) == 1, f'Expected 1 ShellCard, got {len(cards)}'
+        assert cards[0]._state == 'done'
+        line = str(cards[0]._line_text())
+        assert '\n' not in line
+        assert 'import sys' in line
 
 @pytest.mark.asyncio
 async def test_tui_lsp_query_renders_orient_line(

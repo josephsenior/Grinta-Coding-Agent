@@ -126,7 +126,7 @@ class TestConvertObservation:
         # shortened the diff — the agent must still be told to re-read.
         obs = FileEditObservation(
             content='File updated successfully\n\n[EDIT_DIFF]\n'
-            '[EDIT_DIFF_TRUNCATED path=/tmp/x.py] diff shortened due to size',
+            '[DIFF_CODEC path=/tmp/x.py] diff shortened due to size',
             path='/tmp/x.py',
         )
         msg = convert_observation_to_message(obs, max_message_chars=100000)

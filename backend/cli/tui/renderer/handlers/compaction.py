@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from backend.cli.tool_display.orient_tools import OrientLineModel
 from backend.ledger.observation import AgentCondensationObservation
 
 if TYPE_CHECKING:
@@ -20,17 +19,7 @@ def show_compaction_started_card(orch: 'RendererEventProcessorMixin') -> None:
     count = max(orch._condensation_count + 1, 1)
     orch._condensation_count = count
     orch._compaction_transcript_active = True
-    suffix = 'th'
-    if count % 100 not in (11, 12, 13):
-        suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(count % 10, 'th')
-    model = OrientLineModel(
-        tool='condensation',
-        icon='…',
-        verb=f'Compacting ({count}{suffix})',
-        target='context',
-        result='',
-    )
-    orch._write_orient_line(model)
+    orch._create_compaction_scan_card()
     orch._hud.update_condensation_count(count)
 
 
@@ -38,28 +27,11 @@ def _handle_agent_condensation_observation(
     orch: 'RendererEventProcessorMixin', event: AgentCondensationObservation
 ) -> None:
     orch._compaction_transcript_active = False
-    orch._update_runtime_strip(
-        'Context compacted',
-        'Context compressed successfully',
-        active=False,
-    )
+    summary = (event.content or '').strip()
     count = max(orch._condensation_count, 1)
     orch._condensation_count = count
     orch._hud.update_condensation_count(count)
-    suffix = 'th'
-    if count % 100 not in (11, 12, 13):
-        suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(count % 10, 'th')
-    preview = (event.content or '').strip()
-    if len(preview) > 80:
-        preview = preview[:79] + '…'
-    model = OrientLineModel(
-        tool='condensation',
-        icon='✓',
-        verb=f'Compacted ({count}{suffix})',
-        target='context',
-        result=preview or 'done',
-    )
-    orch._write_orient_line(model)
+    orch._complete_compaction_scan_card(summary=summary)
 
 
 def _handle_compaction_trigger(orch: 'RendererEventProcessorMixin', event: Any) -> None:

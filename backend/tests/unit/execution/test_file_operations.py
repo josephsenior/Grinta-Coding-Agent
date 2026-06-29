@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from backend.execution.aes.file_operations import (
+    DIFF_CODEC_MARKER_PREFIX,
     _DIFF_TRUNC_HARD_CAP,
     _format_directory_listing,
     _get_max_cmd_output_chars,
@@ -83,16 +84,14 @@ class TestTruncateDiff:
         diff = '\n'.join(f'+line-{i}' for i in range(20000))
         result = truncate_diff(diff, path='src/big.py')
         assert len(result) < len(diff)
-        assert '[EDIT_DIFF_TRUNCATED path=src/big.py]' in result
-        assert 're-read' in result
+        assert DIFF_CODEC_MARKER_PREFIX in result
 
     def test_large_diff_marker_without_path(self):
         diff = 'x' * (_DIFF_TRUNC_HARD_CAP + 5000)
         result = truncate_diff(diff)
-        assert '[EDIT_DIFF_TRUNCATED]' in result
+        assert DIFF_CODEC_MARKER_PREFIX in result
 
     def test_truncation_snaps_to_line_boundaries(self):
-        # Fixed-width lines: any mid-line cut would produce a short fragment.
         diff = '\n'.join(f'+line-{i:05d}' for i in range(20000))
         result = truncate_diff(diff, path='f.py')
         for line in result.splitlines():
@@ -100,6 +99,114 @@ class TestTruncateDiff:
                 assert len(line) == len('+line-00000'), (
                     f'mid-line cut produced fragment: {line!r}'
                 )
+
+    def test_priority_drops_context_before_changes(self):
+        """Context lines should be dropped before +/- lines."""
+        lines = ['diff --git a/foo b/foo', '--- a/foo', '+++ b/foo']
+        for i in range(500):
+            lines.append(f'@@ -{i * 10 + 1},5 +{i * 10 + 1},5 @@')
+            lines.append(f' context line {i} before')
+            lines.append(f'+added line {i}')
+            lines.append(f'-removed line {i}')
+            lines.append(f' context line {i} after')
+            lines.append(f' far context line {i}')
+        diff = '\n'.join(lines)
+        result = truncate_diff(diff, path='foo')
+        # Context lines should be dropped first; most changes should survive
+        add_count = sum(1 for l in result.splitlines() if l.startswith('+added'))
+        remove_count = sum(1 for l in result.splitlines() if l.startswith('-removed'))
+        assert add_count > 100, f'Only {add_count} additions survived (expected >100)'
+        assert remove_count > 100, f'Only {remove_count} removals survived (expected >100)'
+        # Far context (non-adjacent) should be entirely dropped
+        far_ctx = sum(1 for l in result.splitlines() if l.startswith(' far context'))
+        assert far_ctx == 0, f'{far_ctx} far context lines survived (expected 0)'
+
+    def test_hunk_headers_always_preserved_in_truncated_mode(self):
+        """@@ headers must survive even when their content is dropped."""
+        lines = ['diff --git a/foo b/foo', '--- a/foo', '+++ b/foo']
+        # 400 hunks: headers ~16k chars, content ~24k chars → headers fit, content doesn't
+        for i in range(400):
+            lines.append(f'@@ -{i + 1},2 +{i + 1},2 @@')
+            lines.append(f'+change {i} with some extra text to make it longer')
+            lines.append(f' context {i} with some padding text here')
+        diff = '\n'.join(lines)
+        result = truncate_diff(diff, path='foo')
+        header_count = sum(1 for l in result.splitlines() if l.startswith('@@'))
+        assert header_count == 400, f'Only {header_count} hunk headers survived (expected 400)'
+
+    def test_fidelity_summary_emitted_when_truncated(self):
+        """The fidelity summary must be present when truncation occurs."""
+        lines = ['diff --git a/foo b/foo', '--- a/foo', '+++ b/foo']
+        # 300 hunks: headers ~7.5k, content ~18k → truncated (context dropped)
+        for i in range(300):
+            lines.append(f'@@ -{i + 1},3 +{i + 1},3 @@')
+            lines.append(f' context line with some padding text {i}')
+            lines.append(f'+change line with some padding text {i}')
+        diff = '\n'.join(lines)
+        result = truncate_diff(diff, path='foo')
+        assert '[DIFF_CODEC' in result
+        assert 'mode=truncated' in result
+        assert 'change_line_coverage=' in result
+
+    def test_fidelity_summary_not_emitted_for_small_diff(self):
+        """Small diffs under the cap should pass through unchanged."""
+        diff = 'diff --git a/x b/x\n+added\n-removed\n'
+        assert truncate_diff(diff) == diff
+
+    def test_skeleton_mode_for_huge_metadata(self):
+        """When structural metadata alone exceeds budget, emit skeleton."""
+        # Create a diff with many files so headers exceed 20k
+        lines = []
+        for i in range(2000):
+            lines.append(f'diff --git a/file_{i:04d}_with_long_name.py b/file_{i:04d}_with_long_name.py')
+            lines.append(f'index abc..def 100644')
+            lines.append(f'--- a/file_{i:04d}_with_long_name.py')
+            lines.append(f'+++ b/file_{i:04d}_with_long_name.py')
+            lines.append(f'@@ -1,1 +1,1 @@')
+            lines.append(f'+change {i}')
+        diff = '\n'.join(lines)
+        result = truncate_diff(diff)
+        assert '[SKELETON:' in result
+        assert 'mode=skeleton' in result
+        # Skeleton should have file headers but no +/- content
+        assert 'diff --git' in result
+
+    def test_original_order_preserved(self):
+        """Surviving lines must appear in original diff order."""
+        lines = ['diff --git a/foo b/foo', '--- a/foo', '+++ b/foo']
+        for i in range(800):
+            lines.append(f'@@ -{i + 1},5 +{i + 1},5 @@')
+            lines.append(f' ctx before {i}')
+            lines.append(f'+add {i}')
+            lines.append(f'-rem {i}')
+            lines.append(f' ctx after {i}')
+            lines.append(f' far context {i}')
+        diff = '\n'.join(lines)
+        result = truncate_diff(diff, path='foo')
+        result_lines = [l for l in result.splitlines() if l.startswith('+add ')]
+        indices = [int(l.split()[1]) for l in result_lines]
+        assert indices == sorted(indices), 'Lines not in original order'
+
+    def test_generated_file_hunks_collapsed(self):
+        """Generated file hunks should not compete for main budget."""
+        lines = ['diff --git a/package-lock.json b/package-lock.json']
+        lines.append('--- a/package-lock.json')
+        lines.append('+++ b/package-lock.json')
+        for i in range(100):
+            lines.append(f'@@ -{i * 100 + 1},50 +{i * 100 + 1},50 @@')
+            for j in range(50):
+                lines.append(f'+{"x" * 80}')
+        lines.append('diff --git a/main.py b/main.py')
+        lines.append('--- a/main.py')
+        lines.append('+++ b/main.py')
+        lines.append('@@ -1,3 +1,3 @@')
+        lines.append(' ctx')
+        lines.append('+important change')
+        lines.append(' ctx')
+        diff = '\n'.join(lines)
+        result = truncate_diff(diff)
+        # The important change in main.py should survive
+        assert '+important change' in result
 
 
 class TestTruncateCmdOutput:

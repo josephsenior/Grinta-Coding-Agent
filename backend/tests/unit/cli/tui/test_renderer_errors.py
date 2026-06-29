@@ -29,7 +29,7 @@ from backend.tests.unit.cli.tui._shared import (
     pytest,
 )
 
-from backend.cli.tui.widgets.activity_card import OrientLine
+from backend.cli.tui.widgets.scan_line import CompactionCard
 from backend.cli.tui.widgets.scan_line import (
     EditCard,
 )
@@ -95,6 +95,7 @@ async def test_tui_compaction_status_renders_persistent_card(mock_config):
         from backend.cli.tui.app import TUIRenderer
 
         hud = HUDBar()
+        hud.update_agent_state('Running')
         renderer = TUIRenderer(
             console=console,
             hud=hud,
@@ -112,21 +113,15 @@ async def test_tui_compaction_status_renders_persistent_card(mock_config):
         renderer._process_event(status)
         await pilot.pause()
 
-        orient_lines = s.query(OrientLine).results()
-        compaction_orient = [
-            line
-            for line in orient_lines
-            if 'Compacting' in str(line.query_one('#orient-content').renderable)
-        ]
-        assert len(compaction_orient) == 1
-        assert 'Compacting (1st)' in str(
-            compaction_orient[0].query_one('#orient-content').renderable
-        )
-        assert 'context' in str(
-            compaction_orient[0].query_one('#orient-content').renderable
-        )
+        cards = list(s.query(CompactionCard).results())
+        assert len(cards) == 1
+        assert cards[0].state == 'running'
+        assert 'Compacting' in str(cards[0]._line_text())
+        assert 'context' not in str(cards[0]._line_text())
+        assert '(1st)' not in str(cards[0]._line_text())
         assert renderer._compaction_transcript_active is True
         assert renderer._condensation_count == 1
+        assert hud.state.agent_state_label == 'Running'
 
 @pytest.mark.asyncio
 async def test_tui_condensation_request_reuses_status_card(mock_config):
@@ -161,20 +156,12 @@ async def test_tui_condensation_request_reuses_status_card(mock_config):
         )
         await pilot.pause()
 
-        orient_lines = s.query(OrientLine).results()
-        compaction_orient = [
-            line
-            for line in orient_lines
-            if 'Compacting' in str(line.query_one('#orient-content').renderable)
-            or 'Compacted' in str(line.query_one('#orient-content').renderable)
-        ]
-        assert len(compaction_orient) == 2
-
-        started = compaction_orient[0].query_one('#orient-content')
-        completed = compaction_orient[1].query_one('#orient-content')
-        assert 'Compacting (1st)' in str(started.renderable)
-        assert 'Compacted (1st)' in str(completed.renderable)
-        assert 'Compacted summary' in str(completed.renderable)
+        cards = list(s.query(CompactionCard).results())
+        assert len(cards) == 1
+        card = cards[0]
+        assert card.state == 'done'
+        assert 'Compacted' in str(card._line_text())
+        assert 'Compacted summary' in card.summary
         assert renderer._compaction_transcript_active is False
 
 @pytest.mark.asyncio

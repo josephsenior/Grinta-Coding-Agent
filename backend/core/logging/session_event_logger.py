@@ -139,7 +139,14 @@ class SessionEventLogger:
         if event in WIRE_EVENTS and not wire_log_enabled():
             return
 
-        envelope_ctx = dict(ctx or capture_context_snapshot())
+        # Merge caller-supplied ctx ON TOP of the live snapshot so that
+        # fields like ``astep_id`` / ``phase`` can be added without
+        # overwriting ``model``, ``provider``, etc. Callers that need to
+        # override specific fields can still do so by passing them in
+        # ``ctx`` — those values win.
+        envelope_ctx = capture_context_snapshot()
+        if ctx:
+            envelope_ctx.update(ctx)
         record = {
             'ts': datetime.now(UTC).isoformat(),
             'level': level,
@@ -162,12 +169,69 @@ class SessionEventLogger:
         if changed is not None and event != 'SESSION_START':
             self.emit('SESSION_CONTEXT', changed, level='INFO')
 
+    def _write_raw(
+        self,
+        event: str,
+        payload: dict[str, Any],
+        *,
+        level: str = 'INFO',
+        ctx: dict[str, Any] | None = None,
+    ) -> None:
+        """Write a record WITHOUT triggering an auto-SESSION_CONTEXT follow-up.
+
+        Used by ``bind_session_event_logger`` for the initial SESSION_START
+        and SESSION_CONTEXT, so the caller controls whether to consume
+        context once (not twice — once inside ``emit`` and again outside).
+        """
+        if not LOG_TO_FILE or self._stream is None:
+            return
+        if event in WIRE_EVENTS and not wire_log_enabled():
+            return
+
+        envelope_ctx = capture_context_snapshot()
+        if ctx:
+            envelope_ctx.update(ctx)
+        record = {
+            'ts': datetime.now(UTC).isoformat(),
+            'level': level,
+            'event': event,
+            'session_id': self._session_id,
+            'workspace': self._workspace,
+            'ctx': envelope_ctx,
+            'payload': payload,
+        }
+        line = json.dumps(record, default=_json_default, ensure_ascii=False)
+        with _LOCK:
+            if self._stream is None:
+                return
+            self._stream.write(line + '\n')
+            self._stream.flush()
+
 
 _SESSION_LOGGER = SessionEventLogger()
 
 
 def get_session_event_logger() -> SessionEventLogger:
     return _SESSION_LOGGER
+
+
+def get_bound_session_id() -> str | None:
+    """Return the session id of the currently bound session event logger.
+
+    This is the *process-wide* session id, set at session start by
+    ``bind_session_event_logger``. It is safe to use as a last-resort
+    fallback for session-scoped path resolution when the per-task
+    ``ContextVar`` is not visible (e.g. when working memory is accessed
+    from an asyncio task that did not inherit the contextvar).
+
+    In single-session CLI/TUI mode (the common case) this is always
+    correct. In multi-session server mode the per-task contextvar
+    should be the primary source; this fallback only activates when
+    the contextvar is not set.
+    """
+    with _LOCK:
+        sid = _SESSION_ID
+    return sid if isinstance(sid, str) and sid.strip() else None
 
 
 def bind_session_event_logger(
@@ -181,10 +245,36 @@ def bind_session_event_logger(
     payload = dict(startup_payload or {})
     payload.setdefault('session_id', session_id)
     payload.setdefault('platform', sys.platform)
-    _SESSION_LOGGER.emit('SESSION_START', payload, level='INFO')
+    # Use _write_raw for SESSION_START so the auto-SESSION_CONTEXT
+    # follow-up in ``emit`` doesn't consume the context hash before
+    # we get a chance to decide whether to emit the initial SESSION_CONTEXT.
+    _SESSION_LOGGER._write_raw('SESSION_START', payload, level='INFO')
     full_ctx = consume_context_change()
-    if full_ctx:
-        _SESSION_LOGGER.emit('SESSION_CONTEXT', full_ctx, level='INFO')
+    if full_ctx and _ctx_has_resolved_values(full_ctx):
+        _SESSION_LOGGER._write_raw('SESSION_CONTEXT', full_ctx, level='INFO')
+
+
+def _ctx_has_resolved_values(ctx: dict[str, Any]) -> bool:
+    """Return True if the captured context has at least one resolved field.
+
+    When ``bind_session_event_logger`` is called before
+    ``register_runtime_context`` has populated the controller/llm_config
+    (the typical bootstrap order), the snapshot is fully populated with
+    ``None`` for every observable. Emitting that as a SESSION_CONTEXT line
+    produces a confusing "model=null, mode=null, autonomy=null" entry that
+    is immediately superseded by the real one a few hundred ms later.
+
+    Suppress the empty snapshot so the first SESSION_CONTEXT in the log is
+    the authoritative one.
+    """
+    resolved_fields = (
+        'mode',
+        'active_run_mode',
+        'autonomy',
+        'model',
+        'provider',
+    )
+    return any(ctx.get(field) is not None for field in resolved_fields)
 
 
 def close_session_event_logger() -> None:

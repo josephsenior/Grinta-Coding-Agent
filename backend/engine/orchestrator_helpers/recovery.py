@@ -61,14 +61,25 @@ def _astep_handle_recoverable_tool_call_shape_error(
         orch._recoverable_tool_error_signature = error_signature
         orch._recoverable_tool_error_count = 1
 
-    removed = _clear_queued_actions(
-        orch, reason='Invalid LLM tool call, aborting batched sequence'
-    )
-    if removed > 0:
+    # Per-action validation errors (e.g. serialized content in one
+    # ``create_file`` call of a 6-call parallel batch) are attributable to
+    # a single tool call. Their sibling calls in the same parallel batch
+    # are still valid and must continue. Skipping the queue clear here is
+    # what keeps the parallel batch intact.
+    per_action = bool(getattr(e, 'per_action', False))
+    if per_action:
         logger.info(
-            'Batched sequence aborted! Dispelled %d blind follow-up actions.',
-            removed,
+            'Per-action tool-call error (sibling calls preserved): %s', e
         )
+    else:
+        removed = _clear_queued_actions(
+            orch, reason='Invalid LLM tool call, aborting batched sequence'
+        )
+        if removed > 0:
+            logger.info(
+                'Batched sequence aborted! Dispelled %d blind follow-up actions.',
+                removed,
+            )
 
     if (
         orch._recoverable_tool_error_count

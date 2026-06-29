@@ -37,6 +37,11 @@ _STATE_WORDS: dict[str, str] = {
 }
 
 
+def _collapse_whitespace(text: str) -> str:
+    """Collapse runs of whitespace (including newlines) to single spaces."""
+    return ' '.join(text.split())
+
+
 def _expand_label(state: str) -> str:
     """Return the expand-slot text honoring accessible mode."""
     expand = glyph('⤢')
@@ -53,7 +58,8 @@ class ScanLineCard(Container):
     ----------------
     Call :meth:`set_state` to transition through queued / running / done / failed.
     CSS classes (``queued``, ``running``, ``done``, ``failed``) drive the left
-    border color.  ``failed`` cards auto-open their detail screen on mount.
+    border color.  Detail screens open only when the user focuses a card and
+    presses Enter/Space, clicks the row, or uses the ``⤢`` affordance.
 
     Refresh
     -------
@@ -152,7 +158,7 @@ class ScanLineCard(Container):
         detail_max: int = 80,
     ) -> str:
         """Label tinted by state + neutral detail text."""
-        text = (detail or '').strip()
+        text = _collapse_whitespace(detail or '')
         if len(text) > detail_max:
             text = text[: detail_max - 1] + '…'
         from backend.cli.tui.transcript_typography import TX_BODY
@@ -235,10 +241,6 @@ class ScanLineCard(Container):
         self.add_class(state)
         self._refresh_line()
         self._refresh_expand_label()
-
-    def on_mount(self) -> None:
-        if self._state == 'failed':
-            self._open_detail()
 
     # ── click handler ───────────────────────────────────────────────
 

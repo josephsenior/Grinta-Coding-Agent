@@ -30,3 +30,8 @@ def sanitize_cmd_output(output: str) -> str:
         return ''
     text = strip_tool_result_validation_annotations(output)
     return _strip_terminal_control_literals(text).strip()
+
+
+def normalize_shell_command_key(command: str) -> str:
+    """Canonical key for matching CmdRun to CmdOutput (whitespace-insensitive)."""
+    return ' '.join((command or '').split())

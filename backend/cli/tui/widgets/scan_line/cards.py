@@ -125,6 +125,8 @@ _SCAN_LINE_ICONS: dict[str, str] = {
     'Verified': '⊢',
     'Analyzed': '≡',
     'Shared Board': '⊞',
+    'Compacting': '◈',
+    'Compacted': '◇',
 }
 
 
@@ -768,4 +770,48 @@ class PayloadCard(ScanLineCard):
             body=self._body,
             accent=self.state_border_color,
             title=f'{self._label}  {_truncate(self._detail, 60)}',
+        )
+
+
+# ── CompactionCard ─────────────────────────────────────────────────────
+
+
+class CompactionCard(ScanLineCard):
+    """1-line context compaction summary — full summary in detail screen."""
+
+    def __init__(self, *, summary: str = '', id: str | None = None) -> None:
+        super().__init__(id=id)
+        self.summary = summary
+        if summary:
+            self.set_state('done')
+        else:
+            self.set_state('running')
+
+    @property
+    def _label(self) -> str:
+        return 'Compacted' if self._state == 'done' else 'Compacting'
+
+    def complete(self, *, summary: str) -> None:
+        self.summary = summary
+        self.set_state('done')
+
+    def _line_text(self) -> str:
+        return self._scan_summary_line(_scan_label_with_icon(self._label), '', detail_max=50)
+
+    def _delta_text(self) -> str:
+        return _status_indicator_markup(self._state)
+
+    def refresh_summary(self) -> None:
+        if self._state == 'running':
+            self._refresh_line()
+
+    def build_detail_screen(self) -> DetailScreen:
+        from backend.cli.tui.screens.detail.payload import PayloadDetailScreen
+
+        return PayloadDetailScreen(
+            kind='Compaction',
+            heading=self._label,
+            body=self.summary or '(no summary)',
+            accent=self.state_border_color,
+            title='Compaction',
         )

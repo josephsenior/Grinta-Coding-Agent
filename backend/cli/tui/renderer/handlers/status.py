@@ -271,13 +271,6 @@ def _handle_status_compaction(
     orch: 'RendererEventProcessorMixin',
 ) -> None:
     orch._clear_retry_strip('Idle')
-    orch._hud.update_agent_state('Compacting')
-    orch._tui.set_agent_phase('Compacting context...')
-    orch._update_runtime_strip(
-        'Compacting context',
-        'Reducing context to continue the task',
-        active=True,
-    )
     show_compaction_started_card(orch)
 
 

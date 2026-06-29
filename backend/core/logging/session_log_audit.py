@@ -69,6 +69,7 @@ class _AuditAccumulator:
     tool_fail_by_model: Counter[str] = field(default_factory=Counter)
     first_issue_ctx: dict[str, Any] | None = None
     runtime_msg_types: Counter[str] = field(default_factory=Counter)
+    last_known_model: str | None = None
 
 
 def _ctx_model(record: dict[str, Any]) -> str:
@@ -106,6 +107,10 @@ def _process_event(line_no: int, record: dict[str, Any], acc: _AuditAccumulator)
         acc.last_ts = ts
 
     model = _ctx_model(record)
+    if model == 'unknown':
+        model = acc.last_known_model or 'unknown'
+    else:
+        acc.last_known_model = model
     mode = _ctx_mode(record)
     autonomy = _ctx_autonomy(record)
     acc.by_model[model] += 1

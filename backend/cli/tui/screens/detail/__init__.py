@@ -4,6 +4,7 @@ The seven concrete detail screens correspond to:
 * ``AgentMessageCard`` → ``MessageDetailScreen``
 * ``EditCard`` → ``EditDetailScreen``
 * ``ShellCard`` → ``ShellDetailScreen``
+* ``CompactionCard`` → ``PayloadDetailScreen``
 * ``TerminalCard`` → ``TerminalDetailScreen``
 * ``BrowserCard`` → ``BrowserDetailScreen``
 * ``DebuggerCard`` → ``DebuggerDetailScreen``
