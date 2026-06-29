@@ -196,7 +196,12 @@ async def test_tui_final_stream_suppresses_live_response_for_tool_call(mock_conf
 
         assert renderer._last_final_response_text == ''
         assert renderer._live_response == ''
-        assert len(renderer._history) == 0
+        from backend.cli.tui.widgets.activity_card import AgentMessage
+
+        msgs = list(s.query(AgentMessage).results())
+        assert len(msgs) == 1
+        assert msgs[0].has_class('-plain')
+        assert renderer._last_streamed_preamble_text == 'I will inspect the workspace.'
 
 @pytest.mark.asyncio
 async def test_tui_streamed_response_clears_before_tool_action(mock_config):
@@ -232,7 +237,64 @@ async def test_tui_streamed_response_clears_before_tool_action(mock_config):
 
         assert renderer._last_final_response_text == ''
         assert renderer._live_response == ''
-        assert len(renderer._history) == 0
+        from backend.cli.tui.widgets.activity_card import AgentMessage
+
+        msgs = list(s.query(AgentMessage).results())
+        assert len(msgs) == 1
+        assert msgs[0].has_class('-plain')
+        assert renderer._last_streamed_preamble_text == 'I will inspect the workspace.'
+
+@pytest.mark.asyncio
+async def test_tui_tool_step_message_then_tool_card_in_order(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        renderer._process_event(
+            StreamingChunkAction(
+                accumulated='I will inspect the workspace.',
+                is_final=False,
+            )
+        )
+        renderer._process_event(
+            StreamingChunkAction(
+                accumulated='',
+                is_final=True,
+                suppress_live_response=True,
+            )
+        )
+        renderer._process_event(
+            MessageAction(
+                content='I will inspect the workspace.',
+                transcript_only=True,
+            )
+        )
+        renderer._process_event(CmdRunAction(command='Get-Location'))
+        await pilot.pause()
+
+        from backend.cli.tui.widgets.activity_card import AgentMessage
+        from backend.cli.tui.widgets.scan_line import ShellCard
+
+        msgs = list(s.query(AgentMessage).results())
+        shells = list(s.query(ShellCard).results())
+        assert len(msgs) == 1
+        assert len(shells) == 1
+        assert renderer._last_streamed_preamble_text == 'I will inspect the workspace.'
 
 @pytest.mark.asyncio
 async def test_tui_duplicate_thinking_payload_renders_once(mock_config, monkeypatch):
