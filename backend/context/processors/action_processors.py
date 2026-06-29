@@ -18,6 +18,7 @@ from backend.ledger.action import (
     FileEditAction,
     FileReadAction,
     MessageAction,
+    SystemHintAction,
     TaskTrackingAction,
 )
 from backend.ledger.action.agent import (
@@ -98,6 +99,7 @@ def _is_tool_based_action(action: Action) -> bool:
         src_value = src or ''
     tool_action_classes = (
         AgentThinkAction,
+        SystemHintAction,
         BrowserToolAction,
         FileEditAction,
         FileReadAction,
@@ -123,6 +125,9 @@ def _handle_tool_based_action(
 
     if isinstance(action, AgentThinkAction):
         return _build_think_action_message(action)
+
+    if isinstance(action, SystemHintAction):
+        return _build_system_hint_message(action)
 
     if isinstance(action, _META_COGNITION_ACTION_TYPES):
         return _build_meta_cognition_message(action)
@@ -201,6 +206,14 @@ def _build_think_action_message(action: Action) -> list[Message]:
         TextContent(text=f'🤔 {think_text}')
     ]
     return [Message(role='assistant', content=think_content)]
+
+
+def _build_system_hint_message(action: Action) -> list[Message]:
+    hint_text = cast(str, getattr(action, 'thought', '')) or ''
+    content: list[TextContent | ImageContent] = [
+        TextContent(text=f'[SYSTEM] {hint_text}')
+    ]
+    return [Message(role='user', content=content)]
 
 
 def _build_meta_cognition_message(action: Action) -> list[Message]:

@@ -18,7 +18,6 @@ from backend.engine.function_calling.dispatch import (
 )
 from backend.engine.tools._file_edits import execute_find_symbols, execute_read_symbols
 from backend.ledger.action import (
-    AgentThinkAction,
     FileEditAction,
     FileReadAction,
     FindSymbolsAction,
@@ -281,7 +280,7 @@ def test_read_symbol_infers_from_flat_qualified_name(monkeypatch, tmp_path):
     assert payload['results'][0]['status'] == 'resolved'
 
 
-def test_create_file_public_action_rejects_existing_and_rejects_serialized(
+def test_create_file_public_action_passes_through_and_rejects_serialized(
     monkeypatch, tmp_path
 ):
     _use_tmp_workspace(monkeypatch, tmp_path)
@@ -298,7 +297,7 @@ def test_create_file_public_action_rejects_existing_and_rejects_serialized(
     assert isinstance(action, FileEditAction)
     assert action.command == 'create_file'
     assert action.file_text == 'print("ok")\n'
-    assert action.overwrite_existing is True
+    assert action.overwrite_existing is False
 
     existing_action = _handle_create_file_tool(
         {
@@ -307,10 +306,9 @@ def test_create_file_public_action_rejects_existing_and_rejects_serialized(
             'security_risk': 'LOW',
         }
     )
-    # File existence pre-check: returns soft guidance instead of overwriting
-    assert isinstance(existing_action, AgentThinkAction)
-    assert 'already exists' in existing_action.thought
-    assert 'replace_string' in existing_action.thought
+    assert isinstance(existing_action, FileEditAction)
+    assert existing_action.command == 'create_file'
+    assert existing_action.overwrite_existing is False
 
     with pytest.raises(FunctionCallValidationError, match='CONTENT_APPEARS_SERIALIZED'):
         _handle_create_file_tool(

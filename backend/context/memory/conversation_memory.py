@@ -456,6 +456,7 @@ class ContextMemory:
                 'SystemMessageAction',
                 'CmdRunAction',
                 'AgentThinkAction',
+                'SystemHintAction',
                 'ClarificationRequestAction',
                 'ConfirmRequestAction',
                 'InformAction',
@@ -544,7 +545,7 @@ class ContextMemory:
 
     def _track_agent_think_as_decision(self, event: Any) -> None:
         """Track agent think action as decision if planning-related keywords present."""
-        if type(event).__name__ != 'AgentThinkAction':
+        if type(event).__name__ not in ('AgentThinkAction', 'SystemHintAction'):
             return
         thought = (getattr(event, 'thought', '') or '').strip()
         if not thought:
@@ -685,7 +686,7 @@ class ContextMemory:
     def _memory_record_agent_think(
         self, event: Event
     ) -> tuple[str, str, str, dict[str, Any]] | None:
-        if type(event).__name__ != 'AgentThinkAction':
+        if type(event).__name__ not in ('AgentThinkAction', 'SystemHintAction'):
             return None
         thought = str(getattr(event, 'thought', '') or '').strip()
         if not thought:

@@ -104,6 +104,7 @@ from backend.cli.tui.renderer.handlers.terminal import (
 from backend.cli.tui.renderer.handlers.thinking import (
     _handle_agent_think_action,
     _handle_agent_think_observation,
+    _handle_system_hint_action,
 )
 from backend.ledger.action import (
     AgentThinkAction,
@@ -133,6 +134,7 @@ from backend.ledger.action import (
     ReadSymbolsAction,
     RecallAction,
     StreamingChunkAction,
+    SystemHintAction,
     TaskTrackingAction,
     TerminalInputAction,
     TerminalReadAction,
@@ -260,6 +262,7 @@ _ORIENT_EVENT_TYPES = (
 
 _ORIENT_NEUTRAL_EVENT_TYPES = (
     AgentThinkAction,
+    SystemHintAction,
     AgentThinkObservation,
     StreamingChunkAction,
     StatusObservation,
@@ -413,6 +416,7 @@ _EVENT_HANDLERS: dict[type, Any] = {
     SuccessObservation: _handle_success_observation,
     StatusObservation: _handle_status_observation,
     AgentThinkAction: _handle_agent_think_action,
+    SystemHintAction: _handle_system_hint_action,
     AgentThinkObservation: _handle_agent_think_observation,
     BrowserToolAction: _handle_browser_tool_action,
     BrowseInteractiveAction: _handle_browse_interactive_action,

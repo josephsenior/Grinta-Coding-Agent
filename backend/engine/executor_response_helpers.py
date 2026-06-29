@@ -84,10 +84,10 @@ def is_recoverable_tool_call_error(exc: Exception) -> bool:
 def build_recoverable_tool_call_error_action(exc: Exception) -> Action:
     """Create a recovery action that feeds precise correction guidance back to the LLM."""
     from backend.core.tools.tool_arguments_json import TruncatedToolArgumentsError
-    from backend.ledger.action import AgentThinkAction
+    from backend.ledger.action import SystemHintAction
 
     if isinstance(exc, TruncatedToolArgumentsError):
-        return AgentThinkAction(
+        return SystemHintAction(
             thought=(
                 'The previous tool call arguments were stream-truncated — '
                 'the JSON object was never closed, meaning the model stopped '
@@ -98,7 +98,7 @@ def build_recoverable_tool_call_error_action(exc: Exception) -> Action:
                 'splitting it: create a minimal stub first, then extend with '
                 'replace_string or symbol edits.'
             ),
-            kind=AgentThinkAction.KIND_TRUNCATED,
+            kind=SystemHintAction.KIND_TRUNCATED,
         )
 
     detail = str(exc).strip() or exc.__class__.__name__
@@ -115,9 +115,9 @@ def build_recoverable_tool_call_error_action(exc: Exception) -> Action:
     thought = detail
     if extra_hint:
         thought = f'{detail}\n{extra_hint.strip()}'
-    return AgentThinkAction(
+    return SystemHintAction(
         thought=thought,
-        kind=AgentThinkAction.KIND_RECOVERABLE_ERROR,
+        kind=SystemHintAction.KIND_RECOVERABLE_ERROR,
     )
 
 

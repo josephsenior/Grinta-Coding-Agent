@@ -1488,7 +1488,7 @@ def test_response_to_actions_converts_core_tool_call_validation_error_to_recover
     from backend.core.errors import FunctionCallValidationError
     from backend.engine import executor as executor_module
     from backend.engine.executor import OrchestratorExecutor
-    from backend.ledger.action import AgentThinkAction
+    from backend.ledger.action import SystemHintAction
 
     monkeypatch.setattr(
         executor_module.orchestrator_function_calling,
@@ -1511,9 +1511,9 @@ def test_response_to_actions_converts_core_tool_call_validation_error_to_recover
     actions = executor._response_to_actions(response)
 
     assert len(actions) == 1
-    assert isinstance(actions[0], AgentThinkAction)
+    assert isinstance(actions[0], SystemHintAction)
     assert '[TOOL_CALL_RECOVERABLE_ERROR]' not in (actions[0].thought or '')
-    assert actions[0].kind == AgentThinkAction.KIND_RECOVERABLE_ERROR
+    assert actions[0].kind == SystemHintAction.KIND_RECOVERABLE_ERROR
     assert 'bad JSON arguments' in (actions[0].thought or '')
 
 
@@ -1521,7 +1521,7 @@ def test_response_to_actions_adds_task_status_alias_hint(monkeypatch):
     from backend.core.errors import FunctionCallValidationError
     from backend.engine import executor as executor_module
     from backend.engine.executor import OrchestratorExecutor
-    from backend.ledger.action import AgentThinkAction
+    from backend.ledger.action import SystemHintAction
 
     monkeypatch.setattr(
         executor_module.orchestrator_function_calling,
@@ -1546,7 +1546,7 @@ def test_response_to_actions_adds_task_status_alias_hint(monkeypatch):
     actions = executor._response_to_actions(response)
 
     assert len(actions) == 1
-    assert isinstance(actions[0], AgentThinkAction)
+    assert isinstance(actions[0], SystemHintAction)
     thought = actions[0].thought or ''
     assert '`todo`, `in_progress`, `done`, `skipped`, `blocked`' in thought
 
@@ -1557,7 +1557,7 @@ def test_response_to_actions_converts_common_tool_call_validation_error_to_recov
     from backend.engine import executor as executor_module
     from backend.engine.executor import OrchestratorExecutor
     from backend.engine.response_processing import FunctionCallValidationError
-    from backend.ledger.action import AgentThinkAction
+    from backend.ledger.action import SystemHintAction
 
     monkeypatch.setattr(
         executor_module.orchestrator_function_calling,
@@ -1580,9 +1580,9 @@ def test_response_to_actions_converts_common_tool_call_validation_error_to_recov
     actions = executor._response_to_actions(response)
 
     assert len(actions) == 1
-    assert isinstance(actions[0], AgentThinkAction)
+    assert isinstance(actions[0], SystemHintAction)
     assert '[TOOL_CALL_RECOVERABLE_ERROR]' not in (actions[0].thought or '')
-    assert actions[0].kind == AgentThinkAction.KIND_RECOVERABLE_ERROR
+    assert actions[0].kind == SystemHintAction.KIND_RECOVERABLE_ERROR
     assert 'malformed tool call payload' in (actions[0].thought or '')
 
 

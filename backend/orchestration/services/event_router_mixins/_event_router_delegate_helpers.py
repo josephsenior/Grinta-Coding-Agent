@@ -23,6 +23,7 @@ from backend.ledger.action import (
 from backend.ledger.action.agent import (
     AgentThinkAction,
     RecallAction,
+    SystemHintAction,
 )
 from backend.ledger.action.browse import BrowseInteractiveAction
 from backend.ledger.action.browser_tool import BrowserToolAction
@@ -99,7 +100,7 @@ def _summarize_delegate_think_action(
     event: Action | Observation,
 ) -> tuple[str, str] | None:
     """Forward worker reasoning/thought as a progress detail."""
-    if not isinstance(event, AgentThinkAction):
+    if not isinstance(event, (AgentThinkAction, SystemHintAction)):
         return None
     suppress = bool(getattr(event, 'suppress_cli', False))
     if suppress:

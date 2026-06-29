@@ -430,7 +430,7 @@ def _extract_decisions(event: Event, snapshot: dict) -> None:
         return
 
     cls_name = type(event).__name__
-    if cls_name in ('AgentThinkAction', 'AgentThinkObservation'):
+    if cls_name in ('AgentThinkAction', 'SystemHintAction', 'AgentThinkObservation'):
         thought = str(getattr(event, 'thought', ''))
         # Skip recovery/reflection boilerplate — only capture real decisions
         skip_prefixes = (
@@ -608,6 +608,7 @@ def _extract_invalidated_assumptions(event: Event, snapshot: dict) -> None:
     cls_name = type(event).__name__
     if cls_name not in (
         'AgentThinkAction',
+        'SystemHintAction',
         'AgentThinkObservation',
         'MessageAction',
         'ErrorObservation',

@@ -12,15 +12,6 @@ def _sanitize_sys_path():
         sys.path.remove(project_root)
     sys.path.insert(0, project_root)
 
-    _preload_pydantic_root_model()
-
-
-def _preload_pydantic_root_model() -> None:
-    try:
-        pass  # type: ignore  # pylint: disable=unused-import
-    except Exception:
-        pass
-
 
 _sanitize_sys_path()
 
@@ -192,14 +183,6 @@ def use_repo_root_cwd(tmp_path, monkeypatch):
     finally:
         pass
 
-
-# Removed LLM mocking and dummy environment fixtures.
-
-
-# ---------------------------------------------------------------------------
-# Runtime test helpers
-# ---------------------------------------------------------------------------
-# Removed runtime test helpers that relied on stale non-local runtime logic.
 
 __all__ = [
     'require_pkg',

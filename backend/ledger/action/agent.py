@@ -66,6 +66,51 @@ class AgentThinkAction(Action):
 
 
 @dataclass
+class SystemHintAction(Action):
+    """A system-generated hint fed back to the LLM as external feedback.
+
+    Unlike :class:`AgentThinkAction` (which represents the LLM's own
+    reasoning and renders as ``role='assistant'``), ``SystemHintAction``
+    renders as ``role='user'`` so the LLM correctly perceives the content
+    as environment/system feedback rather than its own prior thoughts.
+
+    Attributes:
+        thought (str): The hint message to feed back to the LLM.
+        kind (str): Classification tag used by the renderer to decide how
+            to display the hint. Known values:
+              - ``'recoverable_error'`` -- the LLM's last tool call was
+                invalid and the thought contains recovery guidance.
+              - ``'recoverable_error_escalated'`` -- the same recoverable
+                error has fired repeatedly and was blocked.
+              - ``'truncated'`` -- the LLM's tool call arguments were
+                stream-truncated.
+            The kind is metadata only and is NOT included in the
+            LLM-facing text.
+        source_tool (str): When set, identifies the tool that produced
+            this hint (e.g. ``'task_tracker'``) so the CLI can render a
+            proper activity row.
+        suppress_cli (bool): When True, the CLI transcript skips this
+            hint (still recorded for the agent / history).
+        action (str): The action type, namely ActionType.SYSTEM_HINT.
+    """
+
+    thought: str = ''
+    kind: str = ''
+    source_tool: str = ''
+    suppress_cli: bool = False
+    action: ClassVar[str] = ActionType.SYSTEM_HINT
+
+    KIND_RECOVERABLE_ERROR: ClassVar[str] = 'recoverable_error'
+    KIND_RECOVERABLE_ERROR_ESCALATED: ClassVar[str] = 'recoverable_error_escalated'
+    KIND_TRUNCATED: ClassVar[str] = 'truncated'
+
+    @property
+    def message(self) -> str:
+        """Get formatted system hint message."""
+        return f'[SYSTEM] {self.thought}'
+
+
+@dataclass
 class AgentRejectAction(Action):
     """An action where the agent rejects the task."""
 

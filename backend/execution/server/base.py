@@ -46,6 +46,7 @@ from backend.ledger.action import (
     CmdRunAction,
     FileEditAction,
     FileReadAction,
+    SystemHintAction,
     TaskTrackingAction,
     is_debugger_action,
 )
@@ -92,6 +93,7 @@ AGENT_LEVEL_ACTIONS: frozenset[str] = frozenset(
         'message',
         'recall',
         'think',
+        'system_hint',
         'reject',
         'delegate',
         'delegate_task',
@@ -787,11 +789,18 @@ class Runtime(
     def _handle_special_actions(self, action: Action) -> Observation | None:
         if isinstance(action, AgentThinkAction):
             return self._make_think_observation(action)
+        if isinstance(action, SystemHintAction):
+            return self._make_system_hint_observation(action)
         if isinstance(action, TaskTrackingAction):
             return self._handle_task_tracking_action(action)
         if is_debugger_action(action):
             return self._handle_debugger_action(action)
         return None
+
+    def _make_system_hint_observation(
+        self, action: SystemHintAction
+    ) -> NullObservation:
+        return NullObservation(content='')
 
     def _make_think_observation(
         self, action: AgentThinkAction

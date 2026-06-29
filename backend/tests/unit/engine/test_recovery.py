@@ -15,7 +15,7 @@ from backend.core.errors import FunctionCallValidationError
 from backend.engine.orchestrator_helpers.recovery import (
     _astep_handle_recoverable_tool_call_shape_error,
 )
-from backend.ledger.action.agent import AgentThinkAction
+from backend.ledger.action.agent import AgentThinkAction, SystemHintAction
 
 
 def _make_orchestrator():
@@ -38,7 +38,7 @@ def test_per_action_error_preserves_sibling_actions():
 
     action = _astep_handle_recoverable_tool_call_shape_error(orch, err)
 
-    assert isinstance(action, AgentThinkAction)
+    assert isinstance(action, SystemHintAction)
     assert len(orch.pending_actions) == 2
     assert len(orch.deferred_actions) == 1
 

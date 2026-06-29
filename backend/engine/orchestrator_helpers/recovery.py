@@ -12,7 +12,7 @@ from backend.engine.orchestrator_helpers.actions import (
 from backend.engine.orchestrator_helpers.helpers import (
     _normalize_recoverable_error_signature,
 )
-from backend.ledger.action import AgentThinkAction
+from backend.ledger.action import SystemHintAction
 
 if TYPE_CHECKING:
     from backend.engine.orchestrator import Orchestrator
@@ -45,7 +45,7 @@ def _astep_handle_tool_execution_error(orch: Orchestrator, e: Exception) -> Acti
             removed,
         )
 
-    return AgentThinkAction(thought=str(e))
+    return SystemHintAction(thought=str(e))
 
 
 def _astep_handle_recoverable_tool_call_shape_error(
@@ -85,17 +85,17 @@ def _astep_handle_recoverable_tool_call_shape_error(
         orch._recoverable_tool_error_count
         >= DEFAULT_AGENT_RECOVERABLE_TOOL_ERROR_THRESHOLD
     ):
-        return AgentThinkAction(
+        return SystemHintAction(
             thought=(
                 'The same invalid tool call pattern '
                 'repeated 3 times and was blocked. You must change strategy now: '
                 're-read relevant file context and emit a different corrected action '
                 '(or switch tool), not a near-identical retry.'
             ),
-            kind=AgentThinkAction.KIND_RECOVERABLE_ERROR_ESCALATED,
+            kind=SystemHintAction.KIND_RECOVERABLE_ERROR_ESCALATED,
         )
 
-    return AgentThinkAction(
+    return SystemHintAction(
         thought=str(e),
-        kind=AgentThinkAction.KIND_RECOVERABLE_ERROR,
+        kind=SystemHintAction.KIND_RECOVERABLE_ERROR,
     )

@@ -30,6 +30,7 @@ from backend.ledger.action import (
 from backend.ledger.action.agent import (
     AgentThinkAction,
     DelegateTaskAction,
+    SystemHintAction,
 )
 from backend.ledger.action.message import StreamingChunkAction
 from backend.ledger.observation import (
@@ -102,7 +103,7 @@ class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
                 )
             return
 
-        if isinstance(event, AgentThinkAction):
+        if isinstance(event, (AgentThinkAction, SystemHintAction)):
             thought = str(getattr(event, 'thought', '') or '')
             if thought.strip():
                 emit_session_event(

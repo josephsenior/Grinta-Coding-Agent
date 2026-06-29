@@ -72,6 +72,7 @@ class ActionType(str, Enum):
     BROWSER_TOOL = 'browser_tool'
     MCP = 'call_tool_mcp'
     THINK = 'think'
+    SYSTEM_HINT = 'system_hint'
     REJECT = 'reject'
     NULL = 'null'
     PAUSE = 'pause'

@@ -808,9 +808,9 @@ class ActionExecutionService:
             'recoverable: %s',
             exc,
         )
-        from backend.ledger.action import AgentThinkAction
+        from backend.ledger.action import SystemHintAction
 
-        think = AgentThinkAction(
+        think = SystemHintAction(
             thought=(
                 '[API_REJECTED_MALFORMED_ARGS] Your previous tool call '
                 'contained invalid JSON escape sequences and was rejected '

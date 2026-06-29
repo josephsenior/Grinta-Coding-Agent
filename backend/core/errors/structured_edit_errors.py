@@ -135,6 +135,8 @@ def format_agent_edit_error_message(
         lines.append(f'Line: {line}')
     if detail := context.get('detail'):
         lines.append(f'Detail: {detail}')
+    if existing := context.get('existing_content'):
+        lines.append(f'Current content:\n{existing}')
     if hint := context.get('hint'):
         if hint not in fallback:
             lines.append(hint)
@@ -323,6 +325,10 @@ def normalize_editor_error_response(
         'files_modified': 0,
         **{key: value for key, value in extra.items() if value is not None},
     }
+    if error_code == 'CREATE_FILE_ALREADY_EXISTS':
+        old_content = getattr(result, 'old_content', None)
+        if old_content:
+            context['existing_content'] = old_content
     message = format_agent_edit_error_message(context, fallback=summary)
     return message, build_edit_error_tool_result(context, operation=command)
 

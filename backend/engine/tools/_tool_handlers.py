@@ -391,9 +391,9 @@ def _handle_task_tracker_tool(arguments: Mapping[str, Any]) -> Action:
         tracker = TaskTracker()
         success, message = tracker.update_task_status(task_id, status, result)
         if not success:
-            from backend.ledger.action.agent import AgentThinkAction
+            from backend.ledger.action.agent import SystemHintAction
 
-            return AgentThinkAction(
+            return SystemHintAction(
                 thought=f'[TASK_TRACKER] {message}',
                 source_tool=TASK_TRACKER_TOOL_NAME,
             )

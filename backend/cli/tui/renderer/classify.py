@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from backend.core.autonomy import normalize_autonomy_level
-from backend.ledger.action import AgentThinkAction, StreamingChunkAction
+from backend.ledger.action import AgentThinkAction, StreamingChunkAction, SystemHintAction
 from backend.ledger.observation import AgentThinkObservation
 
 if TYPE_CHECKING:
@@ -28,6 +28,16 @@ def _is_live_thinking_event(
         if bool(getattr(event, 'suppress_cli', False)):
             return False
         thought = getattr(event, 'thought', '') or getattr(event, 'content', '')
+        source_tool = getattr(event, 'source_tool', '') or ''
+        kind = getattr(event, 'kind', '') or ''
+        intent = orch._classify_thinking_text(
+            thought, source_tool=source_tool, kind=kind
+        )
+        return intent.kind == 'thinking'
+    if isinstance(event, SystemHintAction):
+        if bool(getattr(event, 'suppress_cli', False)):
+            return False
+        thought = getattr(event, 'thought', '') or ''
         source_tool = getattr(event, 'source_tool', '') or ''
         kind = getattr(event, 'kind', '') or ''
         intent = orch._classify_thinking_text(

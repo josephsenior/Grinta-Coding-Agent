@@ -22,6 +22,7 @@ from backend.ledger.action.agent import (
     InformAction,
     ProposalAction,
     RecallAction,
+    SystemHintAction,
     TaskTrackingAction,
     UncertaintyAction,
 )
@@ -68,6 +69,7 @@ actions = (
     FileEditAction,
     AgentThinkAction,
     AgentRejectAction,
+    SystemHintAction,
     RecallAction,
     ChangeAgentStateAction,
     MessageAction,

@@ -77,7 +77,11 @@ def _cleanup_stale_format_error_observations(
     to_remove = []
     for i, event in enumerate(history):
         event_type = type(event).__name__
-        if event_type not in ('AgentThinkObservation', 'AgentThinkAction'):
+        if event_type not in (
+            'AgentThinkObservation',
+            'AgentThinkAction',
+            'SystemHintAction',
+        ):
             continue
         content = getattr(event, 'content', '') or ''
         thought = getattr(event, 'thought', '') or ''
