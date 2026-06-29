@@ -6,7 +6,8 @@ import contextlib
 from typing import TYPE_CHECKING, Any
 
 from backend.core.logging.logger import app_logger as logger
-from backend.ledger.action.agent import AgentThinkAction, CondensationAction
+from backend.ledger.action.agent import CondensationAction
+from backend.ledger.action.empty import NullAction, NullActionReason
 from backend.ledger.event import EventSource
 
 if TYPE_CHECKING:
@@ -65,7 +66,7 @@ def _set_skip_compaction_flag(state: State) -> None:
 
 
 def _queue_post_condensation_recovery(orch: Orchestrator, task_text: str = '') -> None:
-    """Queue a brief think action after condensation to break the re-condensation loop.
+    """Queue a silent no-op after condensation to break the re-condensation loop.
 
     The agent_controller drain loop calls astep() immediately after dispatching
     a CondensationAction. The event-delivery pipeline (background thread →
@@ -76,18 +77,18 @@ def _queue_post_condensation_recovery(orch: Orchestrator, task_text: str = '') -
     call sees stale state, condense_history() concludes condensation is still
     needed, and returns another CondensationAction — an infinite loop.
 
-    Queuing an AgentThinkAction here ensures _consume_pending_action() returns
+    Queuing a sentinel NullAction here ensures _consume_pending_action() returns
     it on the very next astep() call, skipping condense_history() entirely.
-    By the time the ThinkAction's observation triggers the following step,
-    state.history already contains the original CondensationAction.
+    By the time the following step runs, state.history already contains the
+    original CondensationAction. A NullAction is used instead of a think action
+    so the TUI does not show a fake "Memory condensed" reasoning row — the
+    compaction card already covers that UX.
     """
     del task_text  # Currently unused; reserved for future personalization.
     orch_state = getattr(orch, 'state', None)
     if orch_state is not None:
         _set_skip_compaction_flag(orch_state)
-    orch.pending_actions.append(
-        AgentThinkAction(thought='Memory condensed. Resuming task.')
-    )
+    orch.pending_actions.append(NullAction(reason=NullActionReason.SENTINEL))
 
 
 def _is_noop_condensation_action(action: object | None) -> bool:
