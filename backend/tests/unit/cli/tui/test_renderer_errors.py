@@ -22,6 +22,7 @@ from backend.tests.unit.cli.tui._shared import (
     Static,
     StatusObservation,
     StreamingChunkAction,
+    SystemHintAction,
     TUIRenderer,
     ThinkingIndicator,
     _get_screen,
@@ -54,9 +55,9 @@ async def test_tui_recoverable_error_renders_as_plain_error_message(mock_config)
         s._renderer = renderer
 
         renderer._process_event(
-            AgentThinkAction(
+            SystemHintAction(
                 thought="Invalid task status 'doing'. Use one of: blocked, in_progress, done, skipped, todo.",
-                kind=AgentThinkAction.KIND_RECOVERABLE_ERROR,
+                kind=SystemHintAction.KIND_RECOVERABLE_ERROR,
             )
         )
         # The mock config causes the background bootstrap to fail with an

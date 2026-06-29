@@ -18,6 +18,7 @@ from backend.ledger.action.agent import (
     InformAction,
     ProposalAction,
     RecallAction,
+    SystemHintAction,
     TaskTrackingAction,
     UncertaintyAction,
 )
@@ -97,6 +98,7 @@ __all__ = [
     'ScratchpadNoteAction',
     'ScratchpadRecallAction',
     'StreamingChunkAction',
+    'SystemHintAction',
     'SystemMessageAction',
     'TaskTrackingAction',
     'TerminalInputAction',

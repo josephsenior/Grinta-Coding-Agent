@@ -464,7 +464,7 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
                     user_messages.append(content)
                 else:
                     agent_thoughts.append(content)
-            elif type_name == 'AgentThinkAction':
+            elif type_name in ('AgentThinkAction', 'SystemHintAction'):
                 agent_thoughts.append(str(event)[:200])
             elif type_name in (
                 'FileReadAction',

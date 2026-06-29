@@ -36,7 +36,6 @@ from backend.engine.tools._file_ops import (
 )
 from backend.ledger.action import (
     Action,
-    AgentThinkAction,
     FileEditAction,
 )
 
@@ -65,23 +64,6 @@ def _handle_create_file_tool(arguments: Mapping[str, Any]) -> Action:
     normalized_args = dict(arguments)
     normalized_args['file_text'] = str(content)
     _guard_content_arguments(normalized_args)
-    # Pre-flight existence check: if the file already exists, return a soft
-    # guidance message instead of silently overwriting. The LLM has already
-    # generated the content (tokens are spent), but this prevents accidental
-    # data loss and steers the agent toward the correct edit tool.
-    try:
-        safe_path = _safe_workspace_path(str(path), must_exist=False)
-        if safe_path.exists():
-            return AgentThinkAction(
-                thought=(
-                    f'File already exists at {path}. '
-                    'Use replace_string to modify specific sections. '
-                    'Only use create for genuinely new files.'
-                ),
-            )
-    except FunctionCallValidationError:
-        pass  # Path validation failed; let the action proceed and fail downstream
-    normalized_args['overwrite_existing'] = True
     action = _build_create_file_action(str(path), normalized_args)
     set_security_risk(action, arguments)
     return action

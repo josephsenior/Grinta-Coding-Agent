@@ -149,9 +149,9 @@ async def _astep_handle_context_limit_error(orch: Orchestrator, state: State) ->
         logger.warning(
             'Auto-Healing retry failed after condensation. Falling back to think action.'
         )
-        from backend.ledger.action import AgentThinkAction
+        from backend.ledger.action import SystemHintAction
 
-        return AgentThinkAction(
+        return SystemHintAction(
             thought='I have reached the context limit. I must condense my memory before proceeding.',
         )
 

@@ -50,6 +50,7 @@ from backend.ledger.action import (
     MessageAction,
     ProposalAction,
     StreamingChunkAction,
+    SystemHintAction,
     UncertaintyAction,
 )
 from backend.ledger.action.browser_tool import BrowserToolAction

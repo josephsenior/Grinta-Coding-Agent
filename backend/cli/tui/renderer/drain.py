@@ -171,6 +171,7 @@ def _is_low_value_backlog_event(event: Any) -> bool:
     name = type(event).__name__
     if name in {
         'AgentThinkAction',
+        'SystemHintAction',
         'AgentThinkObservation',
         'NullObservation',
         'StatusObservation',

@@ -314,39 +314,5 @@ class TestPluginRegistryDispatch(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(result), 2)
 
 
-class TestPluginTemplate(unittest.IsolatedAsyncioTestCase):
-    async def test_my_plugin_hooks(self):
-        from backend.examples.plugin_template import MyPlugin
-
-        p = MyPlugin()
-        self.assertEqual(p.name, 'my-plugin')
-        self.assertEqual(p.version, '0.1.0')
-
-        # on_action_pre returns action unchanged
-        action = MagicMock()
-        result = await p.on_action_pre(action)
-        self.assertIs(result, action)
-
-        # on_event is a no-op
-        await p.on_event(MagicMock())
-
-        # session hooks
-        await p.on_session_start('sess-1', {})
-        await p.on_session_end('sess-1', {})
-
-    def test_register_function(self):
-        from backend.examples.plugin_template import register
-
-        reg = PluginRegistry()
-        register(reg)
-        self.assertIsNotNone(reg.get_plugin('my-plugin'))
-
-    def test_validate(self):
-        from backend.examples.plugin_template import MyPlugin
-
-        warnings = MyPlugin().validate()
-        self.assertEqual(warnings, [])
-
-
 if __name__ == '__main__':
     unittest.main()

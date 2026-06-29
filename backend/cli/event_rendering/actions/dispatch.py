@@ -48,6 +48,7 @@ from backend.ledger.action import (  # noqa: E402
     ReadSymbolsAction,
     RecallAction,
     StreamingChunkAction,
+    SystemHintAction,
     TaskTrackingAction,
     TerminalInputAction,
     TerminalReadAction,
@@ -80,6 +81,7 @@ class _ActionDispatchMixin(_ActionRenderersBase):
         (StreamingChunkAction, '_render_streaming_chunk_action'),
         (MessageAction, '_render_message_action'),
         (AgentThinkAction, '_render_agent_think_action'),
+        (SystemHintAction, '_render_agent_think_action'),
         (CmdRunAction, '_render_cmd_run_action'),
         (FileEditAction, '_render_file_edit_action'),
         (RecallAction, '_render_recall_action'),
@@ -185,6 +187,7 @@ class _ActionDispatchMixin(_ActionRenderersBase):
                 # the preview clear so reasoning text keeps rendering.
                 if (
                     action_type is not AgentThinkAction
+                    and action_type is not SystemHintAction
                     and action_type is not (StreamingChunkAction)
                     and action_type is not MessageAction
                 ):
