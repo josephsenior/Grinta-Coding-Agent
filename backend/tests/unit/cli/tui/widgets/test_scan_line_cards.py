@@ -7,6 +7,7 @@ from backend.cli.tui.screens.detail.base import DetailScreen
 from backend.cli.tui.widgets.scan_line import (
     AgentMessageCard,
     BrowserCard,
+    CompactionCard,
     DebuggerCard,
     DelegateCard,
     EditCard,
@@ -243,6 +244,50 @@ def test_shell_card_running():
     assert '$ Shell' in line or 'Shell' in line
     assert f'[{NAVY_RUNNING}]…[/]' in card._delta_text()
     assert 'npm install' in line
+
+
+def test_shell_card_multiline_command_renders_single_line():
+    command = 'python3 -c "\nimport sys\nsys.path.insert(0, \'.\')\nprint(1)"'
+    card = ShellCard(command=command)
+    line = _line_text(card)
+    assert '\n' not in line
+    assert 'import sys' in line
+    assert 'sys.path.insert' in line
+
+
+# ── CompactionCard ─────────────────────────────────────────────────────
+
+
+def test_compaction_card_running():
+    from backend.cli.tui.widgets.scan_line import cards as cards_mod
+
+    cards_mod._running_ellipsis_frame = 0
+    card = CompactionCard()
+    assert card.state == 'running'
+    line = _line_text(card)
+    assert 'Compacting' in line
+    assert 'context' not in line
+    assert '(1st)' not in line
+    assert f'[{NAVY_RUNNING}]…[/]' in card._delta_text()
+
+
+def test_compaction_card_done_updates_label():
+    card = CompactionCard()
+    card.complete(summary='Session summary for the next turn.')
+    assert card.state == 'done'
+    line = _line_text(card)
+    assert 'Compacted' in line
+    assert 'Compacting' not in line
+    assert '[scan-line-state-done]✓[/]' in card._delta_text()
+
+
+def test_compaction_card_detail_screen():
+    card = CompactionCard(summary='Condensed history.')
+    screen = card.build_detail_screen()
+    from backend.cli.tui.screens.detail.payload import PayloadDetailScreen
+
+    assert isinstance(screen, PayloadDetailScreen)
+    assert screen._body == 'Condensed history.'
 
 
 def test_running_ellipsis_cycles_with_refresh_frame():

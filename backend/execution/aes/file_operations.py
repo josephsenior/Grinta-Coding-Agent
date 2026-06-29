@@ -221,57 +221,527 @@ def truncate_large_text(value: str, max_chars: int, *, label: str) -> str:
     return value[:half] + '\n[... Truncated by app due to size ...]\n' + value[-half:]
 
 
-# Smart diff truncation constants.
+# ---------------------------------------------------------------------------
+# Diff codec — priority-based lossy diff truncation
+# ---------------------------------------------------------------------------
+# Priority determines DROP ORDER (lowest priority dropped first when budget
+# is tight). Output order is ALWAYS original diff order — lines are never
+# reordered, only removed.
+#
+# Priority tiers:
+#   100  diff metadata     diff --git, index, ---, +++      (always emitted)
+#    90  hunk header       @@ -a,b +c,d @@                  (always emitted*)
+#    80  change            + and - lines                     (dropped last)
+#    40  adjacent context  ±2 context lines around +/-       (dropped second)
+#     5  context           plain context lines               (dropped first)
+#
+# * Hunk headers always emitted in full and truncated modes. In skeleton
+#   mode only file headers are emitted.
+
 _DIFF_TRUNC_HARD_CAP = 20_000
-_DIFF_TRUNC_HEAD_BUDGET = 5_000
-_DIFF_TRUNC_TAIL_BUDGET = 2_000
 
-# Structured marker emitted whenever an edit diff is shortened. Both the
-# prompt-building layer and the agent rely on this exact prefix to detect that
-# the shown changes are incomplete. Keep in sync with the prompt-layer detector
-# in backend.context.processors.observation_processors.
-EDIT_DIFF_TRUNCATED_MARKER_PREFIX = '[EDIT_DIFF_TRUNCATED'
+_PRIORITY_DIFF_METADATA = 100
+_PRIORITY_HUNK_HEADER = 90
+_PRIORITY_CHANGE = 80
+_PRIORITY_ADJ_CONTEXT = 40
+_PRIORITY_CONTEXT = 5
+
+_GENERATED_FILE_PATTERNS = (
+    re.compile(r'(^|/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml)$'),
+    re.compile(r'\.lock$'),
+    re.compile(r'\.min\.js$'),
+    re.compile(r'_pb2\.py$'),
+    re.compile(r'\.generated\.'),
+    re.compile(r'(^|/)(go\.sum|cargo\.lock|poetry\.lock)$'),
+)
+
+# Marker prefix emitted by the diff codec when output is lossy. Detected by
+# the prompt layer (see observation_processors._handle_file_edit_observation)
+# so the agent is told to re-read the file, even when the prompt layer itself
+# does not truncate.
+DIFF_CODEC_MARKER_PREFIX = '[DIFF_CODEC'
+
+_DIFF_CODEC_VERSION = 1
 
 
-def edit_diff_truncated_marker(path: str = '') -> str:
-    """Structured, agent-actionable marker placed where an edit diff was cut."""
-    path_part = f' path={path}' if path else ''
-    return (
-        f'{EDIT_DIFF_TRUNCATED_MARKER_PREFIX}{path_part}] diff shortened due to size '
-        '— re-read the file (or the edited range) to see the complete changes '
-        'before making further edits'
+def _is_generated_path(path: str) -> bool:
+    if not path:
+        return False
+    return any(p.search(path) for p in _GENERATED_FILE_PATTERNS)
+
+
+# --- Parsing ---
+
+
+class _DiffLine:
+    __slots__ = ('text', 'priority', 'category', 'file_idx', 'hunk_idx', 'kept')
+
+    def __init__(self, text: str, priority: int, category: str, file_idx: int, hunk_idx: int):
+        self.text = text
+        self.priority = priority
+        self.category = category
+        self.file_idx = file_idx
+        self.hunk_idx = hunk_idx
+        self.kept = True
+
+
+class _HunkInfo:
+    __slots__ = ('idx', 'file_idx', 'additions', 'deletions', 'context_count', 'header_line')
+
+    def __init__(self, idx: int, file_idx: int, header_line: _DiffLine):
+        self.idx = idx
+        self.file_idx = file_idx
+        self.additions = 0
+        self.deletions = 0
+        self.context_count = 0
+        self.header_line = header_line
+
+
+class _FileInfo:
+    __slots__ = ('idx', 'path', 'is_generated', 'metadata_lines', 'hunks')
+
+    def __init__(self, idx: int, path: str):
+        self.idx = idx
+        self.path = path
+        self.is_generated = _is_generated_path(path)
+        self.metadata_lines: list[_DiffLine] = []
+        self.hunks: list[_HunkInfo] = []
+
+
+def _parse_diff(lines: list[str]) -> tuple[list[_DiffLine], list[_FileInfo], list[_HunkInfo]]:
+    """Parse unified diff into classified lines.
+
+    Returns (all_lines, files, hunks) where all_lines is in original order.
+    Each line is classified with a priority and tagged with file/hunk indices.
+    """
+    all_lines: list[_DiffLine] = []
+    files: list[_FileInfo] = []
+    hunks: list[_HunkInfo] = []
+
+    file_idx = -1
+    hunk_idx = -1
+    current_hunk_lines: list[_DiffLine] = []
+
+    for raw in lines:
+        if raw.startswith('diff --git'):
+            path = _extract_path_from_diff_header(raw)
+            file_idx += 1
+            hunk_idx = -1
+            current_hunk_lines = []
+            fi = _FileInfo(file_idx, path)
+            files.append(fi)
+            dl = _DiffLine(raw, _PRIORITY_DIFF_METADATA, 'metadata', file_idx, -1)
+            fi.metadata_lines.append(dl)
+            all_lines.append(dl)
+        elif raw.startswith('index ') or raw.startswith('--- ') or raw.startswith('+++ '):
+            if file_idx >= 0:
+                dl = _DiffLine(raw, _PRIORITY_DIFF_METADATA, 'metadata', file_idx, -1)
+                files[file_idx].metadata_lines.append(dl)
+                all_lines.append(dl)
+            else:
+                all_lines.append(_DiffLine(raw, _PRIORITY_CONTEXT, 'context', 0, -1))
+        elif raw.startswith('@@'):
+            hunk_idx += 1
+            hdl = _DiffLine(raw, _PRIORITY_HUNK_HEADER, 'hunk_header', file_idx, hunk_idx)
+            hi = _HunkInfo(hunk_idx, file_idx, hdl)
+            if file_idx >= 0:
+                files[file_idx].hunks.append(hi)
+            hunks.append(hi)
+            all_lines.append(hdl)
+            current_hunk_lines = []
+        elif raw.startswith('+'):
+            dl = _DiffLine(raw, _PRIORITY_CHANGE, 'add', file_idx, hunk_idx)
+            all_lines.append(dl)
+            current_hunk_lines.append(dl)
+            if hunk_idx >= 0:
+                hunks[hunk_idx].additions += 1
+        elif raw.startswith('-'):
+            dl = _DiffLine(raw, _PRIORITY_CHANGE, 'remove', file_idx, hunk_idx)
+            all_lines.append(dl)
+            current_hunk_lines.append(dl)
+            if hunk_idx >= 0:
+                hunks[hunk_idx].deletions += 1
+        else:
+            dl = _DiffLine(raw, _PRIORITY_CONTEXT, 'context', file_idx, hunk_idx)
+            all_lines.append(dl)
+            current_hunk_lines.append(dl)
+            if hunk_idx >= 0:
+                hunks[hunk_idx].context_count += 1
+
+    _mark_adjacent_context(current_hunk_lines)
+    _mark_adjacent_context_for_all_hunks(all_lines, hunks)
+    return all_lines, files, hunks
+
+
+def _mark_adjacent_context_for_all_hunks(all_lines: list[_DiffLine], hunks: list[_HunkInfo]) -> None:
+    """Mark context lines within ±2 lines of a change as adjacent context."""
+    for hi in hunks:
+        hunk_content = [
+            dl for dl in all_lines
+            if dl.hunk_idx == hi.idx and dl.category in ('context', 'add', 'remove')
+        ]
+        _mark_adjacent_context(hunk_content)
+
+
+def _mark_adjacent_context(lines: list[_DiffLine]) -> None:
+    """Mark context lines within ±2 positions of a +/- line as adjacent."""
+    change_positions = [i for i, dl in enumerate(lines) if dl.category in ('add', 'remove')]
+    if not change_positions:
+        return
+    adjacent = set()
+    for pos in change_positions:
+        for offset in (-2, -1, 0, 1, 2):
+            adjacent.add(pos + offset)
+    for i, dl in enumerate(lines):
+        if dl.category == 'context' and i in adjacent:
+            dl.priority = _PRIORITY_ADJ_CONTEXT
+            dl.category = 'adj_context'
+
+
+def _extract_path_from_diff_header(line: str) -> str:
+    """Extract the file path from a 'diff --git a/path b/path' line."""
+    parts = line.split()
+    if len(parts) >= 4:
+        return parts[-1].lstrip('b/')
+    return ''
+
+
+# --- Budget allocation ---
+
+
+def _line_cost(dl: _DiffLine) -> int:
+    return len(dl.text) + 1
+
+
+def _structural_size(lines: list[_DiffLine]) -> int:
+    """Size of metadata + hunk headers (always emitted, excluded from budget)."""
+    return sum(_line_cost(dl) for dl in lines if dl.priority >= _PRIORITY_HUNK_HEADER)
+
+
+def _content_size(lines: list[_DiffLine]) -> int:
+    """Size of all non-structural lines."""
+    return sum(_line_cost(dl) for dl in lines if dl.priority < _PRIORITY_HUNK_HEADER)
+
+
+def _allocate_budget(
+    lines: list[_DiffLine],
+    hunks: list[_HunkInfo],
+    files: list[_FileInfo],
+    budget: int,
+) -> tuple[str, dict[str, Any]]:
+    """Allocate budget by dropping lowest-priority lines first.
+
+    Returns (codec_mode, telemetry).
+    """
+    structural = _structural_size(lines)
+
+    # --- Skeleton mode: structural metadata alone exceeds budget ---
+    if structural > budget:
+        return _emit_skeleton(files, budget)
+
+    content_budget = budget - structural
+    content_lines = [dl for dl in lines if dl.priority < _PRIORITY_HUNK_HEADER]
+    total_content = sum(_line_cost(dl) for dl in content_lines)
+
+    # --- Full mode: everything fits ---
+    if total_content <= content_budget:
+        return 'full', _build_telemetry(files, hunks, lines, dropped_any=False)
+
+    # --- Truncated mode: drop by priority (lowest first) ---
+
+    # Phase 1: drop plain context (priority 5)
+    for dl in content_lines:
+        if dl.priority == _PRIORITY_CONTEXT:
+            dl.kept = False
+    used = sum(_line_cost(dl) for dl in content_lines if dl.kept)
+    if used <= content_budget:
+        return 'truncated', _build_telemetry(files, hunks, lines, dropped_any=True)
+
+    # Phase 2: drop adjacent context (priority 40)
+    for dl in content_lines:
+        if dl.priority == _PRIORITY_ADJ_CONTEXT:
+            dl.kept = False
+    used = sum(_line_cost(dl) for dl in content_lines if dl.kept)
+    if used <= content_budget:
+        return 'truncated', _build_telemetry(files, hunks, lines, dropped_any=True)
+
+    # Phase 3: drop changes (priority 80) from lowest-change-count hunks first.
+    # Keep all @@ headers regardless — the agent always knows WHERE a change
+    # occurred even if it can't see WHAT changed.
+    hunks_by_change_count = sorted(
+        [h for h in hunks if h.additions + h.deletions > 0],
+        key=lambda h: h.additions + h.deletions,
     )
+
+    for hi in hunks_by_change_count:
+        if used <= content_budget:
+            break
+        for dl in content_lines:
+            if dl.hunk_idx == hi.idx and dl.category in ('add', 'remove') and dl.kept:
+                dl.kept = False
+                used -= _line_cost(dl)
+        if used <= content_budget:
+            break
+
+    return 'truncated', _build_telemetry(files, hunks, lines, dropped_any=True)
+
+
+# --- Emission ---
+
+
+def _emit_skeleton(files: list[_FileInfo], budget: int) -> tuple[str, dict[str, Any]]:
+    """Emit file headers only — no hunks, no content."""
+    parts: list[str] = []
+    total_omitted_hunks = 0
+    total_omitted_add = 0
+    total_omitted_del = 0
+    files_omitted = 0
+
+    for fi in files:
+        for dl in fi.metadata_lines:
+            parts.append(dl.text)
+        om_hunks = len(fi.hunks)
+        om_add = sum(h.additions for h in fi.hunks)
+        om_del = sum(h.deletions for h in fi.hunks)
+        total_omitted_hunks += om_hunks
+        total_omitted_add += om_add
+        total_omitted_del += om_del
+        files_omitted += 1
+        parts.append(
+            f'[SKELETON: omitted_hunks={om_hunks}, '
+            f'omitted_additions={om_add}, omitted_deletions={om_del}]'
+        )
+
+    summary = _format_fidelity_summary(
+        mode='skeleton',
+        coverage=0.0,
+        files_full=0,
+        files_partial=0,
+        files_omitted=files_omitted,
+        per_file=None,
+        omitted_hunks=total_omitted_hunks,
+        omitted_add=total_omitted_add,
+        omitted_del=total_omitted_del,
+    )
+    parts.append(summary)
+    return 'skeleton', {'_output': '\n'.join(parts), '_summary': summary}
+
+
+def _emit_truncated(
+    lines: list[_DiffLine],
+    files: list[_FileInfo],
+    hunks: list[_HunkInfo],
+    path: str,
+    telemetry: dict[str, Any],
+) -> str:
+    """Emit surviving lines in original order.
+
+    Markers are emitted ONLY where changes (+/- lines) were dropped.
+    Dropped context lines are silently omitted — the hunk header tells
+    the agent where the hunk is, and the absence of context is normal
+    for a truncated diff.
+    """
+    parts: list[str] = []
+    dropped_add = 0
+    dropped_del = 0
+    marker_pending = False
+
+    for dl in lines:
+        if dl.kept:
+            if marker_pending:
+                parts.append(
+                    f'{DIFF_CODEC_MARKER_PREFIX}: +{dropped_add}/-{dropped_del} lines dropped]'
+                )
+                marker_pending = False
+                dropped_add = 0
+                dropped_del = 0
+            parts.append(dl.text)
+        else:
+            if dl.category in ('add', 'remove'):
+                if dl.category == 'add':
+                    dropped_add += 1
+                else:
+                    dropped_del += 1
+                marker_pending = True
+
+    if marker_pending:
+        parts.append(
+            f'{DIFF_CODEC_MARKER_PREFIX}: +{dropped_add}/-{dropped_del} lines dropped]'
+        )
+
+    return '\n'.join(parts)
+
+
+# --- Fidelity summary ---
+
+
+def _build_telemetry(
+    files: list[_FileInfo],
+    hunks: list[_HunkInfo],
+    lines: list[_DiffLine],
+    dropped_any: bool,
+) -> dict[str, Any]:
+    total_add = sum(h.additions for h in hunks)
+    total_del = sum(h.deletions for h in hunks)
+    kept_add = sum(1 for dl in lines if dl.category == 'add' and dl.kept)
+    kept_del = sum(1 for dl in lines if dl.category == 'remove' and dl.kept)
+    total_changes = total_add + total_del
+    kept_changes = kept_add + kept_del
+    coverage = (kept_changes / total_changes * 100) if total_changes else 100.0
+
+    per_file: list[dict[str, Any]] = []
+    files_full = 0
+    files_partial = 0
+    files_omitted = 0
+
+    for fi in files:
+        f_hunks = [h for h in fi.hunks if h.file_idx == fi.idx]
+        f_om_add = sum(h.additions for h in f_hunks) - sum(
+            1 for dl in lines if dl.file_idx == fi.idx and dl.category == 'add' and dl.kept
+        )
+        f_om_del = sum(h.deletions for h in f_hunks) - sum(
+            1 for dl in lines if dl.file_idx == fi.idx and dl.category == 'remove' and dl.kept
+        )
+        f_om_hunks = sum(1 for h in f_hunks if not any(
+            dl.kept for dl in lines if dl.hunk_idx == h.idx and dl.category in ('add', 'remove')
+        ))
+        if f_om_add == 0 and f_om_del == 0:
+            files_full += 1
+        elif f_om_add == sum(h.additions for h in f_hunks) and f_om_del == sum(h.deletions for h in f_hunks):
+            files_omitted += 1
+        else:
+            files_partial += 1
+        per_file.append({
+            'path': fi.path,
+            'omitted_hunks': f_om_hunks,
+            'omitted_additions': f_om_add,
+            'omitted_deletions': f_om_del,
+        })
+
+    return {
+        'coverage': coverage,
+        'files_full': files_full,
+        'files_partial': files_partial,
+        'files_omitted': files_omitted,
+        'per_file': per_file,
+        'omitted_hunks': sum(1 for h in hunks if not any(
+            dl.kept for dl in lines if dl.hunk_idx == h.idx and dl.category in ('add', 'remove')
+        )),
+        'omitted_add': total_add - kept_add,
+        'omitted_del': total_del - kept_del,
+    }
+
+
+def _format_fidelity_summary(
+    mode: str,
+    coverage: float,
+    files_full: int,
+    files_partial: int,
+    files_omitted: int,
+    per_file: list[dict[str, Any]] | None,
+    omitted_hunks: int = 0,
+    omitted_add: int = 0,
+    omitted_del: int = 0,
+) -> str:
+    parts = [
+        f'[DIFF_CODEC v{_DIFF_CODEC_VERSION} mode={mode}',
+        f'change_line_coverage={coverage:.1f}%',
+        f'files_fully_represented={files_full}',
+        f'files_partially_represented={files_partial}',
+        f'files_omitted={files_omitted}]',
+    ]
+    if per_file:
+        for pf in per_file:
+            if pf['omitted_additions'] > 0 or pf['omitted_deletions'] > 0 or pf['omitted_hunks'] > 0:
+                parts.append(
+                    f'  {pf["path"]}: omitted_hunks={pf["omitted_hunks"]}, '
+                    f'omitted_additions={pf["omitted_additions"]}, '
+                    f'omitted_deletions={pf["omitted_deletions"]}'
+                )
+    return '\n'.join(parts)
+
+
+# --- Main entry point ---
 
 
 def truncate_diff(value: str, *, path: str = '') -> str:
-    """Truncate diff output to a reasonable size.
+    """Truncate diff output using a priority-based lossy codec.
 
-    Preserves the head (5k chars) and tail (2k chars) of the diff
-    with a hard cap of 20k chars. This ensures the agent sees the
-    beginning of changes and the end summary while preventing
-    context window overflow from massive diffs.
+    Lines are classified by priority and dropped lowest-first when budget
+    is tight. Output order is always original diff order. The codec operates
+    in three modes:
 
-    Head/tail are cut on line boundaries so a mangled half-line is never
-    emitted, and a structured :func:`edit_diff_truncated_marker` is inserted so
-    the agent knows the shown diff is incomplete and should re-read the file.
+    - **full**: everything fits, nothing dropped.
+    - **truncated**: some lines dropped (context first, then adjacent context,
+      then changes from lowest-density hunks). Hunk headers always kept.
+    - **skeleton**: structural metadata alone exceeds budget — file headers
+      only, no hunks, no content.
+
+    A fidelity summary is always emitted when the codec is active (i.e. when
+    the diff exceeds the budget). All lossy outputs carry the ``[DIFF_CODEC``
+    marker prefix; the prompt layer (observation_processors) detects it and
+    emits a re-read footer.
     """
     if len(value) <= _DIFF_TRUNC_HARD_CAP:
         return value
-    head = value[:_DIFF_TRUNC_HEAD_BUDGET]
-    tail = value[-_DIFF_TRUNC_TAIL_BUDGET:]
-    # Snap to line boundaries to avoid corrupting partial lines.
+
+    lines_text = value.split('\n')
+    all_lines, files, hunks = _parse_diff(lines_text)
+
+    if not files:
+        # Not a standard unified diff — fall back to head/tail truncation.
+        return _fallback_head_tail(value, path)
+
+    mode, telemetry = _allocate_budget(all_lines, hunks, files, _DIFF_TRUNC_HARD_CAP)
+
+    if mode == 'skeleton':
+        logger.warning(
+            'Diff skeleton mode (structural metadata > %s chars), path=%s',
+            _DIFF_TRUNC_HARD_CAP,
+            path,
+        )
+        return telemetry['_output']
+
+    if mode == 'full':
+        return value
+
+    # truncated
+    logger.warning(
+        'Diff truncated from %s chars (mode=%s, coverage=%.1f%%), path=%s',
+        len(value),
+        mode,
+        telemetry['coverage'],
+        path,
+    )
+    body = _emit_truncated(all_lines, files, hunks, path, telemetry)
+    summary = _format_fidelity_summary(
+        mode='truncated',
+        coverage=telemetry['coverage'],
+        files_full=telemetry['files_full'],
+        files_partial=telemetry['files_partial'],
+        files_omitted=telemetry['files_omitted'],
+        per_file=telemetry['per_file'],
+        omitted_hunks=telemetry['omitted_hunks'],
+        omitted_add=telemetry['omitted_add'],
+        omitted_del=telemetry['omitted_del'],
+    )
+    return body + '\n' + summary
+
+
+def _fallback_head_tail(value: str, path: str) -> str:
+    """Fallback for non-diff text that exceeds the cap."""
+    head = value[:5000]
+    tail = value[-2000:]
     if '\n' in head:
         head = head[: head.rfind('\n')]
     if '\n' in tail:
         tail = tail[tail.find('\n') + 1 :]
-    logger.warning(
-        'Truncating diff from %s chars to %s chars (head %s + tail %s)',
-        len(value),
-        _DIFF_TRUNC_HEAD_BUDGET + _DIFF_TRUNC_TAIL_BUDGET,
-        _DIFF_TRUNC_HEAD_BUDGET,
-        _DIFF_TRUNC_TAIL_BUDGET,
+    path_part = f' path={path}' if path else ''
+    marker = (
+        f'{DIFF_CODEC_MARKER_PREFIX}{path_part}] non-diff content shortened '
+        '(head/tail kept) — re-read the source to see the full text'
     )
-    return f'{head}\n{edit_diff_truncated_marker(path)}\n{tail}'
+    return f'{head}\n{marker}\n{tail}'
 
 
 # Default max chars for bash command output (configurable via env var).

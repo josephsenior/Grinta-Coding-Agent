@@ -18,7 +18,9 @@ def resolve_session_id(
     state: State | None = None,
     session_id: str | None = None,
 ) -> str | None:
-    """Resolve session id: explicit arg, then state.session_id, then contextvar."""
+    """Resolve session id: explicit arg, then state.session_id, then contextvar,
+    then the bound session event logger (process-wide fallback).
+    """
     for candidate in (
         session_id,
         getattr(state, 'session_id', None) if state is not None else None,
@@ -31,6 +33,14 @@ def resolve_session_id(
         ctx = get_current_session_id()
         if isinstance(ctx, str) and ctx.strip():
             return ctx.strip()
+    except Exception:
+        pass
+    try:
+        from backend.core.logging.session_event_logger import get_bound_session_id
+
+        sid = get_bound_session_id()
+        if isinstance(sid, str) and sid.strip():
+            return sid.strip()
     except Exception:
         pass
     return None

@@ -111,12 +111,19 @@ if TYPE_CHECKING:
 class FunctionCallValidationError(CoreFunctionCallValidationError):
     """Raised when an LLM response fails validation for function calling."""
 
+    def __init__(self, message: str, *, per_action: bool = False) -> None:
+        super().__init__(message, per_action=per_action)
+
 
 class FunctionCallNotExistsError(
     CoreFunctionCallNotExistsError,
     FunctionCallValidationError,
 ):
     """Raised when a model attempts to call a tool that does not exist."""
+
+    def __init__(self, message: str, *, per_action: bool = False) -> None:
+        CoreFunctionCallNotExistsError.__init__(self, message)
+        self.per_action = per_action
 
 
 def validate_response_choices(response: ModelResponse) -> None:

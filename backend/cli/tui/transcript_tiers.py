@@ -13,7 +13,7 @@ The live TUI renders tool activity in exactly two tiers:
 
 There is no inline collapsed/expanded body in the live feed — expansion always
 means a detail screen on the screen stack (open with Enter/Space on a focused
-card, the ``⤢`` button, or a click; ``failed`` cards auto-open).
+card, the ``⤢`` button, or a click).
 
 These name sets are a reference for which tier a tool belongs to. They are not
 imported by the render pipeline (which keys off event/observation types in
@@ -52,5 +52,6 @@ ACTION_TOOL_NAMES: Final[frozenset[str]] = frozenset(
         'browser',
         'mcp',
         'workers',
+        'condensation',
     }
 )

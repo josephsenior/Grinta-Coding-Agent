@@ -150,7 +150,12 @@ class View(BaseModel):
             # from a CondensationAction created before pruning, so after pruning
             # it may point beyond the list length.
             clamped_offset = max(0, min(summary_offset, len(kept_events)))
-            logger.info(
+            # DEBUG: View.from_events is called once per message channel per LLM
+            # step (4+ times), so the same summary is re-inserted on every call.
+            # The first time it happens in a step is the only one a human cares
+            # about — emit at debug so it's available for triage without flooding
+            # INFO logs.
+            logger.debug(
                 'Inserting summary at offset %s (original=%s, kept_events=%d)',
                 clamped_offset,
                 summary_offset,

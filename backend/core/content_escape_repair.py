@@ -394,7 +394,13 @@ def raise_if_serialized_payload(content: str, field_name: str | None = None) -> 
         return
     from backend.core.errors import FunctionCallValidationError
 
-    raise FunctionCallValidationError(serialized_payload_error(field_name))
+    # per_action=True: the bad content is in this call's arguments only; a
+    # parallel batch of valid sibling calls should still be executed. Without
+    # this flag the orchestrator clears the entire pending queue on the first
+    # bad call, silently losing every other intent in the batch.
+    raise FunctionCallValidationError(
+        serialized_payload_error(field_name), per_action=True
+    )
 
 
 def validate_content_payloads(arguments: object) -> None:

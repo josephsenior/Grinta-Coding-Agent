@@ -20,6 +20,31 @@ class RendererTerminalMixin:
         instance._pending_terminal_scan_card: Any | None = None
         if not hasattr(instance, '_pending_shell_cards_by_command'):
             instance._pending_shell_cards_by_command: dict[str, deque[Any]] = {}
+        instance._pending_compaction_scan_card: Any | None = None
+
+    def _create_compaction_scan_card(self) -> Any:
+        from backend.cli.tui.widgets.scan_line import CompactionCard
+
+        self.commit_live_thinking()
+        card = CompactionCard()
+        card.set_state('running')
+        self._pending_compaction_scan_card = card
+        self._append_scan_line_card(card)
+        return card
+
+    def _complete_compaction_scan_card(self, *, summary: str) -> None:
+        card = getattr(self, '_pending_compaction_scan_card', None)
+        self._pending_compaction_scan_card = None
+
+        if card is None:
+            from backend.cli.tui.widgets.scan_line import CompactionCard
+
+            card = CompactionCard(summary=summary)
+            self._append_scan_line_card(card)
+            return
+
+        card.complete(summary=summary)
+        card._refresh_line()
 
     def _remember_terminal_command(self, session_id: str, command: str) -> None:
         """Remember the most relevant command for a terminal session."""
@@ -56,35 +81,40 @@ class RendererTerminalMixin:
 
     # ── scan-line shell card ──────────────────────────────────────────
 
-    def _create_shell_scan_card(self, command: str) -> Any:
+    def _create_shell_scan_card(
+        self, command_key: str, *, command: str | None = None
+    ) -> Any:
         from backend.cli.tui.widgets.scan_line import ShellCard
 
         self.commit_live_thinking()
-        card = ShellCard(command=command)
+        display_command = command if command is not None else command_key
+        card = ShellCard(command=display_command)
         card.set_state('running')
-        self._pending_shell_cards_by_command[command].append(card)
+        self._pending_shell_cards_by_command[command_key].append(card)
         self._append_scan_line_card(card)
         return card
 
     def _complete_shell_scan_card(
         self,
-        command: str,
+        command_key: str,
         *,
+        command: str | None = None,
         output: str,
         exit_code: int | None,
         cwd: str | None = None,
         is_background: bool = False,
     ) -> None:
-        queue = self._pending_shell_cards_by_command.get(command)
+        display_command = command if command is not None else command_key
+        queue = self._pending_shell_cards_by_command.get(command_key)
         card = queue.popleft() if queue else None
         if queue is not None and not queue:
-            self._pending_shell_cards_by_command.pop(command, None)
+            self._pending_shell_cards_by_command.pop(command_key, None)
 
         if card is None:
             from backend.cli.tui.widgets.scan_line import ShellCard
 
             card = ShellCard(
-                command=command,
+                command=display_command,
                 output=output,
                 exit_code=exit_code,
                 cwd=cwd or '',

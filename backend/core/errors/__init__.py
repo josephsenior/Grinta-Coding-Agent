@@ -352,9 +352,19 @@ class FunctionCallValidationError(AppError):
     This typically happens when the LLM outputs unrecognized function call / parameter names / values.
     """
 
-    def __init__(self, message: str) -> None:
-        """Initialize the error with details about the validation failure."""
+    def __init__(
+        self, message: str, *, per_action: bool = False
+    ) -> None:
+        """Initialize the error with details about the validation failure.
+
+        ``per_action`` indicates the error is attributable to a single tool
+        call (e.g. serialized content in one of 6 parallel ``create_file``
+        calls) rather than a whole-batch shape problem. When set, the
+        orchestrator should NOT clear the entire pending queue — sibling
+        calls in the same parallel batch can still be executed.
+        """
         super().__init__(message)
+        self.per_action = per_action
 
 
 class FunctionCallNotExistsError(AppError):

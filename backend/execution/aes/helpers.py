@@ -1019,18 +1019,16 @@ def _structured_edit_file_outcomes(
 def _join_structured_file_outcome_diffs(
     file_outcomes: list[dict[str, Any]],
 ) -> str | None:
+    from backend.execution.aes.file_operations import truncate_diff
+
     chunks = [
-        str(outcome['diff'])
+        truncate_diff(str(outcome['diff']), path=outcome.get('path', ''))
         for outcome in file_outcomes
         if isinstance(outcome.get('diff'), str) and outcome['diff'].strip()
     ]
     if not chunks:
         return None
-    if len(chunks) == 1:
-        return chunks[0]
-    from backend.execution.aes.file_operations import truncate_diff
-
-    return truncate_diff('\n'.join(chunks))
+    return '\n'.join(chunks)
 
 
 def _structured_edit_verification_text(

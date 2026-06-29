@@ -96,3 +96,41 @@ def test_unbound_session_uses_quarantined_paths_not_legacy(tmp_path, monkeypatch
     path = scoped_agent_path('session_memory', '.md')
     assert path.parent.name == '.session_context_unbound'
     assert load_session_memory() == ''
+
+
+def test_session_event_logger_fallback_resolves_session_id(
+    tmp_path, monkeypatch
+):
+    """When the contextvar is not set, resolve_session_id should fall back
+    to the bound session event logger's session id."""
+    from backend.core.logging.session_event_logger import (
+        close_session_event_logger,
+        get_bound_session_id,
+    )
+    from backend.context.memory.session_context import resolve_session_id
+
+    monkeypatch.setattr(
+        'backend.core.workspace_resolution.workspace_agent_state_dir',
+        lambda: tmp_path,
+    )
+    set_current_session_id(None)
+
+    # Without a bound logger, resolution returns None
+    assert get_bound_session_id() is None
+    assert resolve_session_id() is None
+
+    # Simulate the session event logger being bound (as happens at session start)
+    import backend.core.logging.session_event_logger as sel_mod
+
+    monkeypatch.setattr(sel_mod, '_SESSION_ID', 'logger-bound-sid')
+
+    assert get_bound_session_id() == 'logger-bound-sid'
+    assert resolve_session_id() == 'logger-bound-sid'
+
+    # The contextvar takes priority over the logger fallback
+    set_current_session_id('ctxvar-sid')
+    assert resolve_session_id() == 'ctxvar-sid'
+
+    # Cleanup
+    set_current_session_id(None)
+    close_session_event_logger()

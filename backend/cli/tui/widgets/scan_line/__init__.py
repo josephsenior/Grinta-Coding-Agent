@@ -13,6 +13,7 @@ from backend.cli.tui.widgets.scan_line.card import ScanLineCard
 from backend.cli.tui.widgets.scan_line.cards import (
     AgentMessageCard,
     BrowserCard,
+    CompactionCard,
     DebuggerCard,
     DelegateCard,
     EditCard,
@@ -37,6 +38,7 @@ __all__ = [
     'ShellCard',
     'TerminalCard',
     'BrowserCard',
+    'CompactionCard',
     'DebuggerCard',
     '_parse_syntax_badge',
     '_extract_syntax_error',
