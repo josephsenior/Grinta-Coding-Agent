@@ -195,13 +195,8 @@ async def test_tui_final_stream_suppresses_live_response_for_tool_call(mock_conf
         renderer._process_event(final_stream)
 
         assert renderer._last_final_response_text == ''
-        assert renderer._live_response == ''
-        from backend.cli.tui.widgets.activity_card import AgentMessage
-
-        msgs = list(s.query(AgentMessage).results())
-        assert len(msgs) == 1
-        assert msgs[0].has_class('-plain')
-        assert renderer._last_streamed_preamble_text == 'I will inspect the workspace.'
+        assert renderer._live_response == 'I will inspect the workspace.'
+        assert len(renderer._history) == 0
 
 @pytest.mark.asyncio
 async def test_tui_streamed_response_clears_before_tool_action(mock_config):
@@ -237,12 +232,7 @@ async def test_tui_streamed_response_clears_before_tool_action(mock_config):
 
         assert renderer._last_final_response_text == ''
         assert renderer._live_response == ''
-        from backend.cli.tui.widgets.activity_card import AgentMessage
-
-        msgs = list(s.query(AgentMessage).results())
-        assert len(msgs) == 1
-        assert msgs[0].has_class('-plain')
-        assert renderer._last_streamed_preamble_text == 'I will inspect the workspace.'
+        assert len(renderer._history) == 0
 
 @pytest.mark.asyncio
 async def test_tui_tool_step_message_then_tool_card_in_order(mock_config):
@@ -278,6 +268,7 @@ async def test_tui_tool_step_message_then_tool_card_in_order(mock_config):
                 suppress_live_response=True,
             )
         )
+        assert renderer._live_response == 'I will inspect the workspace.'
         renderer._process_event(
             MessageAction(
                 content='I will inspect the workspace.',
@@ -294,7 +285,53 @@ async def test_tui_tool_step_message_then_tool_card_in_order(mock_config):
         shells = list(s.query(ShellCard).results())
         assert len(msgs) == 1
         assert len(shells) == 1
+        assert renderer._live_response == ''
         assert renderer._last_streamed_preamble_text == 'I will inspect the workspace.'
+
+@pytest.mark.asyncio
+async def test_tui_tool_step_does_not_duplicate_partial_stream_preamble(mock_config):
+    """Final suppress must not commit a partial live snapshot before MessageAction."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        renderer._process_event(
+            StreamingChunkAction(accumulated='Now let me', is_final=False)
+        )
+        renderer._process_event(
+            StreamingChunkAction(
+                accumulated='',
+                is_final=True,
+                suppress_live_response=True,
+            )
+        )
+        renderer._process_event(
+            MessageAction(
+                content='Now let me create the elementwise operators:',
+                transcript_only=True,
+            )
+        )
+        await pilot.pause()
+
+        from backend.cli.tui.widgets.activity_card import AgentMessage
+
+        msgs = list(s.query(AgentMessage).results())
+        assert len(msgs) == 1
 
 @pytest.mark.asyncio
 async def test_tui_duplicate_thinking_payload_renders_once(mock_config, monkeypatch):

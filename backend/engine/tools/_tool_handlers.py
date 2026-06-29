@@ -194,7 +194,10 @@ def execute_memory_recall(action: MemoryRecallAction) -> MemoryRecallObservation
         role = item.get('role', 'unknown')
         score = item.get('score', '')
         score_str = f' (score={score:.3f})' if isinstance(score, float) else ''
-        parts.append(f'  [{i}] ({role}{score_str}) {content[:500]}')
+        excerpt = content[:500]
+        if len(content) > 500:
+            excerpt += ' […truncated]'
+        parts.append(f'  [{i}] ({role}{score_str}) {excerpt}')
     return MemoryRecallObservation(
         content='\n'.join(parts),
         query=query,

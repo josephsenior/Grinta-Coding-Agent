@@ -228,7 +228,10 @@ def _build_recent_action() -> str:
             process_timeout=10.0,
         )
         if res.stdout.strip():
-            out.extend(res.stdout.splitlines()[:100])
+            lines = res.stdout.splitlines()
+            if len(lines) > 100:
+                lines = lines[:100] + ['… (truncated)']
+            out.extend(lines)
         else:
             out.append(
                 _diag(
