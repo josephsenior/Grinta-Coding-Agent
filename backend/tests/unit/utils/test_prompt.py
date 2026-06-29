@@ -622,10 +622,10 @@ class TestPromptBudgetRegression:
         )
         assert report['total_tokens'] >= 1_000, 'Prompt shrank unexpectedly'
         # Baseline post-compression: 5 663 tokens. Post strategic-memory +
-        # objective-nudge additions: ~6 518. Ceiling raised to 6 600 deliberately
-        # to accommodate the new strategic memory kinds + task_tracker objective
-        # framing. Revisit if this grows further.
-        assert report['total_tokens'] <= 6_600, (
+        # objective-nudge additions: ~6 518. Ceiling raised to 6 700 deliberately
+        # to accommodate strategic memory kinds + task_tracker objective
+        # framing + test-tolerance anti-pattern rule. Revisit if this grows further.
+        assert report['total_tokens'] <= 6_700, (
             f'Prompt exceeds budget ceiling: {report["total_tokens"]} tokens '
             '(baseline 5 663). Reduce prompt text or raise this ceiling deliberately.'
         )

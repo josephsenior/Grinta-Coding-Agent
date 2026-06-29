@@ -292,7 +292,7 @@ def test_manager_maps_pwa_node_adapter_to_js_recipe(monkeypatch, tmp_path) -> No
         'backend.execution.dap._dap_manager.DAPDebugSession', FakeSession
     )
     monkeypatch.setattr(
-        'backend.execution.dap._dap_adapters.shutil.which',
+        'backend.execution.dap._dap_adapters.which_normalized',
         lambda cmd: '/fake/js-debug-adapter' if cmd == 'js-debug-adapter' else None,
     )
 
@@ -307,7 +307,7 @@ def test_manager_maps_pwa_node_adapter_to_js_recipe(monkeypatch, tmp_path) -> No
 
 def test_resolve_recipe_supports_tcp_adapter(monkeypatch) -> None:
     monkeypatch.setattr(
-        'backend.execution.dap._dap_adapters.shutil.which',
+        'backend.execution.dap._dap_adapters.which_normalized',
         lambda cmd: '/fake/dlv' if cmd == 'dlv' else None,
     )
     monkeypatch.setattr(
@@ -338,7 +338,7 @@ def test_resolve_recipe_prefers_tcp_codelldb(monkeypatch) -> None:
             return '/fake/lldb-dap'
         return None
 
-    monkeypatch.setattr('backend.execution.dap._dap_adapters.shutil.which', fake_which)
+    monkeypatch.setattr('backend.execution.dap._dap_adapters.which_normalized', fake_which)
     monkeypatch.setattr(
         'backend.execution.dap._dap_adapters._reserve_local_tcp_port',
         lambda: 45679,
@@ -359,7 +359,7 @@ def test_resolve_recipe_falls_back_to_stdio_when_tcp_missing(monkeypatch) -> Non
             return '/fake/lldb-dap'
         return None
 
-    monkeypatch.setattr('backend.execution.dap._dap_adapters.shutil.which', fake_which)
+    monkeypatch.setattr('backend.execution.dap._dap_adapters.which_normalized', fake_which)
 
     assert _resolve_recipe('rust') == ['/fake/lldb-dap']
     rust_entry = next(
@@ -371,7 +371,7 @@ def test_resolve_recipe_falls_back_to_stdio_when_tcp_missing(monkeypatch) -> Non
 
 def test_detect_debug_adapters_keeps_rdbg_diagnostic_only(monkeypatch) -> None:
     monkeypatch.setattr(
-        'backend.execution.dap._dap_adapters.shutil.which',
+        'backend.execution.dap._dap_adapters.which_normalized',
         lambda cmd: '/fake/rdbg' if cmd == 'rdbg' else None,
     )
     ruby_entry = next(
@@ -403,7 +403,7 @@ def test_manager_autoresolves_tcp_adapter(monkeypatch, tmp_path) -> None:
         'backend.execution.dap._dap_manager.DAPDebugSession', FakeSession
     )
     monkeypatch.setattr(
-        'backend.execution.dap._dap_adapters.shutil.which',
+        'backend.execution.dap._dap_adapters.which_normalized',
         lambda cmd: '/fake/dlv' if cmd == 'dlv' else None,
     )
     monkeypatch.setattr(
