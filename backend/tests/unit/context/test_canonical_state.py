@@ -13,6 +13,10 @@ from backend.context.canonical_state import (
     save_canonical_state,
     validate_canonical_state_for_compaction,
 )
+from backend.context.canonical_state.ops import (
+    _merge_narrative,
+    _narrative_overlap,
+)
 from backend.ledger.action import CmdRunAction, MessageAction, TaskTrackingAction
 from backend.ledger.event import EventSource
 from backend.ledger.observation import CmdOutputObservation, TerminalObservation
@@ -332,3 +336,192 @@ def test_canonical_state_reload_preserves_current_fields(tmp_path, monkeypatch) 
     assert reloaded.latest_directive == 'Repair context reload'
     assert reloaded.verification.status == 'passed'
     assert reloaded.source_event_ids['verification'] == 3
+
+
+def test_narrative_summary_merged_across_compactions() -> None:
+    """Compaction #2 must not overwrite the session-arc narrative from
+    compaction #1 — it should merge them so 'Built from scratch' survives."""
+    canonical = CanonicalTaskState()
+    canonical = apply_canonical_patch(
+        canonical,
+        {
+            'narrative_summary': (
+                'Built a complete autograd engine from scratch in Python. '
+                'Created 19 source files across autograd/, autograd/ops/, '
+                'and autograd/jit/ packages.'
+            ),
+            'completed_tasks': 'All 10 operators, JIT pipeline, test suite',
+        },
+        event_id=80,
+        source='structured_compactor',
+    )
+    original_narrative = canonical.narrative_summary
+    assert 'from scratch' in original_narrative
+
+    canonical = apply_canonical_patch(
+        canonical,
+        {
+            'narrative_summary': (
+                'Fixed a critical row-major indexing bug that affected '
+                'SumOp, SoftmaxOp, and AddOp broadcasting.'
+            ),
+            'completed_tasks': (
+                'All 10 operators, JIT pipeline, test suite, '
+                'fixed row-major indexing bug'
+            ),
+        },
+        event_id=100,
+        source='structured_compactor',
+    )
+
+    assert 'from scratch' in canonical.narrative_summary
+    assert 'row-major indexing bug' in canonical.narrative_summary
+    assert 'Fixed a critical' in canonical.narrative_summary
+
+
+def test_narrative_summary_replaced_when_high_overlap() -> None:
+    """If the new narrative is a superset of the old one (high word overlap),
+    the new one replaces the old — no unnecessary duplication."""
+    canonical = CanonicalTaskState()
+    canonical = apply_canonical_patch(
+        canonical,
+        {'narrative_summary': 'Built an autograd engine from scratch with 10 operators'},
+        event_id=50,
+    )
+    canonical = apply_canonical_patch(
+        canonical,
+        {
+            'narrative_summary': (
+                'Built an autograd engine from scratch with 10 operators. '
+                'Fixed row-major indexing bug. All 86 tests pass.'
+            ),
+        },
+        event_id=80,
+    )
+
+    assert canonical.narrative_summary.count('from scratch') == 1
+
+
+def test_completed_tasks_preserved_in_canonical_state() -> None:
+    """completed_tasks from the compaction patch must be stored in the
+    canonical state and rendered in the prompt."""
+    canonical = CanonicalTaskState()
+    canonical = apply_canonical_patch(
+        canonical,
+        {
+            'completed_tasks': 'Tensor class, 10 operators, JIT pipeline, 86 tests',
+            'narrative_summary': 'Built from scratch',
+        },
+        event_id=80,
+    )
+
+    assert 'Tensor class' in canonical.completed_tasks
+    rendered = render_canonical_state_for_prompt(canonical)
+    assert 'Work completed this session' in rendered
+    assert 'Tensor class' in rendered
+
+
+# ---------------------------------------------------------------------------
+# _merge_narrative — direct unit tests
+# ---------------------------------------------------------------------------
+
+
+class TestMergeNarrative:
+    """Direct tests for the _merge_narrative helper."""
+
+    def test_empty_existing_returns_incoming(self):
+        assert _merge_narrative('', 'Built engine from scratch') == 'Built engine from scratch'
+
+    def test_empty_incoming_returns_existing(self):
+        assert _merge_narrative('Built engine from scratch', '') == 'Built engine from scratch'
+
+    def test_both_empty_returns_empty(self):
+        assert _merge_narrative('', '') == ''
+
+    def test_existing_substring_of_incoming_returns_incoming(self):
+        existing = 'Built autograd engine from scratch'
+        incoming = 'Built autograd engine from scratch. Fixed row-major bug. All tests pass.'
+        result = _merge_narrative(existing, incoming)
+        assert result == incoming
+        assert result.count('from scratch') == 1
+
+    def test_incoming_substring_of_existing_returns_existing(self):
+        existing = 'Built engine. Fixed bug. Added tests. Wrote docs.'
+        incoming = 'Built engine.'
+        result = _merge_narrative(existing, incoming)
+        assert result == existing
+
+    def test_low_overlap_prepends_existing(self):
+        existing = 'Built a complete autograd engine from scratch with 19 files'
+        incoming = 'Fixed a critical row-major indexing bug in SumOp broadcasting'
+        result = _merge_narrative(existing, incoming)
+        assert 'from scratch' in result
+        assert 'row-major' in result
+        assert 'Recent:' in result
+
+    def test_high_overlap_replaces_with_incoming(self):
+        existing = 'Built autograd engine from scratch with 10 operators and JIT pipeline'
+        incoming = 'Built autograd engine from scratch with 10 operators and JIT pipeline. Fixed indexing bug.'
+        result = _merge_narrative(existing, incoming)
+        assert result == incoming
+        assert 'Recent:' not in result
+
+    def test_respects_max_chars(self):
+        existing = 'A' * 500
+        incoming = 'B' * 500
+        result = _merge_narrative(existing, incoming, max_chars=100)
+        assert len(result) <= 100
+
+    def test_merge_does_not_double_count_when_superset(self):
+        """The demo1 bug: compaction #3 focused only on recent fixes, losing
+        'from scratch'. _merge_narrative must prepend the original."""
+        compaction_1 = (
+            'Built a complete autograd engine from scratch in Python. '
+            'Created 19 source files across autograd/, autograd/ops/, '
+            'and autograd/jit/ packages.'
+        )
+        compaction_3 = (
+            'Fixed a critical row-major indexing bug that affected '
+            'SumOp, SoftmaxOp, and AddOp broadcasting.'
+        )
+        result = _merge_narrative(compaction_1, compaction_3)
+        assert 'from scratch' in result
+        assert 'row-major' in result
+        assert 'Recent:' in result
+
+
+# ---------------------------------------------------------------------------
+# _narrative_overlap — direct unit tests
+# ---------------------------------------------------------------------------
+
+
+class TestNarrativeOverlap:
+    """Direct tests for the _narrative_overlap helper."""
+
+    def test_identical_strings_return_1(self):
+        assert _narrative_overlap('hello world', 'hello world') == 1.0
+
+    def test_empty_a_returns_0(self):
+        assert _narrative_overlap('', 'anything') == 0.0
+
+    def test_empty_b_returns_0(self):
+        assert _narrative_overlap('anything', '') == 0.0
+
+    def test_both_empty_returns_0(self):
+        assert _narrative_overlap('', '') == 0.0
+
+    def test_no_overlap_returns_0(self):
+        assert _narrative_overlap('apple banana', 'cherry date') == 0.0
+
+    def test_partial_overlap(self):
+        result = _narrative_overlap('apple banana cherry', 'banana cherry date')
+        # words_a = {apple, banana, cherry}, intersection = {banana, cherry}
+        assert 0.5 < result < 0.7
+
+    def test_case_insensitive(self):
+        result = _narrative_overlap('Hello World', 'hello world')
+        assert result == 1.0
+
+    def test_superset_b_covers_all_a(self):
+        result = _narrative_overlap('built engine', 'built engine fixed tests')
+        assert result == 1.0

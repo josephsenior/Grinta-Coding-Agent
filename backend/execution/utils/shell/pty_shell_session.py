@@ -33,6 +33,7 @@ from backend.core.logging.logger import app_logger as logger
 from backend.core.os_capabilities import OS_CAPS
 from backend.execution.utils.shell.pty_session import (
     CONTROL_SEQUENCES,
+    DEFAULT_BUFFER_CHARS,
     InteractiveSession,
     InteractiveSessionConfig,
     InteractiveSessionError,
@@ -203,7 +204,7 @@ class PtyInteractiveShellSession(BaseShellSession):
         *,
         shell_argv: list[str] | None = None,
         dimensions: tuple[int, int] = (24, 120),
-        buffer_chars: int = 1_048_576,
+        buffer_chars: int = DEFAULT_BUFFER_CHARS,
         enable_ps1_metadata: bool | None = None,
     ) -> None:
         self._initialized = False

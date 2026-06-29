@@ -164,6 +164,52 @@ async def test_tui_condensation_request_reuses_status_card(mock_config):
         assert 'Compacted summary' in card.summary
         assert renderer._compaction_transcript_active is False
 
+
+@pytest.mark.asyncio
+async def test_tui_condensation_action_completes_status_card(mock_config):
+    """Production path: StatusObservation starts card, CondensationAction completes it."""
+    from backend.ledger.action.agent import CondensationAction
+
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        renderer._process_event(
+            StatusObservation(
+                content='Compacting context...',
+                status_type='compaction',
+            )
+        )
+        renderer._process_event(
+            CondensationAction(
+                pruned_event_ids=[1, 2, 3],
+                summary='Session summary after LLM compaction.',
+                summary_offset=0,
+            )
+        )
+        await pilot.pause()
+
+        cards = list(s.query(CompactionCard).results())
+        assert len(cards) == 1
+        card = cards[0]
+        assert card.state == 'done'
+        assert 'Compacted' in str(card._line_text())
+        assert card.summary == 'Session summary after LLM compaction.'
+        assert renderer._compaction_transcript_active is False
+
 @pytest.mark.asyncio
 async def test_tui_final_stream_and_normalized_message_do_not_duplicate(mock_config):
     console = RichConsole()

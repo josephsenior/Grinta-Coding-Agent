@@ -25,6 +25,7 @@ from backend.engine.tools._search_helpers import (
     paginate_line_output,
     path_exists_error,
     resolve_search_pagination,
+    get_ripgrep_truncation_warning,
     run_ripgrep_command,
 )
 from backend.engine.tools.param_defs import create_tool_definition
@@ -147,6 +148,7 @@ def execute_glob(action: GlobAction) -> Observation:
         if getattr(result, 'timed_out', False):
             message = 'Search timed out after 30s'
             return _glob_failure(message=message, pattern=pattern, path=path)
+        truncation_warning = get_ripgrep_truncation_warning(result)
         files = [line for line in result.stdout.splitlines() if line]
         content = paginate_line_output(
             files,
@@ -154,6 +156,8 @@ def execute_glob(action: GlobAction) -> Observation:
             head_limit=action.head_limit,
             empty_message=empty_message,
         )
+        if truncation_warning:
+            content = truncation_warning + '\n' + content
         return make_glob_observation(
             pattern=pattern,
             path=path,

@@ -195,6 +195,7 @@ class CanonicalTaskState:
     decisions: list[str] = field(default_factory=list)
     vcs_status: str = ''
     narrative_summary: str = ''
+    completed_tasks: str = ''
     source_event_ids: dict[str, int] = field(default_factory=dict)
     field_freshness: dict[str, FieldFreshness] = field(default_factory=dict)
     last_updated: str = ''
@@ -219,6 +220,7 @@ class CanonicalTaskState:
             'decisions',
             'vcs_status',
             'narrative_summary',
+            'completed_tasks',
             'source_event_ids',
             'last_updated',
         ):

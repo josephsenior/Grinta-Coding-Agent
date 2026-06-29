@@ -223,6 +223,46 @@ class TestTruncateCmdOutput:
 
 
 # ---------------------------------------------------------------------------
+# Issue #1: CmdOutputObservation.__init__ must NOT pre-truncate
+# ---------------------------------------------------------------------------
+class TestCmdOutputObservationNoInitTruncation:
+    """Verify that CmdOutputObservation does NOT truncate content in __init__.
+
+    Previously __init__ called _maybe_truncate (now removed) at a hardcoded
+    10 000 chars, making the env-configurable truncate_cmd_output (40 000)
+    a no-op.  Truncation is now owned by the execution layer
+    (truncate_cmd_output) and the processor layer (truncate_content).
+    """
+
+    def test_init_does_not_truncate_large_content(self):
+        from backend.ledger.observation import CmdOutputObservation
+
+        large = 'x' * 50_000
+        obs = CmdOutputObservation(content=large, command='test')
+        assert len(obs.content) == 50_000, (
+            'CmdOutputObservation.__init__ must not pre-truncate; '
+            'truncate_cmd_output is the primary truncator'
+        )
+
+    def test_init_preserves_content_below_old_cap(self):
+        """Content >10 000 (old MAX_CMD_OUTPUT_SIZE) must pass through."""
+        from backend.ledger.observation import CmdOutputObservation
+
+        content = 'x' * 15_000
+        obs = CmdOutputObservation(content=content, command='test')
+        assert len(obs.content) == 15_000
+
+    def test_truncate_cmd_output_is_effective_at_env_default(self):
+        """truncate_cmd_output at 40 000 chars must actually truncate
+        content that would have been pre-capped at 10 000 before."""
+        output = ''.join(f'line-{i:05d}-padding\n' for i in range(5000))
+        assert len(output) > 40_000
+        truncated = truncate_cmd_output(output)
+        assert '[APP: Output truncated' in truncated
+        assert len(truncated) < len(output)
+
+
+# ---------------------------------------------------------------------------
 # get_max_edit_observation_chars
 # ---------------------------------------------------------------------------
 class TestGetMaxEditObservationChars:

@@ -39,7 +39,9 @@ from backend.core.os_capabilities import OS_CAPS
 
 IS_WINDOWS = OS_CAPS.is_windows
 
-DEFAULT_BUFFER_CHARS = 1_048_576
+DEFAULT_BUFFER_CHARS = int(
+    __import__('os').getenv('APP_PTY_BUFFER_CHARS', '1048576')
+)
 DEFAULT_READ_CHUNK = 4096
 DEFAULT_DIMENSIONS: tuple[int, int] = (24, 80)
 _MAX_SANITIZE_CARRY = 256

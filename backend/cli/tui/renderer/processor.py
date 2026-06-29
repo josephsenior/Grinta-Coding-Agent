@@ -23,6 +23,7 @@ from backend.cli.tui.renderer.handlers.browser import (
 from backend.cli.tui.renderer.handlers.compaction import (
     _handle_agent_condensation_observation,
     _handle_compaction_trigger,
+    _handle_condensation_action,
     show_compaction_started_card,
 )
 from backend.cli.tui.renderer.handlers.debugger import (
@@ -458,7 +459,7 @@ _FALLBACK_HANDLERS: dict[type, Any] = {
     CondensationRequestAction: _handle_compaction_trigger,
     RecallObservation: _handle_noop_event,
     RecallFailureObservation: _handle_noop_event,
-    CondensationAction: _handle_compaction_trigger,
+    CondensationAction: _handle_condensation_action,
     StreamingChunkAction: _handle_streaming_chunk_dispatch,
     AgentStateChangedObservation: _handle_state_change_dispatch,
     ClarificationRequestAction: _handle_legacy_meta_cognition_dispatch,

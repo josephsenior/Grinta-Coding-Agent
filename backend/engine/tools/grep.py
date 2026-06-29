@@ -25,6 +25,7 @@ from backend.engine.tools._search_helpers import (
     collect_python_match_results,
     collect_python_target_files,
     compile_search_regex,
+    get_ripgrep_truncation_warning,
     has_ripgrep,
     make_grep_observation,
     paginate_line_output,
@@ -293,6 +294,7 @@ def _run_ripgrep_mode(
             path=path,
             output_mode=output_mode,
         )
+    truncation_warning = get_ripgrep_truncation_warning(result)
     lines = [line for line in result.stdout.splitlines() if line]
     content = paginate_line_output(
         lines,
@@ -300,6 +302,8 @@ def _run_ripgrep_mode(
         head_limit=action.head_limit,
         empty_message=empty_message,
     )
+    if truncation_warning:
+        content = truncation_warning + '\n' + content
     return make_grep_observation(
         pattern=pattern,
         path=path,

@@ -87,34 +87,13 @@ class StateSummary(BaseModel):
         default='',
         description='The most recent explicit user request or correction that is still active.',
     )
-    current_working_step: str = Field(
-        default='',
-        description='The exact next step the agent was about to perform before compaction.',
-    )
-    current_state: str = Field(
-        default='',
-        description='Current variables, data structures, or other relevant state information.',
-    )
     files_modified: list[FileModification] = Field(
         default_factory=list,
         description='Files created, modified, or deleted. Each entry must have absolute path and change_type.',
     )
-    function_changes: str = Field(
-        default='', description='List of functions that have been created or modified.'
-    )
-    data_structures: str = Field(
-        default='', description='List of key data structures in use or modified.'
-    )
-    tests_written: str = Field(
+    test_status: str = Field(
         default='',
-        description='Whether tests have been written for the changes. True, false, or unknown.',
-    )
-    tests_passing: str = Field(
-        default='',
-        description='Whether all tests are currently passing. True, false, or unknown.',
-    )
-    failing_tests: str = Field(
-        default='', description='List of names or descriptions of any failing tests.'
+        description='Overall test status: "passing", "failing (test_name1, test_name2)", "not_written", or "unknown". Include failing test names in parentheses.',
     )
     error_messages: list[FailedCommand] = Field(
         default_factory=list,
@@ -124,32 +103,13 @@ class StateSummary(BaseModel):
         default_factory=list,
         description='Important commands and their outcomes. Each entry must have command, exit_code, and output_summary.',
     )
-    verification_status: str = Field(
-        default='',
-        description='What has been verified, what failed verification, and what still needs to be rerun.',
-    )
     known_failures_or_avoid: str = Field(
         default='',
         description='Specific failed approaches, user rejected approaches, and constraints that must not be repeated.',
     )
-    branch_created: str = Field(
+    vcs_status: str = Field(
         default='',
-        description='Whether a branch has been created for this work. True, false, or unknown.',
-    )
-    branch_name: str = Field(
-        default='', description='Name of the current working branch if known.'
-    )
-    commits_made: str = Field(
-        default='',
-        description='Whether any commits have been made. True, false, or unknown.',
-    )
-    pr_created: str = Field(
-        default='',
-        description='Whether a pull request has been created. True, false, or unknown.',
-    )
-    pr_status: str = Field(
-        default='',
-        description="Status of any pull request: 'draft', 'open', 'merged', 'closed', or 'unknown'.",
+        description='Version control status: e.g. "branch=fix-auth, commits=true, pr=open" or "none".',
     )
     dependencies: list[Dependency] = Field(
         default_factory=list,
@@ -185,7 +145,7 @@ class StateSummary(BaseModel):
     )
     narrative_summary: str = Field(
         default='',
-        description='Optional short narrative summary. This is secondary to the canonical-state patch.',
+        description='Short narrative covering the FULL session arc: what was built/created, recent changes, and what remains. Must preserve "from scratch"/"created" framing from previous summaries.',
     )
 
     @classmethod
@@ -239,70 +199,76 @@ class StateSummary(BaseModel):
         return result
 
     def __str__(self) -> str:
-        """Format the state summary in a clear way for Claude 3.7 Sonnet."""
-        files_str = (
-            '\n'.join(f'  - {fm.path} ({fm.change_type})' for fm in self.files_modified)
-            or '(none)'
-        )
-        errors_str = (
-            '\n'.join(
-                f'  - {fc.command}: {fc.exact_error} (exit={fc.exit_code})'
-                for fc in self.error_messages
-            )
-            or '(none)'
-        )
-        commands_str = (
-            '\n'.join(
-                f'  - {cr.command} → exit={cr.exit_code}: {cr.output_summary}'
-                for cr in self.exact_commands_and_results
-            )
-            or '(none)'
-        )
-        deps_str = (
-            '\n'.join(f'  - {dep.name}@{dep.version}' for dep in self.dependencies)
-            or '(none)'
-        )
-        sections = [
-            '# State Summary',
-            '## Core Information',
+        """Format the state summary in a compact way, skipping empty fields."""
+        sections: list[str] = []
+
+        core_lines = [
             f'**Original Objective**: {self.original_objective}',
             f'**User Context**: {self.user_context}',
             f'**Completed Tasks**: {self.completed_tasks}',
             f'**Pending Tasks**: {self.pending_tasks}',
-            f'**Latest User Request**: {self.latest_user_request}',
-            f'**Current Working Step**: {self.current_working_step}',
-            f'**Current State**: {self.current_state}',
-            '## Code Changes',
-            f'**Files Modified**:\n{files_str}',
-            f'**Function Changes**: {self.function_changes}',
-            f'**Data Structures**: {self.data_structures}',
-            f'**Dependencies**:\n{deps_str}',
-            '## Testing Status',
-            f'**Tests Written**: {self.tests_written}',
-            f'**Tests Passing**: {self.tests_passing}',
-            f'**Failing Tests**: {self.failing_tests}',
-            f'**Error Messages**:\n{errors_str}',
-            f'**Exact Commands And Results**:\n{commands_str}',
-            f'**Verification Status**: {self.verification_status}',
-            f'**Known Failures Or Avoid**: {self.known_failures_or_avoid}',
-            '## Version Control',
-            f'**Branch Created**: {self.branch_created}',
-            f'**Branch Name**: {self.branch_name}',
-            f'**Commits Made**: {self.commits_made}',
-            f'**PR Created**: {self.pr_created}',
-            f'**PR Status**: {self.pr_status}',
-            '## Additional Context',
-            f'**Other Relevant Context**: {self.other_relevant_context}',
-            '## Canonical State Patch',
-            f'**Active Plan**: {self.canonical_active_plan}',
-            f'**Next Action**: {self.canonical_next_action}',
-            f'**Blockers**: {self.canonical_blockers}',
-            f'**Decisions**: {self.canonical_decisions}',
-            f'**Invalidated Assumptions**: {self.canonical_invalidated_assumptions}',
-            f'**Active Files**: {self.canonical_active_files}',
-            f'**Narrative Summary**: {self.narrative_summary}',
         ]
-        return '\n\n'.join(sections)
+        if self.latest_user_request:
+            core_lines.append(f'**Latest User Request**: {self.latest_user_request}')
+        sections.append('\n'.join(['# State Summary', '## Core Information'] + core_lines))
+
+        code_lines: list[str] = []
+        if self.files_modified:
+            files_str = '\n'.join(
+                f'  - {fm.path} ({fm.change_type})' for fm in self.files_modified
+            )
+            code_lines.append(f'**Files Modified**:\n{files_str}')
+        if self.dependencies:
+            deps_str = '\n'.join(f'  - {dep.name}@{dep.version}' for dep in self.dependencies)
+            code_lines.append(f'**Dependencies**:\n{deps_str}')
+        if code_lines:
+            sections.append('\n'.join(['## Code Changes'] + code_lines))
+
+        test_lines: list[str] = []
+        if self.test_status:
+            test_lines.append(f'**Test Status**: {self.test_status}')
+        if self.error_messages:
+            errors_str = '\n'.join(
+                f'  - {fc.command}: {fc.exact_error} (exit={fc.exit_code})'
+                for fc in self.error_messages
+            )
+            test_lines.append(f'**Error Messages**:\n{errors_str}')
+        if self.exact_commands_and_results:
+            commands_str = '\n'.join(
+                f'  - {cr.command} -> exit={cr.exit_code}: {cr.output_summary}'
+                for cr in self.exact_commands_and_results
+            )
+            test_lines.append(f'**Exact Commands And Results**:\n{commands_str}')
+        if self.known_failures_or_avoid:
+            test_lines.append(f'**Known Failures Or Avoid**: {self.known_failures_or_avoid}')
+        if test_lines:
+            sections.append('\n'.join(['## Testing & Errors'] + test_lines))
+
+        if self.vcs_status:
+            sections.append(f'## Version Control\n**VCS Status**: {self.vcs_status}')
+
+        if self.other_relevant_context:
+            sections.append(f'## Additional Context\n**Other Relevant Context**: {self.other_relevant_context}')
+
+        patch_lines: list[str] = []
+        if self.canonical_active_plan:
+            patch_lines.append(f'**Active Plan**: {self.canonical_active_plan}')
+        if self.canonical_next_action:
+            patch_lines.append(f'**Next Action**: {self.canonical_next_action}')
+        if self.canonical_blockers:
+            patch_lines.append(f'**Blockers**: {self.canonical_blockers}')
+        if self.canonical_decisions:
+            patch_lines.append(f'**Decisions**: {self.canonical_decisions}')
+        if self.canonical_invalidated_assumptions:
+            patch_lines.append(f'**Invalidated Assumptions**: {self.canonical_invalidated_assumptions}')
+        if self.canonical_active_files:
+            patch_lines.append(f'**Active Files**: {self.canonical_active_files}')
+        if self.narrative_summary:
+            patch_lines.append(f'**Narrative Summary**: {self.narrative_summary}')
+        if patch_lines:
+            sections.append('\n'.join(['## Canonical State Patch'] + patch_lines))
+
+        return '\n\n'.join(sections) if sections else '# State Summary\n(empty)'
 
     def canonical_patch(self) -> dict[str, Any]:
         """Return the low-authority canonical-state enrichment patch."""
@@ -318,29 +284,17 @@ class StateSummary(BaseModel):
         )
         return {
             'active_plan': self.canonical_active_plan or self.pending_tasks,
-            'next_action': self.canonical_next_action or self.current_working_step,
+            'next_action': self.canonical_next_action
+            or (self.pending_tasks.split('\n')[0] if self.pending_tasks else ''),
             'blockers': self.canonical_blockers or self.known_failures_or_avoid,
             'decisions': self.canonical_decisions,
             'invalidated_assumptions': self.canonical_invalidated_assumptions,
             'active_files': self.canonical_active_files
             or '\n'.join(fm.path for fm in self.files_modified),
             'narrative_summary': narrative[:1200],
-            'vcs_status': self._vcs_status_patch(),
+            'completed_tasks': self.completed_tasks[:1200] if self.completed_tasks else '',
+            'vcs_status': self.vcs_status or '',
         }
-
-    def _vcs_status_patch(self) -> str:
-        parts = []
-        if self.branch_name:
-            parts.append(f'branch={self.branch_name}')
-        if self.branch_created:
-            parts.append(f'branch_created={self.branch_created}')
-        if self.commits_made:
-            parts.append(f'commits_made={self.commits_made}')
-        if self.pr_created:
-            parts.append(f'pr_created={self.pr_created}')
-        if self.pr_status:
-            parts.append(f'pr_status={self.pr_status}')
-        return '; '.join(parts)
 
 
 class StructuredSummaryCompactor(BaseLLMCompactor):
@@ -456,10 +410,134 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
 
         return head, pruned_events, summary_event
 
+    def _digest_events(self, events: list[Event]) -> str:
+        """Group events by type and produce a compact digest.
+
+        Instead of sending raw events (which can be 500k+ chars for 50 events
+        at 10k each), this classifies events into groups and summarizes each.
+        This reduces prompt size 5-10x and reduces recency bias by showing the
+        big picture (e.g. "19 files created") rather than burying it in detail.
+        """
+        files_created: list[str] = []
+        files_edited: list[str] = []
+        commands_run: list[tuple[str, int | None]] = []
+        user_messages: list[str] = []
+        agent_thoughts: list[str] = []
+        code_nav: list[str] = []
+        errors: list[str] = []
+        other_count = 0
+
+        for event in events:
+            type_name = type(event).__name__
+
+            if type_name == 'FileEditAction':
+                path = getattr(event, 'path', '')
+                cmd = getattr(event, 'command', '')
+                if path:
+                    if cmd == 'create_file':
+                        files_created.append(path)
+                    else:
+                        files_edited.append(path)
+            elif type_name == 'FileEditObservation':
+                path = getattr(event, 'path', '')
+                if path and path not in files_edited:
+                    files_edited.append(path)
+            elif type_name == 'CmdRunAction':
+                cmd = getattr(event, 'command', '')
+                if cmd:
+                    commands_run.append((cmd, None))
+            elif type_name == 'CmdOutputObservation':
+                cmd = getattr(event, 'command', '')
+                exit_code = getattr(event, 'exit_code', None)
+                if cmd:
+                    if exit_code and exit_code != 0:
+                        content = str(event)[:200]
+                        errors.append(f'{cmd} (exit={exit_code}): {content}')
+                    commands_run.append((cmd, exit_code))
+            elif type_name == 'ErrorObservation':
+                content = str(event)[:200]
+                errors.append(content)
+            elif type_name == 'MessageAction':
+                source = getattr(event, 'source', None)
+                content = str(event)[:300]
+                if source and 'user' in str(source).lower():
+                    user_messages.append(content)
+                else:
+                    agent_thoughts.append(content)
+            elif type_name == 'AgentThinkAction':
+                agent_thoughts.append(str(event)[:200])
+            elif type_name in (
+                'FileReadAction',
+                'GlobAction',
+                'GrepAction',
+                'FindSymbolsAction',
+                'ReadSymbolsAction',
+                'LspQueryAction',
+            ):
+                path = getattr(event, 'path', '') or getattr(event, 'query', '') or getattr(event, 'pattern', '')
+                code_nav.append(f'{type_name.replace("Action", "")}: {path}' if path else type_name)
+            elif type_name in (
+                'AgentCondensationObservation',
+                'NullAction',
+                'NullObservation',
+            ):
+                continue
+            else:
+                other_count += 1
+
+        lines: list[str] = []
+
+        if files_created:
+            if len(files_created) <= 15:
+                lines.append(f'Files created ({len(files_created)}): {", ".join(files_created)}')
+            else:
+                lines.append(
+                    f'Files created ({len(files_created)}): {", ".join(files_created[:15])}, '
+                    f'... and {len(files_created) - 15} more'
+                )
+        if files_edited:
+            unique_edited = list(dict.fromkeys(files_edited))
+            if len(unique_edited) <= 15:
+                lines.append(f'Files edited ({len(unique_edited)} unique): {", ".join(unique_edited)}')
+            else:
+                lines.append(
+                    f'Files edited ({len(unique_edited)} unique): {", ".join(unique_edited[:15])}, '
+                    f'... and {len(unique_edited) - 15} more'
+                )
+        if commands_run:
+            unique_cmds = list(dict.fromkeys(commands_run))
+            cmd_strs = [
+                f'{cmd} (exit={exit_code})' if exit_code is not None else cmd
+                for cmd, exit_code in unique_cmds[:20]
+            ]
+            lines.append(f'Commands run ({len(unique_cmds)} unique): {"; ".join(cmd_strs)}')
+        if errors:
+            lines.append(f'Errors ({len(errors)}):')
+            for err in errors[:10]:
+                lines.append(f'  - {err}')
+        if user_messages:
+            lines.append(f'User messages ({len(user_messages)}):')
+            for msg in user_messages:
+                lines.append(f'  - {msg}')
+        if agent_thoughts:
+            lines.append(f'Agent reasoning/thought steps: {len(agent_thoughts)}')
+        if code_nav:
+            unique_nav = list(dict.fromkeys(code_nav))
+            lines.append(f'Code navigation ({len(unique_nav)}): {"; ".join(unique_nav[:20])}')
+        if other_count:
+            lines.append(f'Other events: {other_count}')
+
+        return '\n'.join(lines) if lines else '(no events)'
+
     def _build_condensation_prompt(
         self, summary_event: AgentCondensationObservation, pruned_events: list
     ) -> str:
-        """Build the prompt for LLM condensation."""
+        """Build the prompt for LLM condensation.
+
+        Events are pre-digested into a compact type-grouped summary to reduce
+        prompt size and recency bias. The last few raw events are included
+        for detailed context.
+        """
         base_prompt = (
             'You are maintaining a context-aware state summary for an interactive software agent. This summary is critical because it:\n'
             '1. Preserves essential context when conversation history grows too large\n'
@@ -470,13 +548,14 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             '- Regular narrative fields for human-readable continuity.\n'
             '- canonical_* fields that form a compact canonical-state patch. These must contain only current, still-valid facts. Do not repeat stale failed approaches, old test statuses, or generic "resuming task" boilerplate.\n\n'
             'You will be given:\n'
-            '- A list of events (actions taken by the agent)\n'
+            '- An EVENT DIGEST: a compact grouped summary of what happened (files created/edited, commands run, errors, etc.)\n'
+            '- The last few RAW EVENTS for detailed context\n'
             '- The most recent previous summary (if one exists)\n\n'
             'Capture all relevant information, especially:\n'
             '- The verbatim original user objective (this is non-negotiable)\n'
             '- User requirements that were explicitly stated\n'
             '- The latest user correction/request if it changed the task direction\n'
-            '- Work that has been completed\n'
+            '- Work that has been completed — use the EVENT DIGEST to see the full picture (e.g. how many files were created)\n'
             '- Tasks that remain pending\n'
             '- The immediate next step the agent should take after compaction\n'
             '- Exact file paths, commands, test names, failing assertions, and provider errors\n'
@@ -488,7 +567,19 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             '- error_messages: list of {command, exact_error, exit_code} objects\n'
             '- exact_commands_and_results: list of {command, exit_code, output_summary} objects\n'
             '- dependencies: list of {name, version} objects\n\n'
+            'For test_status, use "passing", "failing (test_names)", "not_written", or "unknown".\n'
+            'For vcs_status, use a compact string like "branch=fix-auth, commits=true, pr=open" or "none".\n'
             'For canonical_next_action, write one concrete next action. For canonical_active_files, include only paths still relevant to upcoming work. For canonical_blockers, include only unresolved blockers.\n\n'
+            'NARRATIVE_SUMMARY — CRITICAL:\n'
+            '- The narrative_summary MUST describe the FULL session arc, not just recent events.\n'
+            '- If a <PREVIOUS SUMMARY> exists, you MUST PRESERVE its key narrative — especially\n'
+            '  what was originally built/created in this session.\n'
+            '- Structure: start with what was built/created, then recent changes/fixes, then\n'
+            '  what remains. Example: "Built X from scratch (N files created). Fixed Y.\n'
+            '  Remaining: Z."\n'
+            '- Do NOT replace the narrative with only recent bug fixes or incremental work.\n'
+            '- If the previous summary says "Built from scratch" or "Created N files", those\n'
+            '  facts MUST appear in your narrative_summary.\n\n'
         )
 
         # Add previous summary
@@ -497,10 +588,19 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             f'<PREVIOUS SUMMARY>\n{summary_event_content}\n</PREVIOUS SUMMARY>\n\n'
         )
 
-        # Add pruned events.
-        for pruned_event in pruned_events:
-            event_content = self._truncate(str(pruned_event))
-            base_prompt += f'<EVENT id={pruned_event.id}>\n{event_content}\n</EVENT>\n'
+        # Add event digest (compact grouped summary)
+        digest = self._digest_events(pruned_events)
+        base_prompt += f'<EVENT DIGEST>\n{digest}\n</EVENT DIGEST>\n\n'
+
+        # Add last few raw events for detailed context
+        raw_event_budget = 5
+        recent_raw = pruned_events[-raw_event_budget:] if len(pruned_events) > raw_event_budget else pruned_events
+        if recent_raw:
+            base_prompt += '<RECENT RAW EVENTS (for detail)>\n'
+            for pruned_event in recent_raw:
+                event_content = self._truncate(str(pruned_event))
+                base_prompt += f'<EVENT id={pruned_event.id}>\n{event_content}\n</EVENT>\n'
+            base_prompt += '</RECENT RAW EVENTS>\n'
 
         return base_prompt
 

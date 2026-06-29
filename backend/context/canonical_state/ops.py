@@ -59,6 +59,38 @@ def _canonical_state_path(*, state: State | None = None) -> Path:
     return facade.canonical_state_path(state=state)
 
 
+def _merge_narrative(existing: str, incoming: str, *, max_chars: int = 1200) -> str:
+    """Merge an incoming compaction narrative with the existing one.
+
+    Prevents session-arc loss across compactions: if the incoming narrative
+    focuses on recent work and doesn't contain key information from the
+    existing narrative, the existing narrative is prepended.
+    """
+    existing = (existing or '').strip()
+    incoming = (incoming or '').strip()
+    if not existing:
+        return incoming[:max_chars]
+    if not incoming:
+        return existing[:max_chars]
+    if existing in incoming or incoming in existing:
+        longer = existing if len(existing) >= len(incoming) else incoming
+        return longer[:max_chars]
+    overlap = _narrative_overlap(existing, incoming)
+    if overlap > 0.4:
+        return incoming[:max_chars]
+    merged = f'{existing}\n\nRecent: {incoming}'
+    return merged[:max_chars]
+
+
+def _narrative_overlap(a: str, b: str) -> float:
+    """Estimate fraction of ``a``'s content words also present in ``b``."""
+    words_a = set(a.lower().split())
+    words_b = set(b.lower().split())
+    if not words_a:
+        return 0.0
+    return len(words_a & words_b) / len(words_a)
+
+
 def canonical_state_path(*, state: State | None = None) -> Path:
     from backend.context.memory.session_context import scoped_agent_path
 
@@ -210,13 +242,22 @@ def apply_canonical_patch(
         'active_plan': 'active_plan',
         'next_action': 'next_action',
         'implementation_checkpoint': 'implementation_checkpoint',
-        'narrative_summary': 'narrative_summary',
         'vcs_status': 'vcs_status',
     }
     for incoming, field_name in text_fields.items():
         value = _clean(patch.get(incoming))
         if value:
             _set_field(canonical, field_name, value, event_id, source)
+
+    incoming_narrative = _clean(patch.get('narrative_summary'))
+    if incoming_narrative:
+        existing = getattr(canonical, 'narrative_summary', '')
+        merged = _merge_narrative(existing, incoming_narrative)
+        _set_field(canonical, 'narrative_summary', merged, event_id, source)
+
+    incoming_completed = _clean(patch.get('completed_tasks'))
+    if incoming_completed:
+        _set_field(canonical, 'completed_tasks', incoming_completed, event_id, source)
 
     for incoming, field_name, limit in (
         ('blockers', 'blockers', _MAX_BLOCKERS),
@@ -314,6 +355,11 @@ def render_canonical_state_for_prompt(
     )
     _append_list(lines, 'Decisions', canonical.decisions[-5:])
     _append(lines, f'- VCS status: {canonical.vcs_status}')
+    if canonical.completed_tasks:
+        _append(
+            lines,
+            f'- Work completed this session: {canonical.completed_tasks[:600]}',
+        )
     _append(lines, f'- Summary: {canonical.narrative_summary}')
     lines.append(CANONICAL_STATE_MARKER)
     block = '\n'.join(line for line in lines if line.strip())
