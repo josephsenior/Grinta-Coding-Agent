@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from backend.core.enums import ActionSecurityRisk
 from backend.engine.orchestrator import Orchestrator
 from backend.engine.planner import OrchestratorPlanner, _maybe_log_prompt_metrics
-from backend.ledger.action.agent import CondensationAction
+from backend.ledger.action.agent import AgentThinkAction, CondensationAction
 from backend.ledger.action.empty import NullAction, NullActionReason
 from backend.ledger.action.files import FileEditAction
 from backend.ledger.observation import ErrorObservation
