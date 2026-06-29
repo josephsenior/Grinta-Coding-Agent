@@ -11,7 +11,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from backend.core.autonomy import normalize_autonomy_level
-from backend.ledger.action import AgentThinkAction, StreamingChunkAction, SystemHintAction
+from backend.ledger.action import (
+    AgentThinkAction,
+    StreamingChunkAction,
+    SystemHintAction,
+)
 from backend.ledger.observation import AgentThinkObservation
 
 if TYPE_CHECKING:
