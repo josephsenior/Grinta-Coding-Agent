@@ -232,10 +232,20 @@ BROWSER_NAVIGATE_TOTAL_TIMEOUT_SEC = 45.0
 BROWSER_SNAPSHOT_CHAIN_TIMEOUT_SEC = 40.0
 BROWSER_SCREENSHOT_TIMEOUT_SEC = 45.0
 # Inline JPEG bytes into LLM context only below this size (vision providers vary).
-BROWSER_SCREENSHOT_MAX_INJECT_BYTES = 1_500_000
-# Snapshot compaction (interactive / diff modes).
-BROWSER_SNAPSHOT_MAX_CHARS_FULL = 120_000
-BROWSER_SNAPSHOT_MAX_CHARS_INTERACTIVE = 12_000
+# Env-configurable so operators can tune for provider-specific limits.
+BROWSER_SCREENSHOT_MAX_INJECT_BYTES = int(
+    os.getenv('APP_BROWSER_SCREENSHOT_MAX_INJECT_BYTES', '1500000')
+)
+# Snapshot compaction (interactive / diff modes).  Env-configurable so operators
+# can tune without code changes.  Full-mode default lowered from 120 000 to 40 000
+# to avoid generating 120k of DOM text only to have the processor truncate it to
+# ~15k — the mismatch wasted computation and memory.
+BROWSER_SNAPSHOT_MAX_CHARS_FULL = int(
+    os.getenv('APP_BROWSER_SNAPSHOT_MAX_CHARS_FULL', '40000')
+)
+BROWSER_SNAPSHOT_MAX_CHARS_INTERACTIVE = int(
+    os.getenv('APP_BROWSER_SNAPSHOT_MAX_CHARS_INTERACTIVE', '12000')
+)
 BROWSER_WAIT_TIMEOUT_SEC = 40.0
 BROWSER_EXTRACT_TIMEOUT_SEC = 120.0
 # Worst single browser_tool call: cold session start + navigate (or snapshot). Not a "hang window".
@@ -511,7 +521,6 @@ RISK_LEVELS = ['LOW', 'MEDIUM', 'HIGH']
 # ── Command Output ──────────────────────────────────────────────────
 CMD_OUTPUT_PS1_BEGIN = '\n###PS1JSON###\n'
 CMD_OUTPUT_PS1_END = '\n###PS1END###'
-MAX_CMD_OUTPUT_SIZE = 10000
 DEFAULT_CMD_EXIT_CODE = -1
 DEFAULT_CMD_PID = -1
 
@@ -538,9 +547,17 @@ DEFAULT_SMART_COMPACTOR_IMPORTANCE_THRESHOLD = 0.6
 DEFAULT_SMART_COMPACTOR_RECENCY_BONUS_WINDOW = 20
 
 # ── Tool Result Persistence (context pressure relief) ───────────────
-DEFAULT_TOOL_RESULT_PERSIST_THRESHOLD_CHARS = 12_000
-DEFAULT_TOOL_RESULTS_PER_MESSAGE_CHARS = 80_000
-DEFAULT_TOOL_RESULT_PREVIEW_CHARS = 2_000
+# Env-configurable so operators can tune persistence behaviour without
+# code changes.
+DEFAULT_TOOL_RESULT_PERSIST_THRESHOLD_CHARS = int(
+    os.getenv('APP_TOOL_RESULT_PERSIST_THRESHOLD', '12000')
+)
+DEFAULT_TOOL_RESULTS_PER_MESSAGE_CHARS = int(
+    os.getenv('APP_TOOL_RESULTS_PER_MESSAGE', '80000')
+)
+DEFAULT_TOOL_RESULT_PREVIEW_CHARS = int(
+    os.getenv('APP_TOOL_RESULT_PREVIEW', '2000')
+)
 
 # ── Prompt Window Floors (coding-agent continuity) ──────────────────
 DEFAULT_PROMPT_MIN_TOOL_LOOPS = 12

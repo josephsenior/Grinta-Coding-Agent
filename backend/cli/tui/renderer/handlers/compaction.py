@@ -6,6 +6,7 @@ import json
 import time
 from typing import TYPE_CHECKING, Any
 
+from backend.ledger.action.agent import CondensationAction
 from backend.ledger.observation import AgentCondensationObservation
 
 if TYPE_CHECKING:
@@ -38,6 +39,30 @@ def _debug_log(hypothesis_id: str, location: str, message: str, data: dict) -> N
 
 
 # endregion
+
+
+def _is_noop_condensation_action(action: CondensationAction) -> bool:
+    if action.summary is not None:
+        return False
+    return len(action.pruned or []) == 0
+
+
+def _condensation_summary_text(action: CondensationAction) -> str:
+    summary = (action.summary or '').strip()
+    if summary:
+        return summary
+    pruned = len(action.pruned or [])
+    if pruned:
+        return f'Context condensed ({pruned} events pruned).'
+    return 'Context condensed.'
+
+
+def _finish_compaction_card(orch: 'RendererEventProcessorMixin', *, summary: str) -> None:
+    orch._compaction_transcript_active = False
+    count = max(orch._condensation_count, 1)
+    orch._condensation_count = count
+    orch._hud.update_condensation_count(count)
+    orch._complete_compaction_scan_card(summary=summary)
 
 
 def show_compaction_started_card(orch: 'RendererEventProcessorMixin') -> None:
@@ -81,29 +106,41 @@ def _handle_agent_condensation_observation(
         },
     )
     # endregion
-    orch._compaction_transcript_active = False
-    count = max(orch._condensation_count, 1)
-    orch._condensation_count = count
-    orch._hud.update_condensation_count(count)
-    orch._complete_compaction_scan_card(summary=summary)
+    _finish_compaction_card(orch, summary=summary)
 
 
-def _handle_compaction_trigger(orch: 'RendererEventProcessorMixin', event: Any) -> None:
-    event_type = type(event).__name__
-    summary = str(getattr(event, 'summary', '') or '').strip()
-    pruned_count = len(getattr(event, 'pruned', []) or [])
+def _handle_condensation_action(
+    orch: 'RendererEventProcessorMixin', event: CondensationAction
+) -> None:
+    """Complete the compaction card when condensation commits.
+
+    Production runs emit ``CondensationAction`` to the event stream with the
+    LLM/session summary attached. ``AgentCondensationObservation`` is synthesized
+    only for prompt replay (``View.from_events``) and does not reach the TUI.
+    """
+    if _is_noop_condensation_action(event):
+        orch._compaction_transcript_active = False
+        return
+
+    summary = _condensation_summary_text(event)
     # region agent log
     _debug_log(
         'B',
-        'compaction.py:_handle_compaction_trigger',
-        'compaction trigger event',
+        'compaction.py:_handle_condensation_action',
+        'condensation action received',
         {
-            'event_type': event_type,
             'summary_len': len(summary),
             'summary_preview': summary[:120],
-            'pruned_count': pruned_count,
+            'pruned_count': len(event.pruned or []),
             'transcript_active': getattr(orch, '_compaction_transcript_active', False),
+            'has_pending_card': getattr(orch, '_pending_compaction_scan_card', None)
+            is not None,
         },
     )
     # endregion
+    _finish_compaction_card(orch, summary=summary)
+
+
+def _handle_compaction_trigger(orch: 'RendererEventProcessorMixin', event: Any) -> None:
+    del event
     show_compaction_started_card(orch)

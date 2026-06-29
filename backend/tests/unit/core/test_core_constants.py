@@ -31,7 +31,6 @@ from backend.core.constants import (
     ENV_VAR_REGISTRY,
     FILES_TO_IGNORE,
     LOG_COLORS,
-    MAX_CMD_OUTPUT_SIZE,
     MAX_FILENAME_LENGTH,
     MAX_PATH_LENGTH,
     MCP_CACHEABLE_TOOLS,
@@ -132,7 +131,6 @@ class TestCoreConstants:
 
     def test_cmd_output(self):
         assert DEFAULT_CMD_EXIT_CODE == -1
-        assert MAX_CMD_OUTPUT_SIZE > 0
 
     def test_log_colors(self):
         assert isinstance(LOG_COLORS, dict)

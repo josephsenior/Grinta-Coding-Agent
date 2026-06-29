@@ -335,6 +335,21 @@ def run_ripgrep_command(args: list[str]) -> Any:
     )
 
 
+_RIPGREP_TRUNCATION_WARNING = (
+    '[WARNING: ripgrep output exceeded the 2 MiB per-stream cap and was '
+    'byte-truncated BEFORE pagination. Some matches below the pagination '
+    'window may have been lost. Narrow your search pattern or path to '
+    'reduce output size.]'
+)
+
+
+def get_ripgrep_truncation_warning(result: Any) -> str:
+    """Return a warning marker if the ripgrep subprocess was byte-truncated."""
+    if getattr(result, 'truncated', False):
+        return _RIPGREP_TRUNCATION_WARNING
+    return ''
+
+
 def format_ripgrep_output(stdout: str, *, max_lines: int, empty_message: str) -> str:
     lines = stdout.splitlines()[:max_lines]
     output = '\n'.join(lines)

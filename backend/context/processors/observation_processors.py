@@ -18,6 +18,7 @@ from backend.ledger.observation import (
     MCPObservation,
     Observation,
     ReadSymbolsObservation,
+    TerminalObservation,
     UserRejectObservation,
 )
 from backend.ledger.observation.agent import AgentCondensationObservation
@@ -737,6 +738,28 @@ def _handle_file_download_observation(
     obs: FileDownloadObservation, max_message_chars: int | None
 ) -> Message:
     return _handle_simple_observation(obs, max_message_chars)
+
+
+@_register_observation_handler(TerminalObservation)
+def _handle_terminal_observation(
+    obs: TerminalObservation, max_message_chars: int | None
+) -> Message:
+    """Handle terminal session output, surfacing dropped chars from the PTY ring buffer."""
+    content_str = _get_observation_content(obs)
+    text = truncate_content(content_str, max_message_chars)
+
+    dropped = getattr(obs, 'dropped_chars', None)
+    if dropped and dropped > 0:
+        text += (
+            f'\n[WARNING: {dropped} chars were dropped from the terminal '
+            'ring buffer (oldest output lost). Use terminal_read with a '
+            'wider offset to capture earlier output if needed.]'
+        )
+
+    has_metadata = getattr(obs, 'tool_call_metadata', None) is not None
+    if not has_metadata:
+        text = f'[Observation: TerminalObservation]\n{text}'
+    return Message(role='user', content=[TextContent(text=text)])
 
 
 @_register_observation_handler(MCPObservation)

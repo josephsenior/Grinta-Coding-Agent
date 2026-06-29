@@ -11,7 +11,6 @@ from typing import Any, ClassVar, Self
 from backend.core.constants import (
     CMD_OUTPUT_PS1_BEGIN,
     CMD_OUTPUT_PS1_END,
-    MAX_CMD_OUTPUT_SIZE,
 )
 from backend.core.logging.logger import app_logger as logger
 from backend.core.schemas import ObservationType
@@ -146,113 +145,6 @@ class CmdOutputObservation(Observation):
 
         # Synchronize with base Observation exit_code
         self.exit_code = self.metadata.exit_code
-
-    _ERROR_LINE_PATTERNS = re.compile(
-        r'(?i)\b(error|warning|FAILED|FAIL|traceback|exception|panic'
-        r'|ModuleNotFoundError|ImportError|SyntaxError|TypeError|ValueError'
-        r'|NameError|AttributeError|KeyError|IndexError|FileNotFoundError'
-        r'|PermissionError|RuntimeError|AssertionError|OSError|IOError'
-        r'|ENOENT|EACCES|EPERM|segfault|Segmentation fault'
-        r'|npm ERR|cargo error|compile error|build failed)\b',
-    )
-
-    @classmethod
-    def _maybe_truncate(cls, content: str, max_size: int = MAX_CMD_OUTPUT_SIZE) -> str:
-        """Truncate content while preserving error-relevant lines from the middle.
-
-        Strategy:
-        - Keep first ~15% of content (command echo + initial output)
-        - Keep last ~35% of content (final errors + exit info)
-        - From the middle ~50%, keep only lines matching error patterns with 2 lines of context
-        - This preserves critical diagnostic info that blind head+tail truncation would lose
-
-        Args:
-            content: The content to truncate
-            max_size: Maximum size before truncation. Defaults to MAX_CMD_OUTPUT_SIZE.
-
-        Returns:
-            Original content if not too large, or smart-truncated content otherwise
-
-        """
-        if len(content) <= max_size:
-            return content
-
-        head_budget = max_size * 15 // 100
-        tail_budget = max_size * 35 // 100
-        middle_budget = max_size - head_budget - tail_budget
-        head = content[:head_budget]
-        tail = content[-tail_budget:]
-        middle = (
-            content[head_budget:-tail_budget]
-            if tail_budget > 0
-            else content[head_budget:]
-        )
-        middle_lines = middle.splitlines(keepends=True)
-
-        error_line_indices = cls._find_error_line_indices(middle_lines)
-        middle_preserved = cls._build_middle_preserved(
-            middle_lines, error_line_indices, middle_budget
-        )
-
-        truncated = cls._build_truncated_output(
-            head, tail, middle_preserved, len(content), error_line_indices
-        )
-        logger.debug(
-            'Smart-truncated command output: %s -> %s chars (%d error lines kept)',
-            len(content),
-            len(truncated),
-            len(error_line_indices),
-        )
-        return truncated
-
-    @classmethod
-    def _find_error_line_indices(cls, middle_lines: list[str]) -> set[int]:
-        """Find indices of lines matching error patterns, plus 2-line context."""
-        indices: set[int] = set()
-        for i, line in enumerate(middle_lines):
-            if cls._ERROR_LINE_PATTERNS.search(line):
-                for ctx in range(max(0, i - 2), min(len(middle_lines), i + 3)):
-                    indices.add(ctx)
-        return indices
-
-    @classmethod
-    def _build_middle_preserved(
-        cls, middle_lines: list[str], error_indices: set[int], middle_budget: int
-    ) -> str:
-        """Build preserved middle section from error-relevant lines within budget."""
-        if not error_indices:
-            return ''
-        kept: list[str] = []
-        prev_idx = -2
-        current_size = 0
-        for idx in sorted(error_indices):
-            if current_size >= middle_budget:
-                break
-            if idx > prev_idx + 1:
-                kept.append('  [...]\n')
-                current_size += 8
-            kept.append(middle_lines[idx])
-            current_size += len(middle_lines[idx])
-            prev_idx = idx
-        return ''.join(kept)
-
-    @classmethod
-    def _build_truncated_output(
-        cls,
-        head: str,
-        tail: str,
-        middle_preserved: str,
-        original_length: int,
-        error_indices: set[int],
-    ) -> str:
-        """Assemble truncated output with markers."""
-        retained = len(head) + len(middle_preserved) + len(tail)
-        pct = round(retained / original_length * 100) if original_length else 100
-        marker = (
-            f'\n[... Observation truncated: {original_length} chars → ~{retained} chars '
-            f'({pct}% retained, {len(error_indices)} error-relevant lines preserved from middle) ...]\n'
-        )
-        return head + marker + middle_preserved + marker + tail
 
     @property
     def command_id(self) -> int:

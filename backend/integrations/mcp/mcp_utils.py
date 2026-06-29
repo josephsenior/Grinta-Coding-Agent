@@ -761,10 +761,57 @@ def _extract_mcp_jsonrpc_error_code(message: str) -> str | None:
     return match.group(1) if match else None
 
 
+_DEFAULT_MAX_MCP_OUTPUT_CHARS = 40_000
+
+
+def _get_max_mcp_output_chars() -> int:
+    """Resolve MCP output cap from ``APP_MAX_MCP_OUTPUT_CHARS`` env var."""
+    raw = os.environ.get('APP_MAX_MCP_OUTPUT_CHARS', '')
+    try:
+        return int(raw) if raw else _DEFAULT_MAX_MCP_OUTPUT_CHARS
+    except (ValueError, TypeError):
+        return _DEFAULT_MAX_MCP_OUTPUT_CHARS
+
+
+def _truncate_mcp_output(content: str, max_chars: int | None = None) -> str:
+    """Truncate MCP tool output with a balanced head+tail strategy.
+
+    MCP results are typically JSON, not command output, so there's no
+    error-context middle to preserve.  A 50/50 head+tail split keeps
+    the beginning (metadata, first results) and end (status, pagination
+    cursors) visible to the LLM.
+
+    Args:
+        content: Serialized MCP result JSON string.
+        max_chars: Maximum chars to keep. Reads ``APP_MAX_MCP_OUTPUT_CHARS``
+            env var if not set, defaulting to 40 000.
+
+    Returns:
+        Possibly-truncated content with a visible truncation marker.
+    """
+    if max_chars is None:
+        max_chars = _get_max_mcp_output_chars()
+    if max_chars <= 0 or len(content) <= max_chars:
+        return content
+
+    head_budget = max_chars // 2
+    tail_budget = max_chars - head_budget
+    head = content[:head_budget]
+    tail = content[-tail_budget:]
+    skipped = len(content) - max_chars
+    marker = (
+        f'\n[APP: MCP output truncated — {skipped} chars hidden. '
+        f'Showing first {head_budget} and last {tail_budget} chars]\n'
+    )
+    return head + marker + tail
+
+
 def _make_mcp_observation(action: MCPAction, payload: dict) -> MCPObservation:
     """Create an MCPObservation with aligned structured tool_result metadata."""
+    raw_content = _serialize_result_to_json(payload)
+    truncated_content = _truncate_mcp_output(raw_content)
     obs = MCPObservation(
-        content=_serialize_result_to_json(payload),
+        content=truncated_content,
         name=action.name,
         arguments=action.arguments,
     )

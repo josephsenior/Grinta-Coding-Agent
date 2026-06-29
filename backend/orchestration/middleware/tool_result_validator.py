@@ -172,7 +172,9 @@ class ToolResultValidator(ToolInvocationMiddleware):
         # CmdOutputObservation may be truncated by ``truncate_cmd_output``
         # (execution layer, emits ``[APP: Output truncated``) or by
         # ``truncate_content`` (processor layer, emits ``Observation truncated:``).
-        # When either marker is present, the LLM cannot see the full output
+        # MCPObservation may be truncated by ``_truncate_mcp_output``
+        # (execution layer, emits ``[APP: MCP output truncated``).
+        # When any marker is present, the LLM cannot see the full output
         # and should usually re-run with a narrower command or with hidden=true.
         def check_truncation_marker(
             ctx: ToolInvocationContext, obs: Observation
@@ -180,7 +182,11 @@ class ToolResultValidator(ToolInvocationMiddleware):
             content = getattr(obs, 'content', '')
             if not isinstance(content, str):
                 return None
-            if 'Observation truncated:' in content or '[APP: Output truncated' in content:
+            if (
+                'Observation truncated:' in content
+                or '[APP: Output truncated' in content
+                or '[APP: MCP output truncated' in content
+            ):
                 return (
                     'Observation content was truncated — output may be incomplete; '
                     're-run with a narrower command or hidden=true'
@@ -339,9 +345,14 @@ class ToolResultValidator(ToolInvocationMiddleware):
         Keeps the annotation compact to reduce token overhead.
         ErrorObservations are skipped — the error content itself is the signal;
         wrapping it in <APP_RESULT_VALIDATION> adds no value and wastes tokens.
+
+        Note: This method deliberately does NOT truncate observation content.
+        Truncation is owned by the execution layer (``truncate_cmd_output``)
+        and the processor layer (``truncate_content``), which use error-aware
+        strategies. A blind ``tail_heavy`` pre-truncation here would destroy
+        the error-context middle that ``truncate_cmd_output`` preserved.
         """
         from backend.ledger.observation import ErrorObservation
-        from backend.ledger.serialization.event import truncate_content
 
         # ErrorObservations carry their own semantic meaning — no annotation needed.
         # The error content is already visible to the agent as a user message.
@@ -352,11 +363,7 @@ class ToolResultValidator(ToolInvocationMiddleware):
         if not isinstance(content, str):
             return
 
-        if len(content) > 10000:
-            content = truncate_content(content, 10000, strategy='tail_heavy')
-
         if not (result.warnings or result.errors or result.blocked):
-            observation.content = content
             return
 
         # Keep message size bounded

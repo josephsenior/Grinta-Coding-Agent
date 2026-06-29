@@ -90,6 +90,34 @@ def _mcp_payload_ok(result: dict[str, Any]) -> bool:
     return True
 
 
+def _truncate_fetch_payload_text(payload: dict[str, Any], max_chars: int) -> dict[str, Any]:
+    """Truncate text content within a fetch MCP payload to ``max_chars``.
+
+    The fallback ``fetch`` MCP tool does not accept a ``maxCharacters``
+    parameter, so we apply a head-truncation on the returned text content
+    to match the cap that Exa would have enforced upstream.
+    """
+    if max_chars <= 0:
+        return payload
+    content = payload.get('content')
+    if not isinstance(content, list):
+        return payload
+    new_content: list[Any] = []
+    for item in content:
+        if isinstance(item, dict) and isinstance(item.get('text'), str):
+            text = item['text']
+            if len(text) > max_chars:
+                item = dict(item)
+                item['text'] = (
+                    text[:max_chars]
+                    + f'\n[... truncated: {len(text) - max_chars} chars omitted]'
+                )
+        new_content.append(item)
+    payload = dict(payload)
+    payload['content'] = new_content
+    return payload
+
+
 async def native_web_fetch_wrapper(
     _mcps: list[Any],
     args: dict[str, Any],
@@ -128,7 +156,9 @@ async def native_web_fetch_wrapper(
                 {'url': urls[0]},
             )
             if _mcp_payload_ok(fetch_result):
-                payload = dict(fetch_result)
+                payload = _truncate_fetch_payload_text(
+                    dict(fetch_result), max_chars
+                )
                 payload['backend'] = 'fetch'
                 return payload
         except Exception:

@@ -410,6 +410,28 @@ class TestObserve:
         assert not truncation_warnings
 
     @pytest.mark.asyncio
+    async def test_truncation_rule_detects_app_marker(self):
+        """The output_truncated rule must detect the [APP: Output truncated]
+        marker emitted by truncate_cmd_output, not just the processor-layer
+        'Observation truncated:' marker."""
+        validator = ToolResultValidator()
+
+        action = CmdRunAction(command='test')
+        obs = CmdOutputObservation(
+            content='head\n[APP: Output truncated — 42 lines hidden.]\ntail',
+            command='test',
+        )
+        controller = MagicMock()
+        state = MagicMock()
+        ctx = ToolInvocationContext(controller=controller, action=action, state=state)
+
+        await validator.observe(ctx, obs)
+
+        result = ctx.metadata['validation_result']
+        warning_text = ' '.join(result.warnings)
+        assert 'truncated' in warning_text.lower()
+
+    @pytest.mark.asyncio
     async def test_empty_result_rule_warns_on_empty_content(self):
         """empty_result rule should warn when content is empty."""
         validator = ToolResultValidator()
@@ -506,3 +528,49 @@ class TestObserve:
 
         result = ctx.metadata['validation_result']
         assert any('no new output' in w.lower() for w in result.warnings)
+
+    @pytest.mark.asyncio
+    async def test_validator_does_not_pre_truncate_large_content(self):
+        """The validator must NOT pre-truncate content at 10k chars.
+
+        Previously the validator applied ``truncate_content(content, 10000,
+        strategy='tail_heavy')`` which destroyed the error-context middle
+        that ``truncate_cmd_output`` carefully preserved.  The processor
+        layer is the proper place for final truncation.
+        """
+        validator = ToolResultValidator()
+
+        action = CmdRunAction(command='test')
+        large_content = 'ERROR: head\n' + 'middle\n' * 5000 + 'tail with traceback\n'
+        obs = CmdOutputObservation(content=large_content, command='test')
+        controller = MagicMock()
+        state = MagicMock()
+        ctx = ToolInvocationContext(controller=controller, action=action, state=state)
+
+        await validator.observe(ctx, obs)
+
+        # Content must NOT be truncated by the validator
+        assert len(obs.content) == len(large_content)
+        assert 'ERROR: head' in obs.content
+        assert 'tail with traceback' in obs.content
+
+    @pytest.mark.asyncio
+    async def test_truncation_rule_detects_mcp_marker(self):
+        """The output_truncated rule must detect the [APP: MCP output truncated]
+        marker emitted by ``_truncate_mcp_output``."""
+        validator = ToolResultValidator()
+
+        action = CmdRunAction(command='test')
+        obs = CmdOutputObservation(
+            content='head\n[APP: MCP output truncated — 42 chars hidden.]\ntail',
+            command='test',
+        )
+        controller = MagicMock()
+        state = MagicMock()
+        ctx = ToolInvocationContext(controller=controller, action=action, state=state)
+
+        await validator.observe(ctx, obs)
+
+        result = ctx.metadata['validation_result']
+        warning_text = ' '.join(result.warnings)
+        assert 'truncated' in warning_text.lower()

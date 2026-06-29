@@ -150,7 +150,6 @@ class TestStateSummary:
     def test_canonical_patch_prefers_explicit_patch_fields(self):
         s = StateSummary(
             pending_tasks='old pending task',
-            current_working_step='old next step',
             files_modified=[FileModification(path='old.py', change_type='modified')],
             canonical_active_plan='patch plan',
             canonical_next_action='run focused test',
@@ -242,9 +241,8 @@ class TestParseLlmResponse:
             'dependencies': [
                 {'name': 'pydantic', 'version': '2.0'},
             ],
-            'tests_passing': 'true',
-            'branch_name': 'fix-auth',
-            'pr_status': 'open',
+            'test_status': 'failing (test_auth, test_token)',
+            'vcs_status': 'branch=fix-auth, commits=true, pr=open',
         }
         response = _make_tool_call_response(args)
         result = self.condenser._parse_llm_response(response)
@@ -257,8 +255,8 @@ class TestParseLlmResponse:
         assert result.exact_commands_and_results[0].exit_code == 0
         assert len(result.dependencies) == 1
         assert result.dependencies[0].name == 'pydantic'
-        assert result.branch_name == 'fix-auth'
-        assert result.pr_status == 'open'
+        assert result.test_status == 'failing (test_auth, test_token)'
+        assert result.vcs_status == 'branch=fix-auth, commits=true, pr=open'
 
     def test_empty_choices_falls_back_to_empty_summary(self):
         response = MagicMock()
@@ -385,3 +383,228 @@ class TestGetCompaction:
         messages = call_kwargs[1]['messages'] if call_kwargs[1] else call_kwargs[0][0]
         prompt_text = str(messages)
         assert 'I remember everything' in prompt_text
+
+
+# ---------------------------------------------------------------------------
+# _build_condensation_prompt — NARRATIVE_SUMMARY instructions
+# ---------------------------------------------------------------------------
+
+
+class TestBuildCondensationPrompt:
+    """Tests for the NARRATIVE_SUMMARY instructions in the compaction prompt."""
+
+    def setup_method(self):
+        self.condenser = StructuredSummaryCompactor(
+            llm=None, max_size=100, keep_first=2
+        )
+
+    def _build_prompt(self, summary_text: str = 'previous summary') -> str:
+        summary_event = _summary_event(0, message=summary_text)
+        return self.condenser._build_condensation_prompt(summary_event, [])
+
+    def test_prompt_contains_narrative_summary_section(self):
+        prompt = self._build_prompt()
+        assert 'NARRATIVE_SUMMARY' in prompt
+
+    def test_prompt_instructs_full_session_arc(self):
+        prompt = self._build_prompt()
+        assert 'FULL session arc' in prompt
+
+    def test_prompt_instructs_preserve_previous_summary(self):
+        prompt = self._build_prompt()
+        assert 'PREVIOUS SUMMARY' in prompt
+        assert 'PRESERVE' in prompt
+
+    def test_prompt_instructs_preserve_from_scratch_framing(self):
+        prompt = self._build_prompt()
+        assert 'from scratch' in prompt.lower() or 'Built from scratch' in prompt
+
+    def test_prompt_gives_structure_example(self):
+        prompt = self._build_prompt()
+        assert 'Built' in prompt
+        assert 'Remaining' in prompt
+
+    def test_prompt_warns_against_replacing_with_recent_only(self):
+        prompt = self._build_prompt()
+        assert 'Do NOT replace' in prompt
+
+    def test_prompt_includes_previous_summary_content(self):
+        prompt = self._build_prompt(summary_text='Built X from scratch')
+        assert 'Built X from scratch' in prompt
+
+    def test_prompt_includes_pruned_events(self):
+        event = _event(42, content='Created autograd/tensor.py')
+        prompt = self.condenser._build_condensation_prompt(
+            _summary_event(0), [event]
+        )
+        assert 'Created autograd/tensor.py' in prompt
+
+
+# ---------------------------------------------------------------------------
+# _digest_events — event pre-digestion
+# ---------------------------------------------------------------------------
+
+
+class TestDigestEvents:
+    """Tests for the event digestion logic."""
+
+    def setup_method(self):
+        self.condenser = StructuredSummaryCompactor(
+            llm=None, max_size=100, keep_first=2
+        )
+
+    def test_empty_events_returns_placeholder(self):
+        result = self.condenser._digest_events([])
+        assert result == '(no events)'
+
+    def test_file_creations_grouped(self):
+        from backend.ledger.action.files import FileEditAction
+        events = [
+            FileEditAction(path='src/a.py', command='create_file'),
+            FileEditAction(path='src/b.py', command='create_file'),
+            FileEditAction(path='src/c.py', command='create_file'),
+        ]
+        for i, e in enumerate(events):
+            e.id = i
+        result = self.condenser._digest_events(events)
+        assert 'Files created (3)' in result
+        assert 'src/a.py' in result
+        assert 'src/b.py' in result
+        assert 'src/c.py' in result
+
+    def test_file_creations_truncated_at_15(self):
+        from backend.ledger.action.files import FileEditAction
+        events = [
+            FileEditAction(path=f'src/file_{i}.py', command='create_file')
+            for i in range(20)
+        ]
+        for i, e in enumerate(events):
+            e.id = i
+        result = self.condenser._digest_events(events)
+        assert 'Files created (20)' in result
+        assert '... and 5 more' in result
+
+    def test_file_edits_deduplicated(self):
+        from backend.ledger.action.files import FileEditAction
+        events = [
+            FileEditAction(path='src/a.py', command='replace_string'),
+            FileEditAction(path='src/a.py', command='replace_string'),
+            FileEditAction(path='src/a.py', command='replace_string'),
+        ]
+        for i, e in enumerate(events):
+            e.id = i
+        result = self.condenser._digest_events(events)
+        assert 'Files edited (1 unique)' in result
+        assert 'src/a.py' in result
+
+    def test_commands_with_exit_codes(self):
+        from backend.ledger.action.commands import CmdRunAction
+        from backend.ledger.observation.commands import CmdOutputObservation
+        events = [
+            CmdRunAction(command='pytest'),
+            CmdOutputObservation(content='5 passed', command='pytest'),
+        ]
+        for i, e in enumerate(events):
+            e.id = i
+        events[1].exit_code = 0
+        result = self.condenser._digest_events(events)
+        assert 'Commands run' in result
+        assert 'pytest' in result
+        assert 'exit=0' in result
+
+    def test_failed_commands_appear_in_errors(self):
+        from backend.ledger.action.commands import CmdRunAction
+        from backend.ledger.observation.commands import CmdOutputObservation
+        events = [
+            CmdRunAction(command='npm test'),
+            CmdOutputObservation(content='FAIL: test_auth', command='npm test'),
+        ]
+        for i, e in enumerate(events):
+            e.id = i
+        events[1].exit_code = 1
+        result = self.condenser._digest_events(events)
+        assert 'Errors (1)' in result
+        assert 'npm test' in result
+        assert 'exit=1' in result
+
+    def test_user_messages_separated_from_agent(self):
+        from backend.ledger.action.message import MessageAction
+        from backend.core.enums import EventSource
+        user_event = MessageAction(content='Fix the auth bug')
+        user_event.source = EventSource.USER
+        user_event.id = 0
+        agent_event = MessageAction(content='I will fix the auth bug')
+        agent_event.source = EventSource.AGENT
+        agent_event.id = 1
+        result = self.condenser._digest_events([user_event, agent_event])
+        assert 'User messages (1)' in result
+        assert 'Fix the auth bug' in result
+        assert 'Agent reasoning' in result
+
+    def test_condensation_events_skipped(self):
+        from backend.ledger.observation.agent import AgentCondensationObservation
+        events = [
+            AgentCondensationObservation('old summary'),
+            AgentCondensationObservation('older summary'),
+        ]
+        for i, e in enumerate(events):
+            e.id = i
+        result = self.condenser._digest_events(events)
+        assert result == '(no events)'
+
+    def test_code_navigation_grouped(self):
+        from backend.ledger.action.search import FindSymbolsAction
+        events = [
+            FindSymbolsAction(query='AuthHandler'),
+            FindSymbolsAction(query='TokenStore'),
+        ]
+        for i, e in enumerate(events):
+            e.id = i
+        result = self.condenser._digest_events(events)
+        assert 'Code navigation' in result
+        assert 'AuthHandler' in result
+        assert 'TokenStore' in result
+
+
+# ---------------------------------------------------------------------------
+# _build_condensation_prompt — event digest integration
+# ---------------------------------------------------------------------------
+
+
+class TestBuildCondensationPromptWithDigest:
+    """Tests that the prompt uses the event digest format."""
+
+    def setup_method(self):
+        self.condenser = StructuredSummaryCompactor(
+            llm=None, max_size=100, keep_first=2
+        )
+
+    def test_prompt_contains_event_digest_section(self):
+        prompt = self.condenser._build_condensation_prompt(
+            _summary_event(0), [_event(1)]
+        )
+        assert '<EVENT DIGEST>' in prompt
+        assert '</EVENT DIGEST>' in prompt
+
+    def test_prompt_contains_recent_raw_events_section(self):
+        prompt = self.condenser._build_condensation_prompt(
+            _summary_event(0), [_event(1)]
+        )
+        assert '<RECENT RAW EVENTS' in prompt
+
+    def test_prompt_only_includes_last_5_raw_events(self):
+        events = [_event(i, content=f'event {i}') for i in range(20)]
+        prompt = self.condenser._build_condensation_prompt(
+            _summary_event(0), events
+        )
+        raw_section = prompt[prompt.index('<RECENT RAW EVENTS'):]
+        assert 'event 19' in raw_section
+        assert 'event 15' in raw_section
+        assert 'event 14' not in raw_section
+
+    def test_prompt_mentions_test_and_vcs_field_guidance(self):
+        prompt = self.condenser._build_condensation_prompt(
+            _summary_event(0), [_event(1)]
+        )
+        assert 'test_status' in prompt
+        assert 'vcs_status' in prompt
