@@ -338,7 +338,11 @@ def _process_event_commit_response(
         return
     if orch._live_response_dirty:
         if is_tool:
-            orch.clear_live_response()
+            live_text = orch._normalize_final_response_text(orch._live_response)
+            if live_text:
+                orch._commit_streamed_tool_step_preamble(live_text)
+            else:
+                orch.clear_live_response()
         else:
             orch._commit_final_response(orch._live_response)
     else:

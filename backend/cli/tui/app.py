@@ -348,6 +348,7 @@ class TUIRenderer(
         self._pending_backpressure: bool = False
         self._pending_backpressure_reclaimed: int = 0
         self._pending_final_commits: list[str] = []
+        self._last_streamed_preamble_text: str = ''
         self._async_drain_active: bool = False
         self._drain_requested_while_active: bool = False
 

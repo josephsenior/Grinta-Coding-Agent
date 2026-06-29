@@ -141,10 +141,30 @@ class RendererActionHandlersMixin:
             return
 
         if bool(getattr(action, 'transcript_only', False)):
+            normalized = self._normalize_final_response_text(content)
+            if (
+                normalized
+                and normalized == getattr(self, '_last_streamed_preamble_text', '')
+            ):
+                self._tui.finalize_thinking()
+                self.clear_live_response()
+                return
             self._append_plain_agent_message(content)
+            if normalized:
+                self._last_streamed_preamble_text = normalized
             return
 
         self._commit_final_response(content)
+
+    def _commit_streamed_tool_step_preamble(self, text: str) -> None:
+        """Pin assistant prose to the transcript before tool cards render."""
+        content = self._normalize_final_response_text(text)
+        if not content:
+            return
+        if content == getattr(self, '_last_streamed_preamble_text', ''):
+            return
+        self._last_streamed_preamble_text = content
+        self._append_plain_agent_message(content)
 
     def _append_plain_agent_message(self, text: str) -> None:
         """Show agent preamble before tool calls — no card chrome."""
@@ -271,7 +291,11 @@ class RendererActionHandlersMixin:
         self, action: StreamingChunkAction, content: str
     ) -> None:
         if bool(getattr(action, 'suppress_live_response', False)):
-            self.clear_live_response()
+            live_text = self._normalize_final_response_text(self._live_response)
+            if live_text:
+                self._commit_streamed_tool_step_preamble(live_text)
+            else:
+                self.clear_live_response()
             return
         final_text = content or self._live_response
         if final_text:

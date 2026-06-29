@@ -80,6 +80,7 @@ class RendererDisplayMixin:
         self._worker_failed = 0
         self._compaction_transcript_active = False
         self._pending_compaction_scan_card = None
+        self._last_streamed_preamble_text = ''
         self._history = []
         self._history_items_dropped = 0
         self._live_thinking = ''
