@@ -77,7 +77,10 @@ def _symbol_preview(content: str, start_line: int, end_line: int) -> str:
     if not lines:
         return ''
     selected = lines[start_line - 1 : min(end_line, start_line + 2)]
-    return '\n'.join(selected)[:240]
+    preview = '\n'.join(selected)
+    if len(preview) > 240:
+        return preview[:240] + '[…]'
+    return preview
 
 
 def _candidate_from_location(
@@ -212,14 +215,23 @@ def _find_symbol_candidates_in_file(
     return candidates
 
 
-def _candidate_paths_for_symbol_search(raw_path: str | None = None) -> list[Path]:
+def _candidate_paths_for_symbol_search(
+    raw_path: str | None = None,
+) -> tuple[list[Path], bool]:
+    """Return ``(paths, scope_capped)``.
+
+    ``scope_capped`` is True when the 200-file scan limit was reached,
+    meaning files beyond the 200th were not searched.
+    """
     if raw_path:
-        return [_safe_readable_path(raw_path, must_exist=True)]
+        return [_safe_readable_path(raw_path, must_exist=True)], False
 
     root = _workspace_root()
     paths: list[Path] = []
+    scope_capped = False
     for path in root.rglob('*'):
         if len(paths) >= 200:
+            scope_capped = True
             break
         if not path.is_file():
             continue
@@ -228,7 +240,7 @@ def _candidate_paths_for_symbol_search(raw_path: str | None = None) -> list[Path
         if any(part in _SKIP_SYMBOL_SEARCH_PARTS for part in path.parts):
             continue
         paths.append(path)
-    return paths
+    return paths, scope_capped
 
 
 def _find_symbol_candidates(
@@ -237,10 +249,16 @@ def _find_symbol_candidates(
     path: str | None = None,
     symbol_kind: str | None = None,
     include_private: bool = False,
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], bool]:
+    """Return ``(candidates, scope_capped)``.
+
+    ``scope_capped`` is True when the file-scan limit was reached and
+    not all source files were searched.
+    """
     lookup_query = query.rsplit('.', 1)[-1]
     candidates: list[dict[str, Any]] = []
-    for candidate_path in _candidate_paths_for_symbol_search(path):
+    paths, scope_capped = _candidate_paths_for_symbol_search(path)
+    for candidate_path in paths:
         candidates.extend(
             _find_symbol_candidates_in_file(
                 candidate_path,
@@ -256,7 +274,7 @@ def _find_symbol_candidates(
             for candidate in candidates
             if query_lower in str(candidate.get('qualified_name') or '').lower()
         ]
-    return candidates
+    return candidates, scope_capped
 
 
 def _parse_symbol_id(symbol_id: str) -> tuple[str, str, int, int]:

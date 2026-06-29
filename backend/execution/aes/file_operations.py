@@ -899,7 +899,7 @@ def truncate_cmd_output(output: str, max_chars: int | None = None) -> str:
     )
     notice += '\n'
 
-    logger.warning(
+    logger.debug(
         'Truncated bash output from %d lines (%d chars) → head=%d tail=%d error_ctx=%d',
         total_lines,
         len(output),

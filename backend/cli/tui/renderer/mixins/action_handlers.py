@@ -156,16 +156,6 @@ class RendererActionHandlersMixin:
 
         self._commit_final_response(content)
 
-    def _commit_streamed_tool_step_preamble(self, text: str) -> None:
-        """Pin assistant prose to the transcript before tool cards render."""
-        content = self._normalize_final_response_text(text)
-        if not content:
-            return
-        if content == getattr(self, '_last_streamed_preamble_text', ''):
-            return
-        self._last_streamed_preamble_text = content
-        self._append_plain_agent_message(content)
-
     def _append_plain_agent_message(self, text: str) -> None:
         """Show agent preamble before tool calls — no card chrome."""
         content = self._normalize_final_response_text(text)
@@ -291,11 +281,9 @@ class RendererActionHandlersMixin:
         self, action: StreamingChunkAction, content: str
     ) -> None:
         if bool(getattr(action, 'suppress_live_response', False)):
-            live_text = self._normalize_final_response_text(self._live_response)
-            if live_text:
-                self._commit_streamed_tool_step_preamble(live_text)
-            else:
-                self.clear_live_response()
+            # Tool-step finals: keep the live preview until transcript_only
+            # MessageAction commits the canonical full text (avoids duplicate
+            # rows from committing a partial stream snapshot early).
             return
         final_text = content or self._live_response
         if final_text:

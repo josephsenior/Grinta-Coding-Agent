@@ -116,10 +116,20 @@ class CmdOutputObservation(Observation):
         hidden: bool = False,
         **kwargs: Any,
     ) -> None:
-        """Initialize the observation, coercing metadata and truncating content if needed."""
-        truncate = not hidden
-        if truncate:
-            content = self._maybe_truncate(content)
+        """Initialize the observation, coercing metadata.
+
+        Note: content truncation is intentionally NOT done here. The
+        execution layer (``truncate_cmd_output`` in
+        ``backend.execution.aes.file_operations``) is the primary
+        truncator for shell output — it is env-configurable via
+        ``APP_MAX_CMD_OUTPUT_CHARS`` (default 40 000) and uses an
+        error-aware head/tail strategy with test-summary extraction.
+        The observation processor layer (``truncate_content``) is the
+        final safety net for ALL observation types (browser, shell, etc.).
+        Doing truncation in ``__init__`` pre-empted the execution-layer
+        truncator at a hardcoded 10 000 chars, making the env var
+        ineffective and the sophisticated strategy dead code.
+        """
         super().__init__(content)
         self.command = command
         # Store observation value in a private attribute to avoid ClassVar conflict

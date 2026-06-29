@@ -11,7 +11,6 @@ from textual.widgets import Static
 
 from backend.cli.theme import (
     CLR_REASONING_SNAP,
-    NAVY_BG_TRANSCRIPT_ACTIVE,
     NAVY_BG_TRANSCRIPT_BLOCK,
     NAVY_BG_USER,
     NAVY_TEXT_BODY,
@@ -228,9 +227,6 @@ class ThinkingIndicator(Container):
     }}
     ThinkingIndicator.-hidden {{
         display: none;
-    }}
-    ThinkingIndicator.-streaming {{
-        background: {NAVY_BG_TRANSCRIPT_ACTIVE};
     }}
     ThinkingIndicator > #thinking-content {{
         width: 100%;

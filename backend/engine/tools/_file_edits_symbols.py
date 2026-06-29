@@ -149,7 +149,7 @@ def _resolve_symbol_candidates_without_path(
             lookup_name,
             symbol_kind=symbol_kind,
             include_private=True,
-        ),
+        )[0],
         symbol_name=lookup_name,
         parent_symbol=parent_symbol,
         occurrence=occurrence,
@@ -482,7 +482,7 @@ def _handle_read_symbols_public(arguments: Mapping[str, Any]) -> ReadSymbolsActi
 
 
 def execute_find_symbols(action: FindSymbolsAction) -> FindSymbolsObservation:
-    candidates = _find_symbol_candidates(
+    candidates, scope_capped = _find_symbol_candidates(
         action.query,
         path=action.path or None,
         symbol_kind=action.symbol_kind or None,
@@ -494,6 +494,12 @@ def execute_find_symbols(action: FindSymbolsAction) -> FindSymbolsObservation:
         'query': action.query,
         'candidates': candidates,
     }
+    if scope_capped:
+        payload['scope_truncated'] = True
+        payload['note'] = (
+            'Search scope capped at 200 source files — results may be incomplete. '
+            'Narrow the search by specifying a path.'
+        )
     observation = FindSymbolsObservation(
         content=json.dumps(payload, indent=2),
         query=action.query,

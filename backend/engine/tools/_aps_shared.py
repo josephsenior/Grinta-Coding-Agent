@@ -95,7 +95,10 @@ def _imports_reverse_via_rg(basename: str) -> list[str] | None:
             ],
         )
         if res.stdout.strip():
-            return res.stdout.splitlines()[:30]
+            lines = res.stdout.splitlines()
+            if len(lines) > 30:
+                return lines[:30] + ['… (truncated)']
+            return lines
     except Exception:
         pass
     return None

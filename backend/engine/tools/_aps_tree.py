@@ -244,6 +244,7 @@ def _build_symbols_action(path: str) -> str:
                         out.append(f'{i}:{line.rstrip()}')
                         count += 1
                         if count >= 100:
+                            out.append('… (truncated)')
                             break
                 if count == 0:
                     out.append(

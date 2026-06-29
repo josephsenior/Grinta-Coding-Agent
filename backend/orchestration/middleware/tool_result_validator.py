@@ -169,16 +169,18 @@ class ToolResultValidator(ToolInvocationMiddleware):
         """Register default validation rules."""
 
         # 1. Truncated output detection
-        # CmdOutputObservation may truncate large command output to MAX_CMD_OUTPUT_SIZE.
-        # When that happens, the LLM cannot see the full output and should usually
-        # re-run with a narrower command or with hidden=true.
+        # CmdOutputObservation may be truncated by ``truncate_cmd_output``
+        # (execution layer, emits ``[APP: Output truncated``) or by
+        # ``truncate_content`` (processor layer, emits ``Observation truncated:``).
+        # When either marker is present, the LLM cannot see the full output
+        # and should usually re-run with a narrower command or with hidden=true.
         def check_truncation_marker(
             ctx: ToolInvocationContext, obs: Observation
         ) -> str | None:
             content = getattr(obs, 'content', '')
             if not isinstance(content, str):
                 return None
-            if 'Observation truncated:' in content:
+            if 'Observation truncated:' in content or '[APP: Output truncated' in content:
                 return (
                     'Observation content was truncated — output may be incomplete; '
                     're-run with a narrower command or hidden=true'

@@ -49,7 +49,10 @@ def _callers_lines_via_rg(symbol: str, safe_scope: str) -> list[str] | None:
             ],
         )
         if res.stdout.strip():
-            return res.stdout.splitlines()[:50]
+            lines = res.stdout.splitlines()
+            if len(lines) > 50:
+                return lines[:50] + ['… (truncated)']
+            return lines
     except Exception:
         pass
     return None
