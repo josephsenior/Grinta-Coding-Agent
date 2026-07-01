@@ -57,6 +57,7 @@ from backend.ledger.action.search import (
     ReadSymbolsAction,
 )
 from backend.ledger.action.terminal import (
+    TerminalCloseAction,
     TerminalInputAction,
     TerminalReadAction,
     TerminalRunAction,
@@ -103,6 +104,7 @@ actions = (
     TerminalRunAction,
     TerminalInputAction,
     TerminalReadAction,
+    TerminalCloseAction,
     DebuggerAction,
 )
 ACTION_TYPE_TO_CLASS = {action_class.action: action_class for action_class in actions}
