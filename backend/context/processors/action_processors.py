@@ -32,6 +32,7 @@ from backend.ledger.action.agent import (
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.mcp import MCPAction
 from backend.ledger.action.terminal import (
+    TerminalCloseAction,
     TerminalInputAction,
     TerminalReadAction,
     TerminalRunAction,
@@ -108,6 +109,7 @@ def _is_tool_based_action(action: Action) -> bool:
         TerminalRunAction,
         TerminalInputAction,
         TerminalReadAction,
+        TerminalCloseAction,
         *_META_COGNITION_ACTION_TYPES,
     )
     if isinstance(action, tool_action_classes):

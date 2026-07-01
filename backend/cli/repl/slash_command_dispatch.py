@@ -26,6 +26,7 @@ COMMAND_DISPATCH: dict[str, str] = {
     '/cost': '_cmd_cost',
     '/diff': '_cmd_diff',
     '/checkpoint': '_cmd_checkpoint',
+    '/revert': '_cmd_revert',
     '/copy': '_cmd_copy',
     '/search': '_cmd_search',
     '/sessions': '_cmd_sessions',

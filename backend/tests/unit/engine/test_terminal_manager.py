@@ -8,6 +8,7 @@ from backend.core.enums import ActionSecurityRisk
 from backend.core.errors import FunctionCallValidationError
 from backend.engine.tools.terminal_manager import handle_terminal_manager_tool
 from backend.ledger.action.terminal import (
+    TerminalCloseAction,
     TerminalInputAction,
     TerminalReadAction,
     TerminalRunAction,
@@ -89,6 +90,35 @@ def test_read_maps_resize() -> None:
     assert act.cols == 100
 
 
+def test_close_maps_session_id() -> None:
+    act = handle_terminal_manager_tool(
+        {'action': 'close', 'session_id': 's4'}
+    )
+    assert isinstance(act, TerminalCloseAction)
+    assert act.session_id == 's4'
+
+
+def test_close_does_not_require_security_risk() -> None:
+    # Close is bookkeeping only — no security_risk gating. The JSON-schema
+    # allOf should not require it (and the model must not have to lie about
+    # a risk level for an idempotent cleanup call).
+    act = handle_terminal_manager_tool(
+        {'action': 'close', 'session_id': 's-no-risk'}
+    )
+    assert isinstance(act, TerminalCloseAction)
+    assert act.session_id == 's-no-risk'
+
+
+def test_close_rejects_missing_session_id() -> None:
+    with pytest.raises(ValueError, match='close.*session_id'):
+        handle_terminal_manager_tool({'action': 'close'})
+
+
+def test_close_rejects_non_string_session_id() -> None:
+    with pytest.raises(ValueError, match='close.*session_id'):
+        handle_terminal_manager_tool({'action': 'close', 'session_id': 123})
+
+
 def test_input_rejects_empty_operation() -> None:
     with pytest.raises(ValueError, match='input.*control'):
         handle_terminal_manager_tool(
@@ -119,6 +149,6 @@ class TestActionValidation:
 
     def test_unknown_action_message_contains_valid_actions(self) -> None:
         with pytest.raises(
-            FunctionCallValidationError, match="'open'.*'input'.*'read'"
+            FunctionCallValidationError, match="'open'.*'input'.*'read'.*'close'"
         ):
             handle_terminal_manager_tool({'action': 'execute'})

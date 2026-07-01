@@ -70,6 +70,7 @@ class _AuditAccumulator:
     first_issue_ctx: dict[str, Any] | None = None
     runtime_msg_types: Counter[str] = field(default_factory=Counter)
     last_known_model: str | None = None
+    compaction_fallbacks: int = 0
 
 
 def _ctx_model(record: dict[str, Any]) -> str:
@@ -145,6 +146,9 @@ def _process_event(line_no: int, record: dict[str, Any], acc: _AuditAccumulator)
         path_preview = str(payload.get('path', ''))[:120]
         acc.file_events.append((kind, path_preview, line_no))
 
+    if event == 'COMPACTION' and payload.get('kind') == 'summary_fallback':
+        acc.compaction_fallbacks += 1
+
     if event in {'ISSUE', 'RUNTIME'}:
         msg = str(payload.get('message', ''))
         msg_type = payload.get('msg_type')
@@ -196,6 +200,14 @@ def _compute_verdict(acc: _AuditAccumulator) -> tuple[str, list[str]]:
     elif acc.levels.get('WARNING', 0) > 5:
         verdict = 'REVIEW'
         notes.append(f'{acc.levels.get("WARNING", 0)} WARNING(s) — worth scanning.')
+
+    if acc.compaction_fallbacks:
+        if verdict == 'CLEAN':
+            verdict = 'REVIEW'
+        notes.append(
+            f'{acc.compaction_fallbacks} compaction summary fallback(s) — '
+            'structured memory may have been lost.'
+        )
 
     return verdict, notes
 
@@ -263,6 +275,8 @@ def _write_report(
             f'max={max(sorted_lat)}'
         )
     w(f'  File events: {len(acc.file_events)}')
+    if acc.compaction_fallbacks:
+        w(f'  Compaction summary fallbacks: {acc.compaction_fallbacks}')
     if acc.tool_outcomes:
         w(
             f'  Tool outcomes: ok={acc.tool_outcomes.get("ok", 0)} '
@@ -367,6 +381,13 @@ def analyze_session(
     events = load_session_events(log_path)
     for line_no, record in enumerate(events, 1):
         _process_event(line_no, record, acc)
+
+    if acc.compaction_fallbacks == 0:
+        acc.compaction_fallbacks = sum(
+            1
+            for line in acc.issue_lines
+            if 'Failed to parse summary tool call' in line
+        )
 
     verdict, notes = _compute_verdict(acc)
     write_session_transcript(events, transcript_path)

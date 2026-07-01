@@ -238,6 +238,11 @@ def _canonical_has_packet_details(canonical: CanonicalTaskState) -> bool:
         or canonical.decisions
         or canonical.vcs_status
         or canonical.narrative_summary
+        or canonical.open_questions
+        or canonical.dependencies
+        or canonical.test_summary.overall
+        or canonical.session_metadata.compaction_timestamp
+        or canonical.environment_state.running_processes
     )
 
 

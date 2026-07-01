@@ -21,6 +21,7 @@ from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.code_nav import LspQueryAction
 from backend.ledger.action.debugger import DebuggerAction
 from backend.ledger.action.terminal import (
+    TerminalCloseAction,
     TerminalInputAction,
     TerminalReadAction,
     TerminalRunAction,
@@ -76,6 +77,25 @@ def test_terminal_read_forwards_to_runtime_executor() -> None:
     result = runtime.terminal_read(action)
     assert result is obs
     executor.terminal_read.assert_awaited_once_with(action)
+
+
+def test_terminal_close_forwards_to_runtime_executor() -> None:
+    runtime = _make_runtime()
+    obs = NullObservation(content='closed')
+    executor = MagicMock()
+    executor.terminal_close = AsyncMock(return_value=obs)
+    runtime._executor = executor
+    action = TerminalCloseAction(session_id='s1')
+    result = runtime.terminal_close(action)
+    assert result is obs
+    executor.terminal_close.assert_awaited_once_with(action)
+
+
+def test_terminal_close_raises_when_runtime_disconnected() -> None:
+    runtime = _make_runtime()
+    runtime._executor = None
+    with pytest.raises(AgentRuntimeDisconnectedError):
+        runtime.terminal_close(TerminalCloseAction(session_id='s1'))
 
 
 def test_lsp_query_forwards_to_runtime_executor() -> None:

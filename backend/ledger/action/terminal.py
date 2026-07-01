@@ -92,3 +92,29 @@ class TerminalReadAction(Action):
             f'**TerminalReadAction (session={self.session_id}, offset={self.offset}, '
             f'mode={self.mode}, rows={self.rows}, cols={self.cols})**'
         )
+
+
+@dataclass
+class TerminalCloseAction(Action):
+    """Action to explicitly close an existing terminal session.
+
+    Sessions are otherwise garbage-collected by the runtime (timeout / LRU),
+    so this action is optional. It is useful when the agent has finished
+    with a session and wants to release the PTY immediately, or to free up
+    the session-id namespace before starting a new one.
+    """
+
+    session_id: str = ''
+    action: ClassVar[str] = ActionType.TERMINAL_CLOSE
+    runnable: ClassVar[bool] = True
+    confirmation_state: ActionConfirmationStatus = ActionConfirmationStatus.CONFIRMED
+    security_risk: ActionSecurityRisk = ActionSecurityRisk.LOW
+
+    @property
+    def message(self) -> str:
+        """Get close message."""
+        return f'Closing terminal {self.session_id}'
+
+    def __str__(self) -> str:
+        """Return a readable summary."""
+        return f'**TerminalCloseAction (session={self.session_id})**'

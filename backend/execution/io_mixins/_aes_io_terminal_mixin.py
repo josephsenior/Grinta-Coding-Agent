@@ -73,6 +73,7 @@ from backend.execution.aes.helpers import (
 )
 from backend.execution.utils.shell.unified_shell import BaseShellSession
 from backend.ledger.action.terminal import (
+    TerminalCloseAction,
     TerminalInputAction,
     TerminalReadAction,
     TerminalRunAction,
@@ -781,3 +782,57 @@ class _AesIoTerminalMixin:
         except Exception as exc:
             logger.error('Error reading terminal %s: %s', action.session_id, exc)
             return ErrorObservation(f'Failed to read terminal: {exc}')
+
+    async def terminal_close(self, action: TerminalCloseAction) -> Observation:
+        """Explicitly close an interactive terminal session.
+
+        Sessions are otherwise garbage-collected by the runtime (timeout /
+        LRU), so this is an opt-in fast path: it releases the PTY and the
+        read-cursor bookkeeping immediately. Closing an unknown ``session_id``
+        is a no-op (idempotent) so the agent can call it speculatively
+        without first probing for existence.
+        """
+        session_id = action.session_id
+        try:
+            session = self.session_manager.get_session(session_id)
+            if session is None:
+                self._clear_terminal_read_cursor(session_id)
+                obs = Observation(
+                    content=(
+                        f'Terminal session {session_id!r} was not active; '
+                        'close is a no-op.'
+                    )
+                )
+                obs.tool_result = {
+                    'tool': 'terminal_manager',
+                    'ok': True,
+                    'error_code': None,
+                    'retryable': False,
+                    'state': 'SESSION_NOT_FOUND',
+                    'next_actions': ['open'],
+                    'payload': {'session_id': session_id},
+                    'progress': False,
+                }
+                return obs
+
+            self.session_manager.close_session(session_id)
+            self._clear_terminal_read_cursor(session_id)
+            obs = Observation(
+                content=f'Closed terminal session {session_id!r}.'
+            )
+            obs.tool_result = {
+                'tool': 'terminal_manager',
+                'ok': True,
+                'error_code': None,
+                'retryable': False,
+                'state': 'SESSION_CLOSED',
+                'next_actions': ['open'],
+                'payload': {'session_id': session_id},
+                'progress': False,
+            }
+            return obs
+        except Exception as exc:
+            logger.error(
+                'Error closing terminal %s: %s', action.session_id, exc
+            )
+            return ErrorObservation(f'Failed to close terminal: {exc}')

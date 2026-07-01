@@ -55,6 +55,7 @@ from backend.ledger.action.search import (
     ReadSymbolsAction,
 )
 from backend.ledger.action.terminal import (
+    TerminalCloseAction,
     TerminalInputAction,
     TerminalReadAction,
     TerminalRunAction,
@@ -392,6 +393,13 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             raise AgentRuntimeDisconnectedError('Runtime not initialized')
         timeout = self._bridge_timeout(action, TOOL_BRIDGE_TIMEOUT_TERMINAL_IO)
         return call_async_from_sync(self._executor.terminal_read, timeout, action)
+
+    def terminal_close(self, action: TerminalCloseAction) -> Observation:
+        """Close a terminal session via RuntimeExecutor."""
+        if self._executor is None:
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
+        timeout = self._bridge_timeout(action, TOOL_BRIDGE_TIMEOUT_TERMINAL_IO)
+        return call_async_from_sync(self._executor.terminal_close, timeout, action)
 
     def debugger(self, action: DebuggerAction) -> Observation:
         """Execute a debugger action via :meth:`DAPDebugManager.handle`.

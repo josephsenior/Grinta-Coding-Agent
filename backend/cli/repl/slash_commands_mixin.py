@@ -133,6 +133,11 @@ class SlashCommandsMixin:
 
         return _ckpt.handle_checkpoint_diff(self, args)
 
+    def _handle_checkpoint_revert(self, args: list[str]) -> bool:
+        import backend.cli.repl.slash_command_checkpoint as _ckpt
+
+        return _ckpt.handle_checkpoint_revert(self, args)
+
     # -- dispatch forwarders -----------------------------------------------
 
     def _handle_command(self, text: str) -> bool:
@@ -311,6 +316,8 @@ class SlashCommandsMixin:
         if sub == 'diff':
             self._handle_checkpoint_diff(args[1:])
             return True
+        if sub in {'revert', 'restore', 'rollback'}:
+            return self._handle_checkpoint_revert(args[1:])
         from backend.ledger.action import MessageAction
 
         label = ' '.join(args).strip()
@@ -326,3 +333,7 @@ class SlashCommandsMixin:
                 title='checkpoint',
             )
         return True
+
+    def _cmd_revert(self, parsed: Any) -> bool:
+        """Top-level /revert <id> — shortcut for /checkpoint revert <id>."""
+        return self._handle_checkpoint_revert(list(parsed.args))

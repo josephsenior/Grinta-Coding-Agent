@@ -359,6 +359,11 @@ class ObservationService:
                 },
                 ctx={'astep_id': current_astep_id() or None},
             )
+            if ok:
+                ObservationService._emit_file_event_if_applicable(
+                    observation,
+                    tool_name=tool_name,
+                )
             logger.info(
                 'Tool observation resolved: action=%s action_id=%s tool=%s call_id=%s observation=%s ok=%s content_chars=%d preview=%r',
                 type(pending_action).__name__,
@@ -382,6 +387,40 @@ class ObservationService:
             )
         except Exception:
             logger.debug('Failed to log resolved tool observation', exc_info=True)
+
+    @staticmethod
+    def _emit_file_event_if_applicable(
+        observation: Observation,
+        *,
+        tool_name: str,
+    ) -> None:
+        from backend.core.logging.session_event_logger import emit_session_event
+        from backend.ledger.observation.files import FileEditObservation
+
+        if not isinstance(observation, FileEditObservation):
+            return
+        path = getattr(observation, 'path', '') or ''
+        if not path:
+            return
+
+        tool_result = getattr(observation, 'tool_result', None)
+        operation = None
+        if isinstance(tool_result, dict):
+            operation = tool_result.get('operation')
+        outcome = getattr(observation, 'outcome', None)
+        kind = 'create' if outcome == 'created' else 'edit'
+
+        emit_session_event(
+            'FILE_EVENT',
+            {
+                'kind': kind,
+                'path': path,
+                'operation': operation or tool_name,
+                'outcome': outcome,
+                'tool': tool_name,
+            },
+            level='INFO',
+        )
 
     @staticmethod
     def _cause_coerces_to_stream_id(cause: object) -> bool:

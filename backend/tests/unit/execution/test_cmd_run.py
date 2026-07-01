@@ -11,6 +11,7 @@ from backend.execution.server.action_execution_server import RuntimeExecutor
 from backend.execution.utils.shell.unified_shell import BaseShellSession
 from backend.ledger.action import CmdRunAction, FileReadAction
 from backend.ledger.action.terminal import (
+    TerminalCloseAction,
     TerminalInputAction,
     TerminalReadAction,
     TerminalRunAction,
@@ -1112,3 +1113,39 @@ async def test_terminal_run_returns_error_when_execution_cap_exceeded(
     assert isinstance(obs, ErrorObservation)
     assert obs.error_id == 'TERMINAL_RUN_TIMEOUT'
     assert 'TERMINAL_RUN_TIMEOUT' in obs.content
+
+
+@pytest.mark.asyncio
+async def test_terminal_close_releases_session_and_clears_cursor(mock_executor):
+    mock_executor.session_manager.get_session.return_value = MagicMock()
+    mock_executor._terminal_read_cursor = {'terminal_99': 42}
+
+    obs = await mock_executor.terminal_close(
+        TerminalCloseAction(session_id='terminal_99')
+    )
+
+    mock_executor.session_manager.close_session.assert_called_once_with(
+        'terminal_99'
+    )
+    assert 'terminal_99' not in mock_executor._terminal_read_cursor
+    assert obs.tool_result['state'] == 'SESSION_CLOSED'
+    assert obs.tool_result['ok'] is True
+    assert obs.tool_result['next_actions'] == ['open']
+
+
+@pytest.mark.asyncio
+async def test_terminal_close_is_idempotent_for_unknown_session(mock_executor):
+    mock_executor.session_manager.get_session.return_value = None
+    mock_executor._terminal_read_cursor = {'terminal_99': 7}
+
+    obs = await mock_executor.terminal_close(
+        TerminalCloseAction(session_id='terminal_99')
+    )
+
+    # No error — closing an unknown session is a no-op so the agent can call
+    # close speculatively without probing for existence first.
+    assert obs.tool_result['ok'] is True
+    assert obs.tool_result['state'] == 'SESSION_NOT_FOUND'
+    # Cursor is still cleared to avoid leaking stale read positions.
+    assert 'terminal_99' not in mock_executor._terminal_read_cursor
+    mock_executor.session_manager.close_session.assert_not_called()

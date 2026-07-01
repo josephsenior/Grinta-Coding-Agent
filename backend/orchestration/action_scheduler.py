@@ -42,6 +42,7 @@ _SAME_TYPE_CATEGORIES: dict[str, str] = {
     ActionType.TERMINAL_RUN: 'terminal',
     ActionType.TERMINAL_INPUT: 'terminal',
     ActionType.TERMINAL_READ: 'terminal',
+    ActionType.TERMINAL_CLOSE: 'terminal',
     ActionType.EDIT: 'file_edit',
 }
 

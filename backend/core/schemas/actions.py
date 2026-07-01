@@ -293,6 +293,16 @@ class TerminalReadActionSchema(ActionSchemaV1):
         return self
 
 
+class TerminalCloseActionSchema(ActionSchemaV1):
+    """Schema for TerminalCloseAction."""
+
+    action_type: Literal['terminal_close'] = Field(
+        ActionType.TERMINAL_CLOSE.value, frozen=True
+    )
+    runnable: bool = Field(True, frozen=True)
+    session_id: str = Field(..., min_length=1, description='Terminal session ID')
+
+
 class DebuggerActionSchema(ActionSchemaV1):
     """Schema for DebuggerAction."""
 
@@ -635,6 +645,7 @@ ActionSchemaUnion = (
     | TerminalRunActionSchema
     | TerminalInputActionSchema
     | TerminalReadActionSchema
+    | TerminalCloseActionSchema
     | DebuggerActionSchema
     | AgentThinkActionSchema
     | ClarificationRequestActionSchema

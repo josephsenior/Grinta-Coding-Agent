@@ -96,6 +96,7 @@ from backend.cli.tui.renderer.handlers.task_tracking import (
     _handle_task_tracking_observation,
 )
 from backend.cli.tui.renderer.handlers.terminal import (
+    _handle_terminal_close_action,
     _handle_terminal_input_action,
     _handle_terminal_observation,
     _handle_terminal_read_action,
@@ -136,6 +137,7 @@ from backend.ledger.action import (
     StreamingChunkAction,
     SystemHintAction,
     TaskTrackingAction,
+    TerminalCloseAction,
     TerminalInputAction,
     TerminalReadAction,
     TerminalRunAction,
@@ -239,6 +241,7 @@ _TOOL_EXECUTION_TYPES = (
     TerminalRunAction,
     TerminalInputAction,
     TerminalReadAction,
+    TerminalCloseAction,
     RecallAction,
     DelegateTaskAction,
 )
@@ -438,6 +441,7 @@ _EVENT_HANDLERS: dict[type, Any] = {
     TerminalRunAction: _handle_terminal_run_action,
     TerminalInputAction: _handle_terminal_input_action,
     TerminalReadAction: _handle_terminal_read_action,
+    TerminalCloseAction: _handle_terminal_close_action,
     TerminalObservation: _handle_terminal_observation,
     AgentCondensationObservation: _handle_agent_condensation_observation,
     DelegateTaskAction: _handle_delegate_task_action,

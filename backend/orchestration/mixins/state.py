@@ -357,24 +357,19 @@ class _SessionOrchestratorStateMixin:
         if not first_msg:
             return None
 
-        from backend.validation.task_metadata import parse_task_from_user_message
+        from backend.validation.task_metadata import merge_task_fields, parse_task_from_user_message
         from backend.validation.task_validator import Task
 
         description, meta = parse_task_from_user_message(first_msg.content)
-
-        raw_expected = meta.get('expected_output_files')
-
-        expected_files: list[str] | None = None
-
-        if isinstance(raw_expected, list) and all(
-            isinstance(x, str) for x in raw_expected
-        ):
-            expected_files = list(raw_expected)
+        description, requirements, acceptance_criteria, expected_files = merge_task_fields(
+            description,
+            meta,
+        )
 
         return Task(
             description=description,
-            requirements=[],
-            acceptance_criteria=[],
+            requirements=requirements,
+            acceptance_criteria=acceptance_criteria,
             expected_output_files=expected_files,
         )
 

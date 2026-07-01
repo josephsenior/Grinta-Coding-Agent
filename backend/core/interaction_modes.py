@@ -72,6 +72,7 @@ def action_blocked_for_interaction_mode(action: object, mode: object) -> str | N
     from backend.ledger.action.mcp import MCPAction
     from backend.ledger.action.memory_tools import CheckpointAction, WorkingMemoryAction
     from backend.ledger.action.terminal import (
+        TerminalCloseAction,
         TerminalInputAction,
         TerminalRunAction,
     )
@@ -98,6 +99,7 @@ def action_blocked_for_interaction_mode(action: object, mode: object) -> str | N
         DelegateTaskAction,
         FileEditAction,
         MCPAction,
+        TerminalCloseAction,
         TerminalInputAction,
         TerminalRunAction,
         WorkingMemoryAction,
