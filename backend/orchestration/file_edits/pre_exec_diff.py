@@ -125,10 +125,24 @@ class PreExecDiffMiddleware(ToolInvocationMiddleware):
         )
         replace_all = getattr(action, 'replace_all', False)
         replace_all = replace_all if isinstance(replace_all, bool) else False
-        match_count = old_content.count(old_match)
+
+        # Count boundary-aware matches (not naive substring count).
+        import re as _re
+        boundary_matches = [
+            m for m in _re.finditer(_re.escape(old_match), old_content)
+            if (m.start() == 0 or not (old_content[m.start()-1].isalnum() or old_content[m.start()-1] == '_'))
+            and (m.end() >= len(old_content) or not (old_content[m.end()].isalnum() or old_content[m.end()] == '_'))
+        ]
+        match_count = len(boundary_matches)
         if match_count == 0 or (match_count > 1 and not replace_all):
             return None
-        return old_content.replace(old_match, new_replacement, -1 if replace_all else 1)
+
+        if replace_all:
+            from backend.execution.utils.file_editor._file_editor_edit_helpers import (
+                _replace_all_with_boundary_check,
+            )
+            return _replace_all_with_boundary_check(old_content, old_match, new_replacement)
+        return old_content.replace(old_match, new_replacement, 1)
 
     def _simulate_range_edit(self, old_content: str, action) -> str | None:
         start = getattr(action, 'start_line', None)

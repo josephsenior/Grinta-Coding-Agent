@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import re
-import traceback
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Self
 
@@ -51,6 +50,47 @@ class CmdOutputMetadata(CmdOutputMetadataSchema):
         return prompt
 
     @classmethod
+    def _preprocess_ps1_json(cls, raw: str) -> str:
+        """Fix common bash-interference issues in PS1 JSON payloads.
+
+        When the shell doesn't fully interpret the PS1 prompt (e.g. in
+        non-interactive mode or when ``echo`` is used), the captured JSON
+        can contain:
+
+        * Literal bash escape sequences (``\\u`` for username, ``\\h`` for
+          hostname, ``\\!`` for history number) that are *not* valid JSON.
+        * Unquoted keys produced by ``json.dumps`` with escaped quotes that
+          bash then strips.
+
+        This method normalises the payload so ``json.loads`` can succeed.
+        """
+        import getpass, os, platform
+
+        text = raw.strip()
+
+        # 1. Expand literal bash PS1 escape sequences to safe placeholders.
+        #    We use actual values when possible so downstream code benefits.
+        _bash_escapes: dict[str, str] = {
+            '\\u': getpass.getuser() if hasattr(getpass, 'getuser') else 'unknown',
+            '\\h': platform.node().split('.')[0] if platform.node() else 'unknown',
+            '\\H': platform.node() or 'unknown',
+            '\\!': '0',
+            '\\#': '0',
+        }
+        for esc, val in _bash_escapes.items():
+            text = text.replace(esc, val)
+
+        # 2. Fix unquoted JSON keys:  { pid: "…", exit_code: "…" }
+        #    Only match bare identifiers before a colon (key positions).
+        text = re.sub(
+            r'(?<=[{,\s])(\w+)\s*:',
+            r'"\1":',
+            text,
+        )
+
+        return text
+
+    @classmethod
     def matches_ps1_metadata(cls, string: str) -> list[re.Match[str]]:
         """Find all PS1 metadata blocks in command output.
 
@@ -63,22 +103,30 @@ class CmdOutputMetadata(CmdOutputMetadataSchema):
         """
         matches = []
         for match in CMD_OUTPUT_METADATA_PS1_REGEX.finditer(string):
+            raw_payload = match.group(1).strip()
             try:
-                json.loads(match.group(1).strip())
+                json.loads(raw_payload)
                 matches.append(match)
             except json.JSONDecodeError:
-                logger.warning(
-                    'Failed to parse PS1 metadata: %s. Skipping.%s',
-                    match.group(1),
-                    traceback.format_exc(),
-                )
-                continue
+                # Try to repair common bash-interference issues.
+                try:
+                    fixed = cls._preprocess_ps1_json(raw_payload)
+                    json.loads(fixed)
+                    # Patch the match object so downstream sees valid JSON.
+                    matches.append(match)
+                except (json.JSONDecodeError, ValueError):
+                    # Truly malformed — skip silently (no warning spam).
+                    continue
         return matches
 
     @classmethod
     def from_ps1_match(cls, match: re.Match[str]) -> Self:
         """Extract the required metadata from a PS1 prompt."""
-        metadata = json.loads(match.group(1))
+        raw = match.group(1).strip()
+        try:
+            metadata = json.loads(raw)
+        except json.JSONDecodeError:
+            metadata = json.loads(cls._preprocess_ps1_json(raw))
         processed = metadata.copy()
         if 'pid' in metadata:
             try:

@@ -256,8 +256,14 @@ _SLASH_COMMANDS = (
     ),
     SlashCommandSpec(
         '/checkpoint',
-        'Save a manual checkpoint of the workspace',
-        '/checkpoint [label]',
+        'Save or restore a workspace checkpoint',
+        '/checkpoint [label | list [--all] | diff <id> | revert <id>]',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/revert',
+        'Restore workspace to a named checkpoint (shortcut for /checkpoint revert)',
+        '/revert <id-prefix>',
         help_section='control',
     ),
     SlashCommandSpec(

@@ -15,6 +15,7 @@ from backend.ledger.action import (
     DelegateTaskAction,
     FileEditAction,
     MCPAction,
+    TerminalCloseAction,
     TerminalInputAction,
     TerminalRunAction,
 )
@@ -43,6 +44,7 @@ class SafetyService:
         FileEditAction,
         TerminalRunAction,
         TerminalInputAction,
+        TerminalCloseAction,
         MCPAction,
         DelegateTaskAction,
         BlackboardAction,

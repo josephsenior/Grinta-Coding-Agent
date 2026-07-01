@@ -177,17 +177,37 @@ class RollbackMiddleware(ToolInvocationMiddleware):
             return
 
         try:
+            action_type = type(ctx.action).__name__
             description = f'auto: before {action_type}'
-            metadata = {
+            metadata: dict = {
                 'action_type': action_type,
                 'session_id': getattr(ctx.state, 'sid', 'unknown'),
             }
-            # Prefer lightweight file-based snapshots (skip git commit noise)
+
+            # Capture the target file for FileEditAction so a future targeted
+            # shadow implementation can copy only that file rather than the
+            # whole workspace.
+            if action_type == 'FileEditAction':
+                target_file = getattr(ctx.action, 'path', None) or getattr(
+                    ctx.action, 'file_path', None
+                )
+                if target_file:
+                    metadata['target_file'] = str(target_file)
+
+            # For shell commands prefer git plumbing snapshots (branch-safe,
+            # fast, deduplicating) over full shutil copies.  For file edits
+            # git is also fine; we keep use_git=False only when git is known
+            # unavailable (handled inside create_checkpoint already).
+            use_git = action_type == 'CmdRunAction'
+
+            # System-generated transaction checkpoints are tier 1 so the CLI
+            # list can hide them from the human operator by default.
             checkpoint_id = manager.create_checkpoint(
                 description=description,
                 checkpoint_type='before_risky',
                 metadata=metadata,
-                use_git=False,
+                use_git=use_git,
+                tier=1,
             )
             ctx.metadata['rollback_checkpoint_id'] = checkpoint_id
             ctx.metadata['rollback_available'] = True

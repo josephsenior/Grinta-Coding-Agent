@@ -39,6 +39,9 @@ class _TUIRendererAdapter:
     def stop_live(self) -> None:
         pass
 
+    def subscribe(self, event_stream: Any, sid: str) -> None:
+        pass
+
     @contextmanager
     def suspend_live(self):
         yield

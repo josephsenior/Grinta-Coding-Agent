@@ -38,6 +38,7 @@ from backend.ledger.action.search import (
     ReadSymbolsAction,
 )
 from backend.ledger.action.terminal import (
+    TerminalCloseAction,
     TerminalInputAction,
     TerminalReadAction,
     TerminalRunAction,
@@ -126,6 +127,8 @@ class RuntimeExecutorProtocol(Protocol):
     async def terminal_input(self, action: TerminalInputAction) -> Observation: ...
 
     async def terminal_read(self, action: TerminalReadAction) -> Observation: ...
+
+    async def terminal_close(self, action: TerminalCloseAction) -> Observation: ...
 
     async def browser_tool(self, action: Any) -> Observation: ...
 

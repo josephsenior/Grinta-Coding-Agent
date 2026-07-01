@@ -16,6 +16,7 @@ from backend.cli.tui.renderer.helpers.terminal import (
     sanitize_terminal_observation_content,
 )
 from backend.ledger.action import (
+    TerminalCloseAction,
     TerminalInputAction,
     TerminalReadAction,
     TerminalRunAction,
@@ -74,6 +75,14 @@ def _handle_terminal_read_action(
     # TerminalReadAction is a streaming trigger — keep the most recent
     # TerminalCard as the active one for output accumulation but don't
     # create a new card for every read pulse.
+    pass
+
+
+def _handle_terminal_close_action(
+    orch: 'RendererEventProcessorMixin', event: TerminalCloseAction
+) -> None:
+    # Close is a lightweight bookkeeping action — no new card, no scrollback
+    # update. The observation will carry the actual state transition.
     pass
 
 

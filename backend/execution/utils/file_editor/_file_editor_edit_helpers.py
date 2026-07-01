@@ -98,6 +98,46 @@ def _validate_replace_string_old_string(old_string: str | None) -> ToolResult | 
     return None
 
 
+def _replace_all_with_boundary_check(
+    content: str, old: str, new: str
+) -> str:
+    """Replace all occurrences of *old* with *new* in *content*.
+
+    Unlike ``str.replace``, this function guards against unintended
+    substring collisions when ``replace_all`` is requested.  For each
+    potential match position it checks that the characters immediately
+    before and after the match are *not* identifier-tail / identifier-head
+    characters respectively.  This prevents ``snap->data`` from also
+    matching inside ``snap->data_size``.
+
+    When the old string is surrounded by non-identifier characters (the
+    common case for full-line or token-level replacements), the check
+    passes and the replacement proceeds as normal.
+    """
+    import re as _re
+
+    result_parts: list[str] = []
+    last_end = 0
+    old_len = len(old)
+
+    for idx in _re.finditer(_re.escape(old), content):
+        start, end = idx.start(), idx.end()
+
+        # Guard: skip matches that are substrings of an identifier.
+        # An "identifier continuation" character is alnum or '_'.
+        if start > 0 and (content[start - 1].isalnum() or content[start - 1] == '_'):
+            continue
+        if end < len(content) and (content[end].isalnum() or content[end] == '_'):
+            continue
+
+        result_parts.append(content[last_end:start])
+        result_parts.append(new)
+        last_end = end
+
+    result_parts.append(content[last_end:])
+    return ''.join(result_parts)
+
+
 def _check_replace_string_preflight(
     self, file_path: Path, new_string: str
 ) -> ToolResult | None:
@@ -192,11 +232,14 @@ def handle_replace_string_impl(
                 metadata={'match_count': match_count},
             )
 
-        new_content = old_content.replace(
-            old_match,
-            new_replacement,
-            -1 if replace_all else 1,
-        )
+        if replace_all:
+            new_content = _replace_all_with_boundary_check(
+                old_content, old_match, new_replacement
+            )
+        else:
+            new_content = old_content.replace(
+                old_match, new_replacement, 1
+            )
         return self._finalize_edit_result(
             file_path,
             old_content,

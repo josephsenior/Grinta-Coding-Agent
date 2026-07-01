@@ -116,6 +116,7 @@ _TIMEOUT_POLICY_BY_ACTION_NAME = {
     'TerminalRunAction': _terminal_run_pending_timeout,
     'TerminalInputAction': _terminal_io_pending_timeout,
     'TerminalReadAction': _terminal_io_pending_timeout,
+    'TerminalCloseAction': _terminal_io_pending_timeout,
     'DebuggerAction': _debugger_pending_timeout,
 }
 
@@ -446,6 +447,7 @@ class PendingActionService:
             'TerminalRunAction',
             'TerminalInputAction',
             'TerminalReadAction',
+            'TerminalCloseAction',
         }:
             try:
                 self._context.close_hung_terminal_sessions()

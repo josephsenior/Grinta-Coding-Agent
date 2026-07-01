@@ -21,6 +21,7 @@ from backend.ledger.action import (
     CmdRunAction,
     DelegateTaskAction,
     FileEditAction,
+    TerminalCloseAction,
     TerminalInputAction,
     TerminalRunAction,
 )
@@ -78,6 +79,8 @@ class AutonomyController:
             return f'terminal-run:{action.cwd or ""}:{action.command}'
         if isinstance(action, TerminalInputAction):
             return f'terminal-input:{action.session_id}:{action.input}'
+        if isinstance(action, TerminalCloseAction):
+            return f'terminal-close:{action.session_id}'
         from backend.ledger.action import FileEditAction
 
         if isinstance(action, FileEditAction):

@@ -54,6 +54,7 @@ from backend.ledger.action.search import (
     ReadSymbolsAction,
 )
 from backend.ledger.action.terminal import (
+    TerminalCloseAction,
     TerminalInputAction,
     TerminalReadAction,
     TerminalRunAction,
@@ -101,6 +102,7 @@ __all__ = [
     'SystemHintAction',
     'SystemMessageAction',
     'TaskTrackingAction',
+    'TerminalCloseAction',
     'TerminalInputAction',
     'TerminalReadAction',
     'TerminalRunAction',

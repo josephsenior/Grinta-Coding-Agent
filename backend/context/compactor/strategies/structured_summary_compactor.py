@@ -1,14 +1,20 @@
-"""Compactor that converts history into structured summaries using template-driven rules."""
+"""Free-prose compactor that converts history into a state summary.
+
+A single unconstrained LLM call produces a rich narrative summary; the model
+allocates its full attention to synthesis instead of schema compliance. A
+minimal deterministic sanity gate (non-empty + substantial length) blocks
+empty / tiny outputs. On any failure the compactor flags itself degraded so
+the pipeline rejects the compaction and never replaces history with emptiness.
+
+Canonical task state is maintained independently by the deterministic
+``reduce_events_into_state`` track; this compactor does not produce a
+canonical patch.
+"""
 
 from __future__ import annotations
 
-import json
 from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel, Field
-
-if TYPE_CHECKING:
-    pass
 from backend.context.compactor.compactor import BaseLLMCompactor, Compaction
 from backend.context.view import View
 from backend.core.logging.logger import app_logger as logger
@@ -20,320 +26,147 @@ if TYPE_CHECKING:
     pass
 
 
-class FileModification(BaseModel):
-    """A file that was created, modified, or deleted."""
+# Default minimum length for an accepted prose summary. Shorter outputs are
+# treated as degraded (model refusal / truncation / empty) so the pipeline
+# falls back to deterministic compaction instead of wiping history.
+DEFAULT_MIN_PROSE_LENGTH = 2000
+# Default number of same-prompt retries when the sanity gate fails. 0 means a
+# short/empty output immediately degrades to the deterministic fallback; the
+# model is otherwise trusted to surface what matters without brittle repair.
+DEFAULT_MAX_REPAIR_ATTEMPTS = 0
+# Maximum summary budget in tokens. Actual budget is
+# min(context_window * 0.05, DEFAULT_SUMMARY_BUDGET_TOKENS).
+DEFAULT_SUMMARY_BUDGET_TOKENS = 12_000
 
-    path: str = Field(description='Absolute file path.')
-    change_type: str = Field(
-        description='One of: "created", "modified", "deleted".',
-    )
-
-
-class FailedCommand(BaseModel):
-    """A command that failed with a non-zero exit code."""
-
-    command: str = Field(description='The exact command that was run.')
-    exact_error: str = Field(description='The exact error message or stderr output.')
-    exit_code: int = Field(description='The non-zero exit code.')
-
-
-class CommandResult(BaseModel):
-    """A command and its outcome."""
-
-    command: str = Field(description='The exact command that was run.')
-    exit_code: int = Field(description='The exit code (0 = success).')
-    output_summary: str = Field(
-        description='First ~200 chars of stdout/stderr output.',
-    )
-
-
-class Dependency(BaseModel):
-    """A dependency or package that was added or modified."""
-
-    name: str = Field(description='Package or module name.')
-    version: str = Field(description='Version string or "latest".')
-
-
-def _strip_title(schema_obj: dict[str, Any]) -> dict[str, Any]:
-    """Remove 'title' keys from a JSON schema object (LLMs don't need them)."""
-    result = {k: v for k, v in schema_obj.items() if k != 'title'}
-    if 'items' in result and isinstance(result['items'], dict):
-        result['items'] = _strip_title(result['items'])
-    if 'properties' in result and isinstance(result['properties'], dict):
-        result['properties'] = {
-            k: _strip_title(v) for k, v in result['properties'].items()
-        }
-    return result
-
-
-class StateSummary(BaseModel):
-    """A structured representation summarizing the state of the agent and the task."""
-
-    original_objective: str = Field(
-        default='',
-        description='The EXACT, VERBATIM original user objective. Do not summarize or dilute it.',
-    )
-    user_context: str = Field(
-        default='',
-        description='Essential user requirements, goals, and clarifications in concise form.',
-    )
-    completed_tasks: str = Field(
-        default='', description='List of tasks completed so far with brief results.'
-    )
-    pending_tasks: str = Field(
-        default='', description='List of tasks that still need to be done.'
-    )
-    latest_user_request: str = Field(
-        default='',
-        description='The most recent explicit user request or correction that is still active.',
-    )
-    files_modified: list[FileModification] = Field(
-        default_factory=list,
-        description='Files created, modified, or deleted. Each entry must have absolute path and change_type.',
-    )
-    test_status: str = Field(
-        default='',
-        description='Overall test status: "passing", "failing (test_name1, test_name2)", "not_written", or "unknown". Include failing test names in parentheses.',
-    )
-    error_messages: list[FailedCommand] = Field(
-        default_factory=list,
-        description='Commands that failed. Each entry must have command, exact_error, and exit_code.',
-    )
-    exact_commands_and_results: list[CommandResult] = Field(
-        default_factory=list,
-        description='Important commands and their outcomes. Each entry must have command, exit_code, and output_summary.',
-    )
-    known_failures_or_avoid: str = Field(
-        default='',
-        description='Specific failed approaches, user rejected approaches, and constraints that must not be repeated.',
-    )
-    vcs_status: str = Field(
-        default='',
-        description='Version control status: e.g. "branch=fix-auth, commits=true, pr=open" or "none".',
-    )
-    dependencies: list[Dependency] = Field(
-        default_factory=list,
-        description='Dependencies added or modified. Each entry must have name and version.',
-    )
-    other_relevant_context: str = Field(
-        default='',
-        description="Any other important information that doesn't fit into the categories above.",
-    )
-    canonical_active_plan: str = Field(
-        default='',
-        description='Canonical-state patch: concise active plan that remains valid after compaction.',
-    )
-    canonical_next_action: str = Field(
-        default='',
-        description='Canonical-state patch: exact next action the agent should take after compaction.',
-    )
-    canonical_blockers: str = Field(
-        default='',
-        description='Canonical-state patch: newline-separated unresolved blockers only; omit stale blockers.',
-    )
-    canonical_decisions: str = Field(
-        default='',
-        description='Canonical-state patch: newline-separated durable decisions that affect future work.',
-    )
-    canonical_invalidated_assumptions: str = Field(
-        default='',
-        description='Canonical-state patch: newline-separated assumptions proven false or rejected by the user.',
-    )
-    canonical_active_files: str = Field(
-        default='',
-        description='Canonical-state patch: newline-separated file paths still relevant to the task.',
-    )
-    narrative_summary: str = Field(
-        default='',
-        description='Short narrative covering the FULL session arc: what was built/created, recent changes, and what remains. Must preserve "from scratch"/"created" framing from previous summaries.',
-    )
-
-    @classmethod
-    def tool_description(cls) -> dict[str, Any]:
-        """Description of a tool whose arguments are the fields of this class.
-
-        Can be given to an LLM to force structured generation.
-        Uses Pydantic's JSON schema generation for correct nested model schemas.
-        """
-        schema = cls.model_json_schema()
-        # Strip top-level metadata that OpenAI/function-calling APIs reject.
-        defs = schema.get('$defs', schema.get('definitions', {}))
-        props = schema.get('properties', {})
-
-        # Strip 'title' keys from properties and nested defs (LLMs don't need them).
-        cleaned_props: dict[str, Any] = {}
-        for name, prop in props.items():
-            cleaned_props[name] = _strip_title(prop)
-        cleaned_defs: dict[str, Any] = {}
-        for name, defn in defs.items():
-            cleaned_defs[name] = _strip_title(defn)
-
-        result: dict[str, Any] = {
-            'type': 'function',
-            'function': {
-                'name': 'create_state_summary',
-                'description': (
-                    'Creates a comprehensive summary of the current state of the '
-                    'interaction to preserve context when history grows too large. '
-                    'You must include non-empty values for original_objective, '
-                    'user_context, completed_tasks, and pending_tasks. '
-                    'For files_modified, error_messages, exact_commands_and_results, '
-                    'and dependencies you MUST return structured arrays with the '
-                    'exact field names specified in the schema — do NOT write '
-                    'free-text summaries for these fields.'
-                ),
-                'parameters': {
-                    'type': 'object',
-                    'properties': cleaned_props,
-                    'required': [
-                        'original_objective',
-                        'user_context',
-                        'completed_tasks',
-                        'pending_tasks',
-                    ],
-                },
-            },
-        }
-        if cleaned_defs:
-            result['function']['parameters']['definitions'] = cleaned_defs
-        return result
-
-    def __str__(self) -> str:
-        """Format the state summary in a compact way, skipping empty fields."""
-        sections: list[str] = []
-
-        core_lines = [
-            f'**Original Objective**: {self.original_objective}',
-            f'**User Context**: {self.user_context}',
-            f'**Completed Tasks**: {self.completed_tasks}',
-            f'**Pending Tasks**: {self.pending_tasks}',
-        ]
-        if self.latest_user_request:
-            core_lines.append(f'**Latest User Request**: {self.latest_user_request}')
-        sections.append('\n'.join(['# State Summary', '## Core Information'] + core_lines))
-
-        code_lines: list[str] = []
-        if self.files_modified:
-            files_str = '\n'.join(
-                f'  - {fm.path} ({fm.change_type})' for fm in self.files_modified
-            )
-            code_lines.append(f'**Files Modified**:\n{files_str}')
-        if self.dependencies:
-            deps_str = '\n'.join(f'  - {dep.name}@{dep.version}' for dep in self.dependencies)
-            code_lines.append(f'**Dependencies**:\n{deps_str}')
-        if code_lines:
-            sections.append('\n'.join(['## Code Changes'] + code_lines))
-
-        test_lines: list[str] = []
-        if self.test_status:
-            test_lines.append(f'**Test Status**: {self.test_status}')
-        if self.error_messages:
-            errors_str = '\n'.join(
-                f'  - {fc.command}: {fc.exact_error} (exit={fc.exit_code})'
-                for fc in self.error_messages
-            )
-            test_lines.append(f'**Error Messages**:\n{errors_str}')
-        if self.exact_commands_and_results:
-            commands_str = '\n'.join(
-                f'  - {cr.command} -> exit={cr.exit_code}: {cr.output_summary}'
-                for cr in self.exact_commands_and_results
-            )
-            test_lines.append(f'**Exact Commands And Results**:\n{commands_str}')
-        if self.known_failures_or_avoid:
-            test_lines.append(f'**Known Failures Or Avoid**: {self.known_failures_or_avoid}')
-        if test_lines:
-            sections.append('\n'.join(['## Testing & Errors'] + test_lines))
-
-        if self.vcs_status:
-            sections.append(f'## Version Control\n**VCS Status**: {self.vcs_status}')
-
-        if self.other_relevant_context:
-            sections.append(f'## Additional Context\n**Other Relevant Context**: {self.other_relevant_context}')
-
-        patch_lines: list[str] = []
-        if self.canonical_active_plan:
-            patch_lines.append(f'**Active Plan**: {self.canonical_active_plan}')
-        if self.canonical_next_action:
-            patch_lines.append(f'**Next Action**: {self.canonical_next_action}')
-        if self.canonical_blockers:
-            patch_lines.append(f'**Blockers**: {self.canonical_blockers}')
-        if self.canonical_decisions:
-            patch_lines.append(f'**Decisions**: {self.canonical_decisions}')
-        if self.canonical_invalidated_assumptions:
-            patch_lines.append(f'**Invalidated Assumptions**: {self.canonical_invalidated_assumptions}')
-        if self.canonical_active_files:
-            patch_lines.append(f'**Active Files**: {self.canonical_active_files}')
-        if self.narrative_summary:
-            patch_lines.append(f'**Narrative Summary**: {self.narrative_summary}')
-        if patch_lines:
-            sections.append('\n'.join(['## Canonical State Patch'] + patch_lines))
-
-        return '\n\n'.join(sections) if sections else '# State Summary\n(empty)'
-
-    def canonical_patch(self) -> dict[str, Any]:
-        """Return the low-authority canonical-state enrichment patch."""
-        narrative = self.narrative_summary or '\n'.join(
-            part
-            for part in (
-                self.user_context,
-                self.completed_tasks,
-                self.pending_tasks,
-                self.other_relevant_context,
-            )
-            if part
-        )
-        return {
-            'active_plan': self.canonical_active_plan or self.pending_tasks,
-            'next_action': self.canonical_next_action
-            or (self.pending_tasks.split('\n')[0] if self.pending_tasks else ''),
-            'blockers': self.canonical_blockers or self.known_failures_or_avoid,
-            'decisions': self.canonical_decisions,
-            'invalidated_assumptions': self.canonical_invalidated_assumptions,
-            'active_files': self.canonical_active_files
-            or '\n'.join(fm.path for fm in self.files_modified),
-            'narrative_summary': narrative[:1200],
-            'completed_tasks': self.completed_tasks[:1200] if self.completed_tasks else '',
-            'vcs_status': self.vcs_status or '',
-        }
+# Nudge appended on a retry when the previous output was too short.
+_REPAIR_NUDGE = (
+    '\n\nYour previous summary was too short to preserve the session context. '
+    'Produce a complete compaction covering the full arc: the emerged objective, '
+    'what was accomplished, decisions and their rationale, current blockers, '
+    'remaining work, and failed approaches to avoid. Be precise and complete.'
+)
 
 
 class StructuredSummaryCompactor(BaseLLMCompactor):
-    """A compactor that summarizes pruned events into structured summaries.
+    """Free-prose compactor with a deterministic sanity gate.
 
-    Maintains a condensed history and prunes old events when it grows too large.
-    Uses structured generation via function-calling to produce summaries that
-    replace pruned events.
+    Maintains a condensed history and prunes old events when it grows too
+    large. Produces a single unconstrained prose summary; canonical task state
+    is maintained separately by the deterministic canonical-state track.
     """
 
+    def __init__(
+        self,
+        llm: Any,
+        max_size: int = 100,
+        keep_first: int = 1,
+        max_event_length: int = 10000,
+        *,
+        min_prose_length: int = DEFAULT_MIN_PROSE_LENGTH,
+        max_repair_attempts: int = DEFAULT_MAX_REPAIR_ATTEMPTS,
+    ) -> None:
+        """Initialize the prose compactor.
+
+        Args:
+            llm: Language model instance for generating the summary.
+            max_size: Maximum number of events before condensation is triggered.
+            keep_first: Number of initial events to always preserve.
+            max_event_length: Maximum character length for individual event content.
+            min_prose_length: Minimum character length for an accepted prose summary.
+            max_repair_attempts: Same-prompt retries when the sanity gate fails.
+        """
+        super().__init__(
+            llm=llm,
+            max_size=max_size,
+            keep_first=keep_first,
+            max_event_length=max_event_length,
+        )
+        self.min_prose_length = min_prose_length
+        self.max_repair_attempts = max_repair_attempts
+
     def _validate_llm(self) -> None:
-        """Validate that the LLM supports function calling."""
-        if self.llm and not self.llm.is_function_calling_active():
-            msg = 'LLM must support function calling to use StructuredSummaryCompactor'
-            raise ValueError(msg)
+        """No function-calling requirement: prose compaction uses plain completion."""
+
+    def _get_summary_char_limit(self) -> int:
+        """Calculate the char limit for the prose summary.
+
+        Uses ``min(context_window * 0.05, 12 000 tokens)`` converted to
+        characters (~4 chars/token). Falls back to the full 12 000 token cap
+        when the LLM context window is unknown.
+        """
+        tokens = DEFAULT_SUMMARY_BUDGET_TOKENS
+        try:
+            if self.llm is not None and hasattr(self.llm, 'config'):
+                max_input = getattr(self.llm.config, 'max_input_tokens', None)
+                if isinstance(max_input, int) and max_input > 0:
+                    tokens = min(int(max_input * 0.05), DEFAULT_SUMMARY_BUDGET_TOKENS)
+        except Exception:
+            pass
+        return tokens * 4
+
+    @staticmethod
+    def _get_extra_config_args(config: Any) -> dict[str, Any]:
+        """Pass prose-specific config through to the constructor."""
+        extra_args: dict[str, Any] = {}
+        if hasattr(config, 'max_event_length'):
+            extra_args['max_event_length'] = config.max_event_length
+        if hasattr(config, 'min_prose_length'):
+            extra_args['min_prose_length'] = config.min_prose_length
+        if hasattr(config, 'max_repair_attempts'):
+            extra_args['max_repair_attempts'] = config.max_repair_attempts
+        return extra_args
 
     async def get_compaction(self, view: View) -> Compaction:
         """Generate condensation from view by summarizing pruned events.
 
-        If the LLM call fails (network, rate-limit, provider outage), fall
-        back to a non-LLM degraded summary so the agent can keep running
-        instead of hard-stalling on context pressure.
+        If the LLM call fails (network, rate-limit, provider outage) or the
+        produced prose fails the sanity gate after any retries, the compactor
+        falls back to a non-LLM degraded summary and flags itself degraded so
+        the pipeline rejects the compaction instead of hard-stalling or wiping
+        context.
         """
-        # Prepare view sections
         _head, pruned_events, summary_event = self._prepare_view_sections(view)
         if not pruned_events:
             return self._create_compaction_result(pruned_events, '')
 
-        # Build prompt for LLM
-        prompt = self._build_condensation_prompt(summary_event, pruned_events)
+        prompt = self._build_condensation_prompt(
+            summary_event, pruned_events, char_limit=self._get_summary_char_limit()
+        )
 
-        self.last_state_patch: dict[str, Any] = {}
         self.last_degraded = False
 
-        # Get summary from LLM, with degraded fallback
         try:
-            summary = await self._get_llm_summary(prompt)
-            self.last_state_patch = summary.canonical_patch()
-            summary_text = str(summary)
+            prose = await self._get_llm_prose_summary(prompt)
+            attempts = 0
+            while (
+                not self._passes_prose_sanity_gate(prose)
+                and attempts < self.max_repair_attempts
+            ):
+                attempts += 1
+                logger.info(
+                    'Condensation prose sanity gate failed (len=%d < %d); '
+                    'retry %d/%d',
+                    len(prose),
+                    self.min_prose_length,
+                    attempts,
+                    self.max_repair_attempts,
+                )
+                prose = await self._get_llm_prose_summary(prompt, nudge=True)
+
+            if self._passes_prose_sanity_gate(prose):
+                summary_text = prose
+            else:
+                self.last_degraded = True
+                logger.warning(
+                    'Condensation prose sanity gate failed after %d retry(es); '
+                    'falling back to degraded summary so history is not wiped.',
+                    attempts,
+                )
+                summary_text = self._degraded_summary(
+                    summary_event,
+                    pruned_events,
+                    ValueError('prose sanity gate failed'),
+                )
         except Exception as e:
             self.last_degraded = True
             logger.warning(
@@ -344,8 +177,62 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             )
             summary_text = self._degraded_summary(summary_event, pruned_events, e)
 
-        # Create compaction result
         return self._create_compaction_result(pruned_events, summary_text)
+
+    def _passes_prose_sanity_gate(self, prose: str) -> bool:
+        """Return True when the prose is non-empty and substantial enough.
+
+        Intentionally relaxed: no refusal/error regex (a model refusal is too
+        short to pass the length floor anyway) and no anchor recall. The model
+        is trusted to surface what matters; the gate only guards against the
+        silent empty-output failure mode.
+        """
+        if not prose:
+            return False
+        return len(prose.strip()) >= self.min_prose_length
+
+    async def _get_llm_prose_summary(self, prompt: str, *, nudge: bool = False) -> str:
+        """Get a free-prose summary from the LLM (no tools, no schema)."""
+        assert self.llm is not None, 'LLM required for prose compactor'
+        messages = [
+            Message(
+                role='user',
+                content=[TextContent(text=prompt + (_REPAIR_NUDGE if nudge else ''))],
+            )
+        ]
+        response = await self.llm.acompletion(
+            messages=self.llm.format_messages_for_llm(messages),
+        )
+        self._add_response_metadata(response)
+        return self._extract_prose_content(response)
+
+    def _extract_prose_content(self, response: Any) -> str:
+        """Extract the prose text from an LLM completion response."""
+        try:
+            choices = getattr(response, 'choices', None)
+            if not choices:
+                return ''
+            message = choices[0].message
+            content = getattr(message, 'content', None)
+            if isinstance(content, str):
+                return content
+            # Some providers return a list of content blocks; join text parts.
+            if isinstance(content, list):
+                parts: list[str] = []
+                for block in content:
+                    if isinstance(block, str):
+                        parts.append(block)
+                        continue
+                    text = getattr(block, 'text', None)
+                    if isinstance(text, str):
+                        parts.append(text)
+                return '\n'.join(parts)
+            return ''
+        except (AttributeError, IndexError, TypeError) as e:
+            logger.warning(
+                'Failed to extract prose content from LLM response: %s', e
+            )
+            return ''
 
     def _degraded_summary(
         self,
@@ -530,56 +417,80 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         return '\n'.join(lines) if lines else '(no events)'
 
     def _build_condensation_prompt(
-        self, summary_event: AgentCondensationObservation, pruned_events: list
+        self, summary_event: AgentCondensationObservation, pruned_events: list,
+        *, char_limit: int = 48000,
     ) -> str:
         """Build the prompt for LLM condensation.
 
         Events are pre-digested into a compact type-grouped summary to reduce
         prompt size and recency bias. The last few raw events are included
-        for detailed context.
+        for detailed context. The prompt enforces a priority-ordered structure
+        with a hard character budget.
         """
         base_prompt = (
-            'You are maintaining a context-aware state summary for an interactive software agent. This summary is critical because it:\n'
-            '1. Preserves essential context when conversation history grows too large\n'
-            '2. Prevents lost work when the session length exceeds token limits\n'
-            '3. Helps maintain continuity across multiple interactions\n\n'
-            'CRITICAL: You MUST strictly enforce that the *original user objective* is always preserved verbatim at the very top of every compressed state summary. Never allow the core goal to be lost or diluted.\n\n'
-            'Your tool output has two layers:\n'
-            '- Regular narrative fields for human-readable continuity.\n'
-            '- canonical_* fields that form a compact canonical-state patch. These must contain only current, still-valid facts. Do not repeat stale failed approaches, old test statuses, or generic "resuming task" boilerplate.\n\n'
+            'You are maintaining the state summary of an interactive software '
+            'agent. This summary is critical: it lets the agent resume work '
+            'WITHOUT re-reading the full conversation history once it has been '
+            'compacted for length.\n\n'
             'You will be given:\n'
-            '- An EVENT DIGEST: a compact grouped summary of what happened (files created/edited, commands run, errors, etc.)\n'
-            '- The last few RAW EVENTS for detailed context\n'
-            '- The most recent previous summary (if one exists)\n\n'
-            'Capture all relevant information, especially:\n'
-            '- The verbatim original user objective (this is non-negotiable)\n'
-            '- User requirements that were explicitly stated\n'
-            '- The latest user correction/request if it changed the task direction\n'
-            '- Work that has been completed — use the EVENT DIGEST to see the full picture (e.g. how many files were created)\n'
-            '- Tasks that remain pending\n'
-            '- The immediate next step the agent should take after compaction\n'
-            '- Exact file paths, commands, test names, failing assertions, and provider errors\n'
-            '- Explicit approaches the user rejected or asked not to repeat\n'
-            '- Current state of code, variables, and data structures\n'
-            '- The status of any version control operations\n\n'
-            'STRUCTURED FIELDS — you MUST return these as typed arrays, not free text:\n'
-            '- files_modified: list of {path, change_type} objects with absolute paths\n'
-            '- error_messages: list of {command, exact_error, exit_code} objects\n'
-            '- exact_commands_and_results: list of {command, exit_code, output_summary} objects\n'
-            '- dependencies: list of {name, version} objects\n\n'
-            'For test_status, use "passing", "failing (test_names)", "not_written", or "unknown".\n'
-            'For vcs_status, use a compact string like "branch=fix-auth, commits=true, pr=open" or "none".\n'
-            'For canonical_next_action, write one concrete next action. For canonical_active_files, include only paths still relevant to upcoming work. For canonical_blockers, include only unresolved blockers.\n\n'
-            'NARRATIVE_SUMMARY — CRITICAL:\n'
-            '- The narrative_summary MUST describe the FULL session arc, not just recent events.\n'
-            '- If a <PREVIOUS SUMMARY> exists, you MUST PRESERVE its key narrative — especially\n'
-            '  what was originally built/created in this session.\n'
-            '- Structure: start with what was built/created, then recent changes/fixes, then\n'
-            '  what remains. Example: "Built X from scratch (N files created). Fixed Y.\n'
-            '  Remaining: Z."\n'
-            '- Do NOT replace the narrative with only recent bug fixes or incremental work.\n'
-            '- If the previous summary says "Built from scratch" or "Created N files", those\n'
-            '  facts MUST appear in your narrative_summary.\n\n'
+            '- <PREVIOUS SUMMARY>: the prior compaction summary (preserve its '
+            'narrative arc)\n'
+            '- <EVENT DIGEST>: a compact grouped breakdown of what happened '
+            '(files created/edited, commands run, errors, user messages)\n'
+            '- <RECENT RAW EVENTS>: the last few raw events for detailed '
+            'context\n\n'
+            '### BUDGET CONSTRAINT\n'
+            f'Your entire response MUST not exceed {char_limit} characters.\n'
+            'To stay under this hard cap, use tight, hyper-dense Markdown '
+            'structures (bullet points, key-value pairs, tables). Avoid '
+            'conversational filler, narrative prose, or meta-commentary (e.g., '
+            'do not say "In this session, the agent...").\n\n'
+            'If you are running close to the character limit, compress '
+            'lower-priority sections into dense, single-line bullets. Never '
+            'truncate or drop higher-priority sections.\n\n'
+            '### PRIORITY ORDER & STRUCTURE\n'
+            'Format your response using the following headers in this exact '
+            'order. If budget runs tight, compress from the bottom up:\n\n'
+            '1. ## UNRESOLVED & BLOCKING (Highest Priority)\n'
+            'What is currently blocking, failing, untested, or incomplete. '
+            'Preserve this verbatim. Never paraphrase, never compress, never '
+            'drop. If a test was skipped, say exactly why. If a spec '
+            'requirement was not met, say exactly which one and what the gap '
+            'is. Flag any spec requirement that could not be verified on this '
+            'platform, or any test that is structural rather than behavioral, '
+            'with [UNVERIFIED] so the resuming agent knows to treat it as '
+            'unproven.\n\n'
+            '2. ## NEXT STEPS\n'
+            'What remains to do, with concrete immediate action items for the '
+            'resuming agent.\n\n'
+            '3. ## FAILED APPROACHES\n'
+            'What was already tried and did not work, including the exact '
+            'error or side effect, so it is not retried.\n\n'
+            '4. ## ACCOMPLISHED & ARCHITECTURE\n'
+            'What was concretely built, fixed, or created across the entire '
+            'session. Preserve the overarching historical narrative arc from '
+            '<PREVIOUS SUMMARY> so early architectural changes are not wiped '
+            'out by recent incremental bug fixes.\n\n'
+            '5. ## DECISIONS & RATIONALE (Lowest Priority)\n'
+            'Key technical choices made and WHY (the rationale, constraints, '
+            'or trade-offs, not just the outcome).\n\n'
+            '### ADHERENCE TO DETAIL\n'
+            '- Preserve VERBATIM: exact file paths, test names, exact error '
+            'messages, function signatures, key variable/data values, and '
+            'precise technical specifications stated by the user.\n'
+            '- If the objective contains specific constraints (e.g., "must run '
+            'under X ms", "do not modify Y", "use Z"), reproduce them '
+            'faithfully. Never dilute technical constraints into vague '
+            'paraphrase.\n'
+            '- Never mark a test as passing if it only checks file existence '
+            'or symbol presence in a header. A test passes only if it '
+            'executes the actual behavior the spec requires and produces a '
+            'verified behavioral result.\n'
+            '- If a previous summary exists, you MUST preserve its key '
+            'narrative. Do not replace the full arc with only recent bug '
+            'fixes or incremental work.\n\n'
+            'Summarize the session now, ensuring a fresh agent can seamlessly '
+            'resume work using only this state.\n'
         )
 
         # Add previous summary
@@ -604,61 +515,6 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
 
         return base_prompt
 
-    async def _get_llm_summary(self, prompt: str) -> StateSummary:
-        """Get summary from LLM using tool calling."""
-        assert self.llm is not None, 'LLM required for structured summary compactor'
-        messages = [Message(role='user', content=[TextContent(text=prompt)])]
-
-        response = await self.llm.acompletion(
-            messages=self.llm.format_messages_for_llm(messages),
-            tools=[StateSummary.tool_description()],
-            tool_choice={
-                'type': 'function',
-                'function': {'name': 'create_state_summary'},
-            },
-        )
-
-        # Parse response
-        summary = self._parse_llm_response(response)
-
-        # Add metadata
-        self._add_response_metadata(response)
-
-        return summary
-
-    def _parse_llm_response(self, response) -> StateSummary:
-        """Parse LLM response to extract StateSummary."""
-        try:
-            choices = getattr(response, 'choices', None)
-            if not choices or len(choices) == 0:
-                raise ValueError('LLM response has no choices')
-            message = choices[0].message
-            if not hasattr(message, 'tool_calls') or not message.tool_calls:
-                msg = 'No tool calls found in response'
-                raise ValueError(msg)
-
-            summary_tool_call = next(
-                (
-                    tool_call
-                    for tool_call in message.tool_calls
-                    if tool_call.function.name == 'create_state_summary'
-                ),
-                None,
-            )
-            if not summary_tool_call:
-                msg = 'create_state_summary tool call not found'
-                raise ValueError(msg)
-
-            args_json = summary_tool_call.function.arguments
-            args_dict = json.loads(args_json)
-            return StateSummary.model_validate(args_dict)
-
-        except (ValueError, AttributeError, KeyError, json.JSONDecodeError) as e:
-            logger.warning(
-                'Failed to parse summary tool call: %s. Using empty summary.', e
-            )
-            return StateSummary()
-
 
 # Lazy registration to avoid circular imports
 def _register_config():
@@ -667,16 +523,6 @@ def _register_config():
     Defers import of StructuredSummaryCompactorConfig to avoid circular dependency between
     compactor implementations and their configuration classes. Called at module load time
     to enable from_config() factory method to instantiate compactors from config objects.
-
-    Side Effects:
-        - Imports StructuredSummaryCompactorConfig from backend.core.config.compactor_config
-        - Registers config class with StructuredSummaryCompactor.register_config() factory
-
-    Notes:
-        - Must be called at module level after StructuredSummaryCompactor class definition
-        - Pattern reused across all compactor implementations
-        - Avoids import-time circular dependency that would occur if config imported at top level
-
     """
     from backend.core.config.compactor_config import StructuredSummaryCompactorConfig
 

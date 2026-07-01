@@ -574,7 +574,9 @@ class _CompactionEngine:
                         'falling back to deterministic compaction'
                     )
                     return None
-                self._apply_structured_compactor_patch(compactor, state, events)
+                # Canonical task state is maintained deterministically by
+                # reduce_events_into_state (pipeline.py); the prose compactor
+                # no longer produces a canonical patch.
                 return action
             logger.info(
                 'ContextPipeline: 5b produced no summary (pruned=%d events=%d max_size=%d)',
@@ -688,29 +690,3 @@ class _CompactionEngine:
         )
         compactor.max_size = min(compactor.max_size, event_count)
         compactor.keep_first = 0
-
-    @staticmethod
-    def _apply_structured_compactor_patch(
-        compactor: object,
-        state: State,
-        events: list[Event],
-    ) -> None:
-        patch = getattr(compactor, 'last_state_patch', None)
-        if not isinstance(patch, dict) or not patch:
-            return
-        from backend.context.canonical_state import (
-            apply_canonical_patch,
-            load_canonical_state,
-            save_canonical_state,
-        )
-        from backend.context.context_pipeline.helpers import _latest_event_id
-
-        latest_id = _latest_event_id(events)
-        try:
-            canonical = load_canonical_state(state=state)
-            canonical = apply_canonical_patch(
-                canonical, patch, event_id=latest_id, source='structured_compactor'
-            )
-            save_canonical_state(canonical, state=state)
-        except Exception:
-            logger.debug('Structured compactor canonical patch failed', exc_info=True)

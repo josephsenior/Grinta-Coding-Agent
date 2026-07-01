@@ -39,6 +39,9 @@ class Checkpoint:
     metadata: dict[str, Any] = field(default_factory=dict)
     git_commit_sha: str | None = None
     file_snapshots: dict[str, str] = field(default_factory=dict)  # path -> content hash
+    # Tier distinguishes user-visible checkpoints (tier=2, 'manual') from
+    # system-generated transaction snapshots (tier=1, 'before_risky' etc.).
+    tier: int = 2
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
@@ -46,8 +49,9 @@ class Checkpoint:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Checkpoint:
-        """Create from dictionary."""
-        return cls(**data)
+        """Create from dictionary, tolerating old manifests without 'tier'."""
+        known = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]
+        return cls(**{k: v for k, v in data.items() if k in known})
 
 
 class RollbackManager:
@@ -191,55 +195,104 @@ class RollbackManager:
         return f'cp_{int(time.time() * 1000)}_{os.urandom(4).hex()}'
 
     def _create_git_snapshot(self) -> str | None:
-        """Create a git commit snapshot and return the SHA.
+        """Create a detached git commit object without touching HEAD or the branch.
+
+        Uses git plumbing commands (``read-tree`` → ``write-tree`` →
+        ``commit-tree``) with a *temporary* index file so that the user's
+        working index and active branch are never modified.  The resulting
+        commit SHA is stored in the checkpoint manifest and used for
+        non-destructive restoration via ``git checkout <sha> -- .``.
 
         Returns:
-            Git commit SHA if successful, None otherwise
+            Git commit SHA if successful, None otherwise.
 
         """
         if not self.vcs_available:
             return None
 
+        tmp_index = self.workspace_path / '.git' / 'grinta_snapshot_index'
+        env = {**os.environ, 'GIT_INDEX_FILE': str(tmp_index)}
+
         try:
-            # Create a temporary commit
+            # 1. Seed a fresh temp index from HEAD so we only diff changes.
+            subprocess.run(
+                ['git', 'read-tree', 'HEAD'],
+                check=False,
+                cwd=self.workspace_path,
+                capture_output=True,
+                env=env,
+                timeout=15,
+            )
+
+            # 2. Stage all current changes into the temp index.
             subprocess.run(
                 ['git', 'add', '-A'],
                 check=False,
                 cwd=self.workspace_path,
                 capture_output=True,
+                env=env,
                 timeout=30,
             )
 
-            result = subprocess.run(
+            # 3. Write a tree object from the temp index.
+            tree_result = subprocess.run(
+                ['git', 'write-tree'],
+                check=False,
+                cwd=self.workspace_path,
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=30,
+            )
+            if tree_result.returncode != 0:
+                logger.warning('git write-tree failed: %s', tree_result.stderr)
+                return None
+            tree_sha = tree_result.stdout.strip()
+
+            # 4. Resolve current HEAD SHA to use as parent (may be absent on
+            #    empty repositories — commit-tree handles no -p gracefully).
+            head_result = subprocess.run(
+                ['git', 'rev-parse', '--verify', 'HEAD'],
+                check=False,
+                cwd=self.workspace_path,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            parent_args = ['-p', head_result.stdout.strip()] if head_result.returncode == 0 else []
+
+            # 5. Create a detached commit object — HEAD is NOT updated.
+            commit_result = subprocess.run(
                 [
-                    'git',
-                    'commit',
-                    '-m',
-                    '[Grinta Checkpoint] Auto-snapshot',
-                    '--allow-empty',
+                    'git', 'commit-tree', tree_sha,
+                    *parent_args,
+                    '-m', '[Grinta Snapshot] detached auto-checkpoint',
                 ],
                 check=False,
                 cwd=self.workspace_path,
                 capture_output=True,
                 text=True,
-                timeout=30,
+                timeout=15,
             )
+            if commit_result.returncode != 0:
+                logger.warning('git commit-tree failed: %s', commit_result.stderr)
+                return None
 
-            if result.returncode == 0:
-                # Get the commit SHA
-                sha_result = subprocess.run(
-                    ['git', 'rev-parse', 'HEAD'],
-                    check=False,
-                    cwd=self.workspace_path,
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                )
-                return sha_result.stdout.strip() if sha_result.returncode == 0 else None
+            commit_sha = commit_result.stdout.strip()
+            logger.debug('Detached git snapshot created: %s', commit_sha)
+            return commit_sha
+
         except Exception as e:
-            logger.warning('Failed to create git snapshot: %s', e)
+            logger.warning('Failed to create detached git snapshot: %s', e)
+            return None
 
-        return None
+        finally:
+            # Always clean up the temp index to avoid leaving stale files.
+            try:
+                if tmp_index.exists():
+                    tmp_index.unlink()
+            except OSError:
+                pass
 
     def _create_file_snapshot(self, checkpoint_id: str) -> dict[str, str]:
         """Create file-level snapshots for the checkpoint.
@@ -269,6 +322,7 @@ class RollbackManager:
         checkpoint_type: str = 'manual',
         metadata: dict[str, Any] | None = None,
         use_git: bool = True,
+        tier: int = 2,
     ) -> str:
         """Create a new checkpoint.
 
@@ -277,6 +331,8 @@ class RollbackManager:
             checkpoint_type: Type of checkpoint ('auto', 'manual', 'before_risky')
             metadata: Additional metadata to store
             use_git: Whether to use git for snapshot (if available)
+            tier: Visibility tier. 2 = user-visible manual snapshot (default).
+                  1 = system transaction (hidden from /checkpoint list by default).
 
         Returns:
             Checkpoint ID
@@ -297,11 +353,17 @@ class RollbackManager:
             git_commit_sha = self._create_git_snapshot()
 
         # Phase-boundary and drvfs workspaces: skip full file snapshots (slow on WSL /mnt/c).
+        # Tier-1 system transactions also skip file snapshots when git plumbing succeeded —
+        # the detached commit already contains the full workspace state, so duplicating
+        # it via shutil would be pure write amplification.
         from backend.core.wsl import is_windows_mount
 
-        if checkpoint_type == 'phase_boundary' or is_windows_mount(
-            self.workspace_path
-        ):
+        skip_file_snapshot = (
+            checkpoint_type == 'phase_boundary'
+            or is_windows_mount(self.workspace_path)
+            or (tier == 1 and git_commit_sha is not None)
+        )
+        if skip_file_snapshot:
             file_snapshots: dict[str, str] = {}
         else:
             file_snapshots = self._create_file_snapshot(checkpoint_id)
@@ -316,6 +378,7 @@ class RollbackManager:
             metadata=metadata or {},
             git_commit_sha=git_commit_sha,
             file_snapshots=file_snapshots,
+            tier=tier,
         )
 
         # Add to list
@@ -380,7 +443,12 @@ class RollbackManager:
         return checkpoint
 
     def _try_git_rollback(self, checkpoint: Checkpoint) -> bool:
-        """Attempt to rollback using git reset.
+        """Restore workspace files from a detached snapshot commit.
+
+        Uses ``git checkout <sha> -- .`` which overwrites tracked files in the
+        working directory without moving HEAD or altering the active branch.
+        This is safe by default and does NOT require
+        ``allow_destructive_git_rollback``.
 
         Args:
             checkpoint: Checkpoint containing git commit SHA
@@ -391,27 +459,23 @@ class RollbackManager:
         """
         if not (checkpoint.git_commit_sha and self.vcs_available):
             return False
-        if not self.allow_destructive_git_rollback:
-            logger.warning(
-                'Skipping git rollback for checkpoint %s because '
-                'allow_destructive_git_rollback is disabled',
-                checkpoint.id,
-            )
-            return False
 
         result = subprocess.run(
-            ['git', 'reset', '--hard', checkpoint.git_commit_sha],
+            ['git', 'checkout', checkpoint.git_commit_sha, '--', '.'],
             check=False,
             cwd=self.workspace_path,
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=60,
         )
 
         if result.returncode == 0:
-            logger.info('Git rollback successful to %s', checkpoint.git_commit_sha)
+            logger.info(
+                'Non-destructive git restore successful from detached commit %s',
+                checkpoint.git_commit_sha,
+            )
             return True
-        logger.warning('Git rollback failed: %s', result.stderr)
+        logger.warning('git checkout restore failed: %s', result.stderr)
         return False
 
     def _try_file_based_rollback(self, checkpoint_id: str) -> bool:
@@ -591,13 +655,26 @@ class RollbackManager:
                 dest_path.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(file_path, dest_path)
 
-    def list_checkpoints(self) -> list[dict[str, Any]]:
-        """List all available checkpoints.
+    def list_checkpoints(
+        self,
+        *,
+        tier: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """List available checkpoints, optionally filtered by tier.
+
+        Args:
+            tier: If provided, only return checkpoints at this tier level.
+                  Tier 1 = system transactions (before_risky etc.).
+                  Tier 2 = user-visible manual snapshots (default shown in CLI).
+                  ``None`` returns all tiers.
 
         Returns:
             List of checkpoint information dictionaries
 
         """
+        checkpoints = self.checkpoints
+        if tier is not None:
+            checkpoints = [cp for cp in checkpoints if cp.tier == tier]
         return [
             {
                 'id': cp.id,
@@ -605,10 +682,12 @@ class RollbackManager:
                 'timestamp': cp.timestamp,
                 'datetime': datetime.fromtimestamp(cp.timestamp).isoformat(),
                 'type': cp.checkpoint_type,
+                'tier': cp.tier,
                 'has_git_snapshot': cp.git_commit_sha is not None,
+                'git_commit_sha': cp.git_commit_sha,
                 'file_count': len(cp.file_snapshots),
             }
-            for cp in sorted(self.checkpoints, key=lambda x: x.timestamp, reverse=True)
+            for cp in sorted(checkpoints, key=lambda x: x.timestamp, reverse=True)
         ]
 
     def get_checkpoint(self, checkpoint_id: str) -> Checkpoint | None:

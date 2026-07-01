@@ -20,6 +20,7 @@ from backend.cli.event_rendering.text_utils import (
     sync_reasoning_after_tool_line as _sync_reasoning_after_tool_line,
 )
 from backend.ledger.action import (  # noqa: E402
+    TerminalCloseAction,
     TerminalInputAction,
     TerminalReadAction,
     TerminalRunAction,
@@ -102,6 +103,21 @@ class _ActionTerminalMixin(_ActionRenderersBase):
             f'{ACTIVITY_CARD_TITLE_TERMINAL} read · {sess}'
             if sess
             else f'{ACTIVITY_CARD_TITLE_TERMINAL} read · …'
+        )
+        thought = getattr(action, 'thought', '') or ''
+        _sync_reasoning_after_tool_line(self._reasoning, line, thought)
+        self.refresh()
+
+    def _render_terminal_close_action(self, action: TerminalCloseAction) -> None:
+        # Close is a fast bookkeeping op — keep it lightweight in the
+        # transcript (one reasoning line, no full activity card) so the
+        # agent's release of a session doesn't drown the next command.
+        sess = (getattr(action, 'session_id', '') or '').strip()
+        self._ensure_reasoning()
+        line = (
+            f'{ACTIVITY_CARD_TITLE_TERMINAL} close · {sess}'
+            if sess
+            else f'{ACTIVITY_CARD_TITLE_TERMINAL} close'
         )
         thought = getattr(action, 'thought', '') or ''
         _sync_reasoning_after_tool_line(self._reasoning, line, thought)

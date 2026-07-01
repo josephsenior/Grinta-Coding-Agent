@@ -132,6 +132,23 @@ class StructuredSummaryCompactorConfig(BaseModel, metaclass=CanonicalModelMetacl
         ),
         ge=1,
     )
+    min_prose_length: int = Field(
+        default=2000,
+        description=(
+            'Minimum character length for an accepted prose summary. Shorter '
+            'outputs are treated as degraded so the pipeline falls back to '
+            'deterministic compaction instead of wiping history.'
+        ),
+        ge=1,
+    )
+    max_repair_attempts: int = Field(
+        default=0,
+        description=(
+            'Same-prompt retries when the prose sanity gate fails. 0 means a '
+            'short/empty output immediately degrades to the deterministic fallback.'
+        ),
+        ge=0,
+    )
     model_config = ConfigDict(extra='forbid')
 
 

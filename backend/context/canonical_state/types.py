@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     pass
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 CANONICAL_STATE_MARKER = '<CANONICAL_TASK_STATE>'
 
 # High-precision phrases that signal an EXPLICIT task pivot (not a refinement
@@ -40,6 +40,7 @@ _MAX_BACKGROUND_TASKS = 8
 _MAX_INVALIDATED = 10
 _MAX_RECENT_WORK = 16
 _MAX_TASK_PLAN_ITEMS = 20
+_MAX_DEPENDENCIES = 20
 _MAX_OUTPUT_CHARS = 360
 # Durable storage cap for verification output. Larger than the rendered slice
 # so the full-enough failure tail survives in the canonical JSON for the
@@ -174,6 +175,43 @@ class TaskPlanItem:
 
 
 @dataclass
+class SessionMetadata:
+    """Compaction tracking metadata (system-populated, not LLM-generated)."""
+
+    compaction_timestamp: str = ''
+    turn_count: int = 0
+    compaction_sequence: int = 0
+
+
+@dataclass
+class EnvironmentState:
+    """Runtime environment context (system-populated)."""
+
+    running_processes: list[str] = field(default_factory=list)
+    active_ports: list[int] = field(default_factory=list)
+    env_vars: dict[str, str] = field(default_factory=dict)
+    auth_status: str = ''
+
+
+@dataclass
+class TestSummary:
+    """LLM-generated overview of test suite status."""
+
+    overall: str = ''
+    failing: list[str] = field(default_factory=list)
+    not_run: list[str] = field(default_factory=list)
+    last_run_clean: bool = False
+
+
+@dataclass
+class DependencyEntry:
+    """A dependency or package that was added or modified."""
+
+    name: str = ''
+    version: str = ''
+
+
+@dataclass
 class CanonicalTaskState:
     """Durable compact task profile used by prompt packets and compaction gates."""
 
@@ -196,6 +234,11 @@ class CanonicalTaskState:
     vcs_status: str = ''
     narrative_summary: str = ''
     completed_tasks: str = ''
+    session_metadata: SessionMetadata = field(default_factory=SessionMetadata)
+    environment_state: EnvironmentState = field(default_factory=EnvironmentState)
+    test_summary: TestSummary = field(default_factory=TestSummary)
+    open_questions: str = ''
+    dependencies: list[DependencyEntry] = field(default_factory=list)
     source_event_ids: dict[str, int] = field(default_factory=dict)
     field_freshness: dict[str, FieldFreshness] = field(default_factory=dict)
     last_updated: str = ''
@@ -221,6 +264,7 @@ class CanonicalTaskState:
             'vcs_status',
             'narrative_summary',
             'completed_tasks',
+            'open_questions',
             'source_event_ids',
             'last_updated',
         ):
@@ -231,6 +275,28 @@ class CanonicalTaskState:
             state.verification = VerificationState(
                 **_known_dataclass_fields(VerificationState, verification)
             )
+        session_meta = data.get('session_metadata')
+        if isinstance(session_meta, dict):
+            state.session_metadata = SessionMetadata(
+                **_known_dataclass_fields(SessionMetadata, session_meta)
+            )
+        env_state = data.get('environment_state')
+        if isinstance(env_state, dict):
+            state.environment_state = EnvironmentState(
+                **_known_dataclass_fields(EnvironmentState, env_state)
+            )
+        test_summ = data.get('test_summary')
+        if isinstance(test_summ, dict):
+            state.test_summary = TestSummary(
+                **_known_dataclass_fields(TestSummary, test_summ)
+            )
+        raw_deps = data.get('dependencies', [])
+        if isinstance(raw_deps, list):
+            state.dependencies = [
+                DependencyEntry(**_known_dataclass_fields(DependencyEntry, item))
+                for item in raw_deps
+                if isinstance(item, dict)
+            ][-_MAX_DEPENDENCIES:]
         state.failed_approaches = [
             FailedApproach(**_known_dataclass_fields(FailedApproach, item))
             for item in data.get('failed_approaches', [])

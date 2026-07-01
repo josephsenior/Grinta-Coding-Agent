@@ -178,3 +178,46 @@ def test_tool_failures_attributed_to_last_known_model(tmp_path: Path) -> None:
     assert 'Tool failures by model:' in report
     assert 'opencode/mimo-v2.5-free' in report
     assert 'unknown' not in report.split('Tool failures by model:')[1]
+
+
+def test_analyze_session_counts_compaction_fallbacks_and_file_events(
+    tmp_path: Path,
+) -> None:
+    log_path = tmp_path / 'session.jsonl'
+    transcript_path = tmp_path / 'session.txt'
+    report_path = tmp_path / 'session.audit.txt'
+    events = [
+        {
+            'ts': '2026-06-08T10:00:00.000Z',
+            'level': 'WARNING',
+            'event': 'COMPACTION',
+            'payload': {'kind': 'summary_fallback', 'reason': 'bad test_status'},
+        },
+        {
+            'ts': '2026-06-08T10:00:01.000Z',
+            'level': 'INFO',
+            'event': 'FILE_EVENT',
+            'payload': {
+                'kind': 'edit',
+                'path': 'ouroboros/tests/test_type_inference.py',
+            },
+        },
+        {
+            'ts': '2026-06-08T10:00:02.000Z',
+            'level': 'INFO',
+            'event': 'STATE_CHANGE',
+            'payload': {'from': 'running', 'to': 'finished'},
+        },
+    ]
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open('w', encoding='utf-8') as handle:
+        for obj in events:
+            handle.write(json.dumps(obj) + '\n')
+
+    result = analyze_session(log_path, transcript_path, report_path)
+    report = report_path.read_text(encoding='utf-8')
+
+    assert result.verdict == 'REVIEW'
+    assert 'Compaction summary fallbacks: 1' in report
+    assert 'Test file writes/edits: 1' in report
+    assert 'test file write/edit event(s)' in report

@@ -7,6 +7,7 @@ from backend.engine.function_calling.helpers import (
     validate_security_risk,
 )
 from backend.ledger.action.terminal import (
+    TerminalCloseAction,
     TerminalInputAction,
     TerminalReadAction,
     TerminalRunAction,
@@ -26,6 +27,7 @@ def create_terminal_manager_tool() -> dict[str, Any]:
                 'action=open starts a session and runs the first command. '
                 'action=read fetches output (prefer mode=delta, remember next_offset). '
                 'action=input sends follow-up commands to the SAME session — do NOT call open again. '
+                'action=close releases a session immediately (otherwise the runtime GCs it after timeout). '
                 'On Windows the shell is usually PowerShell. '
                 'If action=read returns empty output, wait 1–2s and retry — slow commands take time.'
             ),
@@ -34,11 +36,13 @@ def create_terminal_manager_tool() -> dict[str, Any]:
                 'properties': {
                     'action': {
                         'type': 'string',
-                        'enum': ['open', 'input', 'read'],
+                        'enum': ['open', 'input', 'read', 'close'],
                         'description': (
                             "'open': start session and run ``command`` once (already submitted). "
                             "'read': fetch output (delta=new since cursor; snapshot=full buffer). "
-                            "'input': send more text or a named ``control`` (e.g. enter, C-c)."
+                            "'input': send more text or a named ``control`` (e.g. enter, C-c). "
+                            "'close': release the session immediately. Idempotent — no error if the "
+                            'session is already gone.'
                         ),
                     },
                     'session_id': {
@@ -144,6 +148,10 @@ def create_terminal_manager_tool() -> dict[str, Any]:
                         'if': {'properties': {'action': {'const': 'read'}}},
                         'then': {'required': ['session_id']},
                     },
+                    {
+                        'if': {'properties': {'action': {'const': 'close'}}},
+                        'then': {'required': ['session_id']},
+                    },
                 ],
             },
         },
@@ -163,11 +171,11 @@ def _validate_action(arguments: dict) -> str:
     action = arguments.get('action')
     if not action:
         raise FunctionCallValidationError(
-            "terminal_manager requires an 'action' (open, input, or read)."
+            "terminal_manager requires an 'action' (open, input, read, or close)."
         )
-    if action not in ('open', 'input', 'read'):
+    if action not in ('open', 'input', 'read', 'close'):
         raise FunctionCallValidationError(
-            f"Unknown action: {action!r}. Use 'open', 'input', or 'read'."
+            f"Unknown action: {action!r}. Use 'open', 'input', 'read', or 'close'."
         )
     return action
 
@@ -263,6 +271,16 @@ def _handle_read_action(arguments: dict) -> TerminalReadAction:
     )
 
 
+def _handle_close_action(arguments: dict) -> TerminalCloseAction:
+    session_id = arguments.get('session_id')
+    if not session_id or not isinstance(session_id, str):
+        raise ValueError(
+            "Terminal 'close' requires a string 'session_id'. "
+            "Use action='open' first to obtain one."
+        )
+    return TerminalCloseAction(session_id=session_id)
+
+
 def handle_terminal_manager_tool(arguments: dict) -> Any:
     """Route terminal manager intents back into the core backend actions."""
     action = _validate_action(arguments)
@@ -270,4 +288,6 @@ def handle_terminal_manager_tool(arguments: dict) -> Any:
         return _handle_open_action(arguments)
     if action == 'input':
         return _handle_input_action(arguments)
+    if action == 'close':
+        return _handle_close_action(arguments)
     return _handle_read_action(arguments)

@@ -37,12 +37,17 @@ from backend.context.canonical_state.types import (
     _MAX_ACTIVE_FILES,
     _MAX_BLOCKERS,
     _MAX_DECISIONS,
+    _MAX_DEPENDENCIES,
     _MAX_INVALIDATED,
     _MAX_OUTPUT_CHARS,
     _RENDER_VERIFICATION_OUTPUT_CHARS,
     CANONICAL_STATE_MARKER,
     CanonicalTaskState,
     CanonicalValidationResult,
+    DependencyEntry,
+    EnvironmentState,
+    SessionMetadata,
+    TestSummary,
     clip_with_marker,
 )
 from backend.core.logging.logger import app_logger as logger
@@ -273,6 +278,79 @@ def apply_canonical_patch(
                 _merge_strings(getattr(canonical, field_name), values, limit),
             )
             _touch_field(canonical, field_name, event_id, source)
+
+    open_questions = _clean(patch.get('open_questions'))
+    if open_questions:
+        _set_field(canonical, 'open_questions', open_questions[:800], event_id, source)
+
+    test_patch = patch.get('test_summary')
+    if isinstance(test_patch, dict) and test_patch.get('overall'):
+        canonical.test_summary = TestSummary(
+            overall=str(test_patch.get('overall', ''))[:40],
+            failing=[
+                str(t)[:120]
+                for t in test_patch.get('failing', [])
+                if isinstance(t, (str, int)) and str(t).strip()
+            ][-_MAX_DEPENDENCIES:],
+            not_run=[
+                str(t)[:120]
+                for t in test_patch.get('not_run', [])
+                if isinstance(t, (str, int)) and str(t).strip()
+            ][-_MAX_DEPENDENCIES:],
+            last_run_clean=bool(test_patch.get('last_run_clean', False)),
+        )
+        _touch_field(canonical, 'test_summary', event_id, source)
+
+    deps_patch = patch.get('dependencies')
+    if isinstance(deps_patch, list) and deps_patch:
+        incoming_deps = [
+            DependencyEntry(
+                name=str(d.get('name', ''))[:120],
+                version=str(d.get('version', ''))[:60],
+            )
+            for d in deps_patch
+            if isinstance(d, dict) and d.get('name')
+        ]
+        if incoming_deps:
+            by_name = {dep.name: dep for dep in canonical.dependencies}
+            for dep in incoming_deps:
+                by_name[dep.name] = dep
+            canonical.dependencies = list(by_name.values())[-_MAX_DEPENDENCIES:]
+            _touch_field(canonical, 'dependencies', event_id, source)
+
+    session_meta = patch.get('session_metadata')
+    if isinstance(session_meta, dict) and session_meta:
+        canonical.session_metadata = SessionMetadata(
+            compaction_timestamp=str(session_meta.get('compaction_timestamp', ''))[:40],
+            turn_count=int(session_meta.get('turn_count', 0) or 0),
+            compaction_sequence=int(session_meta.get('compaction_sequence', 0) or 0),
+        )
+        _touch_field(canonical, 'session_metadata', event_id, source)
+
+    env_patch = patch.get('environment_state')
+    if isinstance(env_patch, dict) and env_patch:
+        canonical.environment_state = EnvironmentState(
+            running_processes=[
+                str(p)[:200]
+                for p in env_patch.get('running_processes', [])
+                if isinstance(p, (str, int)) and str(p).strip()
+            ][-_MAX_DEPENDENCIES:],
+            active_ports=[
+                int(p)
+                for p in env_patch.get('active_ports', [])
+                if isinstance(p, int) or (isinstance(p, str) and p.isdigit())
+            ][-_MAX_DEPENDENCIES:],
+            env_vars={
+                str(k)[:80]: str(v)[:200]
+                for k, v in env_patch.get('env_vars', {}).items()
+                if k and v
+            }
+            if isinstance(env_patch.get('env_vars'), dict)
+            else {},
+            auth_status=str(env_patch.get('auth_status', ''))[:200],
+        )
+        _touch_field(canonical, 'environment_state', event_id, source)
+
     canonical.last_updated = _now()
     return canonical
 
@@ -360,6 +438,37 @@ def render_canonical_state_for_prompt(
             lines,
             f'- Work completed this session: {canonical.completed_tasks[:600]}',
         )
+    if canonical.test_summary.overall:
+        test_line = f'- Test summary: {canonical.test_summary.overall}'
+        if canonical.test_summary.failing:
+            test_line += f' (failing: {", ".join(canonical.test_summary.failing[:8])})'
+        if canonical.test_summary.last_run_clean:
+            test_line += ' [last run clean]'
+        _append(lines, test_line)
+    if canonical.dependencies:
+        deps_str = ', '.join(
+            f'{d.name}@{d.version}' for d in canonical.dependencies[-10:]
+        )
+        _append(lines, f'- Dependencies: {deps_str}')
+    if canonical.open_questions:
+        _append(lines, f'- Open questions: {canonical.open_questions[:400]}')
+    if canonical.session_metadata.compaction_timestamp:
+        meta = canonical.session_metadata
+        _append(
+            lines,
+            f'- Session metadata: turn={meta.turn_count}, '
+            f'compaction=#{meta.compaction_sequence}, '
+            f'at={meta.compaction_timestamp}',
+        )
+    if canonical.environment_state.running_processes:
+        env = canonical.environment_state
+        _append(lines, '- Environment state:')
+        for proc in env.running_processes[-5:]:
+            _append(lines, f'  - Running: {proc}')
+        if env.active_ports:
+            _append(lines, f'  - Active ports: {", ".join(str(p) for p in env.active_ports)}')
+        if env.auth_status:
+            _append(lines, f'  - Auth: {env.auth_status}')
     _append(lines, f'- Summary: {canonical.narrative_summary}')
     lines.append(CANONICAL_STATE_MARKER)
     block = '\n'.join(line for line in lines if line.strip())
