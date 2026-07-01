@@ -129,8 +129,13 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         if not pruned_events:
             return self._create_compaction_result(pruned_events, '')
 
+        # Load pre-condensation snapshot to inject user objective and
+        # latest directive into the compaction prompt.
+        snapshot = self._load_snapshot_for_prompt()
+
         prompt = self._build_condensation_prompt(
-            summary_event, pruned_events, char_limit=self._get_summary_char_limit()
+            summary_event, pruned_events, snapshot=snapshot,
+            char_limit=self._get_summary_char_limit()
         )
 
         self.last_degraded = False
@@ -297,6 +302,22 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
 
         return head, pruned_events, summary_event
 
+    @staticmethod
+    def _load_snapshot_for_prompt() -> dict[str, Any] | None:
+        """Load the pre-condensation snapshot for prompt injection.
+
+        Returns the snapshot dict if available, None otherwise. The snapshot
+        contains the user's original objective and latest directive, which
+        are critical for preventing task drift during compaction.
+        """
+        try:
+            from backend.context.compactor.pre_condensation_snapshot import (
+                load_snapshot,
+            )
+            return load_snapshot()
+        except Exception:
+            return None
+
     def _digest_events(self, events: list[Event]) -> str:
         """Group events by type and produce a compact digest.
 
@@ -346,7 +367,7 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
                 errors.append(content)
             elif type_name == 'MessageAction':
                 source = getattr(event, 'source', None)
-                content = str(event)[:300]
+                content = str(event)
                 if source and 'user' in str(source).lower():
                     user_messages.append(content)
                 else:
@@ -418,7 +439,7 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
 
     def _build_condensation_prompt(
         self, summary_event: AgentCondensationObservation, pruned_events: list,
-        *, char_limit: int = 48000,
+        *, snapshot: dict[str, Any] | None = None, char_limit: int = 48000,
     ) -> str:
         """Build the prompt for LLM condensation.
 
@@ -426,12 +447,35 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         prompt size and recency bias. The last few raw events are included
         for detailed context. The prompt enforces a priority-ordered structure
         with a hard character budget.
+
+        When a pre-condensation snapshot is available, its objective and
+        latest_directive are injected as a dedicated USER OBJECTIVE section
+        at the top of the prompt to prevent task drift.
         """
+        # Build USER OBJECTIVE section from snapshot if available
+        objective_section = ''
+        if snapshot:
+            objective = str(snapshot.get('objective', '')).strip()
+            latest = str(snapshot.get('latest_directive', '')).strip()
+            if objective or latest:
+                parts = ['### USER OBJECTIVE (NEVER lose this)']
+                if objective:
+                    parts.append(f'Original request: {objective[:1500]}')
+                if latest and latest != objective:
+                    parts.append(f'Latest user directive: {latest[:1500]}')
+                parts.append(
+                    'Everything in this summary must serve this objective. '
+                    'If the summary does not clearly connect to this objective, '
+                    'it is wrong.'
+                )
+                objective_section = '\n'.join(parts) + '\n\n'
+
         base_prompt = (
             'You are maintaining the state summary of an interactive software '
             'agent. This summary is critical: it lets the agent resume work '
             'WITHOUT re-reading the full conversation history once it has been '
             'compacted for length.\n\n'
+            f'{objective_section}'
             'You will be given:\n'
             '- <PREVIOUS SUMMARY>: the prior compaction summary (preserve its '
             'narrative arc)\n'
@@ -464,8 +508,10 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             'What remains to do, with concrete immediate action items for the '
             'resuming agent.\n\n'
             '3. ## FAILED APPROACHES\n'
-            'What was already tried and did not work, including the exact '
-            'error or side effect, so it is not retried.\n\n'
+            'Only list failures of the actual execution approach '
+            '(e.g. "type inference hangs on tuple patterns", "test suite '
+            'times out"), not tool-level errors like "old_string not found" '
+            'or "undo not available".\n\n'
             '4. ## ACCOMPLISHED & ARCHITECTURE\n'
             'What was concretely built, fixed, or created across the entire '
             'session. Preserve the overarching historical narrative arc from '
