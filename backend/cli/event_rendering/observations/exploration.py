@@ -22,7 +22,6 @@ from backend.cli.tool_display.orient_tools import (
     glob_observation_model,
     grep_observation_model,
     lsp_observation_model,
-    read_symbols_observation_model,
 )
 from backend.ledger.observation import (
     AnalyzeProjectStructureObservation,
@@ -30,7 +29,6 @@ from backend.ledger.observation import (
     GlobObservation,
     GrepObservation,
     LspQueryObservation,
-    ReadSymbolsObservation,
 )
 
 logger = logging.getLogger(__name__)
@@ -171,13 +169,6 @@ class _ObsExplorationMixin(_ObservationRenderersBase):
             return f'{symbol_count} symbol{"s" if symbol_count != 1 else ""}'
         return f'{symbol_count} symbol{"s" if symbol_count != 1 else ""} · {file_count} file{"s" if file_count != 1 else ""}'
 
-    def _render_read_symbols_observation(self, obs: ReadSymbolsObservation) -> None:
-        self._stop_reasoning()
-        self._complete_or_append_orient(
-            'read_symbols',
-            read_symbols_observation_model(obs),
-        )
-
     def _render_analyze_project_structure_observation(
         self, obs: AnalyzeProjectStructureObservation
     ) -> None:
@@ -198,40 +189,6 @@ class _ObsExplorationMixin(_ObservationRenderersBase):
             self._append_orient_line(pending.with_result(fallback.result))
             return
         self._append_orient_line(fallback)
-
-    @staticmethod
-    def _orient_read_symbols_result(*, available: bool, content: str) -> str | None:
-        if not available:
-            return 'unavailable'
-        if not content.strip():
-            return None
-        # Parse summary from content
-        lines = [line.strip() for line in content.split('\n') if line.strip()]
-        if not lines:
-            return None
-        # Try to count resolved vs ambiguous vs not_found
-        resolved = sum(
-            1 for line in lines if line.startswith('resolved') or '->' in line
-        )
-        ambiguous = sum(
-            1 for line in lines if line.startswith('ambiguous') or '~>' in line
-        )
-        not_found = sum(
-            1
-            for line in lines
-            if line.startswith('not found') or line.startswith('not_found')
-        )
-        total = resolved + ambiguous + not_found
-        if total == 0:
-            return None
-        parts = []
-        if resolved:
-            parts.append(f'{resolved} resolved')
-        if ambiguous:
-            parts.append(f'{ambiguous} ambiguous')
-        if not_found:
-            parts.append(f'{not_found} not found')
-        return ' · '.join(parts) if parts else None
 
     @staticmethod
     def _orient_analyze_result(*, available: bool, content: str) -> str | None:

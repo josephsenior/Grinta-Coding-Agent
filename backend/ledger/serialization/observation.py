@@ -45,7 +45,6 @@ from backend.ledger.observation.search import (
     FindSymbolsObservation,
     GlobObservation,
     GrepObservation,
-    ReadSymbolsObservation,
 )
 from backend.ledger.observation.status import StatusObservation
 from backend.ledger.observation.success import SuccessObservation
@@ -74,7 +73,6 @@ observations = (
     GrepObservation,
     GlobObservation,
     FindSymbolsObservation,
-    ReadSymbolsObservation,
     AnalyzeProjectStructureObservation,
     CheckpointObservation,
     WorkingMemoryObservation,

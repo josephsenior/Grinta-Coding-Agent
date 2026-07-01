@@ -30,8 +30,6 @@ from backend.cli.tool_display.orient_tools import (
     mcp_observation_model,
     mcp_result,
     read_line_range_from_action,
-    read_symbols_observation_model,
-    read_symbols_result,
 )
 
 
@@ -174,35 +172,6 @@ def test_file_read_action_model_includes_symbol() -> None:
     assert 'auth.py' in model.target
     assert 'AuthService' in model.target
 
-
-@pytest.mark.parametrize(
-    ('results', 'error', 'expected'),
-    [
-        ([], '', 'no symbols'),
-        ([{'status': 'resolved'}], '', '1 resolved'),
-        (
-            [{'status': 'resolved'}, {'status': 'ambiguous'}],
-            '',
-            '1 resolved, 1 ambiguous',
-        ),
-        ([{'status': 'not_found'}], 'boom', 'failed'),
-    ],
-)
-def test_read_symbols_result(
-    results: list[dict[str, str]], error: str, expected: str
-) -> None:
-    assert read_symbols_result(results, error=error) == expected
-
-
-def test_read_symbols_observation_model() -> None:
-    obs = SimpleNamespace(
-        path='pkg/mod.py',
-        results=[{'status': 'resolved'}],
-        error='',
-        targets=[],
-    )
-    model = read_symbols_observation_model(obs)
-    assert model.result == '1 resolved'
 
 
 @pytest.mark.parametrize(

@@ -1216,7 +1216,6 @@ class TestBuildSystemPromptRenders:
         assert 'head_limit' in result
         assert 'command=callers' in result
         assert 'command=semantic_search' in result
-        assert 'read_symbols(symbols=[...])' in result
         assert 'read_file(path=...)' in result
         assert 'test_coverage' not in result
         assert 'glob' in result and 'grep' in result

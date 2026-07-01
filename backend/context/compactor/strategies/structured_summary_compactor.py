@@ -22,10 +22,6 @@ from backend.core.message import Message, TextContent
 from backend.ledger.event import Event
 from backend.ledger.observation.agent import AgentCondensationObservation
 
-if TYPE_CHECKING:
-    pass
-
-
 # Default minimum length for an accepted prose summary. Shorter outputs are
 # treated as degraded (model refusal / truncation / empty) so the pipeline
 # falls back to deterministic compaction instead of wiping history.
@@ -41,9 +37,10 @@ DEFAULT_SUMMARY_BUDGET_TOKENS = 12_000
 # Nudge appended on a retry when the previous output was too short.
 _REPAIR_NUDGE = (
     '\n\nYour previous summary was too short to preserve the session context. '
-    'Produce a complete compaction covering the full arc: the emerged objective, '
-    'what was accomplished, decisions and their rationale, current blockers, '
-    'remaining work, and failed approaches to avoid. Be precise and complete.'
+    'Produce a complete compaction covering the full arc: the USER GOAL section '
+    '(synthesized from all user messages), what was accomplished, decisions and '
+    'their rationale, current blockers, remaining work, and failed approaches '
+    'to avoid. Be precise and complete.'
 )
 
 
@@ -83,6 +80,7 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         )
         self.min_prose_length = min_prose_length
         self.max_repair_attempts = max_repair_attempts
+        self._has_user_messages = False
 
     def _validate_llm(self) -> None:
         """No function-calling requirement: prose compaction uses plain completion."""
@@ -129,9 +127,17 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         if not pruned_events:
             return self._create_compaction_result(pruned_events, '')
 
-        # Load pre-condensation snapshot to inject user objective and
-        # latest directive into the compaction prompt.
+        # Load pre-condensation snapshot to inject all user messages
+        # verbatim into the compaction prompt as ground truth for
+        # goal synthesis.
         snapshot = self._load_snapshot_for_prompt()
+
+        # Extract previous ## USER GOAL section for tripwire comparison.
+        previous_goal = ''
+        if summary_event and summary_event.message:
+            previous_goal = self._extract_section(
+                summary_event.message, '## USER GOAL'
+            )
 
         prompt = self._build_condensation_prompt(
             summary_event, pruned_events, snapshot=snapshot,
@@ -160,6 +166,7 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
 
             if self._passes_prose_sanity_gate(prose):
                 summary_text = prose
+                self._check_goal_regression(prose, previous_goal)
             else:
                 self.last_degraded = True
                 logger.warning(
@@ -185,16 +192,55 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         return self._create_compaction_result(pruned_events, summary_text)
 
     def _passes_prose_sanity_gate(self, prose: str) -> bool:
-        """Return True when the prose is non-empty and substantial enough.
+        """Return True when the prose is non-empty, substantial, and has a USER GOAL section.
 
         Intentionally relaxed: no refusal/error regex (a model refusal is too
         short to pass the length floor anyway) and no anchor recall. The model
         is trusted to surface what matters; the gate only guards against the
-        silent empty-output failure mode.
+        silent empty-output failure mode and ensures the USER GOAL section
+        exists when user messages were injected.
+
+        The USER GOAL check is structural (does the header exist?), not
+        content regex (we don't check what the goal says). It only fires when
+        user messages were injected into the prompt — if there are no user
+        messages, the section is not required.
         """
         if not prose:
             return False
-        return len(prose.strip()) >= self.min_prose_length
+        if len(prose.strip()) < self.min_prose_length:
+            return False
+        if self._has_user_messages and '## USER GOAL' not in prose:
+            return False
+        return True
+
+    def _check_goal_regression(
+        self, prose: str, previous_goal_text: str | None,
+    ) -> None:
+        """Non-blocking tripwire: warn if the USER GOAL section shrank significantly.
+
+        Catches the exact failure pattern observed in production: the goal
+        silently compressing across compactions until the original objective
+        is lost. This is NOT content validation — it's a length comparison
+        between the previous and current goal sections. A legitimate pivot
+        ("forget all that, just fix this typo") will trigger a false positive,
+        which is fine: the warning is logged for audit, the compaction is
+        accepted.
+        """
+        if not previous_goal_text:
+            return
+        new_goal = self._extract_section(prose, '## USER GOAL')
+        if not new_goal:
+            return
+        prev_len = len(previous_goal_text.strip())
+        new_len = len(new_goal.strip())
+        if prev_len > 0 and new_len < prev_len * 0.6:
+            logger.warning(
+                'USER GOAL section regressed: %d -> %d chars (%.0f%% of '
+                'previous). Possible pivot or content loss — review advised.',
+                prev_len,
+                new_len,
+                (new_len / prev_len) * 100,
+            )
 
     async def _get_llm_prose_summary(self, prompt: str, *, nudge: bool = False) -> str:
         """Get a free-prose summary from the LLM (no tools, no schema)."""
@@ -307,8 +353,8 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         """Load the pre-condensation snapshot for prompt injection.
 
         Returns the snapshot dict if available, None otherwise. The snapshot
-        contains the user's original objective and latest directive, which
-        are critical for preventing task drift during compaction.
+        contains all user messages verbatim, which are critical for goal
+        synthesis during compaction.
         """
         try:
             from backend.context.compactor.pre_condensation_snapshot import (
@@ -329,7 +375,6 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         files_created: list[str] = []
         files_edited: list[str] = []
         commands_run: list[tuple[str, int | None]] = []
-        user_messages: list[str] = []
         agent_thoughts: list[str] = []
         code_nav: list[str] = []
         errors: list[str] = []
@@ -367,11 +412,9 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
                 errors.append(content)
             elif type_name == 'MessageAction':
                 source = getattr(event, 'source', None)
-                content = str(event)
                 if source and 'user' in str(source).lower():
-                    user_messages.append(content)
-                else:
-                    agent_thoughts.append(content)
+                    continue
+                agent_thoughts.append(str(event))
             elif type_name in ('AgentThinkAction', 'SystemHintAction'):
                 agent_thoughts.append(str(event)[:200])
             elif type_name in (
@@ -379,7 +422,6 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
                 'GlobAction',
                 'GrepAction',
                 'FindSymbolsAction',
-                'ReadSymbolsAction',
                 'LspQueryAction',
             ):
                 path = getattr(event, 'path', '') or getattr(event, 'query', '') or getattr(event, 'pattern', '')
@@ -423,10 +465,6 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             lines.append(f'Errors ({len(errors)}):')
             for err in errors[:10]:
                 lines.append(f'  - {err}')
-        if user_messages:
-            lines.append(f'User messages ({len(user_messages)}):')
-            for msg in user_messages:
-                lines.append(f'  - {msg}')
         if agent_thoughts:
             lines.append(f'Agent reasoning/thought steps: {len(agent_thoughts)}')
         if code_nav:
@@ -436,6 +474,22 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             lines.append(f'Other events: {other_count}')
 
         return '\n'.join(lines) if lines else '(no events)'
+
+    @staticmethod
+    def _extract_section(text: str, header: str) -> str:
+        """Extract the content of a markdown section from text.
+
+        Returns the content between ``header`` and the next ``## `` header
+        (or end of text). Returns empty string if the header is not found.
+        """
+        idx = text.find(header)
+        if idx < 0:
+            return ''
+        start = idx + len(header)
+        next_header = text.find('\n## ', start)
+        if next_header < 0:
+            return text[start:].strip()
+        return text[start:next_header].strip()
 
     def _build_condensation_prompt(
         self, summary_event: AgentCondensationObservation, pruned_events: list,
@@ -448,39 +502,50 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         for detailed context. The prompt enforces a priority-ordered structure
         with a hard character budget.
 
-        When a pre-condensation snapshot is available, its objective and
-        latest_directive are injected as a dedicated USER OBJECTIVE section
-        at the top of the prompt to prevent task drift.
+        All user messages from the snapshot are injected verbatim as ground
+        truth for goal synthesis. The previous ``## USER GOAL`` section from
+        the prior summary is injected so the LLM can refine it with new
+        messages rather than re-deriving from scratch.
         """
-        # Build USER OBJECTIVE section from snapshot if available
-        objective_section = ''
+        user_messages_section = ''
+        previous_goal_section = ''
+        has_user_messages = False
+
         if snapshot:
-            objective = str(snapshot.get('objective', '')).strip()
-            latest = str(snapshot.get('latest_directive', '')).strip()
-            if objective or latest:
-                parts = ['### USER OBJECTIVE (NEVER lose this)']
-                if objective:
-                    parts.append(f'Original request: {objective[:1500]}')
-                if latest and latest != objective:
-                    parts.append(f'Latest user directive: {latest[:1500]}')
-                parts.append(
-                    'Everything in this summary must serve this objective. '
-                    'If the summary does not clearly connect to this objective, '
-                    'it is wrong.'
+            messages = snapshot.get('user_messages')
+            if isinstance(messages, list) and messages:
+                parts = ['### USER MESSAGES (verbatim ground truth for goal synthesis)']
+                for i, item in enumerate(messages, 1):
+                    if not isinstance(item, dict):
+                        continue
+                    text = str(item.get('text', '')).strip()
+                    if text:
+                        parts.append(f'[{i}] {text}')
+                if len(parts) > 1:
+                    user_messages_section = '\n'.join(parts) + '\n\n'
+                    has_user_messages = True
+
+        self._has_user_messages = has_user_messages
+
+        if summary_event and summary_event.message:
+            prev_goal = self._extract_section(summary_event.message, '## USER GOAL')
+            if prev_goal:
+                previous_goal_section = (
+                    '### PREVIOUS GOAL SYNTHESIS (refine with new messages)\n'
+                    f'{prev_goal}\n\n'
                 )
-                objective_section = '\n'.join(parts) + '\n\n'
 
         base_prompt = (
             'You are maintaining the state summary of an interactive software '
             'agent. This summary is critical: it lets the agent resume work '
             'WITHOUT re-reading the full conversation history once it has been '
             'compacted for length.\n\n'
-            f'{objective_section}'
+            f'{user_messages_section}{previous_goal_section}'
             'You will be given:\n'
             '- <PREVIOUS SUMMARY>: the prior compaction summary (preserve its '
             'narrative arc)\n'
             '- <EVENT DIGEST>: a compact grouped breakdown of what happened '
-            '(files created/edited, commands run, errors, user messages)\n'
+            '(files created/edited, commands run, errors)\n'
             '- <RECENT RAW EVENTS>: the last few raw events for detailed '
             'context\n\n'
             '### BUDGET CONSTRAINT\n'
@@ -495,7 +560,29 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             '### PRIORITY ORDER & STRUCTURE\n'
             'Format your response using the following headers in this exact '
             'order. If budget runs tight, compress from the bottom up:\n\n'
-            '1. ## UNRESOLVED & BLOCKING (Highest Priority)\n'
+        )
+
+        if has_user_messages:
+            base_prompt += (
+                '0. ## USER GOAL (Highest Priority — Never Drop)\n'
+                "Synthesize the user's current goal from ALL their messages "
+                'above AND the previous goal synthesis (if provided). Capture:\n'
+                '- The original intent (what they asked for initially)\n'
+                '- All constraints, acceptance criteria, and preferences stated\n'
+                '- Any refinements, pivots, or scope changes\n'
+                '- If the user abandoned a previous goal, state the CURRENT goal\n'
+                'Reproduce specific constraints (e.g. "must run under X ms", '
+                '"do not modify Y") verbatim — never paraphrase technical '
+                'constraints.\n'
+                'When the goal evolves, cite the user message number [N] that '
+                'triggered the change. Use [DEPRIORITIZED] or [SUPERSEDED] '
+                'markers for constraints that are no longer active, but ONLY '
+                'when a user message explicitly authorized the change — never '
+                'on your own inference that something "seems less relevant".\n\n'
+            )
+
+        base_prompt += (
+            '1. ## UNRESOLVED & BLOCKING\n'
             'What is currently blocking, failing, untested, or incomplete. '
             'Preserve this verbatim. Never paraphrase, never compress, never '
             'drop. If a test was skipped, say exactly why. If a spec '
@@ -524,10 +611,10 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             '- Preserve VERBATIM: exact file paths, test names, exact error '
             'messages, function signatures, key variable/data values, and '
             'precise technical specifications stated by the user.\n'
-            '- If the objective contains specific constraints (e.g., "must run '
-            'under X ms", "do not modify Y", "use Z"), reproduce them '
-            'faithfully. Never dilute technical constraints into vague '
-            'paraphrase.\n'
+            '- If the user messages contain specific constraints (e.g., "must '
+            'run under X ms", "do not modify Y", "use Z"), reproduce them '
+            'faithfully in the USER GOAL section. Never dilute technical '
+            'constraints into vague paraphrase.\n'
             '- Never mark a test as passing if it only checks file existence '
             'or symbol presence in a header. A test passes only if it '
             'executes the actual behavior the spec requires and produces a '

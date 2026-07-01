@@ -69,7 +69,6 @@ def _build_chat_plan_execution_block(
             [
                 '`task_tracker`' if tracker_on and is_plan else None,
                 '`read_file`',
-                '`read_symbols`',
                 '`grep`',
                 '`glob`',
                 '`ask_user`',

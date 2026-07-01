@@ -16,8 +16,6 @@ from backend.cli.tool_display.orient_tools import (
     grep_observation_model,
     lsp_action_model,
     lsp_observation_model,
-    read_symbols_action_model,
-    read_symbols_observation_model,
 )
 from backend.ledger.action import (
     AnalyzeProjectStructureAction,
@@ -25,7 +23,6 @@ from backend.ledger.action import (
     GlobAction,
     GrepAction,
     LspQueryAction,
-    ReadSymbolsAction,
 )
 from backend.ledger.observation import (
     AnalyzeProjectStructureObservation,
@@ -33,7 +30,6 @@ from backend.ledger.observation import (
     GlobObservation,
     GrepObservation,
     LspQueryObservation,
-    ReadSymbolsObservation,
 )
 
 if TYPE_CHECKING:
@@ -47,7 +43,6 @@ def clear_pending_exploration_cards(orch: 'RendererEventProcessorMixin') -> None
     orch._pending_search_card = None
     orch._pending_search_tool = ''
     orch._pending_find_symbols_card = None
-    orch._pending_read_symbols_card = None
     orch._pending_exploration_meta = None
 
 
@@ -181,27 +176,6 @@ def _handle_find_symbols_observation(
     else:
         orch._write_orient_line(fallback)
     orch._pending_find_symbols_card = None
-    orch._pending_exploration_meta = None
-
-
-def _handle_read_symbols_action(
-    orch: 'RendererEventProcessorMixin', event: ReadSymbolsAction
-) -> None:
-    model = read_symbols_action_model(event)
-    orch._pending_read_symbols_card = model
-    orch._pending_exploration_meta = None
-
-
-def _handle_read_symbols_observation(
-    orch: 'RendererEventProcessorMixin', event: ReadSymbolsObservation
-) -> None:
-    fallback = read_symbols_observation_model(event)
-    pending = orch._pending_read_symbols_card
-    if isinstance(pending, OrientLineModel):
-        orch._write_orient_line(pending.with_result(fallback.result))
-    else:
-        orch._write_orient_line(fallback)
-    orch._pending_read_symbols_card = None
     orch._pending_exploration_meta = None
 
 

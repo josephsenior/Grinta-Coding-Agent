@@ -8,7 +8,6 @@ from backend.ledger.action import AgentThinkAction, MessageAction, NullAction
 from backend.ledger.action.search import (
     AnalyzeProjectStructureAction,
     GrepAction,
-    ReadSymbolsAction,
 )
 from backend.ledger.event import EventSource
 from backend.ledger.observation import (
@@ -18,7 +17,6 @@ from backend.ledger.observation import (
     GlobObservation,
     GrepObservation,
     LspQueryObservation,
-    ReadSymbolsObservation,
     TerminalObservation,
 )
 from backend.ledger.serialization.event import (
@@ -161,30 +159,6 @@ class TestEventToDict:
         restored = event_from_dict(obs_data)
         assert isinstance(restored, GlobObservation)
         assert restored.files == ['a.py', 'b.py']
-
-    def test_read_symbols_action_and_observation_roundtrip(self):
-        action = ReadSymbolsAction(
-            targets=[{'symbol_name': 'login'}],
-            path='auth.py',
-            symbol_kind='function',
-        )
-        action._source = EventSource.AGENT
-        action_data = event_to_dict(action)
-        assert action_data['action'] == 'read_symbols'
-        assert action_data['args']['path'] == 'auth.py'
-
-        obs = ReadSymbolsObservation(
-            content='{"status":"ok"}',
-            path='auth.py',
-            symbol_kind='function',
-            results=[{'status': 'resolved', 'symbol_name': 'login'}],
-        )
-        obs._source = EventSource.ENVIRONMENT
-        obs_data = event_to_dict(obs)
-        assert obs_data['observation'] == 'read_symbols_result'
-        restored = event_from_dict(obs_data)
-        assert isinstance(restored, ReadSymbolsObservation)
-        assert restored.results[0]['status'] == 'resolved'
 
     def test_analyze_project_structure_action_and_observation_roundtrip(self):
         action = AnalyzeProjectStructureAction(

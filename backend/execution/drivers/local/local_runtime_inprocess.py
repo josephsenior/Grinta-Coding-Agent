@@ -52,7 +52,6 @@ from backend.ledger.action.search import (
     FindSymbolsAction,
     GlobAction,
     GrepAction,
-    ReadSymbolsAction,
 )
 from backend.ledger.action.terminal import (
     TerminalCloseAction,
@@ -455,13 +454,6 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             raise AgentRuntimeDisconnectedError('Runtime not initialized')
         timeout = self._bridge_timeout(action, TOOL_BRIDGE_TIMEOUT_READ_ONLY)
         return call_async_from_sync(self._executor.find_symbols, timeout, action)
-
-    def read_symbols(self, action: ReadSymbolsAction) -> Observation:
-        """Execute symbol reads via RuntimeExecutor."""
-        if self._executor is None:
-            raise AgentRuntimeDisconnectedError('Runtime not initialized')
-        timeout = self._bridge_timeout(action, TOOL_BRIDGE_TIMEOUT_READ_ONLY)
-        return call_async_from_sync(self._executor.read_symbols, timeout, action)
 
     def analyze_project_structure(
         self, action: AnalyzeProjectStructureAction

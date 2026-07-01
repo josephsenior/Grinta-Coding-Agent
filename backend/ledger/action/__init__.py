@@ -51,7 +51,6 @@ from backend.ledger.action.search import (
     FindSymbolsAction,
     GlobAction,
     GrepAction,
-    ReadSymbolsAction,
 )
 from backend.ledger.action.terminal import (
     TerminalCloseAction,
@@ -87,7 +86,6 @@ __all__ = [
     'GrepAction',
     'GlobAction',
     'FindSymbolsAction',
-    'ReadSymbolsAction',
     'AnalyzeProjectStructureAction',
     'MemoryPersistAction',
     'MemoryRecallAction',

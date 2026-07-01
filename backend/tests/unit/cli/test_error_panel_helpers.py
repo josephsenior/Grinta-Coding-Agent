@@ -105,7 +105,6 @@ def test_build_recovery_text_includes_steps() -> None:
     )
     recovery = build_recovery_text(guidance, wrap_width=80)
     assert isinstance(recovery, Text)
-    assert 'AUTH_401' in recovery.plain
     assert 'Open settings' in recovery.plain
 
 

@@ -72,25 +72,6 @@ class FindSymbolsAction(Action):
 
 
 @dataclass
-class ReadSymbolsAction(Action):
-    """Read one or more resolved symbol definitions."""
-
-    targets: list[dict[str, object]] = field(default_factory=list)
-    path: str = ''
-    symbol_kind: str = ''
-
-    action: ClassVar[str] = ActionType.READ_SYMBOLS
-    runnable: ClassVar[bool] = True
-    confirmation_state: ActionConfirmationStatus = ActionConfirmationStatus.CONFIRMED
-    security_risk: ActionSecurityRisk = ActionSecurityRisk.LOW
-
-    @property
-    def message(self) -> str:
-        target_count = len(self.targets)
-        return f'read {target_count} symbol{"s" if target_count != 1 else ""}'
-
-
-@dataclass
 class AnalyzeProjectStructureAction(Action):
     """Inspect repository structure or relationships for a command mode."""
 

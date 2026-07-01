@@ -49,7 +49,6 @@ from backend.ledger.observation.search import (
     FindSymbolsObservation,
     GlobObservation,
     GrepObservation,
-    ReadSymbolsObservation,
 )
 from backend.ledger.observation.server import ServerReadyObservation
 from backend.ledger.observation.status import StatusObservation
@@ -71,7 +70,6 @@ __all__ = [
     'GrepObservation',
     'GlobObservation',
     'FindSymbolsObservation',
-    'ReadSymbolsObservation',
     'AnalyzeProjectStructureObservation',
     'ERROR_CATEGORY_AUTH',
     'ERROR_CATEGORY_BAD_REQUEST',

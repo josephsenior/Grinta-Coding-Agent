@@ -205,9 +205,6 @@ def build_recovery_text(
         )
         if guidance.steps:
             recovery.append('\n', style=sum_style)
-    # Show error code for user reference (dimmed so it doesn't distract)
-    if guidance.error_code:
-        recovery.append(f'[{guidance.error_code}]\n', style=f'dim {CLR_META}')
     for index, step in enumerate(guidance.steps, start=1):
         line = f'{index}. {step}'
         line = wrap_panel_text_block(line, wrap_width=wrap_width)

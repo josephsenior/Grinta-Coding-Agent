@@ -33,7 +33,6 @@ from backend.ledger.observation import (
     LspQueryObservation,
     MCPObservation,
     Observation,
-    ReadSymbolsObservation,
     RecallFailureObservation,
     RecallObservation,
     ServerReadyObservation,
@@ -75,7 +74,6 @@ class _ObsDispatchMixin(_ObservationRenderersBase):
         (GrepObservation, '_render_grep_observation'),
         (GlobObservation, '_render_glob_observation'),
         (FindSymbolsObservation, '_render_find_symbols_observation'),
-        (ReadSymbolsObservation, '_render_read_symbols_observation'),
         (
             AnalyzeProjectStructureObservation,
             '_render_analyze_project_structure_observation',

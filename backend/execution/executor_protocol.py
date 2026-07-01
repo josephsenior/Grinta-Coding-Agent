@@ -35,7 +35,6 @@ from backend.ledger.action.search import (
     FindSymbolsAction,
     GlobAction,
     GrepAction,
-    ReadSymbolsAction,
 )
 from backend.ledger.action.terminal import (
     TerminalCloseAction,
@@ -101,8 +100,6 @@ class RuntimeExecutorProtocol(Protocol):
     async def glob(self, action: GlobAction) -> Observation: ...
 
     async def find_symbols(self, action: FindSymbolsAction) -> Observation: ...
-
-    async def read_symbols(self, action: ReadSymbolsAction) -> Observation: ...
 
     async def analyze_project_structure(
         self, action: AnalyzeProjectStructureAction

@@ -12,7 +12,6 @@ from backend.core.tools.tool_names import (
     GREP_TOOL_NAME,
     LSP_TOOL_NAME,
     READ_FILE_TOOL_NAME,
-    READ_SYMBOL_TOOL_NAME,
     TASK_TRACKER_TOOL_NAME,
     WEB_FETCH_TOOL_NAME,
     WEB_SEARCH_TOOL_NAME,
@@ -35,7 +34,6 @@ _DISCOVERY_TOOLS = frozenset(
         GREP_TOOL_NAME,
         LSP_TOOL_NAME,
         READ_FILE_TOOL_NAME,
-        READ_SYMBOL_TOOL_NAME,
         WEB_FETCH_TOOL_NAME,
         WEB_SEARCH_TOOL_NAME,
     }

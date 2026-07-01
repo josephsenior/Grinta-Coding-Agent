@@ -143,15 +143,6 @@ def _slice(lines: list[str], start: int, end: int) -> list[str]:
     return lines[start - 1 : end]
 
 
-def _fix_read_symbols_staticmethod(body: list[str]) -> list[str]:
-    out: list[str] = []
-    for line in body:
-        if line.strip() == 'def read_symbols_results(':
-            out.append('    @staticmethod')
-        out.append(line)
-    return out
-
-
 def main() -> None:
     text = SOURCE.read_text(encoding='utf-8')
     lines = text.splitlines()
@@ -177,7 +168,7 @@ def main() -> None:
     for name, (start, end) in MIXIN_RANGES.items():
         body = _slice(lines, start, end)
         if name == 'exploration':
-            body = _fix_read_symbols_staticmethod(body)
+            pass
         class_name = MIXIN_CLASS_NAMES[name]
         mixin_bases.append(class_name)
         mixin_imports.append(

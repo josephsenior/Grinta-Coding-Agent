@@ -40,7 +40,6 @@ _SEARCH_CARD_PRESETS: dict[str, tuple[str, str, str]] = {
     'glob': ('glob', 'Glob', 'Globbed'),
     'search': ('search', 'Search', 'Searched'),
     'find_symbols': ('find_symbols', 'Find Symbols', 'Found'),
-    'read_symbols': ('read_symbols', 'Read Symbols', 'Read'),
     'analyze': ('analyze', 'Analyze', 'Analyzed'),
 }
 

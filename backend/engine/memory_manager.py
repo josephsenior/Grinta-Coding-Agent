@@ -453,7 +453,7 @@ class ContextMemoryManager:
                 or snapshot.get('recent_errors')
                 or snapshot.get('decisions')
                 or snapshot.get('runtime')
-                or snapshot.get('latest_directive')
+                or snapshot.get('user_messages')
                 or snapshot.get('test_results')
                 or snapshot.get('background_tasks')
             ):

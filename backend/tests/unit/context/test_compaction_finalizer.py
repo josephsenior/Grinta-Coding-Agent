@@ -11,7 +11,7 @@ from backend.context.compactor.compaction_finalizer import (
 
 def test_finalize_compaction_artifacts_passes_state_to_snapshot_helpers() -> None:
     state = MagicMock()
-    snapshot = {'latest_directive': 'continue from canonical state'}
+    snapshot = {'user_messages': [{'text': 'continue from canonical state'}]}
 
     with (
         patch(

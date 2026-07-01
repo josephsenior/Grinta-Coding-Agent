@@ -48,7 +48,6 @@ def _discovery_decision_table(
         '- Text/regex in file contents → `grep` (default output_mode=files_with_matches; use content when you need lines)',
         '- File paths by name/pattern → `glob`',
         '- Symbol name, file unknown → `find_symbols`',
-        '- Symbol bodies after candidates → `read_symbols(symbols=[...])`',
         '- File body or line range (one file) → `read_file(path=...)`; add `start_line`+`end_line` together (`end_line=-1` for EOF) or omit both for whole file',
         '- File signatures only (one file) → `analyze_project_structure` command=file_outline',
         '- File symbol list (one file) → `analyze_project_structure` command=symbols',
@@ -99,12 +98,12 @@ def _explore_hint(_config: Any = None) -> str:
     if _lsp_available(_config):
         return (
         '`grep` (files_with_matches first, then content; head_limit/offset), `glob` for file discovery, '
-        '`find_symbols` for symbol candidates, `read_file`/`read_symbols` for file/symbol bodies, `lsp` for precise '
+        '`find_symbols` for symbol candidates, `read_file` for file bodies, `lsp` for precise '
         'definitions/references, `analyze_project_structure` for tree/imports/deps/references'
     )
     return (
         '`grep` (files_with_matches first, then content; head_limit/offset), `glob` for file discovery, '
-        '`find_symbols` for symbol candidates, `read_file`/`read_symbols` for file/symbol bodies, '
+        '`find_symbols` for symbol candidates, `read_file` for file bodies, '
         '`analyze_project_structure` for tree/imports/deps/references'
     )
 
@@ -119,7 +118,7 @@ def _repo_discovery_contract(
     if not is_windows:
         return (
         'Repo/source intelligence: follow `<TOOL_ROUTING_LADDER>` and use '
-        '`read_file`/`read_symbols`—avoid improvised `find`/`grep`/`cat` tree walks; '
+        '`read_file`—avoid improvised `find`/`grep`/`cat` tree walks; '
             '`<SHELL_IDENTITY>` governs allowed shell usage.'
         )
     if windows_with_bash:

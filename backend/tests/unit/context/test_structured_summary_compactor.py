@@ -477,7 +477,7 @@ class TestBuildCondensationPrompt:
     def test_prompt_instructs_failed_approaches(self):
         prompt = self._build_prompt()
         assert 'FAILED APPROACHES' in prompt
-        assert 'not retried' in prompt.lower()
+        assert 'not tool-level' in prompt.lower()
 
     def test_prompt_instructs_dense_markdown_not_filler(self):
         prompt = self._build_prompt()
@@ -590,8 +590,10 @@ class TestDigestEvents:
         agent_event.source = EventSource.AGENT
         agent_event.id = 1
         result = self.condenser._digest_events([user_event, agent_event])
-        assert 'User messages (1)' in result
-        assert 'Fix the auth bug' in result
+        # User messages are injected separately via USER MESSAGES section,
+        # not in the event digest. Only agent reasoning should appear.
+        assert 'User messages' not in result
+        assert 'Fix the auth bug' not in result
         assert 'Agent reasoning' in result
 
     def test_condensation_events_skipped(self):
@@ -619,3 +621,196 @@ class TestDigestEvents:
         assert 'Code navigation' in result
         assert 'AuthHandler' in result
         assert 'TokenStore' in result
+
+
+# ---------------------------------------------------------------------------
+# USER GOAL section / sourced triggers
+# ---------------------------------------------------------------------------
+
+
+class TestUserGoalSection:
+    def setup_method(self):
+        self.condenser = StructuredSummaryCompactor(
+            llm=_make_llm(), max_size=100, keep_first=2
+        )
+
+    def test_prompt_includes_user_goal_section_when_messages_present(self):
+        snapshot = {'user_messages': [{'text': 'Build a compiler'}]}
+        prompt = self.condenser._build_condensation_prompt(
+            _summary_event(0), [], snapshot=snapshot, char_limit=48000
+        )
+        assert '## USER GOAL' in prompt
+        assert 'USER MESSAGES' in prompt
+        assert '[1] Build a compiler' in prompt
+
+    def test_prompt_omits_user_goal_section_when_no_messages(self):
+        prompt = self.condenser._build_condensation_prompt(
+            _summary_event(0), [], snapshot=None, char_limit=48000
+        )
+        assert '## USER GOAL' not in prompt
+        assert 'USER MESSAGES' not in prompt
+
+    def test_user_messages_injected_verbatim_no_truncation(self):
+        long_msg = 'A' * 5000
+        snapshot = {'user_messages': [{'text': long_msg}]}
+        prompt = self.condenser._build_condensation_prompt(
+            _summary_event(0), [], snapshot=snapshot, char_limit=48000
+        )
+        assert long_msg in prompt
+
+    def test_multiple_user_messages_numbered(self):
+        snapshot = {
+            'user_messages': [
+                {'text': 'Build a compiler'},
+                {'text': 'Actually fix this bug instead'},
+                {'text': 'Use the fltk backend'},
+            ]
+        }
+        prompt = self.condenser._build_condensation_prompt(
+            _summary_event(0), [], snapshot=snapshot, char_limit=48000
+        )
+        assert '[1] Build a compiler' in prompt
+        assert '[2] Actually fix this bug instead' in prompt
+        assert '[3] Use the fltk backend' in prompt
+
+    def test_previous_goal_synthesis_injected_from_prior_summary(self):
+        summary = (
+            '## USER GOAL\nBuild a compiler with X constraints\n\n'
+            '## UNRESOLVED\nNone'
+        )
+        summary_event = _summary_event(0, message=summary)
+        snapshot = {'user_messages': [{'text': 'Build a compiler'}]}
+        prompt = self.condenser._build_condensation_prompt(
+            summary_event, [], snapshot=snapshot, char_limit=48000
+        )
+        assert 'PREVIOUS GOAL SYNTHESIS' in prompt
+        assert 'Build a compiler with X constraints' in prompt
+
+    def test_previous_goal_synthesis_omitted_when_no_prior_goal(self):
+        summary_event = _summary_event(0, message='## UNRESOLVED\nNone')
+        snapshot = {'user_messages': [{'text': 'Build a compiler'}]}
+        prompt = self.condenser._build_condensation_prompt(
+            summary_event, [], snapshot=snapshot, char_limit=48000
+        )
+        assert 'PREVIOUS GOAL SYNTHESIS' not in prompt
+
+    def test_prompt_includes_sourced_trigger_instruction(self):
+        snapshot = {'user_messages': [{'text': 'Build a compiler'}]}
+        prompt = self.condenser._build_condensation_prompt(
+            _summary_event(0), [], snapshot=snapshot, char_limit=48000
+        )
+        assert 'cite the user message number' in prompt.lower()
+        assert '[DEPRIORITIZED]' in prompt
+        assert '[SUPERSEDED]' in prompt
+
+    def test_has_user_messages_flag_set_correctly(self):
+        snapshot = {'user_messages': [{'text': 'Build a compiler'}]}
+        self.condenser._build_condensation_prompt(
+            _summary_event(0), [], snapshot=snapshot, char_limit=48000
+        )
+        assert self.condenser._has_user_messages is True
+
+    def test_has_user_messages_flag_false_when_no_snapshot(self):
+        self.condenser._build_condensation_prompt(
+            _summary_event(0), [], snapshot=None, char_limit=48000
+        )
+        assert self.condenser._has_user_messages is False
+
+
+# ---------------------------------------------------------------------------
+# Gate: ## USER GOAL header check
+# ---------------------------------------------------------------------------
+
+
+class TestUserGoalGate:
+    def setup_method(self):
+        self.condenser = StructuredSummaryCompactor(
+            llm=_make_llm(), max_size=100, keep_first=2
+        )
+
+    def test_gate_rejects_missing_user_goal_when_messages_present(self):
+        self.condenser._has_user_messages = True
+        prose = _long_prose()
+        assert not self.condenser._passes_prose_sanity_gate(prose)
+
+    def test_gate_accepts_user_goal_when_messages_present(self):
+        self.condenser._has_user_messages = True
+        prose = '## USER GOAL\nBuild a compiler\n\n' + _long_prose()
+        assert self.condenser._passes_prose_sanity_gate(prose)
+
+    def test_gate_accepts_missing_user_goal_when_no_messages(self):
+        self.condenser._has_user_messages = False
+        prose = _long_prose()
+        assert self.condenser._passes_prose_sanity_gate(prose)
+
+
+# ---------------------------------------------------------------------------
+# Length-regression tripwire
+# ---------------------------------------------------------------------------
+
+
+class TestGoalRegressionTripwire:
+    def setup_method(self):
+        self.condenser = StructuredSummaryCompactor(
+            llm=_make_llm(), max_size=100, keep_first=2
+        )
+
+    def test_warns_when_goal_shrinks_significantly(self):
+        previous = 'A' * 1000
+        new_goal = '## USER GOAL\n' + 'B' * 100 + '\n\n## UNRESOLVED\nstuff'
+        with patch(
+            'backend.context.compactor.strategies.structured_summary_compactor.logger'
+        ) as mock_logger:
+            self.condenser._check_goal_regression(new_goal, previous)
+        mock_logger.warning.assert_called_once()
+        assert 'regressed' in mock_logger.warning.call_args[0][0]
+
+    def test_no_warn_when_goal_grows(self):
+        previous = 'A' * 100
+        new_goal = '## USER GOAL\n' + 'B' * 500 + '\n\n## UNRESOLVED\nstuff'
+        with patch(
+            'backend.context.compactor.strategies.structured_summary_compactor.logger'
+        ) as mock_logger:
+            self.condenser._check_goal_regression(new_goal, previous)
+        mock_logger.warning.assert_not_called()
+
+    def test_no_warn_when_no_previous_goal(self):
+        new_goal = '## USER GOAL\nBuild something\n\n## UNRESOLVED\nstuff'
+        with patch(
+            'backend.context.compactor.strategies.structured_summary_compactor.logger'
+        ) as mock_logger:
+            self.condenser._check_goal_regression(new_goal, None)
+        mock_logger.warning.assert_not_called()
+
+    def test_no_warn_when_goal_shrinks_slightly(self):
+        previous = 'A' * 1000
+        new_goal = '## USER GOAL\n' + 'B' * 700 + '\n\n## UNRESOLVED\nstuff'
+        with patch(
+            'backend.context.compactor.strategies.structured_summary_compactor.logger'
+        ) as mock_logger:
+            self.condenser._check_goal_regression(new_goal, previous)
+        mock_logger.warning.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# _extract_section helper
+# ---------------------------------------------------------------------------
+
+
+class TestExtractSection:
+    def test_extracts_section_between_headers(self):
+        text = '## USER GOAL\nBuild a compiler\n\n## UNRESOLVED\nNone'
+        result = StructuredSummaryCompactor._extract_section(text, '## USER GOAL')
+        assert 'Build a compiler' in result
+        assert '## UNRESOLVED' not in result
+
+    def test_extracts_last_section_to_end(self):
+        text = '## DECISIONS\nUse fltk\nReason: fast'
+        result = StructuredSummaryCompactor._extract_section(text, '## DECISIONS')
+        assert 'Use fltk' in result
+        assert 'Reason: fast' in result
+
+    def test_returns_empty_when_header_not_found(self):
+        text = '## UNRESOLVED\nNone'
+        result = StructuredSummaryCompactor._extract_section(text, '## USER GOAL')
+        assert result == ''
