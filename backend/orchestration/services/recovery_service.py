@@ -23,6 +23,7 @@ from backend.inference.exceptions import (
     InternalServerError,
     NotFoundError,
     RateLimitError,
+    RateLimitKind,
     ServiceUnavailableError,
     Timeout,
 )
@@ -33,6 +34,7 @@ from backend.ledger.observation.error import (
     ERROR_CATEGORY_BAD_REQUEST,
     ERROR_CATEGORY_CONTENT_POLICY,
     ERROR_CATEGORY_CONTEXT_WINDOW,
+    ERROR_CATEGORY_DAILY_QUOTA,
     ERROR_CATEGORY_MODEL_NOT_FOUND,
     ERROR_CATEGORY_NETWORK,
     ERROR_CATEGORY_RATE_LIMIT,
@@ -244,6 +246,8 @@ class RecoveryService:
         )
 
         if isinstance(exc, (RateLimitError, ServiceUnavailableError)):
+            if isinstance(exc, RateLimitError) and exc.kind == RateLimitKind.RPD:
+                return ERROR_CATEGORY_DAILY_QUOTA
             return ERROR_CATEGORY_RATE_LIMIT
         if isinstance(exc, AuthenticationError):
             return ERROR_CATEGORY_AUTH
@@ -392,10 +396,8 @@ class RecoveryService:
         if not isinstance(exc, _QUEUED_RETRY_EXCEPTIONS):
             return False
 
-        from backend.inference.exceptions import RateLimitError, RateLimitKind
-
         if isinstance(exc, RateLimitError):
-            if getattr(exc, 'kind', None) == RateLimitKind.RPD:
+            if exc.kind == RateLimitKind.RPD:
                 logger.warning('Daily quota exhausted.')
                 await self._set_awaiting_user_input_if_allowed(controller)
                 return True

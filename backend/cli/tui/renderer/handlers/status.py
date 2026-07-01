@@ -17,6 +17,7 @@ from backend.ledger.observation.error import (
     ERROR_CATEGORY_BAD_REQUEST,
     ERROR_CATEGORY_CONTENT_POLICY,
     ERROR_CATEGORY_CONTEXT_WINDOW,
+    ERROR_CATEGORY_DAILY_QUOTA,
     ERROR_CATEGORY_MODEL_NOT_FOUND,
     ERROR_CATEGORY_RUNTIME_DISCONNECTED,
 )
@@ -32,6 +33,7 @@ _ACTION_REQUIRED_CATEGORIES = frozenset(
         ERROR_CATEGORY_BAD_REQUEST,
         ERROR_CATEGORY_CONTENT_POLICY,
         ERROR_CATEGORY_CONTEXT_WINDOW,
+        ERROR_CATEGORY_DAILY_QUOTA,
         ERROR_CATEGORY_MODEL_NOT_FOUND,
         ERROR_CATEGORY_RUNTIME_DISCONNECTED,
     }
@@ -42,6 +44,7 @@ _ACTION_REQUIRED_TITLES = {
     ERROR_CATEGORY_BAD_REQUEST: 'Invalid request',
     ERROR_CATEGORY_CONTENT_POLICY: 'Content blocked',
     ERROR_CATEGORY_CONTEXT_WINDOW: 'Context window full',
+    ERROR_CATEGORY_DAILY_QUOTA: 'Daily quota exhausted',
     ERROR_CATEGORY_MODEL_NOT_FOUND: 'Model unavailable',
     ERROR_CATEGORY_RUNTIME_DISCONNECTED: 'Runtime disconnected',
 }
@@ -80,7 +83,9 @@ def _notification_title(content: str, error_category: str | None) -> str:
 def _notification_message(content: str, error_category: str | None) -> str:
     title = _notification_title(content, error_category)
     first_line = _first_error_line(content)
-    if first_line.lower().startswith(title.lower()):
+    lower_line = first_line.lower()
+    lower_title = title.lower()
+    if lower_line.startswith(lower_title) or lower_title in lower_line:
         return first_line
     return f'{title}: {first_line}'
 
