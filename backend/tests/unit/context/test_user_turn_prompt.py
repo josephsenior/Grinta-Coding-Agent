@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from backend.context.memory.conversation_memory import ContextMemory
@@ -104,7 +103,7 @@ def test_user_message_syncs_canonical_state_without_planning_directive() -> None
         ) as reduce_mock,
         patch(
             'backend.context.compactor.pre_condensation_snapshot.extract_snapshot',
-            return_value={'latest_directive': 'steering'},
+            return_value={'user_messages': [{'text': 'steering'}]},
         ),
         patch(
             'backend.context.compactor.pre_condensation_snapshot.save_snapshot'

@@ -336,8 +336,24 @@ def _user_turns_from_events(events: list[Event]) -> list[_UserTurn]:
 def _user_turns_from_snapshot(snapshot: dict | None) -> list[_UserTurn]:
     if not isinstance(snapshot, dict):
         return []
-    raw_turns = snapshot.get('recent_user_messages')
     turns: list[_UserTurn] = []
+
+    # Primary source: user_messages (all user messages, untruncated)
+    raw_turns = snapshot.get('user_messages')
+    if isinstance(raw_turns, list):
+        for item in raw_turns:
+            if not isinstance(item, dict):
+                continue
+            text = _clean_user_text(item.get('text', ''))
+            if not text:
+                continue
+            turns.append((_clean_event_id(item.get('event_id')), text, 'snapshot'))
+    if turns:
+        return turns
+
+    # Backward compat: old snapshots may have recent_user_messages or
+    # objective/latest_directive instead of user_messages.
+    raw_turns = snapshot.get('recent_user_messages')
     if isinstance(raw_turns, list):
         for item in raw_turns:
             if not isinstance(item, dict):
@@ -463,7 +479,11 @@ def _restore_hints(
     if not snapshot:
         return ''
     lines: list[str] = []
-    latest = str(snapshot.get('latest_directive', '')).strip()
+    from backend.context.compactor.pre_condensation_snapshot import (
+        snapshot_user_objective,
+    )
+
+    _, latest = snapshot_user_objective(snapshot)
     if latest and include_latest_directive:
         lines.append(
             f'Latest directive before compaction: {_safe_truncate(latest, 240)}'

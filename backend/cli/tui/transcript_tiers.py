@@ -30,7 +30,6 @@ ORIENT_TOOL_NAMES: Final[frozenset[str]] = frozenset(
         'grep',
         'glob',
         'find_symbols',
-        'read_symbols',
         'read_file',
         'read_symbol',
         'lsp',

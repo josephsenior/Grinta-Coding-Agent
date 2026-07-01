@@ -180,7 +180,7 @@ def test_context_packet_uses_snapshot_user_turns_for_compacted_continue(
     monkeypatch.setattr(
         'backend.context.prompt.context_packet.load_snapshot',
         lambda state=None: {
-            'recent_user_messages': [
+            'user_messages': [
                 {'event_id': 12, 'text': 'Audit the runtime loop'},
                 {'event_id': 13, 'text': 'continue'},
             ]

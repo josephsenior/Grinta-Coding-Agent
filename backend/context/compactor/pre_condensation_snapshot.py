@@ -38,7 +38,6 @@ _MAX_TEST_RESULTS = 8
 _MAX_INVALIDATED_ASSUMPTIONS = 12
 _MAX_CONTENT_LENGTH = 500
 _MAX_TASKS = 20
-_MAX_RECENT_USER_MESSAGES = 8
 
 
 def _agent_debug_log(
@@ -82,10 +81,12 @@ def save_snapshot(snapshot: dict[str, Any], *, state: State | None = None) -> No
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(snapshot, indent=2, ensure_ascii=False), encoding='utf-8')
     logger.debug(
-        'Pre-condensation snapshot staged: %d files, %d errors, %d decisions',
+        'Pre-condensation snapshot staged: %d files, %d errors, %d decisions, '
+        '%d user messages',
         len(snapshot.get('files_touched', {})),
         len(snapshot.get('recent_errors', [])),
         len(snapshot.get('decisions', [])),
+        len(snapshot.get('user_messages', [])),
     )
 
 
@@ -134,9 +135,7 @@ def extract_snapshot(events: list[Event]) -> dict[str, Any]:
     snapshot: dict[str, Any] = {
         'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
         'events_condensed': len(events),
-        'objective': '',
-        'latest_directive': '',
-        'recent_user_messages': [],
+        'user_messages': [],
         'files_touched': {},
         'recent_errors': [],
         'decisions': [],
@@ -161,6 +160,27 @@ def extract_snapshot(events: list[Event]) -> dict[str, Any]:
     _extract_attempted_approaches(events, snapshot)
     _extract_test_results(events, snapshot)
     return snapshot
+
+
+def snapshot_user_objective(snapshot: dict[str, Any]) -> tuple[str, str]:
+    """Extract (objective, latest_directive) from the snapshot's user_messages.
+
+    Returns the first and last user messages. Falls back to old
+    objective/latest_directive fields for snapshots from older versions.
+    """
+    messages = snapshot.get('user_messages')
+    if isinstance(messages, list) and messages:
+        texts = [
+            str(m.get('text', '')).strip()
+            for m in messages
+            if isinstance(m, dict) and str(m.get('text', '')).strip()
+        ]
+        if texts:
+            return texts[0], texts[-1]
+    return (
+        str(snapshot.get('objective', '')).strip(),
+        str(snapshot.get('latest_directive', '')).strip(),
+    )
 
 
 def _sha256_text(text: str) -> str:
@@ -281,7 +301,12 @@ def _extract_file_info(event: Event, snapshot: dict) -> None:
 
 
 def _extract_user_directive(event: Event, snapshot: dict) -> None:
-    """Capture the original task and latest user directive for recovery."""
+    """Capture every user message verbatim for goal synthesis.
+
+    All user messages are preserved in full — no truncation, no limit.
+    The compactor uses these as ground truth to synthesize the evolving
+    user goal across compactions.
+    """
     if type(event).__name__ != 'MessageAction':
         return
     source = getattr(event, 'source', None)
@@ -291,25 +316,21 @@ def _extract_user_directive(event: Event, snapshot: dict) -> None:
     content = str(getattr(event, 'content', '')).strip()
     if not content:
         return
-    if not snapshot.get('objective'):
-        snapshot['objective'] = content[:_MAX_CONTENT_LENGTH]
-    snapshot['latest_directive'] = content[:_MAX_CONTENT_LENGTH]
-    _append_recent_user_message(event, content, snapshot)
+    _append_user_message(event, content, snapshot)
 
 
-def _append_recent_user_message(event: Event, content: str, snapshot: dict) -> None:
-    recent = snapshot.setdefault('recent_user_messages', [])
-    if not isinstance(recent, list):
-        recent = []
-        snapshot['recent_user_messages'] = recent
+def _append_user_message(event: Event, content: str, snapshot: dict) -> None:
+    messages = snapshot.setdefault('user_messages', [])
+    if not isinstance(messages, list):
+        messages = []
+        snapshot['user_messages'] = messages
     event_id = getattr(event, 'id', None)
-    item: dict[str, Any] = {'text': content[:_MAX_CONTENT_LENGTH]}
+    item: dict[str, Any] = {'text': content}
     if isinstance(event_id, int) and event_id >= 0:
         item['event_id'] = event_id
     elif isinstance(event_id, str) and event_id:
         item['event_id'] = event_id
-    recent.append(item)
-    del recent[:-_MAX_RECENT_USER_MESSAGES]
+    messages.append(item)
 
 
 def _extract_task_plan(event: Event, snapshot: dict) -> None:
@@ -925,12 +946,16 @@ def format_snapshot_for_injection(snapshot: dict[str, Any]) -> str:
 
 def _format_directive_section(snapshot: dict[str, Any]) -> list[str]:
     lines: list[str] = []
-    objective = str(snapshot.get('objective', '')).strip()
-    latest = str(snapshot.get('latest_directive', '')).strip()
-    if objective:
-        lines.append(f'\nOriginal objective: {objective[:300]}')
-    if latest and latest != objective:
-        lines.append(f'Latest directive: {latest[:300]}')
+    messages = snapshot.get('user_messages')
+    if isinstance(messages, list) and messages:
+        lines.append('\nUser messages (verbatim):')
+        for i, item in enumerate(messages, 1):
+            if not isinstance(item, dict):
+                continue
+            text = str(item.get('text', '')).strip()
+            if not text:
+                continue
+            lines.append(f'  [{i}] {text}')
     return lines
 
 

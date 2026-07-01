@@ -1,7 +1,7 @@
 """Native public file tools for the agent.
 
-The public file API separates discovery from editing: ``read_file`` and
-``read_symbol`` for reading, ``create_file`` for new files, ``replace_string``
+The public file API separates discovery from editing: ``read_file``
+for reading, ``create_file`` for new files, ``replace_string``
 and ``multiedit`` for edits, ``find_symbols`` for symbol discovery.
 """
 
@@ -12,7 +12,6 @@ from backend.core.tools.tool_names import (
     FIND_SYMBOLS_TOOL_NAME,
     MULTIEDIT_TOOL_NAME,
     READ_FILE_TOOL_NAME,
-    READ_SYMBOL_TOOL_NAME,
     REPLACE_STRING_TOOL_NAME,
     UNDO_LAST_EDIT_TOOL_NAME,
 )
@@ -44,43 +43,6 @@ def create_read_file_tool() -> ChatCompletionToolParam:
             },
         },
         required=['path'],
-    )
-
-
-def create_read_symbols_tool() -> ChatCompletionToolParam:
-    return create_tool_definition(
-        name=READ_SYMBOL_TOOL_NAME,
-        description=(
-            'Read one or more symbol bodies from a file. '
-            'Each item in symbols[] needs qualified_name or symbol_name; '
-            'unique symbols auto-resolve; ambiguous symbols return candidates.'
-        ),
-        properties={
-            'symbols': {
-                'type': 'array',
-                'description': 'One or more symbol targets.',
-                'items': {
-                    'type': 'object',
-                    'properties': {
-                        'qualified_name': {'type': 'string'},
-                        'symbol_name': {'type': 'string'},
-                        'symbol_id': {'type': 'string'},
-                        'path': {'type': 'string'},
-                        'symbol_kind': {'type': 'string'},
-                        'parent_symbol': {'type': 'string'},
-                        'occurrence': {'type': 'integer'},
-                    },
-                },
-            },
-            'path': get_path_param(
-                'Optional default project-relative path for all symbols[].'
-            ),
-            'symbol_kind': {
-                'type': 'string',
-                'description': 'Default symbol kind for all symbols[] items (function, class, method).',
-            },
-        },
-        required=['symbols'],
     )
 
 
@@ -212,7 +174,6 @@ __all__ = [
     'create_find_symbols_tool',
     'create_multiedit_tool',
     'create_read_file_tool',
-    'create_read_symbols_tool',
     'create_replace_string_tool',
     'create_undo_last_edit_tool',
 ]

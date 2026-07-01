@@ -19,7 +19,6 @@ from backend.cli.tool_display.orient_tools import (
     glob_action_model,
     grep_action_model,
     lsp_action_model,
-    read_symbols_action_model,
 )
 from backend.ledger.action import (  # noqa: E402
     AnalyzeProjectStructureAction,
@@ -27,7 +26,6 @@ from backend.ledger.action import (  # noqa: E402
     GlobAction,
     GrepAction,
     LspQueryAction,
-    ReadSymbolsAction,
 )
 
 
@@ -46,10 +44,6 @@ class _ActionExplorationMixin(_ActionRenderersBase):
 
     def _render_find_symbols_action(self, action: FindSymbolsAction) -> None:
         self._queue_orient_line(find_symbols_action_model(action))
-        self.refresh()
-
-    def _render_read_symbols_action(self, action: ReadSymbolsAction) -> None:
-        self._queue_orient_line(read_symbols_action_model(action))
         self.refresh()
 
     def _render_analyze_project_structure_action(

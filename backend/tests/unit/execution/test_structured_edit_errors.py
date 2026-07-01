@@ -266,27 +266,6 @@ def test_build_search_error_observation() -> None:
     assert obs.tool_result['error_code'] == 'PATH_NOT_FOUND'
 
 
-def test_build_read_symbols_error_observation_single_not_found() -> None:
-    from backend.core.errors.structured_edit_errors import (
-        build_read_symbols_error_observation,
-    )
-    from backend.ledger.observation import ErrorObservation
-
-    obs = build_read_symbols_error_observation(
-        [
-            {
-                'status': 'not_found',
-                'symbol_name': 'MissingService',
-                'message': "read_symbols failed: symbol 'MissingService' not found.",
-            }
-        ],
-        total=1,
-    )
-    assert isinstance(obs, ErrorObservation)
-    assert 'not found' in obs.content
-    assert obs.tool_result['error_code'] == 'SYMBOL_NOT_FOUND'
-
-
 def test_format_agent_edit_error_message_includes_rollback() -> None:
     message = format_agent_edit_error_message(
         {

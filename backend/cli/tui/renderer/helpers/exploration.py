@@ -7,14 +7,12 @@ from backend.ledger.action import (
     FindSymbolsAction,
     GlobAction,
     GrepAction,
-    ReadSymbolsAction,
 )
 from backend.ledger.observation import (
     AnalyzeProjectStructureObservation,
     FindSymbolsObservation,
     GlobObservation,
     GrepObservation,
-    ReadSymbolsObservation,
 )
 
 
@@ -64,14 +62,6 @@ def find_symbols_exploration_meta(
         tokens.append(f'kind: {symbol_kind}')
     if getattr(event, 'include_private', False):
         tokens.append('include-private')
-    return exploration_meta_line(tokens)
-
-
-def read_symbols_exploration_meta(event: ReadSymbolsAction) -> list[str]:
-    tokens: list[str] = []
-    symbol_kind = (getattr(event, 'symbol_kind', '') or '').strip()
-    if symbol_kind:
-        tokens.append(f'kind: {symbol_kind}')
     return exploration_meta_line(tokens)
 
 
@@ -125,27 +115,4 @@ def find_symbols_result_lines(
     return result_lines, search_file_list_from_paths(paths)
 
 
-def read_symbols_preview(event: ReadSymbolsObservation) -> str:
-    statuses: dict[str, int] = {}
-    lines: list[str] = []
-    for item in event.results:
-        status = str(item.get('status') or 'unknown')
-        statuses[status] = statuses.get(status, 0) + 1
-        target = str(
-            item.get('qualified_name')
-            or item.get('symbol_name')
-            or item.get('target')
-            or item.get('name')
-            or ''
-        ).strip()
-        path = str(item.get('path') or '').strip()
-        if target and path:
-            lines.append(f'{status}: {target} ({path})')
-        elif target:
-            lines.append(f'{status}: {target}')
-    summary = ', '.join(
-        f'{count} {status}' for status, count in sorted(statuses.items())
-    )
-    if lines:
-        return '\n'.join(([summary] if summary else []) + lines[:4])
-    return summary or (event.error or event.content or '')
+

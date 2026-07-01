@@ -360,18 +360,6 @@ def _summary_analyze_project(args: dict[str, Any]) -> str:
     return _trunc(' · '.join(parts), 120) if parts else 'scan workspace'
 
 
-def _summary_read_symbol(args: dict[str, Any]) -> str:
-    path = _arg_str(args, 'path')
-    symbols = args.get('symbols')
-    parts: list[str] = []
-    if isinstance(symbols, list) and symbols:
-        count = len(symbols)
-        parts.append(f'{count} symbol{"s" if count != 1 else ""}')
-    if path:
-        parts.append(f'in {_orient_path(path)}')
-    return ' '.join(parts) if parts else 'read symbol'
-
-
 def _summary_verify_file(args: dict[str, Any]) -> str:
     path = args.get('path') or args.get('file')
     if isinstance(path, str):
@@ -425,7 +413,6 @@ _TOOL_SUMMARIZERS: dict[str, Callable[[dict[str, Any]], str]] = {
     'glob': _summary_glob,
     'lsp': _summary_lsp,
     'analyze_project_structure': _summary_analyze_project,
-    'read_symbols': _summary_read_symbol,
     'verify_file_lines': _summary_verify_file,
     'delegate_task': _summary_delegate_task,
     'ask_user': _summary_ask_user,

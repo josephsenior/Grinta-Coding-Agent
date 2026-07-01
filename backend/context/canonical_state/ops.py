@@ -171,10 +171,15 @@ def reduce_snapshot_into_state(
     if event_id is None:
         event_id = _snapshot_latest_event_id(snapshot)
 
-    objective = _clean(snapshot.get('objective'))
+    from backend.context.compactor.pre_condensation_snapshot import (
+        snapshot_user_objective,
+    )
+
+    objective, latest_directive = snapshot_user_objective(snapshot)
+    objective = _clean(objective)
     if objective and not canonical.objective:
         _set_field(canonical, 'objective', objective, event_id, source)
-    latest_directive = _clean(snapshot.get('latest_directive'))
+    latest_directive = _clean(latest_directive)
     if latest_directive:
         _set_field(canonical, 'latest_directive', latest_directive, event_id, source)
         if (
@@ -489,7 +494,12 @@ def validate_canonical_state_for_compaction(
 
     snapshot = extract_snapshot(events)
     missing: list[str] = []
-    if snapshot.get('latest_directive') and not canonical.latest_directive:
+    from backend.context.compactor.pre_condensation_snapshot import (
+        snapshot_user_objective,
+    )
+
+    _, latest_directive = snapshot_user_objective(snapshot)
+    if latest_directive and not canonical.latest_directive:
         missing.append('latest_directive')
     if snapshot.get('files_touched') and not canonical.active_files:
         missing.append('active_files')

@@ -27,7 +27,6 @@ from backend.engine.tools._file_edits_symbols import (
     _build_create_file_action,
     _build_read_file_action,
     _handle_read_range_public,
-    _handle_read_symbols_public,
 )
 from backend.engine.tools._file_ops import (
     _guard_content_arguments,
@@ -51,10 +50,6 @@ def _handle_read_file_tool(arguments: Mapping[str, Any]) -> Action:
             )
         return _handle_read_range_public(arguments)
     return _build_read_file_action(str(path), {})
-
-
-def _handle_read_symbols_tool(arguments: Mapping[str, Any]) -> Action:
-    return _handle_read_symbols_public(arguments)
 
 
 def _handle_create_file_tool(arguments: Mapping[str, Any]) -> Action:

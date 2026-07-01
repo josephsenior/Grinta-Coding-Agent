@@ -212,6 +212,42 @@ class AutoCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     model_config = ConfigDict(extra='forbid')
 
 
+class CompositionCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
+    """Configuration for CompositionCompactor with layered pipeline."""
+
+    type: Literal['composition'] = Field(default='composition')
+    microcompact_recency: int = Field(
+        default=50,
+        description='Number of most-recent events to keep raw during microcompact.',
+        ge=1,
+    )
+    snip_max_events: int = Field(
+        default=1000,
+        description='Hard cap on total event count.',
+        ge=100,
+    )
+    summary_recency: int = Field(
+        default=50,
+        description='Number of most-recent events to exclude from summarization.',
+        ge=0,
+    )
+    post_compact_budget: int = Field(
+        default=50000,
+        description='Token budget for re-attaching files after compaction.',
+        ge=0,
+    )
+    post_compact_max_files: int = Field(
+        default=5,
+        description='Maximum number of files to re-attach.',
+        ge=0,
+    )
+    llm_config: LLMConfig | str | None = Field(
+        default=None,
+        description='LLM config for the summary layer. When set, old events before the recency window are summarized via LLM.',
+    )
+    model_config = ConfigDict(extra='forbid')
+
+
 class SmartCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     """Configuration for SmartCompactor with LLM-assisted importance scoring."""
 
@@ -260,6 +296,7 @@ CompactorConfig = (
     | AmortizedPruningCompactorConfig
     | StructuredSummaryCompactorConfig
     | CompactorPipelineConfig
+    | CompositionCompactorConfig
     | SmartCompactorConfig
     | AutoCompactorConfig
     | ContextPipelineConfig
@@ -342,6 +379,7 @@ def create_compactor_config(compactor_type: str, data: dict) -> CompactorConfig:
         'recent': RecentEventsCompactorConfig,
         'amortized': AmortizedPruningCompactorConfig,
         'structured': StructuredSummaryCompactorConfig,
+        'composition': CompositionCompactorConfig,
         'pipeline': CompactorPipelineConfig,
         'smart': SmartCompactorConfig,
         'auto': AutoCompactorConfig,

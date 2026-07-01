@@ -130,7 +130,6 @@ class TestFeatureFlagToolPresence:
         names = _build_toolset(enable_editor=True)
         public_file_tools = {
             'read_file',
-            'read_symbols',
             'find_symbols',
             'create_file',
             'replace_string',
@@ -301,7 +300,6 @@ class TestModeToolVisibility:
 
         assert names == {
             'read_file',
-            'read_symbols',
             'find_symbols',
             'grep',
             'glob',
@@ -379,7 +377,6 @@ class TestModeToolVisibility:
 
         assert names == {
             'read_file',
-            'read_symbols',
             'find_symbols',
             'grep',
             'glob',

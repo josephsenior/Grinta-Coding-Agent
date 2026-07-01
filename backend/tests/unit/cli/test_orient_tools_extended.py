@@ -28,8 +28,7 @@ from backend.cli.tool_display.orient_tools import (
     memory_persist_result,
     memory_recall_action_model,
     memory_recall_observation_model,
-    read_symbols_action_model,
-    read_symbols_result,
+
 )
 
 
@@ -46,15 +45,11 @@ def test_grep_and_glob_action_models() -> None:
     assert glob.tool == 'glob'
 
 
-def test_find_and_read_symbols_action_models() -> None:
+def test_find_symbols_action_model() -> None:
     find = find_symbols_action_model(
         SimpleNamespace(query='Auth', path='backend', candidates=[])
     )
     assert find.tool == 'find_symbols'
-    read = read_symbols_action_model(
-        SimpleNamespace(path='pkg/mod.py', targets=['Foo', 'Bar'])
-    )
-    assert 'symbol' in read.target
 
 
 def test_file_read_action_model_line_ranges() -> None:
@@ -122,20 +117,6 @@ def test_library_and_fetch_target_edge_cases() -> None:
     assert _fetch_target({'urls': ['https://a.com', 'https://b.com']}).startswith(
         'a.com'
     )
-
-
-def test_read_symbols_result_mixed_statuses() -> None:
-    results = [
-        {'status': 'resolved'},
-        {'status': 'ambiguous'},
-        {'status': 'not_found'},
-        {'status': 'unknown'},
-    ]
-    text = read_symbols_result(results)
-    assert 'resolved' in text
-    assert 'ambiguous' in text
-    assert 'not found' in text
-    assert 'unknown' in text
 
 
 def test_orient_line_with_result_on_mcp_models() -> None:

@@ -54,7 +54,6 @@ from backend.ledger.action.search import (
     FindSymbolsAction,
     GlobAction,
     GrepAction,
-    ReadSymbolsAction,
 )
 from backend.ledger.action.terminal import (
     TerminalCloseAction,
@@ -92,7 +91,6 @@ actions = (
     GrepAction,
     GlobAction,
     FindSymbolsAction,
-    ReadSymbolsAction,
     AnalyzeProjectStructureAction,
     CheckpointAction,
     WorkingMemoryAction,

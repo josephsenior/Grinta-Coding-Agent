@@ -31,6 +31,7 @@ from backend.context.compactor.pre_condensation_snapshot import (  # noqa: F401
     extract_snapshot,
     load_snapshot,
     save_snapshot,
+    snapshot_user_objective,
 )
 from backend.context.view import View
 
@@ -55,5 +56,6 @@ __all__ = [
     'load_snapshot',
     'project_after_compact_boundary',
     'save_snapshot',
+    'snapshot_user_objective',
     'View',
 ]

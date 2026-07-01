@@ -544,3 +544,10 @@ Respond ONLY with a JSON array of scores in order:
 
 
 # Lazy registration to avoid circular imports
+def _register_config():
+    from backend.core.config.compactor_config import SmartCompactorConfig
+
+    SmartCompactor.register_config(SmartCompactorConfig)
+
+
+_register_config()

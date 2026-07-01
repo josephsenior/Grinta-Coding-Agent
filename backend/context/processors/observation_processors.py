@@ -17,7 +17,6 @@ from backend.ledger.observation import (
     FindSymbolsObservation,
     MCPObservation,
     Observation,
-    ReadSymbolsObservation,
     TerminalObservation,
     UserRejectObservation,
 )
@@ -142,18 +141,6 @@ def _handle_find_symbols_observation(
         f'[FIND_SYMBOLS query={obs.query!r} path={obs.path!r} '
         f'symbol_kind={obs.symbol_kind!r}]'
     )
-    body = obs.error or obs.content
-    text = truncate_content(
-        f'{header}\n{body}', max_message_chars, strategy='head_heavy'
-    )
-    return Message(role='user', content=[TextContent(text=text)])
-
-
-@_register_observation_handler(ReadSymbolsObservation)
-def _handle_read_symbols_observation(
-    obs: ReadSymbolsObservation, max_message_chars: int | None
-) -> Message:
-    header = f'[READ_SYMBOLS path={obs.path!r} symbol_kind={obs.symbol_kind!r}]'
     body = obs.error or obs.content
     text = truncate_content(
         f'{header}\n{body}', max_message_chars, strategy='head_heavy'

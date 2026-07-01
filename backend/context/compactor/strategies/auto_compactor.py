@@ -140,7 +140,7 @@ class AutoCompactor(Compactor):
         event_count: int,
     ) -> bool:
         config_type = getattr(config, 'type', '')
-        if config_type in {'amortized', 'structured', 'smart'}:
+        if config_type in {'amortized', 'structured', 'smart', 'composition'}:
             return event_count > int(getattr(config, 'max_size', 0) or 0)
         return False
 

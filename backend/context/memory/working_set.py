@@ -189,9 +189,14 @@ def _build_current_state(snapshot: dict[str, Any]) -> dict[str, Any]:
     latest_test = _latest_test_result(snapshot)
     background_tasks = snapshot.get('background_tasks', [])
     blockers = _current_blockers(snapshot, latest_test)
+    from backend.context.compactor.pre_condensation_snapshot import (
+        snapshot_user_objective,
+    )
+
+    objective, latest_directive = snapshot_user_objective(snapshot)
     return {
-        'objective': str(snapshot.get('objective', '')).strip()[:500],
-        'latest_directive': str(snapshot.get('latest_directive', '')).strip()[:500],
+        'objective': objective[:500],
+        'latest_directive': latest_directive[:500],
         'active_files': _active_files(snapshot),
         'latest_test': latest_test,
         'unresolved_blockers': blockers,
@@ -266,7 +271,11 @@ def _infer_next_action(
         if status != 'passed':
             return f'Use the latest failing output from {command} to make the next fix.'
         return 'Continue from the latest directive; verification was last passing.'
-    latest_directive = str(snapshot.get('latest_directive', '')).strip()
+    from backend.context.compactor.pre_condensation_snapshot import (
+        snapshot_user_objective,
+    )
+
+    _, latest_directive = snapshot_user_objective(snapshot)
     if latest_directive:
         return 'Continue from the latest user directive.'
     return ''

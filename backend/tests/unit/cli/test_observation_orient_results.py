@@ -99,50 +99,6 @@ class TestOrientGlobAndFindSymbols:
         )
 
 
-class TestOrientReadSymbolsAndAnalyze:
-    def test_orient_read_symbols_result(self) -> None:
-        assert (
-            _ObsExplorationMixin._orient_read_symbols_result(
-                available=False, content='x'
-            )
-            == 'unavailable'
-        )
-        content = 'resolved foo -> bar\nambiguous x ~> y\nnot found z'
-        assert (
-            _ObsExplorationMixin._orient_read_symbols_result(
-                available=True, content=content
-            )
-            == '1 resolved · 1 ambiguous · 1 not found'
-        )
-
-    def test_orient_analyze_result(self) -> None:
-        assert (
-            _ObsExplorationMixin._orient_analyze_result(available=False, content='x')
-            == 'unavailable'
-        )
-        assert (
-            _ObsExplorationMixin._orient_analyze_result(available=True, content='  ')
-            == 'no output'
-        )
-        callers = 'Callers of foo\npkg/mod.py::bar()'
-        assert 'callers' in _ObsExplorationMixin._orient_analyze_result(
-            available=True, content=callers
-        )
-        deps = 'dependency graph\npkg <- other\nimport os'
-        assert 'deps' in _ObsExplorationMixin._orient_analyze_result(
-            available=True, content=deps
-        )
-        symbols = '# comment\nsymbol Foo\nsymbol Bar'
-        assert 'symbols' in _ObsExplorationMixin._orient_analyze_result(
-            available=True, content=symbols
-        )
-        assert (
-            _ObsExplorationMixin._orient_analyze_result(
-                available=True, content='file_outline complete'
-            )
-            == 'completed'
-        )
-
 
 class TestOrientGrepGlobExtended:
     @pytest.mark.parametrize(

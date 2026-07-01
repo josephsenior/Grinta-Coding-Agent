@@ -3,14 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
-
-from backend.ledger.action.agent import CondensationAction
-from backend.ledger.event import Event
-
-if TYPE_CHECKING:
-    pass
-
 
 _LAST_LLM_COMPACT_KEY = 'last_llm_compact_attempt'
 _LAST_BOUNDARY_COMPACT_KEY = 'last_boundary_compact_at'
@@ -32,15 +24,6 @@ _COMPACTION_TARGET_RATIO = 0.7
 # counter pinned at >=2 forever, silently disabling compaction until the
 # process is restarted.
 _CONSECUTIVE_CONDENSATION_DECAY_SECONDS = 30.0
-
-
-@dataclass
-class PipelineStepResult:
-    """Processed events for prompt build plus optional pending condensation."""
-
-    events: list[Event]
-    pending_action: CondensationAction | None = None
-    compacted: bool = False
 
 
 @dataclass(frozen=True)

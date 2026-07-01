@@ -412,88 +412,6 @@ def build_search_error_observation(
     return obs
 
 
-def format_read_symbols_failure_message(
-    failed: list[dict[str, Any]],
-    *,
-    total: int,
-) -> str:
-    if len(failed) == 1 and total == 1:
-        item = failed[0]
-        lines = [
-            str(item.get('message') or 'read_symbols failed.').split('\n', maxsplit=1)[
-                0
-            ]
-        ]
-        symbol = item.get('symbol_name') or item.get('target')
-        if symbol:
-            lines.append(f'Symbol: {symbol}')
-        hint = item.get('hint')
-        if hint and hint not in lines[0]:
-            lines.append(hint)
-        return '\n'.join(lines)
-
-    lines = [
-        f'read_symbols failed: {len(failed)} of {total} targets could not be resolved.'
-    ]
-    for item in failed[:5]:
-        symbol = item.get('symbol_name') or item.get('target') or '?'
-        status = str(item.get('status') or 'error').replace('_', ' ')
-        lines.append(f'  - {symbol}: {status}')
-    if len(failed) > 5:
-        lines.append(f'  - ... and {len(failed) - 5} more')
-    if any(str(item.get('status') or '') == 'ambiguous' for item in failed):
-        lines.append(_SYMBOL_AMBIGUITY_HINT)
-    return '\n'.join(lines)
-
-
-def build_read_symbols_error_tool_result(
-    failed: list[dict[str, Any]],
-    *,
-    total: int,
-) -> dict[str, Any]:
-    first = failed[0]
-    status = str(first.get('status') or 'error')
-    code_map = {
-        'not_found': 'SYMBOL_NOT_FOUND',
-        'ambiguous': 'SYMBOL_AMBIGUOUS',
-    }
-    tool_result: dict[str, Any] = {
-        'tool': 'read_symbols',
-        'ok': False,
-        'error_code': code_map.get(status, 'SYMBOL_LOOKUP_FAILED'),
-        'retryable': True,
-        'failed_count': len(failed),
-        'resolved_count': max(0, total - len(failed)),
-        'hint': _SYMBOL_AMBIGUITY_HINT,
-    }
-    symbol = first.get('symbol_name') or first.get('target')
-    if symbol:
-        tool_result['symbol'] = symbol
-    if len(failed) == 1 and first.get('candidates'):
-        tool_result['candidates'] = first['candidates']
-    if len(failed) > 1:
-        tool_result['failures'] = [
-            {
-                'symbol': item.get('symbol_name') or item.get('target'),
-                'status': item.get('status'),
-            }
-            for item in failed[:5]
-        ]
-    return tool_result
-
-
-def build_read_symbols_error_observation(
-    failed: list[dict[str, Any]],
-    *,
-    total: int,
-) -> Any:
-    from backend.ledger.observation import ErrorObservation
-
-    content = format_read_symbols_failure_message(failed, total=total)
-    obs = ErrorObservation(content)
-    obs.tool_result = build_read_symbols_error_tool_result(failed, total=total)
-    return obs
-
 
 def build_search_error_tool_result(
     *,
@@ -523,20 +441,4 @@ def compact_symbol_read_result(result: dict[str, Any]) -> dict[str, Any]:
     compact = dict(result)
     status = str(compact.get('status') or '')
     symbol_name = str(compact.get('symbol_name') or compact.get('target') or '')
-    if status == 'not_found':
-        compact['message'] = (
-            f"read_symbols failed: symbol '{symbol_name}' not found."
-            if symbol_name
-            else 'read_symbols failed: symbol not found.'
-        )
-        compact.pop('candidates', None)
-    elif status == 'ambiguous':
-        candidates = compact.get('candidates')
-        if isinstance(candidates, list):
-            compact['candidates'] = compact_symbol_candidates(candidates)
-        compact['message'] = (
-            f"read_symbols failed: symbol '{symbol_name}' is ambiguous "
-            f'({len(compact.get("candidates") or [])} matches).'
-        )
-        compact['hint'] = _SYMBOL_AMBIGUITY_HINT
     return compact

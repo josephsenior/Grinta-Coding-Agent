@@ -99,7 +99,7 @@ def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
             '- **Language servers (LSP / `lsp`)**: detected → '
             f'{"; ".join(lsp_entries)}. Use `lsp` for definition / '
             'references / hover / diagnostics on those languages. '
-            'For file edits use the public file API tools; `lsp` is read-only. For file reads use `read_file` / `read_symbols`.'
+            'For file edits use the public file API tools; `lsp` is read-only. For file reads use `read_file`.'
         )
     else:
         lsp_line = ''

@@ -57,7 +57,6 @@ class RendererThinkingMixin:
         'ANALYZE_PROJECT_STRUCTURE',
         'FIND_SYMBOLS',
         'READ',
-        'READ_SYMBOL_DEFINITION',
         'VERIFY_FILE_LINES',
     }
     _CHECKPOINT_THINK_TAGS = {
@@ -347,7 +346,6 @@ class RendererThinkingMixin:
         verb = {
             'FIND_SYMBOLS': 'Found',
             'READ': 'Read',
-            'READ_SYMBOL_DEFINITION': 'Read',
             'VERIFY_FILE_LINES': 'Verified',
         }.get(tag, 'Analyzed')
         return self._compact_activity_card(

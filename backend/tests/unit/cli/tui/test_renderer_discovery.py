@@ -112,55 +112,6 @@ async def test_tui_grep_observation_renders_orient_line(mock_config):
         assert lines[0].model.result == '1 file'
 
 @pytest.mark.asyncio
-async def test_tui_read_symbols_observation_updates_pending_card(mock_config):
-    console = RichConsole()
-    loop = asyncio.get_running_loop()
-    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
-
-    async with app.run_test(size=(120, 36)) as pilot:
-        await pilot.pause()
-
-        s = _get_screen(app)
-        renderer = TUIRenderer(
-            console=console,
-            hud=HUDBar(),
-            reasoning=ReasoningDisplay(),
-            tui=s,
-            loop=loop,
-        )
-        s._renderer = renderer
-
-        from backend.ledger.action.search import ReadSymbolsAction
-        from backend.ledger.observation.search import ReadSymbolsObservation
-
-        renderer._process_event(
-            ReadSymbolsAction(
-                targets=[{'symbol_name': 'UserService.login'}], path='auth.py'
-            )
-        )
-        renderer._process_event(
-            ReadSymbolsObservation(
-                content='{"status":"ok"}',
-                path='auth.py',
-                results=[
-                    {
-                        'status': 'resolved',
-                        'qualified_name': 'UserService.login',
-                        'path': 'auth.py',
-                    }
-                ],
-            )
-        )
-        await pilot.pause()
-
-        lines = list(s.query(OrientLine).results())
-        assert len(lines) == 1
-        assert lines[0].model.icon == '↳'
-        assert lines[0].model.verb == 'Read'
-        assert lines[0].model.target == '1 symbol in auth.py'
-        assert lines[0].model.result == '1 resolved'
-
-@pytest.mark.asyncio
 async def test_tui_glob_observation_renders_orient_line(mock_config):
     """``GlobObservation`` renders a flat glob row with the action pattern."""
     from backend.ledger.action.search import GlobAction

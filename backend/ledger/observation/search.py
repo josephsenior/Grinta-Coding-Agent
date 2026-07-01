@@ -76,26 +76,6 @@ class FindSymbolsObservation(Observation):
 
 
 @dataclass
-class ReadSymbolsObservation(Observation):
-    """Result of a ``read type=symbols`` request."""
-
-    path: str = ''
-    symbol_kind: str = ''
-    results: list[dict[str, object]] = field(default_factory=list)
-    error: str = ''
-    observation: ClassVar[str] = ObservationType.READ_SYMBOLS_RESULT
-
-    @property
-    def message(self) -> str:
-        if self.error:
-            return self.error
-        count = len(self.results)
-        if count:
-            return f'{count} symbol read result{"s" if count != 1 else ""}'
-        return 'No symbol results.'
-
-
-@dataclass
 class AnalyzeProjectStructureObservation(Observation):
     """Result of an ``analyze_project_structure`` command."""
 

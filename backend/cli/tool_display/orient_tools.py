@@ -287,56 +287,6 @@ def file_read_observation_model(obs: Any) -> OrientLineModel:
     )
 
 
-def read_symbols_action_model(action: Any) -> OrientLineModel:
-    targets = list(getattr(action, 'targets', []) or [])
-    path = getattr(action, 'path', '') or ''
-    target = f'{_plural(len(targets), "symbol")} in {_display_path(path)}'.strip()
-    return OrientLineModel(
-        tool='read_symbols',
-        icon='↳',
-        verb='Read',
-        target=target or _plural(len(targets), 'symbol'),
-        result='…',
-    )
-
-
-def read_symbols_observation_model(obs: Any) -> OrientLineModel:
-    results = list(getattr(obs, 'results', []) or [])
-    return OrientLineModel(
-        tool='read_symbols',
-        icon='↳',
-        verb='Read',
-        target=f'{_plural(len(results), "symbol")} in {_display_path(getattr(obs, "path", ""))}'.strip(),
-        result=read_symbols_result(results, error=str(getattr(obs, 'error', '') or '')),
-    )
-
-
-def read_symbols_result(results: list[Any], *, error: str = '') -> str:
-    if error:
-        return 'failed'
-    if not results:
-        return 'no symbols'
-    counts: dict[str, int] = {}
-    for item in results:
-        raw = str(item.get('status') if isinstance(item, dict) else 'unknown')
-        status = raw.replace('_', ' ').strip().lower() or 'unknown'
-        counts[status] = counts.get(status, 0) + 1
-    if set(counts) == {'resolved'}:
-        return f'{counts["resolved"]} resolved'
-    order = ('resolved', 'ambiguous', 'not found', 'not_found', 'unknown')
-    parts: list[str] = []
-    used: set[str] = set()
-    for key in order:
-        if key not in counts:
-            continue
-        label = key.replace('_', ' ')
-        parts.append(f'{counts[key]} {label}')
-        used.add(key)
-    for key in sorted(set(counts) - used):
-        parts.append(f'{counts[key]} {key}')
-    return ', '.join(parts)
-
-
 def lsp_action_model(action: Any) -> OrientLineModel:
     command = getattr(action, 'command', '') or 'query'
     symbol = getattr(action, 'symbol', '') or ''

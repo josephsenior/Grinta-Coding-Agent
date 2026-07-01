@@ -328,7 +328,6 @@ class TUIRenderer(
         self._pending_search_tool: str = ''
         self._pending_exploration_meta: list[str] | None = None
         self._pending_find_symbols_card: Any | None = None
-        self._pending_read_symbols_card: Any | None = None
         self._pending_analyze_project_structure_card: Any | None = None
         self._pending_mcp_card: Any | None = None
         self._pending_delegate_card: Any | None = None

@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Sequence
 from backend.core.config.compactor_config import (
     AmortizedPruningCompactorConfig,
     CompactorConfig,
+    CompositionCompactorConfig,
     MicrocompactCompactorConfig,
     NoOpCompactorConfig,
     RecentEventsCompactorConfig,
@@ -107,7 +108,7 @@ def compute_signals(events: Sequence[Event]) -> TaskSignals:
 _SHORT_SESSION = 30
 _MEDIUM_SESSION = 31  # Was 120; microcompact now activates at 31 to close the dead zone
 _LONG_SESSION = 250
-_HIGH_ERROR_RATIO = 0.15
+_HIGH_ERROR_RATIO = 0.08
 
 
 def select_compactor_config(
@@ -167,39 +168,27 @@ def select_compactor_config(
             'Auto-select compactor: recent (high error ratio %.2f)', sig.error_ratio
         )
         return RecentEventsCompactorConfig(
-            keep_first=3, max_events=min(sig.total_events, 80)
+            keep_first=3, max_events=min(sig.total_events, 150)
         )
 
-    # 4. Long normal session. Keep the synchronous pre-LLM path bounded by
-    # default; explicit condensation/recovery paths can still use LLM summaries.
+    # 4. Long normal session — use the composition pipeline.
+    # The composition pipeline runs ALL layers (microcompact → snip →
+    # summary → recent keep → reattach → reactive) in sequence instead
+    # of picking a single strategy. This preserves raw recent events
+    # while summarizing old history and clearing bloat.
     if sig.total_events >= _LONG_SESSION:
-        if llm_config and allow_llm_hot_path:
-            if supports_function_calling:
-                logger.info(
-                    'Auto-select compactor: structured (long session + function calling, %d events)',
-                    sig.total_events,
-                )
-                return StructuredSummaryCompactorConfig(
-                    llm_config=llm_config,
-                    max_size=200,
-                    keep_first=5,
-                )
-            logger.info(
-                'Auto-select compactor: smart (long session, %d events)',
-                sig.total_events,
-            )
-            return SmartCompactorConfig(
-                llm_config=llm_config,
-                max_size=200,
-                keep_first=5,
-            )
-        reason = 'LLM hot path disabled' if llm_config else 'no LLM'
         logger.info(
-            'Auto-select compactor: amortized (long session, %s, %d events)',
-            reason,
+            'Auto-select compactor: composition (long session, %d events)',
             sig.total_events,
         )
-        return AmortizedPruningCompactorConfig(max_size=150, keep_first=3)
+        return CompositionCompactorConfig(
+            microcompact_recency=50,
+            snip_max_events=1000,
+            summary_recency=50,
+            post_compact_budget=50000,
+            post_compact_max_files=5,
+            llm_config=llm_config,
+        )
 
     # 5. Medium session → microcompact tool outputs (light-weight)
     if sig.total_events >= _MEDIUM_SESSION:

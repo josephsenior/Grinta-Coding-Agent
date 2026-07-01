@@ -230,9 +230,7 @@ class TestPreCondensationSnapshot(unittest.TestCase):
 
         snapshot = extract_snapshot([first, latest, output])
 
-        assert snapshot['objective'] == 'Fix long-running compaction'
-        assert snapshot['latest_directive'] == 'Also preserve background processes'
-        assert snapshot['recent_user_messages'] == [
+        assert snapshot['user_messages'] == [
             {'text': 'Fix long-running compaction'},
             {'text': 'Also preserve background processes'},
         ]
@@ -543,3 +541,109 @@ class TestPreCondensationSnapshot(unittest.TestCase):
         ]
         assert 'FAILED approaches' in approaches[1]
         assert 'Succeeded approaches:' in approaches[-2]
+
+
+# ---------------------------------------------------------------------------
+# snapshot_user_objective helper
+# ---------------------------------------------------------------------------
+
+
+class TestSnapshotUserObjective(unittest.TestCase):
+    def test_extracts_first_and_last_from_user_messages(self):
+        from backend.context.compactor.pre_condensation_snapshot import (
+            snapshot_user_objective,
+        )
+
+        snapshot = {
+            'user_messages': [
+                {'text': 'Build a compiler'},
+                {'text': 'Add tests'},
+                {'text': 'Use the fltk backend'},
+            ]
+        }
+        objective, latest = snapshot_user_objective(snapshot)
+        assert objective == 'Build a compiler'
+        assert latest == 'Use the fltk backend'
+
+    def test_returns_empty_when_no_user_messages(self):
+        from backend.context.compactor.pre_condensation_snapshot import (
+            snapshot_user_objective,
+        )
+
+        snapshot = {'user_messages': []}
+        objective, latest = snapshot_user_objective(snapshot)
+        assert objective == ''
+        assert latest == ''
+
+    def test_returns_same_for_single_message(self):
+        from backend.context.compactor.pre_condensation_snapshot import (
+            snapshot_user_objective,
+        )
+
+        snapshot = {'user_messages': [{'text': 'Fix the bug'}]}
+        objective, latest = snapshot_user_objective(snapshot)
+        assert objective == 'Fix the bug'
+        assert latest == 'Fix the bug'
+
+    def test_falls_back_to_old_fields_for_backward_compat(self):
+        from backend.context.compactor.pre_condensation_snapshot import (
+            snapshot_user_objective,
+        )
+
+        snapshot = {
+            'objective': 'Old objective',
+            'latest_directive': 'Old directive',
+        }
+        objective, latest = snapshot_user_objective(snapshot)
+        assert objective == 'Old objective'
+        assert latest == 'Old directive'
+
+    def test_no_truncation_on_long_messages(self):
+        from backend.context.compactor.pre_condensation_snapshot import (
+            snapshot_user_objective,
+        )
+
+        long_text = 'A' * 5000
+        snapshot = {'user_messages': [{'text': long_text}]}
+        objective, latest = snapshot_user_objective(snapshot)
+        assert objective == long_text
+        assert latest == long_text
+
+
+# ---------------------------------------------------------------------------
+# user_messages: no truncation, all captured
+# ---------------------------------------------------------------------------
+
+
+class TestUserMessagesNoTruncation(unittest.TestCase):
+    def test_all_user_messages_captured_without_truncation(self):
+        long_msg = 'B' * 2000
+        first = MessageAction(content=long_msg)
+        first.source = EventSource.USER
+        second = MessageAction(content='Short message')
+        second.source = EventSource.USER
+        snapshot = extract_snapshot([first, second])
+        assert len(snapshot['user_messages']) == 2
+        assert snapshot['user_messages'][0]['text'] == long_msg
+        assert snapshot['user_messages'][1]['text'] == 'Short message'
+
+    def test_more_than_8_messages_all_captured(self):
+        messages = []
+        events = []
+        for i in range(15):
+            msg = MessageAction(content=f'Message {i}')
+            msg.source = EventSource.USER
+            events.append(msg)
+            messages.append(f'Message {i}')
+        snapshot = extract_snapshot(events)
+        assert len(snapshot['user_messages']) == 15
+        for i, item in enumerate(snapshot['user_messages']):
+            assert item['text'] == f'Message {i}'
+
+    def test_no_objective_or_latest_directive_fields(self):
+        first = MessageAction(content='Build something')
+        first.source = EventSource.USER
+        snapshot = extract_snapshot([first])
+        assert 'objective' not in snapshot
+        assert 'latest_directive' not in snapshot
+        assert 'recent_user_messages' not in snapshot

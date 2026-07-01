@@ -62,7 +62,6 @@ from backend.engine.tools import (
     create_find_symbols_tool,
     create_multiedit_tool,
     create_read_file_tool,
-    create_read_symbols_tool,
     create_replace_string_tool,
 )
 from backend.ledger.action import Action, AgentThinkAction
@@ -104,9 +103,6 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         cast(
             str, create_read_file_tool().get('function', {}).get('name', '')
         ): _handle_read_file_tool,
-        cast(
-            str, create_read_symbols_tool().get('function', {}).get('name', '')
-        ): _handle_read_symbols_tool,
         cast(
             str, create_find_symbols_tool().get('function', {}).get('name', '')
         ): _handle_find_symbols_tool,
@@ -214,7 +210,7 @@ def _validate_tool_mode(
         ):
             raise FunctionCallValidationError(
                 f'Tool `{tool_name}` is not available in Chat Mode. '
-                'Use discovery tools (read_file, read_symbol, grep, glob, find_symbols, lsp, analyze_project_structure) or ask_user only.'
+                'Use discovery tools (read_file, grep, glob, find_symbols, lsp, analyze_project_structure) or ask_user only.'
             )
     if normalized_mode == PLAN_MODE and tool_name not in PLAN_MODE_ALLOWED_TOOLS:
         raise FunctionCallValidationError(
@@ -272,23 +268,18 @@ from backend.engine.tools._file_edits import (  # noqa: E402, F401
     _apply_multi_edit_operation,
     _build_create_file_action,
     _build_read_file_action,
-    _coerce_read_symbol_targets,
     _handle_create_file_tool,
     _handle_find_symbols_tool,
     _handle_multi_edit_command,
     _handle_multiedit_tool,
     _handle_read_file_tool,
     _handle_read_range_public,
-    _handle_read_symbols_tool,
-    _handle_read_symbols_public,
     _handle_replace_string_tool,
     _multi_edit_raise,
     _multi_edit_relative_path,
     _normalize_multiedit_operations,
     _parse_multi_edit_operation,
-    _read_symbol_payload,
     _resolve_multi_edit_path,
-    _resolve_read_symbol_target,
 )
 from backend.engine.tools._file_ops import (  # noqa: E402, F401
     _SKIP_SYMBOL_SEARCH_PARTS,

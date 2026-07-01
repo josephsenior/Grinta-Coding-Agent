@@ -13,7 +13,6 @@ TIMEOUT_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
             steps=(
                 'The command may still be running. Verify current process/output state before retrying.',
                 'For setup/install tasks, run shorter sequential commands instead of one long chained command.',
-                'Increase pending_action_timeout in settings.json if your environment is consistently slow.',
             ),
             error_code='ERR-TIMEOUT-001',
         ),

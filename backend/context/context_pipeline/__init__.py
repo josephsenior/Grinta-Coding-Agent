@@ -30,7 +30,6 @@ from backend.context.context_pipeline.types import (
     _LAST_BOUNDARY_COMPACT_KEY,
     _LAST_LLM_COMPACT_KEY,
     _SKIP_COMPACTION_UNTIL_KEY,
-    PipelineStepResult,
     _ContinuityGateDecision,
 )
 from backend.context.memory.session_memory import (
@@ -42,7 +41,6 @@ from backend.context.memory.session_memory import (
 __all__ = [
     'ContextBudget',
     'ContextPipeline',
-    'PipelineStepResult',
     '_EmptyState',
     '_COMPACTION_TARGET_RATIO',
     '_CONSECUTIVE_CONDENSATION_KEY',

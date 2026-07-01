@@ -59,7 +59,6 @@ from backend.ledger.action.search import (
     FindSymbolsAction,
     GlobAction,
     GrepAction,
-    ReadSymbolsAction,
 )
 from backend.ledger.observation import (
     ErrorObservation,
@@ -382,12 +381,6 @@ class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
         from backend.engine.tools._file_edits import execute_find_symbols
 
         return await asyncio.to_thread(execute_find_symbols, action)
-
-    async def read_symbols(self, action: ReadSymbolsAction) -> Observation:
-        """Read one or more symbol definitions."""
-        from backend.engine.tools._file_edits import execute_read_symbols
-
-        return await asyncio.to_thread(execute_read_symbols, action)
 
     async def analyze_project_structure(
         self, action: AnalyzeProjectStructureAction
