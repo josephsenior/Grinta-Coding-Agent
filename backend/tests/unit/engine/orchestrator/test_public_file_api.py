@@ -108,7 +108,7 @@ def test_create_file_public_action_passes_through_and_rejects_serialized(
     assert isinstance(action, FileEditAction)
     assert action.command == 'create_file'
     assert action.file_text == 'print("ok")\n'
-    assert action.overwrite_existing is False
+    assert action.overwrite is False
 
     existing_action = _handle_create_file_tool(
         {
@@ -119,7 +119,17 @@ def test_create_file_public_action_passes_through_and_rejects_serialized(
     )
     assert isinstance(existing_action, FileEditAction)
     assert existing_action.command == 'create_file'
-    assert existing_action.overwrite_existing is False
+    assert existing_action.overwrite is False
+
+    overwrite_action = _handle_create_file_tool(
+        {
+            'path': 'existing.py',
+            'content': 'print("new")\n',
+            'overwrite': True,
+            'security_risk': 'LOW',
+        }
+    )
+    assert overwrite_action.overwrite is True
 
     with pytest.raises(FunctionCallValidationError, match='CONTENT_APPEARS_SERIALIZED'):
         _handle_create_file_tool(

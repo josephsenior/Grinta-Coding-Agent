@@ -238,27 +238,28 @@ class TestFileEditorCreate:
         assert 'Placeholder example content detected' in result.error
         assert not (Path(self.tmpdir) / 'placeholder.py').exists()
 
-    def test_create_file_rejects_any_existing_file_without_overwrite_existing(self):
+    def test_create_file_rejects_any_existing_file_without_overwrite(self):
         existing = Path(self.tmpdir) / 'big.py'
         existing.write_text(''.join(f'line_{i} = {i}\n' for i in range(250)))
         result = self.editor(
             command='create_file',
             path='big.py',
             file_text='print("rewritten")\n',
-            overwrite_existing=False,
+            overwrite=False,
         )
         assert result.error is not None
         assert result.error_code == 'CREATE_FILE_ALREADY_EXISTS'
-        assert result.error == 'File already exists.'
+        assert 'replace_string' in result.error
+        assert 'overwrite=true' in result.error
 
-    def test_create_file_overwrites_existing_file_when_overwrite_existing_is_true(self):
+    def test_create_file_overwrites_existing_file_when_overwrite_is_true(self):
         existing = Path(self.tmpdir) / 'big.py'
         existing.write_text(''.join(f'line_{i} = {i}\n' for i in range(250)))
         result = self.editor(
             command='create_file',
             path='big.py',
             file_text='print("rewritten")\n',
-            overwrite_existing=True,
+            overwrite=True,
         )
         assert result.error is None
         assert existing.read_text() == 'print("rewritten")\n'

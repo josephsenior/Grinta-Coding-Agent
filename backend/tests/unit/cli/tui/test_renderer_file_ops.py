@@ -455,7 +455,7 @@ async def test_tui_file_edit_observation_discards_pending_create_for_overwrite(
                 path='demo.txt',
                 command='create_file',
                 file_text='gamma',
-                overwrite_existing=True,
+                overwrite=True,
             )
         )
         obs = FileEditObservation(

@@ -13,14 +13,11 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Sequence
 
 from backend.core.config.compactor_config import (
-    AmortizedPruningCompactorConfig,
     CompactorConfig,
     CompositionCompactorConfig,
     MicrocompactCompactorConfig,
     NoOpCompactorConfig,
     RecentEventsCompactorConfig,
-    SmartCompactorConfig,
-    StructuredSummaryCompactorConfig,
 )
 from backend.core.logging.logger import app_logger as logger
 
@@ -171,11 +168,11 @@ def select_compactor_config(
             keep_first=3, max_events=min(sig.total_events, 150)
         )
 
-    # 4. Long normal session — use the composition pipeline.
-    # The composition pipeline runs ALL layers (microcompact → snip →
-    # summary → recent keep → reattach → reactive) in sequence instead
-    # of picking a single strategy. This preserves raw recent events
-    # while summarizing old history and clearing bloat.
+    # 4. Long normal session → composition pipeline.
+    # Runs all layers (microcompact → snip → summary → reattach → reactive)
+    # in sequence. The summary layer uses the LLM to condense old history
+    # into prose; if no LLM config is available it's skipped and the other
+    # layers still provide baseline compaction.
     if sig.total_events >= _LONG_SESSION:
         logger.info(
             'Auto-select compactor: composition (long session, %d events)',

@@ -34,8 +34,10 @@ from backend.ledger.action.mcp import MCPAction
 from backend.ledger.action.terminal import (
     TerminalCloseAction,
     TerminalInputAction,
+    TerminalListAction,
     TerminalReadAction,
     TerminalRunAction,
+    TerminalWaitAction,
 )
 
 _META_COGNITION_ACTION_TYPES = (

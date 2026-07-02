@@ -74,7 +74,7 @@ class FileEditAction(Action):
     expected_hash: str | None = None
     start_line: int | None = None
     end_line: int | None = None
-    overwrite_existing: bool = False
+    overwrite: bool = False
     structured_payload: dict[str, Any] | None = None
 
     def __repr__(self) -> str:

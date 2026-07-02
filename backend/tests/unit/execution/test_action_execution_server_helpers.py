@@ -394,7 +394,7 @@ def test_edit_via_file_editor_marks_replace_string_as_existing_file() -> None:
         end_line=None,
         edit_mode=None,
         expected_hash=None,
-        overwrite_existing=False,
+        overwrite=False,
     )
     with patch(
         'backend.execution.aes.file_operations.execute_file_editor',

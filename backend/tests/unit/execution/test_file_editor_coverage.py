@@ -92,7 +92,7 @@ class TestFileEditorCoverageGaps:
                 command='create_file',
                 path='file1.txt',
                 file_text='new1',
-                overwrite_existing=True,
+                overwrite=True,
             )
             assert self.editor._transaction_stack
         # Success pop
@@ -110,7 +110,7 @@ class TestFileEditorCoverageGaps:
                     command='create_file',
                     path='file1.txt',
                     file_text='new1',
-                    overwrite_existing=True,
+                    overwrite=True,
                 )
                 raise RuntimeError('Fail')
         except RuntimeError:
