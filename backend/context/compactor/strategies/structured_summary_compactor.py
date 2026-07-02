@@ -243,7 +243,12 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             )
 
     async def _get_llm_prose_summary(self, prompt: str, *, nudge: bool = False) -> str:
-        """Get a free-prose summary from the LLM (no tools, no schema)."""
+        """Get a free-prose summary from the LLM (no tools, no schema).
+
+        Streams the completion when a ``streaming_emitter`` is configured
+        on the compactor (so the TUI can show the summary in real time);
+        otherwise falls back to a single non-streaming call.
+        """
         assert self.llm is not None, 'LLM required for prose compactor'
         messages = [
             Message(
@@ -251,9 +256,11 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
                 content=[TextContent(text=prompt + (_REPAIR_NUDGE if nudge else ''))],
             )
         ]
-        response = await self.llm.acompletion(
-            messages=self.llm.format_messages_for_llm(messages),
-        )
+        formatted = self.llm.format_messages_for_llm(messages)
+        if getattr(self, 'streaming_emitter', None) is not None:
+            response = await self._stream_llm_completion(formatted)
+        else:
+            response = await self.llm.acompletion(messages=formatted)
         self._add_response_metadata(response)
         return self._extract_prose_content(response)
 

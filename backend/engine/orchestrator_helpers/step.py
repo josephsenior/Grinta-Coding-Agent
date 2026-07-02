@@ -99,7 +99,9 @@ async def _astep_normal_path(orch: Orchestrator, state: State) -> Action:
         return pending
 
     emitted_compaction_status = _emit_compaction_status_if_needed(orch, state)
-    condensed = await orch.memory_manager.condense_history(state)
+    condensed = await orch.memory_manager.condense_history(
+        state, event_stream=orch.event_stream
+    )
     if condensed.pending_action is not None and not emitted_compaction_status:
         _emit_compaction_status(orch)
     action = await orch._execute_llm_step_async(state, condensed)
@@ -137,7 +139,9 @@ async def _astep_handle_context_limit_error(orch: Orchestrator, state: State) ->
 
     try:
         emitted_compaction_status = _emit_compaction_status_if_needed(orch, state)
-        condensed = await orch.memory_manager.condense_history(state)
+        condensed = await orch.memory_manager.condense_history(
+            state, event_stream=orch.event_stream
+        )
         if condensed.pending_action is not None and not emitted_compaction_status:
             _emit_compaction_status(orch)
         action = await _execute_llm_step_async(orch, state, condensed)
@@ -186,7 +190,9 @@ async def _attempt_graceful_context_degradation(
         if shrunk == 0 and dropped == 0:
             return None
         _emit_compaction_status(orch)
-        condensed = await orch.memory_manager.condense_history(state)
+        condensed = await orch.memory_manager.condense_history(
+            state, event_stream=orch.event_stream
+        )
         return await _execute_llm_step_async(orch, state, condensed)
     except ContextLimitError:
         logger.error('Graceful degradation insufficient — context still overflows')

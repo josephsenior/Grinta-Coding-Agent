@@ -5,7 +5,7 @@ Each card is exactly 1 line tall with a ``⤢`` detail button.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from backend.cli.theme import NAVY_RUNNING
 from backend.cli.tui.widgets.glyphs import glyph as _glyph
@@ -782,6 +782,9 @@ class CompactionCard(ScanLineCard):
     def __init__(self, *, summary: str = '', id: str | None = None) -> None:
         super().__init__(id=id)
         self.summary = summary
+        # Live detail screen push: when a screen is opened from this card it
+        # registers itself here so streaming updates can re-render the body.
+        self._live_detail_screen: Any | None = None
         if summary:
             self.set_state('done')
         else:
@@ -794,6 +797,37 @@ class CompactionCard(ScanLineCard):
     def complete(self, *, summary: str) -> None:
         self.summary = summary
         self.set_state('done')
+        self._push_summary_to_live_screen()
+
+    def update_summary_streaming(self, text: str) -> None:
+        """Update the streaming summary in place.
+
+        Called by the renderer as ``StreamingChunkAction`` events with
+        ``tool_call_name='compaction'`` arrive. The card stays in the
+        ``running`` state while text is streaming and refreshes the 1-line
+        preview, then the open detail screen (if any) is re-poked.
+        """
+        if not text:
+            return
+        self.summary = text
+        if self._state != 'running':
+            # Keep the running indicator while streaming, in case the card
+            # was already marked done by a stale CondensationAction.
+            self.set_state('running')
+        else:
+            self._refresh_line()
+        self._push_summary_to_live_screen()
+
+    def _push_summary_to_live_screen(self) -> None:
+        screen = getattr(self, '_live_detail_screen', None)
+        if screen is None:
+            return
+        set_body = getattr(screen, 'set_body', None)
+        if callable(set_body):
+            try:
+                set_body(self.summary or '(no summary)')
+            except Exception:  # noqa: BLE001
+                pass
 
     def _line_text(self) -> str:
         return self._scan_summary_line(_scan_label_with_icon(self._label), '', detail_max=50)
@@ -808,10 +842,15 @@ class CompactionCard(ScanLineCard):
     def build_detail_screen(self) -> DetailScreen:
         from backend.cli.tui.screens.detail.payload import PayloadDetailScreen
 
-        return PayloadDetailScreen(
+        screen = PayloadDetailScreen(
             kind='Compaction',
             heading=self._label,
             body=self.summary or '(no summary)',
             accent=self.state_border_color,
             title='Compaction',
         )
+        # Register the screen so subsequent streaming updates can
+        # re-render its body in real time. The screen clears this back
+        # pointer in its on_unmount handler.
+        self._live_detail_screen = screen
+        return screen

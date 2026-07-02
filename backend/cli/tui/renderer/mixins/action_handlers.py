@@ -201,6 +201,12 @@ class RendererActionHandlersMixin:
         if action.is_tool_call:
             return
 
+        # Compaction summary chunks: route to the pending CompactionCard so
+        # the summary text appears in real time on the detail screen.
+        if getattr(action, 'tool_call_name', '') == 'compaction':
+            self._stream_to_compaction_card(action)
+            return
+
         if action.is_final:
             self._stream_paint_timer_armed = False
             self._deferred_stream_chunk = None
@@ -227,6 +233,22 @@ class RendererActionHandlersMixin:
 
         self._last_stream_paint_at = now
         self._apply_streaming_chunk(action)
+
+    def _stream_to_compaction_card(self, action: StreamingChunkAction) -> None:
+        """Update the pending compaction scan card with a streamed chunk."""
+        card = getattr(self, '_pending_compaction_scan_card', None)
+        if card is None:
+            return
+        text = action.accumulated or action.chunk or ''
+        if not text:
+            return
+        update = getattr(card, 'update_summary_streaming', None)
+        if callable(update):
+            update(text)
+        elif hasattr(card, 'summary'):
+            card.summary = text
+            if hasattr(card, '_refresh_line'):
+                card._refresh_line()
 
     def _flush_deferred_stream_chunk(self) -> None:
         self._stream_paint_timer_armed = False
