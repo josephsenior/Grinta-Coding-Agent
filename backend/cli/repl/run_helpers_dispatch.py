@@ -146,11 +146,11 @@ async def _process_slash_command(
     """Handle /command. Returns (continue_loop, controller, agent_task) or None to break."""
     from backend.cli.repl.slash_registry_models import SlashCommandParseError
     from backend.cli.repl.slash_registry_parsing import (
-        _parse_slash_command,
+        parse_slash_command,
     )
 
     try:
-        parsed_command = _parse_slash_command(text)
+        parsed_command = parse_slash_command(text)
     except SlashCommandParseError as exc:
         host._warn(str(exc))
         return True, controller, agent_task

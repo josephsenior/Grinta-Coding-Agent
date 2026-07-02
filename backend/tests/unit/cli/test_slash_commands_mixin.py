@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 from rich.console import Console
 
 from backend.cli.repl.slash_commands_mixin import SlashCommandsMixin
-from backend.cli.repl.slash_registry_parsing import _parse_slash_command
+from backend.cli.repl.slash_registry_parsing import parse_slash_command
 
 # ---------------------------------------------------------------------------
 # Minimal fake host class that provides SlashCommandsMixin requirements
@@ -104,7 +104,7 @@ def _repl(project_root: Path | None = None) -> _FakeRepl:
 
 
 def _parse(cmd: str):
-    return _parse_slash_command(cmd)
+    return parse_slash_command(cmd)
 
 
 # ---------------------------------------------------------------------------
