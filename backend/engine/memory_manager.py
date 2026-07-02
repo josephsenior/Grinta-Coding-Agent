@@ -228,6 +228,8 @@ class ContextMemoryManager:
         state: State,
         history: list,
         condensation_result: View | object,
+        *,
+        emitter: Any | None = None,
     ) -> object:
         """When memory pressure is active and compaction returned a plain View, try forced compaction."""
         memory_pressure = self._memory_pressure_signal(state)
@@ -248,7 +250,17 @@ class ContextMemoryManager:
                 memory_pressure,
             )
             try:
-                forced = await self.compactor.get_compaction(condensation_result)
+                if emitter is not None and hasattr(self.compactor, 'streaming_emitter'):
+                    previous = self.compactor.streaming_emitter
+                    self.compactor.streaming_emitter = emitter
+                    try:
+                        forced = await self.compactor.get_compaction(
+                            condensation_result
+                        )
+                    finally:
+                        self.compactor.streaming_emitter = previous
+                else:
+                    forced = await self.compactor.get_compaction(condensation_result)
                 condensation_result = forced
             except Exception as exc:
                 logger.warning('Forced compaction failed: %s', exc)
@@ -259,6 +271,8 @@ class ContextMemoryManager:
         self,
         state: State,
         condensation_result: View | object,
+        *,
+        emitter: Any | None = None,
     ) -> object:
         """Honor an explicit condensation request even if normal thresholds do not fire."""
         if not self._has_unhandled_condensation_request(state) or not isinstance(
@@ -273,14 +287,24 @@ class ContextMemoryManager:
 
         logger.info('Explicit condensation request: forcing compaction')
         try:
+            if emitter is not None and hasattr(self.compactor, 'streaming_emitter'):
+                previous = self.compactor.streaming_emitter
+                self.compactor.streaming_emitter = emitter
+                try:
+                    return await self.compactor.get_compaction(condensation_result)
+                finally:
+                    self.compactor.streaming_emitter = previous
             return await self.compactor.get_compaction(condensation_result)
         except Exception as exc:
             logger.warning('Explicit-request compaction failed: %s', exc)
             return condensation_result
 
-    async def condense_history(self, state: State) -> CondensedHistory:
+    async def condense_history(
+        self, state: State, *, event_stream: Any | None = None
+    ) -> CondensedHistory:
+        emitter = self._build_streaming_emitter(event_stream)
         if self._pipeline is not None:
-            return await self._pipeline.prepare_step(state)
+            return await self._pipeline.prepare_step(state, streaming_emitter=emitter)
 
         from backend.context.memory.session_context import bind_session_context
 
@@ -300,15 +324,15 @@ class ContextMemoryManager:
         snapshot_elapsed = time.perf_counter() - snapshot_started
 
         condensation_result = await self._get_condensation_result(
-            state, history, snapshot_elapsed
+            state, history, snapshot_elapsed, emitter=emitter
         )
 
         postprocess_started = time.perf_counter()
         condensation_result = await self._maybe_force_compaction_for_explicit_request(
-            state, condensation_result
+            state, condensation_result, emitter=emitter
         )
         condensation_result = await self._maybe_force_compaction_under_memory_pressure(
-            state, history, condensation_result
+            state, history, condensation_result, emitter=emitter
         )
         memory_pressure = self._memory_pressure_signal(state)
 
@@ -331,8 +355,43 @@ class ContextMemoryManager:
             postprocess_started,
         )
 
+    @staticmethod
+    def _build_streaming_emitter(event_stream: Any | None) -> Any | None:
+        """Build a streaming emitter for the compactor from an EventStream.
+
+        Returns ``None`` when no event stream is available or when the
+        necessary action class is not importable.
+        """
+        if event_stream is None:
+            return None
+        try:
+            from backend.ledger.action.message import StreamingChunkAction
+            from backend.ledger.event import EventSource
+        except Exception:
+            return None
+
+        def _emit(chunk: str, accumulated: str, is_final: bool) -> None:
+            try:
+                ev = StreamingChunkAction(
+                    chunk=chunk,
+                    accumulated=accumulated,
+                    is_final=is_final,
+                    tool_call_name='compaction',
+                )
+                ev.source = EventSource.AGENT
+                event_stream.add_event(ev, EventSource.AGENT)
+            except Exception as exc:  # noqa: BLE001
+                logger.debug('compaction streaming emit failed: %s', exc)
+
+        return _emit
+
     async def _get_condensation_result(
-        self, state: State, history: list, snapshot_elapsed: float
+        self,
+        state: State,
+        history: list,
+        snapshot_elapsed: float,
+        *,
+        emitter: Any | None = None,
     ) -> Any:
         turn_signals = getattr(state, 'turn_signals', None)
         prewarmed = getattr(turn_signals, 'prewarmed_compaction', None)
@@ -342,7 +401,14 @@ class ContextMemoryManager:
             )
         compaction_started = time.perf_counter()
         assert self.compactor is not None
-        result = await self.compactor.compacted_history(state)
+        previous_emitter = getattr(self.compactor, 'streaming_emitter', None)
+        if emitter is not None:
+            self.compactor.streaming_emitter = emitter
+        try:
+            result = await self.compactor.compacted_history(state)
+        finally:
+            if emitter is not None:
+                self.compactor.streaming_emitter = previous_emitter
         logger.info(
             'ContextMemoryManager.condense_history compactor returned %s (history_events=%d snapshot=%.3fs compactor=%.3fs)',
             type(result).__name__,

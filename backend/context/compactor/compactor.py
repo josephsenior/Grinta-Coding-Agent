@@ -234,14 +234,20 @@ class BaseLLMCompactor(RollingCompactor, ABC):
         max_size: int = 100,
         keep_first: int = 1,
         max_event_length: int = 10000,
+        *,
+        streaming_emitter: Any | None = None,
     ) -> None:
         """Initialize the LLM-based compactor.
 
         Args:
-            llm: Language model instance for generating summaries or scoring.
+            llm: Language model instance for generating summaries.
             max_size: Maximum number of events before condensation is triggered.
             keep_first: Number of initial events to always preserve.
             max_event_length: Maximum character length for individual event content.
+            streaming_emitter: Optional async callable invoked with
+                ``(chunk, accumulated, is_final)`` for each LLM streaming
+                chunk during summary generation. Subclasses that support
+                streaming can hook in here. Default is ``None`` (no streaming).
         """
         if max_size < 1:
             msg = f'max_size ({max_size}) must be positive'
@@ -258,6 +264,7 @@ class BaseLLMCompactor(RollingCompactor, ABC):
         self.max_size = max_size
         self.keep_first = keep_first
         self.max_event_length = max_event_length
+        self.streaming_emitter = streaming_emitter
         super().__init__()
         self._validate_llm()
 
@@ -347,6 +354,73 @@ class BaseLLMCompactor(RollingCompactor, ABC):
         self.add_metadata('response', model_dump_with_options(response))
         if hasattr(self, 'llm') and self.llm:
             self.add_metadata('metrics', self.llm.metrics.get())
+
+    async def _stream_llm_completion(
+        self, messages: list[dict[str, Any]]
+    ) -> dict[str, Any]:
+        """Stream a chat completion through the LLM, calling the streaming emitter.
+
+        If ``self.streaming_emitter`` is None, falls back to a non-streaming
+        ``acompletion`` call. If the LLM does not support ``astream``,
+        also falls back to ``acompletion``.
+
+        Args:
+            messages: Pre-formatted messages for the LLM.
+
+        Returns:
+            A response dict compatible with the LLM provider's contract
+            (same shape as ``acompletion`` returns).
+        """
+        if self.llm is None:
+            raise RuntimeError('LLM required for streaming completion')
+        emitter = getattr(self, 'streaming_emitter', None)
+        astream = getattr(self.llm, 'astream', None)
+        if emitter is None or astream is None:
+            return await self.llm.acompletion(messages=messages)
+
+        accumulated = ''
+        last_chunk: dict[str, Any] | None = None
+        try:
+            async for chunk in self.llm.astream(messages=messages):
+                last_chunk = chunk
+                choices = chunk.get('choices') if isinstance(chunk, dict) else None
+                if not choices:
+                    continue
+                delta = choices[0].get('delta') or {}
+                piece = delta.get('content') or ''
+                if not isinstance(piece, str):
+                    piece = '' if piece is None else str(piece)
+                if piece:
+                    accumulated += piece
+                    try:
+                        result = emitter(piece, accumulated, False)
+                        if hasattr(result, '__await__'):
+                            await result
+                    except Exception as emit_exc:  # noqa: BLE001
+                        logger.warning(
+                            'compactor streaming emitter raised: %s', emit_exc
+                        )
+        except Exception as stream_exc:
+            logger.warning(
+                'Compactor astream failed (%s); falling back to acompletion',
+                type(stream_exc).__name__,
+            )
+            return await self.llm.acompletion(messages=messages)
+
+        # Notify emitter of completion.
+        if last_chunk is not None:
+            try:
+                result = emitter('', accumulated, True)
+                if hasattr(result, '__await__'):
+                    await result
+            except Exception as emit_exc:  # noqa: BLE001
+                logger.warning(
+                    'compactor streaming emitter (final) raised: %s', emit_exc
+                )
+            return last_chunk
+
+        # Stream produced no chunks — fall back to acompletion.
+        return await self.llm.acompletion(messages=messages)
 
     def _create_compaction_result(
         self, pruned_events: list[Event], summary: str

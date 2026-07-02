@@ -125,13 +125,50 @@ class ContextPipeline:
     # Public API
     # ------------------------------------------------------------------ #
 
-    async def prepare_step(self, state: State) -> CondensedHistory:
-        """Run compaction layers; always commit a boundary when over threshold."""
+    async def prepare_step(
+        self, state: State, *, streaming_emitter: Any | None = None
+    ) -> CondensedHistory:
+        """Run compaction layers; always commit a boundary when over threshold.
+
+        When ``streaming_emitter`` is provided, it is attached to the cached
+        structured-summary compactor so that the LLM stream can be observed
+        in real time by the TUI's compaction card.
+        """
         started = time.perf_counter()
         bind_session_context(state=state)
         history = list(getattr(state, 'history', []))
         llm_config = self._llm_config(state)
 
+        # If a streaming emitter is supplied, attach it to the cached
+        # structured-summary compactor. Restore the previous emitter on
+        # exit so we never leak the caller's emitter across steps.
+        previous_emitter: Any = None
+        compactor_owner: Any = None
+        if streaming_emitter is not None:
+            compactor_owner = self._get_structured_compactor(state)
+            if compactor_owner is not None and hasattr(
+                compactor_owner, 'streaming_emitter'
+            ):
+                previous_emitter = compactor_owner.streaming_emitter
+                compactor_owner.streaming_emitter = streaming_emitter
+        try:
+            return await self._prepare_step_impl(
+                state,
+                history,
+                llm_config,
+                started,
+            )
+        finally:
+            if compactor_owner is not None:
+                compactor_owner.streaming_emitter = previous_emitter
+
+    async def _prepare_step_impl(
+        self,
+        state: State,
+        history: list,
+        llm_config: Any,
+        started: float,
+    ) -> CondensedHistory:
         self._extract_pre_condensation_snapshot(state, history)
         reduce_events_into_state(history, state=state, source='context_pipeline')
         post_boundary = self._project_layers_1_to_3(
