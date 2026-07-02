@@ -32,7 +32,7 @@ def _build_create_file_action(path: str, arguments: Mapping[str, Any]) -> Action
         path=path,
         command='create_file',
         file_text=file_text,
-        overwrite_existing=bool(arguments.get('overwrite_existing', False)),
+        overwrite=bool(arguments.get('overwrite', False)),
         impl_source=FileEditSource.FILE_EDITOR,
     )
 

@@ -13,6 +13,11 @@ _SYMBOL_AMBIGUITY_HINT = (
     'Retry with path + qualified_name + symbol_kind, or use symbol_id.'
 )
 
+_CREATE_FILE_EXISTS_HINT = (
+    'To modify it, use replace_string (preferred). '
+    'If you intend to replace the entire contents, retry with overwrite=true.'
+)
+
 
 def compact_symbol_candidates(
     candidates: list[dict[str, Any]],
@@ -86,7 +91,10 @@ def summarize_editor_error(result: Any) -> tuple[str, str, bool, dict[str, Any]]
         'CONTENT_APPEARS_SERIALIZED': (
             'content appears serialized (literal escape sequences).'
         ),
-        'CREATE_FILE_ALREADY_EXISTS': 'create failed: file already exists.',
+        'CREATE_FILE_ALREADY_EXISTS': (
+            'File exists. To modify it, use replace_string (preferred). '
+            'If you intend to replace the entire contents, retry with overwrite=true.'
+        ),
         'EMPTY_OLD_STRING': 'replace_string failed: old_string must not be empty.',
         'REPLACE_STRING_ERROR': 'replace_string failed.',
         'UNDO_NO_PRIOR_VERSION': (
@@ -326,6 +334,7 @@ def normalize_editor_error_response(
         **{key: value for key, value in extra.items() if value is not None},
     }
     if error_code == 'CREATE_FILE_ALREADY_EXISTS':
+        context['hint'] = _CREATE_FILE_EXISTS_HINT
         old_content = getattr(result, 'old_content', None)
         if old_content:
             context['existing_content'] = old_content

@@ -21,9 +21,9 @@ from backend.context.view import View
 from backend.core.config.compactor_config import (
     AmortizedPruningCompactorConfig,
     AutoCompactorConfig,
+    CompositionCompactorConfig,
     NoOpCompactorConfig,
     RecentEventsCompactorConfig,
-    SmartCompactorConfig,
     StructuredSummaryCompactorConfig,
 )
 from backend.core.config.llm_config import LLMConfig
@@ -158,36 +158,17 @@ class TestSelectCompactorConfig:
         config = select_compactor_config(events)
         assert isinstance(config, RecentEventsCompactorConfig)
 
-    def test_long_session_with_llm_defaults_to_amortized(self):
+    def test_long_session_returns_composition(self):
         events = _make_events(_LONG_SESSION + 10)
         config = select_compactor_config(events, llm_config='condenser_llm')
-        assert isinstance(config, AmortizedPruningCompactorConfig)
-
-    def test_long_session_with_llm_hot_path_allowed_returns_smart(self):
-        events = _make_events(_LONG_SESSION + 10)
-        config = select_compactor_config(
-            events,
-            llm_config='condenser_llm',
-            allow_llm_hot_path=True,
-        )
-        assert isinstance(config, SmartCompactorConfig)
+        assert isinstance(config, CompositionCompactorConfig)
         assert config.llm_config == 'condenser_llm'
 
-    def test_long_session_with_function_calling_hot_path_returns_structured(self):
-        events = _make_events(_LONG_SESSION + 10)
-        config = select_compactor_config(
-            events,
-            llm_config='condenser_llm',
-            supports_function_calling=True,
-            allow_llm_hot_path=True,
-        )
-        assert isinstance(config, StructuredSummaryCompactorConfig)
-        assert config.llm_config == 'condenser_llm'
-
-    def test_long_session_no_llm_returns_amortized(self):
+    def test_long_session_returns_composition_with_no_llm_config(self):
         events = _make_events(_LONG_SESSION + 10)
         config = select_compactor_config(events, llm_config=None)
-        assert isinstance(config, AmortizedPruningCompactorConfig)
+        assert isinstance(config, CompositionCompactorConfig)
+        assert config.llm_config is None
 
     def test_medium_session_returns_microcompact(self):
         events = _make_events(_MEDIUM_SESSION + 10)
@@ -260,7 +241,7 @@ class TestAutoCompactor:
         delegate.get_compaction.assert_awaited_once_with(view)
         assert result is compaction
 
-    async def test_normal_long_session_with_llm_uses_bounded_delegate(self):
+    async def test_normal_long_session_uses_composition(self):
         auto = AutoCompactor(llm_config='condenser_llm', llm_registry=MagicMock())
         view = View(events=_make_events(_LONG_SESSION + 10))
         delegate = MagicMock()
@@ -273,7 +254,7 @@ class TestAutoCompactor:
             result = await auto.compact(view)
 
         config = factory.call_args.args[0]
-        assert isinstance(config, AmortizedPruningCompactorConfig)
+        assert isinstance(config, CompositionCompactorConfig)
         assert result is view
 
     async def test_normal_long_session_can_opt_into_llm_hot_path(self):
@@ -293,10 +274,10 @@ class TestAutoCompactor:
             result = await auto.compact(view)
 
         config = factory.call_args.args[0]
-        assert isinstance(config, SmartCompactorConfig)
+        assert isinstance(config, CompositionCompactorConfig)
         assert result is view
 
-    async def test_background_long_session_uses_structured_when_supported(self):
+    async def test_background_long_session_uses_composition_when_supported(self):
         llm_config = LLMConfig.model_validate({'model': 'openai/gpt-4o'})
         auto = AutoCompactor(llm_config=llm_config, llm_registry=MagicMock())
         view = View(events=_make_events(_LONG_SESSION + 10))
@@ -310,10 +291,10 @@ class TestAutoCompactor:
             result = await auto.compact_background(view)
 
         config = factory.call_args.args[0]
-        assert isinstance(config, StructuredSummaryCompactorConfig)
+        assert isinstance(config, CompositionCompactorConfig)
         assert result is view
 
-    async def test_background_falls_back_when_structured_delegate_unavailable(self):
+    async def test_background_falls_back_when_composition_delegate_unavailable(self):
         llm_config = LLMConfig.model_validate({'model': 'openai/gpt-4o'})
         auto = AutoCompactor(llm_config=llm_config, llm_registry=MagicMock())
         view = View(events=_make_events(_LONG_SESSION + 10))
@@ -322,8 +303,8 @@ class TestAutoCompactor:
 
         def make_delegate(config, registry):
             del registry
-            if isinstance(config, StructuredSummaryCompactorConfig):
-                raise ValueError('function calling unavailable')
+            if isinstance(config, CompositionCompactorConfig):
+                raise ValueError('composition unavailable')
             return delegate
 
         with patch(
@@ -333,8 +314,8 @@ class TestAutoCompactor:
             result = await auto.compact_background(view)
 
         configs = [call.args[0] for call in factory.call_args_list]
-        assert isinstance(configs[0], StructuredSummaryCompactorConfig)
-        assert isinstance(configs[1], SmartCompactorConfig)
+        assert isinstance(configs[0], CompositionCompactorConfig)
+        assert isinstance(configs[1], AmortizedPruningCompactorConfig)
         assert result is view
 
     def test_status_prediction_for_normal_long_session(self):

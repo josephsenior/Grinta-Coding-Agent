@@ -78,14 +78,21 @@ def create_create_file_tool() -> ChatCompletionToolParam:
     return create_tool_definition(
         name=CREATE_FILE_TOOL_NAME,
         description=(
-            'Create a new file. Fails if the file already exists; use replace_string '
-            'or multiedit to modify an existing file.'
+            'Create a new file. Fails if the file already exists unless overwrite=true; '
+            'use replace_string or multiedit to modify an existing file.'
         ),
         properties={
             'path': get_path_param('Project-relative target path.'),
             'content': {
                 'type': 'string',
                 'description': 'Raw file content. Use real newlines.',
+            },
+            'overwrite': {
+                'type': 'boolean',
+                'description': (
+                    'Replace an existing file entirely. Default false fails when the path '
+                    'already exists.'
+                ),
             },
             'security_risk': get_security_risk_param(),
         },

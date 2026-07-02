@@ -34,14 +34,14 @@ class TestFileEditorRecreate(unittest.TestCase):
         self.assertEqual(result.new_content, 'new content')
         self.assertEqual(path.read_text(encoding='utf-8'), 'original content')
 
-    def test_create_file_overwrite_existing_file(self):
+    def test_create_file_overwrite_file(self):
         path = Path(self.tmpdir) / 'file.py'
         path.write_text('old', encoding='utf-8')
 
         result = self.editor._handle_write(
             path,
             'new',
-            overwrite_existing=True,
+            overwrite=True,
         )
 
         self.assertIsNone(result.error)

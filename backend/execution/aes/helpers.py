@@ -944,7 +944,7 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
         end_line=getattr(action, 'end_line', None),
         edit_mode=edit_mode,
         expected_hash=getattr(action, 'expected_hash', None),
-        overwrite_existing=getattr(action, 'overwrite_existing', False),
+        overwrite=getattr(action, 'overwrite', False),
     )
     if tool_result.get('ok') is False:
         obs = ErrorObservation(result_str)

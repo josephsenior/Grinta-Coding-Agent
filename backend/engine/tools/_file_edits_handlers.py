@@ -58,6 +58,7 @@ def _handle_create_file_tool(arguments: Mapping[str, Any]) -> Action:
     content = require_tool_argument(arguments, 'content', CREATE_FILE_TOOL_NAME)
     normalized_args = dict(arguments)
     normalized_args['file_text'] = str(content)
+    normalized_args['overwrite'] = parse_bool_argument(arguments.get('overwrite', False))
     _guard_content_arguments(normalized_args)
     action = _build_create_file_action(str(path), normalized_args)
     set_security_risk(action, arguments)

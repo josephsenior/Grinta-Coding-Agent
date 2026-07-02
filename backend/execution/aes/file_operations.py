@@ -46,7 +46,7 @@ def execute_file_editor(
     *,
     edit_mode: str | None = None,
     expected_hash: str | None = None,
-    overwrite_existing: bool = False,
+    overwrite: bool = False,
 ) -> tuple[str, tuple[str | None, str | None], dict[str, Any]]:
     insert_line, error_msg = _parse_insert_line(insert_line)
     if error_msg:
@@ -67,7 +67,7 @@ def execute_file_editor(
         dry_run,
         edit_mode=edit_mode,
         expected_hash=expected_hash,
-        overwrite_existing=overwrite_existing,
+        overwrite=overwrite,
     )
 
     if result.error:
@@ -178,7 +178,7 @@ def _invoke_editor(
     *,
     edit_mode: str | None = None,
     expected_hash: str | None = None,
-    overwrite_existing: bool = False,
+    overwrite: bool = False,
 ) -> Any:
     """Safely invoke the editor with MISSING sentinels."""
     from backend.core.type_safety.sentinels import MISSING
@@ -199,7 +199,7 @@ def _invoke_editor(
             dry_run=dry_run,
             edit_mode=edit_mode,
             expected_hash=expected_hash,
-            overwrite_existing=overwrite_existing,
+            overwrite=overwrite,
         )
     except ToolError as e:
         return ToolResult(output='', error=str(e))

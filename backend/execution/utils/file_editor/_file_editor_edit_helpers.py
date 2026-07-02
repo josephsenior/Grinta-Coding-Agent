@@ -478,14 +478,17 @@ def write_edit_result_impl(
 
 def _check_write_create_exists(
     file_existed: bool,
-    overwrite_existing: bool,
+    overwrite: bool,
     old_content: str | None,
     content: str,
 ) -> ToolResult | None:
-    if file_existed and not overwrite_existing:
+    if file_existed and not overwrite:
         return ToolResult(
             output='',
-            error='File already exists.',
+            error=(
+                'File exists. To modify it, use replace_string (preferred). '
+                'If you intend to replace the entire contents, retry with overwrite=true.'
+            ),
             old_content=old_content,
             new_content=content,
             error_code='CREATE_FILE_ALREADY_EXISTS',
@@ -543,11 +546,11 @@ def handle_write_maybe_short_circuit_impl(
     old_content: str | None,
     file_existed: bool,
     dry_run: bool,
-    overwrite_existing: bool,
+    overwrite: bool,
 ) -> ToolResult | None:
     """Early exits before validation / disk write."""
     result = _check_write_create_exists(
-        file_existed, overwrite_existing, old_content, content
+        file_existed, overwrite, old_content, content
     )
     if result is not None:
         return result
@@ -675,7 +678,7 @@ def handle_write_impl(
     content: str,
     *,
     dry_run: bool = False,
-    overwrite_existing: bool = False,
+    overwrite: bool = False,
 ) -> ToolResult:
     """Handle create_file command - write new or overwritten file content."""
     try:
@@ -690,7 +693,7 @@ def handle_write_impl(
             old_content=old_content,
             file_existed=file_existed,
             dry_run=dry_run,
-            overwrite_existing=overwrite_existing,
+            overwrite=overwrite,
         )
         if short is not None:
             return short
