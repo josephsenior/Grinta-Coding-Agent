@@ -66,6 +66,8 @@ class ActionType(str, Enum):
     TERMINAL_INPUT = 'terminal_input'
     TERMINAL_READ = 'terminal_read'
     TERMINAL_CLOSE = 'terminal_close'
+    TERMINAL_WAIT = 'terminal_wait'
+    TERMINAL_LIST = 'terminal_list'
     DEBUGGER = 'debugger'
     BROWSE = 'browse'
     BROWSE_INTERACTIVE = 'browse_interactive'

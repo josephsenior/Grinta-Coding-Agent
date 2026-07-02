@@ -39,8 +39,10 @@ from backend.ledger.action.search import (
 from backend.ledger.action.terminal import (
     TerminalCloseAction,
     TerminalInputAction,
+    TerminalListAction,
     TerminalReadAction,
     TerminalRunAction,
+    TerminalWaitAction,
 )
 from backend.ledger.observation import Observation
 
@@ -124,6 +126,10 @@ class RuntimeExecutorProtocol(Protocol):
     async def terminal_input(self, action: TerminalInputAction) -> Observation: ...
 
     async def terminal_read(self, action: TerminalReadAction) -> Observation: ...
+
+    async def terminal_wait(self, action: TerminalWaitAction) -> Observation: ...
+
+    async def terminal_list(self, action: TerminalListAction) -> Observation: ...
 
     async def terminal_close(self, action: TerminalCloseAction) -> Observation: ...
 

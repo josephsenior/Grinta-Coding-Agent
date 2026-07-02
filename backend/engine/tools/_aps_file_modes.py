@@ -176,6 +176,14 @@ def _file_outline_fallback_lines(path: str) -> list[str]:
 
 def _build_file_outline_action(path: str) -> str:
     """Compact API-style outline: Python AST signatures, else line-based heads."""
+    try:
+        from backend.context.symbol_index.aps_bridge import file_outline_text
+
+        indexed = file_outline_text(path)
+        if indexed:
+            return indexed
+    except Exception:
+        pass
     base = os.path.basename(path)
     out: list[str] = [f'=== FILE OUTLINE: {base} ===']
     if not os.path.isfile(path):

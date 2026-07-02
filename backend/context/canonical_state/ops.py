@@ -420,6 +420,11 @@ def render_canonical_state_for_prompt(
             session = task.session_id or 'unknown session'
             _append(lines, f'  - {session}: {task.command} ({task.status})')
             _append(lines, f'    Next: {task.next_action}')
+            if task.recent_output:
+                snippet = task.recent_output
+                if len(snippet) > 800:
+                    snippet = snippet[:800] + '...'
+                _append(lines, f'    Recent output: {snippet}')
     if canonical.recent_work:
         _append(lines, '- Recent work ledger:')
         for work_item in canonical.recent_work[-8:]:

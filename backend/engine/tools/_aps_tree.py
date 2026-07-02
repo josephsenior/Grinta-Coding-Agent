@@ -149,7 +149,17 @@ def _append_tree_file_lines(
         full_path = os.path.join(current_root, filename)
         relative_path = os.path.relpath(full_path, root).replace(os.sep, '/')
         lines.append(f'  {relative_path}')
-        lines.extend(_extract_ast_summary(full_path))
+        indexed_lines = None
+        try:
+            from backend.context.symbol_index.aps_bridge import tree_symbol_lines_for_file
+
+            indexed_lines = tree_symbol_lines_for_file(relative_path)
+        except Exception:
+            indexed_lines = None
+        if indexed_lines:
+            lines.extend(indexed_lines)
+        else:
+            lines.extend(_extract_ast_summary(full_path))
 
     if hidden_files > 0:
         hint_path = relative_root.replace(os.sep, '/') or '.'
@@ -233,6 +243,14 @@ def _build_tree_action(path: str, depth: int) -> str:
 
 def _build_symbols_action(path: str) -> str:
     """List classes, functions, and top-level assignments in a file."""
+    try:
+        from backend.context.symbol_index.aps_bridge import symbols_action_text
+
+        indexed = symbols_action_text(path)
+        if indexed:
+            return indexed
+    except Exception:
+        pass
     out = [f'=== SYMBOLS IN {os.path.basename(path)} ===']
     if os.path.isfile(path):
         sym_re = re.compile(r'^(class |def |async def |[A-Z_][A-Z_0-9]* *=)')

@@ -440,6 +440,7 @@ class OrchestratorPlanner:
         mode = self._active_mode_for_state(state)
         messages = self._inject_turn_status(messages, state)
         messages = self._inject_coding_preflight(messages, state, mode)
+        messages = self._inject_repo_map(messages, mode)
         tools = self._filter_tools_for_mode(tools, mode)
         messages = self._inject_mode_instructions(messages, state, mode)
         _maybe_log_prompt_metrics(messages)
@@ -643,6 +644,26 @@ class OrchestratorPlanner:
             )
         except Exception:
             logger.debug('Coding preflight generation failed', exc_info=True)
+            return messages
+        if not block:
+            return messages
+        return self._apply_control_message(messages, block)
+
+    def _inject_repo_map(self, messages: list, mode: str) -> list:
+        """Inject graph-ranked REPO_MAP control block for coding tasks."""
+        if getattr(self._config, 'enable_repo_map', True) is False:
+            return messages
+        task = self._get_last_user_message(messages) or ''
+        try:
+            from backend.context.symbol_index.repo_map import build_repo_map_block
+
+            block = build_repo_map_block(
+                task=task,
+                config=self._config,
+                mode=mode,
+            )
+        except Exception:
+            logger.debug('Repo map generation failed', exc_info=True)
             return messages
         if not block:
             return messages

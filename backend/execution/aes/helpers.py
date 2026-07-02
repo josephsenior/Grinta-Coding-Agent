@@ -782,6 +782,71 @@ def bump_terminal_empty_read_streak(executor: Any, session_id: str) -> int:
     return streak
 
 
+def describe_terminal_sessions(executor: Any) -> list[dict[str, Any]]:
+    """Return metadata for active non-default terminal/background sessions."""
+    session_manager = getattr(executor, 'session_manager', None)
+    if session_manager is None:
+        return []
+
+    rows: list[dict[str, Any]] = []
+    for session_id, session in list(getattr(session_manager, 'sessions', {}).items()):
+        if session_id == 'default':
+            continue
+        proc = getattr(session, '_process', None)
+        running = True
+        exit_code: int | None = None
+        if proc is not None and hasattr(proc, 'poll'):
+            code = proc.poll()
+            running = code is None
+            if code is not None:
+                exit_code = int(code)
+        rows.append(
+            {
+                'session_id': session_id,
+                'running': running,
+                'exit_code': exit_code,
+                'shell_kind': terminal_shell_kind(session),
+                'cwd': str(getattr(session, 'cwd', '') or ''),
+            }
+        )
+    rows.sort(key=lambda row: str(row.get('session_id', '')))
+    return rows
+
+
+def compile_terminal_wait_pattern(pattern: str) -> Any:
+    """Compile a terminal wait regex, raising ValueError on invalid patterns."""
+    import re
+
+    if not str(pattern or '').strip():
+        msg = 'pattern must be a non-empty regex'
+        raise ValueError(msg)
+    return re.compile(pattern, re.IGNORECASE | re.MULTILINE | re.DOTALL)
+
+
+def read_terminal_delta_once(
+    executor: Any,
+    *,
+    session_id: str,
+    session: Any,
+) -> tuple[str, bool]:
+    """Read one delta chunk and advance the cursor when new bytes arrive."""
+    offset = get_terminal_read_cursor(executor, session_id)
+    content, next_offset, has_new_output, _ = read_terminal_with_mode(
+        executor,
+        session=session,
+        mode='delta',
+        offset=offset,
+    )
+    if has_new_output and content:
+        advance_terminal_read_cursor(
+            executor,
+            session_id,
+            next_offset,
+            mode='delta',
+        )
+    return content or '', bool(has_new_output and content)
+
+
 def close_interactive_terminal_sessions(executor: Any) -> list[str]:
     """Close non-default interactive terminal sessions (best-effort)."""
     session_manager = getattr(executor, 'session_manager', None)

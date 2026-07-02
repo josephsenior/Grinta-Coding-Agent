@@ -56,8 +56,10 @@ from backend.ledger.action.search import (
 from backend.ledger.action.terminal import (
     TerminalCloseAction,
     TerminalInputAction,
+    TerminalListAction,
     TerminalReadAction,
     TerminalRunAction,
+    TerminalWaitAction,
 )
 from backend.ledger.observation import ErrorObservation, Observation
 from backend.security.analyzer import SecurityAnalyzer
@@ -392,6 +394,24 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             raise AgentRuntimeDisconnectedError('Runtime not initialized')
         timeout = self._bridge_timeout(action, TOOL_BRIDGE_TIMEOUT_TERMINAL_IO)
         return call_async_from_sync(self._executor.terminal_read, timeout, action)
+
+    def terminal_wait(self, action: TerminalWaitAction) -> Observation:
+        """Wait for terminal output pattern via RuntimeExecutor."""
+        if self._executor is None:
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
+        wait_timeout = max(1, int(getattr(action, 'timeout', 30) or 30))
+        timeout = max(
+            self._bridge_timeout(action, TOOL_BRIDGE_TIMEOUT_TERMINAL_IO),
+            float(wait_timeout) + 5.0,
+        )
+        return call_async_from_sync(self._executor.terminal_wait, timeout, action)
+
+    def terminal_list(self, action: TerminalListAction) -> Observation:
+        """List terminal sessions via RuntimeExecutor."""
+        if self._executor is None:
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
+        timeout = self._bridge_timeout(action, TOOL_BRIDGE_TIMEOUT_TERMINAL_IO)
+        return call_async_from_sync(self._executor.terminal_list, timeout, action)
 
     def terminal_close(self, action: TerminalCloseAction) -> Observation:
         """Close a terminal session via RuntimeExecutor."""

@@ -113,9 +113,13 @@ def _render_critical(
 
     think_execution_rule = '**Reasoning alone does not execute** — after reasoning, you must still call tools.'
     terminal_manager_rule = (
-        '**Shell vs interactive terminal** — use `{terminal_command_tool}` for one-shot commands '
-        '(build, test, install, git). Use `terminal_manager` for interactive programs (REPLs, ssh, '
-        '`python -i`, programs that ask questions) or reading detached background sessions.'
+        f'**Shell vs interactive terminal** — use `{terminal_command_tool}` for one-shot commands '
+        '(build, test, install, git). '
+        '**Background servers:** start with `{terminal_command_tool}` + `is_background=true`, then '
+        '`terminal_manager action=wait` (pattern like `listening on|ready`) or `action=logs`/`read` '
+        'if needed; use `action=list` to inspect sessions and `action=stop` when finished. '
+        'Fresh background output may already appear in context — do not poll if you already have it. '
+        'Use `terminal_manager action=open` for interactive programs (REPLs, ssh, `python -i`, prompts).'
         if terminal_manager_available and can_edit
         else ''
     )

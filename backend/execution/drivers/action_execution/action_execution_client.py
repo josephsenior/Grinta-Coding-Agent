@@ -50,6 +50,9 @@ class ActionExecutionClient(Runtime):
             'terminal_run',
             'terminal_input',
             'terminal_read',
+            'terminal_wait',
+            'terminal_list',
+            'terminal_close',
             'debugger',
             'read',
             'edit',
@@ -170,6 +173,12 @@ class ActionExecutionClient(Runtime):
         return self._execute_action_on_server(action)
 
     def terminal_read(self, action: Any) -> Any:
+        return self._execute_action_on_server(action)
+
+    def terminal_wait(self, action: Any) -> Any:
+        return self._execute_action_on_server(action)
+
+    def terminal_list(self, action: Any) -> Any:
         return self._execute_action_on_server(action)
 
     def debugger(self, action: Any) -> Any:

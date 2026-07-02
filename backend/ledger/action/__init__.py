@@ -55,8 +55,10 @@ from backend.ledger.action.search import (
 from backend.ledger.action.terminal import (
     TerminalCloseAction,
     TerminalInputAction,
+    TerminalListAction,
     TerminalReadAction,
     TerminalRunAction,
+    TerminalWaitAction,
 )
 
 __all__ = [
@@ -102,8 +104,10 @@ __all__ = [
     'TaskTrackingAction',
     'TerminalCloseAction',
     'TerminalInputAction',
+    'TerminalListAction',
     'TerminalReadAction',
     'TerminalRunAction',
+    'TerminalWaitAction',
     'UncertaintyAction',
     'WorkingMemoryAction',
 ]

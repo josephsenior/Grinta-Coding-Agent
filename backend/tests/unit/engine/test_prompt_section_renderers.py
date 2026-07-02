@@ -129,9 +129,10 @@ class TestRenderCriticalModeSpecific:
     def test_agent_mode_with_terminal_manager_adds_rule(self):
         body = self._render_critical(mode='agent', terminal_manager_available=True)
         self._assert_contains_body(body, 'Shell vs interactive terminal')
-        self._assert_contains_body(
-            body, 'Use `terminal_manager` for interactive programs'
-        )
+        self._assert_contains_body(body, 'is_background=true')
+        self._assert_contains_body(body, 'terminal_manager action=wait')
+        self._assert_contains_body(body, 'action=stop')
+        self._assert_contains_body(body, 'terminal_manager action=open')
         lines = [
             line
             for line in body.split('\n')

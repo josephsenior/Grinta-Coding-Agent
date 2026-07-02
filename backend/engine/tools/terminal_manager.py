@@ -9,8 +9,10 @@ from backend.engine.function_calling.helpers import (
 from backend.ledger.action.terminal import (
     TerminalCloseAction,
     TerminalInputAction,
+    TerminalListAction,
     TerminalReadAction,
     TerminalRunAction,
+    TerminalWaitAction,
 )
 
 
@@ -20,34 +22,52 @@ def create_terminal_manager_tool() -> dict[str, Any]:
         'function': {
             'name': TERMINAL_MANAGER_TOOL_NAME,
             'description': (
-                'Interactive PTY terminal for long-running or interactive programs. '
-                'Use `terminal_manager` for REPLs, ssh, `python -i`, programs that ask questions, '
-                'or reading output from a detached background session. '
-                'For one-shot build/test/install/git commands, use `execute_powershell` instead.\n\n'
-                'action=open starts a session and runs the first command. '
-                'action=read fetches output (prefer mode=delta, remember next_offset). '
-                'action=input sends follow-up commands to the SAME session — do NOT call open again. '
-                'action=close releases a session immediately (otherwise the runtime GCs it after timeout). '
-                'On Windows the shell is usually PowerShell. '
-                'If action=read returns empty output, wait 1–2s and retry — slow commands take time.'
+                'Manage interactive PTY terminals and background shell sessions.\n\n'
+                '**When to use `terminal_manager` vs `execute_bash` / `execute_powershell`**\n'
+                '* Shell executor — one-shot build/test/install/git commands.\n'
+                '* `terminal_manager` — REPLs, ssh, interactive prompts, background '
+                'session polling, waiting for server readiness, listing/stopping sessions.\n\n'
+                '**Actions**\n'
+                '* `open` — start an interactive PTY session and run the first command.\n'
+                '* `read` / `logs` — fetch output (`mode=delta` preferred; remember `next_offset`).\n'
+                '* `wait` — block until output matches `pattern` or `timeout` expires '
+                '(ideal for "server ready" gates).\n'
+                '* `list` — show active background/interactive sessions.\n'
+                '* `input` — send follow-up commands to the SAME session.\n'
+                '* `close` / `stop` — release a session immediately.\n\n'
+                'Background sessions created by `is_background=true` use ids like '
+                '`bg-XXXXXXXX`. Poll them with `read`, `logs`, or `wait` — not `open` again.'
             ),
             'parameters': {
                 'type': 'object',
                 'properties': {
                     'action': {
                         'type': 'string',
-                        'enum': ['open', 'input', 'read', 'close'],
+                        'enum': [
+                            'open',
+                            'input',
+                            'read',
+                            'logs',
+                            'wait',
+                            'list',
+                            'close',
+                            'stop',
+                        ],
                         'description': (
-                            "'open': start session and run ``command`` once (already submitted). "
-                            "'read': fetch output (delta=new since cursor; snapshot=full buffer). "
-                            "'input': send more text or a named ``control`` (e.g. enter, C-c). "
-                            "'close': release the session immediately. Idempotent — no error if the "
-                            'session is already gone.'
+                            "'open': start session and run ``command`` once. "
+                            "'read'/'logs': fetch output (delta=new since cursor). "
+                            "'wait': block until ``pattern`` matches or ``timeout`` expires. "
+                            "'list': show active sessions. "
+                            "'input': send more text/control to the same session. "
+                            "'close'/'stop': release the session immediately."
                         ),
                     },
                     'session_id': {
                         'type': 'string',
-                        'description': "The session ID returned by action='open'. Required for 'input' and 'read'.",
+                        'description': (
+                            'Session id from `open`, `is_background=true`, or idle detach '
+                            '(e.g. `bg-a1b2c3d4`). Required for input/read/logs/wait/close/stop.'
+                        ),
                     },
                     'command': {
                         'type': 'string',
@@ -109,28 +129,42 @@ def create_terminal_manager_tool() -> dict[str, Any]:
                         'type': 'integer',
                         'minimum': 0,
                         'description': (
-                            "For action='read' with mode='delta': byte offset (use ``next_offset`` "
-                            'from the previous terminal result). If omitted, the server uses '
-                            'the last read/input cursor for that session.'
+                            "For action='read'/'logs' with mode='delta': byte offset "
+                            '(use ``next_offset`` from the previous terminal result). '
+                            'If omitted, the server uses the last read/input cursor.'
                         ),
                     },
                     'mode': {
                         'type': 'string',
                         'enum': ['delta', 'snapshot'],
                         'description': (
-                            "For action='read': 'delta' returns only new bytes since ``offset`` "
-                            '(or since the server cursor if ``offset`` is omitted); '
+                            "For action='read'/'logs': 'delta' returns only new bytes since "
+                            '``offset`` (or since the server cursor if omitted); '
                             "'snapshot' returns the current full buffer view."
+                        ),
+                    },
+                    'pattern': {
+                        'type': 'string',
+                        'description': (
+                            "For action='wait': case-insensitive regex matched against "
+                            'accumulated session output (e.g. `listening on|Compiled|ready`).'
+                        ),
+                    },
+                    'timeout': {
+                        'type': 'integer',
+                        'minimum': 1,
+                        'maximum': 600,
+                        'description': (
+                            "For action='wait': seconds to wait for ``pattern`` before "
+                            'returning a timeout result. Default 30.'
                         ),
                     },
                     'security_risk': {
                         'type': 'string',
                         'enum': ['LOW', 'MEDIUM', 'HIGH'],
                         'description': (
-                            "Required when action='open'. Classify the risk of the command you are launching: "
-                            'LOW for safe project commands (e.g. running tests, listing files), '
-                            'MEDIUM for project-scoped installs or scripts, '
-                            'HIGH for system-level or potentially destructive commands.'
+                            "Required when action='open'. Classify the risk of the command "
+                            'you are launching.'
                         ),
                     },
                 },
@@ -141,16 +175,16 @@ def create_terminal_manager_tool() -> dict[str, Any]:
                         'then': {'required': ['command', 'security_risk']},
                     },
                     {
-                        'if': {'properties': {'action': {'const': 'input'}}},
+                        'if': {
+                            'properties': {
+                                'action': {'enum': ['input', 'read', 'logs', 'wait', 'close', 'stop']}
+                            }
+                        },
                         'then': {'required': ['session_id']},
                     },
                     {
-                        'if': {'properties': {'action': {'const': 'read'}}},
-                        'then': {'required': ['session_id']},
-                    },
-                    {
-                        'if': {'properties': {'action': {'const': 'close'}}},
-                        'then': {'required': ['session_id']},
+                        'if': {'properties': {'action': {'const': 'wait'}}},
+                        'then': {'required': ['pattern']},
                     },
                 ],
             },
@@ -171,11 +205,13 @@ def _validate_action(arguments: dict) -> str:
     action = arguments.get('action')
     if not action:
         raise FunctionCallValidationError(
-            "terminal_manager requires an 'action' (open, input, read, or close)."
+            "terminal_manager requires an 'action' "
+            "(open, input, read, logs, wait, list, close, or stop)."
         )
-    if action not in ('open', 'input', 'read', 'close'):
+    valid = ('open', 'input', 'read', 'logs', 'wait', 'list', 'close', 'stop')
+    if action not in valid:
         raise FunctionCallValidationError(
-            f"Unknown action: {action!r}. Use 'open', 'input', 'read', or 'close'."
+            f"Unknown action: {action!r}. Use one of: {', '.join(valid)}."
         )
     return action
 
@@ -271,6 +307,21 @@ def _handle_read_action(arguments: dict) -> TerminalReadAction:
     )
 
 
+def _handle_wait_action(arguments: dict) -> TerminalWaitAction:
+    session_id = arguments.get('session_id')
+    if not session_id or not isinstance(session_id, str):
+        raise ValueError("Terminal 'wait' requires a string 'session_id'.")
+    pattern = arguments.get('pattern')
+    if not pattern or not str(pattern).strip():
+        raise ValueError("Terminal 'wait' requires a non-empty 'pattern' regex.")
+    timeout = _opt_int(arguments.get('timeout'))
+    return TerminalWaitAction(
+        session_id=session_id,
+        pattern=str(pattern),
+        timeout=timeout if timeout is not None else 30,
+    )
+
+
 def _handle_close_action(arguments: dict) -> TerminalCloseAction:
     session_id = arguments.get('session_id')
     if not session_id or not isinstance(session_id, str):
@@ -288,6 +339,15 @@ def handle_terminal_manager_tool(arguments: dict) -> Any:
         return _handle_open_action(arguments)
     if action == 'input':
         return _handle_input_action(arguments)
-    if action == 'close':
+    if action in ('close', 'stop'):
         return _handle_close_action(arguments)
+    if action == 'list':
+        return TerminalListAction()
+    if action == 'wait':
+        return _handle_wait_action(arguments)
+    if action == 'logs':
+        logs_args = dict(arguments)
+        logs_args['action'] = 'read'
+        logs_args.setdefault('mode', 'delta')
+        return _handle_read_action(logs_args)
     return _handle_read_action(arguments)

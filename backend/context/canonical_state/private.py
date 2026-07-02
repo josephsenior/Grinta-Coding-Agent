@@ -159,11 +159,16 @@ def _merge_background_tasks(
         key = session_id or _normalize(command)
         if not key:
             continue
+        prev = by_key.get(key)
+        recent_output = str(item.get('recent_output', ''))[:2000]
+        if not recent_output and prev is not None:
+            recent_output = prev.recent_output
         by_key[key] = BackgroundTaskState(
             session_id=session_id,
             command=command[:240],
             status=str(item.get('status', 'still running'))[:80],
             next_action=str(item.get('next_action', 'terminal_read'))[:200],
+            recent_output=recent_output,
             event_id=event_id,
             updated_at=_now(),
         )
