@@ -403,8 +403,8 @@ def cmd_search(host: Any, parsed: Any) -> bool:
 
 def cmd_help(host: Any, parsed: Any) -> bool:
     from backend.cli.repl.slash_registry_help import (
-        _build_help_markdown,
-        _build_help_table,
+        build_help_markdown,
+        build_help_table,
     )
 
     if len(parsed.args) > 1:
@@ -420,7 +420,7 @@ def cmd_help(host: Any, parsed: Any) -> bool:
             show_all = True
         elif arg not in ('--search', '-s'):
             # Specific command requested
-            help_text = _build_help_markdown(arg)
+            help_text = build_help_markdown(arg)
             if host._renderer is not None:
                 host._renderer.add_markdown_block(
                     'Help',
@@ -433,7 +433,7 @@ def cmd_help(host: Any, parsed: Any) -> bool:
         search_term = parsed.args[1] if len(parsed.args) > 1 else None
 
     # Show interactive table (if renderer supports add_renderable)
-    table = _build_help_table(search_term, show_all=show_all)
+    table = build_help_table(search_term, show_all=show_all)
     if host._renderer is not None:
         if hasattr(host._renderer, 'add_renderable'):
             host._renderer.add_renderable(table, force_terminal=True)
