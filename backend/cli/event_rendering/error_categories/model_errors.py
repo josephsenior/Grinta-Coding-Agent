@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from backend.cli.event_rendering.error_categories.matchers import (
+    _all,
     _any,
     _budget_match,
     _context_size_match,
@@ -11,7 +12,18 @@ from backend.cli.event_rendering.panels import ErrorGuidance, _GuidanceRule
 
 MODEL_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
     _GuidanceRule(
-        _any('404', 'model not found', 'does not exist', 'unknown model'),
+        _any('404', 'model not found', 'unknown model'),
+        ErrorGuidance(
+            summary='The configured model name is not available from the selected provider.',
+            steps=(
+                'Open /settings, press m, and pick a supported model.',
+                'If you entered the model manually, include the correct provider prefix.',
+            ),
+            error_code='ERR-MODEL-001',
+        ),
+    ),
+    _GuidanceRule(
+        _all('does not exist', 'model'),
         ErrorGuidance(
             summary='The configured model name is not available from the selected provider.',
             steps=(

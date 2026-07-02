@@ -161,14 +161,14 @@ class ToolRegistry:
                     available=True,
                     path=shutil.which('cmd'),
                 )
-            # Also detect bash availability (Git Bash / WSL) on Windows
-            bash_path = shutil.which('bash')
-            if bash_path and self._check_command('bash', ['--version']):
+            # Detect Git Bash (exclude WSL's bash.exe in System32)
+            bash_path = self._find_windows_bash_excluding_wsl()
+            if bash_path and self._check_command(bash_path, ['--version']):
                 self._tools['bash'] = ToolInfo(
                     name='bash',
                     available=True,
                     path=bash_path,
-                    version=self._get_bash_version(),
+                    version=self._get_bash_version(bash_path),
                 )
         else:
             # Unix-like: try bash (should always be available)
@@ -187,6 +187,36 @@ class ToolRegistry:
                     available=True,
                     path=shutil.which('sh'),
                 )
+
+    def _find_windows_bash_excluding_wsl(self) -> str | None:
+        """Find a non-WSL bash on Windows (e.g. Git Bash).
+
+        WSL installs ``bash.exe`` inside ``System32``; that launcher is
+        excluded so that only standalone bash installations (Git Bash,
+        MSYS2, Cygwin, …) are considered.  WSL should only be used when
+        the user explicitly chooses it.
+        """
+        system_root = os.path.realpath(
+            os.environ.get('SystemRoot', 'C:\\Windows')
+        ).lower()
+        wsl_dirs = frozenset(
+            os.path.join(system_root, d).lower()
+            for d in ('system32', 'sysnative', 'syswow64')
+        )
+
+        path_exts = os.environ.get('PATHEXT', '.COM;.EXE;.BAT;.CMD').split(os.pathsep)
+        path_dirs = os.environ.get('PATH', '').split(os.pathsep)
+
+        for path_dir in path_dirs:
+            if not path_dir.strip():
+                continue
+            for ext in path_exts:
+                candidate = os.path.join(path_dir.strip(), f'bash{ext}')
+                if os.path.isfile(candidate):
+                    resolved = os.path.realpath(candidate)
+                    if not any(resolved.lower().startswith(wd) for wd in wsl_dirs):
+                        return resolved
+        return None
 
     def _detect_search_tool(self) -> None:
         """Detect the best available search tool."""
@@ -320,11 +350,12 @@ class ToolRegistry:
             pass
         return None
 
-    def _get_bash_version(self) -> str | None:
+    def _get_bash_version(self, bash_exe: str | None = None) -> str | None:
         """Get Bash version."""
         try:
+            cmd = [bash_exe or 'bash', '--version']
             result = subprocess.run(
-                ['bash', '--version'],
+                cmd,
                 check=False,
                 capture_output=True,
                 text=True,
