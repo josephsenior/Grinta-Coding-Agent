@@ -95,6 +95,53 @@ class TerminalReadAction(Action):
 
 
 @dataclass
+class TerminalWaitAction(Action):
+    """Block until terminal output matches a regex or timeout expires."""
+
+    session_id: str = ''
+    pattern: str = ''
+    timeout: int = 30
+    action: ClassVar[str] = ActionType.TERMINAL_WAIT
+    runnable: ClassVar[bool] = True
+    confirmation_state: ActionConfirmationStatus = ActionConfirmationStatus.CONFIRMED
+    security_risk: ActionSecurityRisk = ActionSecurityRisk.UNKNOWN
+
+    @property
+    def message(self) -> str:
+        """Get wait message."""
+        return (
+            f'Waiting on terminal {self.session_id} for pattern {self.pattern!r} '
+            f'(timeout={self.timeout}s)'
+        )
+
+    def __str__(self) -> str:
+        """Return a readable summary."""
+        return (
+            f'**TerminalWaitAction (session={self.session_id}, '
+            f'pattern={self.pattern!r}, timeout={self.timeout})**'
+        )
+
+
+@dataclass
+class TerminalListAction(Action):
+    """List active non-default terminal / background sessions."""
+
+    action: ClassVar[str] = ActionType.TERMINAL_LIST
+    runnable: ClassVar[bool] = True
+    confirmation_state: ActionConfirmationStatus = ActionConfirmationStatus.CONFIRMED
+    security_risk: ActionSecurityRisk = ActionSecurityRisk.LOW
+
+    @property
+    def message(self) -> str:
+        """Get list message."""
+        return 'Listing active terminal sessions'
+
+    def __str__(self) -> str:
+        """Return a readable summary."""
+        return '**TerminalListAction**'
+
+
+@dataclass
 class TerminalCloseAction(Action):
     """Action to explicitly close an existing terminal session.
 

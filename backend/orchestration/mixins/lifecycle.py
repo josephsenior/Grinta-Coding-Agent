@@ -113,6 +113,9 @@ class _SessionOrchestratorLifecycleMixin(SessionOrchestratorAccessorsMixin):
         from backend.orchestration.middleware.destructive_command import (
             DestructiveCommandMiddleware,
         )
+        from backend.orchestration.middleware.symbol_index_invalidation import (
+            SymbolIndexInvalidationMiddleware,
+        )
         from backend.orchestration.middleware.rollback_middleware import (
             RollbackMiddleware,
         )
@@ -144,6 +147,7 @@ class _SessionOrchestratorLifecycleMixin(SessionOrchestratorAccessorsMixin):
             PreExecDiffMiddleware(),
             AutoCheckMiddleware(),
             PostEditDiagnosticsMiddleware(),
+            SymbolIndexInvalidationMiddleware(),
         ]
 
         file_state_mw = FileStateMiddleware()

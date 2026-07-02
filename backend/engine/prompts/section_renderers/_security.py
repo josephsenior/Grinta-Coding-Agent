@@ -54,5 +54,6 @@ def _render_security(
         '- Always escalate to **HIGH** if sensitive data leaves the environment.\n'
         '- Long-running shell commands: pass an explicit `timeout` (seconds) instead of '
         'guessing.\n'
-        '- For servers and log tails, use `is_background=true` on shell executors.'
+        '- For servers and log tails, start with `is_background=true` on shell executors, then '
+        'use `terminal_manager` (`wait`, `logs`, `stop`) — do not start duplicate shell processes.'
     )

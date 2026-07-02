@@ -58,8 +58,10 @@ from backend.ledger.action.search import (
 from backend.ledger.action.terminal import (
     TerminalCloseAction,
     TerminalInputAction,
+    TerminalListAction,
     TerminalReadAction,
     TerminalRunAction,
+    TerminalWaitAction,
 )
 
 actions = (
@@ -103,6 +105,8 @@ actions = (
     TerminalInputAction,
     TerminalReadAction,
     TerminalCloseAction,
+    TerminalWaitAction,
+    TerminalListAction,
     DebuggerAction,
 )
 ACTION_TYPE_TO_CLASS = {action_class.action: action_class for action_class in actions}

@@ -255,9 +255,40 @@ def _find_symbol_candidates(
     ``scope_capped`` is True when the file-scan limit was reached and
     not all source files were searched.
     """
+    from backend.context.symbol_index.query import find_symbols_via_index
+    from backend.context.symbol_index.store import get_symbol_index_store, symbol_index_enabled
+
+    if symbol_index_enabled():
+        store = get_symbol_index_store()
+        if store is not None:
+            if path:
+                store.ensure_indexed(path)
+            indexed = find_symbols_via_index(
+                query,
+                path=path,
+                symbol_kind=symbol_kind,
+                include_private=include_private,
+            )
+            if indexed is not None and (path or store.is_warm()):
+                lookup_query = query.rsplit('.', 1)[-1]
+                if lookup_query != query:
+                    query_lower = query.lower()
+                    indexed = [
+                        candidate
+                        for candidate in indexed
+                        if query_lower
+                        in str(candidate.get('qualified_name') or '').lower()
+                    ]
+                return indexed, False
+
     lookup_query = query.rsplit('.', 1)[-1]
     candidates: list[dict[str, Any]] = []
     paths, scope_capped = _candidate_paths_for_symbol_search(path)
+    if symbol_index_enabled():
+        store = get_symbol_index_store()
+        if store is not None:
+            for candidate_path in paths:
+                store.ensure_indexed(_relative_display_path(candidate_path))
     for candidate_path in paths:
         candidates.extend(
             _find_symbol_candidates_in_file(

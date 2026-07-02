@@ -73,3 +73,10 @@ def test_render_security_prompt_optional_for_full_autonomy():
 def test_render_security_prompt_required_for_balanced_autonomy():
     text = _render_security(autonomy_level=AutonomyLevel.BALANCED.value)
     assert '**required**' in text
+
+
+def test_render_security_prompt_background_server_followup():
+    text = _render_security(autonomy_level=AutonomyLevel.FULL.value)
+    assert 'is_background=true' in text
+    assert 'terminal_manager' in text
+    assert '`wait`' in text

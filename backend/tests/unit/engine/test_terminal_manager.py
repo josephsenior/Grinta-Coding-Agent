@@ -10,8 +10,10 @@ from backend.engine.tools.terminal_manager import handle_terminal_manager_tool
 from backend.ledger.action.terminal import (
     TerminalCloseAction,
     TerminalInputAction,
+    TerminalListAction,
     TerminalReadAction,
     TerminalRunAction,
+    TerminalWaitAction,
 )
 
 
@@ -119,6 +121,43 @@ def test_close_rejects_non_string_session_id() -> None:
         handle_terminal_manager_tool({'action': 'close', 'session_id': 123})
 
 
+def test_wait_maps_pattern_and_timeout() -> None:
+    act = handle_terminal_manager_tool(
+        {
+            'action': 'wait',
+            'session_id': 'bg-abc12345',
+            'pattern': 'listening on|ready',
+            'timeout': 45,
+        }
+    )
+    assert isinstance(act, TerminalWaitAction)
+    assert act.session_id == 'bg-abc12345'
+    assert act.pattern == 'listening on|ready'
+    assert act.timeout == 45
+
+
+def test_list_maps_to_terminal_list_action() -> None:
+    act = handle_terminal_manager_tool({'action': 'list'})
+    assert isinstance(act, TerminalListAction)
+
+
+def test_logs_aliases_read_delta() -> None:
+    act = handle_terminal_manager_tool(
+        {'action': 'logs', 'session_id': 'bg-deadbeef'}
+    )
+    assert isinstance(act, TerminalReadAction)
+    assert act.session_id == 'bg-deadbeef'
+    assert act.mode == 'delta'
+
+
+def test_stop_aliases_close() -> None:
+    act = handle_terminal_manager_tool(
+        {'action': 'stop', 'session_id': 'bg-12345678'}
+    )
+    assert isinstance(act, TerminalCloseAction)
+    assert act.session_id == 'bg-12345678'
+
+
 def test_input_rejects_empty_operation() -> None:
     with pytest.raises(ValueError, match='input.*control'):
         handle_terminal_manager_tool(
@@ -149,6 +188,6 @@ class TestActionValidation:
 
     def test_unknown_action_message_contains_valid_actions(self) -> None:
         with pytest.raises(
-            FunctionCallValidationError, match="'open'.*'input'.*'read'.*'close'"
+            FunctionCallValidationError, match='Use one of: open, input, read, logs, wait'
         ):
             handle_terminal_manager_tool({'action': 'execute'})

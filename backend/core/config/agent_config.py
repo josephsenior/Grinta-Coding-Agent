@@ -211,6 +211,26 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             'Inject a bounded first-turn repository snapshot for likely coding tasks.'
         ),
     )
+    enable_repo_map: bool = Field(
+        default=True,
+        description=(
+            'Inject a graph-ranked REPO_MAP block for coding tasks using the '
+            'persistent symbol index.'
+        ),
+    )
+    map_tokens: int = Field(
+        default=1536,
+        ge=256,
+        le=8192,
+        description='Token budget for the ranked REPO_MAP control block.',
+    )
+    symbol_index_mode: str = Field(
+        default='lazy',
+        description=(
+            "Symbol index persistence: 'lazy' builds on demand; 'off' disables "
+            'indexing and repo map.'
+        ),
+    )
     enable_lsp_query: bool = Field(
         default=True,
         description=(
@@ -416,6 +436,14 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         from backend.core.type_safety.type_safety import validate_non_empty_string
 
         return validate_non_empty_string(v, name='field')
+
+    @field_validator('symbol_index_mode')
+    @classmethod
+    def validate_symbol_index_mode(cls, value: str) -> str:
+        normalized = str(value or 'lazy').strip().lower()
+        if normalized not in {'lazy', 'off'}:
+            raise ValueError("symbol_index_mode must be 'lazy' or 'off'")
+        return normalized
 
     @field_validator('mode')
     @classmethod

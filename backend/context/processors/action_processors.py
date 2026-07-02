@@ -109,6 +109,8 @@ def _is_tool_based_action(action: Action) -> bool:
         TerminalRunAction,
         TerminalInputAction,
         TerminalReadAction,
+        TerminalWaitAction,
+        TerminalListAction,
         TerminalCloseAction,
         *_META_COGNITION_ACTION_TYPES,
     )

@@ -124,7 +124,7 @@ def build_context_packet(
         )
         if canonical_block:
             sections.append(('canonical_state', canonical_block))
-    active_status = _active_status(canonical)
+    active_status = _active_status(canonical, state=state)
     if active_status:
         sections.append(
             (
@@ -460,13 +460,29 @@ def _event_detail(event: Event) -> str:
     return ''
 
 
-def _active_status(canonical: CanonicalTaskState) -> str:
+def _active_status(canonical: CanonicalTaskState, state: State | None = None) -> str:
     lines: list[str] = []
     if canonical.background_tasks:
         lines.append('Pending background tasks:')
         for task in canonical.background_tasks[-4:]:
             session = task.session_id or 'unknown session'
             lines.append(f'- {session}: {task.command} -> {task.next_action}')
+            if task.recent_output:
+                lines.append(
+                    f'  Recent output ({session}):\n'
+                    f'{_safe_truncate(task.recent_output, 1200)}'
+                )
+    from backend.execution.utils.shell.background_turn_sync import read_turn_drain_extras
+
+    extras = read_turn_drain_extras(state)
+    known = {task.session_id for task in canonical.background_tasks if task.session_id}
+    for session_id, content in extras.items():
+        if session_id in known:
+            continue
+        lines.append(
+            f'- {session_id}: background output since last turn:\n'
+            f'{_safe_truncate(content, 1200)}'
+        )
     return '\n'.join(lines)
 
 

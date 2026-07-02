@@ -147,6 +147,7 @@ class BackgroundTaskState:
     command: str = ''
     status: str = 'still running'
     next_action: str = ''
+    recent_output: str = ''
     event_id: int | None = None
     updated_at: str = ''
 

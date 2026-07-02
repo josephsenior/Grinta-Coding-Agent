@@ -34,6 +34,11 @@ _TERMINAL_MANAGER_VERBS = {
     'open': 'Started',
     'input': 'Sent',
     'read': 'Read',
+    'logs': 'Read',
+    'wait': 'Waited',
+    'list': 'Listed',
+    'close': 'Stopped',
+    'stop': 'Stopped',
 }
 
 _DEBUGGER_VERBS = {

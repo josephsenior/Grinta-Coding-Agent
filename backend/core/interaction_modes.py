@@ -72,7 +72,9 @@ def action_blocked_for_interaction_mode(action: object, mode: object) -> str | N
     from backend.ledger.action.terminal import (
         TerminalCloseAction,
         TerminalInputAction,
+        TerminalListAction,
         TerminalRunAction,
+        TerminalWaitAction,
     )
 
     normalized = normalize_interaction_mode(mode)
@@ -99,7 +101,9 @@ def action_blocked_for_interaction_mode(action: object, mode: object) -> str | N
         MCPAction,
         TerminalCloseAction,
         TerminalInputAction,
+        TerminalListAction,
         TerminalRunAction,
+        TerminalWaitAction,
         WorkingMemoryAction,
     )
     if isinstance(action, agent_only_types):

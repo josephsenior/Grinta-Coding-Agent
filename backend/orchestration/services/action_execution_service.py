@@ -336,11 +336,42 @@ class ActionExecutionService:
             raise RuntimeError('unreachable async-step timeout state')
         return result
 
+    async def _get_runtime_executor(self) -> object | None:
+        try:
+            controller = self._context.get_controller()
+            runtime = getattr(controller, 'runtime', None)
+            if runtime is None:
+                return None
+            executor = getattr(runtime, '_executor', None)
+            return executor if executor is not None else runtime
+        except Exception:
+            return None
+
+    async def _sync_background_output_before_agent_step(self) -> None:
+        executor = await self._get_runtime_executor()
+        if executor is None:
+            return
+        try:
+            from backend.execution.utils.shell.background_turn_sync import (
+                apply_background_drain_to_state,
+                sync_background_output_for_turn,
+            )
+
+            drains = sync_background_output_for_turn(executor)
+            if drains:
+                apply_background_drain_to_state(self._context.state, drains)
+        except Exception:
+            logger.debug(
+                'ActionExecutionService: background turn sync failed',
+                exc_info=True,
+            )
+
     async def _acquire_next_action(self, attempt: int) -> tuple[Action | None, bool]:
         controller = self._context.get_controller()
         use_confirmation_replay = self._should_use_confirmation_replay(controller)
         if use_confirmation_replay:
             return await self._get_confirmation_action(), True
+        await self._sync_background_output_before_agent_step()
         return await self._get_agent_step_action(attempt), False
 
     def _log_missing_action(self, attempt: int) -> None:
