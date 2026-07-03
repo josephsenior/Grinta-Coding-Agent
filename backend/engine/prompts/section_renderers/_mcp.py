@@ -5,10 +5,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from backend.engine.prompts.section_renderers._interaction import (
-    _render_interaction_tail,
-)
-
 
 def _append_mcp_connected_catalog_sections(
     parts: list[str],
@@ -80,14 +76,6 @@ def _append_mcp_connected_catalog_sections(
             '</MCP_WHEN_TO_USE>',
         )
     )
-
-
-def _mcp_tail_render_kwargs(
-    render_partial: Callable[..., str],
-    config: Any,
-    mode: str | None = None,
-) -> str:
-    return _render_interaction_tail(render_partial, config, mode)
 
 
 def _render_mcp_and_permissions(

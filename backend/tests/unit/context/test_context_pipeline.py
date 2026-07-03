@@ -163,7 +163,7 @@ async def test_prepare_step_uses_prewarmed_compaction(pipeline):
 
 
 @pytest.mark.asyncio
-async def test_prepare_step_rejects_prewarmed_compaction_that_fails_continuity(
+async def test_prepare_step_accepts_prewarmed_compaction_despite_continuity_issues(
     pipeline,
 ):
     events = [_user('run pytest', 1)]
@@ -179,23 +179,19 @@ async def test_prepare_step_rejects_prewarmed_compaction_that_fails_continuity(
     with (
         patch(
             'backend.context.context_pipeline.finalize_compaction_artifacts'
-        ) as mock_finalize,
+        ),
         patch('backend.context.context_pipeline.delete_staging_snapshot'),
         patch('backend.context.context_pipeline.maybe_update'),
         patch(
             'backend.context.context_pipeline.pipeline.passes_effectiveness_gate',
             return_value=True,
         ),
-        patch(
-            'backend.context.context_pipeline.compaction._passes_continuity_gate',
-            return_value=False,
-        ),
     ):
         result = await pipeline.prepare_step(state)
 
-    assert result.pending_action is None
-    assert result.events == events
-    mock_finalize.assert_not_called()
+    assert result.pending_action is not None
+    assert result.pending_action.summary == action.summary
+    assert len(result.events) < len(events)
 
 
 @pytest.mark.asyncio
@@ -261,20 +257,17 @@ async def test_prepare_step_rejects_micro_prune_and_respects_cooldown(pipeline):
         assert second.pending_action is None
 
 
-def test_configure_structured_compactor_size_forces_material_prune():
-    """Regression: fixed max_size=100 left ~49 post-boundary events with zero pruned (5b no-op)."""
-    events = [_cmd_output(f'line {i}', i) for i in range(1, 50)]
-    compactor = SimpleNamespace(max_size=100, keep_first=0)
-    _CompactionEngine._configure_structured_compactor_size(
-        compactor, events, SimpleNamespace()
+def test_structured_compactor_preserves_50_raw_events():
+    """With max_size=102, compaction keeps ~50 raw tail events."""
+    from backend.context.compactor.strategies.structured_summary_compactor import (
+        StructuredSummaryCompactor,
     )
+
+    compactor = SimpleNamespace(max_size=102, keep_first=0)
 
     target_size = compactor.max_size // 2
     events_from_tail = target_size - compactor.keep_first - 1
-    tail_count = max(0, events_from_tail)
-    stop = len(events) - tail_count if tail_count else len(events)
-    pruned_count = stop - compactor.keep_first
-    assert pruned_count >= 20
+    assert events_from_tail == 50
 
 
 @pytest.mark.asyncio

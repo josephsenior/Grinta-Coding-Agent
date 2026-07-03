@@ -20,6 +20,7 @@ from backend.ledger.action import (
     MessageAction,
     SystemHintAction,
     TaskTrackingAction,
+    AcceptanceCriteriaAction,
 )
 from backend.ledger.action.agent import (
     ClarificationRequestAction,
@@ -108,6 +109,7 @@ def _is_tool_based_action(action: Action) -> bool:
         FileReadAction,
         MCPAction,
         TaskTrackingAction,
+        AcceptanceCriteriaAction,
         TerminalRunAction,
         TerminalInputAction,
         TerminalReadAction,

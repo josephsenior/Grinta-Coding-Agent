@@ -13,16 +13,23 @@ def _build_numbered_rules(rules: list[str]) -> str:
 def _build_agent_execution_block(
     terminal_command_tool: str,
     tracker_on: bool,
+    criteria_on: bool,
     think_execution_rule: str,
     terminal_manager_rule: str,
 ) -> tuple[str, str, str, str]:
     """Build execution block for agent mode (can_edit=True)."""
     edit_context_antipattern = '- **Editing existing content without current context.** Before mutating an existing file/symbol, inspect the relevant file, range, symbol, or anchor in this session. New file creation is exempt. New symbol creation requires reading the target file/anchor first. **Same bar for tests:** if you authored implementation earlier in the turn, **re-read it** before writing tests — memory drifts from the file on disk.\n'
-    planning_tool_list = (
-        f'`task_tracker`, `{terminal_command_tool}`, and the public file API tools'
-        if tracker_on
-        else f'`{terminal_command_tool}` and the public file API tools'
-    )
+    planning_parts: list[str] = []
+    if criteria_on:
+        planning_parts.append('`acceptance_criteria`')
+    if tracker_on:
+        planning_parts.append('`task_tracker`')
+    planning_parts.append(f'`{terminal_command_tool}`')
+    planning_parts.append('the public file API tools')
+    if len(planning_parts) == 2:
+        planning_tool_list = f'{planning_parts[0]} and {planning_parts[1]}'
+    else:
+        planning_tool_list = ', '.join(planning_parts[:-1]) + f', and {planning_parts[-1]}'
     done_criteria_block = (
         '   **Done criteria by task type:**\n'
         '   - **Bugfix:** reproduce or capture the failing test, fix, then re-run the narrowest test/reproducer.\n'
@@ -39,13 +46,24 @@ def _build_agent_execution_block(
     ]
     if terminal_manager_rule:
         rules.append(terminal_manager_rule)
+    if criteria_on:
+        rules.append(
+            '**Structured work start ritual** — for bugfixes, implementations, refactors, or any multi-step task: '
+            'call `acceptance_criteria(update, criteria_list=[...])` first'
+            + (
+                ', then `task_tracker(update, task_list=[...])`,'
+                if tracker_on
+                else ','
+            )
+            + ' before the first file edit or shell command.'
+        )
     rules += [
         f'**Verify before final summary** — run the narrowest relevant proof: reproducer, tests, lint, or typecheck. If verification cannot run, state the concrete blocker: no test/build harness exists, missing dependency or credential, environment cannot install/build/run, verification would be unsafe/destructive, or the task has no meaningful runnable check. Do not use vague excuses like "not applicable."\n{done_criteria_block}',
         '**No unchanged retries after failure** — change strategy or escalate with hypothesis, action/outcome, and ruled-out paths.',
         '**Tests must track real APIs** — Before adding or changing test code, **read** the implementation module(s) you are testing in this session and align mocks, fixtures, and calls with the **actual** signatures and return shapes. Do not assume parity with a different module or an earlier draft from memory.',
         '**Postmortem on failing tests** — After a test failure, state the likely root cause class (wrong assumed API vs mock shape vs implementation bug vs flake), then change **one** lever and re-run a **narrow** test command; avoid blind rewrite loops.',
         '**Tests are executable evidence, not absolute truth.** When tests fail, diagnose whether the failure indicates an implementation bug, stale/incorrect test expectation, fixture/mock mismatch, environment issue, or flake. Fix implementation when tests expose a real defect. Update tests only when evidence shows they are stale, incorrect, or inconsistent with the requested behavior/current API. Never edit tests merely to manufacture a pass — including silently relaxing tolerances or skipping cases without an explained reason.',
-        '**Non-test failures** — After tool/build/lint/runtime failure, state the **root-cause class** in one phrase (wrong path/symbol vs stale assumption vs environment vs defect); then follow `<ERROR_RECOVERY>` (pivot tools, never rerun the same failing command unchanged, escalate with hypothesis / action-outcome / ruled-out paths). (See "No unchanged retries after failure" above — that same rule applies here as well.)',
+        '**Non-test failures** — After tool/build/lint/runtime failure, state the **root-cause class** in one phrase (wrong path/symbol vs stale assumption vs environment vs defect); then follow `<ERROR_RECOVERY>`.',
     ]
     numbered = _build_numbered_rules(rules)
     execution_rules_body = (
@@ -59,6 +77,7 @@ def _build_agent_execution_block(
 
 def _build_chat_plan_execution_block(
     tracker_on: bool,
+    criteria_on: bool,
     is_plan: bool,
 ) -> tuple[str, str, str, str]:
     """Build execution block for chat/plan mode (can_edit=False)."""
@@ -67,6 +86,7 @@ def _build_chat_plan_execution_block(
         filter(
             None,
             [
+                '`acceptance_criteria`' if criteria_on and is_plan else None,
                 '`task_tracker`' if tracker_on and is_plan else None,
                 '`read_file`',
                 '`grep`',
@@ -99,6 +119,7 @@ def _render_critical(
     *,
     terminal_manager_available: bool,
     tracker_on: bool,
+    criteria_on: bool = True,
     checkpoints_on: bool,
     meta_cognition_on: bool,
     mode: str = 'agent',
@@ -129,6 +150,14 @@ def _render_critical(
         if tracker_on and can_edit
         else ''
     )
+    acceptance_criteria_antipattern = (
+        '- **Starting multi-step implementation without `acceptance_criteria(update, ...)` first.** '
+        'Define verifiable assertions before editing.\n'
+        '- **Writing the final summary without `acceptance_criteria(audit, ...)` when criteria exist.** '
+        'Audit every assertion with evidence or an explicit gap first.'
+        if criteria_on and can_edit
+        else ''
+    )
     destructive_ops_antipattern = (
         '- **Running `rm`, `Remove-Item`, force pushes, or other destructive ops without explicit confirmation from the user.**'
         if can_edit
@@ -138,11 +167,13 @@ def _render_critical(
 
     if can_edit:
         execution_rules_body, edit_context_antipattern, planning_tool_list, done_criteria_block = (
-            _build_agent_execution_block(terminal_command_tool, tracker_on, think_execution_rule, terminal_manager_rule)
+            _build_agent_execution_block(
+                terminal_command_tool, tracker_on, criteria_on, think_execution_rule, terminal_manager_rule
+            )
         )
     else:
         execution_rules_body, edit_context_antipattern, planning_tool_list, done_criteria_block = (
-            _build_chat_plan_execution_block(tracker_on, is_plan_mode(mode))
+            _build_chat_plan_execution_block(tracker_on, criteria_on, is_plan_mode(mode))
         )
 
     user_question_antipattern = (
@@ -156,6 +187,7 @@ def _render_critical(
         think_execution_rule=think_execution_rule,
         edit_context_antipattern=edit_context_antipattern,
         task_tracker_antipattern=task_tracker_antipattern,
+        acceptance_criteria_antipattern=acceptance_criteria_antipattern,
         destructive_ops_antipattern=destructive_ops_antipattern,
         planning_tool_list=planning_tool_list,
         user_question_antipattern=user_question_antipattern,

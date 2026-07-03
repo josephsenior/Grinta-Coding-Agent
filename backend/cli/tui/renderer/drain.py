@@ -176,6 +176,10 @@ def _is_low_value_backlog_event(event: Any) -> bool:
         'NullObservation',
         'StatusObservation',
         'TerminalObservation',
+        'TerminalReadAction',
+        'TerminalWaitAction',
+        'TerminalListAction',
+        'TerminalCloseAction',
     }:
         return True
     if name == 'StreamingChunkAction':

@@ -18,7 +18,7 @@ from backend.context.view import View
 from backend.core.logging.logger import app_logger as logger
 from backend.core.tasks.task_status import TASK_STATUS_IN_PROGRESS
 from backend.ledger.action import Action, MessageAction
-from backend.ledger.action.agent import CondensationAction, TaskTrackingAction
+from backend.ledger.action.agent import CondensationAction, TaskTrackingAction, AcceptanceCriteriaAction
 from backend.ledger.event import Event, EventSource
 from backend.ledger.observation import ErrorObservation, Observation
 
@@ -141,6 +141,7 @@ class SmartCompactor(BaseLLMCompactor):
             essential.add(first_user.id)
 
         self._anchor_active_plan_events(events, essential)
+        self._anchor_last_acceptance_criteria(events, essential)
         self._add_critical_error_ids(events[-50:], essential)
         return essential
 
@@ -204,6 +205,19 @@ class SmartCompactor(BaseLLMCompactor):
                 essential.add(event.id)
                 logger.debug(
                     'SmartCompactor: anchored last TaskTrackingAction id=%s', event.id
+                )
+                break
+
+    def _anchor_last_acceptance_criteria(
+        self, events: list[Event], essential: set[int]
+    ) -> None:
+        """Anchor the last AcceptanceCriteriaAction so criteria survive condensation."""
+        for event in reversed(events):
+            if isinstance(event, AcceptanceCriteriaAction):
+                essential.add(event.id)
+                logger.debug(
+                    'SmartCompactor: anchored last AcceptanceCriteriaAction id=%s',
+                    event.id,
                 )
                 break
 

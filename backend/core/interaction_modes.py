@@ -13,6 +13,7 @@ from backend.core.tools.tool_names import (
     LSP_TOOL_NAME,
     READ_FILE_TOOL_NAME,
     TASK_TRACKER_TOOL_NAME,
+    ACCEPTANCE_CRITERIA_TOOL_NAME,
     WEB_FETCH_TOOL_NAME,
     WEB_SEARCH_TOOL_NAME,
 )
@@ -41,7 +42,9 @@ _DISCOVERY_TOOLS = frozenset(
 
 CHAT_MODE_ALLOWED_TOOLS = _DISCOVERY_TOOLS | frozenset({ASK_USER_TOOL_NAME})
 
-PLAN_MODE_ALLOWED_TOOLS = CHAT_MODE_ALLOWED_TOOLS | frozenset({TASK_TRACKER_TOOL_NAME})
+PLAN_MODE_ALLOWED_TOOLS = CHAT_MODE_ALLOWED_TOOLS | frozenset(
+    {TASK_TRACKER_TOOL_NAME, ACCEPTANCE_CRITERIA_TOOL_NAME}
+)
 
 
 def resolve_active_interaction_mode(
@@ -61,6 +64,7 @@ def action_blocked_for_interaction_mode(action: object, mode: object) -> str | N
         BlackboardAction,
         DelegateTaskAction,
         TaskTrackingAction,
+        AcceptanceCriteriaAction,
     )
     from backend.ledger.action.browse import BrowseInteractiveAction
     from backend.ledger.action.browser_tool import BrowserToolAction
@@ -87,6 +91,14 @@ def action_blocked_for_interaction_mode(action: object, mode: object) -> str | N
         return (
             f'Tool `{TASK_TRACKER_TOOL_NAME}` is not available in Chat Mode. '
             'Switch to Plan or Agent mode to track tasks.'
+        )
+
+    if isinstance(action, AcceptanceCriteriaAction):
+        if normalized == PLAN_MODE:
+            return None
+        return (
+            f'Tool `{ACCEPTANCE_CRITERIA_TOOL_NAME}` is not available in Chat Mode. '
+            'Switch to Plan or Agent mode to define acceptance criteria.'
         )
 
     agent_only_types = (

@@ -2,9 +2,21 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from backend.inference.capabilities.provider_capabilities import (
     model_token_correction as _model_token_correction,
 )
+
+
+def _semantic_recall_runtime(
+    config: Any, *, semantic_recall_active: bool | None = None
+) -> bool:
+    from backend.utils.optional_extras import resolve_semantic_recall_for_prompt
+
+    return resolve_semantic_recall_for_prompt(
+        config, semantic_recall_active=semantic_recall_active
+    )
 
 
 def _count_section_tokens(text: str, model_id: str) -> tuple[int, str]:

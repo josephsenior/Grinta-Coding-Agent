@@ -20,15 +20,42 @@ from backend.tests.unit.cli.tui._shared import (
     TerminalObservation,
     TerminalReadAction,
     TerminalRunAction,
+    TerminalWaitAction,
     _get_screen,
     asyncio,
     pytest,
 )
+from unittest.mock import MagicMock
 
 from backend.cli.tui.widgets.activity_card import OrientLine
 from backend.cli.tui.widgets.scan_line import (
     EditCard,
 )
+
+@pytest.mark.asyncio
+async def test_tui_terminal_wait_action_is_silent_in_transcript(mock_config):
+    """TerminalWaitAction must not fall through to the unknown-event log line."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+        s = _get_screen(app)
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        renderer._tui._write_log = MagicMock()
+        renderer._process_event(
+            TerminalWaitAction(session_id='term-1', pattern='ready', timeout=5)
+        )
+        await pilot.pause()
+        renderer._tui._write_log.assert_not_called()
+
 
 @pytest.mark.asyncio
 async def test_tui_terminal_session_reuses_single_card(mock_config):

@@ -22,8 +22,10 @@ from backend.cli.event_rendering.text_utils import (
 from backend.ledger.action import (  # noqa: E402
     TerminalCloseAction,
     TerminalInputAction,
+    TerminalListAction,
     TerminalReadAction,
     TerminalRunAction,
+    TerminalWaitAction,
 )
 
 
@@ -107,6 +109,14 @@ class _ActionTerminalMixin(_ActionRenderersBase):
         thought = getattr(action, 'thought', '') or ''
         _sync_reasoning_after_tool_line(self._reasoning, line, thought)
         self.refresh()
+
+    def _render_terminal_wait_action(self, action: TerminalWaitAction) -> None:
+        # Wait polls for a pattern — keep it out of the transcript (like read).
+        del action
+
+    def _render_terminal_list_action(self, action: TerminalListAction) -> None:
+        # Listing sessions is bookkeeping — no activity card.
+        del action
 
     def _render_terminal_close_action(self, action: TerminalCloseAction) -> None:
         # Close is a fast bookkeeping op — keep it lightweight in the

@@ -579,10 +579,10 @@ class TestPromptBudgetRegression:
         # Floor: prompt must be substantive.
         assert report['total_tokens'] >= 800, 'Prompt shrank unexpectedly'
         # Ceiling: guards against prompt bloat regressions.
-        # Baseline post-compression: 5 752 tokens.  Ceiling = baseline + ~10 %.
-        assert report['total_tokens'] <= 6_330, (
+        # Post-consolidation baseline: 5 531 tokens.  Ceiling = baseline + ~10 %.
+        assert report['total_tokens'] <= 6_100, (
             f'Prompt exceeds budget ceiling: {report["total_tokens"]} tokens '
-            '(baseline 5 752). Reduce prompt text or raise this ceiling deliberately.'
+            '(baseline 5 531). Reduce prompt text or raise this ceiling deliberately.'
         )
 
     def test_windows_ps_balanced_no_mcp_token_ceiling(self) -> None:
@@ -598,10 +598,10 @@ class TestPromptBudgetRegression:
             function_calling_mode='native',
         )
         assert report['total_tokens'] >= 800, 'Prompt shrank unexpectedly'
-        # Baseline post-compression: 6 113 tokens.  Ceiling = baseline + ~10 %.
-        assert report['total_tokens'] <= 6_730, (
+        # Post-consolidation baseline: 5 623 tokens.  Ceiling = baseline + ~10 %.
+        assert report['total_tokens'] <= 6_200, (
             f'Prompt exceeds budget ceiling: {report["total_tokens"]} tokens '
-            '(baseline 6 113). Reduce prompt text or raise this ceiling deliberately.'
+            '(baseline 5 623). Reduce prompt text or raise this ceiling deliberately.'
         )
 
     def test_full_autonomy_tracker_mcp_token_ceiling(self) -> None:
@@ -621,13 +621,10 @@ class TestPromptBudgetRegression:
             function_calling_mode='native',
         )
         assert report['total_tokens'] >= 1_000, 'Prompt shrank unexpectedly'
-        # Baseline post-compression: 5 663 tokens. Post strategic-memory +
-        # objective-nudge additions: ~6 518. Ceiling raised to 6 700 deliberately
-        # to accommodate strategic memory kinds + task_tracker objective
-        # framing + test-tolerance anti-pattern rule. Revisit if this grows further.
-        assert report['total_tokens'] <= 6_700, (
+        # Post-consolidation baseline: 6 120 tokens. Ceiling = baseline + ~10 %.
+        assert report['total_tokens'] <= 6_750, (
             f'Prompt exceeds budget ceiling: {report["total_tokens"]} tokens '
-            '(baseline 5 663). Reduce prompt text or raise this ceiling deliberately.'
+            '(baseline 6 120). Reduce prompt text or raise this ceiling deliberately.'
         )
 
 
@@ -644,6 +641,9 @@ def _base_config(**overrides: object) -> SimpleNamespace:
         enable_checkpoints=bool(overrides.get('enable_checkpoints', False)),
         enable_lsp_query=bool(overrides.get('enable_lsp_query', False)),
         enable_task_tracker_tool=bool(overrides.get('enable_task_tracker_tool', False)),
+        enable_acceptance_criteria_tool=bool(
+            overrides.get('enable_acceptance_criteria_tool', True)
+        ),
         enable_permissions=bool(overrides.get('enable_permissions', False)),
         permissions=overrides.get('permissions'),
         enable_meta_cognition=bool(overrides.get('enable_meta_cognition', False)),
@@ -942,6 +942,20 @@ class TestBuildSystemPromptRenders:
         )
         assert 'task_tracker' in result
 
+    def test_acceptance_criteria_workflow_examples(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(
+                enable_task_tracker_tool=True,
+                enable_acceptance_criteria_tool=True,
+            ),
+            function_calling_mode='native',
+        )
+        assert '<COMMON_PATTERNS>' in result
+        assert 'acceptance_criteria(update,' in result
+        assert 'acceptance_criteria(audit' in result
+
     def test_meta_cognition_enabled(self) -> None:
         result = self._assert_renders_cleanly(
             active_llm_model='gpt-4o',
@@ -1042,7 +1056,7 @@ class TestBuildSystemPromptRenders:
             semantic_recall_active=True,
         )
         assert '<MEMORY_AND_CONTEXT>' in result
-        assert 'memory(action="working")' in result
+        assert 'memory(action="working", update_type=update' in result
         assert 'memory(action="persist"' in result
         assert 'memory(action="recall", key=...)' in result
 
@@ -1055,7 +1069,7 @@ class TestBuildSystemPromptRenders:
             semantic_recall_active=False,
         )
         assert '<MEMORY_AND_CONTEXT>' in result
-        assert 'memory(action="working")' in result
+        assert 'memory(action="working", update_type=update' in result
         assert 'memory(action="persist"' in result
         assert 'memory(action="recall", key=...)' not in result
 
@@ -1161,6 +1175,7 @@ class TestBuildSystemPromptRenders:
             is_windows=False,
             config=_base_config(
                 enable_task_tracker_tool=False,
+                enable_acceptance_criteria_tool=False,
                 enable_checkpoints=False,
                 enable_working_memory=False,
             ),
@@ -1169,6 +1184,9 @@ class TestBuildSystemPromptRenders:
         # The tool names themselves should not appear when disabled
         assert 'task_tracker' not in result, (
             'task_tracker mentioned when tool is disabled'
+        )
+        assert 'acceptance_criteria' not in result, (
+            'acceptance_criteria mentioned when tool is disabled'
         )
         assert 'checkpoint' not in result, 'checkpoint mentioned when tool is disabled'
         assert '`memory`' not in result, 'memory tool mentioned when disabled'
@@ -1224,6 +1242,20 @@ class TestBuildSystemPromptRenders:
         assert 'web_fetch' in result
         assert 'docs_resolve' in result
         assert 'docs_query' in result
+
+    def test_grep_pagination_documented_once(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(mode='agent'),
+            function_calling_mode='native',
+        )
+        needle = 'default output_mode=files_with_matches'
+        assert result.count(needle) == 1, (
+            f'Expected grep pagination guidance once in <DISCOVERY_ROUTING>, '
+            f'found {result.count(needle)} occurrences'
+        )
+        assert '**`grep`:** default' not in result
 
     def test_capabilities_documents_docs_and_optional_context7_key(self) -> None:
         result = self._assert_renders_cleanly(

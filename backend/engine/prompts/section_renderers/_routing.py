@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from backend.engine.prompts.section_renderers._common import _semantic_recall_runtime
 from backend.engine.prompts.section_renderers._env_hints import (
     _debugger_available,
     _discovery_decision_table,
@@ -12,16 +13,6 @@ from backend.engine.prompts.section_renderers._env_hints import (
     _repo_discovery_contract,
     _routing_memory_tool_placeholders,
 )
-
-
-def _semantic_recall_runtime(
-    config: Any, *, semantic_recall_active: bool | None = None
-) -> bool:
-    from backend.utils.optional_extras import resolve_semantic_recall_for_prompt
-
-    return resolve_semantic_recall_for_prompt(
-        config, semantic_recall_active=semantic_recall_active
-    )
 
 
 def _render_routing(

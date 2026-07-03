@@ -634,44 +634,27 @@ class TestUserGoalSection:
             llm=_make_llm(), max_size=100, keep_first=2
         )
 
-    def test_prompt_includes_user_goal_section_when_messages_present(self):
-        snapshot = {'user_messages': [{'text': 'Build a compiler'}]}
+    def test_prompt_includes_previous_goal_when_present(self):
+        prev = _summary_event(0, '## USER GOAL\nBuild a compiler\n## OTHER\nstuff')
         prompt = self.condenser._build_condensation_prompt(
-            _summary_event(0), [], snapshot=snapshot, char_limit=48000
+            prev, [], char_limit=48000
         )
-        assert '## USER GOAL' in prompt
-        assert 'USER MESSAGES' in prompt
-        assert '[1] Build a compiler' in prompt
+        assert 'PREVIOUS GOAL SYNTHESIS' in prompt
+        assert 'Build a compiler' in prompt
 
-    def test_prompt_omits_user_goal_section_when_no_messages(self):
+    def test_prompt_omits_previous_goal_when_absent(self):
         prompt = self.condenser._build_condensation_prompt(
-            _summary_event(0), [], snapshot=None, char_limit=48000
+            _summary_event(0), [], char_limit=48000
         )
-        assert '## USER GOAL' not in prompt
-        assert 'USER MESSAGES' not in prompt
+        assert 'PREVIOUS GOAL SYNTHESIS' not in prompt
 
-    def test_user_messages_injected_verbatim_no_truncation(self):
-        long_msg = 'A' * 5000
-        snapshot = {'user_messages': [{'text': long_msg}]}
+    def test_previous_goal_not_truncated_by_char_limit(self):
+        long_goal = 'A user wants X with ' + 'very specific constraints ' * 300
+        prev = _summary_event(0, f'## USER GOAL\n{long_goal}\n## OTHER\nstuff')
         prompt = self.condenser._build_condensation_prompt(
-            _summary_event(0), [], snapshot=snapshot, char_limit=48000
+            prev, [], char_limit=2000
         )
-        assert long_msg in prompt
-
-    def test_multiple_user_messages_numbered(self):
-        snapshot = {
-            'user_messages': [
-                {'text': 'Build a compiler'},
-                {'text': 'Actually fix this bug instead'},
-                {'text': 'Use the fltk backend'},
-            ]
-        }
-        prompt = self.condenser._build_condensation_prompt(
-            _summary_event(0), [], snapshot=snapshot, char_limit=48000
-        )
-        assert '[1] Build a compiler' in prompt
-        assert '[2] Actually fix this bug instead' in prompt
-        assert '[3] Use the fltk backend' in prompt
+        assert long_goal[:200] in prompt
 
     def test_previous_goal_synthesis_injected_from_prior_summary(self):
         summary = (
@@ -679,69 +662,45 @@ class TestUserGoalSection:
             '## UNRESOLVED\nNone'
         )
         summary_event = _summary_event(0, message=summary)
-        snapshot = {'user_messages': [{'text': 'Build a compiler'}]}
         prompt = self.condenser._build_condensation_prompt(
-            summary_event, [], snapshot=snapshot, char_limit=48000
+            summary_event, [], char_limit=48000
         )
         assert 'PREVIOUS GOAL SYNTHESIS' in prompt
         assert 'Build a compiler with X constraints' in prompt
 
     def test_previous_goal_synthesis_omitted_when_no_prior_goal(self):
         summary_event = _summary_event(0, message='## UNRESOLVED\nNone')
-        snapshot = {'user_messages': [{'text': 'Build a compiler'}]}
         prompt = self.condenser._build_condensation_prompt(
-            summary_event, [], snapshot=snapshot, char_limit=48000
+            summary_event, [], char_limit=48000
         )
         assert 'PREVIOUS GOAL SYNTHESIS' not in prompt
 
-    def test_prompt_includes_sourced_trigger_instruction(self):
-        snapshot = {'user_messages': [{'text': 'Build a compiler'}]}
+    def test_prompt_includes_goal_section_instruction(self):
         prompt = self.condenser._build_condensation_prompt(
-            _summary_event(0), [], snapshot=snapshot, char_limit=48000
+            _summary_event(0), [], char_limit=48000
         )
-        assert 'cite the user message number' in prompt.lower()
-        assert '[DEPRIORITIZED]' in prompt
-        assert '[SUPERSEDED]' in prompt
-
-    def test_has_user_messages_flag_set_correctly(self):
-        snapshot = {'user_messages': [{'text': 'Build a compiler'}]}
-        self.condenser._build_condensation_prompt(
-            _summary_event(0), [], snapshot=snapshot, char_limit=48000
-        )
-        assert self.condenser._has_user_messages is True
-
-    def test_has_user_messages_flag_false_when_no_snapshot(self):
-        self.condenser._build_condensation_prompt(
-            _summary_event(0), [], snapshot=None, char_limit=48000
-        )
-        assert self.condenser._has_user_messages is False
-
+        assert '## USER GOAL' in prompt
+        assert 'Highest Priority' in prompt
 
 # ---------------------------------------------------------------------------
-# Gate: ## USER GOAL header check
+# Gate: prose sanity gate
 # ---------------------------------------------------------------------------
 
 
-class TestUserGoalGate:
+class TestProseSanityGate:
     def setup_method(self):
         self.condenser = StructuredSummaryCompactor(
             llm=_make_llm(), max_size=100, keep_first=2
         )
 
-    def test_gate_rejects_missing_user_goal_when_messages_present(self):
-        self.condenser._has_user_messages = True
-        prose = _long_prose()
-        assert not self.condenser._passes_prose_sanity_gate(prose)
+    def test_gate_rejects_empty_prose(self):
+        assert not self.condenser._passes_prose_sanity_gate('')
 
-    def test_gate_accepts_user_goal_when_messages_present(self):
-        self.condenser._has_user_messages = True
-        prose = '## USER GOAL\nBuild a compiler\n\n' + _long_prose()
-        assert self.condenser._passes_prose_sanity_gate(prose)
+    def test_gate_rejects_too_short_prose(self):
+        assert not self.condenser._passes_prose_sanity_gate('hi')
 
-    def test_gate_accepts_missing_user_goal_when_no_messages(self):
-        self.condenser._has_user_messages = False
-        prose = _long_prose()
-        assert self.condenser._passes_prose_sanity_gate(prose)
+    def test_gate_accepts_long_enough_prose(self):
+        assert self.condenser._passes_prose_sanity_gate(_long_prose())
 
 
 # ---------------------------------------------------------------------------

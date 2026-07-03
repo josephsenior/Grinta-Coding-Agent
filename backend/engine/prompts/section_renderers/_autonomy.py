@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from backend.engine.prompts.section_renderers._common import _semantic_recall_runtime
 from backend.engine.prompts.section_renderers._env_hints import (
     _explore_hint,
     _lsp_available,
@@ -17,20 +18,11 @@ from backend.engine.prompts.section_renderers._env_hints import (
 )
 
 
-def _semantic_recall_runtime(
-    config: Any, *, semantic_recall_active: bool | None = None
-) -> bool:
-    from backend.utils.optional_extras import resolve_semantic_recall_for_prompt
-
-    return resolve_semantic_recall_for_prompt(
-        config, semantic_recall_active=semantic_recall_active
-    )
-
-
 def _build_context_discipline_section(
     *,
     working_memory_on: bool,
     tracker_on: bool,
+    criteria_on: bool = True,
     checkpoints_on: bool,
     condensation_on: bool,
     semantic_recall_on: bool = False,
@@ -38,7 +30,7 @@ def _build_context_discipline_section(
     parts = ['<CONTEXT_DISCIPLINE>']
     parts.append(
         'Use the visible conversation, current files, and fresh tool observations as context. '
-        'After condensation, resume from durable state without restarting broad exploration.'
+        'After condensation, follow `<SELF_REGULATION>`.'
     )
     if working_memory_on:
         memory_actions = 'working/persist'
@@ -47,25 +39,33 @@ def _build_context_discipline_section(
         parts.extend(
             [
                 '',
-                f'**memory** — see `<MEMORY_AND_CONTEXT>` for {memory_actions}; '
-                'do not duplicate task progress here.',
+                f'**memory** — see `<MEMORY_AND_CONTEXT>` for {memory_actions}.',
             ]
         )
     if checkpoints_on:
         parts.append(
-            '**checkpoint** — auto snapshots precede risky edits; use `save` for named milestones, '
-            '`revert` when recovery is needed, `clear` when ending a task or resetting the list.'
+            '**checkpoint** — see System Capabilities and `<EDITOR_AND_FILE_OPERATIONS>`.'
         )
 
     if tracker_on:
         parts.extend(
             [
                 '',
-                '**task_tracker** — see `<TASK_TRACKING>` for planning, sync, and completion rules.',
+                '**task_tracker** — see `<TASK_TRACKING>`.',
             ]
         )
         if condensation_on:
             parts.append('Post-condensation: `task_tracker(view)` first.')
+
+    if criteria_on:
+        parts.extend(
+            [
+                '',
+                '**acceptance_criteria** — see `<ACCEPTANCE_CRITERIA>`.',
+            ]
+        )
+        if condensation_on:
+            parts.append('Post-condensation: `acceptance_criteria(view)` if criteria were defined.')
 
     parts.append('</CONTEXT_DISCIPLINE>')
     return '\n'.join(parts)
@@ -75,32 +75,25 @@ def _build_when_to_use_context(
     *,
     working_memory_on: bool,
     tracker_on: bool,
+    criteria_on: bool = True,
     checkpoints_on: bool,
     semantic_recall_on: bool = False,
 ) -> str:
     parts = ['<WHEN_TO_USE_CONTEXT>']
     if working_memory_on:
-        parts.append(
-            '- **memory(action="working")**: hypothesis, findings, blockers, and plan during long work.'
-        )
-        if semantic_recall_on:
-            parts.append(
-                '- **memory(action="recall", key=...)**: when the visible window no longer shows a prior decision.'
-            )
-        parts.append(
-            '- **memory(action="persist", kind=...)**: rare, only for verified knowledge worth keeping across sessions. '
-            'Tactical kinds (`convention`/`command`/`architecture`/`lesson`) for codebase facts; '
-            'strategic kinds (`strategy`/`heuristic`/`decision`/`preference`) for higher-level knowledge. '
-            'Task progress belongs in `task_tracker`, not memory.'
-        )
+        parts.append('- **memory**: See `<MEMORY_AND_CONTEXT>`.')
     if checkpoints_on:
         parts.append(
-            '- **checkpoint**: `view` before choosing a revert target; `revert` after a bad edit '
-            'or failed command; `clear` when the saved milestone list is stale.'
+            '- **checkpoint**: before revert or when milestones are stale — see System Capabilities.'
         )
     if tracker_on:
         parts.append('- **task_tracker**: See `<TASK_TRACKING>`.')
-    if not tracker_on:
+    if criteria_on:
+        parts.append(
+            '- **acceptance_criteria**: See `<ACCEPTANCE_CRITERIA>`. '
+            'Use at task start (update), before final summary (audit), and `view` after condensation.'
+        )
+    if not tracker_on and not criteria_on:
         parts.append(
             '- Use fresh reads/searches and recent observations to stay grounded.'
         )
@@ -123,19 +116,33 @@ def _build_risk_preview(
     )
 
 
-def _build_autonomy_block(_mode: str, *, checkpoints_on: bool) -> str:
-    _ = checkpoints_on
+def _build_autonomy_block(_mode: str) -> str:
     return (
         '<AUTONOMY>\n'
         'For implementation work, drive the request through tools and verification; '
         'for discussion or planning work, keep the response aligned with the active protocol. '
-        'During implementation, continue work through tool calls. Plain text without tool calls is treated as '
-        'the final response, so reserve it for completion, user-facing explanation, or an honest blocked/partial result. '
+        'During implementation, continue work through tool calls. Plain text without tool calls ends the run — '
+        'see the active mode protocol for when to write it. '
         'If the user changes or contradicts the task mid-run, treat the latest user directive as authoritative. '
         'Preserve completed work that still applies, drop work that no longer applies, and continue from the new instruction. '
         'The runtime may interrupt a tool call to surface a user decision; treat that decision as '
         'authoritative and continue from where you stopped. On tool failure, follow `<ERROR_RECOVERY>`.'
         '\n</AUTONOMY>'
+    )
+
+
+def _build_task_sync_instruction(*, tracker_on: bool, criteria_on: bool) -> str:
+    if not tracker_on and not criteria_on:
+        return '**Plan synchronization:** Keep your final response aligned with what was actually completed.'
+    tags: list[str] = []
+    if criteria_on:
+        tags.append('`<ACCEPTANCE_CRITERIA>`')
+    if tracker_on:
+        tags.append('`<TASK_TRACKING>`')
+    return (
+        '**Completion rituals:** Before the final summary, follow '
+        + ' and '.join(tags)
+        + '.'
     )
 
 
@@ -157,24 +164,26 @@ def _render_autonomy(
     working_memory_on = bool(getattr(config, 'enable_working_memory', True))
     condensation_on = bool(getattr(config, 'enable_condensation_request', False))
     tracker_on = bool(getattr(config, 'enable_task_tracker_tool', True))
+    criteria_on = bool(getattr(config, 'enable_acceptance_criteria_tool', True))
+    semantic_recall_on = _semantic_recall_runtime(
+        config, semantic_recall_active=semantic_recall_active
+    )
 
-    autonomy_block = _build_autonomy_block(mode, checkpoints_on=checkpoints_on)
+    autonomy_block = _build_autonomy_block(mode)
     context_discipline = _build_context_discipline_section(
         working_memory_on=working_memory_on,
         tracker_on=tracker_on,
+        criteria_on=criteria_on,
         checkpoints_on=checkpoints_on,
         condensation_on=condensation_on,
-        semantic_recall_on=_semantic_recall_runtime(
-            config, semantic_recall_active=semantic_recall_active
-        ),
+        semantic_recall_on=semantic_recall_on,
     )
     when_to_use_context = _build_when_to_use_context(
         working_memory_on=working_memory_on,
         tracker_on=tracker_on,
+        criteria_on=criteria_on,
         checkpoints_on=checkpoints_on,
-        semantic_recall_on=_semantic_recall_runtime(
-            config, semantic_recall_active=semantic_recall_active
-        ),
+        semantic_recall_on=semantic_recall_on,
     )
     risk_preview = _build_risk_preview(tracker_on=tracker_on)
 
@@ -188,38 +197,68 @@ def _render_autonomy(
     if tracker_on:
         task_tracker_discipline_block = (
             '<TASK_TRACKING>\n'
-            '**task_tracker**: In Agent or Plan mode, use `task_tracker(update, task_list=[...])` as your first action when you commit to structured work.\n'
-            'Set `title` to the objective; define what "done" looks like before decomposing into steps.\n'
+            '**task_tracker**: Coarse execution plan only — 3–7 parent steps, not micro-requirements.\n'
+            'Use `task_tracker(update, task_list=[...])` when you commit to structured work.\n'
             'Use `view` to inspect the plan, `update` to replace the full `task_list`, and `update_status` for single-task status changes.\n'
             'Quick status updates: use `update_status(task_id="...", status="done")` to change a single task status by ID. Optional `result` field captures outcome.\n'
             'Allowed statuses: `todo`, `in_progress`, `done`, `skipped`, `blocked`.\n'
-            'Each step object has: `id` (string, e.g. "1" or "1.1"), `description` (string), `status` (one of the allowed statuses), `result` (optional string), `tags` (optional LIST of strings — never a bare string), `subtasks` (optional recursive list of the same shape).\n'
+            'Each step object has: `id` (string, e.g. "1"), `description` (string), `status` (one of the allowed statuses), `result` (optional string), `tags` (optional LIST of strings — never a bare string).\n'
             '**Completion**: Before the final summary, no task should remain `todo` or `in_progress`. Mark truly completed work `done`, intentionally omitted work `skipped`, and only genuinely blocked work `blocked` with a reason.'
             '</TASK_TRACKING>'
         )
     else:
         task_tracker_discipline_block = ''
 
-    base_workflow = (
-        'Default loop: scope \u2192 reproduce \u2192 isolate \u2192 fix \u2192 verify.\n'
+    if criteria_on:
+        tracker_follow = (
+            ', then `task_tracker(update, ...)`'
+            if tracker_on
+            else ''
+        )
+        during_work = (
+            '**During work:** update only the coarse `task_tracker` plan — not criteria.\n'
+            if tracker_on
+            else '**During work:** do not rewrite criteria unless something important was missed (`append`).\n'
+        )
+        checkpoint = (
+            '**Component checkpoint:** when marking a `task_tracker` step done, glance at related criteria.\n'
+            if tracker_on
+            else ''
+        )
+        acceptance_criteria_discipline_block = (
+            '<ACCEPTANCE_CRITERIA>\n'
+            '**acceptance_criteria**: Flat verifiable assertions for what must be true when done.\n'
+            f'**Start ritual:** for bugfixes, implementations, or multi-step tasks, first call '
+            f'`acceptance_criteria(update, criteria_list=[...])`{tracker_follow} '
+            'before any file edit or shell command.\n'
+            'See `<COMMON_PATTERNS>` for worked flows.\n'
+            'Tag each item `source: "stated"` or `"inferred"`. Use assertion phrasing, not activities.\n'
+            f'{during_work}'
+            f'{checkpoint}'
+            '**Audit:** before the final summary, `acceptance_criteria(audit, ...)` with `evidence` or `GAP: ...` on every item.\n'
+            'Use `view` to read; `append` only for rare gaps.\n'
+            '</ACCEPTANCE_CRITERIA>'
+        )
+    else:
+        acceptance_criteria_discipline_block = ''
+
+    problem_solving_workflow_body = (
+        'Default loop: scope → reproduce → isolate → fix → verify.\n'
         'For debug/fix tasks, re-run the same reproducer when possible.'
     )
     if tracker_on:
-        problem_solving_workflow_body = (
-            base_workflow
-            + '\n\nWith **task_tracker** enabled, treat **sync** as part of the loop: after verify, update the plan when progress changed.'
+        problem_solving_workflow_body += (
+            '\n\nWith **task_tracker** enabled, sync the plan after verify when progress changed.'
         )
-        task_sync_instruction = (
-            '**Task synchronization:** See `<TASK_TRACKING>` before the final summary.'
-        )
-    else:
-        problem_solving_workflow_body = base_workflow
-        task_sync_instruction = '**Plan synchronization:** Keep your final response aligned with what was actually completed.'
+
+    task_sync_instruction = _build_task_sync_instruction(
+        tracker_on=tracker_on, criteria_on=criteria_on
+    )
 
     lsp_avail = _lsp_available(config)
     error_recovery_pivot_lines = (
-        '- `grep` / `glob` \u2192 `lsp` (check locally with the language server; no shell grep)\n'
-        '- `lsp` \u2192 `grep` (wider text search)'
+        '- `grep` / `glob` → `lsp` (check locally with the language server; no shell grep)\n'
+        '- `lsp` → `grep` (wider text search)'
         if lsp_avail
         else ''
     )
@@ -231,6 +270,7 @@ def _render_autonomy(
         when_to_use_context=when_to_use_context,
         risk_preview=risk_preview,
         task_tracker_discipline_block=task_tracker_discipline_block,
+        acceptance_criteria_discipline_block=acceptance_criteria_discipline_block,
         task_sync_instruction=task_sync_instruction,
         path_discovery_hint=path_hint,
         problem_solving_workflow_body=problem_solving_workflow_body,

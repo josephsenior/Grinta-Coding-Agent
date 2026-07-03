@@ -14,8 +14,11 @@ import backend.engine.tools.checkpoint as checkpoint_tools
 from backend.core.enums import FileEditSource
 from backend.core.errors import FunctionCallValidationError
 from backend.core.logging.logger import app_logger as logger
+from backend.core.criteria.acceptance_criteria_store import AcceptanceCriteriaStore
+from backend.core.criteria.criterion_item import normalize_criteria_list
 from backend.core.tasks.task_tracker import TaskTracker
 from backend.core.tools.tool_names import (
+    ACCEPTANCE_CRITERIA_TOOL_NAME,
     TASK_TRACKER_TOOL_NAME,
     UNDO_LAST_EDIT_TOOL_NAME,
 )
@@ -37,6 +40,7 @@ from backend.engine.tools.browser_native import (
 from backend.engine.tools.glob import build_glob_action
 from backend.engine.tools.grep import build_grep_action
 from backend.ledger.action import (
+    AcceptanceCriteriaAction,
     Action,
     AnalyzeProjectStructureAction,
     BrowserToolAction,
@@ -428,6 +432,105 @@ def _handle_task_tracker_tool(arguments: Mapping[str, Any]) -> Action:
         return noop
 
     return TaskTrackingAction(command=command, task_list=normalized_task_list)
+
+
+def _normalize_criteria_list(
+    raw_list: list[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Normalize criteria list. Raises FunctionCallValidationError on invalid structure."""
+    try:
+        return normalize_criteria_list(list(raw_list))
+    except TypeError as e:
+        raise FunctionCallValidationError(str(e)) from e
+
+
+def _criteria_existing_normalized(store: AcceptanceCriteriaStore) -> list[dict[str, Any]]:
+    try:
+        return normalize_criteria_list(store.load_from_file())
+    except TypeError:
+        return []
+
+
+def _maybe_noop_criteria_action(
+    command: str,
+    normalized: list[dict[str, Any]],
+    existing: list[dict[str, Any]],
+) -> AcceptanceCriteriaAction | None:
+    if command == 'update' and normalized and normalized == existing:
+        logger.info('Converting no-op acceptance_criteria update into a no-op action')
+        return AcceptanceCriteriaAction(
+            command=command,
+            criteria_list=normalized,
+            thought=(
+                '[ACCEPTANCE_CRITERIA] Update skipped because the criteria list is unchanged. '
+                'Continue implementation; re-audit only before the final summary.'
+            ),
+        )
+    return None
+
+
+def _validate_audit_criteria(normalized: list[dict[str, Any]]) -> None:
+    missing = [
+        i + 1
+        for i, item in enumerate(normalized)
+        if not str(item.get('evidence') or '').strip()
+    ]
+    if missing:
+        raise FunctionCallValidationError(
+            f'Audit requires evidence or an explicit gap on every criterion. '
+            f'Missing on item(s): {missing}'
+        )
+
+
+def _handle_acceptance_criteria_tool(arguments: Mapping[str, Any]) -> Action:
+    """Handle acceptance_criteria tool call."""
+    command = require_tool_argument(arguments, 'command', ACCEPTANCE_CRITERIA_TOOL_NAME)
+    if command not in {'view', 'update', 'append', 'audit'}:
+        raise FunctionCallValidationError(
+            f'Unsupported command {command!r} for tool call {ACCEPTANCE_CRITERIA_TOOL_NAME}'
+        )
+
+    store = AcceptanceCriteriaStore()
+
+    if command == 'view':
+        raw_list = store.load_from_file()
+        return AcceptanceCriteriaAction(command='view', criteria_list=raw_list)
+
+    if 'criteria_list' not in arguments:
+        raise FunctionCallValidationError(
+            f'Missing required argument "criteria_list" for "{command}" command '
+            f'in tool call {ACCEPTANCE_CRITERIA_TOOL_NAME}'
+        )
+
+    raw_any = arguments.get('criteria_list', [])
+    if not isinstance(raw_any, Sequence):
+        raise FunctionCallValidationError(
+            f'Invalid format for "criteria_list". Expected a list but got {type(raw_any)}.'
+        )
+    raw_list = cast(Sequence[Mapping[str, Any]], raw_any)
+    normalized = _normalize_criteria_list(list(raw_list))
+    existing = _criteria_existing_normalized(store)
+
+    if command == 'audit':
+        _validate_audit_criteria(normalized)
+        if existing and len(normalized) != len(existing):
+            raise FunctionCallValidationError(
+                'Audit must include every criterion in the current list with evidence filled.'
+            )
+        final_list = normalized
+    elif command == 'append':
+        if not normalized:
+            raise FunctionCallValidationError(
+                'Append requires at least one new criterion in criteria_list.'
+            )
+        final_list = existing + normalized
+    else:
+        final_list = normalized
+        noop = _maybe_noop_criteria_action(command, final_list, existing)
+        if noop is not None:
+            return noop
+
+    return AcceptanceCriteriaAction(command=command, criteria_list=final_list)
 
 
 def _handle_mcp_tool(

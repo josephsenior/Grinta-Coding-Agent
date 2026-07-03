@@ -13,6 +13,8 @@ Specific triggers for `<DECISION_FRAMEWORK>`:
 
 {task_tracker_discipline_block}
 
+{acceptance_criteria_discipline_block}
+
 <ERROR_RECOVERY>
 Read errors quickly. If path is uncertain: {path_discovery_hint}
 
@@ -37,8 +39,6 @@ Escalations must specify: (1) hypothesis, (2) action taken and outcome, (3) rule
 </PROBLEM_SOLVING_WORKFLOW>
 
 <WORK_HABITS>
-**Edit scope:** For an existing file, do not rewrite the whole file to make a local fix unless you have explicit evidence that a full rewrite is required. Do not refactor outside the scope of the task unless asked.
 **Code quality:** Match existing code style and conventions; handle errors explicitly.
-**Ship discipline:** When the requested change is done and verification is complete or explicitly blocked, stop. Do not widen scope or keep investigating unless required by the user request.
 {task_sync_instruction}
 </WORK_HABITS>

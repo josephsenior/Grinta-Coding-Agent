@@ -810,12 +810,9 @@ class CompactionCard(ScanLineCard):
         if not text:
             return
         self.summary = text
-        if self._state != 'running':
-            # Keep the running indicator while streaming, in case the card
-            # was already marked done by a stale CondensationAction.
-            self.set_state('running')
-        else:
-            self._refresh_line()
+        if self._state == 'done':
+            return
+        self._refresh_line()
         self._push_summary_to_live_screen()
 
     def _push_summary_to_live_screen(self) -> None:

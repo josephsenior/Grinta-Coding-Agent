@@ -45,6 +45,7 @@ _TOOL_HEADLINE: dict[str, tuple[str, str]] = {
     'memory': ('', 'Memory'),
     'memory_manager': ('', 'Memory'),
     'task_tracker': ('', 'Tasks'),
+    'acceptance_criteria': ('', 'Criteria'),
     'grep': ('⌕', 'Grepped'),
     'glob': ('✻', 'Globbed'),
     'lsp': ('≡', 'Analyzed'),

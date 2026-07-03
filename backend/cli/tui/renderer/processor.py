@@ -96,9 +96,11 @@ from backend.cli.tui.renderer.handlers.task_tracking import (
 from backend.cli.tui.renderer.handlers.terminal import (
     _handle_terminal_close_action,
     _handle_terminal_input_action,
+    _handle_terminal_list_action,
     _handle_terminal_observation,
     _handle_terminal_read_action,
     _handle_terminal_run_action,
+    _handle_terminal_wait_action,
 )
 from backend.cli.tui.renderer.handlers.thinking import (
     _handle_agent_think_action,
@@ -136,8 +138,10 @@ from backend.ledger.action import (
     TaskTrackingAction,
     TerminalCloseAction,
     TerminalInputAction,
+    TerminalListAction,
     TerminalReadAction,
     TerminalRunAction,
+    TerminalWaitAction,
     UncertaintyAction,
 )
 from backend.ledger.action.memory_tools import (
@@ -432,6 +436,8 @@ _EVENT_HANDLERS: dict[type, Any] = {
     TerminalRunAction: _handle_terminal_run_action,
     TerminalInputAction: _handle_terminal_input_action,
     TerminalReadAction: _handle_terminal_read_action,
+    TerminalWaitAction: _handle_terminal_wait_action,
+    TerminalListAction: _handle_terminal_list_action,
     TerminalCloseAction: _handle_terminal_close_action,
     TerminalObservation: _handle_terminal_observation,
     AgentCondensationObservation: _handle_agent_condensation_observation,

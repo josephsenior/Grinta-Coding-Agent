@@ -236,19 +236,23 @@ class RendererActionHandlersMixin:
 
     def _stream_to_compaction_card(self, action: StreamingChunkAction) -> None:
         """Update the pending compaction scan card with a streamed chunk."""
-        card = getattr(self, '_pending_compaction_scan_card', None)
-        if card is None:
-            return
-        text = action.accumulated or action.chunk or ''
-        if not text:
-            return
-        update = getattr(card, 'update_summary_streaming', None)
-        if callable(update):
-            update(text)
-        elif hasattr(card, 'summary'):
-            card.summary = text
-            if hasattr(card, '_refresh_line'):
-                card._refresh_line()
+        from backend.cli.tui.renderer.handlers.compaction import _finish_compaction_card
+
+        card = self._resolve_running_compaction_card()
+        text = (action.accumulated or action.chunk or '').strip()
+
+        if card is not None and text:
+            update = getattr(card, 'update_summary_streaming', None)
+            if callable(update):
+                update(text)
+            elif hasattr(card, 'summary'):
+                card.summary = text
+                if hasattr(card, '_refresh_line'):
+                    card._refresh_line()
+
+        if action.is_final:
+            summary = text or 'Context condensed.'
+            _finish_compaction_card(self, summary=summary)
 
     def _flush_deferred_stream_chunk(self) -> None:
         self._stream_paint_timer_armed = False

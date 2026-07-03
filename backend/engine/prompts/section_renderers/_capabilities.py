@@ -10,15 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-
-def _vector_memory_runtime(
-    config: Any, *, semantic_recall_active: bool | None = None
-) -> bool:
-    from backend.utils.optional_extras import resolve_semantic_recall_for_prompt
-
-    return resolve_semantic_recall_for_prompt(
-        config, semantic_recall_active=semantic_recall_active
-    )
+from backend.engine.prompts.section_renderers._common import _semantic_recall_runtime
 
 
 def _browser_runtime(config: Any) -> bool:
@@ -150,7 +142,7 @@ def _render_system_capabilities(
 
     condensation_tiers = (
         'working / episodic / semantic'
-        if _vector_memory_runtime(config, semantic_recall_active=semantic_recall_active)
+        if _semantic_recall_runtime(config, semantic_recall_active=semantic_recall_active)
         else 'working / episodic'
     )
     condensation_line = (
@@ -194,23 +186,24 @@ def _render_system_capabilities(
     if bool(getattr(config, 'enable_working_memory', True)) and can_edit:
         recall_hint = (
             ', `recall` for semantic search over indexed history'
-            if _vector_memory_runtime(
+            if _semantic_recall_runtime(
                 config, semantic_recall_active=semantic_recall_active
             )
             else ''
         )
         memory_line = (
             '- **Memory (`memory`)**: `working` for session reasoning, `persist` for rare workspace '
-            f'facts{recall_hint}. Task progress belongs in `task_tracker`, not memory.'
+            f'facts{recall_hint}.'
         )
 
     checkpoint_line = ''
     if bool(getattr(config, 'enable_checkpoints', True)) and can_edit:
         checkpoint_line = (
             '- **Checkpoints (`checkpoint`)**: risky edits/commands get automatic pre-action snapshots '
-            '(rollback middleware). Use `save` for named phase milestones, `view` to list checkpoints, '
-            '`revert` after a bad edit or failed command, `clear` when the milestone list is stale or '
-            'a fresh phase starts. Prefer `undo_last_edit` for the last file write.'
+            '(rollback middleware). Use `checkpoint(save)` for named phase milestones, '
+            '`checkpoint(view)` to list checkpoints, `checkpoint(revert)` after a bad edit or failed command, '
+            '`checkpoint(clear)` when the milestone list is stale or a fresh phase starts. '
+            'Prefer `undo_last_edit` for the last file write.'
         )
 
     # External MCP tool catalogue status — single source of truth for
