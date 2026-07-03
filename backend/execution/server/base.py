@@ -447,11 +447,13 @@ class Runtime(
         """Whether agent config enables the interactive DAP debugger tool."""
         from backend.core.config.app_config import AppConfig
 
+        from backend.core.constants import DEFAULT_AGENT_DEBUGGER_ENABLED
+
         cfg = self.config
         if isinstance(cfg, AppConfig):
             return bool(cfg.get_agent_config(cfg.default_agent).enable_debugger)
-        # Tests may pass a slim stub; default permissive when unspecified.
-        return bool(getattr(cfg, 'enable_debugger', True))  # type: ignore[unreachable]
+        # Tests may pass a slim stub; fall back to code default when unspecified.
+        return bool(getattr(cfg, 'enable_debugger', DEFAULT_AGENT_DEBUGGER_ENABLED))  # type: ignore[unreachable]
 
     def set_runtime_status(
         self, runtime_status: RuntimeStatus, msg: str = '', level: str = 'info'

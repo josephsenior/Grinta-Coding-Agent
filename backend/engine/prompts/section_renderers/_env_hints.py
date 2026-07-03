@@ -9,10 +9,15 @@ from __future__ import annotations
 
 from typing import Any
 
+from backend.core.constants import (
+    DEFAULT_AGENT_DEBUGGER_ENABLED,
+    DEFAULT_AGENT_LSP_QUERY_ENABLED,
+)
+
 
 def _lsp_available(config: Any = None) -> bool:
     """Return whether the lsp tool should be considered available."""
-    if not getattr(config, 'enable_lsp_query', True):
+    if not getattr(config, 'enable_lsp_query', DEFAULT_AGENT_LSP_QUERY_ENABLED):
         return False
     try:
         from backend.utils.runtime_detect import has_any_lsp_server
@@ -24,7 +29,7 @@ def _lsp_available(config: Any = None) -> bool:
 
 def _debugger_available(config: Any = None) -> bool:
     """Return whether the debugger tool should be considered available."""
-    if not getattr(config, 'enable_debugger', True):
+    if not getattr(config, 'enable_debugger', DEFAULT_AGENT_DEBUGGER_ENABLED):
         return False
     try:
         from backend.utils.runtime_detect import has_any_debug_adapter

@@ -10,6 +10,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from backend.core.constants import (
+    DEFAULT_AGENT_DEBUGGER_ENABLED,
+    DEFAULT_AGENT_LSP_QUERY_ENABLED,
+)
 from backend.engine.prompts.section_renderers._common import _semantic_recall_runtime
 
 
@@ -59,8 +63,12 @@ def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
     When ``enable_lsp_query`` / ``enable_debugger`` is false, returns ``''`` for that
     line so the capability block omits the tool entirely (no \"DISABLED\" bullet).
     """
-    lsp_enabled = bool(getattr(config, 'enable_lsp_query', True))
-    debugger_enabled = bool(getattr(config, 'enable_debugger', True))
+    lsp_enabled = bool(
+        getattr(config, 'enable_lsp_query', DEFAULT_AGENT_LSP_QUERY_ENABLED)
+    )
+    debugger_enabled = bool(
+        getattr(config, 'enable_debugger', DEFAULT_AGENT_DEBUGGER_ENABLED)
+    )
     try:
         from backend.utils.runtime_detect import (
             detection_summary,

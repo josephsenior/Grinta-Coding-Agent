@@ -8,6 +8,8 @@ from pydantic import ValidationError
 from backend.core.config.agent_config import AgentConfig
 from backend.core.config.compactor_config import ContextPipelineConfig
 from backend.core.constants import (
+    DEFAULT_AGENT_DEBUGGER_ENABLED,
+    DEFAULT_AGENT_LSP_QUERY_ENABLED,
     DEFAULT_AGENT_NAME,
     DEFAULT_AGENT_STREAMING_CHECKPOINT_DISCARD_STALE_ON_RECOVERY,
     DEFAULT_AGENT_STREAMING_CHECKPOINT_MAX_AGE_SECONDS,
@@ -38,9 +40,11 @@ class TestAgentConfigDefaults:
 
     def test_default_lsp_query_enabled(self):
         cfg = AgentConfig()
-        # LSP is opt-out as of v0.56: the runtime detector silently skips the
-        # tool when no language server is installed, so default-on is safe.
-        assert cfg.enable_lsp_query is True
+        assert cfg.enable_lsp_query is DEFAULT_AGENT_LSP_QUERY_ENABLED
+
+    def test_default_debugger_enabled(self):
+        cfg = AgentConfig()
+        assert cfg.enable_debugger is DEFAULT_AGENT_DEBUGGER_ENABLED
 
     def test_default_swarming_enabled(self):
         cfg = AgentConfig()

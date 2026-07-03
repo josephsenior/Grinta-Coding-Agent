@@ -56,6 +56,8 @@ The default agent name is `Orchestrator`. Common overrides:
 | `enable_vector_memory` | Semantic recall / vector store (default on; requires `[rag]` extra at runtime). Set `false` to disable. |
 | `enable_hybrid_retrieval` | Hybrid search with `[rag]` (default on; same gating as vector memory). |
 | `enable_task_tracker_tool` | Structured plan tracking in Plan mode |
+| `enable_lsp_query` | LSP tool (`lsp`); default off — set `true` when language servers are installed |
+| `enable_debugger` | Interactive DAP debugger tool; default off — set `true` when debug adapters are available |
 
 **Disabled in v1.0:** `enable_blackboard` and `enable_swarming` — schema only, not wired. Autonomy: [USER_GUIDE.md](USER_GUIDE.md).
 

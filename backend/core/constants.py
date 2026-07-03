@@ -351,9 +351,10 @@ DEFAULT_AGENT_HYBRID_RETRIEVAL_ENABLED = True
 DEFAULT_AGENT_AUTO_LINT_ENABLED = True
 DEFAULT_AGENT_AUTO_RETRY_ON_ERROR = True
 DEFAULT_AGENT_AUTONOMY_LEVEL = 'balanced'
-# DAP / interactive debugger: enabled by default, then runtime-gated by adapter
-# detection so the tool appears only when at least one usable adapter is present.
-DEFAULT_AGENT_DEBUGGER_ENABLED = True
+# LSP / DAP tools are opt-in: set enable_lsp_query / enable_debugger in settings.json.
+# When enabled, runtime detection still gates availability on installed adapters.
+DEFAULT_AGENT_LSP_QUERY_ENABLED = False
+DEFAULT_AGENT_DEBUGGER_ENABLED = False
 
 # Optional LLM-initiated compaction; automatic condensation still runs when needed.
 DEFAULT_AGENT_CONDENSATION_REQUEST_ENABLED = False
