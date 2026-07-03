@@ -25,7 +25,6 @@ from backend.context.context_pipeline.types import (
     _INEFFECTIVE_COMPACT_UNTIL_KEY,
     _JUST_COMPACTED_KEY,
     _LAST_BOUNDARY_COMPACT_KEY,
-    _LAST_LLM_COMPACT_KEY,
     _SKIP_COMPACTION_UNTIL_KEY,
     _ContinuityGateDecision,
 )
@@ -46,7 +45,6 @@ __all__ = [
     '_INEFFECTIVE_COMPACT_UNTIL_KEY',
     '_JUST_COMPACTED_KEY',
     '_LAST_BOUNDARY_COMPACT_KEY',
-    '_LAST_LLM_COMPACT_KEY',
     '_SKIP_COMPACTION_UNTIL_KEY',
     '_drop_stale_prompt_state_artifacts',
     '_latest_event_id',

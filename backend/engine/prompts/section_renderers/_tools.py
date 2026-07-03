@@ -80,7 +80,7 @@ def _render_tool_reference(
             '- Discovery: follow `<DISCOVERY_ROUTING>`.\n'
             '- Context: `read_file(path=...)`; add `start_line`/`end_line` on large files '
             '(see `<DISCOVERY_ROUTING>`).\n'
-            '- Creation: `create_file` for new files. Fails if the file already exists; use `replace_string` or `multiedit` to modify an existing file.\n'
+            '- Creation: `create_file` writes a file at the given path (overwrites silently if it already exists).\n'
             '- Editing: `replace_string` (one exact text replacement per call); add by anchor -> anchor + content, delete with `new_string=""`.\n'
             '- Prefer surgical targeted edits for existing files; full-file overwrites only when genuinely necessary.\n'
             '- Batched or cross-file refactors: `multiedit` (multiple replace_string operations across one or more files).\n'

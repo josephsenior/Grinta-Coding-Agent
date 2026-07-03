@@ -13,7 +13,6 @@ from backend.core.constants import (
     DEFAULT_COMPACTOR_MAX_EVENT_LENGTH,
     DEFAULT_COMPACTOR_MAX_EVENTS,
     DEFAULT_COMPACTOR_MAX_SIZE,
-    DEFAULT_LLM_COMPACT_COOLDOWN_SECONDS,
     DEFAULT_MICROCOMPACT_PRESERVE_RECENT,
     DEFAULT_SMART_COMPACTOR_IMPORTANCE_THRESHOLD,
     DEFAULT_SMART_COMPACTOR_KEEP_FIRST,
@@ -173,17 +172,12 @@ class ContextPipelineConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     )
     allow_llm_hot_path: bool = Field(
         default=True,
-        description='Allow LLM structured compaction on the hot path (with cooldown).',
+        description='Allow LLM structured compaction on the hot path.',
     )
     preserve_recent: int = Field(
         default=DEFAULT_MICROCOMPACT_PRESERVE_RECENT,
         description='Microcompact preservation window (Layer 3).',
         ge=1,
-    )
-    llm_compact_cooldown_seconds: int = Field(
-        default=DEFAULT_LLM_COMPACT_COOLDOWN_SECONDS,
-        description='Minimum seconds between hot-path LLM compaction attempts.',
-        ge=0,
     )
     model_config = ConfigDict(extra='forbid')
 

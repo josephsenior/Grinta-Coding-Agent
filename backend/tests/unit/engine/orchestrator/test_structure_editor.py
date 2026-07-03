@@ -137,10 +137,10 @@ class TestCreateFile:
         assert os.path.exists(path)
         assert open(path, encoding='utf-8').read() == 'x = 1\n'
 
-    def test_fails_if_file_exists(self, editor, py_file):
+    def test_overwrites_existing_file(self, editor, py_file):
         result = editor.create_file(py_file, 'overwrite')
-        assert result.success is False
-        assert 'already exists' in result.message.lower()
+        assert result.success is True
+        assert open(py_file, encoding='utf-8').read() == 'overwrite'
 
     def test_creates_parent_directories(self, editor, tmp_path):
         path = str(tmp_path / 'nested' / 'deep' / 'file.py')

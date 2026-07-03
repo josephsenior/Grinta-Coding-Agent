@@ -211,35 +211,11 @@ def test_format_verification_failure_message() -> None:
     assert tool_result['path'] == 'src/missing.py'
 
 
-def test_create_file_schema_exposes_overwrite_param() -> None:
+def test_create_file_schema_omits_overwrite_param() -> None:
     from backend.engine.tools.native_file_tools import create_create_file_tool
 
     params = create_create_file_tool()['function']['parameters']
-    assert 'overwrite' in params['properties']
-    assert 'overwrite' not in params['required']
-
-
-def test_normalize_editor_error_response_create_file_exists() -> None:
-    result = SimpleNamespace(
-        error=(
-            'File exists. To modify it, use replace_string (preferred). '
-            'If you intend to replace the entire contents, retry with overwrite=true.'
-        ),
-        error_code='CREATE_FILE_ALREADY_EXISTS',
-        retryable=True,
-        operation='create_file',
-        old_content='print("old")\n',
-    )
-    message, tool_result = normalize_editor_error_response(
-        result,
-        path='existing.py',
-        command='create_file',
-    )
-    assert 'File exists' in message
-    assert 'replace_string' in message
-    assert 'overwrite=true' in message
-    assert tool_result['error_code'] == 'CREATE_FILE_ALREADY_EXISTS'
-    assert tool_result['path'] == 'existing.py'
+    assert 'overwrite' not in params['properties']
 
 
 def test_normalize_editor_error_response_compact() -> None:

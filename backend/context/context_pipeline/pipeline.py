@@ -58,7 +58,6 @@ from backend.context.tool_result_storage import (
 from backend.core.constants import (
     DEFAULT_BOUNDARY_COMPACT_COOLDOWN_SECONDS,
     DEFAULT_EMERGENCY_PROMPT_MIN_EVENTS,
-    DEFAULT_LLM_COMPACT_COOLDOWN_SECONDS,
     DEFAULT_MICROCOMPACT_PRESERVE_RECENT,
 )
 from backend.core.logging.logger import app_logger as logger
@@ -92,14 +91,12 @@ class ContextPipeline:
         llm_registry: LLMRegistry,
         config: ContextPipelineConfig,
         preserve_recent: int = DEFAULT_MICROCOMPACT_PRESERVE_RECENT,
-        llm_compact_cooldown_seconds: int = DEFAULT_LLM_COMPACT_COOLDOWN_SECONDS,
         boundary_compact_cooldown_seconds: int = DEFAULT_BOUNDARY_COMPACT_COOLDOWN_SECONDS,
         condensation_recorder: Callable[[], None] | None = None,
     ) -> None:
         self._llm_registry = llm_registry
         self._config = config
         self._preserve_recent = preserve_recent
-        self._llm_compact_cooldown = llm_compact_cooldown_seconds
         self._boundary_compact_cooldown = boundary_compact_cooldown_seconds
         self._condensation_recorder = condensation_recorder
 
@@ -109,7 +106,6 @@ class ContextPipeline:
             llm_registry=llm_registry,
             config=config,
             get_structured_compactor=self._get_structured_compactor,
-            llm_compact_cooldown_seconds=llm_compact_cooldown_seconds,
         )
 
     @classmethod

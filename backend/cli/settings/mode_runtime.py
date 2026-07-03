@@ -59,7 +59,27 @@ def apply_interaction_mode_to_controller(controller: object, mode: str) -> None:
         logger.debug('Session context emit after mode change failed', exc_info=True)
 
 
+def apply_agent_tool_flags_to_controller(
+    controller: object,
+    *,
+    enable_lsp_query: bool | None = None,
+    enable_debugger: bool | None = None,
+) -> None:
+    """Mirror LSP/debugger flags onto the live agent and rebuild its toolset."""
+    agent = getattr(controller, 'agent', None)
+    if agent is None:
+        return
+    running_config = getattr(agent, 'config', None)
+    if running_config is not None:
+        if enable_lsp_query is not None:
+            running_config.enable_lsp_query = enable_lsp_query
+        if enable_debugger is not None:
+            running_config.enable_debugger = enable_debugger
+    rebuild_agent_toolset(agent)
+
+
 __all__ = [
+    'apply_agent_tool_flags_to_controller',
     'apply_interaction_mode_to_controller',
     'rebuild_agent_toolset',
     'sync_active_run_mode_extra_data',

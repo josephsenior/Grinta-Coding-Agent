@@ -138,7 +138,6 @@ class FileEditor(
         dry_run: bool = False,
         edit_mode: str | None = None,
         expected_hash: str | None = None,
-        overwrite: bool = False,
         **_: Any,
     ) -> ToolResult:
         """Execute a file editor command.
@@ -157,7 +156,6 @@ class FileEditor(
             dry_run: If True, compute preview result without writing changes
             edit_mode: Sub-command mode when ``command`` is ``edit`` (range only)
             expected_hash: Optional client-supplied content hash (legacy)
-            overwrite: Allow deliberate full-file rewrite guards to be bypassed
             **_: Additional keyword arguments (ignored)
 
         Returns:
@@ -190,7 +188,6 @@ class FileEditor(
                     dry_run=dry_run,
                     edit_mode=edit_mode,
                     expected_hash=expected_hash,
-                    overwrite=overwrite,
                 )
 
         except PathValidationError as e:
@@ -215,7 +212,6 @@ class FileEditor(
         dry_run: bool,
         edit_mode: str | None,
         expected_hash: str | None,
-        overwrite: bool,
     ) -> ToolResult:
         """Dispatch a validated editor command while the target file lock is held."""
         try:
@@ -264,7 +260,6 @@ class FileEditor(
                     file_path,
                     content,
                     dry_run=dry_run,
-                    overwrite=overwrite,
                 )
 
             raise ToolError(f'Unknown command: {command}')

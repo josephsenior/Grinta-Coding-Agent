@@ -11,7 +11,7 @@ from backend.cli.tui.dialogs import (  # noqa: F401
     GrintaManageMCPDialog,
     GrintaManageSkillsDialog,
 )
-from backend.cli.tui.widgets.collapsible import SidebarRow
+from backend.cli.tui.widgets.collapsible import CollapsibleSection, SidebarRow
 from backend.cli.tui.widgets.small import (
     InputBar,
 )
@@ -369,6 +369,109 @@ class ScreenSettingsMixin:
         if event.item_id.startswith('mcp:'):
             mcp_name = event.item_id.split(':', 1)[1]
             self.run_worker(self._toggle_mcp_server(mcp_name), exclusive=True)
+
+    def on_collapsible_section_feature_toggle_changed(self, event: Any) -> None:
+        if not isinstance(event, CollapsibleSection.FeatureToggleChanged):
+            return
+        section_id = getattr(event.control, 'id', None)
+        enabled = bool(event.enabled)
+        if section_id == 'sidebar-mcp':
+            self.run_worker(self._toggle_mcp_master(enabled), exclusive=True)
+        elif section_id == 'sidebar-lsp':
+            self.run_worker(self._toggle_lsp_query(enabled), exclusive=True)
+        elif section_id == 'sidebar-dap':
+            self.run_worker(self._toggle_debugger(enabled), exclusive=True)
+
+    async def _toggle_mcp_master(self, enabled: bool) -> None:
+        from backend.cli.settings.mcp import set_mcp_master_enabled
+        from backend.core.config import load_app_config
+
+        try:
+            set_mcp_master_enabled(enabled)
+        except Exception as exc:
+            self.notify(
+                f'Failed to update MCP: {exc}',
+                severity='error',
+                timeout=3.0,
+            )
+            self._refresh_sidebar()
+            return
+        self._config = load_app_config()
+        self._reload_mcp_config_and_refresh_sidebar()
+        state = 'enabled' if enabled else 'disabled'
+        self.notify(f'MCP: {state}', severity='information', timeout=2.0)
+
+    async def _toggle_lsp_query(self, enabled: bool) -> None:
+        from backend.cli.settings import update_enable_lsp_query
+        from backend.cli.settings.mode_runtime import apply_agent_tool_flags_to_controller
+        from backend.core.config import load_app_config
+
+        agent_name = self._active_agent_name()
+        try:
+            update_enable_lsp_query(enabled, agent_name)
+        except Exception as exc:
+            self.notify(
+                f'Failed to update LSP: {exc}',
+                severity='error',
+                timeout=3.0,
+            )
+            self._refresh_sidebar()
+            return
+        self._config = load_app_config()
+        agent_config = self._active_agent_config()
+        if agent_config is not None:
+            agent_config.enable_lsp_query = enabled
+        controller = self._controller
+        if controller is not None:
+            apply_agent_tool_flags_to_controller(
+                controller,
+                enable_lsp_query=enabled,
+            )
+        renderer = self._renderer
+        if renderer is not None:
+            renderer._last_lsp_sidebar_signature = None
+            if enabled:
+                renderer._lsp_detection_scheduled = False
+                renderer.schedule_lsp_detection()
+        self._refresh_sidebar()
+        state = 'enabled' if enabled else 'disabled'
+        self.notify(f'LSP: {state}', severity='information', timeout=2.0)
+
+    async def _toggle_debugger(self, enabled: bool) -> None:
+        from backend.cli.settings import update_enable_debugger
+        from backend.cli.settings.mode_runtime import apply_agent_tool_flags_to_controller
+        from backend.core.config import load_app_config
+
+        agent_name = self._active_agent_name()
+        try:
+            update_enable_debugger(enabled, agent_name)
+        except Exception as exc:
+            self.notify(
+                f'Failed to update debugger: {exc}',
+                severity='error',
+                timeout=3.0,
+            )
+            self._refresh_sidebar()
+            return
+        self._config = load_app_config()
+        agent_config = self._active_agent_config()
+        if agent_config is not None:
+            agent_config.enable_debugger = enabled
+        controller = self._controller
+        if controller is not None:
+            apply_agent_tool_flags_to_controller(
+                controller,
+                enable_debugger=enabled,
+            )
+        renderer = self._renderer
+        if renderer is not None:
+            renderer._last_dap_sidebar_signature = None
+            if enabled:
+                renderer._lsp_detection_scheduled = False
+                renderer.schedule_lsp_detection()
+        self._refresh_sidebar()
+        state = 'enabled' if enabled else 'disabled'
+        self.notify(f'Debugger: {state}', severity='information', timeout=2.0)
 
     async def _toggle_mcp_server(self, name: str) -> None:
         from backend.cli.settings import get_mcp_server, set_mcp_server_enabled

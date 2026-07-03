@@ -112,7 +112,37 @@ class RendererDisplayMixin:
         self._refresh_dap_sidebar()
         if skip_sidebar:
             return
+        mcp_enabled = self._sidebar_mcp_enabled()
         mcp_count = self._hud.state.mcp_servers
+
+        if not mcp_enabled:
+            skill_items = self._build_skills_sidebar_items()
+            skills_loading = self._skills_sidebar_is_loading(skill_items)
+            current_state = (
+                (),
+                tuple(item[0] for item in skill_items),
+                False,
+                skills_loading,
+                False,
+            )
+            if current_state != self._last_sidebar_state:
+                self._update_sidebar_section(
+                    '#sidebar-mcp',
+                    'MCP Servers',
+                    [],
+                    empty_message='Disabled',
+                )
+                self._sync_sidebar_feature_switch('#sidebar-mcp', False)
+                self._update_sidebar_section(
+                    '#sidebar-skills',
+                    'Skills' if skills_loading else f'Skills ({len(skill_items)})',
+                    skill_items,
+                    empty_message=(
+                        'Loading skills...' if skills_loading else 'No custom skills'
+                    ),
+                )
+                self._last_sidebar_state = current_state
+            return
 
         mcp_servers = self._resolve_mcp_server_list(mcp_count)
 
@@ -127,6 +157,7 @@ class RendererDisplayMixin:
             tuple(item[0] for item in skill_items),
             mcp_loading,
             skills_loading,
+            mcp_enabled,
         )
         if current_state != self._last_sidebar_state:
             self._update_sidebar_section(
@@ -139,6 +170,7 @@ class RendererDisplayMixin:
                     'Loading MCP servers...' if mcp_loading else 'No servers configured'
                 ),
             )
+            self._sync_sidebar_feature_switch('#sidebar-mcp', True)
             self._update_sidebar_section(
                 '#sidebar-skills',
                 'Skills' if skills_loading else f'Skills ({len(skill_items)})',
@@ -158,6 +190,15 @@ class RendererDisplayMixin:
 
     def schedule_lsp_detection(self) -> None:
         """Probe installed language servers off the UI thread."""
+        if not self._sidebar_lsp_enabled() and not self._sidebar_debugger_enabled():
+            self._lsp_servers_cache = {}
+            self._dap_adapters_cache = []
+            self._lsp_detection_scheduled = False
+            self._last_lsp_sidebar_signature = None
+            self._last_dap_sidebar_signature = None
+            self._refresh_lsp_sidebar()
+            self._refresh_dap_sidebar()
+            return
         if getattr(self, '_lsp_detection_scheduled', False):
             return
         self._lsp_detection_scheduled = True
@@ -219,6 +260,24 @@ class RendererDisplayMixin:
 
         from backend.cli.tui.widgets.collapsible import CollapsibleSection
 
+        if not self._sidebar_lsp_enabled():
+            signature = ('disabled',)
+            if signature == getattr(self, '_last_lsp_sidebar_signature', None):
+                return
+            self._last_lsp_sidebar_signature = signature
+            try:
+                section = self._tui.query_one('#sidebar-lsp', CollapsibleSection)
+            except Exception:
+                return
+            section.set_title('LSP Servers')
+            try:
+                empty = section.query_one('#empty-text', Static)
+                empty.update(section._empty_markup('Disabled'))
+            except Exception:
+                section.set_content('Disabled')
+            self._sync_sidebar_feature_switch('#sidebar-lsp', False)
+            return
+
         signature = self._lsp_sidebar_signature()
         if signature == getattr(self, '_last_lsp_sidebar_signature', None):
             return
@@ -245,10 +304,17 @@ class RendererDisplayMixin:
             f'LSP Servers ({available_count})' if available_count else 'LSP Servers (0)'
         )
         section.set_title(title)
+        self._sync_sidebar_feature_switch('#sidebar-lsp', True)
         if items:
             section.set_items(items)
         else:
-            section.set_content('No language servers detected on PATH')
+            message = 'No language servers detected on PATH'
+            section._content = message
+            try:
+                empty = section.query_one('#empty-text', Static)
+                empty.update(section._empty_markup(message))
+            except Exception:
+                section.set_content(message)
 
     def _build_lsp_sidebar_items(self, servers: dict[str, Any]) -> list[tuple]:
         from backend.utils.runtime_detect import CANONICAL_LSP_SERVERS
@@ -283,6 +349,24 @@ class RendererDisplayMixin:
 
         from backend.cli.tui.widgets.collapsible import CollapsibleSection
 
+        if not self._sidebar_debugger_enabled():
+            signature = ('disabled',)
+            if signature == getattr(self, '_last_dap_sidebar_signature', None):
+                return
+            self._last_dap_sidebar_signature = signature
+            try:
+                section = self._tui.query_one('#sidebar-dap', CollapsibleSection)
+            except Exception:
+                return
+            section.set_title('Debug Adapters')
+            try:
+                empty = section.query_one('#empty-text', Static)
+                empty.update(section._empty_markup('Disabled'))
+            except Exception:
+                section.set_content('Disabled')
+            self._sync_sidebar_feature_switch('#sidebar-dap', False)
+            return
+
         signature = self._dap_sidebar_signature()
         if signature == getattr(self, '_last_dap_sidebar_signature', None):
             return
@@ -311,10 +395,17 @@ class RendererDisplayMixin:
             else 'Debug Adapters (0)'
         )
         section.set_title(title)
+        self._sync_sidebar_feature_switch('#sidebar-dap', True)
         if items:
             section.set_items(items)
         else:
-            section.set_content('No debug adapters detected on PATH')
+            message = 'No debug adapters detected on PATH'
+            section._content = message
+            try:
+                empty = section.query_one('#empty-text', Static)
+                empty.update(section._empty_markup(message))
+            except Exception:
+                section.set_content(message)
 
     def _build_dap_sidebar_items(self, adapters: list[dict[str, Any]]) -> list[tuple]:
         items: list[tuple] = []
@@ -441,6 +532,41 @@ class RendererDisplayMixin:
             return True
         except Exception:
             return False
+
+    def _sync_sidebar_feature_switch(self, widget_id: str, enabled: bool) -> None:
+        from backend.cli.tui.widgets.collapsible import CollapsibleSection
+
+        try:
+            section = self._tui.query_one(widget_id, CollapsibleSection)
+            section.set_feature_enabled(enabled)
+        except Exception:
+            pass
+
+    def _sidebar_mcp_enabled(self) -> bool:
+        mcp = getattr(getattr(self._tui, '_config', None), 'mcp', None)
+        return bool(getattr(mcp, 'enabled', False))
+
+    def _sidebar_lsp_enabled(self) -> bool:
+        from backend.core.constants import DEFAULT_AGENT_LSP_QUERY_ENABLED
+
+        getter = getattr(self._tui, '_active_agent_config', None)
+        agent_config = getter() if callable(getter) else None
+        if agent_config is None:
+            return DEFAULT_AGENT_LSP_QUERY_ENABLED
+        return bool(
+            getattr(agent_config, 'enable_lsp_query', DEFAULT_AGENT_LSP_QUERY_ENABLED)
+        )
+
+    def _sidebar_debugger_enabled(self) -> bool:
+        from backend.core.constants import DEFAULT_AGENT_DEBUGGER_ENABLED
+
+        getter = getattr(self._tui, '_active_agent_config', None)
+        agent_config = getter() if callable(getter) else None
+        if agent_config is None:
+            return DEFAULT_AGENT_DEBUGGER_ENABLED
+        return bool(
+            getattr(agent_config, 'enable_debugger', DEFAULT_AGENT_DEBUGGER_ENABLED)
+        )
 
     def _build_task_sidebar_items(self, task_signature):
         # Map task-tracker statuses to sidebar status keys. The sidebar uses
