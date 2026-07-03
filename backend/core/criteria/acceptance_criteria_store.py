@@ -10,7 +10,10 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
-from backend.core.criteria.criterion_item import normalize_criteria_list
+from backend.core.criteria.criterion_item import (
+    backfill_criterion_ids,
+    normalize_criteria_list,
+)
 
 _SAVE_LOCKS: dict[str, threading.Lock] = {}
 _SAVE_LOCKS_GUARD = threading.Lock()
@@ -52,7 +55,7 @@ class AcceptanceCriteriaStore:
         if not isinstance(data, list):
             return []
         try:
-            return normalize_criteria_list(data)
+            return backfill_criterion_ids(normalize_criteria_list(data))
         except TypeError:
             return []
 
@@ -60,7 +63,7 @@ class AcceptanceCriteriaStore:
         """Save criteria to disk atomically."""
         from backend.persistence.file_store.atomic_write import replace_file_with_retry
 
-        normalized = normalize_criteria_list(criteria_list)
+        normalized = backfill_criterion_ids(normalize_criteria_list(criteria_list))
         with _save_lock_for(self.path):
             self.path.parent.mkdir(parents=True, exist_ok=True)
             dir_name = str(self.path.parent)
@@ -84,9 +87,84 @@ class AcceptanceCriteriaStore:
 
     def append_to_file(self, new_items: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Append normalized items and persist."""
-        merged = self.load_from_file() + normalize_criteria_list(new_items)
+        from backend.core.criteria.criterion_item import assign_criterion_ids
+
+        existing = self.load_from_file()
+        appended = assign_criterion_ids(
+            normalize_criteria_list(new_items),
+            existing=existing,
+        )
+        merged = existing + appended
         self.save_to_file(merged)
         return merged
 
+    def refine_criterion(
+        self,
+        criterion_id: str,
+        *,
+        new_assertion: str,
+        reason: str,
+        changed_at: str,
+        persist: bool = True,
+    ) -> list[dict[str, Any]]:
+        """Update one criterion assertion and append to its change log."""
+        updated = build_refined_criteria_list(
+            self.load_from_file(),
+            criterion_id=criterion_id,
+            new_assertion=new_assertion,
+            reason=reason,
+            changed_at=changed_at,
+        )
+        if persist:
+            self.save_to_file(updated)
+        return updated
 
-__all__ = ['AcceptanceCriteriaStore']
+
+def build_refined_criteria_list(
+    existing: list[dict[str, Any]],
+    *,
+    criterion_id: str,
+    new_assertion: str,
+    reason: str,
+    changed_at: str,
+) -> list[dict[str, Any]]:
+    """Return criteria list with one refined assertion and appended change log."""
+    target_id = str(criterion_id or '').strip()
+    new_text = str(new_assertion or '').strip()
+    change_reason = str(reason or '').strip()
+    if not target_id:
+        raise ValueError('criterion_id is required')
+    if not new_text:
+        raise ValueError('new_assertion is required')
+    if not change_reason:
+        raise ValueError('reason is required')
+
+    found = False
+    updated: list[dict[str, Any]] = []
+    for item in existing:
+        if str(item.get('id') or '').strip() != target_id:
+            updated.append(dict(item))
+            continue
+        found = True
+        row = dict(item)
+        old_assertion = str(row.get('assertion') or '').strip()
+        changes = list(row.get('changes') or [])
+        changes.append(
+            {
+                'at': changed_at,
+                'old_assertion': old_assertion,
+                'new_assertion': new_text,
+                'reason': change_reason,
+            }
+        )
+        row['assertion'] = new_text
+        row['changes'] = changes
+        updated.append(row)
+
+    if not found:
+        raise KeyError(f'Criterion {target_id!r} not found')
+
+    return updated
+
+
+__all__ = ['AcceptanceCriteriaStore', 'build_refined_criteria_list']

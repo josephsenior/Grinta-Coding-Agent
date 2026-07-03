@@ -17,6 +17,7 @@ _CRITERIA_VERBS: dict[str, str] = {
     'view': 'Viewed',
     'update': 'Defined',
     'append': 'Updated',
+    'refine': 'Refined',
     'audit': 'Audited',
 }
 

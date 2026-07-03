@@ -305,9 +305,16 @@ def _summary_memory(args: dict[str, Any]) -> str:
 def _summary_acceptance_criteria(args: dict[str, Any]) -> str:
     op = args.get('operation') or args.get('command')
     criteria_list = args.get('criteria_list')
+    audit_entries = args.get('audit_entries')
+    criterion_id = str(args.get('criterion_id') or '').strip()
     count = len(criteria_list) if isinstance(criteria_list, list) else 0
+    audit_count = len(audit_entries) if isinstance(audit_entries, list) else 0
     parts = [str(x) for x in (op,) if x]
-    if count:
+    if criterion_id:
+        parts.append(criterion_id)
+    if audit_count:
+        parts.append(f'{audit_count} audit{"s" if audit_count != 1 else ""}')
+    elif count:
         parts.append(f'{count} criterion{"s" if count != 1 else ""}')
     return _trunc(' · '.join(parts), 160) if parts else 'criteria…'
 

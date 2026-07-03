@@ -125,7 +125,9 @@ def format_criterion_line(item: dict[str, Any]) -> str:
         return ''
     source = str(item.get('source') or 'stated').strip().lower()
     evidence = str(item.get('evidence') or '').strip()
-    line = f'({source}) {assertion}'
+    criterion_id = str(item.get('id') or '').strip()
+    id_prefix = f'[{criterion_id}] ' if criterion_id else ''
+    line = f'{id_prefix}({source}) {assertion}'
     if evidence:
         line += f' — {evidence}'
     return line
