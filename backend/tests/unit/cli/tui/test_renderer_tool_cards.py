@@ -553,3 +553,52 @@ async def test_tui_browser_screenshot_merges_with_action_card(mock_config):
             for c in cards
         )
 
+
+@pytest.mark.asyncio
+async def test_tui_acceptance_criteria_renders_orient_line(mock_config):
+    from backend.ledger.action import AcceptanceCriteriaAction
+    from backend.ledger.observation.acceptance_criteria import (
+        AcceptanceCriteriaObservation,
+    )
+
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+        s = _get_screen(app)
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        renderer._tui._write_log = MagicMock()
+
+        renderer._process_event(
+            AcceptanceCriteriaAction(
+                command='update',
+                criteria_list=[{'assertion': 'Build succeeds', 'source': 'stated'}],
+            )
+        )
+        renderer._process_event(
+            AcceptanceCriteriaObservation(
+                command='update',
+                criteria_list=[{'assertion': 'Build succeeds', 'source': 'stated'}],
+                content='✅ Acceptance criteria defined (1 items).',
+            )
+        )
+        await pilot.pause()
+
+        renderer._tui._write_log.assert_not_called()
+        criteria_lines = [
+            line for line in s.query(OrientLine).results()
+            if line.model.tool == 'acceptance_criteria'
+        ]
+        assert len(criteria_lines) == 1
+        assert criteria_lines[0].model.verb == 'Defined'
+        assert 'update' in criteria_lines[0].model.target
+        assert 'Acceptance criteria defined' in criteria_lines[0].model.result
+

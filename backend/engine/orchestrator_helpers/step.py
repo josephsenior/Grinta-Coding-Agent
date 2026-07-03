@@ -117,6 +117,37 @@ def _consume_pending_action(orch: Orchestrator) -> Action | None:
     return impl(orch)
 
 
+def _try_reactive_api_round_peel(state: State) -> bool:
+    """Peel oldest API-round groups before full condensation on context overflow."""
+    history = list(getattr(state, 'history', []) or [])
+    if len(history) < 4:
+        return False
+    try:
+        from backend.context.context_budget import estimate_boundary_event_tokens
+        from backend.context.context_pipeline.grouping import peel_oldest_api_round_groups
+
+        before = estimate_boundary_event_tokens(history)
+        peeled = peel_oldest_api_round_groups(history, groups_to_peel=1)
+        if not peeled or peeled == history:
+            return False
+        after = estimate_boundary_event_tokens(peeled)
+        saved = before - after
+        if saved < 500:
+            return False
+        state.history = peeled
+        logger.warning(
+            'Reactive overflow compact: peeled oldest API-round group '
+            '(saved ~%d tokens, %d -> %d events)',
+            saved,
+            len(history),
+            len(peeled),
+        )
+        return True
+    except Exception:
+        logger.debug('Reactive API-round peel failed', exc_info=True)
+        return False
+
+
 async def _astep_handle_context_limit_error(orch: Orchestrator, state: State) -> Action:
     """Condense/retry after ContextLimitError; may degrade or raise."""
     orch._consecutive_context_errors = (
@@ -136,6 +167,8 @@ async def _astep_handle_context_limit_error(orch: Orchestrator, state: State) ->
         raise AgentRuntimeError(
             'Circuit breaker: continuous ContextLimitErrors'
         ) from None
+
+    _try_reactive_api_round_peel(state)
 
     try:
         emitted_compaction_status = _emit_compaction_status_if_needed(orch, state)
@@ -430,11 +463,12 @@ async def _execute_llm_step_async(
         orch.executor._state = state  # type: ignore[attr-defined]
         result = await orch.executor.async_execute(params, orch.event_stream)
         orch._consecutive_invalid_protocol_outputs = 0
+    except Exception:
+        raise
+    finally:
         pipeline = getattr(orch.memory_manager, '_pipeline', None)
         if pipeline is not None and hasattr(pipeline, 'note_llm_step'):
             pipeline.note_llm_step(state)
-    except Exception:
-        raise
 
     # Ensure extra_data cleanup always runs, even if async_execute raises.
     try:

@@ -43,6 +43,8 @@ REACTIVE_COMPACT_RATIO = 0.5
 async def microcompact_layer(
     events: list[Event],
     state: State | None = None,
+    *,
+    recency_window: int = MICROCOMPACT_RECENCY_WINDOW,
 ) -> list[Event]:
     """Clear old tool observation content bodies outside recency window.
 
@@ -50,7 +52,7 @@ async def microcompact_layer(
     boundaries remain stable. Keeps observations with important keywords
     (error, failed, traceback, etc.) intact.
     """
-    cutoff = max(0, len(events) - MICROCOMPACT_RECENCY_WINDOW)
+    cutoff = max(0, len(events) - recency_window)
     results: list[Event] = []
     cleared = 0
     for index, event in enumerate(events):
@@ -75,10 +77,12 @@ async def microcompact_layer(
 async def snip_layer(
     events: list[Event],
     state: State | None = None,
+    *,
+    max_events: int = SNIP_MAX_EVENTS,
 ) -> list[Event]:
-    """Hard cap on total event count. Drops oldest events past SNIP_MAX_EVENTS."""
-    if len(events) > SNIP_MAX_EVENTS:
-        return events[-SNIP_MAX_EVENTS:]
+    """Hard cap on total event count. Drops oldest events past max_events."""
+    if len(events) > max_events:
+        return events[-max_events:]
     return events
 
 
@@ -120,6 +124,8 @@ async def summary_layer(
     from backend.context.compactor.compactor import Compaction
 
     if isinstance(result, Compaction):
+        if getattr(summary_compactor, 'last_degraded', False):
+            return events
         summary_text = result.action.summary
         if summary_text:
             summary_obs = AgentCondensationObservation(content=summary_text)
@@ -184,8 +190,17 @@ async def post_compact_reattach_layer(
 async def reactive_compact_layer(
     events: list[Event],
     state: State | None = None,
+    *,
+    max_events: int = int(SNIP_MAX_EVENTS * REACTIVE_COMPACT_RATIO),
 ) -> list[Event]:
-    """Safety net: if event count still exceeds threshold, drop the oldest half."""
+    """Safety net: peel oldest events when count still exceeds *max_events*.
+
+    Runs after snip/summary/reattach, so *max_events* should be lower than the
+    snip hard cap (default: half of ``SNIP_MAX_EVENTS``).
+    """
+    if len(events) > max_events:
+        drop_count = max(1, int(len(events) * REACTIVE_COMPACT_RATIO))
+        return events[drop_count:]
     return events
 
 

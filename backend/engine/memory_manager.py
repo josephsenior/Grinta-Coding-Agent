@@ -425,17 +425,17 @@ class ContextMemoryManager:
         history: list,
         state: State,
     ) -> Any:
-        turn_signals.prewarmed_compaction = None
-        prewarm_len = getattr(turn_signals, 'prewarm_history_len', None)
-        prewarm_latest_id = getattr(turn_signals, 'prewarm_latest_event_id', None)
-        turn_signals.prewarm_history_len = None
-        turn_signals.prewarm_latest_event_id = None
-        current_len = len(history)
-        current_latest_id = getattr(history[-1], 'id', None) if history else None
-        prewarm_stale = prewarm_len is not None and (
-            prewarm_len != current_len or prewarm_latest_id != current_latest_id
+        from backend.context.context_pipeline.helpers import (
+            clear_prewarm_signals,
+            is_prewarm_stale,
         )
-        if prewarm_stale:
+
+        if is_prewarm_stale(history, turn_signals):
+            prewarm_len = getattr(turn_signals, 'prewarm_history_len', None)
+            prewarm_latest_id = getattr(turn_signals, 'prewarm_latest_event_id', None)
+            current_len = len(history)
+            current_latest_id = getattr(history[-1], 'id', None) if history else None
+            clear_prewarm_signals(turn_signals)
             logger.warning(
                 'Discarding stale pre-warmed condensation (prewarm_len=%s current_len=%s prewarm_latest_id=%s current_latest_id=%s); recomputing compaction.',
                 prewarm_len,
@@ -445,6 +445,7 @@ class ContextMemoryManager:
             )
             assert self.compactor is not None
             return await self.compactor.compacted_history(state)
+        clear_prewarm_signals(turn_signals)
         logger.info('Utilizing background pre-warmed condensation result.')
         action = getattr(prewarmed, 'action', None)
         if action:

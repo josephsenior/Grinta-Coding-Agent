@@ -31,13 +31,20 @@ from backend.context.context_pipeline.compaction import (
     increment_condensation_counter,
     mark_just_compacted,
     passes_effectiveness_gate,
+    record_autocompact_failure,
     record_boundary_compact,
     resolve_continuity_or_fallback,
     should_skip_compaction,
 )
+from backend.context.context_pipeline.goal_context import strip_verbatim_user_echo
+from backend.context.context_pipeline.post_compact_reinject import (
+    build_post_compact_attachment_text,
+)
 from backend.context.context_pipeline.helpers import (
     _drop_stale_prompt_state_artifacts,
     apply_ineffective_compaction_backoff,
+    clear_prewarm_signals,
+    is_prewarm_stale,
 )
 from backend.context.context_pipeline.types import _JUST_COMPACTED_KEY
 from backend.context.memory.session_context import bind_session_context
@@ -97,10 +104,12 @@ class ContextPipeline:
         self._condensation_recorder = condensation_recorder
 
         self._structured_compactor: Any = None
+        self._structured_compactor_model_key: str | None = None
         self._compaction_engine = _CompactionEngine(
             llm_registry=llm_registry,
             config=config,
             get_structured_compactor=self._get_structured_compactor,
+            llm_compact_cooldown_seconds=llm_compact_cooldown_seconds,
         )
 
     @classmethod
@@ -179,40 +188,68 @@ class ContextPipeline:
         turn_signals = getattr(state, 'turn_signals', None)
         prewarmed = getattr(turn_signals, 'prewarmed_compaction', None)
         if prewarmed is not None and isinstance(prewarmed, Compaction):
-            turn_signals.prewarmed_compaction = None
-            action = prewarmed.action
-            if isinstance(action, CondensationAction):
-                budget = ContextBudget.from_events(
-                    post_boundary, llm_config=llm_config, state=state
+            if is_prewarm_stale(history, turn_signals):
+                logger.warning(
+                    'Discarding stale pre-warmed compaction '
+                    '(prewarm_len=%s current_len=%d prewarm_latest_id=%s current_latest_id=%s)',
+                    getattr(turn_signals, 'prewarm_history_len', None),
+                    len(history),
+                    getattr(turn_signals, 'prewarm_latest_event_id', None),
+                    getattr(history[-1], 'id', None) if history else None,
                 )
-                if not passes_effectiveness_gate(
-                    history, post_boundary, action, budget, state, llm_config
-                ):
-                    logger.warning(
-                        'Pre-warmed compaction ineffective (pruned=%d); discarding',
-                        len(action.pruned),
+                clear_prewarm_signals(turn_signals)
+            else:
+                clear_prewarm_signals(turn_signals)
+                action = prewarmed.action
+                if isinstance(action, CondensationAction):
+                    budget = ContextBudget.from_events(
+                        post_boundary,
+                        llm_config=llm_config,
+                        state=state,
+                        boundary_compact_cooldown_seconds=self._boundary_compact_cooldown,
                     )
-                    self._set_skip_compaction(state)
-                else:
-                    resolved_action = resolve_continuity_or_fallback(
-                        state, history, post_boundary, action, budget, llm_config
-                    )
-                    if resolved_action is None:
+                    if not passes_effectiveness_gate(
+                        history, post_boundary, action, budget, state, llm_config
+                    ):
+                        logger.warning(
+                            'Pre-warmed compaction ineffective (pruned=%d); discarding',
+                            len(action.pruned),
+                        )
                         self._set_skip_compaction(state)
                     else:
-                        action = resolved_action
-                        finalize_compaction_artifacts(state=state)
-                        mark_just_compacted(state)
-                        record_boundary_compact(state, history, action)
-                        increment_condensation_counter(state)
-                        logger.info(
-                            'ContextPipeline used pre-warmed compaction in %.3fs',
-                            time.perf_counter() - started,
+                        resolved_action = resolve_continuity_or_fallback(
+                            state, history, post_boundary, action, budget, llm_config
                         )
-                        return CondensedHistory([], action)
+                        if resolved_action is None:
+                            self._set_skip_compaction(state)
+                        else:
+                            action = resolved_action
+                            action.summary = strip_verbatim_user_echo(
+                                action.summary or '', state=state
+                            )
+                            finalize_compaction_artifacts(state=state)
+                            mark_just_compacted(state)
+                            record_boundary_compact(
+                                state,
+                                history,
+                                action,
+                                budget=budget,
+                                llm_config=llm_config,
+                            )
+                            increment_condensation_counter(state)
+                            logger.info(
+                                'ContextPipeline used pre-warmed compaction in %.3fs',
+                                time.perf_counter() - started,
+                            )
+                            return CondensedHistory([], action)
 
         events = post_boundary
-        budget = ContextBudget.from_events(events, llm_config=llm_config, state=state)
+        budget = ContextBudget.from_events(
+            events,
+            llm_config=llm_config,
+            state=state,
+            boundary_compact_cooldown_seconds=self._boundary_compact_cooldown,
+        )
         view = getattr(state, 'view', None)
         explicit = bool(getattr(view, 'unhandled_condensation_request', False))
         memory_pressure = getattr(turn_signals, 'memory_pressure', None)
@@ -256,7 +293,12 @@ class ContextPipeline:
             delete_staging_snapshot(state=state)
             return CondensedHistory(history, None)
 
-        if should_skip_compaction(state, self._boundary_compact_cooldown, force=force):
+        if should_skip_compaction(
+            state,
+            self._boundary_compact_cooldown,
+            force=force,
+            explicit=explicit,
+        ):
             delete_staging_snapshot(state=state)
             return CondensedHistory(history, None)
 
@@ -270,6 +312,7 @@ class ContextPipeline:
             critical=critical_pressure,
         )
         if action is None:
+            record_autocompact_failure(state)
             delete_staging_snapshot(state=state)
             return CondensedHistory(history, None)
 
@@ -280,6 +323,7 @@ class ContextPipeline:
                 'Compaction ineffective (pruned=%d); skipping boundary commit',
                 len(action.pruned),
             )
+            record_autocompact_failure(state)
             self._set_skip_compaction(state)
             delete_staging_snapshot(state=state)
             return CondensedHistory(history, None)
@@ -292,10 +336,16 @@ class ContextPipeline:
             delete_staging_snapshot(state=state)
             return CondensedHistory(history, None)
         action = resolved_action
+        if action.summary:
+            action.summary = strip_verbatim_user_echo(
+                action.summary, state=state
+            )
 
         finalize_compaction_artifacts(state=state)
         mark_just_compacted(state)
-        record_boundary_compact(state, history, action)
+        record_boundary_compact(
+            state, history, action, budget=budget, llm_config=llm_config
+        )
         increment_condensation_counter(state)
         if pressure_active:
             state.ack_memory_pressure(source='ContextPipeline')
@@ -345,6 +395,18 @@ class ContextPipeline:
         if packet is not None:
             events = [packet, *events]
 
+        if just_compacted and state is not None:
+            attachment = build_post_compact_attachment_text(state, events)
+            if attachment and not any(
+                'POST_COMPACT_RESTORE' in str(getattr(event, 'content', '') or '')
+                for event in events
+            ):
+                from backend.ledger.observation.agent import AgentCondensationObservation
+
+                reinject = AgentCondensationObservation(content=attachment)
+                insert_at = 1 if packet is not None else 0
+                events = [*events[:insert_at], reinject, *events[insert_at:]]
+
         window = select_prompt_events(
             events,
             llm_config,
@@ -383,7 +445,10 @@ class ContextPipeline:
         if not events:
             return None
         llm_config = self._llm_config(state)
-        budget = ContextBudget.from_events(events, llm_config=llm_config, state=state)
+        budget = ContextBudget.from_events(
+            events, llm_config=llm_config, state=state,
+            boundary_compact_cooldown_seconds=self._boundary_compact_cooldown,
+        )
         action = await self._compaction_engine._llm_structured_compaction(
             events, state, budget=budget, llm_config=llm_config
         )
@@ -401,16 +466,35 @@ class ContextPipeline:
 
     def should_emit_compaction_status(self, state: State) -> bool:
         """Check if the next ``prepare_step`` is likely to compact."""
+        turn_signals = getattr(state, 'turn_signals', None)
+        prewarmed = getattr(turn_signals, 'prewarmed_compaction', None)
+        if prewarmed is not None and isinstance(prewarmed, Compaction):
+            action = getattr(prewarmed, 'action', None)
+            if isinstance(action, CondensationAction):
+                return True
         history = list(getattr(state, 'history', []))
         if not history:
             return False
         llm_config = self._llm_config(state)
         events = self._project_layers_1_to_3(history, state, apply_tool_budget=False)
-        budget = ContextBudget.from_events(events, llm_config=llm_config, state=state)
+        budget = ContextBudget.from_events(
+            events,
+            llm_config=llm_config,
+            state=state,
+            boundary_compact_cooldown_seconds=self._boundary_compact_cooldown,
+        )
         view = getattr(state, 'view', None)
         explicit = bool(getattr(view, 'unhandled_condensation_request', False))
-        turn_signals = getattr(state, 'turn_signals', None)
         memory_pressure = getattr(turn_signals, 'memory_pressure', None)
+        critical_pressure = memory_pressure == 'CRITICAL'
+        force = explicit or critical_pressure
+        if should_skip_compaction(
+            state,
+            self._boundary_compact_cooldown,
+            force=force,
+            explicit=explicit,
+        ):
+            return False
         return bool(
             budget.should_autocompact
             or explicit
@@ -532,19 +616,11 @@ class ContextPipeline:
 
     def _get_structured_compactor(self, state: State) -> Any:
         """Lazily create and cache a StructuredSummaryCompactor."""
-        if self._structured_compactor is not None:
-            return self._structured_compactor
         llm_config = getattr(self._config, 'llm_config', None) or self._llm_config(
             state
         )
         if llm_config is None:
             return None
-        from backend.context.compactor.strategies.structured_summary_compactor import (
-            StructuredSummaryCompactor,
-        )
-        from backend.core.config.compactor_config import (
-            StructuredSummaryCompactorConfig,
-        )
         from backend.core.config.llm_config import LLMConfig
 
         if isinstance(llm_config, LLMConfig):
@@ -553,6 +629,19 @@ class ContextPipeline:
             llm_cfg = self._llm_registry.config.get_llm_config(llm_config)
         else:
             return None
+        model_key = str(getattr(llm_cfg, 'model', '') or '')
+        if (
+            self._structured_compactor is not None
+            and self._structured_compactor_model_key == model_key
+        ):
+            return self._structured_compactor
+        from backend.context.compactor.strategies.structured_summary_compactor import (
+            StructuredSummaryCompactor,
+        )
+        from backend.core.config.compactor_config import (
+            StructuredSummaryCompactorConfig,
+        )
+
         cfg = StructuredSummaryCompactorConfig(
             llm_config=llm_cfg,
             max_size=102,
@@ -564,6 +653,7 @@ class ContextPipeline:
             logger.warning('ContextPipeline: structured compactor unavailable: %s', exc)
             return None
         self._structured_compactor = compactor
+        self._structured_compactor_model_key = model_key
         if compactor.token_budget is None:
             agent_llm = getattr(getattr(state, 'agent', None), 'llm', None)
             max_input = getattr(

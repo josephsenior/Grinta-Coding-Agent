@@ -18,8 +18,10 @@ from typing import TYPE_CHECKING, Any
 from backend.context.compactor.compactor import Compactor, View
 from backend.context.compactor.strategies.layers import (
     LAYERS,
-    SNIP_MAX_EVENTS,
-    SUMMARY_RECENCY_WINDOW,
+    REACTIVE_COMPACT_RATIO,
+    microcompact_layer,
+    reactive_compact_layer,
+    snip_layer,
     summary_layer,
 )
 
@@ -44,6 +46,7 @@ class CompositionCompactor(Compactor):
         summary_recency: int = 50,
         post_compact_budget: int = 50000,
         post_compact_max_files: int = 5,
+        reactive_max_events: int | None = None,
     ) -> None:
         super().__init__()
         self.microcompact_recency = microcompact_recency
@@ -51,6 +54,11 @@ class CompositionCompactor(Compactor):
         self.summary_recency = summary_recency
         self.post_compact_budget = post_compact_budget
         self.post_compact_max_files = post_compact_max_files
+        self.reactive_max_events = (
+            reactive_max_events
+            if reactive_max_events is not None
+            else max(1, int(snip_max_events * REACTIVE_COMPACT_RATIO))
+        )
         self._summary_compactor: Compactor | None = None
 
     def set_summary_compactor(self, compactor: Compactor | None) -> None:
@@ -77,6 +85,24 @@ class CompositionCompactor(Compactor):
                     state=None,
                     summary_compactor=self._summary_compactor,
                     summary_recency=self.summary_recency,
+                )
+            elif name == "microcompact":
+                events = await microcompact_layer(
+                    events,
+                    state=None,
+                    recency_window=self.microcompact_recency,
+                )
+            elif name == "snip":
+                events = await snip_layer(
+                    events,
+                    state=None,
+                    max_events=self.snip_max_events,
+                )
+            elif name == "reactive":
+                events = await reactive_compact_layer(
+                    events,
+                    state=None,
+                    max_events=self.reactive_max_events,
                 )
             else:
                 events = await layer_fn(events, state=None)

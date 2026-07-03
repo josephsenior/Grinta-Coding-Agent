@@ -160,15 +160,20 @@ class TestSelectCompactorConfig:
 
     def test_long_session_returns_composition(self):
         events = _make_events(_LONG_SESSION + 10)
-        config = select_compactor_config(events, llm_config='condenser_llm')
+        config = select_compactor_config(
+            events,
+            llm_config='condenser_llm',
+            allow_llm_hot_path=True,
+        )
         assert isinstance(config, CompositionCompactorConfig)
         assert config.llm_config == 'condenser_llm'
 
-    def test_long_session_returns_composition_with_no_llm_config(self):
+    def test_long_session_returns_microcompact_with_no_llm_config(self):
         events = _make_events(_LONG_SESSION + 10)
         config = select_compactor_config(events, llm_config=None)
-        assert isinstance(config, CompositionCompactorConfig)
-        assert config.llm_config is None
+        from backend.core.config.compactor_config import MicrocompactCompactorConfig
+
+        assert isinstance(config, MicrocompactCompactorConfig)
 
     def test_medium_session_returns_microcompact(self):
         events = _make_events(_MEDIUM_SESSION + 10)
@@ -241,7 +246,7 @@ class TestAutoCompactor:
         delegate.get_compaction.assert_awaited_once_with(view)
         assert result is compaction
 
-    async def test_normal_long_session_uses_composition(self):
+    async def test_normal_long_session_uses_microcompact_without_hot_path(self):
         auto = AutoCompactor(llm_config='condenser_llm', llm_registry=MagicMock())
         view = View(events=_make_events(_LONG_SESSION + 10))
         delegate = MagicMock()
@@ -254,7 +259,9 @@ class TestAutoCompactor:
             result = await auto.compact(view)
 
         config = factory.call_args.args[0]
-        assert isinstance(config, CompositionCompactorConfig)
+        from backend.core.config.compactor_config import MicrocompactCompactorConfig
+
+        assert isinstance(config, MicrocompactCompactorConfig)
         assert result is view
 
     async def test_normal_long_session_can_opt_into_llm_hot_path(self):
@@ -318,8 +325,18 @@ class TestAutoCompactor:
         assert isinstance(configs[1], AmortizedPruningCompactorConfig)
         assert result is view
 
-    def test_status_prediction_for_normal_long_session(self):
+    def test_status_prediction_for_normal_long_session_without_hot_path(self):
         auto = AutoCompactor(llm_config='condenser_llm', llm_registry=MagicMock())
+        view = View(events=_make_events(_LONG_SESSION + 10))
+
+        assert auto.should_emit_compaction_status(view) is False
+
+    def test_status_prediction_for_long_session_with_hot_path(self):
+        auto = AutoCompactor(
+            llm_config='condenser_llm',
+            llm_registry=MagicMock(),
+            allow_llm_hot_path=True,
+        )
         view = View(events=_make_events(_LONG_SESSION + 10))
 
         assert auto.should_emit_compaction_status(view) is True

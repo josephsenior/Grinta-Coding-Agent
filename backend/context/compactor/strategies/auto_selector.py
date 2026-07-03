@@ -168,12 +168,16 @@ def select_compactor_config(
             keep_first=3, max_events=min(sig.total_events, 150)
         )
 
-    # 4. Long normal session → composition pipeline.
-    # Runs all layers (microcompact → snip → summary → reattach → reactive)
-    # in sequence. The summary layer uses the LLM to condense old history
-    # into prose; if no LLM config is available it's skipped and the other
-    # layers still provide baseline compaction.
+    # 4. Long normal session → composition pipeline or deterministic fallback.
     if sig.total_events >= _LONG_SESSION:
+        if not allow_llm_hot_path or llm_config is None:
+            logger.info(
+                'Auto-select compactor: microcompact (long session, %d events, '
+                'allow_llm_hot_path=%s)',
+                sig.total_events,
+                allow_llm_hot_path,
+            )
+            return MicrocompactCompactorConfig(preserve_recent=80)
         logger.info(
             'Auto-select compactor: composition (long session, %d events)',
             sig.total_events,

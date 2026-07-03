@@ -9,7 +9,11 @@ import pytest
 from backend.context.symbol_index.builder import build_indexed_file
 from backend.context.symbol_index.rank import rank_files_for_map
 from backend.context.symbol_index.repo_map import build_repo_map_block, render_repo_map
-from backend.context.symbol_index.store import SymbolIndexStore, get_symbol_index_store
+from backend.context.symbol_index.store import (
+    SymbolIndexStore,
+    clear_symbol_index_for_workspace,
+    get_symbol_index_store,
+)
 from backend.context.symbol_index import paths as index_paths
 
 
@@ -145,3 +149,18 @@ def test_get_symbol_index_store_singleton(workspace_with_py: Path) -> None:
     store_a = get_symbol_index_store(workspace_with_py)
     store_b = get_symbol_index_store(workspace_with_py)
     assert store_a is store_b
+
+
+def test_clear_symbol_index_for_workspace_wipes_cache_and_db(
+    workspace_with_py: Path,
+) -> None:
+    store = SymbolIndexStore(workspace_with_py)
+    store.ensure_indexed('app/main.py')
+    store.set_cached_map('<REPO_MAP>stale</REPO_MAP>')
+    import backend.context.symbol_index.store as store_module
+
+    store_module._store_registry[str(workspace_with_py.resolve())] = store
+    clear_symbol_index_for_workspace(workspace_with_py)
+    assert store.get_cached_map() is None
+    assert store.index_dirty is True
+    assert store.symbols_for_file('app/main.py') == []
