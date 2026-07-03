@@ -424,11 +424,13 @@ def _collect_system_prompt_sections(
     if is_plan_mode(mode):
         plan_tools_line = (
             'Use `acceptance_criteria` to define verifiable completion assertions, '
-            'then `task_tracker` for a coarse execution plan when committing to multi-step work.\n'
+            'then `task_tracker` for a coarse execution plan when committing to multi-step work. '
+            'Define scope only in Plan mode — audit with `evidence_ref` belongs in Agent mode after verification.\n'
             if bool(getattr(config, 'enable_acceptance_criteria_tool', True))
             and bool(getattr(config, 'enable_task_tracker_tool', True))
             else (
-                'Use `acceptance_criteria` to define verifiable completion assertions when committing to structured work.\n'
+                'Use `acceptance_criteria` to define verifiable completion assertions when committing to structured work. '
+                'Do not audit in Plan mode — no executable evidence yet.\n'
                 if bool(getattr(config, 'enable_acceptance_criteria_tool', True))
                 else (
                     'Use `task_tracker` when committing to structured multi-step planning.\n'

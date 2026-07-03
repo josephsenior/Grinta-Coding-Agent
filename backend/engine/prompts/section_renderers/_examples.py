@@ -48,11 +48,23 @@ def _build_bug_fix_pattern(
     tracker_on: bool,
 ) -> str:
     prefix = _build_structured_work_prefix(criteria_on=criteria_on, tracker_on=tracker_on)
-    if prefix:
-        suffix = 'discover → edit → verify → audit → final summary.'
-        if criteria_on:
-            return prefix + suffix
-        return prefix + 'discover → edit → verify → final summary.'
+    if criteria_on and tracker_on:
+        return (
+            prefix
+            + 'criteria(update) → tracker(update) → discover → edit → verify → '
+            'tracker(sync) → audit(audit_entries) → final summary.'
+        )
+    if criteria_on:
+        return (
+            prefix
+            + 'criteria(update) → discover → edit → verify → '
+            'audit(audit_entries) → final summary.'
+        )
+    if tracker_on:
+        return (
+            prefix
+            + 'tracker(update) → discover → edit → verify → tracker(sync) → final summary.'
+        )
     return 'Discover → edit → verify → final summary.'
 
 
@@ -62,10 +74,23 @@ def _build_feature_pattern(
     tracker_on: bool,
 ) -> str:
     prefix = _build_structured_work_prefix(criteria_on=criteria_on, tracker_on=tracker_on)
-    if prefix:
-        return prefix + 'analyze → edit → test/lint → audit → final summary.'
+    if criteria_on and tracker_on:
+        return (
+            prefix
+            + 'criteria(update) → tracker(update) → analyze → edit → test/lint → '
+            'tracker(sync) → audit(audit_entries) → final summary.'
+        )
+    if criteria_on:
+        return (
+            prefix
+            + 'criteria(update) → analyze → edit → test/lint → '
+            'audit(audit_entries) → final summary.'
+        )
     if tracker_on:
-        return 'See <TASK_TRACKING> → analyze → edit → test/lint → final summary.'
+        return (
+            'See <TASK_TRACKING> → tracker(update) → analyze → edit → test/lint → '
+            'tracker(sync) → final summary.'
+        )
     return 'Scope → analyze → edit → test/lint → final summary.'
 
 

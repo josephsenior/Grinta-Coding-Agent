@@ -108,6 +108,11 @@ class TestRenderCriticalModeSpecific:
         # Should NOT have chat-specific rules
         self._assert_not_contains_body(body, 'Non-tool responses end the turn')
 
+    def test_agent_mode_verify_rule_mentions_audit_entries(self):
+        body = self._render_critical(mode='agent', criteria_on=True)
+        self._assert_contains_body(body, 'audit_entries')
+        self._assert_contains_body(body, 'evidence_ref')
+
     def test_agent_mode_contains_exactly_11_rules(self):
         body = self._render_critical(mode='agent', terminal_manager_available=False)
         lines = [

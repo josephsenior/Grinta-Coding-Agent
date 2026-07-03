@@ -17,6 +17,13 @@ from backend.engine.prompts.section_renderers._env_hints import (
     _path_uncertainty_hint,
 )
 
+_CRITERIA_VS_TASKS_EXAMPLE = (
+    '**Example (criteria vs tasks):** '
+    'Criteria (outcomes): ac1 "pytest backend/tests/unit/foo.py exits 0" (stated); '
+    'ac2 "No new public API exports" (inferred). '
+    'Tasks (milestones): 1 Reproduce failure; 2 Fix root cause; 3 Verify and audit.'
+)
+
 
 def _build_context_discipline_section(
     *,
@@ -91,7 +98,9 @@ def _build_when_to_use_context(
     if criteria_on:
         parts.append(
             '- **acceptance_criteria**: See `<ACCEPTANCE_CRITERIA>`. '
-            'Use at task start (update), before final summary (audit), and `view` after condensation.'
+            'Use `update` at task start, `view` for ids (after condensation too), '
+            '`refine` to correct one assertion, and `audit(audit_entries=[...])` '
+            'with `evidence_ref` before the final summary.'
         )
     if not tracker_on and not criteria_on:
         parts.append(
@@ -134,16 +143,20 @@ def _build_autonomy_block(_mode: str) -> str:
 def _build_task_sync_instruction(*, tracker_on: bool, criteria_on: bool) -> str:
     if not tracker_on and not criteria_on:
         return '**Plan synchronization:** Keep your final response aligned with what was actually completed.'
-    tags: list[str] = []
-    if criteria_on:
-        tags.append('`<ACCEPTANCE_CRITERIA>`')
+    steps: list[str] = []
     if tracker_on:
-        tags.append('`<TASK_TRACKING>`')
-    return (
-        '**Completion rituals:** Before the final summary, follow '
-        + ' and '.join(tags)
-        + '.'
-    )
+        steps.append(
+            'sync `task_tracker` (no open `todo`/`in_progress` unless truly blocked)'
+        )
+    steps.append('run the narrowest verification')
+    if criteria_on:
+        steps.append(
+            '`acceptance_criteria(audit, audit_entries=[...])` with `evidence_ref` '
+            'pointing at prior tool output'
+        )
+    steps.append('write the final summary')
+    ordered = '; '.join(f'{index}. {step}' for index, step in enumerate(steps, 1))
+    return f'**Completion ritual:** Before the final summary: {ordered}.'
 
 
 def _render_autonomy(
@@ -198,12 +211,14 @@ def _render_autonomy(
         task_tracker_discipline_block = (
             '<TASK_TRACKING>\n'
             '**task_tracker**: Coarse execution plan only — 3–7 parent steps, not micro-requirements.\n'
+            'Task steps are activities/milestones, not verifiable outcomes (those belong in `<ACCEPTANCE_CRITERIA>`).\n'
             'Use `task_tracker(update, task_list=[...])` when you commit to structured work.\n'
             'Use `view` to inspect the plan, `update` to replace the full `task_list`, and `update_status` for single-task status changes.\n'
             'Quick status updates: use `update_status(task_id="...", status="done")` to change a single task status by ID. Optional `result` field captures outcome.\n'
             'Allowed statuses: `todo`, `in_progress`, `done`, `skipped`, `blocked`.\n'
             'Each step object has: `id` (string, e.g. "1"), `description` (string), `status` (one of the allowed statuses), `result` (optional string), `tags` (optional LIST of strings — never a bare string).\n'
-            '**Completion**: Before the final summary, no task should remain `todo` or `in_progress`. Mark truly completed work `done`, intentionally omitted work `skipped`, and only genuinely blocked work `blocked` with a reason.'
+            '**Completion**: Before the final summary, no task should remain `todo` or `in_progress`. Mark truly completed work `done`, intentionally omitted work `skipped`, and only genuinely blocked work `blocked` with a reason.\n'
+            f'{_CRITERIA_VS_TASKS_EXAMPLE}\n'
             '</TASK_TRACKING>'
         )
     else:
@@ -228,15 +243,19 @@ def _render_autonomy(
         acceptance_criteria_discipline_block = (
             '<ACCEPTANCE_CRITERIA>\n'
             '**acceptance_criteria**: Flat verifiable assertions for what must be true when done.\n'
+            '**Skip when trivial:** omit criteria and tracker for one-line typo fixes, pure Q&A, or discussion-only turns.\n'
             f'**Start ritual:** for bugfixes, implementations, or multi-step tasks, first call '
             f'`acceptance_criteria(update, criteria_list=[...])`{tracker_follow} '
             'before any file edit or shell command.\n'
             'See `<COMMON_PATTERNS>` for worked flows.\n'
-            'Tag each item `source: "stated"` or `"inferred"`. Use assertion phrasing, not activities.\n'
+            'Tag each item `source: "stated"` (user/directive) or `"inferred"` (agent-proposed scope extension — proceed autonomously). '
+            'Use assertion phrasing, not activities.\n'
+            f'{_CRITERIA_VS_TASKS_EXAMPLE}\n'
             f'{during_work}'
             f'{checkpoint}'
             '**Refine:** when implementation reveals a wrong assertion, `refine(criterion_id, new_assertion, reason)` — do not rewrite the full list.\n'
-            '**Audit:** before the final summary, `audit(audit_entries=[...])` with `evidence_ref` pointing at prior tool output; free-text only with `unverifiable: true`.\n'
+            '**Audit:** before the final summary, `audit(audit_entries=[{criterion_id, evidence_ref}, ...])` citing prior tool output '
+            '(e.g. `call_<id>:lines[n-m]` or `event:<id>:lines[n-m]`); free-text only with `unverifiable: true`.\n'
             'Legacy bulk `audit(criteria_list=[...])` with free-text evidence still works but is deprecated.\n'
             'Use `view` to read ids; `append` only for rare gaps.\n'
             '</ACCEPTANCE_CRITERIA>'

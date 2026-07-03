@@ -954,7 +954,9 @@ class TestBuildSystemPromptRenders:
         )
         assert '<COMMON_PATTERNS>' in result
         assert 'acceptance_criteria(update,' in result
-        assert 'acceptance_criteria(audit' in result
+        assert 'audit_entries' in result
+        assert 'evidence_ref' in result
+        assert 'audit(audit_entries)' in result
 
     def test_meta_cognition_enabled(self) -> None:
         result = self._assert_renders_cleanly(
