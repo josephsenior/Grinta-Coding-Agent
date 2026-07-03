@@ -302,7 +302,6 @@ class SidebarManageButton(Static):
 
     DEFAULT_CSS = """
     SidebarManageButton {
-        dock: right;
         width: auto;
         height: 1;
         min-height: 1;
@@ -399,8 +398,18 @@ class CollapsibleSection(Container):
         align: left middle;
         padding-right: 0;
     }
-    CollapsibleSection Switch#feature-switch {
+    CollapsibleSection .header-actions {
         dock: right;
+        width: auto;
+        height: 1;
+        min-height: 1;
+        align: right middle;
+    }
+    CollapsibleSection .header-actions SidebarManageButton {
+        dock: initial;
+        margin: 0 0 0 1;
+    }
+    CollapsibleSection Switch#feature-switch {
         width: 4;
         height: 1;
         min-height: 1;
@@ -568,17 +577,19 @@ class CollapsibleSection(Container):
                     else 'collapsible-header expanded'
                 ),
             )
-            if self._action_label:
-                btn_classes = ''
-                if self._action_button_class:
-                    btn_classes = self._action_button_class
-                yield SidebarManageButton(
-                    self._action_label,
-                    id='action-btn',
-                    classes=btn_classes,
-                )
-            if self._feature_enabled is not None:
-                yield Switch(value=self._feature_enabled, id='feature-switch')
+            if self._action_label or self._feature_enabled is not None:
+                with Horizontal(classes='header-actions', id='header-actions'):
+                    if self._action_label:
+                        btn_classes = ''
+                        if self._action_button_class:
+                            btn_classes = self._action_button_class
+                        yield SidebarManageButton(
+                            self._action_label,
+                            id='action-btn',
+                            classes=btn_classes,
+                        )
+                    if self._feature_enabled is not None:
+                        yield Switch(value=self._feature_enabled, id='feature-switch')
 
         body_classes = (
             'collapsible-body -hidden' if self._collapsed else 'collapsible-body'
@@ -646,6 +657,8 @@ class CollapsibleSection(Container):
         if event.widget and getattr(event.widget, 'id', None) == 'action-btn':
             return
         if isinstance(event.widget, Switch):
+            return
+        if event.widget and getattr(event.widget, 'id', None) == 'header-actions':
             return
 
         if event.widget and (
