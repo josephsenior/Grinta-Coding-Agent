@@ -238,13 +238,21 @@ class AcceptanceCriteriaAction(Action):
     """An action where the agent writes or audits flat acceptance criteria.
 
     Attributes:
-        command (str): One of view, update, append, audit.
+        command (str): One of view, update, append, refine, audit.
         criteria_list (list): Flat list of verifiable assertion dicts.
+        criterion_id (str): Target id for refine.
+        new_assertion (str): Updated assertion for refine.
+        reason (str): Auditable reason for refine.
+        audit_entries (list): Per-criterion audit payloads for audit command.
         thought (str): The agent's explanation of its actions.
     """
 
     command: str = 'view'
     criteria_list: list[dict[str, Any]] = field(default_factory=list)
+    criterion_id: str = ''
+    new_assertion: str = ''
+    reason: str = ''
+    audit_entries: list[dict[str, Any]] = field(default_factory=list)
     thought: str = ''
     action: ClassVar[str] = ActionType.ACCEPTANCE_CRITERIA
 

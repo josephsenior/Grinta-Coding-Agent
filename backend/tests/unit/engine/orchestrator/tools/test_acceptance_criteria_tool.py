@@ -30,12 +30,22 @@ class TestCreateAcceptanceCriteriaTool:
 
     def test_command_enum(self):
         enum = _params(self.tool)['properties']['command']['enum']
-        assert enum == ['view', 'update', 'append', 'audit']
+        assert enum == ['view', 'update', 'append', 'refine', 'audit']
 
     def test_criteria_item_requires_assertion_and_source(self):
         items = _params(self.tool)['properties']['criteria_list']['items']
         assert 'assertion' in items['required']
         assert 'source' in items['required']
+
+    def test_refine_params_present(self):
+        props = _params(self.tool)['properties']
+        assert 'criterion_id' in props
+        assert 'new_assertion' in props
+        assert 'reason' in props
+
+    def test_audit_entries_present(self):
+        props = _params(self.tool)['properties']
+        assert 'audit_entries' in props
 
 
 class TestHandleAcceptanceCriteriaTool:
@@ -55,7 +65,7 @@ class TestHandleAcceptanceCriteriaTool:
         assert action.command == 'update'
         assert len(action.criteria_list) == 1
 
-    def test_audit_requires_evidence(self):
+    def test_audit_legacy_requires_evidence(self):
         args = {
             'command': 'audit',
             'criteria_list': [
@@ -65,8 +75,87 @@ class TestHandleAcceptanceCriteriaTool:
         with pytest.raises(Exception, match='evidence'):
             _handle_acceptance_criteria_tool(args)
 
+    def test_audit_entries_requires_unverifiable_for_free_text(self):
+        stored = [
+            {
+                'id': 'ac1',
+                'assertion': 'Looks good',
+                'source': 'stated',
+                'evidence': None,
+            }
+        ]
+        args = {
+            'command': 'audit',
+            'audit_entries': [
+                {'criterion_id': 'ac1', 'evidence': 'subjective check passed'},
+            ],
+        }
+        with patch(
+            'backend.engine.tools._tool_handlers.AcceptanceCriteriaStore'
+        ) as store_cls:
+            store_cls.return_value.load_from_file.return_value = stored
+            with pytest.raises(Exception, match='unverifiable'):
+                _handle_acceptance_criteria_tool(args)
+
+    def test_audit_entries_accepts_evidence_ref(self):
+        stored = [
+            {
+                'id': 'ac1',
+                'assertion': 'Tests pass',
+                'source': 'stated',
+                'evidence': None,
+            }
+        ]
+        args = {
+            'command': 'audit',
+            'audit_entries': [
+                {'criterion_id': 'ac1', 'evidence_ref': 'call_abc:lines[1-5]'},
+            ],
+        }
+        with patch(
+            'backend.engine.tools._tool_handlers.AcceptanceCriteriaStore'
+        ) as store_cls:
+            store_cls.return_value.load_from_file.return_value = stored
+            action = _handle_acceptance_criteria_tool(args)
+        assert action.command == 'audit'
+        assert action.audit_entries[0]['evidence_ref'] == 'call_abc:lines[1-5]'
+
+    def test_refine_requires_reason(self):
+        stored = [{'id': 'ac1', 'assertion': 'A', 'source': 'stated'}]
+        with patch(
+            'backend.engine.tools._tool_handlers.AcceptanceCriteriaStore'
+        ) as store_cls:
+            store_cls.return_value.load_from_file.return_value = stored
+            with pytest.raises(Exception, match='reason'):
+                _handle_acceptance_criteria_tool(
+                    {
+                        'command': 'refine',
+                        'criterion_id': 'ac1',
+                        'new_assertion': 'B',
+                    }
+                )
+
+    def test_refine_returns_action(self):
+        stored = [{'id': 'ac1', 'assertion': 'A', 'source': 'stated'}]
+        with patch(
+            'backend.engine.tools._tool_handlers.AcceptanceCriteriaStore'
+        ) as store_cls:
+            store_cls.return_value.load_from_file.return_value = stored
+            action = _handle_acceptance_criteria_tool(
+                {
+                    'command': 'refine',
+                    'criterion_id': 'ac1',
+                    'new_assertion': 'B',
+                    'reason': 'discovered during implementation',
+                }
+            )
+        assert action.command == 'refine'
+        assert action.criterion_id == 'ac1'
+
     def test_view_loads_from_store(self):
-        stored = [{'assertion': 'Saved item', 'source': 'stated', 'evidence': None}]
+        stored = [
+            {'id': 'ac1', 'assertion': 'Saved item', 'source': 'stated', 'evidence': None}
+        ]
         with patch(
             'backend.engine.tools._tool_handlers.AcceptanceCriteriaStore'
         ) as store_cls:

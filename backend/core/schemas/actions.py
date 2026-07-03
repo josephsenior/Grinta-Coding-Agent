@@ -540,6 +540,12 @@ class AcceptanceCriteriaActionSchema(ActionSchemaV1):
     criteria_list: list[dict[str, Any]] = Field(
         default_factory=list, description='Flat list of verifiable criteria'
     )
+    criterion_id: str = Field(default='', description='Target criterion id for refine')
+    new_assertion: str = Field(default='', description='Updated assertion for refine')
+    reason: str = Field(default='', description='Auditable reason for refine')
+    audit_entries: list[dict[str, Any]] = Field(
+        default_factory=list, description='Per-criterion audit payloads'
+    )
 
 
 class TaskTrackingActionSchema(ActionSchemaV1):

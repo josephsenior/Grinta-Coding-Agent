@@ -235,8 +235,10 @@ def _render_autonomy(
             'Tag each item `source: "stated"` or `"inferred"`. Use assertion phrasing, not activities.\n'
             f'{during_work}'
             f'{checkpoint}'
-            '**Audit:** before the final summary, `acceptance_criteria(audit, ...)` with `evidence` or `GAP: ...` on every item.\n'
-            'Use `view` to read; `append` only for rare gaps.\n'
+            '**Refine:** when implementation reveals a wrong assertion, `refine(criterion_id, new_assertion, reason)` — do not rewrite the full list.\n'
+            '**Audit:** before the final summary, `audit(audit_entries=[...])` with `evidence_ref` pointing at prior tool output; free-text only with `unverifiable: true`.\n'
+            'Legacy bulk `audit(criteria_list=[...])` with free-text evidence still works but is deprecated.\n'
+            'Use `view` to read ids; `append` only for rare gaps.\n'
             '</ACCEPTANCE_CRITERIA>'
         )
     else:

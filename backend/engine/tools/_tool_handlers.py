@@ -15,7 +15,11 @@ from backend.core.enums import FileEditSource
 from backend.core.errors import FunctionCallValidationError
 from backend.core.logging.logger import app_logger as logger
 from backend.core.criteria.acceptance_criteria_store import AcceptanceCriteriaStore
-from backend.core.criteria.criterion_item import normalize_criteria_list
+from backend.core.criteria.criterion_item import (
+    assign_criterion_ids,
+    merge_ids_from_existing,
+    normalize_criteria_list,
+)
 from backend.core.tasks.task_tracker import TaskTracker
 from backend.core.tools.tool_names import (
     ACCEPTANCE_CRITERIA_TOOL_NAME,
@@ -482,10 +486,94 @@ def _validate_audit_criteria(normalized: list[dict[str, Any]]) -> None:
         )
 
 
+def _normalize_audit_entry(entry: Mapping[str, Any]) -> dict[str, Any]:
+    if not isinstance(entry, Mapping):
+        raise FunctionCallValidationError(
+            'Each audit_entries item must be an object with criterion_id.'
+        )
+    criterion_id = str(entry.get('criterion_id') or '').strip()
+    if not criterion_id:
+        raise FunctionCallValidationError(
+            'Each audit_entries item requires a non-empty criterion_id.'
+        )
+    evidence_ref = str(entry.get('evidence_ref') or '').strip()
+    evidence = str(entry.get('evidence') or '').strip()
+    unverifiable = parse_bool_argument(entry.get('unverifiable'))
+
+    if evidence_ref and evidence:
+        raise FunctionCallValidationError(
+            f'Audit entry for {criterion_id!r} must use evidence_ref OR evidence, not both.'
+        )
+    if evidence_ref:
+        return {'criterion_id': criterion_id, 'evidence_ref': evidence_ref}
+    if evidence:
+        if not unverifiable:
+            raise FunctionCallValidationError(
+                f'Audit entry for {criterion_id!r} uses free-text evidence; '
+                'set unverifiable=true for subjective criteria or use evidence_ref.'
+            )
+        return {
+            'criterion_id': criterion_id,
+            'evidence': evidence,
+            'unverifiable': True,
+        }
+    raise FunctionCallValidationError(
+        f'Audit entry for {criterion_id!r} requires evidence_ref or '
+        'evidence with unverifiable=true.'
+    )
+
+
+def _validate_audit_entries(
+    raw_entries: Any,
+    existing: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    if not isinstance(raw_entries, Sequence):
+        raise FunctionCallValidationError(
+            'Invalid format for "audit_entries". Expected a list.'
+        )
+    if not existing:
+        raise FunctionCallValidationError(
+            'Audit requires existing acceptance criteria. Call update first.'
+        )
+    normalized_entries = [
+        _normalize_audit_entry(cast(Mapping[str, Any], item))
+        for item in raw_entries
+        if isinstance(item, Mapping)
+    ]
+    if len(normalized_entries) != len(raw_entries):
+        raise FunctionCallValidationError(
+            'Each audit_entries item must be an object with criterion_id.'
+        )
+
+    existing_ids = {
+        str(item.get('id') or '').strip()
+        for item in existing
+        if str(item.get('id') or '').strip()
+    }
+    entry_ids = [entry['criterion_id'] for entry in normalized_entries]
+    if len(set(entry_ids)) != len(entry_ids):
+        raise FunctionCallValidationError(
+            'audit_entries must include each criterion_id at most once.'
+        )
+    if set(entry_ids) != existing_ids:
+        missing = sorted(existing_ids - set(entry_ids))
+        extra = sorted(set(entry_ids) - existing_ids)
+        parts: list[str] = []
+        if missing:
+            parts.append(f'missing: {", ".join(missing)}')
+        if extra:
+            parts.append(f'unknown: {", ".join(extra)}')
+        raise FunctionCallValidationError(
+            'audit_entries must cover every current criterion exactly once'
+            + (f' ({"; ".join(parts)})' if parts else '')
+        )
+    return normalized_entries
+
+
 def _handle_acceptance_criteria_tool(arguments: Mapping[str, Any]) -> Action:
     """Handle acceptance_criteria tool call."""
     command = require_tool_argument(arguments, 'command', ACCEPTANCE_CRITERIA_TOOL_NAME)
-    if command not in {'view', 'update', 'append', 'audit'}:
+    if command not in {'view', 'update', 'append', 'refine', 'audit'}:
         raise FunctionCallValidationError(
             f'Unsupported command {command!r} for tool call {ACCEPTANCE_CRITERIA_TOOL_NAME}'
         )
@@ -495,6 +583,69 @@ def _handle_acceptance_criteria_tool(arguments: Mapping[str, Any]) -> Action:
     if command == 'view':
         raw_list = store.load_from_file()
         return AcceptanceCriteriaAction(command='view', criteria_list=raw_list)
+
+    if command == 'refine':
+        criterion_id = str(arguments.get('criterion_id') or '').strip()
+        new_assertion = str(arguments.get('new_assertion') or '').strip()
+        reason = str(arguments.get('reason') or '').strip()
+        if not criterion_id:
+            raise FunctionCallValidationError(
+                'refine requires non-empty criterion_id (from view).'
+            )
+        if not new_assertion:
+            raise FunctionCallValidationError(
+                'refine requires non-empty new_assertion.'
+            )
+        if not reason:
+            raise FunctionCallValidationError(
+                'refine requires non-empty reason explaining the change.'
+            )
+        existing = _criteria_existing_normalized(store)
+        known_ids = {
+            str(item.get('id') or '').strip()
+            for item in existing
+            if str(item.get('id') or '').strip()
+        }
+        if criterion_id not in known_ids:
+            raise FunctionCallValidationError(
+                f'Unknown criterion_id {criterion_id!r}. Call view for current ids.'
+            )
+        return AcceptanceCriteriaAction(
+            command='refine',
+            criterion_id=criterion_id,
+            new_assertion=new_assertion,
+            reason=reason,
+            criteria_list=existing,
+        )
+
+    if command == 'audit':
+        existing = _criteria_existing_normalized(store)
+        if 'audit_entries' in arguments:
+            audit_entries = _validate_audit_entries(arguments.get('audit_entries'), existing)
+            return AcceptanceCriteriaAction(
+                command='audit',
+                audit_entries=audit_entries,
+                criteria_list=existing,
+            )
+
+        if 'criteria_list' not in arguments:
+            raise FunctionCallValidationError(
+                'Missing required argument "audit_entries" (preferred) or '
+                '"criteria_list" (legacy) for "audit" command.'
+            )
+        raw_any = arguments.get('criteria_list', [])
+        if not isinstance(raw_any, Sequence):
+            raise FunctionCallValidationError(
+                f'Invalid format for "criteria_list". Expected a list but got {type(raw_any)}.'
+            )
+        raw_list = cast(Sequence[Mapping[str, Any]], raw_any)
+        normalized = _normalize_criteria_list(list(raw_list))
+        _validate_audit_criteria(normalized)
+        if existing and len(normalized) != len(existing):
+            raise FunctionCallValidationError(
+                'Audit must include every criterion in the current list with evidence filled.'
+            )
+        return AcceptanceCriteriaAction(command='audit', criteria_list=normalized)
 
     if 'criteria_list' not in arguments:
         raise FunctionCallValidationError(
@@ -511,21 +662,15 @@ def _handle_acceptance_criteria_tool(arguments: Mapping[str, Any]) -> Action:
     normalized = _normalize_criteria_list(list(raw_list))
     existing = _criteria_existing_normalized(store)
 
-    if command == 'audit':
-        _validate_audit_criteria(normalized)
-        if existing and len(normalized) != len(existing):
-            raise FunctionCallValidationError(
-                'Audit must include every criterion in the current list with evidence filled.'
-            )
-        final_list = normalized
-    elif command == 'append':
+    if command == 'append':
         if not normalized:
             raise FunctionCallValidationError(
                 'Append requires at least one new criterion in criteria_list.'
             )
-        final_list = existing + normalized
+        final_list = existing + assign_criterion_ids(normalized, existing=existing)
     else:
-        final_list = normalized
+        final_list = merge_ids_from_existing(normalized, existing)
+        final_list = assign_criterion_ids(final_list, existing=existing)
         noop = _maybe_noop_criteria_action(command, final_list, existing)
         if noop is not None:
             return noop

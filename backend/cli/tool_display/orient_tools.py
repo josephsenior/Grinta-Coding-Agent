@@ -625,6 +625,7 @@ _CRITERIA_VERBS: dict[str, str] = {
     'view': 'Viewed',
     'update': 'Defined',
     'append': 'Updated',
+    'refine': 'Refined',
     'audit': 'Audited',
 }
 
@@ -633,6 +634,8 @@ def _acceptance_criteria_args(event: Any) -> dict[str, Any]:
     return {
         'command': getattr(event, 'command', ''),
         'criteria_list': getattr(event, 'criteria_list', None),
+        'criterion_id': getattr(event, 'criterion_id', ''),
+        'audit_entries': getattr(event, 'audit_entries', None),
     }
 
 
