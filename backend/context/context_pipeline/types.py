@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-_LAST_LLM_COMPACT_KEY = 'last_llm_compact_attempt'
 _LAST_BOUNDARY_COMPACT_KEY = 'last_boundary_compact_at'
 _LAST_LLM_STEP_KEY = 'last_llm_step_at'
 _JUST_COMPACTED_KEY = 'just_compacted'

@@ -296,7 +296,6 @@ async def test_run_compaction_tries_structured_llm_before_session_memory():
     pipeline = ContextPipeline(
         llm_registry=MagicMock(),
         config=ContextPipelineConfig(allow_llm_hot_path=True),
-        llm_compact_cooldown_seconds=0,
     )
     llm_action = CondensationAction(
         pruned_event_ids=list(range(2, 60)),
@@ -348,7 +347,6 @@ async def test_run_compaction_uses_session_memory_only_as_fallback():
     pipeline = ContextPipeline(
         llm_registry=MagicMock(),
         config=ContextPipelineConfig(allow_llm_hot_path=True),
-        llm_compact_cooldown_seconds=0,
     )
     session_action = CondensationAction(
         pruned_event_ids=list(range(2, 60)),
@@ -675,58 +673,6 @@ def test_should_emit_compaction_status_true_when_prewarmed(pipeline):
     state = _make_state([_user('hello', 1)])
     state.turn_signals.prewarmed_compaction = Compaction(action=action)
     assert pipeline.should_emit_compaction_status(state) is True
-
-
-@pytest.mark.asyncio
-async def test_run_compaction_uses_constructor_llm_cooldown_not_config_default():
-    events = [_user('fix context', 1)]
-    for event_id in range(2, 80):
-        events.append(_cmd_output(f'line {event_id}', event_id))
-    state = _make_state(events)
-    config = ContextPipelineConfig(
-        allow_llm_hot_path=True,
-        llm_compact_cooldown_seconds=9_999,
-    )
-    pipeline = ContextPipeline(
-        llm_registry=MagicMock(),
-        config=config,
-        llm_compact_cooldown_seconds=0,
-    )
-    llm_action = CondensationAction(
-        pruned_event_ids=list(range(2, 60)),
-        summary='structured summary',
-        summary_offset=0,
-    )
-    budget = SimpleNamespace(
-        should_autocompact=True,
-        estimated_tokens=80_000,
-        autocompact_threshold=70_000,
-        fixed_prompt_reserve_tokens=0,
-    )
-
-    with (
-        patch.object(
-            pipeline._compaction_engine,
-            '_llm_structured_compaction',
-            new=AsyncMock(return_value=llm_action),
-        ) as mock_llm,
-        patch(
-            'backend.context.context_pipeline.compaction.session_memory_exists',
-            return_value=False,
-        ),
-    ):
-        action = await pipeline._compaction_engine.run(
-            state,
-            events,
-            events,
-            budget,  # type: ignore[arg-type]
-            llm_config=SimpleNamespace(model='test-model'),
-            force=False,
-            critical=False,
-        )
-
-    assert action is llm_action
-    mock_llm.assert_awaited_once()
 
 
 def test_just_compacted_skips_autocompact_but_critical_force_bypasses(pipeline):

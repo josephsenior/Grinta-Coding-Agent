@@ -239,10 +239,23 @@ class StructureEditor:
             EditResult
         """
         if os.path.exists(path):
-            return EditResult(
-                success=False,
-                message=f'File already exists: {path}. Use replace_string or multiedit to modify it.',
-            )
+            try:
+                os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+                self._write_text_atomically(path, content)
+                verified, verify_msg = self._verify_disk_content(
+                    path, content, operation='create_file'
+                )
+                if not verified:
+                    return EditResult(success=False, message=verify_msg)
+
+                return EditResult(
+                    success=True,
+                    message=f'Updated file {path}',
+                    modified_code=content,
+                    lines_changed=content.count('\n') + 1,
+                )
+            except Exception as e:
+                return EditResult(success=False, message=f'Failed to update file: {e}')
 
         try:
             # Create parent directories if needed

@@ -135,6 +135,30 @@ class ScreenStateMixin:
         except TypeError:
             return getter()
 
+    def _sidebar_mcp_enabled(self) -> bool:
+        mcp = getattr(self._config, 'mcp', None)
+        return bool(getattr(mcp, 'enabled', False))
+
+    def _sidebar_lsp_enabled(self) -> bool:
+        from backend.core.constants import DEFAULT_AGENT_LSP_QUERY_ENABLED
+
+        agent_config = self._active_agent_config()
+        if agent_config is None:
+            return DEFAULT_AGENT_LSP_QUERY_ENABLED
+        return bool(
+            getattr(agent_config, 'enable_lsp_query', DEFAULT_AGENT_LSP_QUERY_ENABLED)
+        )
+
+    def _sidebar_debugger_enabled(self) -> bool:
+        from backend.core.constants import DEFAULT_AGENT_DEBUGGER_ENABLED
+
+        agent_config = self._active_agent_config()
+        if agent_config is None:
+            return DEFAULT_AGENT_DEBUGGER_ENABLED
+        return bool(
+            getattr(agent_config, 'enable_debugger', DEFAULT_AGENT_DEBUGGER_ENABLED)
+        )
+
     def _active_interaction_mode(self) -> str:
         agent_config = self._active_agent_config()
         configured = getattr(agent_config, 'mode', AGENT_MODE)

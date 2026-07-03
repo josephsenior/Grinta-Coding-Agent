@@ -60,7 +60,8 @@ async def test_tui_sidebar_mcp_rows_have_switch_and_skills_are_read_only(
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
     mock_config.mcp = SimpleNamespace(
-        servers=[SimpleNamespace(name='server-a', type='stdio')]
+        enabled=True,
+        servers=[SimpleNamespace(name='server-a', type='stdio', enabled=True)],
     )
 
     from backend.cli.event_rendering import sidebar as sidebar_module
@@ -121,14 +122,14 @@ async def test_tui_sidebar_mcp_rows_have_switch_and_skills_are_read_only(
 async def test_tui_lsp_sidebar_lists_detected_servers(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
+    agent_config = SimpleNamespace(enable_lsp_query=True, enable_debugger=False)
+    mock_config.get_agent_config.return_value = agent_config
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
 
     async with app.run_test(size=(120, 36)) as pilot:
         await pilot.pause()
 
         s = _get_screen(app)
-        from types import SimpleNamespace
-
         from backend.cli.tui.app import TUIRenderer
         from backend.cli.tui.widgets.collapsible import CollapsibleSection, SidebarRow
 
@@ -140,7 +141,7 @@ async def test_tui_lsp_sidebar_lists_detected_servers(mock_config):
             loop=loop,
         )
         renderer._lsp_servers_cache = {
-            'pylsp': SimpleNamespace(
+            'pyright-langserver': SimpleNamespace(
                 available=True,
                 spec=SimpleNamespace(language='python', extensions=('.py', '.pyw')),
             ),
@@ -162,7 +163,7 @@ async def test_tui_lsp_sidebar_lists_detected_servers(mock_config):
             if getattr(row, 'item_id', '').startswith('lsp:')
         ]
         assert len(rows) == 1
-        assert rows[0]._label == 'python (pylsp)'
+        assert rows[0]._label == 'python (pyright-langserver)'
         assert rows[0]._meta is None
         assert rows[0].interactive is False
         assert lsp_section.is_collapsed is False
@@ -171,6 +172,8 @@ async def test_tui_lsp_sidebar_lists_detected_servers(mock_config):
 async def test_tui_dap_sidebar_lists_detected_adapters(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
+    agent_config = SimpleNamespace(enable_lsp_query=False, enable_debugger=True)
+    mock_config.get_agent_config.return_value = agent_config
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
 
     async with app.run_test(size=(120, 36)) as pilot:
@@ -226,6 +229,126 @@ async def test_tui_dap_sidebar_lists_detected_adapters(mock_config):
         assert by_language['javascript']._meta is None
         assert by_language['javascript']._status == 'warn'
         assert dap_section.is_collapsed is False
+
+@pytest.mark.asyncio
+async def test_tui_lsp_sidebar_shows_disabled_when_feature_off(mock_config, monkeypatch):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_bootstrap', AsyncMock())
+    agent_config = SimpleNamespace(enable_lsp_query=False, enable_debugger=False)
+    mock_config.get_agent_config.return_value = agent_config
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+        from backend.cli.tui.widgets.collapsible import CollapsibleSection
+        from textual.widgets import Static
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        renderer._lsp_servers_cache = {
+            'rust': SimpleNamespace(
+                available=True,
+                spec=SimpleNamespace(language='rust', extensions=('.rs',)),
+            ),
+        }
+        renderer._last_lsp_sidebar_signature = None
+        renderer._refresh_lsp_sidebar()
+        await pilot.pause()
+
+        lsp_section = s.query_one('#sidebar-lsp', CollapsibleSection)
+        assert lsp_section._section_title == 'LSP Servers'
+        empty = lsp_section.query_one('#empty-text', Static)
+        assert 'Disabled' in str(empty.render())
+        assert lsp_section.feature_enabled is False
+
+@pytest.mark.asyncio
+async def test_tui_dap_sidebar_shows_disabled_when_feature_off(mock_config, monkeypatch):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_bootstrap', AsyncMock())
+    agent_config = SimpleNamespace(enable_lsp_query=False, enable_debugger=False)
+    mock_config.get_agent_config.return_value = agent_config
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+        from backend.cli.tui.widgets.collapsible import CollapsibleSection
+        from textual.widgets import Static
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        renderer._dap_adapters_cache = [
+            {
+                'language': 'python',
+                'adapter': 'debugpy',
+                'available': True,
+                'auto_resolvable': True,
+            },
+        ]
+        renderer._last_dap_sidebar_signature = None
+        renderer._refresh_dap_sidebar()
+        await pilot.pause()
+
+        dap_section = s.query_one('#sidebar-dap', CollapsibleSection)
+        assert dap_section._section_title == 'Debug Adapters'
+        empty = dap_section.query_one('#empty-text', Static)
+        assert 'Disabled' in str(empty.render())
+        assert dap_section.feature_enabled is False
+
+@pytest.mark.asyncio
+async def test_tui_mcp_sidebar_shows_disabled_when_feature_off(mock_config, monkeypatch):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_bootstrap', AsyncMock())
+    from backend.cli.event_rendering import sidebar as sidebar_module
+
+    monkeypatch.setattr(sidebar_module, 'load_sidebar_skill_items', lambda: [])
+    mock_config.mcp = SimpleNamespace(
+        enabled=False,
+        servers=[SimpleNamespace(name='server-a', type='stdio', enabled=True)],
+    )
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        if s._bootstrapping is not None:
+            s._bootstrapping.set()
+        from backend.cli.tui.app import TUIRenderer
+        from backend.cli.tui.widgets.collapsible import CollapsibleSection
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        assert renderer._sidebar_mcp_enabled() is False
+        renderer._last_sidebar_state = None
+        renderer._refresh_display()
+        mcp_section = s.query_one('#sidebar-mcp', CollapsibleSection)
+        assert mcp_section._section_title == 'MCP Servers'
+        assert mcp_section._content == 'Disabled'
+        assert mcp_section.feature_enabled is False
 
 @pytest.mark.asyncio
 async def test_tui_task_sidebar_does_not_clear_on_empty_view_payload(

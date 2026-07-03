@@ -117,6 +117,76 @@ def test_render_repo_map_respects_markers(workspace_with_py: Path, monkeypatch: 
     assert 'app/util.py' in rendered.replace('\\', '/')
 
 
+def test_render_repo_map_includes_empty_workspace_hint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / 'empty_repo'
+    root.mkdir()
+    index_dir = tmp_path / 'grinta_storage' / 'symbol_index'
+    monkeypatch.setattr(index_paths, 'symbol_index_dir', lambda: index_dir)
+    monkeypatch.setattr(
+        index_paths,
+        'symbol_index_db_path',
+        lambda: index_dir / 'symbols.sqlite',
+    )
+    monkeypatch.setattr(
+        'backend.context.symbol_index.store.symbol_index_dir',
+        lambda: index_dir,
+    )
+    monkeypatch.setattr(
+        'backend.context.symbol_index.store.symbol_index_db_path',
+        lambda: index_dir / 'symbols.sqlite',
+    )
+    monkeypatch.setattr(
+        'backend.core.workspace_resolution.require_effective_workspace_root',
+        lambda: str(root),
+    )
+    store = SymbolIndexStore(root)
+    rendered = render_repo_map(store, task='implement backend api', map_tokens=500)
+    assert '<REPO_MAP>' in rendered
+    assert 'workspace is currently empty' in rendered
+    assert '</REPO_MAP>' in rendered
+
+
+def test_build_repo_map_block_includes_empty_workspace_hint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / 'empty_repo'
+    root.mkdir()
+    index_dir = tmp_path / 'grinta_storage' / 'symbol_index'
+    monkeypatch.setattr(index_paths, 'symbol_index_dir', lambda: index_dir)
+    monkeypatch.setattr(
+        index_paths,
+        'symbol_index_db_path',
+        lambda: index_dir / 'symbols.sqlite',
+    )
+    monkeypatch.setattr(
+        'backend.context.symbol_index.store.symbol_index_dir',
+        lambda: index_dir,
+    )
+    monkeypatch.setattr(
+        'backend.context.symbol_index.store.symbol_index_db_path',
+        lambda: index_dir / 'symbols.sqlite',
+    )
+    monkeypatch.setattr(
+        'backend.core.workspace_resolution.require_effective_workspace_root',
+        lambda: str(root),
+    )
+
+    class _Config:
+        enable_repo_map = True
+        map_tokens = 800
+        symbol_index_mode = 'lazy'
+        llm_config = None
+
+    block = build_repo_map_block(
+        task='please implement the backend api endpoint',
+        config=_Config(),
+        mode='agent',
+    )
+    assert 'workspace is currently empty' in block
+
+
 def test_build_repo_map_block_skips_read_only(workspace_with_py: Path) -> None:
     class _Config:
         enable_repo_map = True

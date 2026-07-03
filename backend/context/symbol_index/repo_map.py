@@ -12,6 +12,13 @@ from backend.context.symbol_index.store import (
 )
 from backend.inference.llm.utils import get_token_count
 
+_REPO_MAP_HEADER = (
+    '<REPO_MAP>',
+    'Preloaded ranked repository map (refreshed after index changes).',
+)
+
+_WORKSPACE_EMPTY_LINE = 'workspace is currently empty'
+
 
 def _format_symbol_line(symbol: Any) -> str:
     kind = getattr(symbol, 'kind', '') or ''
@@ -34,11 +41,13 @@ def render_repo_map(
     model: str | None = None,
 ) -> str:
     ranked_paths = rank_files_for_map(store, task=task)
-    header = [
-        '<REPO_MAP>',
-        'Preloaded ranked repository map (refreshed after index changes).',
-        'Use analyze_project_structure command=tree only to drill into a subpath.',
-    ]
+    header = list(_REPO_MAP_HEADER)
+    if not ranked_paths:
+        lines = list(header)
+        lines.append(_WORKSPACE_EMPTY_LINE)
+        lines.append('</REPO_MAP>')
+        return '\n'.join(lines)
+
     lines = list(header)
 
     low = 0

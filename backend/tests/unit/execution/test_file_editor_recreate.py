@@ -8,7 +8,7 @@ from backend.execution.utils.file_editor import FileEditor
 
 
 class TestFileEditorRecreate(unittest.TestCase):
-    """Verify create_file behavior on existing paths."""
+    """Verify create_file overwrites existing paths silently."""
 
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
@@ -22,45 +22,27 @@ class TestFileEditorRecreate(unittest.TestCase):
         self.assertEqual(result.new_content, "print('hello')")
         self.assertTrue(path.exists())
 
-    def test_recreate_existing_file_rejected(self):
+    def test_recreate_existing_file_overwrites(self):
         path = Path(self.tmpdir) / 'existing.py'
         path.write_text('original content', encoding='utf-8')
 
         result = self.editor._handle_write(path, 'new content')
 
-        self.assertIsNotNone(result.error)
-        self.assertEqual(result.error_code, 'CREATE_FILE_ALREADY_EXISTS')
+        self.assertIsNone(result.error)
         self.assertEqual(result.old_content, 'original content')
         self.assertEqual(result.new_content, 'new content')
-        self.assertEqual(path.read_text(encoding='utf-8'), 'original content')
+        self.assertEqual(path.read_text(encoding='utf-8'), 'new content')
 
-    def test_create_file_overwrite_file(self):
+    def test_create_file_overwrites_existing_path(self):
         path = Path(self.tmpdir) / 'file.py'
         path.write_text('old', encoding='utf-8')
 
-        result = self.editor._handle_write(
-            path,
-            'new',
-            overwrite=True,
-        )
+        result = self.editor._handle_write(path, 'new')
 
         self.assertIsNone(result.error)
         self.assertEqual(result.old_content, 'old')
         self.assertEqual(result.new_content, 'new')
         self.assertEqual(path.read_text(encoding='utf-8'), 'new')
-
-    def test_recreate_result_keeps_attempted_new_content(self):
-        path = Path(self.tmpdir) / 'component.tsx'
-        original = 'export default function Page() { return <div/>; }'
-        path.write_text(original, encoding='utf-8')
-
-        result = self.editor._handle_write(path, 'different content')
-
-        self.assertIsNotNone(result.error)
-        self.assertIsNotNone(result.old_content)
-        self.assertEqual(result.old_content, original)
-        self.assertEqual(result.new_content, 'different content')
-        self.assertEqual(path.read_text(encoding='utf-8'), original)
 
 
 if __name__ == '__main__':

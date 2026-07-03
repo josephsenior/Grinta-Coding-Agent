@@ -378,6 +378,38 @@ def get_persisted_interaction_mode(agent_name: str | None = None) -> str:
     return ''
 
 
+def _update_agent_bool_field(
+    field: str,
+    value: bool,
+    agent_name: str | None = None,
+) -> None:
+    """Persist a single boolean field on the active agent entry."""
+    from backend.core.constants import DEFAULT_AGENT_NAME
+
+    target_agent = (agent_name or DEFAULT_AGENT_NAME).strip() or DEFAULT_AGENT_NAME
+    settings = _load_raw_settings()
+    agent_section = settings.get('agent')
+    if not isinstance(agent_section, dict):
+        agent_section = {}
+    agent_entry = agent_section.get(target_agent)
+    if not isinstance(agent_entry, dict):
+        agent_entry = {}
+    agent_entry[field] = bool(value)
+    agent_section[target_agent] = agent_entry
+    settings['agent'] = agent_section
+    _save_raw_settings(settings)
+
+
+def update_enable_lsp_query(enabled: bool, agent_name: str | None = None) -> None:
+    """Persist ``enable_lsp_query`` for the active agent."""
+    _update_agent_bool_field('enable_lsp_query', enabled, agent_name)
+
+
+def update_enable_debugger(enabled: bool, agent_name: str | None = None) -> None:
+    """Persist ``enable_debugger`` for the active agent."""
+    _update_agent_bool_field('enable_debugger', enabled, agent_name)
+
+
 def update_interaction_mode(mode: str, agent_name: str | None = None) -> None:
     """Persist interaction mode without touching other agent fields."""
     from backend.core.constants import DEFAULT_AGENT_NAME

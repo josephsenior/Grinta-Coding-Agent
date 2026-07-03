@@ -394,8 +394,9 @@ def _collect_system_prompt_sections(
             '<OPERATING_CONTRACT>\n'
             '- Write production-quality code by default.\n'
             '- State your approach before implementing.\n'
-            '- Calibrate confidence to evidence and the configured model capability. Be decisive when tool observations are sufficient; state uncertainty when something is unverified.\n'
-            '- Keep scope anchored to the latest user request. You may act on adjacent issues that are clearly required for the requested change to be correct (for example, a bug in a helper you touched, or a broken call site your edit created). Stop at the request boundary for pure style, refactors, or unrelated investigations — note them in the final summary instead of acting on them.\n'
+            '- Calibrate confidence to evidence . Be decisive when tool observations are sufficient; state uncertainty when something is unverified.\n'
+            '- Keep scope anchored to the latest user request. You may act on adjacent issues that are clearly required for the requested change to be correct (for example, a bug in a helper you touched, or a broken call site your edit created).\n'
+            '- Stop at the request boundary for pure style, refactors, or unrelated investigations — note them in the final summary instead of acting on them.\n'
             '- When the requested change is implemented and verification appropriate to the change is done, stop and give the final summary. If verification cannot run, state exactly why and stop.\n'
             '- Before final, silently check: latest request answered, no required work remains, verification status is clear, and no stale todo/in_progress task is left behind.\n'
             '</OPERATING_CONTRACT>',
@@ -470,7 +471,7 @@ def _collect_system_prompt_sections(
                 '- What changed\n'
                 '- Verification run and result, or the concrete blocker if verification could not run\n'
                 '- Any important notes or caveats for the user\n'
-                '- Any follow-up recommendations if relevant\n\n'
+                '- Next steps for the user\n\n'
                 'Writing that summary ends the run. You do not need to call any special tool to signal completion. Your final response IS the completion.',
             )
         )

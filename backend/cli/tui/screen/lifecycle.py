@@ -86,6 +86,7 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
                         section_icon='⬡',
                         action_label='Edit',
                         action_button_class='-mcp',
+                        feature_enabled=self._sidebar_mcp_enabled(),
                         id='sidebar-mcp',
                     )
                     yield CollapsibleSection(
@@ -94,6 +95,7 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
                         collapsed=False,
                         accent_color=NAVY_FOCUS_ACCENT,
                         section_icon='◈',
+                        feature_enabled=self._sidebar_lsp_enabled(),
                         id='sidebar-lsp',
                     )
                     yield CollapsibleSection(
@@ -102,6 +104,7 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
                         collapsed=False,
                         accent_color=NAVY_RUNNING,
                         section_icon='◆',
+                        feature_enabled=self._sidebar_debugger_enabled(),
                         id='sidebar-dap',
                     )
                     yield CollapsibleSection(

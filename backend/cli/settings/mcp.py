@@ -156,6 +156,17 @@ def update_mcp_server(
     _save_raw_settings(settings)
 
 
+def set_mcp_master_enabled(enabled: bool) -> None:
+    """Enable or disable the MCP integration globally (``mcp_config.enabled``)."""
+    settings = _load_raw_settings()
+    mcp_cfg = settings.get('mcp_config')
+    if not isinstance(mcp_cfg, dict):
+        mcp_cfg = {}
+    mcp_cfg['enabled'] = bool(enabled)
+    settings['mcp_config'] = mcp_cfg
+    _save_raw_settings(settings)
+
+
 def set_mcp_server_enabled(
     name: str, enabled: bool, *, config: AppConfig | None = None
 ) -> None:

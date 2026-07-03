@@ -36,7 +36,6 @@ from backend.context.context_pipeline.types import (
     _INEFFECTIVE_COMPACT_UNTIL_KEY,
     _JUST_COMPACTED_KEY,
     _LAST_BOUNDARY_COMPACT_KEY,
-    _LAST_LLM_COMPACT_KEY,
     _MAX_AUTOCOMPACT_FAILURES,
     _POST_COMPACT_TRUE_TOKENS_KEY,
     _SKIP_COMPACTION_UNTIL_KEY,
@@ -168,20 +167,6 @@ def increment_condensation_counter(state: State) -> None:
         count = 0
     pipe[_CONSECUTIVE_CONDENSATION_KEY] = count + 1
     _set_pipeline_state(state, pipe)
-
-
-def record_llm_compact_attempt(state: State) -> None:
-    pipe = _pipeline_state(state)
-    pipe[_LAST_LLM_COMPACT_KEY] = time.time()
-    _set_pipeline_state(state, pipe)
-
-
-def llm_cooldown_elapsed(state: State, llm_compact_cooldown: int) -> bool:
-    pipe = _pipeline_state(state)
-    last = pipe.get(_LAST_LLM_COMPACT_KEY)
-    if not isinstance(last, (int, float)):
-        return True
-    return (time.time() - last) >= llm_compact_cooldown
 
 
 def record_boundary_compact(
@@ -382,16 +367,10 @@ class _CompactionEngine:
         llm_registry: LLMRegistry,
         config: ContextPipelineConfig,
         get_structured_compactor: Any = None,
-        llm_compact_cooldown_seconds: int | None = None,
     ) -> None:
         self._llm_registry = llm_registry
         self._config = config
         self._get_structured_compactor_cb = get_structured_compactor
-        self._llm_compact_cooldown_seconds = (
-            llm_compact_cooldown_seconds
-            if llm_compact_cooldown_seconds is not None
-            else config.llm_compact_cooldown_seconds
-        )
 
     async def run(
         self,
@@ -425,22 +404,15 @@ class _CompactionEngine:
             budget.fixed_prompt_reserve_tokens,
         )
 
-        llm_allowed = self._config.allow_llm_hot_path and (
-            critical
-            or llm_cooldown_elapsed(state, self._llm_compact_cooldown_seconds)
-        )
-        if llm_allowed:
+        if self._config.allow_llm_hot_path:
             action = await self._llm_structured_compaction(
                 events, state, budget=budget, llm_config=llm_config
             )
             if action is not None and action.summary:
                 logger.info('ContextPipeline: LLM structured compaction (5b)')
-                record_llm_compact_attempt(state)
                 return action
-        elif not self._config.allow_llm_hot_path:
-            logger.debug('ContextPipeline: 5b skipped (allow_llm_hot_path=False)')
         else:
-            logger.info('ContextPipeline: 5b skipped (llm compact cooldown)')
+            logger.debug('ContextPipeline: 5b skipped (allow_llm_hot_path=False)')
 
         if session_memory_exists(state=state):
             action = self._session_memory_compaction(

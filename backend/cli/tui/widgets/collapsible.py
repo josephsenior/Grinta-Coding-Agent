@@ -369,6 +369,14 @@ class CollapsibleSection(Container):
         def control(self) -> 'CollapsibleSection':
             return self._control
 
+    class FeatureToggleChanged(Message):
+        """Event fired when the section enable switch is toggled."""
+
+        def __init__(self, control: 'CollapsibleSection', enabled: bool) -> None:
+            super().__init__()
+            self.control = control
+            self.enabled = enabled
+
     """A collapsible section with a header and expandable body."""
 
     DEFAULT_CSS = """
@@ -390,6 +398,27 @@ class CollapsibleSection(Container):
         margin-bottom: 1;
         align: left middle;
         padding-right: 0;
+    }
+    CollapsibleSection Switch#feature-switch {
+        dock: right;
+        width: 4;
+        height: 1;
+        min-height: 1;
+        margin: 0 0 0 1;
+        border: none;
+        background: transparent;
+        padding: 0;
+    }
+    CollapsibleSection Switch#feature-switch .switch--slider {
+        background: #0f1c30;
+        color: #54597b;
+    }
+    CollapsibleSection Switch#feature-switch.-on .switch--slider {
+        background: #0f2a22;
+        color: #54efae;
+    }
+    CollapsibleSection Switch#feature-switch:focus {
+        border: none;
     }
     CollapsibleSection .section-icon {
         width: auto;
@@ -453,6 +482,7 @@ class CollapsibleSection(Container):
         action_label: str | None = None,
         action_button_class: str = '',
         footer_hint: str | None = None,
+        feature_enabled: bool | None = None,
         id: str | None = None,
         is_thinking: bool = False,
     ) -> None:
@@ -465,8 +495,14 @@ class CollapsibleSection(Container):
         self._action_label = action_label
         self._action_button_class = action_button_class
         self._footer_hint = footer_hint
+        self._feature_enabled = feature_enabled
+        self._suppress_feature_switch = False
         self._items: list[dict[str, Any]] = []
         self._is_thinking = is_thinking
+
+    @property
+    def feature_enabled(self) -> bool | None:
+        return self._feature_enabled
 
     def _header_icon_markup(self) -> str:
         if not self._section_icon:
@@ -541,6 +577,8 @@ class CollapsibleSection(Container):
                     id='action-btn',
                     classes=btn_classes,
                 )
+            if self._feature_enabled is not None:
+                yield Switch(value=self._feature_enabled, id='feature-switch')
 
         body_classes = (
             'collapsible-body -hidden' if self._collapsed else 'collapsible-body'
@@ -592,9 +630,22 @@ class CollapsibleSection(Container):
             self.post_message(self.ActionClicked(self))
             event.stop()
 
+    def on_switch_changed(self, event: Switch.Changed) -> None:
+        if event.control.id != 'feature-switch':
+            return
+        if self._suppress_feature_switch:
+            self._suppress_feature_switch = False
+            return
+        enabled = bool(event.value)
+        self._feature_enabled = enabled
+        self.post_message(self.FeatureToggleChanged(self, enabled))
+        event.stop()
+
     def on_click(self, event: events.Click) -> None:
         """Handle click events on the header or widget itself."""
-        if event.widget and event.widget.id == 'action-btn':
+        if event.widget and getattr(event.widget, 'id', None) == 'action-btn':
+            return
+        if isinstance(event.widget, Switch):
             return
 
         if event.widget and (
@@ -639,6 +690,19 @@ class CollapsibleSection(Container):
         """Update the section title."""
         self._section_title = title
         self._refresh_header()
+
+    def set_feature_enabled(self, enabled: bool, *, suppress_event: bool = True) -> None:
+        """Sync the header enable switch without posting a toggle event."""
+        self._feature_enabled = enabled
+        try:
+            switch = self.query_one('#feature-switch', Switch)
+        except Exception:
+            return
+        if bool(switch.value) == enabled:
+            return
+        if suppress_event:
+            self._suppress_feature_switch = True
+        switch.value = enabled
 
     @staticmethod
     def _normalize_item(

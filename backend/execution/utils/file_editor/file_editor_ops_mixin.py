@@ -214,7 +214,6 @@ class FileEditorOpsMixin:
         old_content: str | None,
         file_existed: bool,
         dry_run: bool,
-        overwrite: bool,
     ) -> ToolResult | None:
         return _handle_write_maybe_short_circuit_impl(
             self,
@@ -223,7 +222,6 @@ class FileEditorOpsMixin:
             old_content=old_content,
             file_existed=file_existed,
             dry_run=dry_run,
-            overwrite=overwrite,
         )
 
     def _handle_write_commit(
@@ -264,14 +262,12 @@ class FileEditorOpsMixin:
         content: str,
         *,
         dry_run: bool = False,
-        overwrite: bool = False,
     ) -> ToolResult:
         return _handle_write_impl(
             self,
             file_path,
             content,
             dry_run=dry_run,
-            overwrite=overwrite,
         )
 
     def _read_file_with_meta(self, file_path: Path) -> tuple[str, _FileReadMeta]:
