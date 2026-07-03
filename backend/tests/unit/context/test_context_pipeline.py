@@ -219,13 +219,6 @@ async def test_prepare_step_rejects_micro_prune_and_respects_cooldown(pipeline):
 
     with (
         patch(
-            'backend.context.context_pipeline.session_memory_exists', return_value=True
-        ),
-        patch(
-            'backend.context.context_pipeline.build_compaction_summary',
-            return_value='# Session Memory\nsummary',
-        ),
-        patch(
             'backend.context.context_pipeline.compaction._select_compaction_tail',
             return_value=events[-47:],
         ),
@@ -288,7 +281,7 @@ def test_structured_compactor_preserves_50_raw_events():
 
 
 @pytest.mark.asyncio
-async def test_run_compaction_tries_structured_llm_before_session_memory():
+async def test_run_compaction_uses_llm_structured_compaction_when_available():
     events = [_user('fix context', 1)]
     for event_id in range(2, 80):
         events.append(_cmd_output(f'line {event_id}', event_id))
@@ -309,20 +302,11 @@ async def test_run_compaction_tries_structured_llm_before_session_memory():
         fixed_prompt_reserve_tokens=0,
     )
 
-    with (
-        patch.object(
-            pipeline._compaction_engine,
-            '_llm_structured_compaction',
-            new=AsyncMock(return_value=llm_action),
-        ) as mock_llm,
-        patch.object(
-            pipeline._compaction_engine, '_session_memory_compaction'
-        ) as mock_session,
-        patch(
-            'backend.context.context_pipeline.compaction.session_memory_exists',
-            return_value=True,
-        ),
-    ):
+    with patch.object(
+        pipeline._compaction_engine,
+        '_llm_structured_compaction',
+        new=AsyncMock(return_value=llm_action),
+    ) as mock_llm:
         action = await pipeline._compaction_engine.run(
             state,
             events,
@@ -335,11 +319,12 @@ async def test_run_compaction_tries_structured_llm_before_session_memory():
 
     assert action is llm_action
     mock_llm.assert_awaited_once()
-    mock_session.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_run_compaction_uses_session_memory_only_as_fallback():
+async def test_run_compaction_falls_back_to_degraded_when_llm_exhausted():
+    from backend.context.context_pipeline.types import _MAX_LLM_COMPACTION_ATTEMPTS
+
     events = [_user('fix context', 1)]
     for event_id in range(2, 80):
         events.append(_cmd_output(f'line {event_id}', event_id))
@@ -348,9 +333,9 @@ async def test_run_compaction_uses_session_memory_only_as_fallback():
         llm_registry=MagicMock(),
         config=ContextPipelineConfig(allow_llm_hot_path=True),
     )
-    session_action = CondensationAction(
+    degraded_action = CondensationAction(
         pruned_event_ids=list(range(2, 60)),
-        summary='session fallback summary',
+        summary='recovery summary',
         summary_offset=0,
     )
     budget = SimpleNamespace(
@@ -368,17 +353,9 @@ async def test_run_compaction_uses_session_memory_only_as_fallback():
         ) as mock_llm,
         patch.object(
             pipeline._compaction_engine,
-            '_session_memory_compaction',
-            return_value=session_action,
-        ) as mock_session,
-        patch(
-            'backend.context.context_pipeline.compaction.action_meets_effectiveness',
-            return_value=True,
-        ),
-        patch(
-            'backend.context.context_pipeline.compaction.session_memory_exists',
-            return_value=True,
-        ),
+            '_degraded_compaction',
+            return_value=degraded_action,
+        ) as mock_degraded,
     ):
         action = await pipeline._compaction_engine.run(
             state,
@@ -390,9 +367,9 @@ async def test_run_compaction_uses_session_memory_only_as_fallback():
             critical=False,
         )
 
-    assert action is session_action
-    mock_llm.assert_awaited_once()
-    mock_session.assert_called_once()
+    assert action is degraded_action
+    assert mock_llm.await_count == _MAX_LLM_COMPACTION_ATTEMPTS
+    mock_degraded.assert_called_once()
 
 
 def test_build_prompt_events_injects_context_packet(pipeline):

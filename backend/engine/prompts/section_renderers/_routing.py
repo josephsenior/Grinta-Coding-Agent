@@ -38,6 +38,7 @@ def _render_routing(
     debugger_available = can_edit and _debugger_available(config)
     working_memory_on = getattr(config, 'enable_working_memory', True)
     tracker_on = getattr(config, 'enable_task_tracker_tool', True)
+    criteria_on = getattr(config, 'enable_acceptance_criteria_tool', True)
     if not is_windows:
         env_line = 'Use **bash** for environment actions (install, build, test, git, processes). '
     elif windows_with_bash:
@@ -66,6 +67,7 @@ def _render_routing(
     memory_kw = _routing_memory_tool_placeholders(
         working_memory_on=working_memory_on,
         tracker_on=tracker_on,
+        criteria_on=criteria_on,
         semantic_recall_on=_semantic_recall_runtime(
             config, semantic_recall_active=semantic_recall_active
         ),

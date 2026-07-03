@@ -37,23 +37,17 @@ from backend.context.context_pipeline.types import (
     _JUST_COMPACTED_KEY,
     _LAST_BOUNDARY_COMPACT_KEY,
     _MAX_AUTOCOMPACT_FAILURES,
+    _MAX_LLM_COMPACTION_ATTEMPTS,
     _POST_COMPACT_TRUE_TOKENS_KEY,
     _SKIP_COMPACTION_UNTIL_KEY,
     _WILL_RETRIGGER_HYSTERESIS_KEY,
     _ContinuityGateDecision,
 )
 from backend.context.continuity_eval import compaction_passes_continuity_gate
-from backend.context.memory.session_memory import (
-    build_compaction_summary,
-    session_memory_exists,
-)
 from backend.core.constants import (
     DEFAULT_COMPACT_MIN_PRUNED_EVENTS,
     DEFAULT_COMPACT_MIN_TOKEN_REDUCTION,
     DEFAULT_DEGRADED_COMPACT_TAIL_RATIO,
-    DEFAULT_SM_COMPACT_MAX_TOKENS,
-    DEFAULT_SM_COMPACT_MIN_MESSAGES,
-    DEFAULT_SM_COMPACT_MIN_TOKENS,
 )
 from backend.core.logging.logger import app_logger as logger
 from backend.ledger.action.agent import CondensationAction
@@ -264,9 +258,6 @@ def evaluate_continuity_gate(
             restored_parts.append(canonical_rendered)
     except Exception:
         logger.debug('Canonical continuity render failed', exc_info=True)
-    snapshot_text = build_compaction_summary(state=state)
-    if snapshot_text:
-        restored_parts.append(snapshot_text)
     restored = '\n\n'.join(part for part in restored_parts if part.strip())
     passed, result = compaction_passes_continuity_gate(history, restored)
     canonical_result = validate_canonical_state_for_compaction(
@@ -350,15 +341,16 @@ def resolve_continuity_or_fallback(
 
 
 # --------------------------------------------------------------------------- #
-# Compaction Engine — runs the 5a→5b→5c→5d fallback chain
+# Compaction Engine — runs 5b (LLM) with retries, then 5d boundary fallback
 # --------------------------------------------------------------------------- #
 
 
 class _CompactionEngine:
     """Stateless compaction runner — instantiated once by ContextPipeline.
 
-    Delegates to the structured compactor LLM, session memory, or deterministic
-    truncation in order of preference.
+    Delegates to the structured compactor LLM with retries, then deterministic
+    boundary pruning. Session-memory template compaction is not used — persisted
+    task/criteria state is re-injected separately after compaction.
     """
 
     def __init__(
@@ -405,39 +397,48 @@ class _CompactionEngine:
         )
 
         if self._config.allow_llm_hot_path:
-            action = await self._llm_structured_compaction(
-                events, state, budget=budget, llm_config=llm_config
-            )
-            if action is not None and action.summary:
-                logger.info('ContextPipeline: LLM structured compaction (5b)')
+            for attempt in range(1, _MAX_LLM_COMPACTION_ATTEMPTS + 1):
+                action = await self._llm_structured_compaction(
+                    events, state, budget=budget, llm_config=llm_config
+                )
+                if action is None or not action.summary:
+                    logger.info(
+                        'ContextPipeline: 5b attempt %d/%d produced no summary',
+                        attempt,
+                        _MAX_LLM_COMPACTION_ATTEMPTS,
+                    )
+                    continue
+                compactor = (
+                    self._get_structured_compactor_cb(state)
+                    if self._get_structured_compactor_cb
+                    else None
+                )
+                if compactor is not None and getattr(
+                    compactor, 'last_degraded', False
+                ):
+                    logger.warning(
+                        'ContextPipeline: 5b degraded on attempt %d/%d; '
+                        'retrying LLM compaction',
+                        attempt,
+                        _MAX_LLM_COMPACTION_ATTEMPTS,
+                    )
+                    continue
+                logger.info(
+                    'ContextPipeline: LLM structured compaction (5b) '
+                    'after %d attempt(s)',
+                    attempt,
+                )
                 return action
+            logger.warning(
+                'ContextPipeline: LLM structured compaction exhausted '
+                '%d attempt(s); falling back to degraded boundary compaction',
+                _MAX_LLM_COMPACTION_ATTEMPTS,
+            )
         else:
             logger.debug('ContextPipeline: 5b skipped (allow_llm_hot_path=False)')
 
-        if session_memory_exists(state=state):
-            action = self._session_memory_compaction(
-                state, history, events, budget=budget, llm_config=llm_config
-            )
-            if action is not None and action_meets_effectiveness(
-                history, events, action, budget, state, llm_config
-            ):
-                if not _session_memory_post_compact_within_budget(
-                    history, action, budget, llm_config
-                ):
-                    logger.info(
-                        'ContextPipeline: session-memory compact still over threshold; '
-                        'falling through'
-                    )
-                else:
-                    logger.info('ContextPipeline: session-memory fallback compaction')
-                    return action
-            logger.info(
-                'ContextPipeline: session-memory fallback skipped '
-                '(missing or ineffective action)'
-            )
-
         logger.warning(
-            'ContextPipeline: degraded boundary compaction (5c) — mandatory fallback'
+            'ContextPipeline: degraded boundary compaction (5d) — mandatory fallback'
         )
         return self._degraded_compaction(
             state, history, events, budget=budget, llm_config=llm_config
@@ -475,13 +476,10 @@ class _CompactionEngine:
             if action is not None and action.summary:
                 if getattr(compactor, 'last_degraded', False):
                     logger.info(
-                        'ContextPipeline: 5b degraded summary ignored; '
-                        'falling back to deterministic compaction'
+                        'ContextPipeline: 5b produced degraded summary '
+                        '(len=%d); caller may retry',
+                        len(action.summary),
                     )
-                    return None
-                # Canonical task state is maintained deterministically by
-                # reduce_events_into_state (pipeline.py); the prose compactor
-                # no longer produces a canonical patch.
                 return action
             logger.info(
                 'ContextPipeline: 5b produced no summary (pruned=%d events=%d max_size=%d)',
@@ -490,57 +488,6 @@ class _CompactionEngine:
                 getattr(compactor, 'max_size', 0),
             )
         return None
-
-    def _session_memory_compaction(
-        self,
-        state: State,
-        history: list[Event],
-        events: list[Event],
-        *,
-        budget: ContextBudget,
-        llm_config: object | None,
-    ) -> CondensationAction | None:
-        from backend.context.context_pipeline.goal_context import (
-            strip_verbatim_user_echo,
-        )
-
-        summary = build_compaction_summary(state=state)
-        if not summary.strip():
-            return None
-        summary = strip_verbatim_user_echo(summary, state=state)
-        tail = _select_session_memory_tail(
-            events,
-            state,
-            budget=budget,
-            llm_config=llm_config,
-        )
-        if not tail:
-            return None
-        tail = _shrink_tail_for_token_reduction(
-            events,
-            tail,
-            history=history,
-            budget=budget,
-            state=state,
-            llm_config=llm_config,
-            summary=summary,
-        )
-        pruned = _pruned_ids(events, tail)
-        if not pruned:
-            return None
-        action = CondensationAction(
-            pruned_event_ids=sorted(pruned),
-            summary=summary,
-            summary_offset=0,
-        )
-        if not _session_memory_post_compact_within_budget(
-            history, action, budget, llm_config
-        ):
-            logger.info(
-                'ContextPipeline: session-memory compact still over threshold; rejecting 5c'
-            )
-            return None
-        return action
 
     def _degraded_compaction(
         self,
@@ -557,19 +504,17 @@ class _CompactionEngine:
             llm_config=llm_config,
             tail_ratio=DEFAULT_DEGRADED_COMPACT_TAIL_RATIO,
         )
-        summary = build_compaction_summary(state=state)
-        if not summary.strip():
-            pruned_preview = _pruned_ids(events, tail)
-            from backend.context.compactor.strategies.amortized_pruning_compactor import (
-                AmortizedPruningCompactor,
-            )
+        pruned_preview = _pruned_ids(events, tail)
+        from backend.context.compactor.strategies.amortized_pruning_compactor import (
+            AmortizedPruningCompactor,
+        )
 
-            pruned_events = [
-                event
-                for event in events
-                if getattr(event, 'id', None) in pruned_preview
-            ]
-            summary = AmortizedPruningCompactor._build_recovery_summary(pruned_events)
+        pruned_events = [
+            event
+            for event in events
+            if getattr(event, 'id', None) in pruned_preview
+        ]
+        summary = AmortizedPruningCompactor._build_recovery_summary(pruned_events)
         tail = _shrink_tail_for_token_reduction(
             events,
             tail,
@@ -585,81 +530,4 @@ class _CompactionEngine:
             summary=summary,
             summary_offset=0,
         )
-
-
-def _get_last_summarized_event_id(state: State) -> int | None:
-    from backend.context.memory.session_memory import _read_metadata, load_session_memory
-
-    content = load_session_memory(state=state)
-    if not content:
-        return None
-    meta = _read_metadata(content)
-    raw = meta.get('last_summarized_event_id')
-    if isinstance(raw, str) and raw.isdigit():
-        return int(raw)
-    if isinstance(raw, int):
-        return raw
-    pipe = _pipeline_state(state)
-    fallback = pipe.get('last_session_memory_event_id')
-    return fallback if isinstance(fallback, int) else None
-
-
-def _select_session_memory_tail(
-    events: list[Event],
-    state: State,
-    *,
-    budget: ContextBudget,
-    llm_config: object | None,
-) -> list[Event]:
-    from backend.context.context_pipeline.grouping import adjust_tail_for_api_invariants
-    from backend.context.prompt.prompt_window import estimate_prompt_events_tokens
-
-    del budget, llm_config
-    if not events:
-        return []
-
-    last_summarized = _get_last_summarized_event_id(state)
-    start_index = 0
-    if isinstance(last_summarized, int):
-        for index, event in enumerate(events):
-            event_id = getattr(event, 'id', None)
-            if isinstance(event_id, int) and event_id > last_summarized:
-                start_index = index
-                break
-
-    tail = list(events[start_index:])
-    if len(tail) < DEFAULT_SM_COMPACT_MIN_MESSAGES and start_index > 0:
-        start_index = max(0, len(events) - DEFAULT_SM_COMPACT_MIN_MESSAGES)
-        tail = list(events[start_index:])
-
-    while (
-        len(tail) > DEFAULT_SM_COMPACT_MIN_MESSAGES
-        and estimate_prompt_events_tokens(tail) > DEFAULT_SM_COMPACT_MAX_TOKENS
-    ):
-        tail.pop(0)
-
-    while (
-        len(tail) < DEFAULT_SM_COMPACT_MIN_MESSAGES
-        and start_index > 0
-        and estimate_prompt_events_tokens(tail) < DEFAULT_SM_COMPACT_MIN_TOKENS
-    ):
-        start_index -= 1
-        tail = list(events[start_index:])
-
-    return adjust_tail_for_api_invariants(tail, events)
-
-
-def _session_memory_post_compact_within_budget(
-    history: list[Event],
-    action: CondensationAction,
-    budget: ContextBudget,
-    llm_config: object | None,
-) -> bool:
-    post_events = project_after_compact_boundary(
-        _synthetic_history_after_action(history, action)
-    )
-    post_tokens = estimate_boundary_event_tokens(
-        post_events, llm_config=llm_config
-    )
-    return post_tokens < budget.autocompact_threshold
 

@@ -21,6 +21,7 @@ _POST_COMPACT_TRUE_TOKENS_KEY = 'post_compact_true_tokens'
 _WILL_RETRIGGER_HYSTERESIS_KEY = 'will_retrigger_hysteresis'
 _AUTOCOMPACT_FAILURE_STREAK_KEY = 'autocompact_failure_streak'
 _MAX_AUTOCOMPACT_FAILURES = 3
+_MAX_LLM_COMPACTION_ATTEMPTS = 3
 
 
 @dataclass(frozen=True)
