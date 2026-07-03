@@ -235,13 +235,19 @@ class RendererActionHandlersMixin:
         self._apply_streaming_chunk(action)
 
     def _stream_to_compaction_card(self, action: StreamingChunkAction) -> None:
-        """Update the pending compaction scan card with a streamed chunk."""
-        from backend.cli.tui.renderer.handlers.compaction import _finish_compaction_card
+        """Update the pending compaction scan card with a streamed chunk.
 
+        Streaming chunks are preview-only. The card is completed when
+        ``CondensationAction`` commits — not on each LLM stream ``is_final``,
+        because sanity-gate retries emit multiple finals during one compaction.
+        """
         card = self._resolve_running_compaction_card()
         text = (action.accumulated or action.chunk or '').strip()
 
-        if card is not None and text:
+        if card is None:
+            return
+
+        if text:
             update = getattr(card, 'update_summary_streaming', None)
             if callable(update):
                 update(text)
@@ -249,10 +255,6 @@ class RendererActionHandlersMixin:
                 card.summary = text
                 if hasattr(card, '_refresh_line'):
                     card._refresh_line()
-
-        if action.is_final:
-            summary = text or 'Context condensed.'
-            _finish_compaction_card(self, summary=summary)
 
     def _flush_deferred_stream_chunk(self) -> None:
         self._stream_paint_timer_armed = False

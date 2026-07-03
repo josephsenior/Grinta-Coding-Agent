@@ -213,8 +213,10 @@ async def test_tui_condensation_action_completes_status_card(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_tui_compaction_streaming_final_completes_status_card(mock_config):
-    """Streaming final chunk completes the card when CondensationAction is delayed."""
+async def test_tui_compaction_streaming_final_waits_for_condensation_action(mock_config):
+    """Stream is_final is preview-only; CondensationAction commits the card."""
+    from backend.ledger.action.agent import CondensationAction
+
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -259,10 +261,80 @@ async def test_tui_compaction_streaming_final_completes_status_card(mock_config)
         cards = list(s.query(CompactionCard).results())
         assert len(cards) == 1
         card = cards[0]
+        assert card.state == 'running'
+        assert 'Compacting' in str(card._line_text())
+        assert card.summary == 'Session summary after streaming.'
+        assert renderer._compaction_transcript_active is True
+
+        renderer._process_event(
+            CondensationAction(
+                pruned_event_ids=[1, 2],
+                summary='Session summary after streaming.',
+                summary_offset=0,
+            )
+        )
+        await pilot.pause()
+
         assert card.state == 'done'
         assert 'Compacted' in str(card._line_text())
-        assert card.summary == 'Session summary after streaming.'
         assert renderer._compaction_transcript_active is False
+
+
+@pytest.mark.asyncio
+async def test_tui_compaction_sanity_retries_emit_single_card(mock_config):
+    """Multiple stream finals during one compaction must not create duplicate cards."""
+    from backend.ledger.action.agent import CondensationAction
+
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        renderer._process_event(
+            StatusObservation(
+                content='Compacting context...',
+                status_type='compaction',
+            )
+        )
+        for attempt in range(3):
+            renderer._process_event(
+                StreamingChunkAction(
+                    chunk='',
+                    accumulated='',
+                    is_final=True,
+                    tool_call_name='compaction',
+                )
+            )
+        await pilot.pause()
+
+        cards = list(s.query(CompactionCard).results())
+        assert len(cards) == 1
+        assert cards[0].state == 'running'
+
+        renderer._process_event(
+            CondensationAction(
+                pruned_event_ids=[1, 2, 3],
+                summary='Committed after retries.',
+                summary_offset=0,
+            )
+        )
+        await pilot.pause()
+
+        assert len(list(s.query(CompactionCard).results())) == 1
+        assert cards[0].state == 'done'
+        assert cards[0].summary == 'Committed after retries.'
 
 
 @pytest.mark.asyncio
