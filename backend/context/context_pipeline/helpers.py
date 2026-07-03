@@ -14,8 +14,10 @@ from backend.context.context_pipeline.types import (
     _CONSECUTIVE_DECAY_SECONDS_KEY,
     _INEFFECTIVE_COMPACT_STREAK_KEY,
     _INEFFECTIVE_COMPACT_UNTIL_KEY,
+    _JUST_COMPACTED_KEY,
     _LAST_LLM_STEP_KEY,
     _SKIP_COMPACTION_UNTIL_KEY,
+    _WILL_RETRIGGER_HYSTERESIS_KEY,
 )
 from backend.context.prompt.context_packet import (
     CONTEXT_PACKET_MARKER,
@@ -69,6 +71,8 @@ def reset_consecutive_condensation_counter(state: State) -> None:
     pipe = dict(getattr(state, 'extra_data', {}).get('context_pipeline_state', {}))
     pipe[_CONSECUTIVE_CONDENSATION_KEY] = 0
     pipe[_LAST_LLM_STEP_KEY] = time.time()
+    pipe[_JUST_COMPACTED_KEY] = False
+    pipe.pop(_WILL_RETRIGGER_HYSTERESIS_KEY, None)
     state.set_extra('context_pipeline_state', pipe, source='ContextPipeline')
 
 
@@ -108,13 +112,38 @@ def maybe_decay_consecutive_condensation_counter(
     return False
 
 
+def is_prewarm_stale(history: list[Event], turn_signals: object | None) -> bool:
+    """Return True when background prewarm was computed on a different history snapshot."""
+    if turn_signals is None:
+        return False
+    prewarm_len = getattr(turn_signals, 'prewarm_history_len', None)
+    if not isinstance(prewarm_len, int):
+        return False
+    prewarm_latest_id = getattr(turn_signals, 'prewarm_latest_event_id', None)
+    current_len = len(history)
+    current_latest_id = getattr(history[-1], 'id', None) if history else None
+    return prewarm_len != current_len or prewarm_latest_id != current_latest_id
+
+
+def clear_prewarm_signals(turn_signals: object | None) -> None:
+    """Clear prewarm metadata after consumption or discard."""
+    if turn_signals is None:
+        return
+    if hasattr(turn_signals, 'prewarmed_compaction'):
+        turn_signals.prewarmed_compaction = None
+    if hasattr(turn_signals, 'prewarm_history_len'):
+        turn_signals.prewarm_history_len = None
+    if hasattr(turn_signals, 'prewarm_latest_event_id'):
+        turn_signals.prewarm_latest_event_id = None
+
+
 def apply_ineffective_compaction_backoff(state: State) -> None:
     """Backoff compaction after an ineffective prune (shared with orchestrator)."""
     pipe = dict(getattr(state, 'extra_data', {}).get('context_pipeline_state', {}))
     history = list(getattr(state, 'history', []))
     latest_id = getattr(history[-1], 'id', None) if history else None
     if not isinstance(latest_id, int):
-        return
+        latest_id = len(history) if history else 0
     streak = pipe.get(_INEFFECTIVE_COMPACT_STREAK_KEY, 0)
     if not isinstance(streak, int):
         streak = 0
@@ -156,13 +185,15 @@ def _projected_compaction_token_reduction(
         summary=summary or 'summary',
         summary_offset=0,
     )
+    from backend.context.context_budget import estimate_boundary_event_tokens
+
     post_events = project_after_compact_boundary(
         _synthetic_history_after_action(history, action)
     )
-    post_budget = ContextBudget.from_events(
-        post_events, llm_config=llm_config, state=state
+    post_tokens = estimate_boundary_event_tokens(
+        post_events, llm_config=llm_config
     )
-    return budget.estimated_tokens - post_budget.estimated_tokens
+    return budget.estimated_tokens - post_tokens
 
 
 def _shrink_tail_for_token_reduction(

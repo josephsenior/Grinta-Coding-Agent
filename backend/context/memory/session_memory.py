@@ -78,9 +78,9 @@ def _read_metadata(content: str) -> dict[str, Any]:
 
 
 def _format_session_memory(
-    snapshot: dict[str, Any], *, last_event_id: int | None
+    snapshot: dict[str, Any], *, last_event_id: int | None, state: State | None = None
 ) -> str:
-    body = format_snapshot_for_injection(snapshot)
+    body = format_snapshot_for_injection(snapshot, state=state)
     if not body.strip():
         body = '_No structured facts extracted yet._'
     meta_lines = [
@@ -182,7 +182,9 @@ def maybe_update(
     snapshot = extract_snapshot(events)
     latest_id = getattr(events[-1], 'id', None)
     last_summarized = latest_id if isinstance(latest_id, int) else last_event_id
-    markdown = _format_session_memory(snapshot, last_event_id=last_summarized)
+    markdown = _format_session_memory(
+        snapshot, last_event_id=last_summarized, state=state
+    )
     path = _session_memory_path(state)
     pipeline_state_payload = {
         'last_session_memory_event_id': last_summarized,
@@ -329,11 +331,21 @@ def build_compaction_summary(
             from backend.context.compactor.pre_condensation_snapshot import (
                 load_snapshot,
             )
+            from backend.context.context_pipeline.goal_context import (
+                build_goal_context_for_compaction,
+            )
 
             snapshot = load_snapshot(state=state)
             if snapshot:
-                block = format_snapshot_for_injection(snapshot)
-                if block and block not in memory:
+                goal_block = build_goal_context_for_compaction(
+                    state=state, snapshot=snapshot
+                )
+                if goal_block and goal_block not in memory:
+                    parts.append(
+                        '<GOAL_CONTEXT>\n' + goal_block + '\n</GOAL_CONTEXT>'
+                    )
+                block = format_snapshot_for_injection(snapshot, state=state)
+                if block and block not in memory and 'User messages (verbatim)' not in block:
                     parts.append(block)
         except Exception:
             logger.debug('Snapshot merge for compaction summary failed', exc_info=True)

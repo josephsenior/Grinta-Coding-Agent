@@ -16,6 +16,9 @@ from backend.cli.tool_display.orient_tools import (
     _quote,
     analyze_observation_model,
     analyze_result,
+    acceptance_criteria_action_model,
+    acceptance_criteria_observation_model,
+    acceptance_criteria_result,
     checkpoint_action_model,
     checkpoint_observation_model,
     checkpoint_result,
@@ -321,3 +324,44 @@ def test_checkpoint_observation_model_avoids_duplicate_target_and_result() -> No
     assert model.target == label
     assert model.result == '#3'
     assert model.target not in model.result
+
+
+def test_acceptance_criteria_action_model_uses_summarize_target() -> None:
+    action = SimpleNamespace(
+        command='update',
+        criteria_list=[
+            {'assertion': 'Tests pass', 'source': 'stated'},
+            {'assertion': 'Lint clean', 'source': 'inferred'},
+        ],
+    )
+    model = acceptance_criteria_action_model(action)
+
+    assert model.tool == 'acceptance_criteria'
+    assert model.verb == 'Defined'
+    assert 'update' in model.target
+    assert '2 criterion' in model.target
+
+
+def test_acceptance_criteria_observation_model_summarizes_success() -> None:
+    pending = acceptance_criteria_action_model(
+        SimpleNamespace(command='update', criteria_list=[{'assertion': 'x'}])
+    )
+    obs = SimpleNamespace(
+        command='update',
+        criteria_list=[{'assertion': 'x'}],
+        content='✅ Acceptance criteria defined (1 items).',
+    )
+
+    model = acceptance_criteria_observation_model(obs, pending)
+
+    assert model.verb == 'Defined'
+    assert 'Acceptance criteria defined' in model.result
+
+
+def test_acceptance_criteria_result_counts_view_criteria() -> None:
+    obs = SimpleNamespace(
+        content='# Acceptance Criteria\n\n1. (stated) Tests pass\n',
+        criteria_list=[{'assertion': 'Tests pass', 'source': 'stated'}],
+    )
+
+    assert acceptance_criteria_result(obs) == '1 criterion'

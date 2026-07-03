@@ -15,6 +15,10 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from backend.cli.tool_display.orient_tools import ORIENT_MCP_TOOL_NAMES
+from backend.cli.tui.renderer.handlers.acceptance_criteria import (
+    _handle_acceptance_criteria_action,
+    _handle_acceptance_criteria_observation,
+)
 from backend.cli.tui.renderer.handlers.browser import (
     _handle_browse_interactive_action,
     _handle_browser_screenshot_observation,
@@ -108,6 +112,7 @@ from backend.cli.tui.renderer.handlers.thinking import (
     _handle_system_hint_action,
 )
 from backend.ledger.action import (
+    AcceptanceCriteriaAction,
     AgentThinkAction,
     AnalyzeProjectStructureAction,
     BrowseInteractiveAction,
@@ -180,6 +185,7 @@ from backend.ledger.observation import (
     TerminalObservation,
     UserRejectObservation,
 )
+from backend.ledger.observation.acceptance_criteria import AcceptanceCriteriaObservation
 from backend.ledger.observation.memory_tools import (
     CheckpointObservation,
     MemoryPersistObservation,
@@ -445,6 +451,8 @@ _EVENT_HANDLERS: dict[type, Any] = {
     DelegateTaskObservation: _handle_delegate_task_observation,
     TaskTrackingObservation: _handle_task_tracking_observation,
     TaskTrackingAction: _handle_task_tracking_action,
+    AcceptanceCriteriaObservation: _handle_acceptance_criteria_observation,
+    AcceptanceCriteriaAction: _handle_acceptance_criteria_action,
     CheckpointAction: _handle_checkpoint_action,
     WorkingMemoryAction: _handle_working_memory_action,
     MemoryPersistAction: _handle_memory_persist_action,

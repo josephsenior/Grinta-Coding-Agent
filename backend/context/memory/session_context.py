@@ -11,6 +11,20 @@ if TYPE_CHECKING:
     from backend.orchestration.state.state import State
 
 _UNBOUND_DIR = '.session_context_unbound'
+_last_session_symbol_index_cleared: str | None = None
+
+
+def _clear_symbol_index_on_new_session(session_id: str) -> None:
+    global _last_session_symbol_index_cleared
+    if _last_session_symbol_index_cleared == session_id:
+        return
+    _last_session_symbol_index_cleared = session_id
+    try:
+        from backend.context.symbol_index.store import clear_symbol_index_for_workspace
+
+        clear_symbol_index_for_workspace()
+    except Exception:
+        logger.debug('Symbol index session reset skipped', exc_info=True)
 
 
 def resolve_session_id(
@@ -59,6 +73,7 @@ def bind_session_context(
         from backend.engine.tools.working_memory import set_current_session_id
 
         set_current_session_id(sid)
+        _clear_symbol_index_on_new_session(sid)
     except Exception:
         logger.debug('bind_session_context failed', exc_info=True)
         return None

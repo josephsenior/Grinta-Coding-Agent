@@ -341,6 +341,28 @@ _store_registry: dict[str, SymbolIndexStore] = {}
 _registry_lock = threading.Lock()
 
 
+def clear_symbol_index_for_workspace(
+    workspace_root: Path | str | None = None,
+) -> None:
+    """Delete the on-disk symbol index and cached repo map for a workspace."""
+    key: str | None = None
+    try:
+        if workspace_root is None:
+            from backend.core.workspace_resolution import require_effective_workspace_root
+
+            workspace_root = require_effective_workspace_root()
+        key = str(Path(workspace_root).resolve())
+    except Exception:
+        logger.debug('clear_symbol_index_for_workspace: no workspace root', exc_info=True)
+
+    with _registry_lock:
+        store = _store_registry.get(key) if key else None
+    if store is not None:
+        store.reset()
+        return
+    shutil.rmtree(symbol_index_dir(), ignore_errors=True)
+
+
 def get_symbol_index_store(workspace_root: Path | str | None = None) -> SymbolIndexStore | None:
     try:
         if workspace_root is None:

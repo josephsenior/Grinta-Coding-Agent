@@ -103,7 +103,7 @@ class TestValidateLlm:
     def test_prose_config_defaults(self):
         condenser = StructuredSummaryCompactor(llm=None, max_size=100, keep_first=2)
         assert condenser.min_prose_length == DEFAULT_MIN_PROSE_LENGTH
-        assert condenser.max_repair_attempts == 0
+        assert condenser.max_repair_attempts == 2
 
     def test_prose_config_overrides(self):
         condenser = StructuredSummaryCompactor(
@@ -312,9 +312,31 @@ class TestGetCompaction:
         assert condenser.last_degraded is True
         assert llm.acompletion.await_count == 3  # 1 initial + 2 retries
 
-    async def test_no_retry_by_default(self):
+    async def test_retries_by_default_on_short_output(self):
         llm = _make_llm()
         condenser = StructuredSummaryCompactor(llm=llm, max_size=10, keep_first=2)
+
+        events = [_event(i) for i in range(8)]
+        view = _make_view(events)
+
+        llm.acompletion = AsyncMock(
+            side_effect=[
+                _make_prose_response('short'),
+                _make_prose_response(_long_prose()),
+            ]
+        )
+
+        with patch.object(condenser, '_add_response_metadata'):
+            await condenser.get_compaction(view)
+
+        assert llm.acompletion.await_count == 2
+        assert condenser.last_degraded is False
+
+    async def test_degrades_after_retries_exhausted(self):
+        llm = _make_llm()
+        condenser = StructuredSummaryCompactor(
+            llm=llm, max_size=10, keep_first=2, max_repair_attempts=1
+        )
 
         events = [_event(i) for i in range(8)]
         view = _make_view(events)
@@ -324,8 +346,7 @@ class TestGetCompaction:
         with patch.object(condenser, '_add_response_metadata'):
             await condenser.get_compaction(view)
 
-        # Default max_repair_attempts=0 → exactly one call, immediate degrade.
-        assert llm.acompletion.await_count == 1
+        assert llm.acompletion.await_count == 2
         assert condenser.last_degraded is True
 
     async def test_llm_receives_previous_summary_in_prompt(self):
@@ -467,12 +488,14 @@ class TestBuildCondensationPrompt:
         )
         assert '12000 characters' in prompt
 
-    def test_prompt_instructs_verbatim_detail_preservation(self):
+    def test_prompt_instructs_synthesized_user_goal_not_verbatim_quotes(self):
         prompt = self._build_prompt()
-        assert 'VERBATIM' in prompt
+        assert 'GOAL CONTEXT' in prompt or 'goal context' in prompt.lower()
+        assert 'Do NOT quote' in prompt or 'Never include' in prompt
         assert 'exact file paths' in prompt
         assert 'test names' in prompt
         assert 'exact error messages' in prompt
+        assert 'User messages (verbatim)' not in prompt
 
     def test_prompt_instructs_failed_approaches(self):
         prompt = self._build_prompt()

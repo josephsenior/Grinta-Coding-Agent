@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from backend.context.prompt.prompt_window import estimate_prompt_events_tokens
+from backend.context.context_pipeline.types import _LAST_BOUNDARY_COMPACT_KEY
 from backend.core.constants import (
     DEFAULT_BOUNDARY_COMPACT_COOLDOWN_SECONDS,
     DEFAULT_COMPACTION_RESERVED_SUMMARY_TOKENS,
@@ -19,7 +20,6 @@ if TYPE_CHECKING:
     from backend.orchestration.state.state import State
 
 _POST_COMPACT_BASELINE_KEY = 'post_compact_baseline_tokens'
-_LAST_BOUNDARY_COMPACT_KEY = 'last_boundary_compact_at'
 
 
 @dataclass(frozen=True)
@@ -43,6 +43,7 @@ class ContextBudget:
         *,
         llm_config: object | None = None,
         state: State | None = None,
+        boundary_compact_cooldown_seconds: int = DEFAULT_BOUNDARY_COMPACT_COOLDOWN_SECONDS,
     ) -> ContextBudget:
         """Build a budget from post-boundary events and optional API usage."""
         from backend.context.prompt.prompt_window import (
@@ -63,7 +64,10 @@ class ContextBudget:
         model_token = set_current_tokenizer_model(model_id or None)
         try:
             estimated = _estimate_tokens(
-                events, llm_config=llm_config, state=state
+                events,
+                llm_config=llm_config,
+                state=state,
+                boundary_compact_cooldown_seconds=boundary_compact_cooldown_seconds,
             )
         finally:
             reset_current_tokenizer_model(model_token)
@@ -100,12 +104,42 @@ def _pipeline_state(state: State | None) -> dict[str, Any]:
     return dict(raw) if isinstance(raw, dict) else {}
 
 
-def _recent_compaction(state: State | None) -> bool:
+def _recent_compaction(
+    state: State | None,
+    *,
+    boundary_compact_cooldown_seconds: int = DEFAULT_BOUNDARY_COMPACT_COOLDOWN_SECONDS,
+) -> bool:
     pipe = _pipeline_state(state)
     last = pipe.get(_LAST_BOUNDARY_COMPACT_KEY)
     if not isinstance(last, (int, float)):
         return False
-    return (time.time() - last) < DEFAULT_BOUNDARY_COMPACT_COOLDOWN_SECONDS
+    return (time.time() - last) < boundary_compact_cooldown_seconds
+
+
+def estimate_boundary_event_tokens(
+    events: list[Event],
+    *,
+    llm_config: object | None,
+) -> int:
+    """Full tokenizer count for post-compaction projections.
+
+    Unlike :func:`_estimate_tokens`, this never reuses stale API or baseline
+    caches. Use when comparing pre/post compaction boundaries so pruned events
+    are reflected in the savings estimate.
+    """
+    from backend.context.prompt.prompt_window import (
+        reset_current_tokenizer_model,
+        set_current_tokenizer_model,
+    )
+
+    model_id = str(getattr(llm_config, 'model', '') or '') if llm_config else ''
+    model_token = set_current_tokenizer_model(model_id or None)
+    try:
+        raw = estimate_prompt_events_tokens(events)
+    finally:
+        reset_current_tokenizer_model(model_token)
+    factor, _ = model_token_correction(model_id)
+    return int(raw * factor)
 
 
 def _estimate_tokens(
@@ -113,8 +147,12 @@ def _estimate_tokens(
     *,
     llm_config: object | None,
     state: State | None,
+    boundary_compact_cooldown_seconds: int = DEFAULT_BOUNDARY_COMPACT_COOLDOWN_SECONDS,
 ) -> int:
-    if _recent_compaction(state):
+    if _recent_compaction(
+        state,
+        boundary_compact_cooldown_seconds=boundary_compact_cooldown_seconds,
+    ):
         raw = estimate_prompt_events_tokens(events)
         model = str(getattr(llm_config, 'model', '') or '')
         factor, _ = model_token_correction(model)
@@ -229,4 +267,8 @@ def _last_api_prompt_tokens(state: State | None) -> int:
     return total if isinstance(total, int) and total > 0 else 0
 
 
-__all__ = ['ContextBudget', 'record_post_compact_baseline']
+__all__ = [
+    'ContextBudget',
+    'estimate_boundary_event_tokens',
+    'record_post_compact_baseline',
+]

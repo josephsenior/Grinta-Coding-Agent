@@ -69,6 +69,7 @@ class RendererDisplayMixin:
         self._pending_shell_cards_by_command = defaultdict(deque)
         self._pending_file_read_cards_by_path = defaultdict(deque)
         self._pending_checkpoint_line = None
+        self._pending_acceptance_criteria_line = None
         self._pending_memory_recall_line = None
         self._pending_memory_persist_line = None
         self._orient_burst_lines = []

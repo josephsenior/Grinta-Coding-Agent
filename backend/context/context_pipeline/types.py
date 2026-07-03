@@ -15,12 +15,13 @@ _CONSECUTIVE_CONDENSATION_KEY = 'consecutive_condensation_steps'
 _CONSECUTIVE_DECAY_SECONDS_KEY = 'consecutive_condensation_decay_seconds'
 _COMPACTION_TARGET_RATIO = 0.7
 
-# If no real LLM step has been recorded for this many seconds, treat the
-# consecutive-condensation counter as stale and reset it. Without this
-# guard, an error path that skips ``note_llm_step`` can leave the
-# counter pinned at >=2 forever, silently disabling compaction until the
-# process is restarted.
+# consecutive-condensation counter is telemetry / decay only — not a skip gate.
 _CONSECUTIVE_CONDENSATION_DECAY_SECONDS = 30.0
+_POST_COMPACT_TRUE_TOKENS_KEY = 'post_compact_true_tokens'
+# Logged when post-compact estimate is still over threshold; not a skip gate.
+_WILL_RETRIGGER_HYSTERESIS_KEY = 'will_retrigger_hysteresis'
+_AUTOCOMPACT_FAILURE_STREAK_KEY = 'autocompact_failure_streak'
+_MAX_AUTOCOMPACT_FAILURES = 3
 
 
 @dataclass(frozen=True)

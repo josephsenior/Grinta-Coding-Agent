@@ -57,12 +57,6 @@ def _set_skip_compaction_flag(state: State) -> None:
     from backend.context.context_pipeline import apply_ineffective_compaction_backoff
 
     apply_ineffective_compaction_backoff(state)
-    pipe = dict(getattr(state, 'extra_data', {}).get('context_pipeline_state', {}))
-    count = pipe.get('consecutive_condensation_steps', 0)
-    if not isinstance(count, int):
-        count = 0
-    pipe['consecutive_condensation_steps'] = count + 1
-    state.set_extra('context_pipeline_state', pipe, source='OrchestratorCondensation')
 
 
 def _queue_post_condensation_recovery(orch: Orchestrator, task_text: str = '') -> None:

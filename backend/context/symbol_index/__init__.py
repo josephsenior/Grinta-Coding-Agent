@@ -4,6 +4,7 @@ from backend.context.symbol_index.paths import symbol_index_db_path, symbol_inde
 from backend.context.symbol_index.repo_map import build_repo_map_block, render_repo_map
 from backend.context.symbol_index.store import (
     SymbolIndexStore,
+    clear_symbol_index_for_workspace,
     get_symbol_index_store,
     repo_map_enabled,
     symbol_index_enabled,
@@ -12,6 +13,7 @@ from backend.context.symbol_index.store import (
 __all__ = [
     'SymbolIndexStore',
     'build_repo_map_block',
+    'clear_symbol_index_for_workspace',
     'get_symbol_index_store',
     'render_repo_map',
     'repo_map_enabled',

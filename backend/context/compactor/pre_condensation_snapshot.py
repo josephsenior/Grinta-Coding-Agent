@@ -917,7 +917,11 @@ def delete_staging_snapshot(*, state: State | None = None) -> None:
         pass
 
 
-def format_snapshot_for_injection(snapshot: dict[str, Any]) -> str:
+def format_snapshot_for_injection(
+    snapshot: dict[str, Any],
+    *,
+    state: object | None = None,
+) -> str:
     """Format a snapshot into a human-readable block for LLM context injection.
 
     Returns a compact string suitable for appending to the post-condensation
@@ -925,7 +929,7 @@ def format_snapshot_for_injection(snapshot: dict[str, Any]) -> str:
     """
     parts = ['<RESTORED_CONTEXT>']
     parts.append(f'Events condensed: {snapshot.get("events_condensed", "?")}')
-    parts.extend(_format_directive_section(snapshot))
+    parts.extend(_format_directive_section(snapshot, state=state))
     parts.extend(_format_runtime_section(snapshot.get('runtime', {})))
     parts.extend(_format_task_plan_section(snapshot.get('task_plan', {})))
     parts.extend(_format_files_section(snapshot.get('files_touched', {})))
@@ -944,19 +948,23 @@ def format_snapshot_for_injection(snapshot: dict[str, Any]) -> str:
     return '\n'.join(parts)
 
 
-def _format_directive_section(snapshot: dict[str, Any]) -> list[str]:
-    lines: list[str] = []
-    messages = snapshot.get('user_messages')
-    if isinstance(messages, list) and messages:
-        lines.append('\nUser messages (verbatim):')
-        for i, item in enumerate(messages, 1):
-            if not isinstance(item, dict):
-                continue
-            text = str(item.get('text', '')).strip()
-            if not text:
-                continue
-            lines.append(f'  [{i}] {text}')
-    return lines
+def _format_directive_section(
+    snapshot: dict[str, Any],
+    *,
+    state: object | None = None,
+) -> list[str]:
+    """Synthesized goal context — never verbatim user transcripts."""
+    try:
+        from backend.context.context_pipeline.goal_context import (
+            build_goal_context_for_compaction,
+        )
+
+        goal = build_goal_context_for_compaction(state=state, snapshot=snapshot)
+    except Exception:
+        goal = ''
+    if not goal.strip():
+        return []
+    return ['\nSynthesized goal context:', goal]
 
 
 def _format_runtime_section(runtime: dict) -> list[str]:

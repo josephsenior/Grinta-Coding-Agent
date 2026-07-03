@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 from backend.context.compactor.compactor import BaseLLMCompactor, Compaction
 from backend.context.view import View
+from backend.core.constants import DEFAULT_USER_GOAL_SECTION_MAX_CHARS
 from backend.core.logging.logger import app_logger as logger
 from backend.core.message import Message, TextContent
 from backend.ledger.event import Event
@@ -29,7 +30,7 @@ DEFAULT_MIN_PROSE_LENGTH = 2000
 # Default number of same-prompt retries when the sanity gate fails. 0 means a
 # short/empty output immediately degrades to the deterministic fallback; the
 # model is otherwise trusted to surface what matters without brittle repair.
-DEFAULT_MAX_REPAIR_ATTEMPTS = 0
+DEFAULT_MAX_REPAIR_ATTEMPTS = 2
 # Maximum summary budget in tokens. Actual budget is
 # min(context_window * 0.05, DEFAULT_SUMMARY_BUDGET_TOKENS).
 DEFAULT_SUMMARY_BUDGET_TOKENS = 12_000
@@ -37,10 +38,12 @@ DEFAULT_SUMMARY_BUDGET_TOKENS = 12_000
 # Nudge appended on a retry when the previous output was too short.
 _REPAIR_NUDGE = (
     '\n\nYour previous summary was too short to preserve the session context. '
-    'Produce a complete compaction covering the full arc: the USER GOAL section '
-    '(synthesized from all user messages), what was accomplished, decisions and '
-    'their rationale, current blockers, remaining work, and failed approaches '
-    'to avoid. Be precise and complete.'
+    'Produce a complete, detailed compaction covering the full arc: a synthesized '
+    'USER GOAL (from goal context, task tracker, and acceptance criteria — never '
+    'verbatim user quotes), what was accomplished, decisions and their rationale, '
+    'current blockers, remaining work, and failed '
+    'approaches to avoid. Each required section must contain multiple substantive '
+    'bullets — not stubs or placeholders. Be precise, exhaustive, and complete.'
 )
 
 
@@ -159,8 +162,8 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
                 prose = await self._get_llm_prose_summary(prompt, nudge=True)
 
             if self._passes_prose_sanity_gate(prose):
-                summary_text = prose
-                self._check_goal_regression(prose, previous_goal)
+                summary_text = self._sanitize_summary_prose(prose)
+                self._check_goal_regression(summary_text, previous_goal)
             else:
                 self.last_degraded = True
                 logger.warning(
@@ -184,6 +187,21 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             summary_text = self._degraded_summary(summary_event, pruned_events, e)
 
         return self._create_compaction_result(pruned_events, summary_text)
+
+    def _sanitize_summary_prose(self, prose: str) -> str:
+        """Strip verbatim user echoes from USER GOAL as a post-LLM safety net."""
+        pipeline_state = getattr(self, '_pipeline_state', None)
+        if pipeline_state is None:
+            return prose
+        try:
+            from backend.context.context_pipeline.goal_context import (
+                strip_verbatim_user_echo,
+            )
+
+            return strip_verbatim_user_echo(prose, state=pipeline_state)
+        except Exception:
+            logger.debug('Summary verbatim-echo sanitizer failed', exc_info=True)
+            return prose
 
     def _passes_prose_sanity_gate(self, prose: str) -> bool:
         """Return True when the prose is non-empty and substantial.
@@ -468,6 +486,14 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             return text[start:].strip()
         return text[start:next_header].strip()
 
+    @staticmethod
+    def _is_user_message_event(event: Event) -> bool:
+        """Return True if *event* is a user MessageAction (skipped from raw EV blocks)."""
+        if type(event).__name__ != 'MessageAction':
+            return False
+        source = getattr(event, 'source', None)
+        return bool(source and 'user' in str(source).lower())
+
     def _build_condensation_prompt(
         self, summary_event: AgentCondensationObservation, pruned_events: list,
         *, char_limit: int = 48000,
@@ -492,13 +518,32 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
                     f'{prev_goal}\n\n'
                 )
 
+        goal_context_block = ''
+        pipeline_state = getattr(self, '_pipeline_state', None)
+        if pipeline_state is not None:
+            try:
+                from backend.context.context_pipeline.goal_context import (
+                    build_goal_context_for_compaction,
+                )
+
+                goal_context = build_goal_context_for_compaction(state=pipeline_state)
+                if goal_context:
+                    goal_context_block = (
+                        f'<GOAL CONTEXT>\n{goal_context}\n</GOAL CONTEXT>\n\n'
+                    )
+            except Exception:
+                logger.debug('Failed to build goal context for 5b prompt', exc_info=True)
+
         base_prompt = (
             'You are maintaining the state summary of an interactive software '
             'agent. This summary is critical: it lets the agent resume work '
             'WITHOUT re-reading the full conversation history once it has been '
             'compacted for length.\n\n'
+            f'{goal_context_block}'
             f'{previous_goal_section}'
             'You will be given:\n'
+            '- <GOAL CONTEXT> (when present): synthesized objective, active scope, '
+            'and acceptance gates — use this as the source of truth for USER GOAL\n'
             '- <PREVIOUS SUMMARY>: the prior compaction summary (preserve its '
             'narrative arc)\n'
             '- <EVENT DIGEST>: a compact grouped breakdown of what happened '
@@ -509,8 +554,14 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             f'Your entire response MUST not exceed {char_limit} characters.\n'
             'To stay under this hard cap, use tight, hyper-dense Markdown '
             'structures (bullet points, key-value pairs, tables). Avoid '
-            'conversational filler, narrative prose, or meta-commentary (e.g., '
-            'do not say "In this session, the agent...").\n\n'
+            'conversational filler or meta-commentary (e.g., do not say '
+            '"In this session, the agent..."). Dense does NOT mean brief: '
+            'each section below must be information-rich.\n\n'
+            '### OUTPUT LENGTH & COMPLETENESS\n'
+            f'Your summary must be at least {self.min_prose_length} characters '
+            'and comprehensive enough that a fresh agent can resume without the '
+            'pruned history. Cover every required section with multiple concrete '
+            'bullets — never output section headers with empty or one-line stubs.\n\n'
             'If you are running close to the character limit, compress '
             'lower-priority sections into dense, single-line bullets. Never '
             'truncate or drop higher-priority sections.\n\n'
@@ -518,15 +569,19 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             'Format your response using the following headers in this exact '
             'order. If budget runs tight, compress from the bottom up:\n\n'
             '0. ## USER GOAL (Highest Priority — Never Drop)\n'
-            "Synthesize the user's current goal from the previous goal synthesis "
-            'above AND the event digest. Capture:\n'
-            '- The original intent (what they asked for initially)\n'
-            '- All constraints, acceptance criteria, and preferences stated\n'
-            '- Any refinements, pivots, or scope changes\n'
-            '- If the user abandoned a previous goal, state the CURRENT goal\n'
-            'Reproduce specific constraints (e.g. "must run under X ms", '
-            '"do not modify Y") verbatim — never paraphrase technical '
-            'constraints.\n\n'
+            'Synthesize the user contract from <GOAL CONTEXT>, the previous goal '
+            'synthesis, task tracker signals in the digest, and acceptance criteria. '
+            'Use this structure:\n'
+            '- Objective: one sentence\n'
+            '- Active scope: from in-progress tasks / next actions\n'
+            '- Acceptance gates: open criteria only\n'
+            '- Constraints: technical specs only (paths, thresholds, must-not-touch files), '
+            f'max ~120 chars each\n'
+            '- Pivots: only if the directive materially changed\n'
+            f'Hard cap: entire ## USER GOAL section must stay under '
+            f'{DEFAULT_USER_GOAL_SECTION_MAX_CHARS} characters. Compress pivots first.\n'
+            'Do NOT quote, paraphrase-stretch, or paste user messages. Never include '
+            'multi-paragraph user text.\n\n'
         )
 
         base_prompt += (
@@ -556,13 +611,10 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             'Key technical choices made and WHY (the rationale, constraints, '
             'or trade-offs, not just the outcome).\n\n'
             '### ADHERENCE TO DETAIL\n'
-            '- Preserve VERBATIM: exact file paths, test names, exact error '
-            'messages, function signatures, key variable/data values, and '
-            'precise technical specifications stated by the user.\n'
-            '- If the user messages contain specific constraints (e.g., "must '
-            'run under X ms", "do not modify Y", "use Z"), reproduce them '
-            'faithfully in the USER GOAL section. Never dilute technical '
-            'constraints into vague paraphrase.\n'
+            '- Preserve VERBATIM only for: exact file paths, test names, exact error '
+            'messages, function signatures, key variable/data values.\n'
+            '- Technical constraints (paths, thresholds, must-not-touch files) may be '
+            'stated verbatim in USER GOAL; never quote full user messages.\n'
             '- Never mark a test as passing if it only checks file existence '
             'or symbol presence in a header. A test passes only if it '
             'executes the actual behavior the spec requires and produces a '
@@ -584,9 +636,14 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         digest = self._digest_events(pruned_events)
         base_prompt += f'<EVENT DIGEST>\n{digest}\n</EVENT DIGEST>\n\n'
 
-        # Add last few raw events for detailed context
+        # Add last few raw events for detailed context (skip user messages)
         raw_event_budget = 5
-        recent_raw = pruned_events[-raw_event_budget:] if len(pruned_events) > raw_event_budget else pruned_events
+        recent_raw = [
+            e for e in (pruned_events[-raw_event_budget:]
+                        if len(pruned_events) > raw_event_budget
+                        else pruned_events)
+            if not self._is_user_message_event(e)
+        ]
         if recent_raw:
             base_prompt += '<RECENT RAW EVENTS (for detail)>\n'
             for pruned_event in recent_raw:

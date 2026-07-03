@@ -621,6 +621,70 @@ def checkpoint_think_orient_model(
     )
 
 
+_CRITERIA_VERBS: dict[str, str] = {
+    'view': 'Viewed',
+    'update': 'Defined',
+    'append': 'Updated',
+    'audit': 'Audited',
+}
+
+
+def _acceptance_criteria_args(event: Any) -> dict[str, Any]:
+    return {
+        'command': getattr(event, 'command', ''),
+        'criteria_list': getattr(event, 'criteria_list', None),
+    }
+
+
+def acceptance_criteria_target(event: Any) -> str:
+    from backend.cli.tool_display.summarize import summarize_tool_arguments
+
+    return summarize_tool_arguments(
+        'acceptance_criteria', _acceptance_criteria_args(event)
+    )
+
+
+def acceptance_criteria_action_model(action: Any) -> OrientLineModel:
+    from backend.cli.tool_display.headline import tool_headline
+
+    command = str(getattr(action, 'command', '') or 'view').strip().lower()
+    verb = _CRITERIA_VERBS.get(command, 'Criteria')
+    icon, _ = tool_headline('acceptance_criteria')
+    return OrientLineModel(
+        tool='acceptance_criteria',
+        icon=icon,
+        verb=verb,
+        target=acceptance_criteria_target(action),
+        result='…',
+        area='workspace',
+    )
+
+
+def acceptance_criteria_result(obs: Any) -> str:
+    content = str(getattr(obs, 'content', '') or '').strip()
+    if content.startswith('[ACCEPTANCE_CRITERIA]'):
+        return 'unchanged'
+    if content.startswith('✅'):
+        summary = content.removeprefix('✅').strip().split('\n', 1)[0]
+        return summary[:44] if summary else 'done'
+    if 'No acceptance criteria found' in content:
+        return 'empty'
+    criteria_list = getattr(obs, 'criteria_list', None)
+    if isinstance(criteria_list, list) and criteria_list:
+        return _plural(len(criteria_list), 'criterion')
+    if content:
+        first = content.split('\n', 1)[0].strip()
+        return first[:44] if len(first) > 44 else first
+    return 'done'
+
+
+def acceptance_criteria_observation_model(
+    obs: Any, pending: OrientLineModel | None = None
+) -> OrientLineModel:
+    base = pending or acceptance_criteria_action_model(obs)
+    return base.with_result(acceptance_criteria_result(obs))
+
+
 def memory_recall_action_model(action: Any) -> OrientLineModel:
     query = str(getattr(action, 'query', '') or '').strip()
     target = _quote(query) if query else 'history'

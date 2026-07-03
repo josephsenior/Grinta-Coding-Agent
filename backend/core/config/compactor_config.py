@@ -142,7 +142,7 @@ class StructuredSummaryCompactorConfig(BaseModel, metaclass=CanonicalModelMetacl
         ge=1,
     )
     max_repair_attempts: int = Field(
-        default=0,
+        default=2,
         description=(
             'Same-prompt retries when the prose sanity gate fails. 0 means a '
             'short/empty output immediately degrades to the deterministic fallback.'
@@ -225,6 +225,15 @@ class CompositionCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         default=1000,
         description='Hard cap on total event count.',
         ge=100,
+    )
+    reactive_max_events: int | None = Field(
+        default=None,
+        description=(
+            'Secondary event cap for the reactive safety-net layer. When the '
+            'pipeline still exceeds this after snip/summary/reattach, reactive '
+            'drops the oldest half. Defaults to snip_max_events * 0.5.'
+        ),
+        ge=1,
     )
     summary_recency: int = Field(
         default=50,
