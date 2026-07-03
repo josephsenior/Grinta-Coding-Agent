@@ -207,6 +207,13 @@ CollapsibleSection .collapsible-header.expanded {
     text-style: none;
 }
 
+CollapsibleSection .header-actions {
+    width: auto;
+    height: 1;
+    min-height: 1;
+    align: right middle;
+}
+
 SidebarRow:hover {
     background: #101c36;
     color: #e9e9e9;
@@ -238,7 +245,6 @@ SidebarRow.-read-only:hover {
 }
 
 SidebarManageButton {
-    dock: right;
     width: auto;
     height: 1;
     min-height: 1;
