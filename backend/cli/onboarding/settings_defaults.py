@@ -30,6 +30,8 @@ def default_init_agent_block() -> dict[str, Any]:
         'Orchestrator': {
             'mode': 'agent',
             'autonomy_level': 'balanced',
+            'enable_lsp_query': False,
+            'enable_debugger': False,
         },
     }
 

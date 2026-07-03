@@ -3,7 +3,10 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, Any
 
-from backend.core import json_compat as json
+from backend.core.constants import (
+    DEFAULT_AGENT_DEBUGGER_ENABLED,
+    DEFAULT_AGENT_LSP_QUERY_ENABLED,
+)
 from backend.core.interaction_modes import (
     CHAT_MODE_ALLOWED_TOOLS,
     PLAN_MODE,
@@ -279,7 +282,7 @@ class OrchestratorPlanner:
             )
 
             tools.append(create_terminal_manager_tool())
-        if getattr(self._config, 'enable_debugger', True):
+        if getattr(self._config, 'enable_debugger', DEFAULT_AGENT_DEBUGGER_ENABLED):
             from backend.utils.runtime_detect import has_any_debug_adapter
 
             if not has_any_debug_adapter():
@@ -299,7 +302,7 @@ class OrchestratorPlanner:
 
         tools.append(create_analyze_project_structure_tool())
 
-        if getattr(self._config, 'enable_lsp_query', True):
+        if getattr(self._config, 'enable_lsp_query', DEFAULT_AGENT_LSP_QUERY_ENABLED):
             from backend.utils.runtime_detect import detect_lsp_servers
 
             detected = detect_lsp_servers()

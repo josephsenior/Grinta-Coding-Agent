@@ -6,7 +6,9 @@
   "agent": {
     "Orchestrator": {
       "mode": "agent",
-      "autonomy_level": "balanced"
+      "autonomy_level": "balanced",
+      "enable_lsp_query": false,
+      "enable_debugger": false
     }
   },
   "security": {

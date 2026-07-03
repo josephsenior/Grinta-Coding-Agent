@@ -29,6 +29,7 @@ from backend.core.constants import (
     DEFAULT_AGENT_COMPLEXITY_ITERATION_MULTIPLIER,
     DEFAULT_AGENT_CONDENSATION_REQUEST_ENABLED,
     DEFAULT_AGENT_DEBUGGER_ENABLED,
+    DEFAULT_AGENT_LSP_QUERY_ENABLED,
     DEFAULT_AGENT_DOCS_ENABLED,
     DEFAULT_AGENT_DYNAMIC_ITERATIONS_ENABLED,
     DEFAULT_AGENT_ENABLE_FIRST_TURN_ORIENTATION_PROMPT,
@@ -233,12 +234,12 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         ),
     )
     enable_lsp_query: bool = Field(
-        default=True,
+        default=DEFAULT_AGENT_LSP_QUERY_ENABLED,
         description=(
             'Expose the lsp (LSP) tool. The runtime detector probes the '
             'machine for installed language servers (pyright, gopls, rust-analyzer, '
             'typescript-language-server, clangd, …). When none are present the tool is '
-            'silently skipped, so leaving this on is safe even on minimal images.'
+            'silently skipped even when this flag is true.'
         ),
     )
     enable_swarming: bool = Field(default=False)
