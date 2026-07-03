@@ -120,6 +120,27 @@ class HUDBar:
         return '…' + path[-tail_len:]
 
     @staticmethod
+    def compact_workspace_label(path: str, max_len: int = 28) -> str:
+        """Show the leaf directory name with a leading ellipsis when nested."""
+        raw = (path or '').strip()
+        if not raw or max_len < 2:
+            return raw
+        normalized = raw.replace('\\', '/').rstrip('/')
+        parts = [part for part in normalized.split('/') if part and part != '.']
+        if not parts:
+            return raw[:max_len]
+        leaf = parts[-1]
+        if len(parts) == 1:
+            return leaf if len(leaf) <= max_len else leaf[:max_len]
+        prefix = '…/'
+        budget = max_len - len(prefix)
+        if budget < 1:
+            return leaf[:max_len]
+        if len(leaf) <= budget:
+            return f'{prefix}{leaf}'
+        return f'{prefix}{leaf[:budget]}'
+
+    @staticmethod
     def _describe_model_via_resolver(raw: str) -> tuple[str, str]:
         try:
             from backend.inference.provider_resolver import get_resolver
@@ -254,6 +275,58 @@ class HUDBar:
         self.state.model = model
         if self.state.context_limit <= 0:
             self.state.context_limit = self.resolve_context_limit_for_model(model)
+
+    @staticmethod
+    def _usage_context_pressure(usage: Any) -> int:
+        """Best-effort current prompt size for HUD context pressure."""
+        if isinstance(usage, dict):
+            full = int(usage.get('full_request_tokens', 0) or 0)
+            prompt = int(usage.get('prompt_tokens', 0) or 0)
+        else:
+            full = int(getattr(usage, 'full_request_tokens', 0) or 0)
+            prompt = int(getattr(usage, 'prompt_tokens', 0) or 0)
+        return full if full > prompt else prompt
+
+    @staticmethod
+    def _usage_context_limit(usage: Any, *, fallback: int = 0) -> int:
+        """Prefer usable input budget over total catalog context window."""
+        if isinstance(usage, dict):
+            usable = int(usage.get('usable_input_tokens', 0) or 0)
+            window = int(usage.get('context_window', 0) or 0)
+        else:
+            usable = int(getattr(usage, 'usable_input_tokens', 0) or 0)
+            window = int(getattr(usage, 'context_window', 0) or 0)
+        if usable > 0:
+            return usable
+        return window if window > 0 else fallback
+
+    @staticmethod
+    def _prompt_token_accounting_from_extra(extra_data: Any) -> dict[str, Any] | None:
+        if not isinstance(extra_data, dict):
+            return None
+        raw = extra_data.get('prompt_token_accounting')
+        return raw if isinstance(raw, dict) else None
+
+    def apply_prompt_token_accounting(self, accounting: dict[str, Any] | None) -> None:
+        """Overlay internal prompt composition when provider usage undercounts."""
+        if not isinstance(accounting, dict):
+            return
+        full = accounting.get('full_request_tokens')
+        if full is not None and not isinstance(full, bool):
+            try:
+                parsed_full = int(full)
+            except (TypeError, ValueError):
+                parsed_full = 0
+            if parsed_full > self.state.context_tokens:
+                self.state.context_tokens = parsed_full
+        usable = accounting.get('usable_input_tokens')
+        if usable is not None and not isinstance(usable, bool):
+            try:
+                parsed_usable = int(usable)
+            except (TypeError, ValueError):
+                parsed_usable = 0
+            if parsed_usable > 0:
+                self.state.context_limit = parsed_usable
 
     def update_tokens(self, used: int, limit: int) -> None:
         self.state.context_tokens = used
@@ -449,8 +522,10 @@ class HUDBar:
         best_estimated = self.state.token_usage_estimated
         latest_limit = self.state.context_limit
         for usage in relevant:
-            prompt_tokens = int(getattr(usage, 'prompt_tokens', 0) or 0)
-            context_limit = int(getattr(usage, 'context_window', 0) or 0)
+            prompt_tokens = self._usage_context_pressure(usage)
+            context_limit = self._usage_context_limit(
+                usage, fallback=self.state.context_limit
+            )
             if context_limit > 0:
                 latest_limit = context_limit
             if prompt_tokens >= best_prompt:
@@ -533,8 +608,10 @@ class HUDBar:
         best_estimated = self.state.token_usage_estimated
         latest_limit = self.state.context_limit
         for usage in relevant:
-            prompt_tokens = int(usage.get('prompt_tokens', 0) or 0)
-            context_limit = int(usage.get('context_window', 0) or 0)
+            prompt_tokens = self._usage_context_pressure(usage)
+            context_limit = self._usage_context_limit(
+                usage, fallback=self.state.context_limit
+            )
             if context_limit > 0:
                 latest_limit = context_limit
             if prompt_tokens >= best_prompt:

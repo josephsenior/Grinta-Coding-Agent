@@ -52,5 +52,6 @@ ACTION_TOOL_NAMES: Final[frozenset[str]] = frozenset(
         'mcp',
         'workers',
         'condensation',
+        'acceptance_criteria',
     }
 )

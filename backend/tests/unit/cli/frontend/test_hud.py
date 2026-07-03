@@ -127,6 +127,49 @@ def test_hud_context_pressure_does_not_drop_on_smaller_later_call() -> None:
     assert hud.state.context_tokens == 2_000
     assert hud.state.context_limit == 16_000
 
+def test_hud_context_pressure_prefers_full_request_tokens() -> None:
+    hud = HUDBar()
+    metrics = Metrics()
+    metrics.add_token_usage(
+        prompt_tokens=12_000,
+        completion_tokens=200,
+        cache_read_tokens=0,
+        cache_write_tokens=0,
+        context_window=200_000,
+        response_id='resp-1',
+        full_request_tokens=18_500,
+        usable_input_tokens=120_000,
+    )
+
+    hud.update_from_llm_metrics(metrics)
+
+    assert hud.state.context_tokens == 18_500
+    assert hud.state.context_limit == 120_000
+
+def test_hud_apply_prompt_token_accounting_overlays_internal_estimate() -> None:
+    hud = HUDBar()
+    metrics = Metrics()
+    metrics.add_token_usage(
+        prompt_tokens=40_000,
+        completion_tokens=100,
+        cache_read_tokens=0,
+        cache_write_tokens=0,
+        context_window=200_000,
+        response_id='resp-1',
+    )
+    hud.update_from_llm_metrics(metrics)
+    assert hud.state.context_tokens == 40_000
+
+    hud.apply_prompt_token_accounting(
+        {
+            'full_request_tokens': 52_000,
+            'usable_input_tokens': 128_000,
+        }
+    )
+
+    assert hud.state.context_tokens == 52_000
+    assert hud.state.context_limit == 128_000
+
 def test_hud_context_pressure_resets_after_condensation_epoch() -> None:
     hud = HUDBar()
     metrics = Metrics()
@@ -207,6 +250,11 @@ def test_hud_falls_back_to_response_latencies_for_call_count() -> None:
 
     assert hud.state.llm_calls == 1
     assert hud.state.cost_usd == 0.5
+
+def test_hud_compact_workspace_label_shows_leaf_with_ellipsis() -> None:
+    assert HUDBar.compact_workspace_label('~/projects/my-app') == '…/my-app'
+    assert HUDBar.compact_workspace_label('C:/Users/dev/repos/Grinta') == '…/Grinta'
+    assert HUDBar.compact_workspace_label('Grinta') == 'Grinta'
 
 def test_hud_single_bar_format_all_widths() -> None:
     """HUD uses one dense bar (no wide/narrow mode split)."""

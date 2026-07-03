@@ -21,9 +21,9 @@ async def test_tui_mounts(mock_config):
         await pilot.pause()
 
         s = _get_screen(app)
-        stats = s.query_one('#hud-line-1', Label)
+        stats = s.query_one('#hud-line-2-ws', Label)
         assert stats is not None
-        assert 'GRINTA' in str(stats.renderable)
+        assert '.Grinta' in str(stats.renderable)
 
         footer = s.query_one('#hud-bar', HUD)
         assert footer is not None

@@ -113,6 +113,58 @@ def list_row_arrow(text: str, *, tone: str = TX_BODY) -> str:
     return f'[{TX_BODY}]→[/] [{tone}]{text}[/]'
 
 
+def list_row_bullet(text: str, *, tone: str = TX_BODY) -> str:
+    """Bullet-prefixed list row for checklist-style detail panes."""
+    return f'[{TX_MUTED}]●[/] [{tone}]{text}[/]'
+
+
+def format_criterion_line(item: dict[str, Any]) -> str:
+    """Render one acceptance criterion as a single detail line."""
+    assertion = str(item.get('assertion') or '').strip()
+    if not assertion:
+        return ''
+    source = str(item.get('source') or 'stated').strip().lower()
+    evidence = str(item.get('evidence') or '').strip()
+    line = f'({source}) {assertion}'
+    if evidence:
+        line += f' — {evidence}'
+    return line
+
+
+def criteria_rows_from_observation(obs: Any) -> list[dict[str, Any]]:
+    """Extract structured criteria rows from an observation payload."""
+    import re
+
+    criteria_list = getattr(obs, 'criteria_list', None)
+    if isinstance(criteria_list, list):
+        rows = [item for item in criteria_list if isinstance(item, dict)]
+        if rows:
+            return rows
+
+    content = str(getattr(obs, 'content', '') or '')
+    parsed: list[dict[str, Any]] = []
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+        match = re.match(r'^\d+\.\s+\((\w+)\)\s+(.+)$', line)
+        if not match:
+            continue
+        source = match.group(1).strip().lower()
+        rest = match.group(2).strip()
+        evidence: str | None = None
+        if ' — ' in rest:
+            assertion, evidence = rest.rsplit(' — ', 1)
+        else:
+            assertion = rest
+        parsed.append(
+            {
+                'assertion': assertion.strip(),
+                'source': source,
+                'evidence': evidence.strip() if evidence else None,
+            }
+        )
+    return parsed
+
+
 def kv_row(name: str, value: str) -> str:
     """Name = value row for debugger variables and similar."""
     return f'[{TX_BODY}]{name}[/] [{TX_MUTED}]=[/] [{TX_KEY_HINT}]{value}[/]'

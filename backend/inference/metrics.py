@@ -38,6 +38,10 @@ class TokenUsage(BaseModel):
     cache_read_tokens: int = Field(default=0)
     cache_write_tokens: int = Field(default=0)
     context_window: int = Field(default=0)
+    #: Internal tokenizer count for the full outbound request (messages + tools).
+    full_request_tokens: int = Field(default=0)
+    #: Usable input budget for the active model (excludes reserved output headroom).
+    usable_input_tokens: int = Field(default=0)
     per_turn_token: int = Field(default=0)
     response_id: str = Field(default='')
     usage_estimated: bool = Field(default=False)
@@ -51,6 +55,12 @@ class TokenUsage(BaseModel):
             cache_read_tokens=self.cache_read_tokens + other.cache_read_tokens,
             cache_write_tokens=self.cache_write_tokens + other.cache_write_tokens,
             context_window=max(self.context_window, other.context_window),
+            full_request_tokens=max(
+                self.full_request_tokens, other.full_request_tokens
+            ),
+            usable_input_tokens=max(
+                self.usable_input_tokens, other.usable_input_tokens
+            ),
             per_turn_token=other.per_turn_token,
             response_id=self.response_id,
             usage_estimated=self.usage_estimated or other.usage_estimated,
@@ -199,6 +209,9 @@ class Metrics:
         context_window: int,
         response_id: str,
         usage_estimated: bool = False,
+        *,
+        full_request_tokens: int = 0,
+        usable_input_tokens: int = 0,
     ) -> None:
         """Add a single usage record."""
         per_turn_token = prompt_tokens + completion_tokens
@@ -209,6 +222,8 @@ class Metrics:
             cache_read_tokens=cache_read_tokens,
             cache_write_tokens=cache_write_tokens,
             context_window=context_window,
+            full_request_tokens=full_request_tokens,
+            usable_input_tokens=usable_input_tokens,
             per_turn_token=per_turn_token,
             response_id=response_id,
             usage_estimated=usage_estimated,
@@ -221,6 +236,8 @@ class Metrics:
             cache_read_tokens=cache_read_tokens,
             cache_write_tokens=cache_write_tokens,
             context_window=context_window,
+            full_request_tokens=full_request_tokens,
+            usable_input_tokens=usable_input_tokens,
             per_turn_token=per_turn_token,
             response_id='',
             usage_estimated=usage_estimated,

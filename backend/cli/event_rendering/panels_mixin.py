@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 from rich.panel import Panel
 from rich.text import Text
 
+from backend.cli.display.hud import HUDBar
 from backend.cli.event_rendering.panels import (
     build_delegate_worker_panel as _build_delegate_worker_panel,
 )
@@ -124,6 +125,13 @@ class PanelsMixin(CLIEventRenderer if TYPE_CHECKING else object):
         llm_metrics = getattr(event, 'llm_metrics', None)
         if llm_metrics is not None:
             self._hud.update_from_llm_metrics(llm_metrics)
+            controller = getattr(self, '_controller', None)
+            if controller is not None:
+                state = getattr(controller, 'state', None)
+                extra = getattr(state, 'extra_data', None) if state is not None else None
+                accounting = HUDBar._prompt_token_accounting_from_extra(extra)
+                if accounting:
+                    self._hud.apply_prompt_token_accounting(accounting)
             self._reasoning.update_cost(self._hud.state.cost_usd)
             self._check_budget()
 
