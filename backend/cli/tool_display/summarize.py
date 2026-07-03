@@ -302,6 +302,16 @@ def _summary_memory(args: dict[str, Any]) -> str:
     return _trunc(' · '.join(bits), 120) if bits else 'memory…'
 
 
+def _summary_acceptance_criteria(args: dict[str, Any]) -> str:
+    op = args.get('operation') or args.get('command')
+    criteria_list = args.get('criteria_list')
+    count = len(criteria_list) if isinstance(criteria_list, list) else 0
+    parts = [str(x) for x in (op,) if x]
+    if count:
+        parts.append(f'{count} criterion{"s" if count != 1 else ""}')
+    return _trunc(' · '.join(parts), 160) if parts else 'criteria…'
+
+
 def _summary_task_tracker(args: dict[str, Any]) -> str:
     op = args.get('operation') or args.get('command')
     title = args.get('title') or args.get('task')
@@ -409,6 +419,7 @@ _TOOL_SUMMARIZERS: dict[str, Callable[[dict[str, Any]], str]] = {
     'memory': _summary_memory,
     'memory_manager': _summary_memory,
     'task_tracker': _summary_task_tracker,
+    'acceptance_criteria': _summary_acceptance_criteria,
     'grep': _summary_grep,
     'glob': _summary_glob,
     'lsp': _summary_lsp,

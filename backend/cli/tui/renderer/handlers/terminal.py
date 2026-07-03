@@ -18,8 +18,10 @@ from backend.cli.tui.renderer.helpers.terminal import (
 from backend.ledger.action import (
     TerminalCloseAction,
     TerminalInputAction,
+    TerminalListAction,
     TerminalReadAction,
     TerminalRunAction,
+    TerminalWaitAction,
 )
 from backend.ledger.observation import TerminalObservation
 
@@ -76,6 +78,20 @@ def _handle_terminal_read_action(
     # TerminalCard as the active one for output accumulation but don't
     # create a new card for every read pulse.
     pass
+
+
+def _handle_terminal_wait_action(
+    orch: 'RendererEventProcessorMixin', event: TerminalWaitAction
+) -> None:
+    # Wait polls for output patterns — silent in the transcript (like read).
+    del orch, event
+
+
+def _handle_terminal_list_action(
+    orch: 'RendererEventProcessorMixin', event: TerminalListAction
+) -> None:
+    # Session listing is bookkeeping — no transcript card.
+    del orch, event
 
 
 def _handle_terminal_close_action(

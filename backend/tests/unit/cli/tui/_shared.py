@@ -61,6 +61,7 @@ from backend.ledger.action.terminal import (
     TerminalInputAction,
     TerminalReadAction,
     TerminalRunAction,
+    TerminalWaitAction,
 )
 from backend.ledger.observation import (
     AgentCondensationObservation,

@@ -108,7 +108,7 @@ class TestRenderCriticalModeSpecific:
         # Should NOT have chat-specific rules
         self._assert_not_contains_body(body, 'Non-tool responses end the turn')
 
-    def test_agent_mode_contains_exactly_10_rules(self):
+    def test_agent_mode_contains_exactly_11_rules(self):
         body = self._render_critical(mode='agent', terminal_manager_available=False)
         lines = [
             line
@@ -117,13 +117,8 @@ class TestRenderCriticalModeSpecific:
                 ('1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.', '10.', '11.')
             )
         ]
-        # 6 core + 1 verify + 1 terminal_manager = 8 when terminal_manager is available
-        # Without terminal_manager: 6 core + 1 verify = 7 (with verify and done_criteria on same line)
-        # Actually the verify rule has a newline in it for done_criteria_block
-        # The numbered rules are: 1-4 (core), 5 (verify+criteria), 6-10 (retry, test rules, non-test)
-        # So 10 rules without terminal_manager, 11 with terminal_manager
-        assert len(lines) == 10, (
-            f'Expected 10 numbered rules, got {len(lines)}:\n{body}'
+        assert len(lines) == 11, (
+            f'Expected 11 numbered rules with acceptance_criteria enabled, got {len(lines)}:\n{body}'
         )
 
     def test_agent_mode_with_terminal_manager_adds_rule(self):

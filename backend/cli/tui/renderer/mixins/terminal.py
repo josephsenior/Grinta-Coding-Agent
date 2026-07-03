@@ -22,6 +22,28 @@ class RendererTerminalMixin:
             instance._pending_shell_cards_by_command: dict[str, deque[Any]] = {}
         instance._pending_compaction_scan_card: Any | None = None
 
+    def _resolve_running_compaction_card(self) -> Any | None:
+        """Return the pending compaction card, or the newest running one in the transcript."""
+        card = getattr(self, '_pending_compaction_scan_card', None)
+        if card is not None:
+            return card
+        try:
+            from backend.cli.tui.widgets.scan_line import CompactionCard
+
+            tui = getattr(self, '_tui', None)
+            if tui is None:
+                return None
+            screen = tui if hasattr(tui, 'query') else getattr(tui, 'screen', None)
+            query = getattr(screen, 'query', None)
+            if not callable(query):
+                return None
+            for candidate in reversed(list(query(CompactionCard).results())):
+                if getattr(candidate, 'state', None) == 'running':
+                    return candidate
+        except Exception:
+            return None
+        return None
+
     def _create_compaction_scan_card(self) -> Any:
         from backend.cli.tui.widgets.scan_line import CompactionCard
 
@@ -33,47 +55,19 @@ class RendererTerminalMixin:
         return card
 
     def _complete_compaction_scan_card(self, *, summary: str) -> None:
-        card = getattr(self, '_pending_compaction_scan_card', None)
-        # region agent log
-        import json
-        import time
-
-        try:
-            with open(
-                r'c:\Users\GIGABYTE\Desktop\Grinta\debug-f2dab3.log',
-                'a',
-                encoding='utf-8',
-            ) as f:
-                f.write(
-                    json.dumps(
-                        {
-                            'sessionId': 'f2dab3',
-                            'hypothesisId': 'C',
-                            'location': 'terminal.py:_complete_compaction_scan_card',
-                            'message': 'complete compaction card',
-                            'data': {
-                                'summary_len': len(summary or ''),
-                                'summary_preview': (summary or '')[:120],
-                                'has_pending_card': card is not None,
-                                'card_state': getattr(card, '_state', None)
-                                if card is not None
-                                else None,
-                            },
-                            'timestamp': int(time.time() * 1000),
-                        }
-                    )
-                    + '\n'
-                )
-        except Exception:
-            pass
-        # endregion
+        card = self._resolve_running_compaction_card()
         self._pending_compaction_scan_card = None
 
         if card is None:
+            if not summary:
+                return
             from backend.cli.tui.widgets.scan_line import CompactionCard
 
             card = CompactionCard(summary=summary)
             self._append_scan_line_card(card)
+            return
+
+        if getattr(card, 'state', None) == 'done':
             return
 
         card.complete(summary=summary)

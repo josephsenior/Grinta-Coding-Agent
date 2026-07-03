@@ -10,6 +10,11 @@ from backend.engine.prompts.section_renderers._env_hints import (
     _path_uncertainty_hint,
 )
 
+_QUALITY_BLOCK = (
+    '**Quality:** Minimal diff unless asked. Match existing style; handle errors explicitly. '
+    'Keep imports at top; avoid circular dependencies.'
+)
+
 
 def _render_tool_reference(
     render_partial: Callable[..., str],
@@ -50,11 +55,8 @@ def _render_tool_reference(
     checkpoint_hint = ''
     if checkpoints_on:
         checkpoint_hint = (
-            '\n**Checkpoints**\n'
-            '- Auto snapshots run before risky edits/commands (rollback middleware).\n'
-            '- `checkpoint(save)` after a named phase; `checkpoint(view)` to list IDs; '
-            '`checkpoint(revert)` to roll back; `checkpoint(clear)` when the milestone list is '
-            'stale or you start a fresh phase. Prefer `undo_last_edit` for the last file write.\n'
+            '\n**Checkpoints:** auto snapshots before risky edits; '
+            '`save` / `view` / `revert` / `clear` — see System Capabilities.\n'
         )
 
     if not can_edit:
@@ -62,11 +64,11 @@ def _render_tool_reference(
             '<EDITOR_AND_FILE_OPERATIONS>\n'
             f'Editor `path` values normalize safely. {confirm_cmd}\n'
             '**File API mental model**\n'
-            '- Discovery: follow `<DISCOVERY_ROUTING>` — `grep` (files_with_matches → content), '
-            '`glob`, `find_symbols`, `analyze_project_structure`.\n'
-            '- Context: `read_file(path=...)` for files; add `start_line`/`end_line` together on large files '
-            '(1-based; `end_line=-1` = EOF; omit both for whole file).\n'
+            '- Discovery: follow `<DISCOVERY_ROUTING>`.\n'
+            '- Context: `read_file(path=...)`; add `start_line`/`end_line` on large files '
+            '(see `<DISCOVERY_ROUTING>`).\n'
             f'{checkpoint_hint}'
+            f'{_QUALITY_BLOCK}\n'
             '</EDITOR_AND_FILE_OPERATIONS>'
         )
     else:
@@ -75,13 +77,12 @@ def _render_tool_reference(
             f'Editor `path` values normalize safely. {confirm_cmd}\n'
             'Edit the user path directly; no shadow copies; remove temp files when done.\n\n'
             '**File API mental model**\n'
-            '- Discovery: follow `<DISCOVERY_ROUTING>` — `grep` (files_with_matches → content; head_limit/offset), '
-            '`glob`, `find_symbols`, `analyze_project_structure`; prefer `callers` before `semantic_search`.\n'
-            '- Context: `read_file(path=...)` for files; add `start_line`/`end_line` together on large files '
-            'instead of whole-file reads (1-based; `end_line=-1` = EOF; omit both for whole file).\n'
+            '- Discovery: follow `<DISCOVERY_ROUTING>`.\n'
+            '- Context: `read_file(path=...)`; add `start_line`/`end_line` on large files '
+            '(see `<DISCOVERY_ROUTING>`).\n'
             '- Creation: `create_file` for new files. Fails if the file already exists; use `replace_string` or `multiedit` to modify an existing file.\n'
             '- Editing: `replace_string` (one exact text replacement per call); add by anchor -> anchor + content, delete with `new_string=""`.\n'
-            '- Prefer surgical targeted edits for existing files; full-file overwrites are not recommended unless a full rewrite is genuinely necessary.\n'
+            '- Prefer surgical targeted edits for existing files; full-file overwrites only when genuinely necessary.\n'
             '- Batched or cross-file refactors: `multiedit` (multiple replace_string operations across one or more files).\n'
             '- File API rule: one change on one file -> `replace_string`; anything batched -> `multiedit`.\n'
             '- Undo: `undo_last_edit` reverts the last content edit on an existing file. '
@@ -89,12 +90,12 @@ def _render_tool_reference(
             '- Never write source via shell. Use real newlines/quotes, not serialized JSON strings.\n\n'
             '**Examples**\n'
             '- Find candidates: `find_symbols(query="authenticate")`.\n'
-            '- Read a line range: `read_file(path="src/auth.py", start_line=40, end_line=80)` (both bounds required; use `end_line=-1` to read through EOF).\n'
-            '- APPEND to a config file: use `replace_string` with a unique anchor line. Set old_string to the anchor, new_string to the inserted text followed by the same anchor, using real line breaks.\n'
+            '- Read a line range: `read_file(path="src/auth.py", start_line=40, end_line=80)`.\n'
+            '- APPEND to a config file: use `replace_string` with a unique anchor line.\n'
             '- DELETE: `replace_string(old_string="old config block", new_string="")`.\n'
-            '- Code/content payloads must represent normal source text. Do not include literal backslash-n sequences unless the target file actually requires them. Transport escaping is handled by the tool API; do not serialize code yourself.\n'
-            '- Multiple edits on one file or across files: `multiedit`; implementation + tests across files: `multiedit`.\n'
+            '- Multiple edits on one file or across files: `multiedit`.\n'
             f'{checkpoint_hint}'
+            f'{_QUALITY_BLOCK}\n'
             '</EDITOR_AND_FILE_OPERATIONS>'
         )
 

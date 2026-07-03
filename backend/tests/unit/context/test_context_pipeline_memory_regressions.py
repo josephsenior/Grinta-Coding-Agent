@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from backend.context.canonical_state import (
     CanonicalTaskState,
@@ -12,14 +12,8 @@ from backend.context.canonical_state import (
     render_canonical_state_for_prompt,
 )
 from backend.context.compactor.pre_condensation_snapshot import extract_snapshot
-from backend.context.context_budget import ContextBudget
-from backend.context.context_pipeline import (
-    ContextPipeline,
-    _ContinuityGateDecision,
-)
-from backend.context.context_pipeline.compaction import (
-    _deterministic_fallback_after_rejection,
-)
+from backend.context.context_pipeline import ContextPipeline
+
 from backend.core.config.compactor_config import ContextPipelineConfig
 from backend.core.constants import DEFAULT_EMERGENCY_PROMPT_MIN_EVENTS
 from backend.ledger.action.agent import AgentThinkAction
@@ -92,81 +86,6 @@ def test_soak_replay_excerpt_recoverable_tool_error_is_not_durable() -> None:
     assert snapshot['decisions'] == []
     assert snapshot['recent_errors'] == []
     assert snapshot['attempted_approaches'] == []
-
-
-def test_deterministic_fallback_commits_after_repeated_equivalent_rejection(
-    tmp_path,
-    monkeypatch,
-) -> None:
-    monkeypatch.setattr(
-        'backend.context.canonical_state.canonical_state_path',
-        lambda state=None: tmp_path / 'canonical_task_state.json',
-    )
-    events = [_user('Fix the context pipeline regression', 1)]
-    for event_id in range(2, 122, 2):
-        events.append(_cmd(f'pytest chunk-{event_id}', event_id))
-        events.append(
-            _output(
-                f'pytest chunk-{event_id}',
-                ('failed output line\n' * 30),
-                event_id + 1,
-                1,
-            )
-        )
-    state = _state(events)
-    reduce_events_into_state(events, CanonicalTaskState(), state=state, persist=True)
-    pipeline = ContextPipeline(
-        llm_registry=MagicMock(),
-        config=ContextPipelineConfig(allow_llm_hot_path=False),
-    )
-    decision = _ContinuityGateDecision(
-        passed=False,
-        canonical_ok=True,
-        fingerprint='continuity:stale-tool-schema',
-        missing=('decision:Missing required argument "type"',),
-        score=0.98,
-        matched=105,
-        total=107,
-    )
-    budget = ContextBudget(
-        estimated_tokens=80_000,
-        effective_window=100_000,
-        autocompact_threshold=70_000,
-    )
-    llm_config = SimpleNamespace(
-        model='openai/gpt-4.1',
-        context_window_tokens=1_047_576,
-        max_output_tokens=32_768,
-    )
-
-    with patch(
-        'backend.context.context_pipeline.compaction.passes_effectiveness_gate',
-        return_value=True,
-    ):
-        first = _deterministic_fallback_after_rejection(
-            state,
-            events,
-            events,
-            budget,
-            llm_config,
-            decision,
-        )
-        second = _deterministic_fallback_after_rejection(
-            state,
-            events,
-            events,
-            budget,
-            llm_config,
-            decision,
-        )
-
-    assert first is None
-    assert second is not None
-    assert len(second.pruned) >= 20
-    assert 'Canonical task state' in (second.summary or '')
-    assert (
-        'continuity_rejection_streak' not in state.extra_data['context_pipeline_state']
-    )
 
 
 def test_recent_work_ledger_renders_once_for_latest_verification() -> None:

@@ -529,6 +529,19 @@ class StreamingChunkActionSchema(ActionSchemaV1):
     )
 
 
+class AcceptanceCriteriaActionSchema(ActionSchemaV1):
+    """Schema for AcceptanceCriteriaAction."""
+
+    action_type: Literal['acceptance_criteria'] = Field(
+        ActionType.ACCEPTANCE_CRITERIA.value, frozen=True
+    )
+    runnable: bool = Field(False, frozen=True)
+    command: str = Field(default='view', description='Acceptance criteria command')
+    criteria_list: list[dict[str, Any]] = Field(
+        default_factory=list, description='Flat list of verifiable criteria'
+    )
+
+
 class TaskTrackingActionSchema(ActionSchemaV1):
     """Schema for TaskTrackingAction.
 
@@ -656,6 +669,7 @@ ActionSchemaUnion = (
     | ProposalActionSchema
     | RecallActionSchema
     | StreamingChunkActionSchema
+    | AcceptanceCriteriaActionSchema
     | TaskTrackingActionSchema
     | UncertaintyActionSchema
     | DelegateTaskActionSchema

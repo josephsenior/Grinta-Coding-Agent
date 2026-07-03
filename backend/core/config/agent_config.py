@@ -61,6 +61,7 @@ from backend.core.constants import (
     DEFAULT_AGENT_STUCK_DETECTION_ENABLED,
     DEFAULT_AGENT_STUCK_THRESHOLD_ITERATIONS,
     DEFAULT_AGENT_TASK_TRACKER_TOOL_ENABLED,
+    DEFAULT_AGENT_ACCEPTANCE_CRITERIA_TOOL_ENABLED,
     DEFAULT_AGENT_VECTOR_MEMORY_ENABLED,
     DEFAULT_AGENT_WARNING_FIRST_TRIP_ENABLED,
     DEFAULT_AGENT_WARNING_FIRST_TRIP_LIMIT,
@@ -336,6 +337,12 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     enable_task_tracker_tool: bool = Field(
         default=DEFAULT_AGENT_TASK_TRACKER_TOOL_ENABLED,
         description='Enable the task_tracker tool for structured multi-step plans.',
+    )
+    enable_acceptance_criteria_tool: bool = Field(
+        default=DEFAULT_AGENT_ACCEPTANCE_CRITERIA_TOOL_ENABLED,
+        description=(
+            'Enable the acceptance_criteria tool for flat verifiable completion assertions.'
+        ),
     )
 
     # Memory features

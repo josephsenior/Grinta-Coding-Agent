@@ -44,6 +44,7 @@ from backend.core.schemas.actions import (
     RecallActionSchema,
     StreamingChunkActionSchema,
     SystemMessageActionSchema,
+    AcceptanceCriteriaActionSchema,
     TaskTrackingActionSchema,
     UncertaintyActionSchema,
 )

@@ -67,6 +67,7 @@ _SIMPLE_VERB_MAP = {
     'think': 'Thinking',
     'memory_manager': 'Managed',
     'task_tracker': 'Tracked',
+    'acceptance_criteria': 'Criteria',
     'grep': 'Grepped',
     'glob': 'Globbed',
     'lsp': 'Analyzed',

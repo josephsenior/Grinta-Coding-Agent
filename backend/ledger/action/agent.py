@@ -234,6 +234,32 @@ class CondensationRequestAction(Action):
 
 
 @dataclass
+class AcceptanceCriteriaAction(Action):
+    """An action where the agent writes or audits flat acceptance criteria.
+
+    Attributes:
+        command (str): One of view, update, append, audit.
+        criteria_list (list): Flat list of verifiable assertion dicts.
+        thought (str): The agent's explanation of its actions.
+    """
+
+    command: str = 'view'
+    criteria_list: list[dict[str, Any]] = field(default_factory=list)
+    thought: str = ''
+    action: ClassVar[str] = ActionType.ACCEPTANCE_CRITERIA
+
+    @property
+    def message(self) -> str:
+        """Get acceptance criteria message with count."""
+        num = len(self.criteria_list)
+        if num == 0:
+            return 'Viewing acceptance criteria.'
+        if num == 1:
+            return 'Managing 1 acceptance criterion.'
+        return f'Managing {num} acceptance criteria.'
+
+
+@dataclass
 class TaskTrackingAction(Action):
     """An action where the agent writes or updates a task list for task management.
 

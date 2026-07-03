@@ -22,6 +22,7 @@ from .native_file_tools import (
     create_replace_string_tool,
     create_undo_last_edit_tool,
 )
+from .acceptance_criteria import create_acceptance_criteria_tool
 from .task_tracker import create_task_tracker_tool
 from .terminal_manager import create_terminal_manager_tool
 
@@ -43,6 +44,7 @@ __all__ = [
     'create_glob_tool',
     'create_cmd_run_tool',
     'create_browser_tool',
+    'create_acceptance_criteria_tool',
     'create_task_tracker_tool',
     'create_delegate_task_tool',
     'create_terminal_manager_tool',

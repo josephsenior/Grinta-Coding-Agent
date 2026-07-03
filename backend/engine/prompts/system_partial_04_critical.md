@@ -3,7 +3,7 @@
 <ANTI_PATTERNS>
 The following are *always wrong*. Avoid them even if they look like a shortcut.
 
-{edit_context_antipattern}{task_tracker_antipattern}
+{edit_context_antipattern}{task_tracker_antipattern}{acceptance_criteria_antipattern}
 - **Inventing tool names or tool prefixes.** Pass tool names exactly as listed; if a name is not in the list, the tool is not available — pick a different approach.
 - {user_question_antipattern}
 - {destructive_ops_antipattern}

@@ -23,6 +23,7 @@ from backend.ledger.action.agent import (
     ProposalAction,
     RecallAction,
     SystemHintAction,
+    AcceptanceCriteriaAction,
     TaskTrackingAction,
     UncertaintyAction,
 )
@@ -80,6 +81,7 @@ actions = (
     CondensationAction,
     CondensationRequestAction,
     MCPAction,
+    AcceptanceCriteriaAction,
     TaskTrackingAction,
     UncertaintyAction,
     ProposalAction,

@@ -11,11 +11,7 @@
 </DECISION_FRAMEWORK>
 
 <TOOL_ROUTING_LADDER>
-- **Search & Explore:** Follow `<DISCOVERY_ROUTING>`. Use native `grep`/`glob`/`find_symbols`/`read_file`/`analyze_project_structure` — never shell `grep`/`find`/`rg` for repo intelligence.
-- **`grep`:** default `output_mode=files_with_matches`; switch to `content` only for files that matter; paginate with `head_limit`/`offset` (default 200).
-- **`glob`:** paginate file lists with `head_limit`/`offset` (default 200).
-- **`read_file`:** pass `path`; add `start_line`/`end_line` for a line range (`start_line>=1`; `end_line>=start_line` or `-1` for EOF); omit both for a whole file.
-- **`find_symbols` + `read_file`:** use `find_symbols` to discover symbol locations, then `read_file` with line ranges to read specific symbol bodies.
+- **Search & Explore:** Follow `<DISCOVERY_ROUTING>`. Use native discovery tools — never shell `grep`/`find`/`rg` for repo intelligence.
 {lsp_routing}
 {debugger_routing}
 {discovery_decision_table}

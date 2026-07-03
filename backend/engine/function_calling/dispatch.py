@@ -49,6 +49,7 @@ from backend.core.tools.tool_names import (
     GREP_TOOL_NAME,
     MEMORY_TOOL_NAME,
     TASK_TRACKER_TOOL_NAME,
+    ACCEPTANCE_CRITERIA_TOOL_NAME,
     TERMINAL_MANAGER_TOOL_NAME,
     UNDO_LAST_EDIT_TOOL_NAME,
     WEB_FETCH_TOOL_NAME,
@@ -116,6 +117,7 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
             str, create_multiedit_tool().get('function', {}).get('name', '')
         ): _handle_multiedit_tool,
         TASK_TRACKER_TOOL_NAME: _handle_task_tracker_tool,
+        ACCEPTANCE_CRITERIA_TOOL_NAME: _handle_acceptance_criteria_tool,
         MEMORY_TOOL_NAME: _handle_memory_tool,
         GREP_TOOL_NAME: _handle_grep_tool,
         GLOB_TOOL_NAME: _handle_glob_tool,
@@ -215,7 +217,7 @@ def _validate_tool_mode(
     if normalized_mode == PLAN_MODE and tool_name not in PLAN_MODE_ALLOWED_TOOLS:
         raise FunctionCallValidationError(
             f'Tool `{tool_name}` is not available in Plan Mode. '
-            'Use discovery tools, ask_user, or task_tracker only.'
+            'Use discovery tools, ask_user, task_tracker, or acceptance_criteria only.'
         )
 
 
@@ -318,6 +320,7 @@ from backend.engine.tools._tool_handlers import (  # noqa: E402, F401  # noqa: E
     _handle_memory_manager_tool,
     _handle_memory_tool,
     _handle_task_tracker_tool,
+    _handle_acceptance_criteria_tool,
     _handle_undo_last_edit_tool,
     _handle_web_fetch_tool,
     _handle_web_search_tool,

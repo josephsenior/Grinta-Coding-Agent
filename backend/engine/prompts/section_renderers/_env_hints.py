@@ -95,17 +95,14 @@ def _discovery_decision_table(
 
 
 def _explore_hint(_config: Any = None) -> str:
-    """Return the canonical layout-discovery tool hint."""
+    """Compact discovery tool list; pagination rules live in ``<DISCOVERY_ROUTING>``."""
     if _lsp_available(_config):
         return (
-        '`grep` (files_with_matches first, then content; head_limit/offset), `glob` for file discovery, '
-        '`find_symbols` for symbol candidates, `read_file` for file bodies, `lsp` for precise '
-        'definitions/references, `analyze_project_structure` for tree/imports/deps/references'
-    )
+            '`grep`, `glob`, `find_symbols`, `read_file`, `lsp`, '
+            '`analyze_project_structure`'
+        )
     return (
-        '`grep` (files_with_matches first, then content; head_limit/offset), `glob` for file discovery, '
-        '`find_symbols` for symbol candidates, `read_file` for file bodies, '
-        '`analyze_project_structure` for tree/imports/deps/references'
+        '`grep`, `glob`, `find_symbols`, `read_file`, `analyze_project_structure`'
     )
 
 

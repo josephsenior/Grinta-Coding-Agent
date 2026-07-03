@@ -555,7 +555,7 @@ class ContextPipeline:
             return None
         cfg = StructuredSummaryCompactorConfig(
             llm_config=llm_cfg,
-            max_size=40,
+            max_size=102,
             keep_first=0,
         )
         try:

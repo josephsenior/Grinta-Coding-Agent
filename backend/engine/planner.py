@@ -256,6 +256,12 @@ class OrchestratorPlanner:
 
         if getattr(self._config, 'enable_task_tracker_tool', True):
             tools.append(create_task_tracker_tool())
+        if getattr(self._config, 'enable_acceptance_criteria_tool', True):
+            from backend.engine.tools.acceptance_criteria import (
+                create_acceptance_criteria_tool,
+            )
+
+            tools.append(create_acceptance_criteria_tool())
         tools.append(create_grep_tool())
         tools.append(create_glob_tool())
 
@@ -782,7 +788,8 @@ class OrchestratorPlanner:
             f'- Use discovery tools{hint} '
             'to inspect and search the codebase.\n'
             '- Use `ask_user` only when user input is required to continue.\n'
-            '- Use `task_tracker` to structure the plan when committing to multi-step work.\n'
+            '- Workflow: `acceptance_criteria(update)` → `task_tracker(update)` (when enabled) → '
+            'discovery; `acceptance_criteria(audit)` before the written plan.\n'
             '- Do not edit files or run shell commands.\n'
             '- Write the final plan in plain text when complete; that ends the run.\n'
             '==========================\n'

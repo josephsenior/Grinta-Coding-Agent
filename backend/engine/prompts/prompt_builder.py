@@ -196,6 +196,7 @@ def _render_critical(
     *,
     terminal_manager_available: bool,
     tracker_on: bool,
+    criteria_on: bool = True,
     checkpoints_on: bool,
     meta_cognition_on: bool,
     mode: str = 'agent',
@@ -205,6 +206,7 @@ def _render_critical(
         terminal_command_tool,
         terminal_manager_available=terminal_manager_available,
         tracker_on=tracker_on,
+        criteria_on=criteria_on,
         checkpoints_on=checkpoints_on,
         meta_cognition_on=meta_cognition_on,
         mode=mode,
@@ -215,6 +217,7 @@ def _render_examples(
     *,
     terminal_command_tool: str,
     tracker_on: bool,
+    criteria_on: bool = True,
     working_memory_on: bool,
     meta_cognition_on: bool,
     lsp_available: bool,
@@ -225,6 +228,7 @@ def _render_examples(
         _render_partial,
         terminal_command_tool=terminal_command_tool,
         tracker_on=tracker_on,
+        criteria_on=criteria_on,
         working_memory_on=working_memory_on,
         meta_cognition_on=meta_cognition_on,
         lsp_available=lsp_available,
@@ -326,7 +330,7 @@ def _mcp_or_permissions_sections_for_collect(
     """Return permissions guidance only.
 
     MCP tools are never inlined into the system prompt. When connected they are
-    delivered via :func:`build_mcp_user_addendum` as a per-turn user message.
+    delivered via :func:`build_mcp_user_addendum` as a second system message.
     The ``render_mcp_inline`` flag is retained for API compatibility only.
     """
     _ = (render_mcp_inline, mcp_tool_names, mcp_tool_descriptions, mcp_server_hints)
@@ -361,7 +365,7 @@ def _collect_system_prompt_sections(
     """Ordered (name, body) sections before joining with blank lines.
 
     MCP tools are never part of the system prompt. Connected MCP catalogues are
-    delivered as a per-turn user-role addendum via :func:`build_mcp_user_addendum`
+    delivered as a second system message via :func:`build_mcp_user_addendum`
     so the system prefix stays stable when MCP servers connect or disconnect.
     """
     model_id = active_llm_model or 'unknown'
@@ -417,12 +421,27 @@ def _collect_system_prompt_sections(
         else ''
     )
     if is_plan_mode(mode):
+        plan_tools_line = (
+            'Use `acceptance_criteria` to define verifiable completion assertions, '
+            'then `task_tracker` for a coarse execution plan when committing to multi-step work.\n'
+            if bool(getattr(config, 'enable_acceptance_criteria_tool', True))
+            and bool(getattr(config, 'enable_task_tracker_tool', True))
+            else (
+                'Use `acceptance_criteria` to define verifiable completion assertions when committing to structured work.\n'
+                if bool(getattr(config, 'enable_acceptance_criteria_tool', True))
+                else (
+                    'Use `task_tracker` when committing to structured multi-step planning.\n'
+                    if bool(getattr(config, 'enable_task_tracker_tool', True))
+                    else ''
+                )
+            )
+        )
         sections.append(
             (
                 'simplified_plan_protocol',
                 f'You are in Plan mode. Use discovery tools{external_discovery_hint} '
                 'to inspect the codebase.\n\n'
-                'Use `task_tracker` when committing to structured multi-step planning.\n'
+                f'{plan_tools_line}'
                 'Do **not** edit files or run shell commands in Plan mode.\n\n'
                 'When you need input from the user to continue, see `<ASK_USER_TOOL>`.\n\n'
                 'When planning is complete, write the plan as your final response. '
@@ -536,6 +555,7 @@ def _collect_system_prompt_sections(
                 _render_examples(
                     terminal_command_tool=resolved_terminal_tool,
                     tracker_on=bool(getattr(config, 'enable_task_tracker_tool', True)),
+                    criteria_on=bool(getattr(config, 'enable_acceptance_criteria_tool', True)),
                     working_memory_on=bool(
                         getattr(config, 'enable_working_memory', True)
                     ),
@@ -558,6 +578,7 @@ def _collect_system_prompt_sections(
                     getattr(config, 'enable_terminal', True)
                 ),
                 tracker_on=bool(getattr(config, 'enable_task_tracker_tool', True)),
+                criteria_on=bool(getattr(config, 'enable_acceptance_criteria_tool', True)),
                 checkpoints_on=bool(getattr(config, 'enable_checkpoints', True)),
                 meta_cognition_on=bool(getattr(config, 'enable_meta_cognition', False)),
                 mode=mode,
@@ -573,11 +594,11 @@ def build_mcp_user_addendum(
     mcp_server_hints: list[dict[str, str]] | None = None,
     config: Any = None,
 ) -> str:
-    """Render the MCP tool catalogue as a per-turn user-role addendum.
+    """Render the MCP tool catalogue as a per-turn system-message addendum.
 
     Returns an empty string when no MCP tools are connected. The system prompt
-    intentionally omits MCP so this addendum can be injected without invalidating
-    provider prefix caches.
+    intentionally omits MCP so this addendum can be injected as a second system
+    message without invalidating provider prefix caches.
     """
     names = list(mcp_tool_names or [])
     if not names:

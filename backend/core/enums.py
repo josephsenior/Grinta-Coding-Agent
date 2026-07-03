@@ -88,6 +88,7 @@ class ActionType(str, Enum):
     CONDENSATION = 'condensation'
     CONDENSATION_REQUEST = 'condensation_request'
     TASK_TRACKING = 'task_tracking'
+    ACCEPTANCE_CRITERIA = 'acceptance_criteria'
     STREAMING_CHUNK = 'streaming_chunk'
     # New meta-cognition actions for uncertainty handling
     UNCERTAINTY = 'uncertainty'
@@ -164,6 +165,7 @@ class ObservationType(str, Enum):
     MCP = 'mcp'
     DOWNLOAD = 'download'
     TASK_TRACKING = 'task_tracking'
+    ACCEPTANCE_CRITERIA = 'acceptance_criteria'
     SERVER_READY = 'server_ready'
     RECALL_FAILURE = 'recall_failure'
     STATUS = 'status'

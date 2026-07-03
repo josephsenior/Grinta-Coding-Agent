@@ -39,6 +39,7 @@ from backend.engine.prompts.section_renderers._common import (
     _choose,
     _count_section_tokens,
     _resolve_terminal_command_tool,
+    _semantic_recall_runtime,
 )
 from backend.engine.prompts.section_renderers._critical import _render_critical
 from backend.engine.prompts.section_renderers._env_hints import (
@@ -56,7 +57,6 @@ from backend.engine.prompts.section_renderers._interaction import (
 )
 from backend.engine.prompts.section_renderers._mcp import (
     _append_mcp_connected_catalog_sections,
-    _mcp_tail_render_kwargs,
     _render_mcp_and_permissions,
 )
 from backend.engine.prompts.section_renderers._permissions import (
@@ -80,7 +80,6 @@ __all__ = [
     '_debugger_available',
     '_explore_hint',
     '_lsp_available',
-    '_mcp_tail_render_kwargs',
     '_path_uncertainty_hint',
     '_permission_git_summary',
     '_permission_shell_network_limits',
@@ -98,4 +97,5 @@ __all__ = [
     '_repo_discovery_contract',
     '_resolve_terminal_command_tool',
     '_routing_memory_tool_placeholders',
+    '_semantic_recall_runtime',
 ]

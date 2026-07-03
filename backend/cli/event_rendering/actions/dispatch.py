@@ -51,8 +51,10 @@ from backend.ledger.action import (  # noqa: E402
     TaskTrackingAction,
     TerminalCloseAction,
     TerminalInputAction,
+    TerminalListAction,
     TerminalReadAction,
     TerminalRunAction,
+    TerminalWaitAction,
     UncertaintyAction,
 )
 
@@ -100,6 +102,8 @@ class _ActionDispatchMixin(_ActionRenderersBase):
         (TerminalRunAction, '_render_terminal_run_action'),
         (TerminalInputAction, '_render_terminal_input_action'),
         (TerminalReadAction, '_render_terminal_read_action'),
+        (TerminalWaitAction, '_render_terminal_wait_action'),
+        (TerminalListAction, '_render_terminal_list_action'),
         (TerminalCloseAction, '_render_terminal_close_action'),
         (DelegateTaskAction, '_render_delegate_task_action'),
         (EscalateToHumanAction, '_render_escalate_to_human_action'),
