@@ -23,6 +23,88 @@ from backend.core.wsl import is_wsl_runtime
 
 _WINDOWS_SHELL_BASH = frozenset({'bash', 'git-bash', 'gitbash', 'posix'})
 _WINDOWS_SHELL_POWERSHELL = frozenset({'powershell', 'pwsh', 'ps'})
+_WELL_KNOWN_GIT_BASH_PATHS = (
+    r'C:\Program Files\Git\bin\bash.exe',
+    r'C:\Program Files (x86)\Git\bin\bash.exe',
+)
+
+
+def _windows_wsl_bash_dirs() -> frozenset[str]:
+    system_root = os.path.realpath(
+        os.environ.get('SystemRoot', 'C:\\Windows')
+    ).lower()
+    return frozenset(
+        os.path.join(system_root, directory).lower()
+        for directory in ('system32', 'sysnative', 'syswow64')
+    )
+
+
+def _is_wsl_bash_path(resolved: str, wsl_dirs: frozenset[str]) -> bool:
+    lowered = resolved.lower()
+    return any(lowered.startswith(directory) for directory in wsl_dirs)
+
+
+def _accept_windows_bash_candidate(candidate: str, wsl_dirs: frozenset[str]) -> str | None:
+    if not candidate or not os.path.isfile(candidate):
+        return None
+    resolved = os.path.realpath(candidate)
+    if _is_wsl_bash_path(resolved, wsl_dirs):
+        return None
+    return resolved
+
+
+def _git_for_windows_bash_candidates() -> list[str]:
+    """Derive Git Bash from a Git-for-Windows install when only ``git.cmd`` is on PATH."""
+    git_exe = shutil.which('git')
+    if not git_exe:
+        return []
+
+    git_dir = os.path.dirname(os.path.realpath(git_exe))
+    parent = os.path.dirname(git_dir)
+    basename = os.path.basename(git_dir).lower()
+    candidates: list[str] = []
+    if basename == 'cmd':
+        candidates.append(os.path.join(parent, 'bin', 'bash.exe'))
+    candidates.append(os.path.join(git_dir, 'bash.exe'))
+    candidates.append(os.path.join(parent, 'bin', 'bash.exe'))
+    return candidates
+
+
+def find_windows_bash_excluding_wsl() -> str | None:
+    """Find a non-WSL bash on Windows (e.g. Git Bash).
+
+    WSL installs ``bash.exe`` inside ``System32``; that launcher is excluded.
+    Git for Windows often puts ``git`` on PATH via ``Git\\cmd`` while ``bash.exe``
+    lives under ``Git\\bin`` — probe install-relative and well-known paths too.
+    """
+    wsl_dirs = _windows_wsl_bash_dirs()
+
+    path_exts = os.environ.get('PATHEXT', '.COM;.EXE;.BAT;.CMD').split(os.pathsep)
+    for path_dir in os.environ.get('PATH', '').split(os.pathsep):
+        if not path_dir.strip():
+            continue
+        for ext in path_exts:
+            accepted = _accept_windows_bash_candidate(
+                os.path.join(path_dir.strip(), f'bash{ext}'),
+                wsl_dirs,
+            )
+            if accepted:
+                return accepted
+
+    seen: set[str] = set()
+    for candidate in (
+        *_git_for_windows_bash_candidates(),
+        *_WELL_KNOWN_GIT_BASH_PATHS,
+        os.path.join(os.environ.get('LOCALAPPDATA', ''), 'Programs', 'Git', 'bin', 'bash.exe'),
+    ):
+        normalized = os.path.normcase(os.path.normpath(candidate))
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        accepted = _accept_windows_bash_candidate(candidate, wsl_dirs)
+        if accepted:
+            return accepted
+    return None
 
 
 @functools.cache
@@ -189,34 +271,8 @@ class ToolRegistry:
                 )
 
     def _find_windows_bash_excluding_wsl(self) -> str | None:
-        """Find a non-WSL bash on Windows (e.g. Git Bash).
-
-        WSL installs ``bash.exe`` inside ``System32``; that launcher is
-        excluded so that only standalone bash installations (Git Bash,
-        MSYS2, Cygwin, …) are considered.  WSL should only be used when
-        the user explicitly chooses it.
-        """
-        system_root = os.path.realpath(
-            os.environ.get('SystemRoot', 'C:\\Windows')
-        ).lower()
-        wsl_dirs = frozenset(
-            os.path.join(system_root, d).lower()
-            for d in ('system32', 'sysnative', 'syswow64')
-        )
-
-        path_exts = os.environ.get('PATHEXT', '.COM;.EXE;.BAT;.CMD').split(os.pathsep)
-        path_dirs = os.environ.get('PATH', '').split(os.pathsep)
-
-        for path_dir in path_dirs:
-            if not path_dir.strip():
-                continue
-            for ext in path_exts:
-                candidate = os.path.join(path_dir.strip(), f'bash{ext}')
-                if os.path.isfile(candidate):
-                    resolved = os.path.realpath(candidate)
-                    if not any(resolved.lower().startswith(wd) for wd in wsl_dirs):
-                        return resolved
-        return None
+        """Find a non-WSL bash on Windows (e.g. Git Bash)."""
+        return find_windows_bash_excluding_wsl()
 
     def _detect_search_tool(self) -> None:
         """Detect the best available search tool."""

@@ -12,6 +12,7 @@ from backend.execution.utils.tool_registry import (
     ToolInfo,
     ToolRegistry,
     _configured_windows_shell,
+    find_windows_bash_excluding_wsl,
     resolve_windows_powershell_preference,
 )
 
@@ -242,3 +243,27 @@ class TestRuntimeContextProperties:
         reg._is_container = False
         reg._is_wsl = True
         assert reg.is_wsl_runtime is True
+
+
+class TestFindWindowsBashExcludingWsl:
+    def test_skips_system32_wsl_bash_on_path(self, monkeypatch: pytest.MonkeyPatch):
+        wsl_bash = r'C:\Windows\System32\bash.exe'
+        monkeypatch.setenv('PATH', r'C:\Windows\System32')
+        with (
+            patch('backend.execution.utils.tool_registry.shutil.which', return_value=None),
+            patch('os.path.isfile') as mock_isfile,
+            patch('os.path.realpath', side_effect=lambda path: path),
+        ):
+            mock_isfile.side_effect = lambda path: path.lower() == wsl_bash.lower()
+            assert find_windows_bash_excluding_wsl() is None
+
+    def test_finds_git_bash_from_git_cmd_on_path(self, monkeypatch: pytest.MonkeyPatch):
+        git_bash = r'C:\Program Files\Git\bin\bash.exe'
+        monkeypatch.setenv('PATH', r'C:\Program Files\Git\cmd')
+        with (
+            patch('shutil.which', return_value=r'C:\Program Files\Git\cmd\git.exe'),
+            patch('os.path.isfile') as mock_isfile,
+            patch('os.path.realpath', side_effect=lambda p: p),
+        ):
+            mock_isfile.side_effect = lambda p: p == git_bash
+            assert find_windows_bash_excluding_wsl() == git_bash
