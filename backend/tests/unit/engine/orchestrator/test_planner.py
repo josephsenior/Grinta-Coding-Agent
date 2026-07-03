@@ -676,6 +676,21 @@ class TestBuildLlmParams:
         assert 'open_questions_or_blockers' not in joined
         assert 'Current mode: AGENT' not in joined
 
+    def test_plan_mode_instructions_do_not_require_audit(self):
+        p = _make_planner(config=_make_config(mode='plan'))
+        state = _make_state()
+        messages = [{'role': 'user', 'content': 'Plan a refactor'}]
+        result = p._inject_plan_mode_instructions(messages, state)
+        plan_blocks = [
+            m['content']
+            for m in result
+            if isinstance(m.get('content'), str) and 'CURRENT MODE: PLAN' in m['content']
+        ]
+        assert plan_blocks
+        plan_text = plan_blocks[0]
+        assert 'do not audit in Plan mode' in plan_text
+        assert 'acceptance_criteria(audit)' not in plan_text
+
     @pytest.mark.parametrize(
         ('mode', 'label'),
         [('chat', 'CHAT'), ('plan', 'PLAN'), ('agent', 'AGENT')],

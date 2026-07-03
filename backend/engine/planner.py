@@ -792,7 +792,7 @@ class OrchestratorPlanner:
             'to inspect and search the codebase.\n'
             '- Use `ask_user` only when user input is required to continue.\n'
             '- Workflow: `acceptance_criteria(update)` → `task_tracker(update)` (when enabled) → '
-            'discovery; `acceptance_criteria(audit)` before the written plan.\n'
+            'discovery; define scope only — do not audit in Plan mode (no executable evidence yet).\n'
             '- Do not edit files or run shell commands.\n'
             '- Write the final plan in plain text when complete; that ends the run.\n'
             '==========================\n'

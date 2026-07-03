@@ -58,7 +58,14 @@ def _build_agent_execution_block(
             + ' before the first file edit or shell command.'
         )
     rules += [
-        f'**Verify before final summary** — run the narrowest relevant proof: reproducer, tests, lint, or typecheck. If verification cannot run, state the concrete blocker: no test/build harness exists, missing dependency or credential, environment cannot install/build/run, verification would be unsafe/destructive, or the task has no meaningful runnable check. Do not use vague excuses like "not applicable."\n{done_criteria_block}',
+        f'**Verify before final summary** — run the narrowest relevant proof: reproducer, tests, lint, or typecheck'
+        + (
+            '; then `acceptance_criteria(audit, audit_entries=[...])` with `evidence_ref` to prior tool output'
+            if criteria_on
+            else ''
+        )
+        + '. If verification cannot run, state the concrete blocker: no test/build harness exists, missing dependency or credential, environment cannot install/build/run, verification would be unsafe/destructive, or the task has no meaningful runnable check. Do not use vague excuses like "not applicable."\n'
+        f'{done_criteria_block}',
         '**No unchanged retries after failure** — change strategy or escalate with hypothesis, action/outcome, and ruled-out paths.',
         '**Tests must track real APIs** — Before adding or changing test code, **read** the implementation module(s) you are testing in this session and align mocks, fixtures, and calls with the **actual** signatures and return shapes. Do not assume parity with a different module or an earlier draft from memory.',
         '**Postmortem on failing tests** — After a test failure, state the likely root cause class (wrong assumed API vs mock shape vs implementation bug vs flake), then change **one** lever and re-run a **narrow** test command; avoid blind rewrite loops.',
@@ -153,8 +160,9 @@ def _render_critical(
     acceptance_criteria_antipattern = (
         '- **Starting multi-step implementation without `acceptance_criteria(update, ...)` first.** '
         'Define verifiable assertions before editing.\n'
-        '- **Writing the final summary without `acceptance_criteria(audit, ...)` when criteria exist.** '
-        'Audit every assertion with evidence or an explicit gap first.'
+        '- **Writing the final summary when criteria exist but `acceptance_criteria(audit, audit_entries=[...])` was not done.** '
+        'Attach `evidence_ref` to prior tool output — do not paraphrase evidence from memory.\n'
+        '- **Rewriting the full criteria list to fix one assertion.** Use `refine(criterion_id, new_assertion, reason)` instead.'
         if criteria_on and can_edit
         else ''
     )
