@@ -72,7 +72,10 @@ def _build_context_discipline_section(
             ]
         )
         if condensation_on:
-            parts.append('Post-condensation: `acceptance_criteria(view)` if criteria were defined.')
+            parts.append(
+                'Post-condensation: persisted and auto-re-injected — use '
+                '`acceptance_criteria(view)` for stable ids; do not redefine unless scope changed.'
+            )
 
     parts.append('</CONTEXT_DISCIPLINE>')
     return '\n'.join(parts)
@@ -98,8 +101,8 @@ def _build_when_to_use_context(
     if criteria_on:
         parts.append(
             '- **acceptance_criteria**: See `<ACCEPTANCE_CRITERIA>`. '
-            'Use `update` at task start, `view` for ids (after condensation too), '
-            '`refine` to correct one assertion, and `audit(audit_entries=[...])` '
+            'Persisted across condensation — use `update` before work, `view` after compaction '
+            'for stable ids, `refine` to correct one assertion, and `audit(audit_entries=[...])` '
             'with `evidence_ref` before the final summary.'
         )
     if not tracker_on and not criteria_on:
@@ -243,10 +246,10 @@ def _render_autonomy(
         acceptance_criteria_discipline_block = (
             '<ACCEPTANCE_CRITERIA>\n'
             '**acceptance_criteria**: Flat verifiable assertions for what must be true when done.\n'
-            '**Skip when trivial:** omit criteria and tracker for one-line typo fixes, pure Q&A, or discussion-only turns.\n'
-            f'**Start ritual:** for bugfixes, implementations, or multi-step tasks, first call '
-            f'`acceptance_criteria(update, criteria_list=[...])`{tracker_follow} '
-            'before any file edit or shell command.\n'
+            f'**Start ritual:** required before work — call '
+            f'`acceptance_criteria(update, criteria_list=[...])`{tracker_follow}.\n'
+            '**Condensation:** persisted and auto-re-injected after context compaction; '
+            'use `view` for stable ids — do not redefine unless scope changed.\n'
             'See `<COMMON_PATTERNS>` for worked flows.\n'
             'Tag each item `source: "stated"` (user/directive) or `"inferred"` (agent-proposed scope extension — proceed autonomously). '
             'Use assertion phrasing, not activities.\n'

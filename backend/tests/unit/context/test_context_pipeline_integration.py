@@ -2,7 +2,7 @@
 
 Manual 45+ minute session replay checklist (workspace ``New folder (4)``):
 - CONDENSATION actions total < 20 (not hundreds of micro-prunes)
-- No burst of degraded boundary (5c) every few seconds
+- No burst of degraded boundary (5d) every few seconds
 - LLM calls completed grows steadily in the second half
 - No ON_EVENT_EXCEPTION at session start
 - No retry-queue worker warning after RUNNING

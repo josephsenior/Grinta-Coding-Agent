@@ -289,15 +289,11 @@ class HUDBar:
 
     @staticmethod
     def _usage_context_limit(usage: Any, *, fallback: int = 0) -> int:
-        """Prefer usable input budget over total catalog context window."""
+        """Return total context window for HUD display."""
         if isinstance(usage, dict):
-            usable = int(usage.get('usable_input_tokens', 0) or 0)
             window = int(usage.get('context_window', 0) or 0)
         else:
-            usable = int(getattr(usage, 'usable_input_tokens', 0) or 0)
             window = int(getattr(usage, 'context_window', 0) or 0)
-        if usable > 0:
-            return usable
         return window if window > 0 else fallback
 
     @staticmethod
@@ -319,14 +315,18 @@ class HUDBar:
                 parsed_full = 0
             if parsed_full > self.state.context_tokens:
                 self.state.context_tokens = parsed_full
-        usable = accounting.get('usable_input_tokens')
-        if usable is not None and not isinstance(usable, bool):
+        window = accounting.get('context_window')
+        if window is not None and not isinstance(window, bool):
             try:
-                parsed_usable = int(usable)
+                parsed_window = int(window)
             except (TypeError, ValueError):
-                parsed_usable = 0
-            if parsed_usable > 0:
-                self.state.context_limit = parsed_usable
+                parsed_window = 0
+            if parsed_window > 0:
+                self.state.context_limit = parsed_window
+        elif self.state.context_limit <= 0:
+            self.state.context_limit = self.resolve_context_limit_for_model(
+                self.state.model
+            )
 
     def update_tokens(self, used: int, limit: int) -> None:
         self.state.context_tokens = used

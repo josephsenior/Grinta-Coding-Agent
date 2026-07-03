@@ -144,7 +144,7 @@ def test_hud_context_pressure_prefers_full_request_tokens() -> None:
     hud.update_from_llm_metrics(metrics)
 
     assert hud.state.context_tokens == 18_500
-    assert hud.state.context_limit == 120_000
+    assert hud.state.context_limit == 200_000
 
 def test_hud_apply_prompt_token_accounting_overlays_internal_estimate() -> None:
     hud = HUDBar()
@@ -168,7 +168,7 @@ def test_hud_apply_prompt_token_accounting_overlays_internal_estimate() -> None:
     )
 
     assert hud.state.context_tokens == 52_000
-    assert hud.state.context_limit == 128_000
+    assert hud.state.context_limit == 200_000
 
 def test_hud_context_pressure_resets_after_condensation_epoch() -> None:
     hud = HUDBar()

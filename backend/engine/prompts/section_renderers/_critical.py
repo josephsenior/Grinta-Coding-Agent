@@ -48,14 +48,14 @@ def _build_agent_execution_block(
         rules.append(terminal_manager_rule)
     if criteria_on:
         rules.append(
-            '**Structured work start ritual** — for bugfixes, implementations, refactors, or any multi-step task: '
+            '**Structured work start ritual** — required before work: '
             'call `acceptance_criteria(update, criteria_list=[...])` first'
             + (
-                ', then `task_tracker(update, task_list=[...])`,'
+                ', then `task_tracker(update, task_list=[...])`'
                 if tracker_on
-                else ','
+                else ''
             )
-            + ' before the first file edit or shell command.'
+            + '.'
         )
     rules += [
         f'**Verify before final summary** — run the narrowest relevant proof: reproducer, tests, lint, or typecheck'
@@ -159,7 +159,7 @@ def _render_critical(
     )
     acceptance_criteria_antipattern = (
         '- **Starting multi-step implementation without `acceptance_criteria(update, ...)` first.** '
-        'Define verifiable assertions before editing.\n'
+        'Define verifiable assertions before work.\n'
         '- **Writing the final summary when criteria exist but `acceptance_criteria(audit, audit_entries=[...])` was not done.** '
         'Attach `evidence_ref` to prior tool output — do not paraphrase evidence from memory.\n'
         '- **Rewriting the full criteria list to fix one assertion.** Use `refine(criterion_id, new_assertion, reason)` instead.'

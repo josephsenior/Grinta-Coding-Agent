@@ -12,8 +12,9 @@ from backend.engine.tools.param_defs import create_tool_definition, get_command_
 
 _ACCEPTANCE_CRITERIA_DESCRIPTION = (
     'Define flat verifiable acceptance criteria — what must be true when done. '
-    'REQUIRED at the start of structured work (bugfix, implementation, refactor, multi-step tasks): '
-    'call `update` with `criteria_list` before any file edit or shell command. '
+    'REQUIRED before work: '
+    'call `update` with `criteria_list` to define verifiable completion assertions. '
+    'Persists across condensation (persisted and auto-re-injected). '
     'Typical workflow: `update` (start) → implement + verify → `audit` (before final summary). '
     'Use `view` to read criteria (includes stable `id` on each item). Use `append` for rare missing items. '
     'Use `refine` to correct an existing assertion in place (requires `reason`). '

@@ -164,6 +164,7 @@ def _routing_memory_tool_placeholders(
     *,
     working_memory_on: bool,
     tracker_on: bool,
+    criteria_on: bool = True,
     semantic_recall_on: bool = False,
 ) -> dict[str, str]:
     ambiguous_intent_instruction = 'If intent is still ambiguous after inspection, see `<ASK_USER_TOOL>` rather than guessing.'
@@ -189,15 +190,58 @@ def _routing_memory_tool_placeholders(
         )
     else:
         memory_and_context_section = ''
-    post_condensation_retrieval = (
-        'Resume from the summary and your most recent verified observations.'
-    )
-    surviving_state_facts = 'Only the visible conversation, current files, and tool observations are available.'
-    remaining_work_source_of_truth = (
-        'Trust your `task_tracker` plan as the source of truth for what remains.'
-        if tracker_on
-        else 'Use recent verified observations as the source of truth for what remains.'
-    )
+    if criteria_on and tracker_on:
+        post_condensation_retrieval = (
+            'Resume from the summary and the re-injected acceptance criteria / task plan; '
+            'use `acceptance_criteria(view)` and `task_tracker(view)` if you need stable ids or step status.'
+        )
+    elif criteria_on:
+        post_condensation_retrieval = (
+            'Resume from the summary and the re-injected acceptance criteria; '
+            'use `acceptance_criteria(view)` if you need stable criterion ids.'
+        )
+    elif tracker_on:
+        post_condensation_retrieval = (
+            'Resume from the summary and the re-injected task plan; '
+            'use `task_tracker(view)` if you need step ids or status.'
+        )
+    else:
+        post_condensation_retrieval = (
+            'Resume from the summary and your most recent verified observations.'
+        )
+    if criteria_on or tracker_on:
+        persisted: list[str] = []
+        if criteria_on:
+            persisted.append('acceptance criteria')
+        if tracker_on:
+            persisted.append('task plans')
+        surviving_state_facts = (
+            f'Persisted {" and ".join(persisted)} survive condensation and are '
+            're-injected automatically; the visible conversation, current files, and fresh '
+            'tool observations remain your live grounding.'
+        )
+    else:
+        surviving_state_facts = (
+            'Only the visible conversation, current files, and tool observations are available.'
+        )
+    if criteria_on and tracker_on:
+        remaining_work_source_of_truth = (
+            'Trust persisted acceptance criteria for what must be true when done and your '
+            '`task_tracker` plan for what execution steps remain.'
+        )
+    elif criteria_on:
+        remaining_work_source_of_truth = (
+            'Trust persisted acceptance criteria as the source of truth for what must be '
+            'true when done.'
+        )
+    elif tracker_on:
+        remaining_work_source_of_truth = (
+            'Trust your `task_tracker` plan as the source of truth for what remains.'
+        )
+    else:
+        remaining_work_source_of_truth = (
+            'Use recent verified observations as the source of truth for what remains.'
+        )
     return {
         'ambiguous_intent_instruction': ambiguous_intent_instruction,
         'memory_and_context_section': memory_and_context_section,

@@ -153,11 +153,26 @@ def _render_system_capabilities(
         if _semantic_recall_runtime(config, semantic_recall_active=semantic_recall_active)
         else 'working / episodic'
     )
+    criteria_on = bool(getattr(config, 'enable_acceptance_criteria_tool', True))
+    tracker_on = bool(getattr(config, 'enable_task_tracker_tool', True))
+    persisted_surfaces: list[str] = []
+    if criteria_on:
+        persisted_surfaces.append('acceptance criteria')
+    if tracker_on:
+        persisted_surfaces.append('task plans')
+    if persisted_surfaces:
+        survival_list = (
+            'verified facts, '
+            + ', '.join(persisted_surfaces)
+            + ', and the immediate task surface'
+        )
+    else:
+        survival_list = 'verified facts and the immediate task surface'
     condensation_line = (
         '- **Conversation condensation**: AUTOMATIC and middleware-driven. '
         'It costs ZERO tool calls and ZERO turns from your budget. '
         f'It uses a {condensation_tiers} memory model and re-injects a pre-condensation '
-        'snapshot after pruning, so verified facts and the immediate task surface survive. '
+        f'snapshot after pruning, so {survival_list} survive. '
         'Do not describe condensation as "lossy" or as something you must invoke manually.'
     )
 
