@@ -9,10 +9,14 @@ The seven concrete detail screens correspond to:
 * ``BrowserCard`` → ``BrowserDetailScreen``
 * ``DebuggerCard`` → ``DebuggerDetailScreen``
 * ``DelegateCard`` / ``MCPCard`` / ``PayloadCard`` → ``PayloadDetailScreen``
+* ``AcceptanceCriteriaCard`` → ``AcceptanceCriteriaDetailScreen``
 """
 
 from __future__ import annotations
 
+from backend.cli.tui.screens.detail.acceptance_criteria import (
+    AcceptanceCriteriaDetailScreen,
+)
 from backend.cli.tui.screens.detail.base import DetailScreen
 from backend.cli.tui.screens.detail.browser import BrowserDetailScreen
 from backend.cli.tui.screens.detail.debugger import DebuggerDetailScreen
@@ -24,6 +28,7 @@ from backend.cli.tui.screens.detail.terminal import TerminalDetailScreen
 
 __all__ = [
     'DetailScreen',
+    'AcceptanceCriteriaDetailScreen',
     'MessageDetailScreen',
     'EditDetailScreen',
     'ShellDetailScreen',

@@ -41,7 +41,7 @@ def clear_pending_memory_lines(orch: 'RendererEventProcessorMixin') -> None:
     """Drop in-flight memory orient rows when a tool resolves as ErrorObservation."""
     orch._pending_memory_recall_line = None
     orch._pending_memory_persist_line = None
-    orch._pending_acceptance_criteria_line = None
+    orch._pending_acceptance_criteria_card = None
 
 
 def _handle_checkpoint_observation(

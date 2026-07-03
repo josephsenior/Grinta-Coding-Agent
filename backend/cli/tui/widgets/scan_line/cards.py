@@ -127,6 +127,10 @@ _SCAN_LINE_ICONS: dict[str, str] = {
     'Shared Board': '⊞',
     'Compacting': '◈',
     'Compacted': '◇',
+    'Defined': '⊡',
+    'Updated': '⊡',
+    'Viewed': '⊡',
+    'Audited': '⊡',
 }
 
 
@@ -851,3 +855,90 @@ class CompactionCard(ScanLineCard):
         # pointer in its on_unmount handler.
         self._live_detail_screen = screen
         return screen
+
+
+# ── AcceptanceCriteriaCard ───────────────────────────────────────────────
+
+
+class AcceptanceCriteriaCard(ScanLineCard):
+    """1-line acceptance criteria summary — full bullet list in detail screen."""
+
+    _VERBS: dict[str, str] = {
+        'view': 'Viewed',
+        'update': 'Defined',
+        'append': 'Updated',
+        'audit': 'Audited',
+    }
+
+    def __init__(
+        self,
+        command: str,
+        *,
+        criteria_list: list[dict[str, Any]] | None = None,
+        status_message: str = '',
+        success: bool | None = None,
+        id: str | None = None,
+    ) -> None:
+        super().__init__(id=id)
+        self._command = str(command or 'view').strip().lower()
+        self._criteria_list = list(criteria_list or [])
+        self._status_message = status_message
+        if success is None:
+            self.set_state('running')
+        elif success:
+            self.set_state('done')
+        else:
+            self.set_state('failed')
+
+    def complete(
+        self,
+        *,
+        criteria_list: list[dict[str, Any]] | None = None,
+        status_message: str = '',
+        success: bool = True,
+    ) -> None:
+        if criteria_list is not None:
+            self._criteria_list = list(criteria_list)
+        if status_message:
+            self._status_message = status_message
+        self.set_state('done' if success else 'failed')
+        self._refresh_line()
+
+    def _command_verb(self) -> str:
+        return self._VERBS.get(self._command, 'Criteria')
+
+    def _detail_summary(self) -> str:
+        count = len(self._criteria_list)
+        if count:
+            label = 'criterion' if count == 1 else 'criteria'
+            return f'{count} {label}'
+        if self._status_message:
+            return _truncate(self._status_message, 70)
+        return self._command
+
+    def _line_text(self) -> str:
+        return self._scan_summary_line(
+            _scan_label_with_icon(self._command_verb()),
+            self._detail_summary(),
+            detail_max=70,
+        )
+
+    def _delta_text(self) -> str:
+        return _status_indicator_markup(self._state)
+
+    def build_detail_screen(self) -> DetailScreen:
+        from backend.cli.tui.screens.detail.acceptance_criteria import (
+            AcceptanceCriteriaDetailScreen,
+        )
+
+        fallback = ''
+        if not self._criteria_list and self._status_message:
+            fallback = self._status_message
+        return AcceptanceCriteriaDetailScreen(
+            command=self._command,
+            criteria_list=self._criteria_list,
+            status_message=self._status_message,
+            fallback_body=fallback,
+            accent=self.state_border_color,
+            title=f'Criteria  {self._command_verb()}',
+        )

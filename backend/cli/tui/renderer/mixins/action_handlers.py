@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from backend.cli.display.hud import HUDBar
 from backend.cli.event_rendering.text_utils import (
     sanitize_streaming_thinking_text,
     sanitize_visible_transcript_text,
@@ -326,6 +327,7 @@ class RendererActionHandlersMixin:
             changed = True
         if hasattr(event, 'llm_metrics') and event.llm_metrics:
             self._hud.update_from_llm_metrics(event.llm_metrics)
+            self._apply_hud_prompt_token_accounting()
             changed = True
         cost = getattr(event, 'cost_usd', None)
         if cost is not None and cost > 0:
@@ -333,6 +335,16 @@ class RendererActionHandlersMixin:
             changed = True
         if changed:
             self._tui._render_hud_bar()
+
+    def _apply_hud_prompt_token_accounting(self) -> None:
+        controller = getattr(self._tui, '_controller', None)
+        if controller is None:
+            return
+        state = getattr(controller, 'state', None)
+        extra = getattr(state, 'extra_data', None) if state is not None else None
+        accounting = HUDBar._prompt_token_accounting_from_extra(extra)
+        if accounting:
+            self._hud.apply_prompt_token_accounting(accounting)
 
     def _handle_state_change(self, obs: Any) -> None:
         state = obs.agent_state

@@ -555,7 +555,7 @@ async def test_tui_browser_screenshot_merges_with_action_card(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_tui_acceptance_criteria_renders_orient_line(mock_config):
+async def test_tui_acceptance_criteria_renders_scan_line_card(mock_config):
     from backend.ledger.action import AcceptanceCriteriaAction
     from backend.ledger.observation.acceptance_criteria import (
         AcceptanceCriteriaObservation,
@@ -580,25 +580,41 @@ async def test_tui_acceptance_criteria_renders_orient_line(mock_config):
         renderer._process_event(
             AcceptanceCriteriaAction(
                 command='update',
-                criteria_list=[{'assertion': 'Build succeeds', 'source': 'stated'}],
+                criteria_list=[
+                    {'assertion': 'Build succeeds', 'source': 'stated'},
+                    {'assertion': 'Tests pass', 'source': 'stated'},
+                ],
             )
         )
         renderer._process_event(
             AcceptanceCriteriaObservation(
                 command='update',
-                criteria_list=[{'assertion': 'Build succeeds', 'source': 'stated'}],
-                content='✅ Acceptance criteria defined (1 items).',
+                criteria_list=[
+                    {'assertion': 'Build succeeds', 'source': 'stated'},
+                    {'assertion': 'Tests pass', 'source': 'stated'},
+                ],
+                content='✅ Acceptance criteria defined (2 items).',
             )
         )
         await pilot.pause()
 
         renderer._tui._write_log.assert_not_called()
-        criteria_lines = [
-            line for line in s.query(OrientLine).results()
-            if line.model.tool == 'acceptance_criteria'
+        from backend.cli.tui.widgets.scan_line import AcceptanceCriteriaCard
+
+        cards = [
+            card
+            for card in s.query(AcceptanceCriteriaCard).results()
         ]
-        assert len(criteria_lines) == 1
-        assert criteria_lines[0].model.verb == 'Defined'
-        assert 'update' in criteria_lines[0].model.target
-        assert 'Acceptance criteria defined' in criteria_lines[0].model.result
+        assert len(cards) == 1
+        card = cards[0]
+        assert card._command == 'update'
+        assert len(card._criteria_list) == 2
+        assert '2 criteria' in str(card._line_text())
+
+        detail = card.build_detail_screen()
+        body_widgets = detail.build_content()
+        joined = '\n'.join(str(getattr(widget, 'render', lambda: widget)()) for widget in body_widgets)
+        assert 'Build succeeds' in joined
+        assert 'Tests pass' in joined
+        assert '●' in joined
 

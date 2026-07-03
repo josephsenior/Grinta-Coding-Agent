@@ -98,7 +98,7 @@ class ScreenStateMixin:
             return display_state
         if self._state_lookup_key(raw_state) not in self._TURN_DURATION_STATES:
             return display_state
-        return f'{display_state} (worked for {duration})'
+        return f'{display_state} [worked for {duration}]'
 
     @classmethod
     def _resolve_state_display(cls, raw_state: str | None) -> tuple[str, str]:
@@ -204,11 +204,7 @@ class ScreenStateMixin:
             )
         else:
             state_part = f'[{state_color}]● {display_state}[/]'
-        parts = [
-            '[#91abec]GRINTA[/]',
-            state_part,
-        ]
-        return '  '.join(parts)
+        return state_part
 
     def _tick_hud_running_pulse(self) -> None:
         """Advance the HUD bullet pulse for active/waiting states (cheap label-only refresh)."""
@@ -226,8 +222,11 @@ class ScreenStateMixin:
         self._render_hud_bar()
 
     @staticmethod
-    def _build_hud_line1_ws(ws_display: str) -> str:
-        return f'[{NAVY_TEXT_DIM}]Ws: {ws_display}[/]'
+    def _build_hud_line2_leading(ws_display: str) -> str:
+        return (
+            f'[#91abec].Grinta[/]  '
+            f'[{NAVY_TEXT_DIM}]Ws: {ws_display}[/]'
+        )
 
     @staticmethod
     def _build_context_display(used: int, limit: int) -> str:
@@ -251,11 +250,11 @@ class ScreenStateMixin:
             word = 'low' if pct < 80 else 'med' if pct < 95 else 'high'
             return (
                 f'[{NAVY_TEXT_DIM}]Ctx: {used_label}/{limit_label} '
-                f'({pct}% {word})  '
+                f'[{pct}% {word}]  '
                 f'[{ctx_color}]{glyph("●")}[/][/]'
             )
         return (
-            f'[{NAVY_TEXT_DIM}]Ctx: {used_label}/{limit_label} ({pct}%)  '
+            f'[{NAVY_TEXT_DIM}]Ctx: {used_label}/{limit_label} [{pct}%]  '
             f'[{ctx_color}]●[/][/]'
         )
 
@@ -514,11 +513,9 @@ class ScreenStateMixin:
         hud.update_interaction_mode(current_mode)
 
         workspace = self._resolve_workspace_display(hud.state.workspace_path)
-        term_width = getattr(getattr(self, 'size', None), 'width', None) or 120
-        ws_budget = max(20, term_width // 3)
-        ws_display = HUDBar.ellipsize_path(workspace, ws_budget)
+        ws_display = HUDBar.compact_workspace_label(workspace, max_len=24)
         line1 = self._build_hud_line1(display_state, state_color, raw_state=raw_state)
-        line1_ws = self._build_hud_line1_ws(ws_display)
+        line2_leading = self._build_hud_line2_leading(ws_display)
         model_label = f'[{NAVY_TEXT_SECONDARY}]{model_display}[/]'
 
         token_display = self._build_context_display(used, limit)
@@ -528,7 +525,7 @@ class ScreenStateMixin:
         hud_bar = self.query_one('#hud-bar', HUD)
         hud_bar.query_one('#hud-line-1', Label).update(line1)
         hud_bar.query_one('#hud-model-name', Label).update(model_label)
-        hud_bar.query_one('#hud-line-2-ws', Label).update(line1_ws)
+        hud_bar.query_one('#hud-line-2-ws', Label).update(line2_leading)
         hud_bar.query_one('#hud-line-2', Label).update(line2)
         hud_bar.query_one('#hud-line-1-help', Label).update(help_hint)
         self._sync_hud_reasoning_select(hud_bar)

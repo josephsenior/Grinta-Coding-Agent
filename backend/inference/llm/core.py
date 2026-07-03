@@ -236,6 +236,9 @@ class LLM(RetryMixin, DebugMixin):
         ):
             kwargs.pop(param, None)
         prompt_accounting = kwargs.pop('_prompt_accounting', None)
+        self._last_prompt_accounting = (
+            prompt_accounting if isinstance(prompt_accounting, dict) else None
+        )
 
         call_kwargs = {
             'model': self.config.model,
@@ -340,6 +343,11 @@ class LLM(RetryMixin, DebugMixin):
         )
         self.metrics.add_cost(cost)
 
+        accounting = getattr(self, '_last_prompt_accounting', None) or {}
+        full_request_tokens = int(accounting.get('full_request_tokens', 0) or 0)
+        usable_input_tokens = int(accounting.get('usable_input_tokens', 0) or 0)
+        self._last_prompt_accounting = None
+
         self.metrics.add_token_usage(
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
@@ -348,6 +356,8 @@ class LLM(RetryMixin, DebugMixin):
             context_window=self._get_context_window_for_metrics(),
             response_id=response.id,
             usage_estimated=usage_estimated,
+            full_request_tokens=full_request_tokens,
+            usable_input_tokens=usable_input_tokens,
         )
         try:
             from backend.core.logging.session_event_logger import emit_session_event

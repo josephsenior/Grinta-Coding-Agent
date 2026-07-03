@@ -12,6 +12,7 @@ from __future__ import annotations
 from backend.cli.tui.widgets.scan_line.card import ScanLineCard
 from backend.cli.tui.widgets.scan_line.cards import (
     AgentMessageCard,
+    AcceptanceCriteriaCard,
     BrowserCard,
     CompactionCard,
     DebuggerCard,
@@ -30,6 +31,7 @@ from backend.cli.tui.widgets.scan_line.cards import (
 
 __all__ = [
     'ScanLineCard',
+    'AcceptanceCriteriaCard',
     'AgentMessageCard',
     'DelegateCard',
     'EditCard',

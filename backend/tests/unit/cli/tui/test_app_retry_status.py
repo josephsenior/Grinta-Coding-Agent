@@ -62,7 +62,7 @@ def test_grinta_screen_append_turn_duration_for_finished() -> None:
 
     result = screen._append_turn_duration('Ready', 'finished')
 
-    assert result == 'Ready (worked for 2m 3s)'
+    assert result == 'Ready [worked for 2m 3s]'
 
 
 @pytest.mark.asyncio
