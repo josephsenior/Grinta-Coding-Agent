@@ -376,9 +376,19 @@ class RendererActionHandlersMixin:
             self._hud.update_agent_state(str(state))
             self._tui.set_agent_phase(str(state))
 
+        self._maybe_start_agent_turn(state)
         self._maybe_end_agent_turn(state)
         self._state_event.set()
         self._tui._render_hud_bar()
+
+    def _maybe_start_agent_turn(self, state: Any) -> None:
+        if self._in_agent_turn or state != AgentState.RUNNING:
+            return
+        self._in_agent_turn = True
+        self._turn_count += 1
+        self._tools_in_turn = 0
+        self._turn_start_time = time.monotonic()
+        self._tui._last_turn_duration = None
 
     def _maybe_end_agent_turn(self, state: Any) -> None:
         if self._in_agent_turn and state in (
@@ -388,11 +398,8 @@ class RendererActionHandlersMixin:
             AgentState.STOPPED,
         ):
             self._in_agent_turn = False
-            if self._tools_in_turn > 0:
-                elapsed = time.monotonic() - self._turn_start_time
-                self._tui._last_turn_duration = self._format_turn_duration(int(elapsed))
-            else:
-                self._tui._last_turn_duration = None
+            elapsed = time.monotonic() - self._turn_start_time
+            self._tui._last_turn_duration = self._format_turn_duration(int(elapsed))
 
         if state in (AgentState.FINISHED, AgentState.ERROR, AgentState.STOPPED):
             self._tui._agent_running = False

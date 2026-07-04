@@ -65,6 +65,15 @@ def test_grinta_screen_append_turn_duration_for_finished() -> None:
     assert result == 'Ready [worked for 2m 3s]'
 
 
+def test_grinta_screen_append_turn_duration_for_ready_label() -> None:
+    screen = GrintaScreen.__new__(GrintaScreen)
+    screen._last_turn_duration = '45s'
+
+    result = screen._append_turn_duration('Ready', 'Ready')
+
+    assert result == 'Ready [worked for 45s]'
+
+
 @pytest.mark.asyncio
 async def test_tui_renderer_surfaces_retry_pending_status() -> None:
     hud = HUDBar()

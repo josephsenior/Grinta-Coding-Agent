@@ -49,7 +49,7 @@ class ScreenStateMixin:
     """State-related methods of GrintaScreen."""
 
     _TURN_DURATION_STATES = frozenset(
-        {'awaiting_user_input', 'finished', 'stopped', 'error'}
+        {'awaiting_user_input', 'finished', 'stopped', 'error', 'ready'}
     )
     _RUNNING_PULSE_BULLETS = ('●', '◉')
     _RUNNING_PULSE_COLORS = (NAVY_RUNNING, NAVY_RUNNING_DIM)
