@@ -128,10 +128,21 @@ class PreExecDiffMiddleware(ToolInvocationMiddleware):
 
         # Count boundary-aware matches (not naive substring count).
         import re as _re
+
         boundary_matches = [
-            m for m in _re.finditer(_re.escape(old_match), old_content)
-            if (m.start() == 0 or not (old_content[m.start()-1].isalnum() or old_content[m.start()-1] == '_'))
-            and (m.end() >= len(old_content) or not (old_content[m.end()].isalnum() or old_content[m.end()] == '_'))
+            m
+            for m in _re.finditer(_re.escape(old_match), old_content)
+            if (
+                m.start() == 0
+                or not (
+                    old_content[m.start() - 1].isalnum()
+                    or old_content[m.start() - 1] == '_'
+                )
+            )
+            and (
+                m.end() >= len(old_content)
+                or not (old_content[m.end()].isalnum() or old_content[m.end()] == '_')
+            )
         ]
         match_count = len(boundary_matches)
         if match_count == 0 or (match_count > 1 and not replace_all):
@@ -141,7 +152,10 @@ class PreExecDiffMiddleware(ToolInvocationMiddleware):
             from backend.execution.utils.file_editor._file_editor_edit_helpers import (
                 _replace_all_with_boundary_check,
             )
-            return _replace_all_with_boundary_check(old_content, old_match, new_replacement)
+
+            return _replace_all_with_boundary_check(
+                old_content, old_match, new_replacement
+            )
         return old_content.replace(old_match, new_replacement, 1)
 
     def _simulate_range_edit(self, old_content: str, action) -> str | None:

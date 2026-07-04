@@ -19,7 +19,6 @@ from backend.core.logging.logger import app_logger as logger
 from backend.ledger.action import ActionSecurityRisk
 from backend.telemetry.models import AuditEntry
 
-
 # Patterns for credentials that may end up in `str(action)` for non-typed
 # actions. Matches are deliberately conservative — false positives are cheap
 # (we replace with a placeholder), false negatives leak secrets to disk.
@@ -35,8 +34,12 @@ _CREDENTIAL_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r'eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}'),
     re.compile(r'AKIA[0-9A-Z]{12,}'),
     re.compile(r'AIza[0-9A-Za-z_-]{32,}'),
-    re.compile(r'-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]+?-----END [A-Z ]*PRIVATE KEY-----'),
-    re.compile(r'(?i)(?:password|passwd|token|secret|api[_-]?key|auth)\s*[:=]\s*["\']?([^\s,"\']{6,})'),
+    re.compile(
+        r'-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]+?-----END [A-Z ]*PRIVATE KEY-----'
+    ),
+    re.compile(
+        r'(?i)(?:password|passwd|token|secret|api[_-]?key|auth)\s*[:=]\s*["\']?([^\s,"\']{6,})'
+    ),
     re.compile(r'(?i)bearer\s+[A-Za-z0-9._-]{16,}'),
 )
 _CREDENTIAL_PLACEHOLDER = '<credential_redacted>'

@@ -69,10 +69,7 @@ class ActivityMixin(CLIEventRenderer if TYPE_CHECKING else object):
     @staticmethod
     def _search_head_says_no_match(lines: list[str]) -> bool:
         head_blob = '\n'.join(lines[:5])
-        return any(
-            frag in head_blob
-            for frag in ActivityMixin._NO_MATCH_FRAGMENTS
-        )
+        return any(frag in head_blob for frag in ActivityMixin._NO_MATCH_FRAGMENTS)
 
     _PLAIN_RG_LOCATION_LINE = re.compile(r'^[^:]+:\d+:')
     _RG_PATH_LINE_COLON = re.compile(r'^([^:]+):(\d+):(.*)$')
@@ -102,9 +99,7 @@ class ActivityMixin(CLIEventRenderer if TYPE_CHECKING else object):
     @staticmethod
     def _format_match_count(lines: list[str]) -> str:
         match_count = sum(
-            1
-            for line in lines
-            if ActivityMixin._PLAIN_RG_LOCATION_LINE.match(line)
+            1 for line in lines if ActivityMixin._PLAIN_RG_LOCATION_LINE.match(line)
         ) or len(lines)
         return f'Found {match_count} match{"es" if match_count != 1 else ""}.'
 

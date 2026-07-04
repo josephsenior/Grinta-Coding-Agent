@@ -78,7 +78,9 @@ def handle_checkpoint_list(host: Any, args: list[str]) -> None:
     if not entries:
         msg = 'No checkpoints recorded yet.'
         if not show_all:
-            msg += ' (system transactions hidden; use /checkpoint list --all to see them)'
+            msg += (
+                ' (system transactions hidden; use /checkpoint list --all to see them)'
+            )
         if host._renderer is not None:
             host._renderer.add_system_message(msg, title='checkpoint')
         return

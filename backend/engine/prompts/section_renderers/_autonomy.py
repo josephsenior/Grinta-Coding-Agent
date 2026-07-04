@@ -228,11 +228,7 @@ def _render_autonomy(
         task_tracker_discipline_block = ''
 
     if criteria_on:
-        tracker_follow = (
-            ', then `task_tracker(update, ...)`'
-            if tracker_on
-            else ''
-        )
+        tracker_follow = ', then `task_tracker(update, ...)`' if tracker_on else ''
         during_work = (
             '**During work:** update only the coarse `task_tracker` plan — not criteria.\n'
             if tracker_on
@@ -271,9 +267,7 @@ def _render_autonomy(
         'For debug/fix tasks, re-run the same reproducer when possible.'
     )
     if tracker_on:
-        problem_solving_workflow_body += (
-            '\n\nWith **task_tracker** enabled, sync the plan after verify when progress changed.'
-        )
+        problem_solving_workflow_body += '\n\nWith **task_tracker** enabled, sync the plan after verify when progress changed.'
 
     task_sync_instruction = _build_task_sync_instruction(
         tracker_on=tracker_on, criteria_on=criteria_on

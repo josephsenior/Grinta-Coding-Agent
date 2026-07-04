@@ -259,14 +259,21 @@ class RollbackManager:
                 text=True,
                 timeout=5,
             )
-            parent_args = ['-p', head_result.stdout.strip()] if head_result.returncode == 0 else []
+            parent_args = (
+                ['-p', head_result.stdout.strip()]
+                if head_result.returncode == 0
+                else []
+            )
 
             # 5. Create a detached commit object — HEAD is NOT updated.
             commit_result = subprocess.run(
                 [
-                    'git', 'commit-tree', tree_sha,
+                    'git',
+                    'commit-tree',
+                    tree_sha,
                     *parent_args,
-                    '-m', '[Grinta Snapshot] detached auto-checkpoint',
+                    '-m',
+                    '[Grinta Snapshot] detached auto-checkpoint',
                 ],
                 check=False,
                 cwd=self.workspace_path,

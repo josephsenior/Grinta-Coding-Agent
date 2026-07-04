@@ -30,7 +30,6 @@ from backend.context.context_pipeline.helpers import (
 )
 from backend.context.context_pipeline.types import (
     _AUTOCOMPACT_FAILURE_STREAK_KEY,
-    _COMPACTION_TARGET_RATIO,
     _CONSECUTIVE_CONDENSATION_KEY,
     _INEFFECTIVE_COMPACT_STREAK_KEY,
     _INEFFECTIVE_COMPACT_UNTIL_KEY,
@@ -178,9 +177,7 @@ def record_boundary_compact(
     )
     record_post_compact_baseline(state, post_events)
     if budget is not None:
-        post_tokens = estimate_boundary_event_tokens(
-            post_events, llm_config=llm_config
-        )
+        post_tokens = estimate_boundary_event_tokens(post_events, llm_config=llm_config)
         pipe = _pipeline_state(state)
         pipe[_POST_COMPACT_TRUE_TOKENS_KEY] = post_tokens
         if post_tokens >= budget.autocompact_threshold:
@@ -209,9 +206,7 @@ def action_meets_effectiveness(
     state: State,
     llm_config: object | None,
 ) -> bool:
-    return passes_effectiveness_gate(
-        history, events, action, budget, state, llm_config
-    )
+    return passes_effectiveness_gate(history, events, action, budget, state, llm_config)
 
 
 def passes_effectiveness_gate(
@@ -227,9 +222,7 @@ def passes_effectiveness_gate(
     post_events = project_after_compact_boundary(
         _synthetic_history_after_action(history, action)
     )
-    post_tokens = estimate_boundary_event_tokens(
-        post_events, llm_config=llm_config
-    )
+    post_tokens = estimate_boundary_event_tokens(post_events, llm_config=llm_config)
     return (
         budget.estimated_tokens - post_tokens
     ) >= DEFAULT_COMPACT_MIN_TOKEN_REDUCTION
@@ -329,13 +322,14 @@ def resolve_continuity_or_fallback(
     """Evaluate continuity telemetry; always returns *action* (telemetry-only)."""
     decision = evaluate_continuity_gate(state, history, action)
     if not decision.passed:
-        missing_items = (
-            ', '.join(decision.missing[:5]) if decision.missing else 'none'
-        )
+        missing_items = ', '.join(decision.missing[:5]) if decision.missing else 'none'
         logger.warning(
             'Compaction continuity metric score=%.2f matched=%d/%d '
             'missing=%s (accepting anyway)',
-            decision.score, decision.matched, decision.total, missing_items,
+            decision.score,
+            decision.matched,
+            decision.total,
+            missing_items,
         )
     return action
 
@@ -413,9 +407,7 @@ class _CompactionEngine:
                     if self._get_structured_compactor_cb
                     else None
                 )
-                if compactor is not None and getattr(
-                    compactor, 'last_degraded', False
-                ):
+                if compactor is not None and getattr(compactor, 'last_degraded', False):
                     logger.warning(
                         'ContextPipeline: 5b degraded on attempt %d/%d; '
                         'retrying LLM compaction',
@@ -510,9 +502,7 @@ class _CompactionEngine:
         )
 
         pruned_events = [
-            event
-            for event in events
-            if getattr(event, 'id', None) in pruned_preview
+            event for event in events if getattr(event, 'id', None) in pruned_preview
         ]
         summary = AmortizedPruningCompactor._build_recovery_summary(pruned_events)
         tail = _shrink_tail_for_token_reduction(
@@ -530,4 +520,3 @@ class _CompactionEngine:
             summary=summary,
             summary_offset=0,
         )
-

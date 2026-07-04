@@ -3,10 +3,7 @@
 """Tests for SessionOrchestrator — the main agent orchestration controller."""
 # pylint: disable=protected-access,too-many-lines
 
-import asyncio
-from types import SimpleNamespace
-from typing import cast
-from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -14,14 +11,9 @@ from backend.core.enums import LifecyclePhase
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
 from backend.ledger.action import MessageAction
-from backend.orchestration.action_scheduler import ActionScheduler
-from backend.orchestration.orchestration_config import OrchestrationConfig
 from backend.orchestration.session_orchestrator import (
-    ERROR_ACTION_NOT_EXECUTED_ERROR,
     ERROR_ACTION_NOT_EXECUTED_STOPPED,
     ERROR_ACTION_NOT_EXECUTED_STOPPED_ID,
-    TRAFFIC_CONTROL_REMINDER,
-    SessionOrchestrator,
 )
 
 
@@ -31,7 +23,6 @@ class TestStateHelpers:
     @pytest.fixture(autouse=True)
     def _setup(self, ctrl):
         self.ctrl = ctrl
-
 
     def test_get_agent_state(self):
         self.ctrl.state_tracker.state.agent_state = AgentState.AWAITING_USER_INPUT
@@ -55,15 +46,12 @@ class TestStateHelpers:
 # ── get_transcript ───────────────────────────────────────────────────
 
 
-
-
 class TestGetTranscript:
     """Test get_transcript."""
 
     @pytest.fixture(autouse=True)
     def _setup(self, ctrl):
         self.ctrl = ctrl
-
 
     def test_get_transcript_requires_closed(self):
         self.ctrl._lifecycle = LifecyclePhase.ACTIVE
@@ -85,15 +73,12 @@ class TestGetTranscript:
 # ── _is_stuck ────────────────────────────────────────────────────────
 
 
-
-
 class TestIsStuck:
     """Test _is_stuck delegation."""
 
     @pytest.fixture(autouse=True)
     def _setup(self, ctrl):
         self.ctrl = ctrl
-
 
     def test_is_stuck_true(self):
         self.ctrl.services.stuck.is_stuck.return_value = True
@@ -107,8 +92,6 @@ class TestIsStuck:
 # ── _first_user_message ─────────────────────────────────────────────
 
 
-
-
 class TestFirstUserMessage:
     """Test _first_user_message."""
 
@@ -116,11 +99,8 @@ class TestFirstUserMessage:
     def _setup(self, ctrl):
         self.ctrl = ctrl
 
-
     def test_with_events_list(self):
         import builtins
-
-        from backend.ledger.action import MessageAction
 
         msg = MagicMock(spec=MessageAction)
         msg.source = EventSource.USER
@@ -146,15 +126,12 @@ class TestFirstUserMessage:
 # ── __repr__ ─────────────────────────────────────────────────────────
 
 
-
-
 class TestActionContextManagement:
     """Test action context register, bind, cleanup."""
 
     @pytest.fixture(autouse=True)
     def _setup(self, ctrl):
         self.ctrl = ctrl
-
 
     def test_register_action_context(self):
         action = MagicMock()
@@ -204,15 +181,12 @@ class TestActionContextManagement:
 # ── _reset ───────────────────────────────────────────────────────────
 
 
-
-
 class TestReset:
     """Test _reset."""
 
     @pytest.fixture(autouse=True)
     def _setup(self, ctrl):
         self.ctrl = ctrl
-
 
     def test_reset_clears_contexts(self):
         self.ctrl._action_contexts_by_object[1] = MagicMock()
@@ -286,15 +260,12 @@ class TestReset:
 # ── _is_awaiting_observation ─────────────────────────────────────────
 
 
-
-
 class TestIsAwaitingObservation:
     """Test _is_awaiting_observation."""
 
     @pytest.fixture(autouse=True)
     def _setup(self, ctrl):
         self.ctrl = ctrl
-
 
     def test_returns_true_when_running(self):
         from backend.ledger.observation import AgentStateChangedObservation
@@ -318,5 +289,3 @@ class TestIsAwaitingObservation:
 
 
 # ── log_task_audit ───────────────────────────────────────────────────
-
-

@@ -831,7 +831,9 @@ class CompactionCard(ScanLineCard):
                 pass
 
     def _line_text(self) -> str:
-        return self._scan_summary_line(_scan_label_with_icon(self._label), '', detail_max=50)
+        return self._scan_summary_line(
+            _scan_label_with_icon(self._label), '', detail_max=50
+        )
 
     def _delta_text(self) -> str:
         return _status_indicator_markup(self._state)

@@ -67,9 +67,7 @@ def _build_fallback_action(orch: Orchestrator, result) -> Action:
             message_text = raw if isinstance(raw, str) else str(raw)
 
     if not message_text.strip():
-        logger.debug(
-            'LLM returned no tool calls and no content; continuing the run.'
-        )
+        logger.debug('LLM returned no tool calls and no content; continuing the run.')
         return NullAction(reason=NullActionReason.REASONING_ONLY)
     message_text = _visible_fallback_message_text(message_text)
     if not message_text.strip():

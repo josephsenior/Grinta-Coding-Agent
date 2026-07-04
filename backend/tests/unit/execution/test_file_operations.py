@@ -10,8 +10,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from backend.execution.aes.file_operations import (
-    DIFF_CODEC_MARKER_PREFIX,
     _DIFF_TRUNC_HARD_CAP,
+    DIFF_CODEC_MARKER_PREFIX,
     _format_directory_listing,
     _get_max_cmd_output_chars,
     _list_directory_recursive,
@@ -113,12 +113,18 @@ class TestTruncateDiff:
         diff = '\n'.join(lines)
         result = truncate_diff(diff, path='foo')
         # Context lines should be dropped first; most changes should survive
-        add_count = sum(1 for l in result.splitlines() if l.startswith('+added'))
-        remove_count = sum(1 for l in result.splitlines() if l.startswith('-removed'))
+        add_count = sum(1 for line in result.splitlines() if line.startswith('+added'))
+        remove_count = sum(
+            1 for line in result.splitlines() if line.startswith('-removed')
+        )
         assert add_count > 100, f'Only {add_count} additions survived (expected >100)'
-        assert remove_count > 100, f'Only {remove_count} removals survived (expected >100)'
+        assert remove_count > 100, (
+            f'Only {remove_count} removals survived (expected >100)'
+        )
         # Far context (non-adjacent) should be entirely dropped
-        far_ctx = sum(1 for l in result.splitlines() if l.startswith(' far context'))
+        far_ctx = sum(
+            1 for line in result.splitlines() if line.startswith(' far context')
+        )
         assert far_ctx == 0, f'{far_ctx} far context lines survived (expected 0)'
 
     def test_hunk_headers_always_preserved_in_truncated_mode(self):
@@ -131,8 +137,10 @@ class TestTruncateDiff:
             lines.append(f' context {i} with some padding text here')
         diff = '\n'.join(lines)
         result = truncate_diff(diff, path='foo')
-        header_count = sum(1 for l in result.splitlines() if l.startswith('@@'))
-        assert header_count == 400, f'Only {header_count} hunk headers survived (expected 400)'
+        header_count = sum(1 for line in result.splitlines() if line.startswith('@@'))
+        assert header_count == 400, (
+            f'Only {header_count} hunk headers survived (expected 400)'
+        )
 
     def test_fidelity_summary_emitted_when_truncated(self):
         """The fidelity summary must be present when truncation occurs."""
@@ -158,11 +166,13 @@ class TestTruncateDiff:
         # Create a diff with many files so headers exceed 20k
         lines = []
         for i in range(2000):
-            lines.append(f'diff --git a/file_{i:04d}_with_long_name.py b/file_{i:04d}_with_long_name.py')
-            lines.append(f'index abc..def 100644')
+            lines.append(
+                f'diff --git a/file_{i:04d}_with_long_name.py b/file_{i:04d}_with_long_name.py'
+            )
+            lines.append('index abc..def 100644')
             lines.append(f'--- a/file_{i:04d}_with_long_name.py')
             lines.append(f'+++ b/file_{i:04d}_with_long_name.py')
-            lines.append(f'@@ -1,1 +1,1 @@')
+            lines.append('@@ -1,1 +1,1 @@')
             lines.append(f'+change {i}')
         diff = '\n'.join(lines)
         result = truncate_diff(diff)
@@ -183,8 +193,10 @@ class TestTruncateDiff:
             lines.append(f' far context {i}')
         diff = '\n'.join(lines)
         result = truncate_diff(diff, path='foo')
-        result_lines = [l for l in result.splitlines() if l.startswith('+add ')]
-        indices = [int(l.split()[1]) for l in result_lines]
+        result_lines = [
+            line for line in result.splitlines() if line.startswith('+add ')
+        ]
+        indices = [int(line.split()[1]) for line in result_lines]
         assert indices == sorted(indices), 'Lines not in original order'
 
     def test_generated_file_hunks_collapsed(self):
@@ -254,7 +266,8 @@ class TestCmdOutputObservationNoInitTruncation:
 
     def test_truncate_cmd_output_is_effective_at_env_default(self):
         """truncate_cmd_output at 40 000 chars must actually truncate
-        content that would have been pre-capped at 10 000 before."""
+        content that would have been pre-capped at 10 000 before.
+        """
         output = ''.join(f'line-{i:05d}-padding\n' for i in range(5000))
         assert len(output) > 40_000
         truncated = truncate_cmd_output(output)

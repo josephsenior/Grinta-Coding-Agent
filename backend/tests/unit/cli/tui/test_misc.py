@@ -1,8 +1,9 @@
 """Headless TUI — misc."""
 
+from typing import Any
+
 from backend.tests.unit.cli.tui._shared import (
     ActivityRenderer,
-    AgentMessage,
     AgentState,
     AgentStateChangedObservation,
     AsyncMock,
@@ -19,15 +20,13 @@ from backend.tests.unit.cli.tui._shared import (
     ScrollTailBadge,
     SimpleNamespace,
     Static,
-    StreamingChunkAction,
     TUIRenderer,
-    TerminalObservation,
-    UnifiedDiffView,
     _fill_scrollable_transcript,
     _get_screen,
     asyncio,
     pytest,
 )
+
 
 @pytest.mark.asyncio
 async def test_tui_composer_placeholder_changes_by_mode(mock_config):
@@ -54,6 +53,7 @@ async def test_tui_composer_placeholder_changes_by_mode(mock_config):
         s._apply_mode('agent')
         await pilot.pause()
         assert 'Describe a task for Grinta to execute...' in str(hint.renderable)
+
 
 @pytest.mark.asyncio
 async def test_tui_agent_message_action_renders_response(mock_config):
@@ -84,6 +84,7 @@ async def test_tui_agent_message_action_renders_response(mock_config):
         from backend.cli.tui.widgets.activity_card import AgentMessage
 
         assert isinstance(renderer._history[0], AgentMessage)
+
 
 @pytest.mark.asyncio
 async def test_tui_transcript_only_agent_message_is_plain(mock_config):
@@ -119,6 +120,7 @@ async def test_tui_transcript_only_agent_message_is_plain(mock_config):
         assert len(msgs) == 1
         assert msgs[0].has_class('-plain')
         assert renderer._history[0] is msgs[0]
+
 
 @pytest.mark.asyncio
 async def test_tui_renderer_receives_queued_agent_message_events(mock_config):
@@ -164,6 +166,7 @@ async def test_tui_renderer_receives_queued_agent_message_events(mock_config):
 
             assert isinstance(renderer._history[0], AgentMessage)
 
+
 @pytest.mark.asyncio
 async def test_tui_turn_duration_shown_in_hud_not_transcript(mock_config):
     console = RichConsole()
@@ -199,6 +202,7 @@ async def test_tui_turn_duration_shown_in_hud_not_transcript(mock_config):
         assert s._last_turn_duration in line1
         assert 'Ready' in line1
 
+
 def test_activity_renderer_keeps_failed_delegation_open() -> None:
     card = ActivityRenderer.delegation(
         'Fix parser',
@@ -208,6 +212,7 @@ def test_activity_renderer_keeps_failed_delegation_open() -> None:
     assert card.secondary == 'failed'
     assert card.secondary_kind == 'err'
     assert card.start_collapsed is False
+
 
 @pytest.mark.asyncio
 async def test_tui_run_agent_loop_is_awaitable(mock_config):
@@ -221,6 +226,7 @@ async def test_tui_run_agent_loop_is_awaitable(mock_config):
 
         s = _get_screen(app)
         assert asyncio.iscoroutinefunction(s._run_agent_loop)
+
 
 @pytest.mark.asyncio
 async def test_tui_dispatch_enqueues_user_message_before_starting_agent(mock_config):
@@ -260,6 +266,7 @@ async def test_tui_dispatch_enqueues_user_message_before_starting_agent(mock_con
         assert event_stream.events[0][1] == EventSource.USER
         assert event_stream.events[0][0].content == 'hello'
 
+
 @pytest.mark.asyncio
 async def test_handle_input_skips_user_transcript_when_bootstrap_fails(
     mock_config, monkeypatch
@@ -289,6 +296,7 @@ async def test_handle_input_skips_user_transcript_when_bootstrap_fails(
         await s._handle_input('do not show this in transcript')
 
         assert user_messages == []
+
 
 @pytest.mark.asyncio
 async def test_tui_handle_input_does_not_bootstrap_twice_after_background_ready(
@@ -328,6 +336,7 @@ async def test_tui_handle_input_does_not_bootstrap_twice_after_background_ready(
         assert calls == 1
         s._dispatch_to_agent.assert_awaited_once_with('hello', image_urls=[])
 
+
 @pytest.mark.asyncio
 async def test_tui_drain_events_noop_when_empty(mock_config, monkeypatch):
     """Verify drain_events is safe to call with no pending events."""
@@ -361,6 +370,7 @@ async def test_tui_drain_events_noop_when_empty(mock_config, monkeypatch):
                 loop=loop,
             )
             renderer.drain_events()
+
 
 @pytest.mark.asyncio
 async def test_handle_input_releases_lock_during_dispatch(mock_config, monkeypatch):
@@ -414,6 +424,7 @@ async def test_handle_input_releases_lock_during_dispatch(mock_config, monkeypat
         await asyncio.wait_for(task, timeout=10)
         assert s._turn_in_flight is False
 
+
 @pytest.mark.asyncio
 async def test_tui_stats_panel_exists(mock_config):
     """Verify stats panel in input bar is present."""
@@ -427,6 +438,7 @@ async def test_tui_stats_panel_exists(mock_config):
         s = _get_screen(app)
         stats = s.query_one('#hud-bar')
         assert stats is not None
+
 
 @pytest.mark.asyncio
 async def test_bootstrap_setup_renderer_marks_ready_before_hydrate(mock_config):
@@ -464,6 +476,7 @@ async def test_bootstrap_setup_renderer_marks_ready_before_hydrate(mock_config):
         assert s._hud.state.agent_state_label == 'awaiting_user_input'
         await asyncio.wait_for(hydrate_started.wait(), timeout=2.0)
 
+
 @pytest.mark.asyncio
 async def test_environment_probe_unblocks_dispatch(mock_config, monkeypatch):
     console = RichConsole()
@@ -488,6 +501,7 @@ async def test_environment_probe_unblocks_dispatch(mock_config, monkeypatch):
         await asyncio.wait_for(probe_started.wait(), timeout=2.0)
         assert not wait_task.done()
         await asyncio.wait_for(wait_task, timeout=2.0)
+
 
 @pytest.mark.asyncio
 async def test_dispatch_waits_for_environment_ready(mock_config, monkeypatch):
@@ -518,6 +532,7 @@ async def test_dispatch_waits_for_environment_ready(mock_config, monkeypatch):
         await s._dispatch_to_agent('hello')
 
         assert env_waited.is_set()
+
 
 @pytest.mark.asyncio
 async def test_drain_invocation_budget_reschedules_with_backlog(
@@ -563,6 +578,7 @@ async def test_drain_invocation_budget_reschedules_with_backlog(
     assert post_drain.called
     assert len(orch._pending_events) > 0
 
+
 @pytest.mark.asyncio
 async def test_drain_respects_frame_budget(mock_config, monkeypatch):
     from backend.cli.tui.renderer import drain as drain_mod
@@ -588,6 +604,7 @@ async def test_drain_respects_frame_budget(mock_config, monkeypatch):
     count = await drain_mod._process_events_with_frame_budget(orch, events)
     assert count < len(events)
     assert count >= 1
+
 
 @pytest.mark.asyncio
 async def test_viewport_keeps_bounded_child_count(mock_config):
@@ -617,6 +634,7 @@ async def test_viewport_keeps_bounded_child_count(mock_config):
         await pilot.pause()
         assert display.child_widget_count <= _TUI_VIEWPORT_MAX_MOUNTED
 
+
 def test_no_pending_event_drop_under_burst(monkeypatch):
     from backend.cli.tui.renderer import drain as drain_mod
     from backend.ledger.observation.terminal import TerminalObservation
@@ -645,6 +663,7 @@ def test_no_pending_event_drop_under_burst(monkeypatch):
 
     assert orch._pending_events_dropped == 0
     assert len(orch._pending_events) <= 5
+
 
 def test_on_event_eagerly_applies_task_list_and_prioritizes_queue(monkeypatch):
     from collections import deque
@@ -694,6 +713,7 @@ def test_on_event_eagerly_applies_task_list_and_prioritizes_queue(monkeypatch):
     refresh_scheduled[0][0]()
     assert refresh_calls == ['refresh']
 
+
 @pytest.mark.asyncio
 async def test_tui_scroll_badge_shows_and_follows_tail(mock_config, monkeypatch):
     console = RichConsole()
@@ -722,6 +742,7 @@ async def test_tui_scroll_badge_shows_and_follows_tail(mock_config, monkeypatch)
         assert display._user_scrolled_away is False
         assert badge.has_class('-hidden')
 
+
 def test_unified_diff_view_scrollable_after_ten_lines() -> None:
     from textual.containers import VerticalScroll
 
@@ -747,12 +768,14 @@ def test_unified_diff_view_scrollable_after_ten_lines() -> None:
     assert scrollable.has_class('-scrollable')
     assert not scrollable.allow_vertical_scroll
 
+
 def test_unified_diff_view_compact_does_not_claim_vertical_scroll() -> None:
     from backend.cli.tui.widgets.unified_diff_view import UnifiedDiffView
 
     view = UnifiedDiffView(old_content='alpha', new_content='beta')
     assert view.has_class('-compact')
     assert not view.allow_vertical_scroll
+
 
 def test_diff_view_shows_two_context_lines_for_contents() -> None:
     from backend.cli.tui.widgets.unified_diff_view import (
@@ -772,6 +795,7 @@ def test_diff_view_shows_two_context_lines_for_contents() -> None:
     assert 'line7' in ctx_texts
     assert 'line1' not in ctx_texts
     assert 'line10' not in ctx_texts
+
 
 def test_diff_view_trims_patch_context_to_two_lines() -> None:
     from backend.cli.tui.widgets.unified_diff_view import build_diff_view_rows
@@ -805,6 +829,7 @@ def test_diff_view_trims_patch_context_to_two_lines() -> None:
     assert 'ctx0' not in ctx_texts
     assert 'ctx9' not in ctx_texts
     assert any(row.text == '…' for row in rows if row.kind == 'hdr')
+
 
 def test_syntax_line_text_keeps_colors_without_background() -> None:
     from rich.style import Style

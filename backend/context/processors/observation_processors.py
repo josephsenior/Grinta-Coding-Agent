@@ -542,7 +542,9 @@ def _truncate_diff_smart(content: str, max_chars: int) -> str:
 # Marker prefix emitted by the execution layer (file_operations.truncate_diff)
 # when an edit diff is shortened at production time. Detected here so the agent
 # is always told to re-read, even when the prompt layer itself does not truncate.
-from backend.execution.aes.file_operations import DIFF_CODEC_MARKER_PREFIX as _DIFF_CODEC_MARKER_PREFIX
+from backend.execution.aes.file_operations import (  # noqa: E402
+    DIFF_CODEC_MARKER_PREFIX as _DIFF_CODEC_MARKER_PREFIX,
+)
 
 
 def _edit_observation_truncation_footer(path: str) -> str:

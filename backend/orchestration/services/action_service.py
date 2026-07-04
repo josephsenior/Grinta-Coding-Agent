@@ -84,13 +84,13 @@ def _restore_pre_dispatch_hook(
 def _should_defer_stream_emission_until_confirmed(action: Action) -> bool:
     """Return True when the action must not be published to the event stream yet.
 
-  Runnable actions that still need user approval are held back here and
-  published once via :meth:`SessionOrchestrator.apply_user_decision`. Publishing
-  them earlier made every subscriber (runtime, TUI, history) observe the same
-  action twice — once while ``AWAITING_CONFIRMATION`` and again after approval —
-  which duplicated shell/thinking rows in the transcript. File creates were
-  especially confusing: the first pass wrote the file and showed ``Created``,
-  then approval re-ran the action against the new file and showed ``Edited``.
+    Runnable actions that still need user approval are held back here and
+    published once via :meth:`SessionOrchestrator.apply_user_decision`. Publishing
+    them earlier made every subscriber (runtime, TUI, history) observe the same
+    action twice — once while ``AWAITING_CONFIRMATION`` and again after approval —
+    which duplicated shell/thinking rows in the transcript. File creates were
+    especially confusing: the first pass wrote the file and showed ``Created``,
+    then approval re-ran the action against the new file and showed ``Edited``.
     """
     if not getattr(action, 'runnable', False):
         return False

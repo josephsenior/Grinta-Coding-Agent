@@ -144,9 +144,7 @@ async def run_tui(
     """Run the Grinta TUI (interactive default when stdin is a TTY)."""
     loop = asyncio.get_running_loop()
 
-    app = GrintaTUIApp(
-        config=config, console=console, loop=loop, accessible=accessible
-    )
+    app = GrintaTUIApp(config=config, console=console, loop=loop, accessible=accessible)
     app._hud.update_model(config.get_llm_config().model or '(not set)')
     model = config.get_llm_config().model or '(not set)'
     app._hud.update_tokens(0, HUDBar.resolve_context_limit_for_model(model))

@@ -65,7 +65,7 @@ def resolve_adapter_cwd(
 
 
 def format_adapter_spawn_error(
-    exc: OSError,
+    exc: OSError | ValueError,
     *,
     command: list[str],
     cwd: str | None,
@@ -163,9 +163,7 @@ def validate_debugger_start(
         return
 
     if not _debugpy_importable():
-        raise DAPError(
-            'debugpy is not installed in the active Python environment.'
-        )
+        raise DAPError('debugpy is not installed in the active Python environment.')
 
     program = str(getattr(action, 'program', '') or '').strip()
     if not program:

@@ -9,17 +9,14 @@ import pytest
 from backend.core.errors import FunctionCallValidationError, ToolExecutionError
 from backend.engine.function_calling.dispatch import (
     _handle_create_file_tool,
-    _handle_find_symbols_tool,
     _handle_multi_edit_command,
     _handle_multiedit_tool,
     _handle_read_file_tool,
     _handle_replace_string_tool,
 )
-from backend.engine.tools._file_edits import execute_find_symbols
 from backend.ledger.action import (
     FileEditAction,
     FileReadAction,
-    FindSymbolsAction,
 )
 
 
@@ -48,9 +45,7 @@ def test_read_file_and_range_return_file_read_actions(monkeypatch, tmp_path):
     _use_tmp_workspace(monkeypatch, tmp_path)
     (tmp_path / 'a.txt').write_text('one\ntwo\nthree\n', encoding='utf-8')
 
-    file_action = _handle_read_file_tool(
-        {'path': 'a.txt', 'security_risk': 'LOW'}
-    )
+    file_action = _handle_read_file_tool({'path': 'a.txt', 'security_risk': 'LOW'})
     range_action = _handle_read_file_tool(
         {
             'path': 'a.txt',
@@ -88,7 +83,6 @@ def test_read_file_line_range_requires_both_bounds(monkeypatch, tmp_path):
                 'security_risk': 'LOW',
             }
         )
-
 
 
 def test_create_file_public_action_passes_through_and_rejects_serialized(

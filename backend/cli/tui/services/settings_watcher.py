@@ -126,9 +126,7 @@ class SettingsFileWatcher:
         if self._task is not None and not self._task.done():
             return
         self._stopping = False
-        self._task = asyncio.create_task(
-            self._run(), name='grinta-settings-watcher'
-        )
+        self._task = asyncio.create_task(self._run(), name='grinta-settings-watcher')
 
     async def stop(self) -> None:
         self._stopping = True

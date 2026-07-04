@@ -77,6 +77,5 @@ class TestBrowserToolSyncBridge:
         assert browser_tool_sync_bridge_timeout_seconds(
             action, session_ready=True
         ) == pytest.approx(
-            float(BROWSER_SCREENSHOT_TIMEOUT_SEC)
-            + float(TOOL_BRIDGE_TIMEOUT_BUFFER)
+            float(BROWSER_SCREENSHOT_TIMEOUT_SEC) + float(TOOL_BRIDGE_TIMEOUT_BUFFER)
         )

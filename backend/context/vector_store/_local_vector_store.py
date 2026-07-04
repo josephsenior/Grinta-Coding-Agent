@@ -603,8 +603,7 @@ class SQLiteBM25Backend(VectorBackend):
             'ON docs_meta(session_id)'
         )
         conn.execute(
-            'CREATE INDEX IF NOT EXISTS idx_docs_meta_step_id '
-            'ON docs_meta(step_id)'
+            'CREATE INDEX IF NOT EXISTS idx_docs_meta_step_id ON docs_meta(step_id)'
         )
         conn.execute(
             'CREATE INDEX IF NOT EXISTS idx_docs_meta_artifact_hash '

@@ -128,7 +128,9 @@ class PanelsMixin(CLIEventRenderer if TYPE_CHECKING else object):
             controller = getattr(self, '_controller', None)
             if controller is not None:
                 state = getattr(controller, 'state', None)
-                extra = getattr(state, 'extra_data', None) if state is not None else None
+                extra = (
+                    getattr(state, 'extra_data', None) if state is not None else None
+                )
                 accounting = HUDBar._prompt_token_accounting_from_extra(extra)
                 if accounting:
                     self._hud.apply_prompt_token_accounting(accounting)

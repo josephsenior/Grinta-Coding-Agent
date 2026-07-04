@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -39,9 +39,7 @@ def test_is_noise_message_filters_streaming_chunks() -> None:
 
 
 def test_emit_writes_jsonl(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        'backend.core.logging.session_event_logger.LOG_TO_FILE', True
-    )
+    monkeypatch.setattr('backend.core.logging.session_event_logger.LOG_TO_FILE', True)
     bind_session_event_logger('sess-1', str(tmp_path), workspace_segment='ws-seg')
     emit_session_event('USER_TURN', {'text': 'hello'})
     lines = [
@@ -62,9 +60,7 @@ def test_emit_writes_jsonl(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
 def test_wire_events_respect_grinta_log_wire(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(
-        'backend.core.logging.session_event_logger.LOG_TO_FILE', True
-    )
+    monkeypatch.setattr('backend.core.logging.session_event_logger.LOG_TO_FILE', True)
     bind_session_event_logger('sess-1', str(tmp_path))
     with patch(
         'backend.core.logging.session_event_logger.wire_log_enabled',
@@ -74,21 +70,25 @@ def test_wire_events_respect_grinta_log_wire(
     emit_session_event('PROMPT_SHAPE', {'roles': {'user': 1}})
     events = [
         json.loads(line)['event']
-        for line in (tmp_path / 'session.jsonl').read_text(encoding='utf-8').splitlines()
+        for line in (tmp_path / 'session.jsonl')
+        .read_text(encoding='utf-8')
+        .splitlines()
         if line.strip()
     ]
     assert 'WIRE_PROMPT' not in events
     assert 'PROMPT_SHAPE' in events
 
 
-def test_bind_emits_session_start(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        'backend.core.logging.session_event_logger.LOG_TO_FILE', True
-    )
+def test_bind_emits_session_start(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr('backend.core.logging.session_event_logger.LOG_TO_FILE', True)
     bind_session_event_logger('abc', str(tmp_path), workspace_segment='ws')
     events = [
         json.loads(line)['event']
-        for line in (tmp_path / 'session.jsonl').read_text(encoding='utf-8').splitlines()
+        for line in (tmp_path / 'session.jsonl')
+        .read_text(encoding='utf-8')
+        .splitlines()
         if line.strip()
     ]
     assert events[0] == 'SESSION_START'
@@ -102,14 +102,14 @@ def test_bind_suppresses_empty_session_context(
     the first one in the log is the authoritative one emitted after
     controller/llm_config are registered.
     """
-    monkeypatch.setattr(
-        'backend.core.logging.session_event_logger.LOG_TO_FILE', True
-    )
+    monkeypatch.setattr('backend.core.logging.session_event_logger.LOG_TO_FILE', True)
     # No register_runtime_context() call — snapshot is all None.
     bind_session_event_logger('sess-2', str(tmp_path))
     events = [
         json.loads(line)['event']
-        for line in (tmp_path / 'session.jsonl').read_text(encoding='utf-8').splitlines()
+        for line in (tmp_path / 'session.jsonl')
+        .read_text(encoding='utf-8')
+        .splitlines()
         if line.strip()
     ]
     assert events == ['SESSION_START']
@@ -120,17 +120,18 @@ def test_bind_emits_session_context_when_runtime_resolved(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """When the runtime context is registered before bind, the SESSION_CONTEXT
-    line is emitted with the resolved values."""
-    monkeypatch.setattr(
-        'backend.core.logging.session_event_logger.LOG_TO_FILE', True
-    )
+    line is emitted with the resolved values.
+    """
+    monkeypatch.setattr('backend.core.logging.session_event_logger.LOG_TO_FILE', True)
     from backend.core.logging.session_context import register_runtime_context
 
     agent_config = SimpleNamespace(mode='full', autonomy_level='high')
     agent = SimpleNamespace(config=agent_config)
     state = SimpleNamespace(extra_data={'active_run_mode': 'plan'})
     autonomy_ctrl = SimpleNamespace(autonomy_level='high')
-    controller = SimpleNamespace(agent=agent, state=state, autonomy_controller=autonomy_ctrl)
+    controller = SimpleNamespace(
+        agent=agent, state=state, autonomy_controller=autonomy_ctrl
+    )
     llm_config = SimpleNamespace(
         model='test/model',
         custom_llm_provider='openai',
@@ -150,7 +151,9 @@ def test_bind_emits_session_context_when_runtime_resolved(
     bind_session_event_logger('sess-3', str(tmp_path))
     events = [
         json.loads(line)['event']
-        for line in (tmp_path / 'session.jsonl').read_text(encoding='utf-8').splitlines()
+        for line in (tmp_path / 'session.jsonl')
+        .read_text(encoding='utf-8')
+        .splitlines()
         if line.strip()
     ]
     assert events[0] == 'SESSION_START'
@@ -174,23 +177,28 @@ def test_emit_merges_caller_ctx_with_snapshot(
     ``ctx.model=null`` and the audit rollup had to back-fill from
     ``last_known_model``.
     """
-    monkeypatch.setattr(
-        'backend.core.logging.session_event_logger.LOG_TO_FILE', True
-    )
+    monkeypatch.setattr('backend.core.logging.session_event_logger.LOG_TO_FILE', True)
     from backend.core.logging.session_context import register_runtime_context
 
     agent_config = SimpleNamespace(mode='full', autonomy_level='high')
     agent = SimpleNamespace(config=agent_config)
     state = SimpleNamespace(extra_data={'active_run_mode': 'plan'})
     autonomy_ctrl = SimpleNamespace(autonomy_level='high')
-    controller = SimpleNamespace(agent=agent, state=state, autonomy_controller=autonomy_ctrl)
+    controller = SimpleNamespace(
+        agent=agent, state=state, autonomy_controller=autonomy_ctrl
+    )
     llm_config = SimpleNamespace(
         model='test/model',
         custom_llm_provider='openai',
         reasoning_effort='medium',
-        temperature=0.0, top_p=1.0, top_k=None, native_tool_calling=True,
-        context_window_tokens=128000, max_output_tokens=8192,
-        prompt_history_token_budget=None, prompt_history_budget_ratio=None,
+        temperature=0.0,
+        top_p=1.0,
+        top_k=None,
+        native_tool_calling=True,
+        context_window_tokens=128000,
+        max_output_tokens=8192,
+        prompt_history_token_budget=None,
+        prompt_history_budget_ratio=None,
         prompt_history_max_events=None,
     )
     register_runtime_context(controller=controller, llm_config=llm_config)
@@ -203,7 +211,9 @@ def test_emit_merges_caller_ctx_with_snapshot(
     )
     lines = [
         json.loads(line)
-        for line in (tmp_path / 'session.jsonl').read_text(encoding='utf-8').splitlines()
+        for line in (tmp_path / 'session.jsonl')
+        .read_text(encoding='utf-8')
+        .splitlines()
         if line.strip()
     ]
     tool_result = [r for r in lines if r['event'] == 'TOOL_RESULT'][0]
@@ -218,23 +228,30 @@ def test_emit_caller_ctx_can_override_snapshot_fields(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Caller ctx can override snapshot fields when needed (e.g. to inject
-    a debug override of model)."""
-    monkeypatch.setattr(
-        'backend.core.logging.session_event_logger.LOG_TO_FILE', True
-    )
+    a debug override of model).
+    """
+    monkeypatch.setattr('backend.core.logging.session_event_logger.LOG_TO_FILE', True)
     from backend.core.logging.session_context import register_runtime_context
 
     agent_config = SimpleNamespace(mode='full', autonomy_level='high')
     agent = SimpleNamespace(config=agent_config)
     state = SimpleNamespace(extra_data={'active_run_mode': 'plan'})
     autonomy_ctrl = SimpleNamespace(autonomy_level='high')
-    controller = SimpleNamespace(agent=agent, state=state, autonomy_controller=autonomy_ctrl)
+    controller = SimpleNamespace(
+        agent=agent, state=state, autonomy_controller=autonomy_ctrl
+    )
     llm_config = SimpleNamespace(
-        model='real/model', custom_llm_provider='openai',
+        model='real/model',
+        custom_llm_provider='openai',
         reasoning_effort='medium',
-        temperature=0.0, top_p=1.0, top_k=None, native_tool_calling=True,
-        context_window_tokens=128000, max_output_tokens=8192,
-        prompt_history_token_budget=None, prompt_history_budget_ratio=None,
+        temperature=0.0,
+        top_p=1.0,
+        top_k=None,
+        native_tool_calling=True,
+        context_window_tokens=128000,
+        max_output_tokens=8192,
+        prompt_history_token_budget=None,
+        prompt_history_budget_ratio=None,
         prompt_history_max_events=None,
     )
     register_runtime_context(controller=controller, llm_config=llm_config)
@@ -246,7 +263,9 @@ def test_emit_caller_ctx_can_override_snapshot_fields(
     )
     lines = [
         json.loads(line)
-        for line in (tmp_path / 'session.jsonl').read_text(encoding='utf-8').splitlines()
+        for line in (tmp_path / 'session.jsonl')
+        .read_text(encoding='utf-8')
+        .splitlines()
         if line.strip()
     ]
     tool_result = [r for r in lines if r['event'] == 'TOOL_RESULT'][0]

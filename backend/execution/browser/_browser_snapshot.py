@@ -150,7 +150,9 @@ async def _execute_screenshot_body(
 
     started_at = time.monotonic()
     logger.info(
-        'browser screenshot begin (full_page=%s, budget=%.0fs)', full_page, BROWSER_SCREENSHOT_TIMEOUT_SEC
+        'browser screenshot begin (full_page=%s, budget=%.0fs)',
+        full_page,
+        BROWSER_SCREENSHOT_TIMEOUT_SEC,
     )
     _browser_trace(
         f'screenshot begin full_page={full_page} '
@@ -169,7 +171,12 @@ async def _execute_screenshot_body(
         )
     except Exception as exc:
         total = time.monotonic() - started_at
-        logger.error('browser screenshot failed after %.1fs: %s: %s', total, type(exc).__name__, exc)
+        logger.error(
+            'browser screenshot failed after %.1fs: %s: %s',
+            total,
+            type(exc).__name__,
+            exc,
+        )
         _browser_trace(f'screenshot failed: {type(exc).__name__}: {exc}')
         return _finalize_observation(
             cmd,

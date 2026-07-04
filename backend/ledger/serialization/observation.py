@@ -7,6 +7,7 @@ import importlib
 from typing import Any
 
 from backend.core.enums import RecallType
+from backend.ledger.observation.acceptance_criteria import AcceptanceCriteriaObservation
 from backend.ledger.observation.agent import (
     AgentCondensationObservation,
     AgentStateChangedObservation,
@@ -49,7 +50,6 @@ from backend.ledger.observation.search import (
 from backend.ledger.observation.status import StatusObservation
 from backend.ledger.observation.success import SuccessObservation
 from backend.ledger.observation.task_tracking import TaskTrackingObservation
-from backend.ledger.observation.acceptance_criteria import AcceptanceCriteriaObservation
 from backend.ledger.observation.terminal import TerminalObservation
 
 observations = (

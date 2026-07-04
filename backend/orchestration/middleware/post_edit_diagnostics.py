@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from backend.core.constants import DEFAULT_AGENT_LSP_QUERY_ENABLED
-
 from backend.core.logging.logger import app_logger as logger
 from backend.orchestration.tool_pipeline import ToolInvocationMiddleware
 from backend.utils.async_helpers.async_utils import call_sync_from_async
@@ -107,7 +106,10 @@ def _auto_lsp_diagnostics_enabled(ctx: ToolInvocationContext) -> bool:
     if getattr(config, 'enable_lsp_query', DEFAULT_AGENT_LSP_QUERY_ENABLED) is False:
         return False
     agent_config = getattr(config, 'agent', None)
-    if getattr(agent_config, 'enable_lsp_query', DEFAULT_AGENT_LSP_QUERY_ENABLED) is False:
+    if (
+        getattr(agent_config, 'enable_lsp_query', DEFAULT_AGENT_LSP_QUERY_ENABLED)
+        is False
+    ):
         return False
     return True
 

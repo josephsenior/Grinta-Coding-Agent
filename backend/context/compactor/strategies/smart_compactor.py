@@ -18,7 +18,11 @@ from backend.context.view import View
 from backend.core.logging.logger import app_logger as logger
 from backend.core.tasks.task_status import TASK_STATUS_IN_PROGRESS
 from backend.ledger.action import Action, MessageAction
-from backend.ledger.action.agent import CondensationAction, TaskTrackingAction, AcceptanceCriteriaAction
+from backend.ledger.action.agent import (
+    AcceptanceCriteriaAction,
+    CondensationAction,
+    TaskTrackingAction,
+)
 from backend.ledger.event import Event, EventSource
 from backend.ledger.observation import ErrorObservation, Observation
 

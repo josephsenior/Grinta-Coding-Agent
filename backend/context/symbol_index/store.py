@@ -186,7 +186,9 @@ class SymbolIndexStore:
 
     def ensure_indexed(self, rel_path: str) -> bool:
         rel = normalize_workspace_path(rel_path)
-        if not rel or any(part in _SKIP_SYMBOL_SEARCH_PARTS for part in Path(rel).parts):
+        if not rel or any(
+            part in _SKIP_SYMBOL_SEARCH_PARTS for part in Path(rel).parts
+        ):
             return False
         abs_path = (self.workspace_root / rel).resolve()
         try:
@@ -238,9 +240,7 @@ class SymbolIndexStore:
         with self._lock:
             try:
                 conn = self._connect()
-                rows = conn.execute(
-                    'SELECT src_path, dst_path FROM imports'
-                ).fetchall()
+                rows = conn.execute('SELECT src_path, dst_path FROM imports').fetchall()
                 return [(str(row['src_path']), str(row['dst_path'])) for row in rows]
             except Exception as exc:
                 self._handle_error(exc)
@@ -348,12 +348,16 @@ def clear_symbol_index_for_workspace(
     key: str | None = None
     try:
         if workspace_root is None:
-            from backend.core.workspace_resolution import require_effective_workspace_root
+            from backend.core.workspace_resolution import (
+                require_effective_workspace_root,
+            )
 
             workspace_root = require_effective_workspace_root()
         key = str(Path(workspace_root).resolve())
     except Exception:
-        logger.debug('clear_symbol_index_for_workspace: no workspace root', exc_info=True)
+        logger.debug(
+            'clear_symbol_index_for_workspace: no workspace root', exc_info=True
+        )
 
     with _registry_lock:
         store = _store_registry.get(key) if key else None
@@ -363,10 +367,14 @@ def clear_symbol_index_for_workspace(
     shutil.rmtree(symbol_index_dir(), ignore_errors=True)
 
 
-def get_symbol_index_store(workspace_root: Path | str | None = None) -> SymbolIndexStore | None:
+def get_symbol_index_store(
+    workspace_root: Path | str | None = None,
+) -> SymbolIndexStore | None:
     try:
         if workspace_root is None:
-            from backend.core.workspace_resolution import require_effective_workspace_root
+            from backend.core.workspace_resolution import (
+                require_effective_workspace_root,
+            )
 
             workspace_root = require_effective_workspace_root()
         root = Path(workspace_root).resolve()
@@ -384,7 +392,9 @@ def get_symbol_index_store(workspace_root: Path | str | None = None) -> SymbolIn
 def symbol_index_enabled(config: Any | None = None) -> bool:
     mode = 'lazy'
     if config is not None:
-        mode = str(getattr(config, 'symbol_index_mode', 'lazy') or 'lazy').strip().lower()
+        mode = (
+            str(getattr(config, 'symbol_index_mode', 'lazy') or 'lazy').strip().lower()
+        )
     return mode != 'off'
 
 

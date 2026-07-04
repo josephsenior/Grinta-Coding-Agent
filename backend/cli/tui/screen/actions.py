@@ -177,12 +177,8 @@ class ScreenActionsMixin:
             # user has a record of what was approved, since otherwise the
             # action happens invisibly.
             await self._controller.apply_user_decision(approved=True)
-            action_type_raw = (
-                type(pending).__name__ if pending else 'Unknown'
-            )
-            action_type = self._ACTION_TYPE_LABELS.get(
-                action_type_raw, action_type_raw
-            )
+            action_type_raw = type(pending).__name__ if pending else 'Unknown'
+            action_type = self._ACTION_TYPE_LABELS.get(action_type_raw, action_type_raw)
             target, _risk = self._extract_pending_details(pending)
             verb = ConfirmWidget._ACTION_VERBS.get(action_type, action_type.lower())
             self.notify(
@@ -203,7 +199,13 @@ class ScreenActionsMixin:
 
         widget = self.query_one('#confirm-widget', ConfirmWidget)
         widget.configure(
-            action_type, risk_label, risk_style, risk_css_class, target, options, recommended=0
+            action_type,
+            risk_label,
+            risk_style,
+            risk_css_class,
+            target,
+            options,
+            recommended=0,
         )
         widget.show()
         try:

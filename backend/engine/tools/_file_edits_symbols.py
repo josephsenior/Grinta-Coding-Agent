@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from pathlib import Path
 from typing import Any, cast
 
 from backend.core.enums import FileEditSource, FileReadSource
@@ -20,9 +19,13 @@ from backend.engine.function_calling.helpers import (
 )
 from backend.engine.tools._file_ops import (
     _find_symbol_candidates,
-    _relative_display_path,
 )
-from backend.ledger.action import Action, FileEditAction, FileReadAction, FindSymbolsAction
+from backend.ledger.action import (
+    Action,
+    FileEditAction,
+    FileReadAction,
+    FindSymbolsAction,
+)
 from backend.ledger.observation import FindSymbolsObservation
 
 
@@ -85,7 +88,7 @@ def execute_find_symbols(action: FindSymbolsAction) -> FindSymbolsObservation:
         symbol_kind=action.symbol_kind or None,
         include_private=action.include_private,
     )
-    payload = {
+    payload: dict[str, Any] = {
         'type': 'symbols',
         'status': 'ok',
         'query': action.query,

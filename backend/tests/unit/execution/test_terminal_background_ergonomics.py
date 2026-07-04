@@ -73,8 +73,14 @@ def test_sync_background_output_for_turn_drains_live_sessions() -> None:
 
 
 def test_apply_background_drain_to_state_updates_canonical_task() -> None:
-    from backend.context.canonical_state import load_canonical_state, save_canonical_state
-    from backend.context.canonical_state.types import BackgroundTaskState, CanonicalTaskState
+    from backend.context.canonical_state import (
+        load_canonical_state,
+        save_canonical_state,
+    )
+    from backend.context.canonical_state.types import (
+        BackgroundTaskState,
+        CanonicalTaskState,
+    )
     from backend.orchestration.state.state import State
 
     state = State(session_id='test-session')

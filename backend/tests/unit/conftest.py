@@ -41,7 +41,8 @@ def _restore_os_capabilities_after_test() -> typing.Generator[None, None, None]:
 @pytest.fixture(autouse=True)
 def _reset_session_event_logger_state() -> typing.Generator[None, None, None]:
     """Reset the process-wide session event logger between tests to prevent
-    the bound ``_SESSION_ID`` from leaking across test boundaries."""
+    the bound ``_SESSION_ID`` from leaking across test boundaries.
+    """
     from backend.core.logging import session_event_logger as sel_mod
 
     saved = sel_mod._SESSION_ID

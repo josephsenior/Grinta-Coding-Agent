@@ -10,8 +10,8 @@ from backend.tests.unit.cli.frontend._shared import (
     patch,
     subprocess,
 )
-
 from backend.tests.unit.cli.helpers.slash_host import make_slash_host
+
 
 def test_diff_panel_new_file() -> None:
     """DiffPanel should show creation info for new files."""
@@ -33,6 +33,7 @@ def test_diff_panel_new_file() -> None:
     assert "print('hello')" in output
     assert "print('world')" in output
 
+
 def test_diff_panel_new_xml_file_shows_plain_preview() -> None:
     """DiffPanel should render new XML file content as plain text preview."""
     obs = MagicMock()
@@ -50,6 +51,7 @@ def test_diff_panel_new_xml_file_shows_plain_preview() -> None:
     assert '<root>' in output
     assert '<item>value</item>' in output
     assert '```xml' not in output
+
 
 def test_diff_panel_existing_file_with_groups() -> None:
     """DiffPanel should render edit groups for existing file edits."""
@@ -74,6 +76,7 @@ def test_diff_panel_existing_file_with_groups() -> None:
     assert '+2 lines' in output
     assert '-1 lines' in output
 
+
 def test_diff_panel_shows_files_badge_title_when_requested() -> None:
     obs = MagicMock()
     obs.path = 'src/main.py'
@@ -93,6 +96,7 @@ def test_diff_panel_shows_files_badge_title_when_requested() -> None:
     output = _console_output(console)
     assert 'Files' in output
     assert 'main.py' in output
+
 
 def test_diff_panel_extracts_diff_preview_block() -> None:
     obs = MagicMock()
@@ -115,6 +119,7 @@ def test_diff_panel_extracts_diff_preview_block() -> None:
     output = _console_output(console)
     assert 'README.md' in output
     assert '+new' in output
+
 
 def test_diff_command_uses_configured_project_root(tmp_path: Path) -> None:
     config = _make_config()

@@ -10,17 +10,12 @@ from backend.tests.unit.cli.tui._shared import (
     RichConsole,
     Select,
     SimpleNamespace,
-    TUIRenderer,
     TaskTrackingObservation,
     _get_screen,
     asyncio,
     pytest,
 )
 
-from backend.cli.tui.widgets.activity_card import OrientLine
-from backend.cli.tui.widgets.scan_line import (
-    EditCard,
-)
 
 @pytest.mark.asyncio
 async def test_tui_autonomy_visibility_follows_mode(mock_config):
@@ -51,6 +46,7 @@ async def test_tui_autonomy_visibility_follows_mode(mock_config):
         await pilot.pause()
         assert autonomy.display is True
         assert autonomy_label.display is True
+
 
 @pytest.mark.asyncio
 async def test_tui_sidebar_mcp_rows_have_switch_and_skills_are_read_only(
@@ -118,6 +114,7 @@ async def test_tui_sidebar_mcp_rows_have_switch_and_skills_are_read_only(
         assert all(isinstance(row, SidebarRow) for row in skill_rows)
         assert all(not getattr(row, 'deletable', False) for row in skill_rows)
 
+
 @pytest.mark.asyncio
 async def test_tui_lsp_sidebar_lists_detected_servers(mock_config):
     console = RichConsole()
@@ -167,6 +164,7 @@ async def test_tui_lsp_sidebar_lists_detected_servers(mock_config):
         assert rows[0]._meta is None
         assert rows[0].interactive is False
         assert lsp_section.is_collapsed is False
+
 
 @pytest.mark.asyncio
 async def test_tui_dap_sidebar_lists_detected_adapters(mock_config):
@@ -230,8 +228,11 @@ async def test_tui_dap_sidebar_lists_detected_adapters(mock_config):
         assert by_language['javascript']._status == 'warn'
         assert dap_section.is_collapsed is False
 
+
 @pytest.mark.asyncio
-async def test_tui_lsp_sidebar_shows_disabled_when_feature_off(mock_config, monkeypatch):
+async def test_tui_lsp_sidebar_shows_disabled_when_feature_off(
+    mock_config, monkeypatch
+):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     monkeypatch.setattr(GrintaScreen, '_bootstrap', AsyncMock())
@@ -243,9 +244,10 @@ async def test_tui_lsp_sidebar_shows_disabled_when_feature_off(mock_config, monk
         await pilot.pause()
 
         s = _get_screen(app)
+        from textual.widgets import Static
+
         from backend.cli.tui.app import TUIRenderer
         from backend.cli.tui.widgets.collapsible import CollapsibleSection
-        from textual.widgets import Static
 
         renderer = TUIRenderer(
             console=console,
@@ -270,8 +272,11 @@ async def test_tui_lsp_sidebar_shows_disabled_when_feature_off(mock_config, monk
         assert 'Disabled' in str(empty.render())
         assert lsp_section.feature_enabled is False
 
+
 @pytest.mark.asyncio
-async def test_tui_dap_sidebar_shows_disabled_when_feature_off(mock_config, monkeypatch):
+async def test_tui_dap_sidebar_shows_disabled_when_feature_off(
+    mock_config, monkeypatch
+):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     monkeypatch.setattr(GrintaScreen, '_bootstrap', AsyncMock())
@@ -283,9 +288,10 @@ async def test_tui_dap_sidebar_shows_disabled_when_feature_off(mock_config, monk
         await pilot.pause()
 
         s = _get_screen(app)
+        from textual.widgets import Static
+
         from backend.cli.tui.app import TUIRenderer
         from backend.cli.tui.widgets.collapsible import CollapsibleSection
-        from textual.widgets import Static
 
         renderer = TUIRenderer(
             console=console,
@@ -312,8 +318,11 @@ async def test_tui_dap_sidebar_shows_disabled_when_feature_off(mock_config, monk
         assert 'Disabled' in str(empty.render())
         assert dap_section.feature_enabled is False
 
+
 @pytest.mark.asyncio
-async def test_tui_mcp_sidebar_shows_disabled_when_feature_off(mock_config, monkeypatch):
+async def test_tui_mcp_sidebar_shows_disabled_when_feature_off(
+    mock_config, monkeypatch
+):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     monkeypatch.setattr(GrintaScreen, '_bootstrap', AsyncMock())
@@ -350,6 +359,7 @@ async def test_tui_mcp_sidebar_shows_disabled_when_feature_off(mock_config, monk
         assert mcp_section._content == 'Disabled'
         assert mcp_section.feature_enabled is False
 
+
 @pytest.mark.asyncio
 async def test_tui_task_sidebar_does_not_clear_on_empty_view_payload(
     mock_config, monkeypatch
@@ -380,6 +390,7 @@ async def test_tui_task_sidebar_does_not_clear_on_empty_view_payload(
 
         tasks_widget = s.query_one('#sidebar-tasks', CollapsibleSection)
         assert tasks_widget._section_title == 'Tasks · 0/1 done'
+
 
 @pytest.mark.asyncio
 async def test_tui_task_sidebar_does_not_clear_on_ambiguous_empty_update_payload(
@@ -419,6 +430,7 @@ async def test_tui_task_sidebar_does_not_clear_on_ambiguous_empty_update_payload
 
         tasks_widget = s.query_one('#sidebar-tasks', CollapsibleSection)
         assert tasks_widget._section_title == 'Tasks · 0/1 done'
+
 
 @pytest.mark.asyncio
 async def test_tui_task_sidebar_allows_explicit_empty_update_clear(
@@ -469,4 +481,3 @@ async def test_tui_task_sidebar_allows_explicit_empty_update_clear(
 
         tasks_widget = s.query_one('#sidebar-tasks', CollapsibleSection)
         assert tasks_widget._section_title == 'Tasks'
-

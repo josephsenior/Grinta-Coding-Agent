@@ -177,7 +177,16 @@ def create_terminal_manager_tool() -> dict[str, Any]:
                     {
                         'if': {
                             'properties': {
-                                'action': {'enum': ['input', 'read', 'logs', 'wait', 'close', 'stop']}
+                                'action': {
+                                    'enum': [
+                                        'input',
+                                        'read',
+                                        'logs',
+                                        'wait',
+                                        'close',
+                                        'stop',
+                                    ]
+                                }
                             }
                         },
                         'then': {'required': ['session_id']},
@@ -206,12 +215,12 @@ def _validate_action(arguments: dict) -> str:
     if not action:
         raise FunctionCallValidationError(
             "terminal_manager requires an 'action' "
-            "(open, input, read, logs, wait, list, close, or stop)."
+            '(open, input, read, logs, wait, list, close, or stop).'
         )
     valid = ('open', 'input', 'read', 'logs', 'wait', 'list', 'close', 'stop')
     if action not in valid:
         raise FunctionCallValidationError(
-            f"Unknown action: {action!r}. Use one of: {', '.join(valid)}."
+            f'Unknown action: {action!r}. Use one of: {", ".join(valid)}.'
         )
     return action
 

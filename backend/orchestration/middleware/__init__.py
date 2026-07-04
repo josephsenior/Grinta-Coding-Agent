@@ -12,11 +12,11 @@ from backend.orchestration.middleware.logging_mw import LoggingMiddleware
 from backend.orchestration.middleware.post_edit_diagnostics import (
     PostEditDiagnosticsMiddleware,
 )
+from backend.orchestration.middleware.progress_policy import ProgressPolicyMiddleware
+from backend.orchestration.middleware.safety_validator import SafetyValidatorMiddleware
 from backend.orchestration.middleware.symbol_index_invalidation import (
     SymbolIndexInvalidationMiddleware,
 )
-from backend.orchestration.middleware.progress_policy import ProgressPolicyMiddleware
-from backend.orchestration.middleware.safety_validator import SafetyValidatorMiddleware
 from backend.orchestration.middleware.telemetry import TelemetryMiddleware
 
 __all__ = [

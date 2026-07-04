@@ -472,7 +472,9 @@ def _active_status(canonical: CanonicalTaskState, state: State | None = None) ->
                     f'  Recent output ({session}):\n'
                     f'{_safe_truncate(task.recent_output, 1200)}'
                 )
-    from backend.execution.utils.shell.background_turn_sync import read_turn_drain_extras
+    from backend.execution.utils.shell.background_turn_sync import (
+        read_turn_drain_extras,
+    )
 
     extras = read_turn_drain_extras(state)
     known = {task.session_id for task in canonical.background_tasks if task.session_id}

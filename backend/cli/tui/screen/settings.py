@@ -403,7 +403,9 @@ class ScreenSettingsMixin:
 
     async def _toggle_lsp_query(self, enabled: bool) -> None:
         from backend.cli.settings import update_enable_lsp_query
-        from backend.cli.settings.mode_runtime import apply_agent_tool_flags_to_controller
+        from backend.cli.settings.mode_runtime import (
+            apply_agent_tool_flags_to_controller,
+        )
         from backend.core.config import load_app_config
 
         agent_name = self._active_agent_name()
@@ -439,7 +441,9 @@ class ScreenSettingsMixin:
 
     async def _toggle_debugger(self, enabled: bool) -> None:
         from backend.cli.settings import update_enable_debugger
-        from backend.cli.settings.mode_runtime import apply_agent_tool_flags_to_controller
+        from backend.cli.settings.mode_runtime import (
+            apply_agent_tool_flags_to_controller,
+        )
         from backend.core.config import load_app_config
 
         agent_name = self._active_agent_name()

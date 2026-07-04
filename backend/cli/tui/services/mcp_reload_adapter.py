@@ -26,7 +26,6 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable
 if TYPE_CHECKING:
     from backend.execution.server.base import Runtime
     from backend.orchestration.agent import Agent
-    from backend.orchestration.session_orchestrator import SessionOrchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +81,9 @@ class MCPReloadAdapter:
             return self._handle_change(change)
 
         self._unsubscribe = bus.subscribe(_on_change)
-        return self._unsubscribe or (lambda: None)
+        if self._unsubscribe is None:
+            return lambda: None
+        return self._unsubscribe
 
     def close(self) -> None:
         if self._unsubscribe is not None:

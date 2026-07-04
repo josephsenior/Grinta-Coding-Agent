@@ -93,9 +93,7 @@ def test_read_maps_resize() -> None:
 
 
 def test_close_maps_session_id() -> None:
-    act = handle_terminal_manager_tool(
-        {'action': 'close', 'session_id': 's4'}
-    )
+    act = handle_terminal_manager_tool({'action': 'close', 'session_id': 's4'})
     assert isinstance(act, TerminalCloseAction)
     assert act.session_id == 's4'
 
@@ -104,9 +102,7 @@ def test_close_does_not_require_security_risk() -> None:
     # Close is bookkeeping only — no security_risk gating. The JSON-schema
     # allOf should not require it (and the model must not have to lie about
     # a risk level for an idempotent cleanup call).
-    act = handle_terminal_manager_tool(
-        {'action': 'close', 'session_id': 's-no-risk'}
-    )
+    act = handle_terminal_manager_tool({'action': 'close', 'session_id': 's-no-risk'})
     assert isinstance(act, TerminalCloseAction)
     assert act.session_id == 's-no-risk'
 
@@ -142,18 +138,14 @@ def test_list_maps_to_terminal_list_action() -> None:
 
 
 def test_logs_aliases_read_delta() -> None:
-    act = handle_terminal_manager_tool(
-        {'action': 'logs', 'session_id': 'bg-deadbeef'}
-    )
+    act = handle_terminal_manager_tool({'action': 'logs', 'session_id': 'bg-deadbeef'})
     assert isinstance(act, TerminalReadAction)
     assert act.session_id == 'bg-deadbeef'
     assert act.mode == 'delta'
 
 
 def test_stop_aliases_close() -> None:
-    act = handle_terminal_manager_tool(
-        {'action': 'stop', 'session_id': 'bg-12345678'}
-    )
+    act = handle_terminal_manager_tool({'action': 'stop', 'session_id': 'bg-12345678'})
     assert isinstance(act, TerminalCloseAction)
     assert act.session_id == 'bg-12345678'
 
@@ -188,6 +180,7 @@ class TestActionValidation:
 
     def test_unknown_action_message_contains_valid_actions(self) -> None:
         with pytest.raises(
-            FunctionCallValidationError, match='Use one of: open, input, read, logs, wait'
+            FunctionCallValidationError,
+            match='Use one of: open, input, read, logs, wait',
         ):
             handle_terminal_manager_tool({'action': 'execute'})

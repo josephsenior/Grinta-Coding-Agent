@@ -153,9 +153,11 @@ def test_lsp_session_ensure_initialized_rejects_error_response(tmp_path: Path) -
         session._inbox.put(error_response)  # noqa: SLF001
         return error_response
 
-    with patch.object(session, 'start', return_value=True), patch.object(
-        session, '_write_message'
-    ), patch.object(session, '_wait_for_response', side_effect=fake_wait_for_response):
+    with (
+        patch.object(session, 'start', return_value=True),
+        patch.object(session, '_write_message'),
+        patch.object(session, '_wait_for_response', side_effect=fake_wait_for_response),
+    ):
         result = session.ensure_initialized(timeout=0.5)
 
     assert result is False

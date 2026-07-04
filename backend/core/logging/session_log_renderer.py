@@ -35,7 +35,9 @@ def render_session_transcript(events: list[dict[str, Any]]) -> str:
                 continue
             eid = payload.get('event_id')
             lines.append(
-                _block_header(ts, 'USER', event_id=eid if isinstance(eid, int) else None)
+                _block_header(
+                    ts, 'USER', event_id=eid if isinstance(eid, int) else None
+                )
             )
             lines.append(text)
             lines.append('')
@@ -50,7 +52,11 @@ def render_session_transcript(events: list[dict[str, Any]]) -> str:
                 parts.append(f'[thinking]\n{thinking}')
             if not parts:
                 continue
-            label = 'AGENT final-response' if payload.get('final_response') else 'AGENT step'
+            label = (
+                'AGENT final-response'
+                if payload.get('final_response')
+                else 'AGENT step'
+            )
             if payload.get('tool_step'):
                 label = 'AGENT step (tools)'
             elif payload.get('stream_final'):

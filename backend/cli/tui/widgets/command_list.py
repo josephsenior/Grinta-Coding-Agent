@@ -105,7 +105,8 @@ def build_help_shortcuts(
         try:
             bindings_as_tuples.append((b.key, b.action))
         except AttributeError:
-            bindings_as_tuples.append((b[0], b[1]))
+            if isinstance(b, tuple) and len(b) >= 2:
+                bindings_as_tuples.append((b[0], b[1]))
     return shortcuts_from_bindings(
         bindings_as_tuples, also_document=('Enter', 'Esc', 'Tab')
     )

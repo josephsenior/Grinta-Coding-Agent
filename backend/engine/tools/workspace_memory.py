@@ -14,10 +14,18 @@ from backend.engine.tools.lesson_store import lessons_are_similar, normalize_les
 _MEMORY_QUERY_MAX_CHARS = 500
 
 _WORKSPACE_MEMORY_FILE = 'workspace_memory.json'
-_VALID_KINDS = frozenset({
-    'convention', 'command', 'architecture', 'lesson',
-    'strategy', 'heuristic', 'decision', 'preference',
-})
+_VALID_KINDS = frozenset(
+    {
+        'convention',
+        'command',
+        'architecture',
+        'lesson',
+        'strategy',
+        'heuristic',
+        'decision',
+        'preference',
+    }
+)
 _MAX_ENTRIES = 50
 _DEFAULT_PROMPT_CHAR_BUDGET = 800
 _DEFAULT_RANKED_ENTRIES = 8

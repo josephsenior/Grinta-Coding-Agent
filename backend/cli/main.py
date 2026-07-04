@@ -606,7 +606,7 @@ def main(
     os.environ['PROJECT_ROOT'] = resolved_project
     from backend.core.runtime_paths import pin_grinta_runtime_paths
 
-    repo_root = pin_grinta_runtime_paths()
+    pin_grinta_runtime_paths()
     from backend.core.logging.logger import configure_file_logging
 
     configure_file_logging()

@@ -333,7 +333,7 @@ def check_wsl_layout(
         return DoctorCheck(
             'wsl_layout',
             True,
-            f'supported split layout (repo on Linux home, workspace on Windows mount)',
+            'supported split layout (repo on Linux home, workspace on Windows mount)',
             critical=False,
         )
     return DoctorCheck(
@@ -475,9 +475,9 @@ def collect_doctor_checks(*, verbose: bool = False) -> list[DoctorCheck]:
         checks.append(check_binary('bash', critical=False))
     checks.extend(
         [
-        check_debugpy(),
-        check_optional_imports(),
-        *collect_wsl_checks(),
+            check_debugpy(),
+            check_optional_imports(),
+            *collect_wsl_checks(),
         ]
     )
     if verbose:

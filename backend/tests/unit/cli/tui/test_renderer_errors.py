@@ -1,10 +1,9 @@
 """Headless TUI — renderer errors/misc."""
 
+from backend.cli.tui.widgets.scan_line import CompactionCard
 from backend.tests.unit.cli.tui._shared import (
     ActivityRenderer,
     AgentCondensationObservation,
-    AgentMessage,
-    AgentThinkAction,
     AsyncMock,
     CmdOutputObservation,
     CmdRunAction,
@@ -23,17 +22,13 @@ from backend.tests.unit.cli.tui._shared import (
     StatusObservation,
     StreamingChunkAction,
     SystemHintAction,
-    TUIRenderer,
     ThinkingIndicator,
+    TUIRenderer,
     _get_screen,
     asyncio,
     pytest,
 )
 
-from backend.cli.tui.widgets.scan_line import CompactionCard
-from backend.cli.tui.widgets.scan_line import (
-    EditCard,
-)
 
 @pytest.mark.asyncio
 async def test_tui_recoverable_error_renders_as_plain_error_message(mock_config):
@@ -83,6 +78,7 @@ async def test_tui_recoverable_error_renders_as_plain_error_message(mock_config)
         )
         assert "Invalid task status 'doing'" in history_text
 
+
 @pytest.mark.asyncio
 async def test_tui_compaction_status_renders_persistent_card(mock_config):
     console = RichConsole()
@@ -123,6 +119,7 @@ async def test_tui_compaction_status_renders_persistent_card(mock_config):
         assert renderer._compaction_transcript_active is True
         assert renderer._condensation_count == 1
         assert hud.state.agent_state_label == 'Running'
+
 
 @pytest.mark.asyncio
 async def test_tui_condensation_request_reuses_status_card(mock_config):
@@ -213,7 +210,9 @@ async def test_tui_condensation_action_completes_status_card(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_tui_compaction_streaming_final_waits_for_condensation_action(mock_config):
+async def test_tui_compaction_streaming_final_waits_for_condensation_action(
+    mock_config,
+):
     """Stream is_final is preview-only; CondensationAction commits the card."""
     from backend.ledger.action.agent import CondensationAction
 
@@ -390,6 +389,7 @@ async def test_tui_compaction_late_stream_does_not_reopen_card(mock_config):
         assert card.summary == 'Committed summary.'
         assert renderer._compaction_transcript_active is False
 
+
 @pytest.mark.asyncio
 async def test_tui_final_stream_and_normalized_message_do_not_duplicate(mock_config):
     console = RichConsole()
@@ -435,6 +435,7 @@ async def test_tui_final_stream_and_normalized_message_do_not_duplicate(mock_con
         msgs = list(s.query(AgentMessage).results())
         assert len(msgs) >= 2
 
+
 @pytest.mark.asyncio
 async def test_tui_shell_command_empty_output_still_completes(mock_config):
     console = RichConsole()
@@ -465,6 +466,7 @@ async def test_tui_shell_command_empty_output_still_completes(mock_config):
         assert len(cards) >= 1
         assert '✓' in str(cards[0]._delta_text())
 
+
 def test_activity_renderer_keeps_error_heavy_success_output_expanded() -> None:
     card = ActivityRenderer.shell_command(
         'pytest',
@@ -474,10 +476,10 @@ def test_activity_renderer_keeps_error_heavy_success_output_expanded() -> None:
     assert card.is_collapsible is True
     assert card.start_collapsed is False
 
+
 @pytest.mark.asyncio
 async def test_tui_error_observations_follow_visibility_policy(mock_config):
     """ErrorObservations route by transcript/context visibility policy."""
-
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -540,6 +542,7 @@ async def test_tui_error_observations_follow_visibility_policy(mock_config):
         all_args = str(status_args.args) + ' ' + str(status_args.kwargs)
         assert '401 Unauthorized' in all_args
 
+
 @pytest.mark.asyncio
 async def test_tui_add_error_and_warning_omit_hardcoded_wrap(mock_config):
     """add_error/add_warning must not pre-wrap text — let the container wrap."""
@@ -572,6 +575,7 @@ async def test_tui_add_error_and_warning_omit_hardcoded_wrap(mock_config):
     # The 200-char run must remain on a single line — no width=80 pre-wrap.
     assert 'x' * 200 in plain
 
+
 @pytest.mark.asyncio
 async def test_tui_protocol_status_is_unlabeled_dim_text(mock_config):
     from backend.cli.tui.screen.messages import (
@@ -591,6 +595,7 @@ async def test_tui_protocol_status_is_unlabeled_dim_text(mock_config):
     assert plain == 'Working through the next edit.'
     assert 'Status' not in plain
     assert 'Continue with a tool call' not in plain
+
 
 @pytest.mark.asyncio
 async def test_flush_live_ui_applies_deferred_stream_chunk(mock_config):
@@ -623,6 +628,7 @@ async def test_flush_live_ui_applies_deferred_stream_chunk(mock_config):
         assert renderer._deferred_stream_chunk is None
         assert renderer._stream_paint_timer_armed is False
 
+
 @pytest.mark.asyncio
 async def test_transcript_skips_mount_animation_during_streaming(mock_config):
     console = RichConsole()
@@ -638,6 +644,7 @@ async def test_transcript_skips_mount_animation_during_streaming(mock_config):
         widget = Static('quiet mount')
         display.append_widget(widget)
         assert float(widget.styles.offset.y.value) == 0.0
+
 
 @pytest.mark.asyncio
 async def test_tui_debugger_events_render_terminal_style_card(mock_config, monkeypatch):
@@ -691,6 +698,7 @@ async def test_tui_debugger_events_render_terminal_style_card(mock_config, monke
         line = str(cards[0]._line_text())
         assert 'tests/demo.py' in line or 'demo.py' in line
 
+
 @pytest.mark.asyncio
 async def test_tui_live_response_uses_streaming_widget(mock_config, monkeypatch):
     console = RichConsole()
@@ -715,6 +723,7 @@ async def test_tui_live_response_uses_streaming_widget(mock_config, monkeypatch)
 
         assert isinstance(renderer._live_response_widget, LiveResponse)
         assert renderer._live_response_widget.has_class('-streaming')
+
 
 @pytest.mark.asyncio
 async def test_tui_tasks_sidebar_refreshes_during_streaming_skip(

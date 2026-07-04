@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from backend.context.symbol_index.store import get_symbol_index_store, symbol_index_enabled
+from backend.context.symbol_index.store import (
+    get_symbol_index_store,
+    symbol_index_enabled,
+)
 
 
 def find_symbols_via_index(

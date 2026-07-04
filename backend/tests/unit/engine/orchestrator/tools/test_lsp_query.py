@@ -1,5 +1,4 @@
 import json
-
 from unittest.mock import patch
 
 from backend.engine.tools.lsp_query import create_lsp_query_tool

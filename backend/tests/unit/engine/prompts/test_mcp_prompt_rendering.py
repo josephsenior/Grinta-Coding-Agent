@@ -16,12 +16,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from typing import Any
-from unittest.mock import MagicMock
-
-import pytest
 
 from backend.integrations.mcp import mcp_bootstrap_status as bs_mod
-from backend.integrations.mcp.native_backends import NATIVE_MCP_SERVER_NAMES
 
 
 def _base_config(**overrides: Any) -> SimpleNamespace:
@@ -51,14 +47,16 @@ class TestDisabledServerHints:
         from backend.utils.prompt import OrchestratorPromptManager
 
         cfg = _base_config()
-        cfg.mcp = SimpleNamespace(servers=[
-            SimpleNamespace(
-                name='rigour',
-                type='stdio',
-                enabled=False,
-                usage_hint='Rigour local code governance.',
-            ),
-        ])
+        cfg.mcp = SimpleNamespace(
+            servers=[
+                SimpleNamespace(
+                    name='rigour',
+                    type='stdio',
+                    enabled=False,
+                    usage_hint='Rigour local code governance.',
+                ),
+            ]
+        )
         cfg.llm_registry = SimpleNamespace(config=cfg)
 
         opm = OrchestratorPromptManager(prompt_dir=str(tmp_path), config=cfg)
@@ -71,17 +69,18 @@ class TestDisabledServerHints:
         assert hints == []
 
     def test_enabled_server_hint_included(self, tmp_path: Any) -> None:
-        from backend.utils.prompt import OrchestratorPromptManager
 
         cfg = _base_config()
-        cfg.mcp = SimpleNamespace(servers=[
-            SimpleNamespace(
-                name='github',
-                type='stdio',
-                enabled=True,
-                usage_hint='GitHub API for repos, issues, PRs.',
-            ),
-        ])
+        cfg.mcp = SimpleNamespace(
+            servers=[
+                SimpleNamespace(
+                    name='github',
+                    type='stdio',
+                    enabled=True,
+                    usage_hint='GitHub API for repos, issues, PRs.',
+                ),
+            ]
+        )
         cfg.llm_registry = SimpleNamespace(config=cfg)
         orch = SimpleNamespace(llm_registry=cfg.llm_registry)
 
@@ -118,7 +117,9 @@ class TestNativeServerToolHiding:
             'github_search': 'github',
             'exa_web_search_exa': 'exa',
         }
-        opm.mcp_tool_descriptions = {name: f'desc {name}' for name in opm.mcp_tool_names}
+        opm.mcp_tool_descriptions = {
+            name: f'desc {name}' for name in opm.mcp_tool_names
+        }
 
         from backend.engine.orchestrator_helpers.prompts import (
             _apply_mcp_tools,
@@ -144,9 +145,7 @@ class TestNativeServerToolHiding:
         assert 'exa_web_search_exa' not in opm.mcp_tool_names
         assert 'github_search' in opm.mcp_tool_names
 
-    def test_tool_with_unknown_server_not_hidden(
-        self, tmp_path: Any
-    ) -> None:
+    def test_tool_with_unknown_server_not_hidden(self, tmp_path: Any) -> None:
         from backend.utils.prompt import OrchestratorPromptManager
 
         cfg = _base_config()
@@ -162,9 +161,7 @@ class TestNativeServerToolHiding:
         class _StubOrch:
             config = cfg
             mcp_tools = {
-                'user_tool': {
-                    'function': {'name': 'user_tool', 'description': 'd'}
-                }
+                'user_tool': {'function': {'name': 'user_tool', 'description': 'd'}}
             }
             tools: list = []
             llm = None

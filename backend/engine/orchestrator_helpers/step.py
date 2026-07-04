@@ -124,13 +124,15 @@ def _try_reactive_api_round_peel(state: State) -> bool:
         return False
     try:
         from backend.context.context_budget import estimate_boundary_event_tokens
-        from backend.context.context_pipeline.grouping import peel_oldest_api_round_groups
+        from backend.context.context_pipeline.grouping import (
+            peel_oldest_api_round_groups,
+        )
 
-        before = estimate_boundary_event_tokens(history)
+        before = estimate_boundary_event_tokens(history, llm_config=None)
         peeled = peel_oldest_api_round_groups(history, groups_to_peel=1)
         if not peeled or peeled == history:
             return False
-        after = estimate_boundary_event_tokens(peeled)
+        after = estimate_boundary_event_tokens(peeled, llm_config=None)
         saved = before - after
         if saved < 500:
             return False

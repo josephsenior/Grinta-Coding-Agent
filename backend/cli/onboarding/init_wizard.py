@@ -40,7 +40,6 @@ from backend.cli.settings.constants import _PROVIDERS
 from backend.cli.theme import (
     CLR_BRAND,
     CLR_CARD_BORDER,
-    CLR_CARD_TITLE,
     CLR_META,
     CLR_STATUS_OK,
     CLR_STATUS_WARN,
@@ -255,7 +254,11 @@ def _prompt_provider(
         title='Select provider:',
         items=_build_all_provider_items(),
         default_index=next(
-            (idx for idx, (key, _label) in enumerate(_build_all_provider_items(), 1) if key == 'openai'),
+            (
+                idx
+                for idx, (key, _label) in enumerate(_build_all_provider_items(), 1)
+                if key == 'openai'
+            ),
             1,
         ),
     )

@@ -135,9 +135,7 @@ class TestQueryCacheTenantIsolation:
 
     def test_store_and_get_tenant_scoped(self):
         cache = QueryCache()
-        cache.store(
-            'how to test', [{'id': 1}], tenant_id='session-a'
-        )
+        cache.store('how to test', [{'id': 1}], tenant_id='session-a')
         results = cache.get('how to test', tenant_id='session-a')
         assert results == [{'id': 1}]
         # Same query from a different tenant must miss.

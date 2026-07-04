@@ -66,9 +66,7 @@ class ScreenLifecycleBootstrapMixin:
             self._install_mcp_reload_bridge(agent, runtime, memory)
             await self._start_settings_watcher()
 
-    def _install_mcp_reload_bridge(
-        self, agent: Any, runtime: Any, memory: Any
-    ) -> None:
+    def _install_mcp_reload_bridge(self, agent: Any, runtime: Any, memory: Any) -> None:
         """Subscribe the running runtime to MCP bus events.
 
         Idempotent: calling twice replaces the previous adapter

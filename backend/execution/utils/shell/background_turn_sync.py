@@ -100,10 +100,15 @@ def apply_background_drain_to_state(state: Any, drains: dict[str, str]) -> None:
     if not drains or state is None:
         return
 
-    from backend.context.canonical_state import load_canonical_state, save_canonical_state
+    from backend.context.canonical_state import (
+        load_canonical_state,
+        save_canonical_state,
+    )
 
     canonical = load_canonical_state(state=state)
-    known_ids = {task.session_id for task in canonical.background_tasks if task.session_id}
+    known_ids = {
+        task.session_id for task in canonical.background_tasks if task.session_id
+    }
     updated = False
     for task in canonical.background_tasks:
         chunk = drains.get(task.session_id)
@@ -111,9 +116,7 @@ def apply_background_drain_to_state(state: Any, drains: dict[str, str]) -> None:
             task.recent_output = chunk
             updated = True
 
-    extra_drains = {
-        sid: chunk for sid, chunk in drains.items() if sid not in known_ids
-    }
+    extra_drains = {sid: chunk for sid, chunk in drains.items() if sid not in known_ids}
     if extra_drains:
         state.set_extra(
             _BACKGROUND_TURN_DRAIN_KEY,

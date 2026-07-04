@@ -9,10 +9,6 @@ from backend.core.logging.logger import app_logger as logger  # noqa: E402, F401
 from backend.execution.dap._dap_adapters import (
     detect_debug_adapters,  # noqa: E402, F401
 )
-from backend.execution.dap._dap_spawn_utils import (  # noqa: E402, F401
-    resolve_adapter_cwd,
-    resolve_python_executable,
-)
 from backend.execution.dap._dap_client import DAPClient  # noqa: E402, F401
 from backend.execution.dap._dap_errors import (  # noqa: E402, F401
     DAPError,
@@ -21,3 +17,7 @@ from backend.execution.dap._dap_errors import (  # noqa: E402, F401
 from backend.execution.dap._dap_logging import _dap_log  # noqa: E402, F401
 from backend.execution.dap._dap_manager import DAPDebugManager  # noqa: E402, F401
 from backend.execution.dap._dap_session import DAPDebugSession  # noqa: E402, F401
+from backend.execution.dap._dap_spawn_utils import (  # noqa: E402, F401
+    resolve_adapter_cwd,
+    resolve_python_executable,
+)

@@ -34,6 +34,7 @@ from backend.core.interaction_modes import (
 )
 from backend.core.logging.logger import app_logger as logger
 from backend.core.tools.tool_names import (
+    ACCEPTANCE_CRITERIA_TOOL_NAME,
     ANALYZE_PROJECT_STRUCTURE_TOOL_NAME,
     ASK_USER_TOOL_NAME,
     BLACKBOARD_TOOL_NAME,
@@ -49,7 +50,6 @@ from backend.core.tools.tool_names import (
     GREP_TOOL_NAME,
     MEMORY_TOOL_NAME,
     TASK_TRACKER_TOOL_NAME,
-    ACCEPTANCE_CRITERIA_TOOL_NAME,
     TERMINAL_MANAGER_TOOL_NAME,
     UNDO_LAST_EDIT_TOOL_NAME,
     WEB_FETCH_TOOL_NAME,
@@ -306,6 +306,7 @@ from backend.engine.tools._file_ops import (  # noqa: E402, F401
 )
 from backend.engine.tools._tool_handlers import (  # noqa: E402, F401  # noqa: E402, F401
     _apply_context7_resolve_library_defaults,
+    _handle_acceptance_criteria_tool,
     _handle_analyze_project_structure_tool,
     _handle_ask_user_tool,
     _handle_browser_tool,
@@ -320,7 +321,6 @@ from backend.engine.tools._tool_handlers import (  # noqa: E402, F401  # noqa: E
     _handle_memory_manager_tool,
     _handle_memory_tool,
     _handle_task_tracker_tool,
-    _handle_acceptance_criteria_tool,
     _handle_undo_last_edit_tool,
     _handle_web_fetch_tool,
     _handle_web_search_tool,

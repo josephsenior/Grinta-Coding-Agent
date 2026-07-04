@@ -606,9 +606,7 @@ class ContextMemory:
             try:
                 self._index_queue.put_nowait((event_id, role, content, metadata))
             except queue.Full:
-                logger.debug(
-                    'Semantic index queue full; dropping event %s', event_id
-                )
+                logger.debug('Semantic index queue full; dropping event %s', event_id)
                 return
         self._ensure_index_worker()
 

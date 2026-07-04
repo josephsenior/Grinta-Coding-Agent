@@ -98,16 +98,15 @@ def test_unbound_session_uses_quarantined_paths_not_legacy(tmp_path, monkeypatch
     assert load_session_memory() == ''
 
 
-def test_session_event_logger_fallback_resolves_session_id(
-    tmp_path, monkeypatch
-):
+def test_session_event_logger_fallback_resolves_session_id(tmp_path, monkeypatch):
     """When the contextvar is not set, resolve_session_id should fall back
-    to the bound session event logger's session id."""
+    to the bound session event logger's session id.
+    """
+    from backend.context.memory.session_context import resolve_session_id
     from backend.core.logging.session_event_logger import (
         close_session_event_logger,
         get_bound_session_id,
     )
-    from backend.context.memory.session_context import resolve_session_id
 
     monkeypatch.setattr(
         'backend.core.workspace_resolution.workspace_agent_state_dir',

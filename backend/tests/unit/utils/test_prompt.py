@@ -781,7 +781,8 @@ def test_render_runtime_detection_omits_disabled_tools() -> None:
 
 def test_render_runtime_detection_lsp_uses_language_server_labels() -> None:
     """LSP capability line mirrors sidebar: ``python → pyright-langserver``,
-    derived from the canonical registry, not bare server names."""
+    derived from the canonical registry, not bare server names.
+    """
     from types import SimpleNamespace
 
     from backend.engine.prompts.section_renderers import _render_runtime_detection_lines
@@ -1756,7 +1757,9 @@ def test_active_tool_registry_visible_from_worker_thread(monkeypatch):
     from backend.execution.utils import tool_registry
     from backend.utils.terminal import terminal_contract as prompt_mod
 
-    monkeypatch.setattr(tool_registry, '_configured_windows_shell', lambda: 'powershell')
+    monkeypatch.setattr(
+        tool_registry, '_configured_windows_shell', lambda: 'powershell'
+    )
 
     prompt_mod.set_active_tool_registry(None)
     prompt_mod._get_global_tool_registry.cache_clear()

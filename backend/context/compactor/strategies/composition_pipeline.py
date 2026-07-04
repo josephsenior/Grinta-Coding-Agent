@@ -28,7 +28,6 @@ from backend.context.compactor.strategies.layers import (
 if TYPE_CHECKING:
     from backend.inference.llm_registry import LLMRegistry
     from backend.ledger.event import Event
-    from backend.orchestration.state.state import State
 
 
 class CompositionCompactor(Compactor):
@@ -79,26 +78,26 @@ class CompositionCompactor(Compactor):
         events: list[Event] = list(view.events)
 
         for name, layer_fn in LAYERS:
-            if name == "summary" and self._summary_compactor is not None:
+            if name == 'summary' and self._summary_compactor is not None:
                 events = await summary_layer(
                     events,
                     state=None,
                     summary_compactor=self._summary_compactor,
                     summary_recency=self.summary_recency,
                 )
-            elif name == "microcompact":
+            elif name == 'microcompact':
                 events = await microcompact_layer(
                     events,
                     state=None,
                     recency_window=self.microcompact_recency,
                 )
-            elif name == "snip":
+            elif name == 'snip':
                 events = await snip_layer(
                     events,
                     state=None,
                     max_events=self.snip_max_events,
                 )
-            elif name == "reactive":
+            elif name == 'reactive':
                 events = await reactive_compact_layer(
                     events,
                     state=None,
@@ -106,7 +105,7 @@ class CompositionCompactor(Compactor):
                 )
             else:
                 events = await layer_fn(events, state=None)
-            self.add_metadata(f"layer_{name}_count", len(events))
+            self.add_metadata(f'layer_{name}_count', len(events))
 
         return View(events=events)
 
@@ -118,10 +117,10 @@ class CompositionCompactor(Compactor):
     ) -> CompositionCompactor:
         from backend.core.pydantic_compat import model_dump_with_options
 
-        kwargs = model_dump_with_options(config, exclude={"type", "llm_config"})
+        kwargs = model_dump_with_options(config, exclude={'type', 'llm_config'})
         compactor = CompositionCompactor(**kwargs)
 
-        llm_config = getattr(config, "llm_config", None)
+        llm_config = getattr(config, 'llm_config', None)
         if llm_config is not None and llm_registry is not None:
             compactor._build_summary_compactor(llm_config, llm_registry)
 
@@ -148,7 +147,7 @@ class CompositionCompactor(Compactor):
                 inner_config, llm_registry
             )
         except Exception as exc:
-            self.add_metadata("summary_compactor_build_error", str(exc))
+            self.add_metadata('summary_compactor_build_error', str(exc))
             self._summary_compactor = None
 
 

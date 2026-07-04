@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
-from typing import Any, cast
 from unittest.mock import patch
 
 from backend.core.logging.logger import (

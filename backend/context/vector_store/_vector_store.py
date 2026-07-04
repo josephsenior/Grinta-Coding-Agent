@@ -270,9 +270,7 @@ class EnhancedVectorStore:
                     model_name='ms-marco-TinyBERT-L-2-v2', cache_dir=str(cache_dir)
                 )
             except ImportError:
-                logger.info(
-                    'flashrank not installed; reranking disabled at runtime'
-                )
+                logger.info('flashrank not installed; reranking disabled at runtime')
                 self.reranker = None
 
         # Configuration
@@ -340,9 +338,7 @@ class EnhancedVectorStore:
         future :meth:`search` calls with the same tenant can filter on it.
         """
         merged = self._attach_tenant_metadata(metadata, tenant_id)
-        self.backend.add(
-            step_id, role, artifact_hash, rationale, content_text, merged
-        )
+        self.backend.add(step_id, role, artifact_hash, rationale, content_text, merged)
         self.bm25_backend.add(
             step_id, role, artifact_hash, rationale, content_text, merged
         )

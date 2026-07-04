@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
-from backend.context.tool_result_storage import PERSISTED_OUTPUT_TAG
+from backend.core.constants import PERSISTED_OUTPUT_TAG
 from backend.ledger.event import Event
 from backend.ledger.observation import Observation
 

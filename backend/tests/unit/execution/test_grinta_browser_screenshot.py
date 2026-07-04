@@ -22,10 +22,13 @@ if 'browser_use' not in sys.modules:
     sys.modules['browser_use'] = stub
 
 from backend.execution.browser import grinta_browser as gb  # noqa: E402
-from backend.ledger.serialization.event import event_from_dict, event_to_dict  # noqa: E402
 from backend.ledger.observation import (  # noqa: E402
     BrowserScreenshotObservation,
     ErrorObservation,
+)
+from backend.ledger.serialization.event import (  # noqa: E402
+    event_from_dict,
+    event_to_dict,
 )
 
 
@@ -154,13 +157,21 @@ async def test_screenshot_returns_error_on_no_data() -> None:
 
 
 @pytest.mark.asyncio
-async def test_screenshot_timeout_returns_error(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_screenshot_timeout_returns_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     import backend.execution.browser._browser_snapshot as snap_mod
 
     monkeypatch.setattr(snap_mod, 'BROWSER_SCREENSHOT_TIMEOUT_SEC', 2.0)
 
     class _SlowBrowser(_FakeBrowser):
-        async def take_screenshot(self, **kwargs: Any) -> bytes:
+        async def take_screenshot(
+            self,
+            path: str | None = None,
+            full_page: bool = False,
+            format: str = 'png',
+            quality: int | None = None,
+        ) -> bytes:
             await asyncio.sleep(100)
             return b''
 

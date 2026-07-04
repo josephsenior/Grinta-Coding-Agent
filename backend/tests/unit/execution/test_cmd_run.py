@@ -1124,9 +1124,7 @@ async def test_terminal_close_releases_session_and_clears_cursor(mock_executor):
         TerminalCloseAction(session_id='terminal_99')
     )
 
-    mock_executor.session_manager.close_session.assert_called_once_with(
-        'terminal_99'
-    )
+    mock_executor.session_manager.close_session.assert_called_once_with('terminal_99')
     assert 'terminal_99' not in mock_executor._terminal_read_cursor
     assert obs.tool_result['state'] == 'SESSION_CLOSED'
     assert obs.tool_result['ok'] is True

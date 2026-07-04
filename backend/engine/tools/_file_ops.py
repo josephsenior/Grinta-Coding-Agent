@@ -256,7 +256,10 @@ def _find_symbol_candidates(
     not all source files were searched.
     """
     from backend.context.symbol_index.query import find_symbols_via_index
-    from backend.context.symbol_index.store import get_symbol_index_store, symbol_index_enabled
+    from backend.context.symbol_index.store import (
+        get_symbol_index_store,
+        symbol_index_enabled,
+    )
 
     if symbol_index_enabled():
         store = get_symbol_index_store()

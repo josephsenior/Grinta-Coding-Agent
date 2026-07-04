@@ -136,9 +136,7 @@ def _apply_mcp_tools(orch: Orchestrator, mcp_tools: list[dict]) -> None:
             getattr(orch.config, 'enable_docs', True)
         )
         server_map: dict[str, str] = (
-            dict(getattr(pm, 'mcp_tool_server_map', {}) or {})
-            if pm is not None
-            else {}
+            dict(getattr(pm, 'mcp_tool_server_map', {}) or {}) if pm is not None else {}
         )
 
         def _is_hidden_by_server(name: str) -> bool:

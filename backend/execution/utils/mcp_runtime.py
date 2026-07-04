@@ -117,9 +117,7 @@ async def reload_mcp_servers(
     from backend.integrations.mcp.mcp_utils import create_mcps
 
     filtered_new = _filter_windows_stdio_servers(list(new_servers or []))
-    filtered_old = _filter_windows_stdio_servers(
-        list(current_servers_resolved or [])
-    )
+    filtered_old = _filter_windows_stdio_servers(list(current_servers_resolved or []))
 
     def _identity(server: Any) -> tuple[str, str]:
         return (getattr(server, 'name', ''), getattr(server, 'type', ''))
@@ -224,9 +222,7 @@ async def reload_mcp_servers(
         try:
             prepare_mcp_tool_exposed_names(kept_clients, set(reserved_tool_names))
         except Exception as exc:
-            logger.debug(
-                'MCP reload: alias preparation failed: %s', exc, exc_info=True
-            )
+            logger.debug('MCP reload: alias preparation failed: %s', exc, exc_info=True)
 
     summary = {
         'added': [new_by_id[k].name for k in sorted(added_ids)],

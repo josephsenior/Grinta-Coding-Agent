@@ -447,6 +447,7 @@ def create_controller(
         conversation_stats: Conversation statistics tracker
         headless_mode: Whether running in headless mode
         replay_events: Optional events to replay
+        defer_init_checkpoint: When True, defer the initial checkpoint write
 
     Returns:
         Tuple of (controller, initial_state)

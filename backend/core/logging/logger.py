@@ -12,7 +12,6 @@ import re
 import sys
 import threading
 import traceback
-from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TextIO
@@ -26,12 +25,6 @@ from backend.core.constants import (
     LOG_LEVEL,
     LOG_TO_FILE,
     OTEL_LOG_CORRELATION,
-)
-from backend.core.logging.session_event_logger import (
-    SessionEventLogHandler,
-    bind_session_event_logger,
-    close_session_event_logger,
-    get_session_event_logger,
 )
 
 # Re-export formatter/filter classes from dedicated module for backward compat.
@@ -53,6 +46,12 @@ from backend.core.logging.log_formatters import (
 )
 from backend.core.logging.log_formatters import (
     _fix_record as fix_record,  # type: ignore
+)
+from backend.core.logging.session_event_logger import (
+    SessionEventLogHandler,
+    bind_session_event_logger,
+    close_session_event_logger,
+    get_session_event_logger,
 )
 
 __all__ = [

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
+from backend.execution.dap._dap_errors import DAPError
 from backend.execution.dap._dap_spawn_utils import (
     format_adapter_spawn_error,
     resolve_adapter_cwd,
@@ -16,7 +16,6 @@ from backend.execution.dap._dap_spawn_utils import (
     uses_python_debugpy_adapter,
     validate_debugger_start,
 )
-from backend.execution.dap._dap_errors import DAPError
 from backend.ledger.action.debugger import DebuggerAction
 
 
@@ -64,9 +63,7 @@ def test_validate_debugger_start_rejects_non_python_program(tmp_path: Path) -> N
         program=bad_program,
     )
     with pytest.raises(DAPError, match='not a Python file'):
-        validate_debugger_start(
-            action, adapter='python', workspace_root=tmp_path
-        )
+        validate_debugger_start(action, adapter='python', workspace_root=tmp_path)
 
 
 def test_validate_debugger_start_rejects_missing_program(tmp_path: Path) -> None:
@@ -76,9 +73,7 @@ def test_validate_debugger_start_rejects_missing_program(tmp_path: Path) -> None
         program='missing.py',
     )
     with pytest.raises(DAPError, match='does not exist'):
-        validate_debugger_start(
-            action, adapter='python', workspace_root=tmp_path
-        )
+        validate_debugger_start(action, adapter='python', workspace_root=tmp_path)
 
 
 def test_uses_python_debugpy_adapter_for_py_program_without_adapter() -> None:
@@ -119,6 +114,4 @@ def test_validate_debugger_start_rejects_unspawnable_debugpy(
         lambda *_args, **_kwargs: False,
     )
     with pytest.raises(DAPError, match='Failed to spawn debugpy adapter'):
-        validate_debugger_start(
-            action, adapter='python', workspace_root=tmp_path
-        )
+        validate_debugger_start(action, adapter='python', workspace_root=tmp_path)

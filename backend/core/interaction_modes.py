@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from backend.core.tools.tool_names import (
+    ACCEPTANCE_CRITERIA_TOOL_NAME,
     ANALYZE_PROJECT_STRUCTURE_TOOL_NAME,
     ASK_USER_TOOL_NAME,
     DOCS_QUERY_TOOL_NAME,
@@ -13,7 +14,6 @@ from backend.core.tools.tool_names import (
     LSP_TOOL_NAME,
     READ_FILE_TOOL_NAME,
     TASK_TRACKER_TOOL_NAME,
-    ACCEPTANCE_CRITERIA_TOOL_NAME,
     WEB_FETCH_TOOL_NAME,
     WEB_SEARCH_TOOL_NAME,
 )
@@ -61,10 +61,10 @@ def resolve_active_interaction_mode(
 def action_blocked_for_interaction_mode(action: object, mode: object) -> str | None:
     """Return an error message when *action* is not allowed in *mode*."""
     from backend.ledger.action.agent import (
+        AcceptanceCriteriaAction,
         BlackboardAction,
         DelegateTaskAction,
         TaskTrackingAction,
-        AcceptanceCriteriaAction,
     )
     from backend.ledger.action.browse import BrowseInteractiveAction
     from backend.ledger.action.browser_tool import BrowserToolAction

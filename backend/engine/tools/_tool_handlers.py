@@ -11,15 +11,15 @@ from typing import Any, cast
 
 import backend.engine.tools.analyze_project_structure as analyze_project_structure_tools
 import backend.engine.tools.checkpoint as checkpoint_tools
-from backend.core.enums import FileEditSource
-from backend.core.errors import FunctionCallValidationError
-from backend.core.logging.logger import app_logger as logger
 from backend.core.criteria.acceptance_criteria_store import AcceptanceCriteriaStore
 from backend.core.criteria.criterion_item import (
     assign_criterion_ids,
     merge_ids_from_existing,
     normalize_criteria_list,
 )
+from backend.core.enums import FileEditSource
+from backend.core.errors import FunctionCallValidationError
+from backend.core.logging.logger import app_logger as logger
 from backend.core.tasks.task_tracker import TaskTracker
 from backend.core.tools.tool_names import (
     ACCEPTANCE_CRITERIA_TOOL_NAME,
@@ -448,7 +448,9 @@ def _normalize_criteria_list(
         raise FunctionCallValidationError(str(e)) from e
 
 
-def _criteria_existing_normalized(store: AcceptanceCriteriaStore) -> list[dict[str, Any]]:
+def _criteria_existing_normalized(
+    store: AcceptanceCriteriaStore,
+) -> list[dict[str, Any]]:
     try:
         return normalize_criteria_list(store.load_from_file())
     except TypeError:
@@ -621,7 +623,9 @@ def _handle_acceptance_criteria_tool(arguments: Mapping[str, Any]) -> Action:
     if command == 'audit':
         existing = _criteria_existing_normalized(store)
         if 'audit_entries' in arguments:
-            audit_entries = _validate_audit_entries(arguments.get('audit_entries'), existing)
+            audit_entries = _validate_audit_entries(
+                arguments.get('audit_entries'), existing
+            )
             return AcceptanceCriteriaAction(
                 command='audit',
                 audit_entries=audit_entries,
@@ -638,8 +642,8 @@ def _handle_acceptance_criteria_tool(arguments: Mapping[str, Any]) -> Action:
             raise FunctionCallValidationError(
                 f'Invalid format for "criteria_list". Expected a list but got {type(raw_any)}.'
             )
-        raw_list = cast(Sequence[Mapping[str, Any]], raw_any)
-        normalized = _normalize_criteria_list(list(raw_list))
+        criteria_raw = cast(Sequence[Mapping[str, Any]], raw_any)
+        normalized = _normalize_criteria_list(list(criteria_raw))
         _validate_audit_criteria(normalized)
         if existing and len(normalized) != len(existing):
             raise FunctionCallValidationError(
@@ -658,8 +662,8 @@ def _handle_acceptance_criteria_tool(arguments: Mapping[str, Any]) -> Action:
         raise FunctionCallValidationError(
             f'Invalid format for "criteria_list". Expected a list but got {type(raw_any)}.'
         )
-    raw_list = cast(Sequence[Mapping[str, Any]], raw_any)
-    normalized = _normalize_criteria_list(list(raw_list))
+    criteria_raw = cast(Sequence[Mapping[str, Any]], raw_any)
+    normalized = _normalize_criteria_list(list(criteria_raw))
     existing = _criteria_existing_normalized(store)
 
     if command == 'append':

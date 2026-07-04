@@ -56,9 +56,33 @@ def _detect_linux_package_manager() -> str | None:
 def _install_command_variants(pm: str) -> list[list[str]]:
     if pm == 'apt':
         return [
-            ['sudo', '-n', 'env', 'DEBIAN_FRONTEND=noninteractive', 'apt-get', 'install', '-y', 'tmux'],
-            ['env', 'DEBIAN_FRONTEND=noninteractive', 'apt-get', 'install', '-y', 'tmux'],
-            ['sudo', 'env', 'DEBIAN_FRONTEND=noninteractive', 'apt-get', 'install', '-y', 'tmux'],
+            [
+                'sudo',
+                '-n',
+                'env',
+                'DEBIAN_FRONTEND=noninteractive',
+                'apt-get',
+                'install',
+                '-y',
+                'tmux',
+            ],
+            [
+                'env',
+                'DEBIAN_FRONTEND=noninteractive',
+                'apt-get',
+                'install',
+                '-y',
+                'tmux',
+            ],
+            [
+                'sudo',
+                'env',
+                'DEBIAN_FRONTEND=noninteractive',
+                'apt-get',
+                'install',
+                '-y',
+                'tmux',
+            ],
         ]
     if pm in {'dnf', 'yum'}:
         return [

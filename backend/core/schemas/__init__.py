@@ -19,6 +19,7 @@ from backend.core.enums import (
     RuntimeStatus,
 )
 from backend.core.schemas.actions import (
+    AcceptanceCriteriaActionSchema,
     ActionSchemaUnion,
     ActionSchemaV1,
     AgentRejectActionSchema,
@@ -44,7 +45,6 @@ from backend.core.schemas.actions import (
     RecallActionSchema,
     StreamingChunkActionSchema,
     SystemMessageActionSchema,
-    AcceptanceCriteriaActionSchema,
     TaskTrackingActionSchema,
     UncertaintyActionSchema,
 )
@@ -80,6 +80,7 @@ __all__ = [
     'EventVersion',
     # Action schemas
     'ActionSchemaV1',
+    'AcceptanceCriteriaActionSchema',
     'ActionType',
     'AgentRejectActionSchema',
     'AgentThinkActionSchema',

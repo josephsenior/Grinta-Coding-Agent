@@ -62,7 +62,9 @@ def _extract_symbols_via_ast(display_path: str, content: str) -> list[dict[str, 
                         'line_end': node.end_lineno or node.lineno,
                     },
                 )()
-                symbols.append(_candidate_from_location(location, content, display_path))
+                symbols.append(
+                    _candidate_from_location(location, content, display_path)
+                )
             previous = self.parent
             self.parent = node.name
             self.generic_visit(node)
@@ -87,8 +89,9 @@ def _extract_symbols_via_ast(display_path: str, content: str) -> list[dict[str, 
                     'node_type': 'function_definition',
                     'symbol_kind': kind,
                     'parent_name': self.parent,
-                    'line_start': node.lineno,
-                    'line_end': node.end_lineno or node.lineno,
+                    'line_start': getattr(node, 'lineno', 0),
+                    'line_end': getattr(node, 'end_lineno', None)
+                    or getattr(node, 'lineno', 0),
                 },
             )()
             symbols.append(_candidate_from_location(location, content, display_path))
@@ -155,7 +158,9 @@ def _extract_symbols_via_treesitter(
                         'line_end': node.end_point[0] + 1,
                     },
                 )()
-                symbols.append(_candidate_from_location(location, content, display_path))
+                symbols.append(
+                    _candidate_from_location(location, content, display_path)
+                )
                 if kind == 'class':
                     next_parent = name
         for child in getattr(node, 'children', []) or []:

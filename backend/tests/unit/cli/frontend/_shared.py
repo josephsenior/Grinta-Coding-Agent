@@ -92,6 +92,7 @@ def _make_renderer_sync() -> tuple[Console, HUDBar, CLIEventRenderer]:
     renderer = CLIEventRenderer(console, hud, reasoning, loop=loop)
     return console, hud, renderer
 
+
 __all__ = [
     'ActionSecurityRisk',
     'AgentState',

@@ -128,9 +128,7 @@ class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
                         'text': content,
                         'thinking': str(getattr(event, 'thought', '') or ''),
                         'event_id': eid,
-                        'final_response': bool(
-                            getattr(event, 'final_response', False)
-                        ),
+                        'final_response': bool(getattr(event, 'final_response', False)),
                         'tool_step': bool(getattr(event, 'transcript_only', False)),
                     },
                 )

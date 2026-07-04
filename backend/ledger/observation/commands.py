@@ -51,7 +51,7 @@ class CmdOutputMetadata(CmdOutputMetadataSchema):
 
     @classmethod
     def _preprocess_ps1_json(cls, raw: str) -> str:
-        """Fix common bash-interference issues in PS1 JSON payloads.
+        r"""Fix common bash-interference issues in PS1 JSON payloads.
 
         When the shell doesn't fully interpret the PS1 prompt (e.g. in
         non-interactive mode or when ``echo`` is used), the captured JSON
@@ -64,7 +64,8 @@ class CmdOutputMetadata(CmdOutputMetadataSchema):
 
         This method normalises the payload so ``json.loads`` can succeed.
         """
-        import getpass, os, platform
+        import getpass
+        import platform
 
         text = raw.strip()
 

@@ -5,24 +5,13 @@
 
 import asyncio
 from types import SimpleNamespace
-from typing import cast
-from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from backend.core.enums import LifecyclePhase
 from backend.core.schemas import AgentState
-from backend.ledger import EventSource
 from backend.ledger.action import MessageAction
-from backend.orchestration.action_scheduler import ActionScheduler
-from backend.orchestration.orchestration_config import OrchestrationConfig
-from backend.orchestration.session_orchestrator import (
-    ERROR_ACTION_NOT_EXECUTED_ERROR,
-    ERROR_ACTION_NOT_EXECUTED_STOPPED,
-    ERROR_ACTION_NOT_EXECUTED_STOPPED_ID,
-    TRAFFIC_CONTROL_REMINDER,
-    SessionOrchestrator,
-)
 
 
 class TestEventHandling:
@@ -31,7 +20,6 @@ class TestEventHandling:
     @pytest.fixture(autouse=True)
     def _setup(self, ctrl):
         self.ctrl = ctrl
-
 
     @pytest.mark.asyncio
     async def test_on_event_routes_via_event_router(self):
@@ -55,15 +43,12 @@ class TestEventHandling:
 # ── Lifecycle ────────────────────────────────────────────────────────
 
 
-
-
 class TestLifecycle:
     """Test close, stop, lifecycle property."""
 
     @pytest.fixture(autouse=True)
     def _setup(self, ctrl):
         self.ctrl = ctrl
-
 
     def test_closed_property_false_when_running(self):
         self.ctrl._lifecycle = LifecyclePhase.ACTIVE
@@ -202,15 +187,12 @@ class TestLifecycle:
 # ── State helpers ────────────────────────────────────────────────────
 
 
-
-
 class TestPostExecution:
     """Test _handle_post_execution."""
 
     @pytest.fixture(autouse=True)
     def _setup(self, ctrl):
         self.ctrl = ctrl
-
 
     @pytest.mark.asyncio
     async def test_rate_governor_check(self):
@@ -274,5 +256,3 @@ class TestPostExecution:
 
 
 # ── Action context management ────────────────────────────────────────
-
-

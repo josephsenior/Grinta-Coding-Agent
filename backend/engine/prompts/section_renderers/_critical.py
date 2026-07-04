@@ -29,7 +29,9 @@ def _build_agent_execution_block(
     if len(planning_parts) == 2:
         planning_tool_list = f'{planning_parts[0]} and {planning_parts[1]}'
     else:
-        planning_tool_list = ', '.join(planning_parts[:-1]) + f', and {planning_parts[-1]}'
+        planning_tool_list = (
+            ', '.join(planning_parts[:-1]) + f', and {planning_parts[-1]}'
+        )
     done_criteria_block = (
         '   **Done criteria by task type:**\n'
         '   - **Bugfix:** reproduce or capture the failing test, fix, then re-run the narrowest test/reproducer.\n'
@@ -50,15 +52,11 @@ def _build_agent_execution_block(
         rules.append(
             '**Structured work start ritual** — required before work: '
             'call `acceptance_criteria(update, criteria_list=[...])` first'
-            + (
-                ', then `task_tracker(update, task_list=[...])`'
-                if tracker_on
-                else ''
-            )
+            + (', then `task_tracker(update, task_list=[...])`' if tracker_on else '')
             + '.'
         )
     rules += [
-        f'**Verify before final summary** — run the narrowest relevant proof: reproducer, tests, lint, or typecheck'
+        '**Verify before final summary** — run the narrowest relevant proof: reproducer, tests, lint, or typecheck'
         + (
             '; then `acceptance_criteria(audit, audit_entries=[...])` with `evidence_ref` to prior tool output'
             if criteria_on
@@ -79,7 +77,12 @@ def _build_agent_execution_block(
         f'{numbered}\n'
         '</CRITICAL_TOOL_EXECUTION_RULES>'
     )
-    return execution_rules_body, edit_context_antipattern, planning_tool_list, done_criteria_block
+    return (
+        execution_rules_body,
+        edit_context_antipattern,
+        planning_tool_list,
+        done_criteria_block,
+    )
 
 
 def _build_chat_plan_execution_block(
@@ -117,7 +120,12 @@ def _build_chat_plan_execution_block(
         f'{numbered}\n'
         '</CRITICAL_TOOL_EXECUTION_RULES>'
     )
-    return execution_rules_body, edit_context_antipattern, planning_tool_list, done_criteria_block
+    return (
+        execution_rules_body,
+        edit_context_antipattern,
+        planning_tool_list,
+        done_criteria_block,
+    )
 
 
 def _render_critical(
@@ -174,14 +182,26 @@ def _render_critical(
     _ = checkpoints_on
 
     if can_edit:
-        execution_rules_body, edit_context_antipattern, planning_tool_list, done_criteria_block = (
-            _build_agent_execution_block(
-                terminal_command_tool, tracker_on, criteria_on, think_execution_rule, terminal_manager_rule
-            )
+        (
+            execution_rules_body,
+            edit_context_antipattern,
+            planning_tool_list,
+            done_criteria_block,
+        ) = _build_agent_execution_block(
+            terminal_command_tool,
+            tracker_on,
+            criteria_on,
+            think_execution_rule,
+            terminal_manager_rule,
         )
     else:
-        execution_rules_body, edit_context_antipattern, planning_tool_list, done_criteria_block = (
-            _build_chat_plan_execution_block(tracker_on, criteria_on, is_plan_mode(mode))
+        (
+            execution_rules_body,
+            edit_context_antipattern,
+            planning_tool_list,
+            done_criteria_block,
+        ) = _build_chat_plan_execution_block(
+            tracker_on, criteria_on, is_plan_mode(mode)
         )
 
     user_question_antipattern = (

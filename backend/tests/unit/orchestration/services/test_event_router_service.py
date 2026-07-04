@@ -493,7 +493,10 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_plan_mode_integration_smoke_read_clarify_resume_finish(self):
-        from backend.core.tools.tool_names import CREATE_FILE_TOOL_NAME, READ_FILE_TOOL_NAME
+        from backend.core.tools.tool_names import (
+            CREATE_FILE_TOOL_NAME,
+            READ_FILE_TOOL_NAME,
+        )
         from backend.engine.function_calling.dispatch import (
             _process_single_tool_call,
         )
@@ -543,7 +546,9 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIsInstance(search_action, GrepAction)
 
-        create_call = SimpleNamespace(function=SimpleNamespace(name=CREATE_FILE_TOOL_NAME))
+        create_call = SimpleNamespace(
+            function=SimpleNamespace(name=CREATE_FILE_TOOL_NAME)
+        )
         with self.assertRaises(FunctionCallValidationError):
             _process_single_tool_call(
                 create_call,

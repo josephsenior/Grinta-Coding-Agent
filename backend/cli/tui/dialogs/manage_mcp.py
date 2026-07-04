@@ -201,9 +201,7 @@ class GrintaManageMCPDialog(ModalDialog[bool]):
                 name = row.get('name')
                 if not name or name == 'default':
                     continue
-                servers.append(
-                    MCPServerConfig(**{**row, 'name': name})
-                )
+                servers.append(MCPServerConfig(**{**row, 'name': name}))
             new_config = MCPConfig(
                 enabled=bool(mcp_cfg.get('enabled', True)),
                 servers=servers,

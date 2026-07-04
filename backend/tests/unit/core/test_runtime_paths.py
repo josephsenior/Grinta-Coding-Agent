@@ -6,9 +6,7 @@ from pathlib import Path
 from backend.core import runtime_paths as rp
 
 
-def test_pin_grinta_runtime_paths_sets_log_root(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_pin_grinta_runtime_paths_sets_log_root(monkeypatch, tmp_path: Path) -> None:
     repo = tmp_path / 'grinta'
     (repo / 'backend').mkdir(parents=True)
     (repo / 'pyproject.toml').write_text('[project]\nname="x"\n', encoding='utf-8')

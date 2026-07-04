@@ -1,7 +1,6 @@
 """Headless TUI — renderer streaming."""
 
 from backend.tests.unit.cli.tui._shared import (
-    AgentMessage,
     AgentThinkAction,
     AgentThinkObservation,
     CmdRunAction,
@@ -15,18 +14,14 @@ from backend.tests.unit.cli.tui._shared import (
     RichConsole,
     Static,
     StreamingChunkAction,
-    TUIRenderer,
     ThinkingIndicator,
+    TUIRenderer,
     _get_screen,
     _static_render_plain,
     asyncio,
     pytest,
 )
 
-from backend.cli.tui.widgets.activity_card import OrientLine
-from backend.cli.tui.widgets.scan_line import (
-    EditCard,
-)
 
 @pytest.mark.asyncio
 async def test_tui_final_stream_and_message_action_do_not_duplicate(mock_config):
@@ -65,6 +60,7 @@ async def test_tui_final_stream_and_message_action_do_not_duplicate(mock_config)
 
         msgs = list(s.query(AgentMessage).results())
         assert len(msgs) == 1
+
 
 @pytest.mark.asyncio
 async def test_tui_final_stream_commits_response(mock_config):
@@ -106,6 +102,7 @@ async def test_tui_final_stream_commits_response(mock_config):
         assert (
             len(renderer._history) == 1
         )  # suppressed message should not add to history
+
 
 @pytest.mark.asyncio
 async def test_tui_final_stream_empty_accumulated_commits_live_response(mock_config):
@@ -155,6 +152,7 @@ async def test_tui_final_stream_empty_accumulated_commits_live_response(mock_con
         msgs = list(s.query(AgentMessage).results())
         assert len(msgs) >= 1
 
+
 @pytest.mark.asyncio
 async def test_tui_final_stream_suppresses_live_response_for_tool_call(mock_config):
     console = RichConsole()
@@ -198,6 +196,7 @@ async def test_tui_final_stream_suppresses_live_response_for_tool_call(mock_conf
         assert renderer._live_response == 'I will inspect the workspace.'
         assert len(renderer._history) == 0
 
+
 @pytest.mark.asyncio
 async def test_tui_streamed_response_clears_before_tool_action(mock_config):
     console = RichConsole()
@@ -233,6 +232,7 @@ async def test_tui_streamed_response_clears_before_tool_action(mock_config):
         assert renderer._last_final_response_text == ''
         assert renderer._live_response == ''
         assert len(renderer._history) == 0
+
 
 @pytest.mark.asyncio
 async def test_tui_tool_step_message_then_tool_card_in_order(mock_config):
@@ -288,6 +288,7 @@ async def test_tui_tool_step_message_then_tool_card_in_order(mock_config):
         assert renderer._live_response == ''
         assert renderer._last_streamed_preamble_text == 'I will inspect the workspace.'
 
+
 @pytest.mark.asyncio
 async def test_tui_tool_step_does_not_duplicate_partial_stream_preamble(mock_config):
     """Final suppress must not commit a partial live snapshot before MessageAction."""
@@ -333,6 +334,7 @@ async def test_tui_tool_step_does_not_duplicate_partial_stream_preamble(mock_con
         msgs = list(s.query(AgentMessage).results())
         assert len(msgs) == 1
 
+
 @pytest.mark.asyncio
 async def test_tui_duplicate_thinking_payload_renders_once(mock_config, monkeypatch):
     monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
@@ -373,12 +375,12 @@ async def test_tui_duplicate_thinking_payload_renders_once(mock_config, monkeypa
         )
         assert rendered.count(thought) == 1
 
+
 @pytest.mark.asyncio
 async def test_tui_thinking_indicator_shows_content_without_collapse(
     mock_config, monkeypatch
 ):
     """Thinking indicator shows content directly with no collapse/expand or duration."""
-
     monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
     console = RichConsole()
     loop = asyncio.get_running_loop()
@@ -419,4 +421,3 @@ async def test_tui_thinking_indicator_shows_content_without_collapse(
         rendered = _static_render_plain(content)
         assert thought in rendered
         assert 'Thinking:' in rendered
-

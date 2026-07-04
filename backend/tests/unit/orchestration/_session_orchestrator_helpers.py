@@ -4,25 +4,14 @@
 # pylint: disable=protected-access,too-many-lines
 
 import asyncio
-from types import SimpleNamespace
-from typing import cast
-from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
-
-import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from backend.core.enums import LifecyclePhase
 from backend.core.schemas import AgentState
-from backend.ledger import EventSource
-from backend.ledger.action import MessageAction
-from backend.orchestration.action_scheduler import ActionScheduler
-from backend.orchestration.orchestration_config import OrchestrationConfig
 from backend.orchestration.session_orchestrator import (
-    ERROR_ACTION_NOT_EXECUTED_ERROR,
-    ERROR_ACTION_NOT_EXECUTED_STOPPED,
-    ERROR_ACTION_NOT_EXECUTED_STOPPED_ID,
-    TRAFFIC_CONTROL_REMINDER,
     SessionOrchestrator,
 )
+
 
 def _noop_init(self: SessionOrchestrator, *args: object, **kwargs: object) -> None:
     del self, args, kwargs
@@ -82,4 +71,3 @@ def _make_controller() -> SessionOrchestrator:
     ctrl._draining_batch = False
 
     return ctrl
-

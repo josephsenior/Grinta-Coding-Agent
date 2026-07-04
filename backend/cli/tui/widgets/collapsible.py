@@ -708,7 +708,9 @@ class CollapsibleSection(Container):
         self._section_title = title
         self._refresh_header()
 
-    def set_feature_enabled(self, enabled: bool, *, suppress_event: bool = True) -> None:
+    def set_feature_enabled(
+        self, enabled: bool, *, suppress_event: bool = True
+    ) -> None:
         """Sync the header enable switch without posting a toggle event."""
         self._feature_enabled = enabled
         try:

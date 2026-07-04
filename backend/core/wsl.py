@@ -93,7 +93,9 @@ def classify_wsl_layout(
     return WslLayout.IDEAL
 
 
-def measure_mount_latency(path: Path | str, *, min_ms_to_report: float = 50.0) -> float | None:
+def measure_mount_latency(
+    path: Path | str, *, min_ms_to_report: float = 50.0
+) -> float | None:
     """Measure a small write/delete on *path*; return latency in ms or None on failure."""
     target = Path(path)
     try:

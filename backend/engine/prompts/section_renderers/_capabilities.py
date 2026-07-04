@@ -150,7 +150,9 @@ def _render_system_capabilities(
 
     condensation_tiers = (
         'working / episodic / semantic'
-        if _semantic_recall_runtime(config, semantic_recall_active=semantic_recall_active)
+        if _semantic_recall_runtime(
+            config, semantic_recall_active=semantic_recall_active
+        )
         else 'working / episodic'
     )
     criteria_on = bool(getattr(config, 'enable_acceptance_criteria_tool', True))

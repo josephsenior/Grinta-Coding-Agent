@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from backend.context.prompt.prompt_window import estimate_prompt_events_tokens
-from backend.context.context_pipeline.types import _LAST_BOUNDARY_COMPACT_KEY
 from backend.core.constants import (
     DEFAULT_BOUNDARY_COMPACT_COOLDOWN_SECONDS,
     DEFAULT_COMPACTION_RESERVED_SUMMARY_TOKENS,
@@ -82,6 +81,8 @@ class ContextBudget:
 
 def record_post_compact_baseline(state: object, events: list[Event]) -> None:
     """Store post-boundary token baseline after a committed compaction."""
+    from backend.context.context_pipeline.types import _LAST_BOUNDARY_COMPACT_KEY
+
     if not hasattr(state, 'set_extra'):
         return
     pipe = dict(getattr(state, 'extra_data', {}).get('context_pipeline_state', {}))
@@ -109,6 +110,8 @@ def _recent_compaction(
     *,
     boundary_compact_cooldown_seconds: int = DEFAULT_BOUNDARY_COMPACT_COOLDOWN_SECONDS,
 ) -> bool:
+    from backend.context.context_pipeline.types import _LAST_BOUNDARY_COMPACT_KEY
+
     pipe = _pipeline_state(state)
     last = pipe.get(_LAST_BOUNDARY_COMPACT_KEY)
     if not isinstance(last, (int, float)):
@@ -183,13 +186,11 @@ def _estimate_tokens(
     return int(raw * factor)
 
 
+# Any single event whose estimated token count is above this floor is counted
+# individually instead of being folded into a baseline cache. This prevents
+# the autocompact gate from underestimating when one large tool result (e.g.
+# an 80k-token pytest log) sits in the middle of the history.
 _LARGE_EVENT_TOKEN_FLOOR = 1_000
-"""Any single event whose estimated token count is above this floor is
-counted individually instead of being folded into a ``baseline`` cache.
-This prevents the autocompact gate from underestimating when one large
-tool result (e.g. an 80k-token pytest log) sits in the middle of the
-history.
-"""
 
 
 def _sum_large_event_tokens(events: list[Event]) -> int:

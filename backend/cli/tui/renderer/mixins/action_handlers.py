@@ -143,9 +143,8 @@ class RendererActionHandlersMixin:
 
         if bool(getattr(action, 'transcript_only', False)):
             normalized = self._normalize_final_response_text(content)
-            if (
-                normalized
-                and normalized == getattr(self, '_last_streamed_preamble_text', '')
+            if normalized and normalized == getattr(
+                self, '_last_streamed_preamble_text', ''
             ):
                 self._tui.finalize_thinking()
                 self.clear_live_response()

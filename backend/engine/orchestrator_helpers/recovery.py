@@ -68,9 +68,7 @@ def _astep_handle_recoverable_tool_call_shape_error(
     # what keeps the parallel batch intact.
     per_action = bool(getattr(e, 'per_action', False))
     if per_action:
-        logger.info(
-            'Per-action tool-call error (sibling calls preserved): %s', e
-        )
+        logger.info('Per-action tool-call error (sibling calls preserved): %s', e)
     else:
         removed = _clear_queued_actions(
             orch, reason='Invalid LLM tool call, aborting batched sequence'

@@ -6,10 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from backend.context.memory.session_context import bind_session_context
-from backend.context.symbol_index.store import SymbolIndexStore, get_symbol_index_store
 import backend.context.memory.session_context as session_context_module
 import backend.context.symbol_index.store as store_module
+from backend.context.memory.session_context import bind_session_context
+from backend.context.symbol_index.store import get_symbol_index_store
 
 
 @pytest.fixture
@@ -17,7 +17,9 @@ def workspace_with_py(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     root = tmp_path / 'repo'
     root.mkdir()
     (root / 'app').mkdir()
-    (root / 'app' / 'main.py').write_text('def run():\n    return 1\n', encoding='utf-8')
+    (root / 'app' / 'main.py').write_text(
+        'def run():\n    return 1\n', encoding='utf-8'
+    )
     monkeypatch.setattr(
         'backend.core.workspace_resolution.require_effective_workspace_root',
         lambda: str(root),

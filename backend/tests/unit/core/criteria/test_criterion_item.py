@@ -37,7 +37,10 @@ def test_normalize_preserves_optional_fields():
 
 def test_assign_criterion_ids_skips_existing_and_increments():
     items = assign_criterion_ids(
-        [{'assertion': 'A', 'source': 'stated'}, {'assertion': 'B', 'source': 'inferred'}],
+        [
+            {'assertion': 'A', 'source': 'stated'},
+            {'assertion': 'B', 'source': 'inferred'},
+        ],
         existing=[{'id': 'ac3', 'assertion': 'X', 'source': 'stated'}],
     )
     assert items[0]['id'] == 'ac4'

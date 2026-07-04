@@ -1,5 +1,8 @@
 """Headless TUI — renderer tool cards."""
 
+from unittest.mock import MagicMock
+
+from backend.cli.tui.widgets.activity_card import OrientLine
 from backend.tests.unit.cli.tui._shared import (
     BrowserScreenshotObservation,
     BrowserToolAction,
@@ -15,22 +18,17 @@ from backend.tests.unit.cli.tui._shared import (
     MCPObservation,
     ReasoningDisplay,
     RichConsole,
-    TUIRenderer,
     TerminalInputAction,
     TerminalObservation,
     TerminalReadAction,
     TerminalRunAction,
     TerminalWaitAction,
+    TUIRenderer,
     _get_screen,
     asyncio,
     pytest,
 )
-from unittest.mock import MagicMock
 
-from backend.cli.tui.widgets.activity_card import OrientLine
-from backend.cli.tui.widgets.scan_line import (
-    EditCard,
-)
 
 @pytest.mark.asyncio
 async def test_tui_terminal_wait_action_is_silent_in_transcript(mock_config):
@@ -60,7 +58,6 @@ async def test_tui_terminal_wait_action_is_silent_in_transcript(mock_config):
 @pytest.mark.asyncio
 async def test_tui_terminal_session_reuses_single_card(mock_config):
     """Terminal now appends one TerminalCard per command (not upserting SessionPanel)."""
-
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -96,6 +93,7 @@ async def test_tui_terminal_session_reuses_single_card(mock_config):
         # Verify cards exist and can produce detail screens
         for c in cards:
             assert c.build_detail_screen() is not None
+
 
 @pytest.mark.asyncio
 async def test_tui_terminal_observation_strips_control_traffic(mock_config):
@@ -135,6 +133,7 @@ async def test_tui_terminal_observation_strips_control_traffic(mock_config):
         assert '[444444;32;15M' not in card.output
         assert 'ok' in card.output
 
+
 @pytest.mark.asyncio
 async def test_tui_shell_command_reuses_single_card(mock_config):
     console = RichConsole()
@@ -167,6 +166,7 @@ async def test_tui_shell_command_reuses_single_card(mock_config):
         assert len(cards) == 1, f'Expected 1 ShellCard, got {len(cards)}'
         assert 'pytest -q' in str(cards[0]._line_text())
         assert cards[0]._state == 'done'
+
 
 @pytest.mark.asyncio
 async def test_tui_shell_command_reuses_card_with_mixed_case_flags(mock_config):
@@ -203,6 +203,7 @@ async def test_tui_shell_command_reuses_card_with_mixed_case_flags(mock_config):
         assert cards[0]._state == 'done'
         assert 'cat -A' in cards[0].command
 
+
 @pytest.mark.asyncio
 async def test_tui_shell_command_reuses_card_with_multiline_command(mock_config):
     console = RichConsole()
@@ -238,6 +239,7 @@ async def test_tui_shell_command_reuses_card_with_multiline_command(mock_config)
         line = str(cards[0]._line_text())
         assert '\n' not in line
         assert 'import sys' in line
+
 
 @pytest.mark.asyncio
 async def test_tui_lsp_query_renders_orient_line(
@@ -285,6 +287,7 @@ async def test_tui_lsp_query_renders_orient_line(
         assert lines[0].model.target == 'find_definition · MyClass'
         assert lines[0].model.result == '1 result'
 
+
 @pytest.mark.asyncio
 async def test_tui_mcp_call_merges_action_and_observation_into_single_card(
     mock_config,
@@ -328,6 +331,7 @@ async def test_tui_mcp_call_merges_action_and_observation_into_single_card(
         assert 'Called' in line
         assert 'search_docs' in line
         assert 'ranking' in line.lower()
+
 
 @pytest.mark.asyncio
 async def test_tui_web_search_renders_orient_line(mock_config):
@@ -377,6 +381,7 @@ async def test_tui_web_search_renders_orient_line(mock_config):
         assert lines[0].model.target == '"Next.js 15 release notes"'
         assert lines[0].model.result == '2 results'
 
+
 @pytest.mark.asyncio
 async def test_tui_web_fetch_renders_orient_line(mock_config):
     from backend.engine.tools.web_tools import build_web_fetch_action
@@ -419,6 +424,7 @@ async def test_tui_web_fetch_renders_orient_line(mock_config):
         assert lines[0].model.verb == 'Fetched'
         assert lines[0].model.target == 'example.com/docs'
         assert lines[0].model.result == '1 result'
+
 
 @pytest.mark.asyncio
 async def test_tui_delegate_task_merges_action_and_observation_into_single_card(
@@ -601,10 +607,7 @@ async def test_tui_acceptance_criteria_renders_scan_line_card(mock_config):
         renderer._tui._write_log.assert_not_called()
         from backend.cli.tui.widgets.scan_line import AcceptanceCriteriaCard
 
-        cards = [
-            card
-            for card in s.query(AcceptanceCriteriaCard).results()
-        ]
+        cards = [card for card in s.query(AcceptanceCriteriaCard).results()]
         assert len(cards) == 1
         card = cards[0]
         assert card._command == 'update'
@@ -613,8 +616,10 @@ async def test_tui_acceptance_criteria_renders_scan_line_card(mock_config):
 
         detail = card.build_detail_screen()
         body_widgets = detail.build_content()
-        joined = '\n'.join(str(getattr(widget, 'render', lambda: widget)()) for widget in body_widgets)
+        joined = '\n'.join(
+            str(getattr(widget, 'render', lambda w=widget: w)())
+            for widget in body_widgets
+        )
         assert 'Build succeeds' in joined
         assert 'Tests pass' in joined
         assert '●' in joined
-

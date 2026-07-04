@@ -6,10 +6,10 @@ from collections.abc import Callable
 
 from backend.core.tools.tool_names import (
     ANALYZE_PROJECT_STRUCTURE_TOOL_NAME,
-    GREP_TOOL_NAME,
-    GLOB_TOOL_NAME,
-    FIND_SYMBOLS_TOOL_NAME,
     CODE_INTELLIGENCE_TOOL_NAME,
+    FIND_SYMBOLS_TOOL_NAME,
+    GLOB_TOOL_NAME,
+    GREP_TOOL_NAME,
     MULTIEDIT_TOOL_NAME,
     READ_FILE_TOOL_NAME,
     REPLACE_STRING_TOOL_NAME,
@@ -47,17 +47,17 @@ def _build_bug_fix_pattern(
     criteria_on: bool,
     tracker_on: bool,
 ) -> str:
-    prefix = _build_structured_work_prefix(criteria_on=criteria_on, tracker_on=tracker_on)
+    prefix = _build_structured_work_prefix(
+        criteria_on=criteria_on, tracker_on=tracker_on
+    )
     if criteria_on and tracker_on:
         return (
-            prefix
-            + 'criteria(update) → tracker(update) → discover → edit → verify → '
+            prefix + 'criteria(update) → tracker(update) → discover → edit → verify → '
             'tracker(sync) → audit(audit_entries) → final summary.'
         )
     if criteria_on:
         return (
-            prefix
-            + 'criteria(update) → discover → edit → verify → '
+            prefix + 'criteria(update) → discover → edit → verify → '
             'audit(audit_entries) → final summary.'
         )
     if tracker_on:
@@ -73,7 +73,9 @@ def _build_feature_pattern(
     criteria_on: bool,
     tracker_on: bool,
 ) -> str:
-    prefix = _build_structured_work_prefix(criteria_on=criteria_on, tracker_on=tracker_on)
+    prefix = _build_structured_work_prefix(
+        criteria_on=criteria_on, tracker_on=tracker_on
+    )
     if criteria_on and tracker_on:
         return (
             prefix
@@ -82,8 +84,7 @@ def _build_feature_pattern(
         )
     if criteria_on:
         return (
-            prefix
-            + 'criteria(update) → analyze → edit → test/lint → '
+            prefix + 'criteria(update) → analyze → edit → test/lint → '
             'audit(audit_entries) → final summary.'
         )
     if tracker_on:
@@ -126,8 +127,12 @@ def _render_examples(
         'with a 1-line post-mortem and a specific question'
     )
 
-    bug_fix_pattern = _build_bug_fix_pattern(criteria_on=criteria_on, tracker_on=tracker_on)
-    feature_pattern = _build_feature_pattern(criteria_on=criteria_on, tracker_on=tracker_on)
+    bug_fix_pattern = _build_bug_fix_pattern(
+        criteria_on=criteria_on, tracker_on=tracker_on
+    )
+    feature_pattern = _build_feature_pattern(
+        criteria_on=criteria_on, tracker_on=tracker_on
+    )
 
     return render_partial(
         'system_partial_05_examples.md',

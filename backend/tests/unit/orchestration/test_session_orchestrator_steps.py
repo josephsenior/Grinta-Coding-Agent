@@ -4,25 +4,13 @@
 # pylint: disable=protected-access,too-many-lines
 
 import asyncio
-from types import SimpleNamespace
-from typing import cast
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
 
-from backend.core.enums import LifecyclePhase
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
 from backend.ledger.action import MessageAction
-from backend.orchestration.action_scheduler import ActionScheduler
-from backend.orchestration.orchestration_config import OrchestrationConfig
-from backend.orchestration.session_orchestrator import (
-    ERROR_ACTION_NOT_EXECUTED_ERROR,
-    ERROR_ACTION_NOT_EXECUTED_STOPPED,
-    ERROR_ACTION_NOT_EXECUTED_STOPPED_ID,
-    TRAFFIC_CONTROL_REMINDER,
-    SessionOrchestrator,
-)
 
 
 class TestStepExecution:
@@ -31,7 +19,6 @@ class TestStepExecution:
     @pytest.fixture(autouse=True)
     def _setup(self, ctrl):
         self.ctrl = ctrl
-
 
     @pytest.mark.asyncio
     async def test_step_with_exception_handling_success(self):
@@ -178,8 +165,6 @@ class TestStepExecution:
 # ── Control flags ────────────────────────────────────────────────────
 
 
-
-
 class TestStepDispatch:
     """Test that step() correctly dispatches to the main loop.
 
@@ -192,7 +177,6 @@ class TestStepDispatch:
     @pytest.fixture(autouse=True)
     def _setup(self, ctrl):
         self.ctrl = ctrl
-
 
     def test_step_uses_call_soon_threadsafe_when_main_loop_running(self):
         """step() should use call_soon_threadsafe when main loop is running."""
@@ -588,8 +572,6 @@ class TestStepDispatch:
         self.ctrl._audit_callback.assert_called()
 
 
-
-
 class TestStepRequestRaceFix:
     """Regression tests for the step-request race condition.
 
@@ -610,7 +592,6 @@ class TestStepRequestRaceFix:
     @pytest.fixture(autouse=True)
     def _setup(self, ctrl):
         self.ctrl = ctrl
-
 
     @pytest.mark.asyncio
     async def test_request_event_survives_step_finally(self):
@@ -741,5 +722,3 @@ class TestStepRequestRaceFix:
 
         mock_create.assert_called_once()
         assert self.ctrl._step_request_count == 0
-
-
