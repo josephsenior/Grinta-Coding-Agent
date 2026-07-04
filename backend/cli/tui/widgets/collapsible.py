@@ -373,8 +373,12 @@ class CollapsibleSection(Container):
 
         def __init__(self, control: 'CollapsibleSection', enabled: bool) -> None:
             super().__init__()
-            self.control = control
+            self._control = control
             self.enabled = enabled
+
+        @property
+        def control(self) -> 'CollapsibleSection':
+            return self._control
 
     """A collapsible section with a header and expandable body."""
 
@@ -642,7 +646,7 @@ class CollapsibleSection(Container):
             event.stop()
 
     def on_switch_changed(self, event: Switch.Changed) -> None:
-        if event.control.id != 'feature-switch':
+        if not self.is_mounted or event.control.id != 'feature-switch':
             return
         if self._suppress_feature_switch:
             self._suppress_feature_switch = False
