@@ -29,7 +29,9 @@ def _condensation_summary_text(action: CondensationAction) -> str:
     return 'Context condensed.'
 
 
-def _finish_compaction_card(orch: 'RendererEventProcessorMixin', *, summary: str) -> None:
+def _finish_compaction_card(
+    orch: 'RendererEventProcessorMixin', *, summary: str
+) -> None:
     orch._compaction_transcript_active = False
     count = max(orch._condensation_count, 1)
     orch._condensation_count = count

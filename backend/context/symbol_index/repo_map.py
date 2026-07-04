@@ -53,7 +53,6 @@ def render_repo_map(
     low = 0
     high = len(ranked_paths)
     best_lines = list(header)
-    best_count = 0
 
     while low <= high:
         mid = (low + high) // 2
@@ -69,10 +68,12 @@ def render_repo_map(
             for symbol in public[:4]:
                 candidate_lines.append(_format_symbol_line(symbol))
         body = '\n'.join(candidate_lines) + '\n</REPO_MAP>'
-        tokens = get_token_count(body, model=model)
+        tokens = get_token_count(
+            [{'role': 'user', 'content': body}],
+            model=model or 'gpt-4o',
+        )
         if tokens <= map_tokens:
             best_lines = candidate_lines
-            best_count = mid
             low = mid + 1
         else:
             high = mid - 1

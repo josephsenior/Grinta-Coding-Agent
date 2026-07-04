@@ -15,6 +15,7 @@ from backend.core.constants import (
     DEFAULT_TOOL_RESULT_PERSIST_THRESHOLD_CHARS,
     DEFAULT_TOOL_RESULT_PREVIEW_CHARS,
     DEFAULT_TOOL_RESULTS_PER_MESSAGE_CHARS,
+    PERSISTED_OUTPUT_TAG,
 )
 from backend.core.logging.logger import app_logger as logger
 from backend.ledger.event import Event
@@ -24,7 +25,6 @@ from backend.ledger.observation.files import FileReadObservation
 from backend.ledger.observation.terminal import TerminalObservation
 from backend.ledger.serialization.event import event_from_dict, event_to_dict
 
-PERSISTED_OUTPUT_TAG = '<persisted-output>'
 TOOL_RESULT_CLEARED_MESSAGE = '[Old tool result content cleared]'
 TOOL_RESULT_REPLACEMENTS_KEY = 'tool_result_replacements'
 

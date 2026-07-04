@@ -90,7 +90,9 @@ def _mcp_payload_ok(result: dict[str, Any]) -> bool:
     return True
 
 
-def _truncate_fetch_payload_text(payload: dict[str, Any], max_chars: int) -> dict[str, Any]:
+def _truncate_fetch_payload_text(
+    payload: dict[str, Any], max_chars: int
+) -> dict[str, Any]:
     """Truncate text content within a fetch MCP payload to ``max_chars``.
 
     The fallback ``fetch`` MCP tool does not accept a ``maxCharacters``
@@ -156,9 +158,7 @@ async def native_web_fetch_wrapper(
                 {'url': urls[0]},
             )
             if _mcp_payload_ok(fetch_result):
-                payload = _truncate_fetch_payload_text(
-                    dict(fetch_result), max_chars
-                )
+                payload = _truncate_fetch_payload_text(dict(fetch_result), max_chars)
                 payload['backend'] = 'fetch'
                 return payload
         except Exception:

@@ -250,7 +250,9 @@ class TestFindWindowsBashExcludingWsl:
         wsl_bash = r'C:\Windows\System32\bash.exe'
         monkeypatch.setenv('PATH', r'C:\Windows\System32')
         with (
-            patch('backend.execution.utils.tool_registry.shutil.which', return_value=None),
+            patch(
+                'backend.execution.utils.tool_registry.shutil.which', return_value=None
+            ),
             patch('os.path.isfile') as mock_isfile,
             patch('os.path.realpath', side_effect=lambda path: path),
         ):

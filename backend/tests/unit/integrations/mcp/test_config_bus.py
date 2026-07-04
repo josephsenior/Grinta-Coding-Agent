@@ -8,10 +8,8 @@ from typing import Any
 import pytest
 
 from backend.core.config.mcp_config import MCPConfig, MCPServerConfig
-from backend.integrations.mcp import config_bus as bus_mod
 from backend.integrations.mcp.config_bus import (
     MCPConfigBus,
-    MCPServerDiff,
     diff_mcp_servers,
     get_mcp_config_bus,
     reset_mcp_config_bus,

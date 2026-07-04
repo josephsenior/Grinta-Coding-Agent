@@ -5,6 +5,7 @@ from __future__ import annotations
 from backend.core.enums import ActionConfirmationStatus, ActionSecurityRisk
 from backend.ledger.action.action import Action
 from backend.ledger.action.agent import (
+    AcceptanceCriteriaAction,
     AgentRejectAction,
     AgentThinkAction,
     BlackboardAction,
@@ -19,7 +20,6 @@ from backend.ledger.action.agent import (
     ProposalAction,
     RecallAction,
     SystemHintAction,
-    AcceptanceCriteriaAction,
     TaskTrackingAction,
     UncertaintyAction,
 )

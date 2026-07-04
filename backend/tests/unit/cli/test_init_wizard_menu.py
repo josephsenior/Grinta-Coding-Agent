@@ -14,7 +14,10 @@ from backend.cli.onboarding.menu_prompts import (
 def test_format_detected_model_preview() -> None:
     assert format_detected_model_preview([]) == 'running (no models listed)'
     assert format_detected_model_preview(['a', 'b']) == 'a, b'
-    assert format_detected_model_preview(['a', 'b', 'c', 'd', 'e']) == 'a, b, c, d (+1 more)'
+    assert (
+        format_detected_model_preview(['a', 'b', 'c', 'd', 'e'])
+        == 'a, b, c, d (+1 more)'
+    )
 
 
 def test_build_detected_provider_items() -> None:

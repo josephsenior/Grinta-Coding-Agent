@@ -216,9 +216,7 @@ class TestGetCompaction:
         events = [_event(i) for i in range(8)]
         view = _make_view(events)
 
-        llm.acompletion = AsyncMock(
-            return_value=_make_prose_response('too short')
-        )
+        llm.acompletion = AsyncMock(return_value=_make_prose_response('too short'))
 
         with patch.object(condenser, '_add_response_metadata'):
             result = await condenser.get_compaction(view)
@@ -302,9 +300,7 @@ class TestGetCompaction:
         events = [_event(i) for i in range(8)]
         view = _make_view(events)
 
-        llm.acompletion = AsyncMock(
-            return_value=_make_prose_response('still short')
-        )
+        llm.acompletion = AsyncMock(return_value=_make_prose_response('still short'))
 
         with patch.object(condenser, '_add_response_metadata'):
             result = await condenser.get_compaction(view)
@@ -363,9 +359,7 @@ class TestGetCompaction:
         ]
         view = _make_view(events)
 
-        llm.acompletion = AsyncMock(
-            return_value=_make_prose_response(_long_prose())
-        )
+        llm.acompletion = AsyncMock(return_value=_make_prose_response(_long_prose()))
 
         with patch.object(condenser, '_add_response_metadata'):
             await condenser.get_compaction(view)
@@ -382,9 +376,7 @@ class TestGetCompaction:
         events = [_event(i) for i in range(8)]
         view = _make_view(events)
 
-        llm.acompletion = AsyncMock(
-            return_value=_make_prose_response(_long_prose())
-        )
+        llm.acompletion = AsyncMock(return_value=_make_prose_response(_long_prose()))
 
         with patch.object(condenser, '_add_response_metadata'):
             await condenser.get_compaction(view)
@@ -452,19 +444,15 @@ class TestBuildCondensationPrompt:
 
     def test_prompt_only_includes_last_5_raw_events(self):
         events = [_event(i, content=f'event {i}') for i in range(20)]
-        prompt = self.condenser._build_condensation_prompt(
-            _summary_event(0), events
-        )
-        raw_section = prompt[prompt.index('<RECENT RAW EVENTS'):]
+        prompt = self.condenser._build_condensation_prompt(_summary_event(0), events)
+        raw_section = prompt[prompt.index('<RECENT RAW EVENTS') :]
         assert 'event 19' in raw_section
         assert 'event 15' in raw_section
         assert 'event 14' not in raw_section
 
     def test_prompt_includes_pruned_events(self):
         event = _event(42, content='Created autograd/tensor.py')
-        prompt = self.condenser._build_condensation_prompt(
-            _summary_event(0), [event]
-        )
+        prompt = self.condenser._build_condensation_prompt(_summary_event(0), [event])
         assert 'Created autograd/tensor.py' in prompt
 
     def test_prompt_has_priority_ordered_sections(self):
@@ -659,9 +647,7 @@ class TestUserGoalSection:
 
     def test_prompt_includes_previous_goal_when_present(self):
         prev = _summary_event(0, '## USER GOAL\nBuild a compiler\n## OTHER\nstuff')
-        prompt = self.condenser._build_condensation_prompt(
-            prev, [], char_limit=48000
-        )
+        prompt = self.condenser._build_condensation_prompt(prev, [], char_limit=48000)
         assert 'PREVIOUS GOAL SYNTHESIS' in prompt
         assert 'Build a compiler' in prompt
 
@@ -674,15 +660,12 @@ class TestUserGoalSection:
     def test_previous_goal_not_truncated_by_char_limit(self):
         long_goal = 'A user wants X with ' + 'very specific constraints ' * 300
         prev = _summary_event(0, f'## USER GOAL\n{long_goal}\n## OTHER\nstuff')
-        prompt = self.condenser._build_condensation_prompt(
-            prev, [], char_limit=2000
-        )
+        prompt = self.condenser._build_condensation_prompt(prev, [], char_limit=2000)
         assert long_goal[:200] in prompt
 
     def test_previous_goal_synthesis_injected_from_prior_summary(self):
         summary = (
-            '## USER GOAL\nBuild a compiler with X constraints\n\n'
-            '## UNRESOLVED\nNone'
+            '## USER GOAL\nBuild a compiler with X constraints\n\n## UNRESOLVED\nNone'
         )
         summary_event = _summary_event(0, message=summary)
         prompt = self.condenser._build_condensation_prompt(
@@ -704,26 +687,6 @@ class TestUserGoalSection:
         )
         assert '## USER GOAL' in prompt
         assert 'Highest Priority' in prompt
-
-# ---------------------------------------------------------------------------
-# Gate: prose sanity gate
-# ---------------------------------------------------------------------------
-
-
-class TestProseSanityGate:
-    def setup_method(self):
-        self.condenser = StructuredSummaryCompactor(
-            llm=_make_llm(), max_size=100, keep_first=2
-        )
-
-    def test_gate_rejects_empty_prose(self):
-        assert not self.condenser._passes_prose_sanity_gate('')
-
-    def test_gate_rejects_too_short_prose(self):
-        assert not self.condenser._passes_prose_sanity_gate('hi')
-
-    def test_gate_accepts_long_enough_prose(self):
-        assert self.condenser._passes_prose_sanity_gate(_long_prose())
 
 
 # ---------------------------------------------------------------------------

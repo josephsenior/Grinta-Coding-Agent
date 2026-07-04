@@ -6,11 +6,13 @@ from backend.tests.unit.cli.frontend._shared import (
     _risk_label,
 )
 
+
 def test_confirmation_uses_backend_security_risk() -> None:
     action = CmdRunAction(command='echo hello')
     action.security_risk = ActionSecurityRisk.HIGH
 
     assert _risk_label(action) == ('HIGH', 'bold #fd8383')
+
 
 def test_confirmation_handles_all_risk_levels() -> None:
     """All ActionSecurityRisk levels should map to readable labels."""

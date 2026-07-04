@@ -34,7 +34,6 @@ EXPECTED_EXPORTS = [
     'MULTIEDIT_TOOL_NAME',
     'NOTE_TOOL_NAME',
     'READ_FILE_TOOL_NAME',
-
     'RECALL_TOOL_NAME',
     'REPLACE_STRING_TOOL_NAME',
     'SHARED_TASK_BOARD_TOOL_NAME',
@@ -100,7 +99,6 @@ class TestToolNames(TestCase):
             'MULTIEDIT_TOOL_NAME',
             'NOTE_TOOL_NAME',
             'READ_FILE_TOOL_NAME',
-
             'RECALL_TOOL_NAME',
             'REPLACE_STRING_TOOL_NAME',
             'TASK_TRACKER_TOOL_NAME',

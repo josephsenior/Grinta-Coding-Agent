@@ -32,9 +32,12 @@ def _make_orchestrator():
 def test_per_action_error_preserves_sibling_actions():
     """Per-action errors (serialized content in one of N parallel calls)
     must NOT clear the pending queue. Otherwise one bad call in a batch
-    silently loses every other sibling intent."""
+    silently loses every other sibling intent.
+    """
     orch = _make_orchestrator()
-    err = FunctionCallValidationError('CONTENT_APPEARS_SERIALIZED: ...', per_action=True)
+    err = FunctionCallValidationError(
+        'CONTENT_APPEARS_SERIALIZED: ...', per_action=True
+    )
 
     action = _astep_handle_recoverable_tool_call_shape_error(orch, err)
 
@@ -45,7 +48,8 @@ def test_per_action_error_preserves_sibling_actions():
 
 def test_whole_batch_error_clears_queue():
     """A non-per-action validation error (default) still clears the
-    queue, matching the pre-existing stuck-recovery behavior."""
+    queue, matching the pre-existing stuck-recovery behavior.
+    """
     orch = _make_orchestrator()
     err = FunctionCallValidationError('unrecognized function name')
 
@@ -58,9 +62,12 @@ def test_whole_batch_error_clears_queue():
 def test_repeated_per_action_error_still_increments_counter():
     """The escalation counter must still fire when the same per-action
     error repeats, so a permanently bad call (e.g. agent stuck emitting
-    serialized content) eventually surfaces a strategy-change prompt."""
+    serialized content) eventually surfaces a strategy-change prompt.
+    """
     orch = _make_orchestrator()
-    err = FunctionCallValidationError('CONTENT_APPEARS_SERIALIZED: ...', per_action=True)
+    err = FunctionCallValidationError(
+        'CONTENT_APPEARS_SERIALIZED: ...', per_action=True
+    )
 
     _astep_handle_recoverable_tool_call_shape_error(orch, err)
     _astep_handle_recoverable_tool_call_shape_error(orch, err)

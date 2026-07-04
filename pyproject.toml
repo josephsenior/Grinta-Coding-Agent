@@ -250,6 +250,8 @@ fail_under = 75
 # B404: import subprocess — needed for runtime command execution
 # B603: subprocess_without_shell — all calls use list args (no shell injection)
 # B607: start_process_with_partial_path — standard system executables (git, node, etc.)
+# B310: urllib uses validated URLs only
+# B608: SQL uses bound parameters; Bandit flags f-string clause assembly
 skips = [
   "B101",
   "B103",
@@ -264,6 +266,7 @@ skips = [
   "B603",
   "B607",
   "B310",
+  "B608",
 ]
 exclude_dirs = [ "backend/tests", "tests" ]
 

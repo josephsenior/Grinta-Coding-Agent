@@ -13,7 +13,7 @@ canonical patch.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from backend.context.compactor.compactor import BaseLLMCompactor, Compaction
 from backend.context.view import View
@@ -132,13 +132,10 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         # Extract previous ## USER GOAL section for tripwire comparison.
         previous_goal = ''
         if summary_event and summary_event.message:
-            previous_goal = self._extract_section(
-                summary_event.message, '## USER GOAL'
-            )
+            previous_goal = self._extract_section(summary_event.message, '## USER GOAL')
 
         prompt = self._build_condensation_prompt(
-            summary_event, pruned_events,
-            char_limit=self._get_summary_char_limit()
+            summary_event, pruned_events, char_limit=self._get_summary_char_limit()
         )
 
         self.last_degraded = False
@@ -152,8 +149,7 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             ):
                 attempts += 1
                 logger.info(
-                    'Condensation prose sanity gate failed (len=%d < %d); '
-                    'retry %d/%d',
+                    'Condensation prose sanity gate failed (len=%d < %d); retry %d/%d',
                     len(prose),
                     self.min_prose_length,
                     attempts,
@@ -218,7 +214,9 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         return True
 
     def _check_goal_regression(
-        self, prose: str, previous_goal_text: str | None,
+        self,
+        prose: str,
+        previous_goal_text: str | None,
     ) -> None:
         """Non-blocking tripwire: warn if the USER GOAL section shrank significantly.
 
@@ -291,9 +289,7 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
                 return '\n'.join(parts)
             return ''
         except (AttributeError, IndexError, TypeError) as e:
-            logger.warning(
-                'Failed to extract prose content from LLM response: %s', e
-            )
+            logger.warning('Failed to extract prose content from LLM response: %s', e)
             return ''
 
     def _degraded_summary(
@@ -419,8 +415,14 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
                 'FindSymbolsAction',
                 'LspQueryAction',
             ):
-                path = getattr(event, 'path', '') or getattr(event, 'query', '') or getattr(event, 'pattern', '')
-                code_nav.append(f'{type_name.replace("Action", "")}: {path}' if path else type_name)
+                path = (
+                    getattr(event, 'path', '')
+                    or getattr(event, 'query', '')
+                    or getattr(event, 'pattern', '')
+                )
+                code_nav.append(
+                    f'{type_name.replace("Action", "")}: {path}' if path else type_name
+                )
             elif type_name in (
                 'AgentCondensationObservation',
                 'NullAction',
@@ -434,7 +436,9 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
 
         if files_created:
             if len(files_created) <= 15:
-                lines.append(f'Files created ({len(files_created)}): {", ".join(files_created)}')
+                lines.append(
+                    f'Files created ({len(files_created)}): {", ".join(files_created)}'
+                )
             else:
                 lines.append(
                     f'Files created ({len(files_created)}): {", ".join(files_created[:15])}, '
@@ -443,7 +447,9 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         if files_edited:
             unique_edited = list(dict.fromkeys(files_edited))
             if len(unique_edited) <= 15:
-                lines.append(f'Files edited ({len(unique_edited)} unique): {", ".join(unique_edited)}')
+                lines.append(
+                    f'Files edited ({len(unique_edited)} unique): {", ".join(unique_edited)}'
+                )
             else:
                 lines.append(
                     f'Files edited ({len(unique_edited)} unique): {", ".join(unique_edited[:15])}, '
@@ -455,7 +461,9 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
                 f'{cmd} (exit={exit_code})' if exit_code is not None else cmd
                 for cmd, exit_code in unique_cmds[:20]
             ]
-            lines.append(f'Commands run ({len(unique_cmds)} unique): {"; ".join(cmd_strs)}')
+            lines.append(
+                f'Commands run ({len(unique_cmds)} unique): {"; ".join(cmd_strs)}'
+            )
         if errors:
             lines.append(f'Errors ({len(errors)}):')
             for err in errors[:10]:
@@ -464,7 +472,9 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             lines.append(f'Agent reasoning/thought steps: {len(agent_thoughts)}')
         if code_nav:
             unique_nav = list(dict.fromkeys(code_nav))
-            lines.append(f'Code navigation ({len(unique_nav)}): {"; ".join(unique_nav[:20])}')
+            lines.append(
+                f'Code navigation ({len(unique_nav)}): {"; ".join(unique_nav[:20])}'
+            )
         if other_count:
             lines.append(f'Other events: {other_count}')
 
@@ -495,8 +505,11 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         return bool(source and 'user' in str(source).lower())
 
     def _build_condensation_prompt(
-        self, summary_event: AgentCondensationObservation, pruned_events: list,
-        *, char_limit: int = 48000,
+        self,
+        summary_event: AgentCondensationObservation,
+        pruned_events: list,
+        *,
+        char_limit: int = 48000,
     ) -> str:
         """Build the prompt for LLM condensation.
 
@@ -513,10 +526,7 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         if summary_event and summary_event.message:
             prev_goal = self._extract_section(summary_event.message, '## USER GOAL')
             if prev_goal:
-                previous_goal_section = (
-                    '### PREVIOUS GOAL SYNTHESIS\n'
-                    f'{prev_goal}\n\n'
-                )
+                previous_goal_section = f'### PREVIOUS GOAL SYNTHESIS\n{prev_goal}\n\n'
 
         goal_context_block = ''
         pipeline_state = getattr(self, '_pipeline_state', None)
@@ -532,7 +542,9 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
                         f'<GOAL CONTEXT>\n{goal_context}\n</GOAL CONTEXT>\n\n'
                     )
             except Exception:
-                logger.debug('Failed to build goal context for 5b prompt', exc_info=True)
+                logger.debug(
+                    'Failed to build goal context for 5b prompt', exc_info=True
+                )
 
         base_prompt = (
             'You are maintaining the state summary of an interactive software '
@@ -639,16 +651,21 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         # Add last few raw events for detailed context (skip user messages)
         raw_event_budget = 5
         recent_raw = [
-            e for e in (pruned_events[-raw_event_budget:]
-                        if len(pruned_events) > raw_event_budget
-                        else pruned_events)
+            e
+            for e in (
+                pruned_events[-raw_event_budget:]
+                if len(pruned_events) > raw_event_budget
+                else pruned_events
+            )
             if not self._is_user_message_event(e)
         ]
         if recent_raw:
             base_prompt += '<RECENT RAW EVENTS (for detail)>\n'
             for pruned_event in recent_raw:
                 event_content = self._truncate(str(pruned_event))
-                base_prompt += f'<EVENT id={pruned_event.id}>\n{event_content}\n</EVENT>\n'
+                base_prompt += (
+                    f'<EVENT id={pruned_event.id}>\n{event_content}\n</EVENT>\n'
+                )
             base_prompt += '</RECENT RAW EVENTS>\n'
 
         return base_prompt

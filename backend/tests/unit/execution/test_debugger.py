@@ -338,7 +338,9 @@ def test_resolve_recipe_prefers_tcp_codelldb(monkeypatch) -> None:
             return '/fake/lldb-dap'
         return None
 
-    monkeypatch.setattr('backend.execution.dap._dap_adapters.which_normalized', fake_which)
+    monkeypatch.setattr(
+        'backend.execution.dap._dap_adapters.which_normalized', fake_which
+    )
     monkeypatch.setattr(
         'backend.execution.dap._dap_adapters._reserve_local_tcp_port',
         lambda: 45679,
@@ -359,7 +361,9 @@ def test_resolve_recipe_falls_back_to_stdio_when_tcp_missing(monkeypatch) -> Non
             return '/fake/lldb-dap'
         return None
 
-    monkeypatch.setattr('backend.execution.dap._dap_adapters.which_normalized', fake_which)
+    monkeypatch.setattr(
+        'backend.execution.dap._dap_adapters.which_normalized', fake_which
+    )
 
     assert _resolve_recipe('rust') == ['/fake/lldb-dap']
     rust_entry = next(

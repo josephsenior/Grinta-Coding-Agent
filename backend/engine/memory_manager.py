@@ -4,7 +4,7 @@ import copy
 import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from backend.context.compactor import Compactor
 from backend.context.compactor.compact_boundary import (
@@ -401,14 +401,15 @@ class ContextMemoryManager:
             )
         compaction_started = time.perf_counter()
         assert self.compactor is not None
-        previous_emitter = getattr(self.compactor, 'streaming_emitter', None)
+        compactor = cast(Any, self.compactor)
+        previous_emitter = getattr(compactor, 'streaming_emitter', None)
         if emitter is not None:
-            self.compactor.streaming_emitter = emitter
+            compactor.streaming_emitter = emitter
         try:
             result = await self.compactor.compacted_history(state)
         finally:
             if emitter is not None:
-                self.compactor.streaming_emitter = previous_emitter
+                compactor.streaming_emitter = previous_emitter
         logger.info(
             'ContextMemoryManager.condense_history compactor returned %s (history_events=%d snapshot=%.3fs compactor=%.3fs)',
             type(result).__name__,

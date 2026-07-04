@@ -12,7 +12,6 @@ from backend.cli.tui.screens.detail.helpers import (
 )
 from backend.cli.tui.transcript_typography import TX_BODY, TX_MUTED
 
-
 _CRITERIA_VERBS: dict[str, str] = {
     'view': 'Viewed',
     'update': 'Defined',
@@ -41,7 +40,9 @@ class AcceptanceCriteriaDetailScreen(DetailScreen):
         verb = _CRITERIA_VERBS.get(command_key, 'Criteria')
         count = len(criteria_list or [])
         resolved_heading = heading or (
-            f'{count} criterion' if count == 1 else f'{count} criteria'
+            f'{count} criterion'
+            if count == 1
+            else f'{count} criteria'
             if count
             else verb
         )
@@ -92,10 +93,7 @@ class AcceptanceCriteriaDetailScreen(DetailScreen):
             widgets.extend(
                 self.section(
                     f'Criteria ({len(rows)})',
-                    *[
-                        self.list_row(list_row_bullet(line))
-                        for line in rows
-                    ],
+                    *[self.list_row(list_row_bullet(line)) for line in rows],
                 )
             )
         elif self._fallback_body:

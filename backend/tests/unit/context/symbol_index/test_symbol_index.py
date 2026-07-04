@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from backend.context.symbol_index.builder import build_indexed_file
+from backend.context.symbol_index import paths as index_paths
 from backend.context.symbol_index.rank import rank_files_for_map
 from backend.context.symbol_index.repo_map import build_repo_map_block, render_repo_map
 from backend.context.symbol_index.store import (
@@ -14,7 +14,6 @@ from backend.context.symbol_index.store import (
     clear_symbol_index_for_workspace,
     get_symbol_index_store,
 )
-from backend.context.symbol_index import paths as index_paths
 
 
 @pytest.fixture
@@ -24,15 +23,12 @@ def workspace_with_py(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     (root / 'app').mkdir()
     main = root / 'app' / 'main.py'
     main.write_text(
-        'from app.util import helper\n\n'
-        'def run():\n'
-        '    return helper()\n',
+        'from app.util import helper\n\ndef run():\n    return helper()\n',
         encoding='utf-8',
     )
     util = root / 'app' / 'util.py'
     util.write_text(
-        'def helper():\n'
-        '    return 1\n',
+        'def helper():\n    return 1\n',
         encoding='utf-8',
     )
     index_dir = tmp_path / 'grinta_storage' / 'symbol_index'
@@ -103,7 +99,9 @@ def test_rank_prefers_imported_util(workspace_with_py: Path) -> None:
     assert 'app/main.py' in ranked
 
 
-def test_render_repo_map_respects_markers(workspace_with_py: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_render_repo_map_respects_markers(
+    workspace_with_py: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     store = SymbolIndexStore(workspace_with_py)
     store.ensure_indexed('app/main.py')
     store.ensure_indexed('app/util.py')
@@ -202,7 +200,9 @@ def test_build_repo_map_block_skips_read_only(workspace_with_py: Path) -> None:
     assert block == ''
 
 
-def test_reset_on_corrupt_query(workspace_with_py: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_reset_on_corrupt_query(
+    workspace_with_py: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     store = SymbolIndexStore(workspace_with_py)
     store.ensure_indexed('app/main.py')
     db_path = index_paths.symbol_index_db_path()

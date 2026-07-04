@@ -558,7 +558,9 @@ def _collect_system_prompt_sections(
                 _render_examples(
                     terminal_command_tool=resolved_terminal_tool,
                     tracker_on=bool(getattr(config, 'enable_task_tracker_tool', True)),
-                    criteria_on=bool(getattr(config, 'enable_acceptance_criteria_tool', True)),
+                    criteria_on=bool(
+                        getattr(config, 'enable_acceptance_criteria_tool', True)
+                    ),
                     working_memory_on=bool(
                         getattr(config, 'enable_working_memory', True)
                     ),
@@ -581,7 +583,9 @@ def _collect_system_prompt_sections(
                     getattr(config, 'enable_terminal', True)
                 ),
                 tracker_on=bool(getattr(config, 'enable_task_tracker_tool', True)),
-                criteria_on=bool(getattr(config, 'enable_acceptance_criteria_tool', True)),
+                criteria_on=bool(
+                    getattr(config, 'enable_acceptance_criteria_tool', True)
+                ),
                 checkpoints_on=bool(getattr(config, 'enable_checkpoints', True)),
                 meta_cognition_on=bool(getattr(config, 'enable_meta_cognition', False)),
                 mode=mode,

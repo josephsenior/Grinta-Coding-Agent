@@ -476,7 +476,10 @@ def render_canonical_state_for_prompt(
         for proc in env.running_processes[-5:]:
             _append(lines, f'  - Running: {proc}')
         if env.active_ports:
-            _append(lines, f'  - Active ports: {", ".join(str(p) for p in env.active_ports)}')
+            _append(
+                lines,
+                f'  - Active ports: {", ".join(str(p) for p in env.active_ports)}',
+            )
         if env.auth_status:
             _append(lines, f'  - Auth: {env.auth_status}')
     _append(lines, f'- Summary: {canonical.narrative_summary}')

@@ -14,11 +14,11 @@ from backend.cli.tool_display.orient_tools import (
     _library_target,
     _payload_failed,
     _quote,
-    analyze_observation_model,
-    analyze_result,
     acceptance_criteria_action_model,
     acceptance_criteria_observation_model,
     acceptance_criteria_result,
+    analyze_observation_model,
+    analyze_result,
     checkpoint_action_model,
     checkpoint_observation_model,
     checkpoint_result,
@@ -174,7 +174,6 @@ def test_file_read_action_model_includes_symbol() -> None:
     model = file_read_action_model(action)
     assert 'auth.py' in model.target
     assert 'AuthService' in model.target
-
 
 
 @pytest.mark.parametrize(

@@ -139,7 +139,8 @@ def test_analyze_session_aggregates_event_and_metadata_breakdowns(
 
 def test_tool_failures_attributed_to_last_known_model(tmp_path: Path) -> None:
     """Tool failures with null ctx.model should be attributed to the
-    session's active model, not 'unknown'."""
+    session's active model, not 'unknown'.
+    """
     log_path = tmp_path / 'session.jsonl'
     transcript_path = tmp_path / 'session.txt'
     report_path = tmp_path / 'session.audit.txt'
@@ -148,7 +149,11 @@ def test_tool_failures_attributed_to_last_known_model(tmp_path: Path) -> None:
             'ts': '2026-06-08T10:00:00.000Z',
             'level': 'INFO',
             'event': 'RUNTIME',
-            'ctx': {'model': 'opencode/mimo-v2.5-free', 'mode': 'agent', 'autonomy': 'full'},
+            'ctx': {
+                'model': 'opencode/mimo-v2.5-free',
+                'mode': 'agent',
+                'autonomy': 'full',
+            },
             'payload': {'message': 'model resolved'},
         },
         {
@@ -156,7 +161,11 @@ def test_tool_failures_attributed_to_last_known_model(tmp_path: Path) -> None:
             'level': 'INFO',
             'event': 'TOOL_RESULT',
             'ctx': {'model': None, 'mode': None, 'autonomy': None},
-            'payload': {'tool': 'edit', 'ok': False, 'preview': "Tool 'edit' is not registered"},
+            'payload': {
+                'tool': 'edit',
+                'ok': False,
+                'preview': "Tool 'edit' is not registered",
+            },
         },
         {
             'ts': '2026-06-08T10:00:02.000Z',

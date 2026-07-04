@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import cast
 
 from backend.context.prompt.prompt_window import event_fingerprint
 from backend.ledger.action import MessageAction
@@ -28,11 +29,13 @@ def collect_user_messages(
     """Return USER MessageActions in chronological order."""
     users = [event for event in events if is_nonempty_user_message(event)]
     if max_turns is not None and max_turns > 0 and len(users) > max_turns:
-        return users[-max_turns:]
-    return users
+        return cast(list[MessageAction], users[-max_turns:])
+    return cast(list[MessageAction], users)
 
 
-def user_message_present(prompt_events: Iterable[Event], user_event: MessageAction) -> bool:
+def user_message_present(
+    prompt_events: Iterable[Event], user_event: MessageAction
+) -> bool:
     user_id = getattr(user_event, 'id', None)
     user_fp = event_fingerprint(user_event)
     for event in prompt_events:
@@ -66,7 +69,9 @@ def merge_missing_user_turns(
         return prompt_events
 
     history_index = {
-        id(event): index for index, event in enumerate(full_history) if id(event) is not None
+        id(event): index
+        for index, event in enumerate(full_history)
+        if id(event) is not None
     }
     merged = list(prompt_events)
     for user in missing:

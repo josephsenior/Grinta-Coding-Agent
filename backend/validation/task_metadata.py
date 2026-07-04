@@ -123,7 +123,7 @@ def extract_task_rubric(description: str) -> tuple[list[str], list[str]]:
     Looks for a ``VALIDATION`` banner section and collects:
     - numbered checklist items as acceptance criteria
     - bullets under ``Do not claim full success unless`` as acceptance criteria
-  """
+    """
     validation = _section_text(description, 'VALIDATION')
     if not validation:
         return [], []

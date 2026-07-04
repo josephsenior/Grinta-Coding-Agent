@@ -30,9 +30,7 @@ _WELL_KNOWN_GIT_BASH_PATHS = (
 
 
 def _windows_wsl_bash_dirs() -> frozenset[str]:
-    system_root = os.path.realpath(
-        os.environ.get('SystemRoot', 'C:\\Windows')
-    ).lower()
+    system_root = os.path.realpath(os.environ.get('SystemRoot', 'C:\\Windows')).lower()
     return frozenset(
         os.path.join(system_root, directory).lower()
         for directory in ('system32', 'sysnative', 'syswow64')
@@ -44,7 +42,9 @@ def _is_wsl_bash_path(resolved: str, wsl_dirs: frozenset[str]) -> bool:
     return any(lowered.startswith(directory) for directory in wsl_dirs)
 
 
-def _accept_windows_bash_candidate(candidate: str, wsl_dirs: frozenset[str]) -> str | None:
+def _accept_windows_bash_candidate(
+    candidate: str, wsl_dirs: frozenset[str]
+) -> str | None:
     if not candidate or not os.path.isfile(candidate):
         return None
     resolved = os.path.realpath(candidate)
@@ -71,7 +71,7 @@ def _git_for_windows_bash_candidates() -> list[str]:
 
 
 def find_windows_bash_excluding_wsl() -> str | None:
-    """Find a non-WSL bash on Windows (e.g. Git Bash).
+    r"""Find a non-WSL bash on Windows (e.g. Git Bash).
 
     WSL installs ``bash.exe`` inside ``System32``; that launcher is excluded.
     Git for Windows often puts ``git`` on PATH via ``Git\\cmd`` while ``bash.exe``
@@ -95,7 +95,9 @@ def find_windows_bash_excluding_wsl() -> str | None:
     for candidate in (
         *_git_for_windows_bash_candidates(),
         *_WELL_KNOWN_GIT_BASH_PATHS,
-        os.path.join(os.environ.get('LOCALAPPDATA', ''), 'Programs', 'Git', 'bin', 'bash.exe'),
+        os.path.join(
+            os.environ.get('LOCALAPPDATA', ''), 'Programs', 'Git', 'bin', 'bash.exe'
+        ),
     ):
         normalized = os.path.normcase(os.path.normpath(candidate))
         if normalized in seen:
@@ -119,7 +121,9 @@ def _configured_windows_shell() -> Literal['bash', 'powershell']:
     try:
         from backend.core.config.config_loader import load_app_config
 
-        shell = str(getattr(load_app_config().security, 'windows_shell', 'bash')).lower()
+        shell = str(
+            getattr(load_app_config().security, 'windows_shell', 'bash')
+        ).lower()
         if shell in _WINDOWS_SHELL_POWERSHELL:
             return 'powershell'
     except Exception:

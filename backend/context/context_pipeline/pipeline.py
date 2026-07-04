@@ -37,14 +37,14 @@ from backend.context.context_pipeline.compaction import (
     should_skip_compaction,
 )
 from backend.context.context_pipeline.goal_context import strip_verbatim_user_echo
-from backend.context.context_pipeline.post_compact_reinject import (
-    build_post_compact_attachment_text,
-)
 from backend.context.context_pipeline.helpers import (
     _drop_stale_prompt_state_artifacts,
     apply_ineffective_compaction_backoff,
     clear_prewarm_signals,
     is_prewarm_stale,
+)
+from backend.context.context_pipeline.post_compact_reinject import (
+    build_post_compact_attachment_text,
 )
 from backend.context.context_pipeline.types import _JUST_COMPACTED_KEY
 from backend.context.memory.session_context import bind_session_context
@@ -333,9 +333,7 @@ class ContextPipeline:
             return CondensedHistory(history, None)
         action = resolved_action
         if action.summary:
-            action.summary = strip_verbatim_user_echo(
-                action.summary, state=state
-            )
+            action.summary = strip_verbatim_user_echo(action.summary, state=state)
 
         finalize_compaction_artifacts(state=state)
         mark_just_compacted(state)
@@ -397,7 +395,9 @@ class ContextPipeline:
                 'POST_COMPACT_RESTORE' in str(getattr(event, 'content', '') or '')
                 for event in events
             ):
-                from backend.ledger.observation.agent import AgentCondensationObservation
+                from backend.ledger.observation.agent import (
+                    AgentCondensationObservation,
+                )
 
                 reinject = AgentCondensationObservation(content=attachment)
                 insert_at = 1 if packet is not None else 0
@@ -442,7 +442,9 @@ class ContextPipeline:
             return None
         llm_config = self._llm_config(state)
         budget = ContextBudget.from_events(
-            events, llm_config=llm_config, state=state,
+            events,
+            llm_config=llm_config,
+            state=state,
             boundary_compact_cooldown_seconds=self._boundary_compact_cooldown,
         )
         action = await self._compaction_engine._llm_structured_compaction(

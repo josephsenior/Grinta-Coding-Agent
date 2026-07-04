@@ -937,10 +937,10 @@ class _AesIoTerminalMixin:
             else:
                 lines = [
                     (
-                        f"- {row['session_id']}: running={row['running']}"
-                        f" kind={row['shell_kind']} cwd={row['cwd']}"
+                        f'- {row["session_id"]}: running={row["running"]}'
+                        f' kind={row["shell_kind"]} cwd={row["cwd"]}'
                         + (
-                            f" exit_code={row['exit_code']}"
+                            f' exit_code={row["exit_code"]}'
                             if row.get('exit_code') is not None
                             else ''
                         )
@@ -998,9 +998,7 @@ class _AesIoTerminalMixin:
 
             self.session_manager.close_session(session_id)
             self._clear_terminal_read_cursor(session_id)
-            obs = Observation(
-                content=f'Closed terminal session {session_id!r}.'
-            )
+            obs = Observation(content=f'Closed terminal session {session_id!r}.')
             obs.tool_result = {
                 'tool': 'terminal_manager',
                 'ok': True,
@@ -1013,7 +1011,5 @@ class _AesIoTerminalMixin:
             }
             return obs
         except Exception as exc:
-            logger.error(
-                'Error closing terminal %s: %s', action.session_id, exc
-            )
+            logger.error('Error closing terminal %s: %s', action.session_id, exc)
             return ErrorObservation(f'Failed to close terminal: {exc}')

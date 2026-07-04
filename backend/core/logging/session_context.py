@@ -51,9 +51,7 @@ def _compact_llm_config(config: Any) -> dict[str, Any]:
         'prompt_history_budget_ratio': getattr(
             config, 'prompt_history_budget_ratio', None
         ),
-        'prompt_history_max_events': getattr(
-            config, 'prompt_history_max_events', None
-        ),
+        'prompt_history_max_events': getattr(config, 'prompt_history_max_events', None),
     }
 
 

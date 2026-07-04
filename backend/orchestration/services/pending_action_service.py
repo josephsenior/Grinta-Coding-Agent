@@ -496,9 +496,7 @@ class PendingActionService:
             controller.event_stream.add_event(
                 timeout_observation, EventSource.ENVIRONMENT
             )
-            self._record_timeout_observation_for_prompt(
-                controller, timeout_observation
-            )
+            self._record_timeout_observation_for_prompt(controller, timeout_observation)
         finally:
             aid = self._int_action_id(action)
             if aid is not None:

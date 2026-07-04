@@ -223,10 +223,7 @@ class ScreenStateMixin:
 
     @staticmethod
     def _build_hud_line2_leading(ws_display: str) -> str:
-        return (
-            f'[#91abec].Grinta[/]  '
-            f'[{NAVY_TEXT_DIM}]Ws: {ws_display}[/]'
-        )
+        return f'[#91abec].Grinta[/]  [{NAVY_TEXT_DIM}]Ws: {ws_display}[/]'
 
     @staticmethod
     def _build_context_display(used: int, limit: int) -> str:

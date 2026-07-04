@@ -13,7 +13,6 @@ from backend.context.canonical_state import (
 )
 from backend.context.compactor.pre_condensation_snapshot import extract_snapshot
 from backend.context.context_pipeline import ContextPipeline
-
 from backend.core.config.compactor_config import ContextPipelineConfig
 from backend.core.constants import DEFAULT_EMERGENCY_PROMPT_MIN_EVENTS
 from backend.ledger.action.agent import AgentThinkAction

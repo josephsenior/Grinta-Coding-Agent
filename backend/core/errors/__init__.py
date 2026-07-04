@@ -352,9 +352,7 @@ class FunctionCallValidationError(AppError):
     This typically happens when the LLM outputs unrecognized function call / parameter names / values.
     """
 
-    def __init__(
-        self, message: str, *, per_action: bool = False
-    ) -> None:
+    def __init__(self, message: str, *, per_action: bool = False) -> None:
         """Initialize the error with details about the validation failure.
 
         ``per_action`` indicates the error is attributable to a single tool

@@ -152,4 +152,6 @@ def test_recent_compaction_respects_custom_boundary_cooldown() -> None:
         boundary_compact_cooldown_seconds=120,
     )
 
-    assert short_cooldown_budget.estimated_tokens > long_cooldown_budget.estimated_tokens
+    assert (
+        short_cooldown_budget.estimated_tokens > long_cooldown_budget.estimated_tokens
+    )

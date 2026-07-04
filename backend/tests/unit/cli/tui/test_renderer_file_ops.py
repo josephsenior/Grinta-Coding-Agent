@@ -1,5 +1,9 @@
 """Headless TUI — renderer file ops."""
 
+from backend.cli.tui.widgets.activity_card import OrientLine
+from backend.cli.tui.widgets.scan_line import (
+    EditCard,
+)
 from backend.tests.unit.cli.tui._shared import (
     FileEditAction,
     FileEditObservation,
@@ -9,16 +13,11 @@ from backend.tests.unit.cli.tui._shared import (
     HUDBar,
     ReasoningDisplay,
     RichConsole,
-    TUIRenderer,
     _get_screen,
     asyncio,
     pytest,
 )
 
-from backend.cli.tui.widgets.activity_card import OrientLine
-from backend.cli.tui.widgets.scan_line import (
-    EditCard,
-)
 
 @pytest.mark.asyncio
 async def test_tui_file_edit_create_renders_compact_create_card(mock_config):
@@ -64,6 +63,7 @@ async def test_tui_file_edit_create_renders_compact_create_card(mock_config):
         line = str(cards[0]._line_text())
         assert 'demo.txt' in line
         assert '+2' in cards[0]._delta_text()
+
 
 @pytest.mark.asyncio
 async def test_tui_file_edit_observation_uses_new_content_not_polluted_preview(
@@ -114,6 +114,7 @@ async def test_tui_file_edit_observation_uses_new_content_not_polluted_preview(
         assert 'Stale preview' not in line
         assert 'File created successfully' not in line
 
+
 @pytest.mark.asyncio
 async def test_tui_file_edit_create_uses_new_content_not_observation_body(mock_config):
     console = RichConsole()
@@ -158,6 +159,7 @@ async def test_tui_file_edit_create_uses_new_content_not_observation_body(mock_c
         assert 'created.txt' in line
         assert '+2' in cards[0]._delta_text()
 
+
 @pytest.mark.asyncio
 async def test_tui_file_read_renders_flat_orient_line(mock_config):
     console = RichConsole()
@@ -189,6 +191,7 @@ async def test_tui_file_read_renders_flat_orient_line(mock_config):
         assert lines[0].model.verb == 'Read'
         assert lines[0].model.target.endswith('read_card.py')
         assert lines[0].model.result == 'lines 1–EOF'
+
 
 @pytest.mark.asyncio
 async def test_tui_file_read_observation_keeps_filename_visible(mock_config):
@@ -225,6 +228,7 @@ async def test_tui_file_read_observation_keeps_filename_visible(mock_config):
         assert lines[0].model.result == 'lines 1–EOF'
         assert not list(lines[0].query('#caret').results())
 
+
 @pytest.mark.asyncio
 async def test_tui_file_read_ranged_line_shows_range_metric(mock_config):
     console = RichConsole()
@@ -258,6 +262,7 @@ async def test_tui_file_read_ranged_line_shows_range_metric(mock_config):
         assert len(lines) == 1
         assert lines[0].model.target.endswith('ranged_read.py')
         assert lines[0].model.result == 'lines 50–100'
+
 
 @pytest.mark.asyncio
 async def test_tui_file_edit_observation_uses_unified_diff_rows(mock_config):
@@ -296,6 +301,7 @@ async def test_tui_file_edit_observation_uses_unified_diff_rows(mock_config):
         detail = cards[0].build_detail_screen()
         assert detail is not None
         assert cards[0]._encoded_diff is not None, 'EditCard should store a diff'
+
 
 @pytest.mark.asyncio
 async def test_tui_file_edit_action_and_observation_render_single_delta_card(
@@ -341,6 +347,7 @@ async def test_tui_file_edit_action_and_observation_render_single_delta_card(
         delta = cards[0]._delta_text()
         assert '+1' in delta and '-1' in delta
 
+
 @pytest.mark.asyncio
 async def test_tui_undo_last_edit_renders_undo_edit_card(mock_config):
     console = RichConsole()
@@ -381,6 +388,7 @@ async def test_tui_undo_last_edit_renders_undo_edit_card(mock_config):
         assert cards[0]._is_undo is True
         assert 'Undo' in str(cards[0]._line_text())
         assert cards[0]._encoded_diff is not None
+
 
 @pytest.mark.asyncio
 async def test_tui_replace_string_observation_renders_edited_not_created(
@@ -428,6 +436,7 @@ async def test_tui_replace_string_observation_renders_edited_not_created(
         assert 'demo.txt' in line
         assert cards[0].build_detail_screen() is not None
 
+
 @pytest.mark.asyncio
 async def test_tui_file_edit_observation_discards_pending_create_for_overwrite(
     mock_config,
@@ -474,6 +483,7 @@ async def test_tui_file_edit_observation_discards_pending_create_for_overwrite(
         assert 'demo.txt' in line
         assert cards[0].build_detail_screen() is not None
 
+
 @pytest.mark.asyncio
 async def test_tui_file_edit_observation_uses_explicit_diff_rows(mock_config):
     console = RichConsole()
@@ -507,6 +517,7 @@ async def test_tui_file_edit_observation_uses_explicit_diff_rows(mock_config):
         assert len(cards) == 1
         assert cards[0]._encoded_diff is not None, 'EditCard should store a diff'
         assert cards[0].build_detail_screen() is not None
+
 
 @pytest.mark.asyncio
 async def test_tui_file_edit_observation_uses_diff_preview_rows_in_content(mock_config):
@@ -546,6 +557,7 @@ async def test_tui_file_edit_observation_uses_diff_preview_rows_in_content(mock_
         assert 'demo.txt' in line
         assert cards[0]._encoded_diff is not None, 'EditCard should store a diff'
         assert cards[0].build_detail_screen() is not None
+
 
 @pytest.mark.asyncio
 async def test_tui_file_edit_observation_uses_diff_preview_rows_with_outcome(
@@ -589,4 +601,3 @@ async def test_tui_file_edit_observation_uses_diff_preview_rows_with_outcome(
         assert 'config.toml' in line
         assert cards[0]._encoded_diff is not None, 'EditCard should store a diff'
         assert cards[0].build_detail_screen() is not None
-

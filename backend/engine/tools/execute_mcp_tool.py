@@ -54,9 +54,9 @@ def create_execute_mcp_tool_tool(config: Any = None) -> dict:
         mcp_status = getattr(config, 'mcp_capability_status', None)
         if isinstance(mcp_status, dict):
             try:
-                has_mcp_catalog = int(
-                    mcp_status.get('remote_tool_param_count') or 0
-                ) > 0
+                has_mcp_catalog = (
+                    int(mcp_status.get('remote_tool_param_count') or 0) > 0
+                )
             except (TypeError, ValueError):
                 has_mcp_catalog = False
 

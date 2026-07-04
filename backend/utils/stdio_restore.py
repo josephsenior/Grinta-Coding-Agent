@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 from contextlib import contextmanager
-from typing import IO, Iterator
+from typing import IO, Iterator, cast
 
 
 def _stream_has_encoding(stream: object) -> bool:
@@ -32,7 +32,7 @@ class _StdioEncodingProxy:
 def _with_encoding(stream: IO[str]) -> IO[str]:
     if _stream_has_encoding(stream):
         return stream
-    return _StdioEncodingProxy(stream)
+    return cast(IO[str], _StdioEncodingProxy(stream))
 
 
 @contextmanager

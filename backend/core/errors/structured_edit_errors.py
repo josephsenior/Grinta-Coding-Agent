@@ -407,7 +407,6 @@ def build_search_error_observation(
     return obs
 
 
-
 def build_search_error_tool_result(
     *,
     tool: str,
@@ -434,6 +433,6 @@ def build_search_error_tool_result(
 def compact_symbol_read_result(result: dict[str, Any]) -> dict[str, Any]:
     """Trim symbol read/find payloads for not_found and ambiguous results."""
     compact = dict(result)
-    status = str(compact.get('status') or '')
-    symbol_name = str(compact.get('symbol_name') or compact.get('target') or '')
+    str(compact.get('status') or '')
+    str(compact.get('symbol_name') or compact.get('target') or '')
     return compact

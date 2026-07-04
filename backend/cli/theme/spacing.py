@@ -11,21 +11,21 @@ shorthand for ``top right bottom left``. The four-point variants
 from __future__ import annotations
 
 # 0 — flush
-SPACE_0 = "0 0"
+SPACE_0 = '0 0'
 # 1 — tight (e.g. inline label gap)
-SPACE_1 = "0 1"
+SPACE_1 = '0 1'
 # 2 — standard inline padding (e.g. card horizontal)
-SPACE_2 = "1 2"
+SPACE_2 = '1 2'
 # 3 — comfortable padding (e.g. card vertical breathing)
-SPACE_3 = "1 3"
+SPACE_3 = '1 3'
 # 4 — block padding (panels)
-SPACE_BLOCK_2 = "2 2"
+SPACE_BLOCK_2 = '2 2'
 # 5 — spacious block (dialogs)
-SPACE_BLOCK_3 = "2 3"
+SPACE_BLOCK_3 = '2 3'
 # 6 — transcript block (the heaviest unit; used between transcript cards)
-TRANSCRIPT_BLOCK = "2 2 3 2"
+TRANSCRIPT_BLOCK = '2 2 3 2'
 
 # Margin scale (slightly different rhythm than padding)
-MARGIN_TIGHT = "0 0 1 0"
-MARGIN_BLOCK = "0 0 2 0"
-MARGIN_TRANSCRIPT = "0 0 1 0"
+MARGIN_TIGHT = '0 0 1 0'
+MARGIN_BLOCK = '0 0 2 0'
+MARGIN_TRANSCRIPT = '0 0 1 0'

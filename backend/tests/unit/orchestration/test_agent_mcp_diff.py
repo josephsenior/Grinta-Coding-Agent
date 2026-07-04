@@ -5,10 +5,10 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any
 
-import pytest
-
+from backend.ledger.action import Action, NullAction
 from backend.orchestration.agent import Agent
 from backend.orchestration.agent.tools import build_tool
+from backend.orchestration.state.state import State
 
 
 class _RecordingAgent(Agent):
@@ -25,8 +25,8 @@ class _RecordingAgent(Agent):
         self.llm_registry = None
         self.config = SimpleNamespace(name='recording')
 
-    async def step(self, *_args: Any, **_kwargs: Any) -> None:  # pragma: no cover
-        return None
+    def step(self, state: State) -> Action:  # pragma: no cover
+        return NullAction()
 
     @property
     def name(self) -> str:

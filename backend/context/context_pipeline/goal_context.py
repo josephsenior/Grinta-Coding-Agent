@@ -10,7 +10,7 @@ from backend.core.constants import DEFAULT_GOAL_CONTEXT_MAX_CHARS
 from backend.core.logging.logger import app_logger as logger
 
 if TYPE_CHECKING:
-    from backend.orchestration.state.state import State
+    pass
 
 _USER_GOAL_HEADER = '## USER GOAL'
 
@@ -68,7 +68,9 @@ def strip_verbatim_user_echo(
             continue
         ratio = difflib.SequenceMatcher(None, goal.lower(), raw.lower()).ratio()
         if ratio >= 0.8 or raw.strip() in goal:
-            synthesized = build_goal_context_for_compaction(state=state, snapshot=snapshot)
+            synthesized = build_goal_context_for_compaction(
+                state=state, snapshot=snapshot
+            )
             if not synthesized:
                 continue
             replacement = f'{_USER_GOAL_HEADER}\n{synthesized}'

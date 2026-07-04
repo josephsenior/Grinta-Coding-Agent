@@ -154,7 +154,12 @@ class TestHandleAcceptanceCriteriaTool:
 
     def test_view_loads_from_store(self):
         stored = [
-            {'id': 'ac1', 'assertion': 'Saved item', 'source': 'stated', 'evidence': None}
+            {
+                'id': 'ac1',
+                'assertion': 'Saved item',
+                'source': 'stated',
+                'evidence': None,
+            }
         ]
         with patch(
             'backend.engine.tools._tool_handlers.AcceptanceCriteriaStore'

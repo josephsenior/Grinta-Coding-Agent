@@ -1,22 +1,19 @@
 """Headless TUI — renderer discovery/orient."""
 
+from backend.cli.tui.widgets.activity_card import OrientLine
 from backend.tests.unit.cli.tui._shared import (
     AgentThinkAction,
     GrintaTUIApp,
     HUDBar,
     ReasoningDisplay,
     RichConsole,
-    TUIRenderer,
     ThinkingIndicator,
+    TUIRenderer,
     _get_screen,
     asyncio,
     pytest,
 )
 
-from backend.cli.tui.widgets.activity_card import OrientLine
-from backend.cli.tui.widgets.scan_line import (
-    EditCard,
-)
 
 @pytest.mark.asyncio
 async def test_tui_find_symbols_observation_renders_orient_line(mock_config):
@@ -65,10 +62,10 @@ async def test_tui_find_symbols_observation_renders_orient_line(mock_config):
         assert lines[0].model.target == '"render" in backend'
         assert lines[0].model.result == '1 symbol'
 
+
 @pytest.mark.asyncio
 async def test_tui_grep_observation_renders_orient_line(mock_config):
     """``GrepObservation`` renders a flat grep row with the action pattern."""
-
     from backend.ledger.action.search import GrepAction
     from backend.ledger.observation.search import GrepObservation
 
@@ -111,6 +108,7 @@ async def test_tui_grep_observation_renders_orient_line(mock_config):
         assert lines[0].model.target == '"_start_election" in raftkv/node.py'
         assert lines[0].model.result == '1 file'
 
+
 @pytest.mark.asyncio
 async def test_tui_glob_observation_renders_orient_line(mock_config):
     """``GlobObservation`` renders a flat glob row with the action pattern."""
@@ -152,6 +150,7 @@ async def test_tui_glob_observation_renders_orient_line(mock_config):
         assert lines[0].model.verb == 'Globbed'
         assert lines[0].model.target == '**/*.py in backend'
         assert lines[0].model.result == '2 files'
+
 
 @pytest.mark.asyncio
 async def test_tui_grep_content_mode_uses_match_and_file_metric(mock_config):
@@ -201,6 +200,7 @@ async def test_tui_grep_content_mode_uses_match_and_file_metric(mock_config):
         assert lines[0].model.verb == 'Grepped'
         assert lines[0].model.result == '1 match · 1 file'
 
+
 @pytest.mark.asyncio
 async def test_tui_glob_orient_line_uses_file_labels_not_matches(mock_config):
     """Glob rows summarize files, not grep-style match counts."""
@@ -240,6 +240,7 @@ async def test_tui_glob_orient_line_uses_file_labels_not_matches(mock_config):
         assert len(lines) == 1
         assert lines[0].model.result == '2 files'
         assert 'matches' not in lines[0].model.result.lower()
+
 
 @pytest.mark.asyncio
 async def test_tui_grep_files_with_matches_shows_file_count(mock_config):
@@ -289,6 +290,7 @@ async def test_tui_grep_files_with_matches_shows_file_count(mock_config):
         assert len(lines) == 1
         assert lines[0].model.result == '2 files'
         assert 'matches' not in lines[0].model.result.lower()
+
 
 @pytest.mark.asyncio
 async def test_tui_orient_lines_stay_individual_for_consecutive_lookups(mock_config):
@@ -353,6 +355,7 @@ async def test_tui_orient_lines_stay_individual_for_consecutive_lookups(mock_con
         assert lines[1].model.verb == 'Globbed'
         assert lines[2].model.verb == 'Found'
 
+
 @pytest.mark.asyncio
 async def test_tui_internal_thinking_payloads_render_as_activity_cards(mock_config):
     console = RichConsole()
@@ -395,4 +398,3 @@ async def test_tui_internal_thinking_payloads_render_as_activity_cards(mock_conf
         assert 'Saved' in str(
             checkpoint_lines[0].query_one('#orient-content').renderable
         )
-

@@ -155,9 +155,7 @@ class MCPConfigChange:
     source: str = 'mutation'
 
 
-SubscriberCallback = Callable[
-    [MCPConfigChange], Awaitable[None] | None
-]
+SubscriberCallback = Callable[[MCPConfigChange], Awaitable[None] | None]
 
 
 class MCPConfigBus:
@@ -291,7 +289,13 @@ class MCPConfigBus:
                 # returned a coroutine without a loop are the test's
                 # problem — they should ``await`` directly.
                 try:
-                    asyncio.run(result)
+
+                    async def _await_subscriber(
+                        subscriber_result: Awaitable[None] = result,
+                    ) -> None:
+                        await subscriber_result
+
+                    asyncio.run(_await_subscriber())
                 except Exception:
                     logger.exception(
                         'MCPConfigBus async subscriber failed (no running loop)'
@@ -305,9 +309,7 @@ class MCPConfigBus:
     # Introspection (mostly for tests / status panels)
     # ------------------------------------------------------------------
 
-    def has_changes_since(
-        self, prior: MCPConfig | None
-    ) -> bool:
+    def has_changes_since(self, prior: MCPConfig | None) -> bool:
         """Return True when the current snapshot differs from ``prior``."""
         with self._lock:
             current = self._snapshot
@@ -322,9 +324,7 @@ async def _safe_await(awaitable: Awaitable[Any], source: str) -> None:
     try:
         await awaitable
     except Exception:
-        logger.exception(
-            'MCPConfigBus async subscriber failed (source=%s)', source
-        )
+        logger.exception('MCPConfigBus async subscriber failed (source=%s)', source)
 
 
 # Process-singleton accessor. Tests can ``bus.clear()`` / ``bus.set_snapshot(...)``

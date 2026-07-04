@@ -41,7 +41,9 @@ class AcceptanceCriteriaStore:
             workspace_root = require_effective_workspace_root()
         from backend.core.workspace_resolution import workspace_agent_state_dir
 
-        self.path = workspace_agent_state_dir(workspace_root) / 'acceptance_criteria.json'
+        self.path = (
+            workspace_agent_state_dir(workspace_root) / 'acceptance_criteria.json'
+        )
 
     def load_from_file(self) -> list[dict[str, Any]]:
         """Load criteria from disk."""

@@ -8,13 +8,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from backend.context.compactor.compactor import Compaction
+from backend.context.context_budget import ContextBudget
 from backend.context.context_pipeline import (
     ContextPipeline,
     _shrink_tail_for_token_reduction,
     apply_ineffective_compaction_backoff,
 )
 from backend.context.context_pipeline.compaction import (
-    _CompactionEngine,
     mark_just_compacted,
     passes_effectiveness_gate,
     record_autocompact_failure,
@@ -25,12 +25,10 @@ from backend.context.context_pipeline.compaction import (
 from backend.context.context_pipeline.helpers import is_prewarm_stale
 from backend.context.context_pipeline.types import (
     _AUTOCOMPACT_FAILURE_STREAK_KEY,
-    _JUST_COMPACTED_KEY,
     _MAX_AUTOCOMPACT_FAILURES,
     _WILL_RETRIGGER_HYSTERESIS_KEY,
     _ContinuityGateDecision,
 )
-from backend.context.context_budget import ContextBudget
 from backend.core.config.compactor_config import ContextPipelineConfig
 from backend.core.constants import (
     DEFAULT_COMPACT_MIN_TOKEN_REDUCTION,
@@ -190,9 +188,7 @@ async def test_prepare_step_accepts_prewarmed_compaction_despite_continuity_issu
     state = _make_state(events)
     state.turn_signals.prewarmed_compaction = Compaction(action=action)
     with (
-        patch(
-            'backend.context.context_pipeline.finalize_compaction_artifacts'
-        ),
+        patch('backend.context.context_pipeline.finalize_compaction_artifacts'),
         patch('backend.context.context_pipeline.delete_staging_snapshot'),
         patch('backend.context.context_pipeline.maybe_update'),
         patch(
@@ -269,10 +265,6 @@ async def test_prepare_step_rejects_micro_prune_and_respects_cooldown(pipeline):
 
 def test_structured_compactor_preserves_50_raw_events():
     """With max_size=102, compaction keeps ~50 raw tail events."""
-    from backend.context.compactor.strategies.structured_summary_compactor import (
-        StructuredSummaryCompactor,
-    )
-
     compactor = SimpleNamespace(max_size=102, keep_first=0)
 
     target_size = compactor.max_size // 2
@@ -449,9 +441,7 @@ def test_passes_effectiveness_gate_uses_full_post_boundary_estimate() -> None:
         summary_offset=0,
     )
 
-    assert passes_effectiveness_gate(
-        events, events, action, budget, state, llm_config
-    )
+    assert passes_effectiveness_gate(events, events, action, budget, state, llm_config)
 
 
 def test_note_llm_step_does_not_clear_ineffective_compaction_backoff(pipeline):
@@ -631,9 +621,13 @@ async def test_prepare_step_discards_stale_prewarmed_compaction(pipeline):
     state.turn_signals.prewarm_history_len = 10
     state.turn_signals.prewarm_latest_event_id = 10
     with (
-        patch('backend.context.context_pipeline.finalize_compaction_artifacts') as mock_finalize,
+        patch(
+            'backend.context.context_pipeline.finalize_compaction_artifacts'
+        ) as mock_finalize,
         patch('backend.context.context_pipeline.maybe_update'),
-        patch.object(pipeline._compaction_engine, 'run', new=AsyncMock(return_value=None)),
+        patch.object(
+            pipeline._compaction_engine, 'run', new=AsyncMock(return_value=None)
+        ),
     ):
         result = await pipeline.prepare_step(state)
     mock_finalize.assert_not_called()

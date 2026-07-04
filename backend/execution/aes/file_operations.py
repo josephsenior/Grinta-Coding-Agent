@@ -272,7 +272,9 @@ def _is_generated_path(path: str) -> bool:
 class _DiffLine:
     __slots__ = ('text', 'priority', 'category', 'file_idx', 'hunk_idx', 'kept')
 
-    def __init__(self, text: str, priority: int, category: str, file_idx: int, hunk_idx: int):
+    def __init__(
+        self, text: str, priority: int, category: str, file_idx: int, hunk_idx: int
+    ):
         self.text = text
         self.priority = priority
         self.category = category
@@ -282,7 +284,14 @@ class _DiffLine:
 
 
 class _HunkInfo:
-    __slots__ = ('idx', 'file_idx', 'additions', 'deletions', 'context_count', 'header_line')
+    __slots__ = (
+        'idx',
+        'file_idx',
+        'additions',
+        'deletions',
+        'context_count',
+        'header_line',
+    )
 
     def __init__(self, idx: int, file_idx: int, header_line: _DiffLine):
         self.idx = idx
@@ -304,7 +313,9 @@ class _FileInfo:
         self.hunks: list[_HunkInfo] = []
 
 
-def _parse_diff(lines: list[str]) -> tuple[list[_DiffLine], list[_FileInfo], list[_HunkInfo]]:
+def _parse_diff(
+    lines: list[str],
+) -> tuple[list[_DiffLine], list[_FileInfo], list[_HunkInfo]]:
     """Parse unified diff into classified lines.
 
     Returns (all_lines, files, hunks) where all_lines is in original order.
@@ -329,7 +340,9 @@ def _parse_diff(lines: list[str]) -> tuple[list[_DiffLine], list[_FileInfo], lis
             dl = _DiffLine(raw, _PRIORITY_DIFF_METADATA, 'metadata', file_idx, -1)
             fi.metadata_lines.append(dl)
             all_lines.append(dl)
-        elif raw.startswith('index ') or raw.startswith('--- ') or raw.startswith('+++ '):
+        elif (
+            raw.startswith('index ') or raw.startswith('--- ') or raw.startswith('+++ ')
+        ):
             if file_idx >= 0:
                 dl = _DiffLine(raw, _PRIORITY_DIFF_METADATA, 'metadata', file_idx, -1)
                 files[file_idx].metadata_lines.append(dl)
@@ -338,7 +351,9 @@ def _parse_diff(lines: list[str]) -> tuple[list[_DiffLine], list[_FileInfo], lis
                 all_lines.append(_DiffLine(raw, _PRIORITY_CONTEXT, 'context', 0, -1))
         elif raw.startswith('@@'):
             hunk_idx += 1
-            hdl = _DiffLine(raw, _PRIORITY_HUNK_HEADER, 'hunk_header', file_idx, hunk_idx)
+            hdl = _DiffLine(
+                raw, _PRIORITY_HUNK_HEADER, 'hunk_header', file_idx, hunk_idx
+            )
             hi = _HunkInfo(hunk_idx, file_idx, hdl)
             if file_idx >= 0:
                 files[file_idx].hunks.append(hi)
@@ -369,11 +384,14 @@ def _parse_diff(lines: list[str]) -> tuple[list[_DiffLine], list[_FileInfo], lis
     return all_lines, files, hunks
 
 
-def _mark_adjacent_context_for_all_hunks(all_lines: list[_DiffLine], hunks: list[_HunkInfo]) -> None:
+def _mark_adjacent_context_for_all_hunks(
+    all_lines: list[_DiffLine], hunks: list[_HunkInfo]
+) -> None:
     """Mark context lines within ±2 lines of a change as adjacent context."""
     for hi in hunks:
         hunk_content = [
-            dl for dl in all_lines
+            dl
+            for dl in all_lines
             if dl.hunk_idx == hi.idx and dl.category in ('context', 'add', 'remove')
         ]
         _mark_adjacent_context(hunk_content)
@@ -381,7 +399,9 @@ def _mark_adjacent_context_for_all_hunks(all_lines: list[_DiffLine], hunks: list
 
 def _mark_adjacent_context(lines: list[_DiffLine]) -> None:
     """Mark context lines within ±2 positions of a +/- line as adjacent."""
-    change_positions = [i for i, dl in enumerate(lines) if dl.category in ('add', 'remove')]
+    change_positions = [
+        i for i, dl in enumerate(lines) if dl.category in ('add', 'remove')
+    ]
     if not change_positions:
         return
     adjacent = set()
@@ -593,26 +613,40 @@ def _build_telemetry(
     for fi in files:
         f_hunks = [h for h in fi.hunks if h.file_idx == fi.idx]
         f_om_add = sum(h.additions for h in f_hunks) - sum(
-            1 for dl in lines if dl.file_idx == fi.idx and dl.category == 'add' and dl.kept
+            1
+            for dl in lines
+            if dl.file_idx == fi.idx and dl.category == 'add' and dl.kept
         )
         f_om_del = sum(h.deletions for h in f_hunks) - sum(
-            1 for dl in lines if dl.file_idx == fi.idx and dl.category == 'remove' and dl.kept
+            1
+            for dl in lines
+            if dl.file_idx == fi.idx and dl.category == 'remove' and dl.kept
         )
-        f_om_hunks = sum(1 for h in f_hunks if not any(
-            dl.kept for dl in lines if dl.hunk_idx == h.idx and dl.category in ('add', 'remove')
-        ))
+        f_om_hunks = sum(
+            1
+            for h in f_hunks
+            if not any(
+                dl.kept
+                for dl in lines
+                if dl.hunk_idx == h.idx and dl.category in ('add', 'remove')
+            )
+        )
         if f_om_add == 0 and f_om_del == 0:
             files_full += 1
-        elif f_om_add == sum(h.additions for h in f_hunks) and f_om_del == sum(h.deletions for h in f_hunks):
+        elif f_om_add == sum(h.additions for h in f_hunks) and f_om_del == sum(
+            h.deletions for h in f_hunks
+        ):
             files_omitted += 1
         else:
             files_partial += 1
-        per_file.append({
-            'path': fi.path,
-            'omitted_hunks': f_om_hunks,
-            'omitted_additions': f_om_add,
-            'omitted_deletions': f_om_del,
-        })
+        per_file.append(
+            {
+                'path': fi.path,
+                'omitted_hunks': f_om_hunks,
+                'omitted_additions': f_om_add,
+                'omitted_deletions': f_om_del,
+            }
+        )
 
     return {
         'coverage': coverage,
@@ -620,9 +654,15 @@ def _build_telemetry(
         'files_partial': files_partial,
         'files_omitted': files_omitted,
         'per_file': per_file,
-        'omitted_hunks': sum(1 for h in hunks if not any(
-            dl.kept for dl in lines if dl.hunk_idx == h.idx and dl.category in ('add', 'remove')
-        )),
+        'omitted_hunks': sum(
+            1
+            for h in hunks
+            if not any(
+                dl.kept
+                for dl in lines
+                if dl.hunk_idx == h.idx and dl.category in ('add', 'remove')
+            )
+        ),
         'omitted_add': total_add - kept_add,
         'omitted_del': total_del - kept_del,
     }
@@ -648,7 +688,11 @@ def _format_fidelity_summary(
     ]
     if per_file:
         for pf in per_file:
-            if pf['omitted_additions'] > 0 or pf['omitted_deletions'] > 0 or pf['omitted_hunks'] > 0:
+            if (
+                pf['omitted_additions'] > 0
+                or pf['omitted_deletions'] > 0
+                or pf['omitted_hunks'] > 0
+            ):
                 parts.append(
                     f'  {pf["path"]}: omitted_hunks={pf["omitted_hunks"]}, '
                     f'omitted_additions={pf["omitted_additions"]}, '

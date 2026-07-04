@@ -1,14 +1,15 @@
 """Headless TUI — mount."""
 
 from backend.tests.unit.cli.tui._shared import (
-    GrintaTUIApp,
     HUD,
+    GrintaTUIApp,
     Label,
     RichConsole,
     _get_screen,
     asyncio,
     pytest,
 )
+
 
 @pytest.mark.asyncio
 async def test_tui_mounts(mock_config):

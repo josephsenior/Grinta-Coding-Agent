@@ -571,7 +571,7 @@ class TestSnapshotUserObjective(unittest.TestCase):
             snapshot_user_objective,
         )
 
-        snapshot = {'user_messages': []}
+        snapshot: dict[str, list] = {'user_messages': []}
         objective, latest = snapshot_user_objective(snapshot)
         assert objective == ''
         assert latest == ''

@@ -439,9 +439,7 @@ class TestCreateShellSession:
             '-NoProfile',
         ]
 
-    def test_windows_prefers_bash_by_default(
-        self, tmp_path, monkeypatch, request
-    ):
+    def test_windows_prefers_bash_by_default(self, tmp_path, monkeypatch, request):
         _force_os(request, windows=True)
         monkeypatch.delenv('SECURITY_WINDOWS_SHELL', raising=False)
         _configured_windows_shell.cache_clear()
@@ -464,7 +462,9 @@ class TestCreateShellSession:
         )
         assert isinstance(session, _DummySession)
 
-    def test_interactive_shell_argv_prefers_powershell_on_windows(self, request, monkeypatch):
+    def test_interactive_shell_argv_prefers_powershell_on_windows(
+        self, request, monkeypatch
+    ):
         _force_os(request, windows=True)
         monkeypatch.setenv('SECURITY_WINDOWS_SHELL', 'powershell')
         _configured_windows_shell.cache_clear()

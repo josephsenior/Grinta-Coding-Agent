@@ -131,10 +131,7 @@ class ConfirmWidget(Widget):
                 f'[{risk_style}]({risk_label} risk)[/]'
             )
         else:
-            info = (
-                f'[dim]Agent wants to {verb}[/] '
-                f'[{risk_style}]({risk_label} risk)[/]'
-            )
+            info = f'[dim]Agent wants to {verb}[/] [{risk_style}]({risk_label} risk)[/]'
 
         info_static = self.query_one('#confirm-info', Static)
         for cls in (

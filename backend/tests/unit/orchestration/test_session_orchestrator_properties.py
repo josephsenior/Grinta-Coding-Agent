@@ -6,20 +6,14 @@
 import asyncio
 from types import SimpleNamespace
 from typing import cast
-from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
-from backend.core.enums import LifecyclePhase
-from backend.core.schemas import AgentState
-from backend.ledger import EventSource
-from backend.ledger.action import MessageAction
-from backend.orchestration.action_scheduler import ActionScheduler
 from backend.orchestration.orchestration_config import OrchestrationConfig
 from backend.orchestration.session_orchestrator import (
     ERROR_ACTION_NOT_EXECUTED_ERROR,
     ERROR_ACTION_NOT_EXECUTED_STOPPED,
-    ERROR_ACTION_NOT_EXECUTED_STOPPED_ID,
     TRAFFIC_CONTROL_REMINDER,
     SessionOrchestrator,
 )
@@ -34,7 +28,6 @@ class TestSessionOrchestratorProperties:
     @pytest.fixture(autouse=True)
     def _setup(self, ctrl):
         self.ctrl = ctrl
-
 
     def test_id_returns_config_sid(self):
         assert self.ctrl.id == 'test-sid'
@@ -58,8 +51,6 @@ class TestSessionOrchestratorProperties:
 
     def test_task_id_equals_id(self):
         assert self.ctrl.task_id == self.ctrl.id
-
-
 
 
 @pytest.mark.asyncio
@@ -168,8 +159,6 @@ async def test_init_registers_main_event_loop(
     assert captured_loops == [running_loop]
 
 
-
-
 def test_default_operation_pipeline_order_is_stable() -> None:
     ctrl = _make_controller()
     ctrl.services.context = MagicMock()
@@ -201,15 +190,12 @@ def test_default_operation_pipeline_order_is_stable() -> None:
 # ── Service aliasing ────────────────────────────────────────────────
 
 
-
-
 class TestServiceAliasing:
     """Test __getattr__ service alias magic."""
 
     @pytest.fixture(autouse=True)
     def _setup(self, ctrl):
         self.ctrl = ctrl
-
 
     def test_action_service_alias(self):
         assert self.ctrl.action_service is self.ctrl.services.action
@@ -273,22 +259,16 @@ class TestServiceAliasing:
         assert self.ctrl.stuck_service is self.ctrl.services.stuck
 
     def test_circuit_breaker_service_property(self):
-        assert (
-            self.ctrl.circuit_breaker_service is self.ctrl.services.circuit_breaker
-        )
+        assert self.ctrl.circuit_breaker_service is self.ctrl.services.circuit_breaker
 
     def test_observation_service_property(self):
         assert self.ctrl.observation_service is self.ctrl.services.observation
 
     def test_task_validation_service_property(self):
-        assert (
-            self.ctrl.task_validation_service is self.ctrl.services.task_validation
-        )
+        assert self.ctrl.task_validation_service is self.ctrl.services.task_validation
 
 
 # ── Logging ──────────────────────────────────────────────────────────
-
-
 
 
 class TestRepr:
@@ -297,7 +277,6 @@ class TestRepr:
     @pytest.fixture(autouse=True)
     def _setup(self, ctrl):
         self.ctrl = ctrl
-
 
     def test_repr_contains_id(self):
         self.ctrl.services.action.get_pending_action_info.return_value = None
@@ -327,8 +306,6 @@ class TestRepr:
 # ── _handle_post_execution ───────────────────────────────────────────
 
 
-
-
 class TestConstants:
     """Test module-level constants exist."""
 
@@ -342,6 +319,3 @@ class TestConstants:
     def test_error_action_not_executed_error(self):
         assert 'Runtime error' in ERROR_ACTION_NOT_EXECUTED_ERROR
         assert 'Ctrl+C' in ERROR_ACTION_NOT_EXECUTED_ERROR
-
-
-

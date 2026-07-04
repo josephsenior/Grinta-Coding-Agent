@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Any
-
-from backend.context.symbol_index.store import SymbolIndexStore
-from backend.context.context_explorer import explore_context
-from backend.engine.tools._aps_tree import _TREE_FILE_PRIORITY
 from pathlib import Path
+
+from backend.context.context_explorer import explore_context
+from backend.context.symbol_index.store import SymbolIndexStore
+from backend.engine.tools._aps_tree import _TREE_FILE_PRIORITY
 
 
 def _pagerank(
@@ -44,7 +43,9 @@ def _pagerank(
                 outs = out_edges.get(src) or []
                 if outs:
                     incoming += ranks[src] / len(outs)
-            next_ranks[node] = (1.0 - damping) * teleport_norm.get(node, 0.0) + damping * incoming
+            next_ranks[node] = (1.0 - damping) * teleport_norm.get(
+                node, 0.0
+            ) + damping * incoming
         total = sum(next_ranks.values()) or 1.0
         ranks = {node: score / total for node, score in next_ranks.items()}
     return ranks
@@ -63,7 +64,9 @@ def _task_boosts(task: str, workspace: Path) -> dict[str, float]:
     result = explore_context(task, workspace)
     boosts: dict[str, float] = {}
     for candidate in result.candidates:
-        boosts[candidate.path] = max(boosts.get(candidate.path, 0.0), candidate.score / 100.0)
+        boosts[candidate.path] = max(
+            boosts.get(candidate.path, 0.0), candidate.score / 100.0
+        )
     for dirty in result.dirty_files:
         boosts[dirty] = max(boosts.get(dirty, 0.0), 0.35)
     return boosts
@@ -102,6 +105,10 @@ def rank_files_for_map(
     graph_scores = _pagerank(indexed, edges, personalization=personalization)
 
     def combined(path: str) -> float:
-        return graph_scores.get(path, 0.0) + task_scores.get(path, 0.0) + _entrypoint_boost(path)
+        return (
+            graph_scores.get(path, 0.0)
+            + task_scores.get(path, 0.0)
+            + _entrypoint_boost(path)
+        )
 
     return sorted(indexed, key=lambda path: (-combined(path), path))

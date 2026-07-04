@@ -2,16 +2,24 @@
 
 from __future__ import annotations
 
-from backend.context.symbol_index.store import get_symbol_index_store, symbol_index_enabled
-from backend.engine.tools._file_ops import _relative_display_path
 from pathlib import Path
+
+from backend.context.symbol_index.store import (
+    get_symbol_index_store,
+    symbol_index_enabled,
+)
+from backend.engine.tools._file_ops import _relative_display_path
 
 
 def _store_for_path(path: str):
     store = get_symbol_index_store()
     if store is None or not symbol_index_enabled():
         return None
-    rel = _relative_display_path(Path(path)) if Path(path).is_absolute() else path.replace('\\', '/').lstrip('./')
+    rel = (
+        _relative_display_path(Path(path))
+        if Path(path).is_absolute()
+        else path.replace('\\', '/').lstrip('./')
+    )
     if store.ensure_indexed(rel):
         return store
     return None

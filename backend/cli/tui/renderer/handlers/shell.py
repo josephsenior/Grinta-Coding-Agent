@@ -27,9 +27,7 @@ def _handle_cmd_run_action(
 ) -> None:
     cmd = normalize_shell_command_key(getattr(event, 'command', '') or '')
     if not getattr(event, 'hidden', False):
-        orch._create_shell_scan_card(
-            cmd, command=getattr(event, 'command', '') or ''
-        )
+        orch._create_shell_scan_card(cmd, command=getattr(event, 'command', '') or '')
 
 
 def _handle_cmd_output_observation(

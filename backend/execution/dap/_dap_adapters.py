@@ -351,7 +351,7 @@ def detect_debug_adapters() -> list[dict[str, Any]]:
             else str(recipe.get('transport') or 'stdio')
         )
         adapter = chosen['adapter'] if chosen is not None else recipe['probe']
-        command = chosen['command'] if chosen is not None else None
+        adapter_command = chosen['command'] if chosen is not None else None
         unsupported_reason = ''
         if available and not auto_resolvable:
             unsupported_reason = (
@@ -368,7 +368,7 @@ def detect_debug_adapters() -> list[dict[str, Any]]:
                 'transport': transport,
                 'host': chosen.get('host') if chosen is not None else None,
                 'port': chosen.get('port') if chosen is not None else None,
-                'command': command,
+                'command': adapter_command,
                 'source': 'PATH',
                 'unsupported_reason': unsupported_reason,
             }

@@ -11,8 +11,8 @@ from backend.tests.unit.cli.tui._shared import (
     Select,
     SimpleNamespace,
     Static,
-    TUIRenderer,
     TextArea,
+    TUIRenderer,
     _await_at_bottom,
     _fill_scrollable_transcript,
     _get_screen,
@@ -20,15 +20,10 @@ from backend.tests.unit.cli.tui._shared import (
     pytest,
 )
 
-from backend.cli.tui.widgets.activity_card import OrientLine
-from backend.cli.tui.widgets.scan_line import (
-    EditCard,
-)
 
 @pytest.mark.asyncio
 async def test_tui_input_and_transcript(mock_config):
     """Verify the input area and transcript log are present."""
-
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -42,6 +37,7 @@ async def test_tui_input_and_transcript(mock_config):
 
         input_bar = s.query_one('#input-bar', InputBar)
         assert 'processing' not in input_bar.classes
+
 
 @pytest.mark.asyncio
 async def test_tui_transcript_autoscrolls_on_rapid_append(mock_config, monkeypatch):
@@ -67,6 +63,7 @@ async def test_tui_transcript_autoscrolls_on_rapid_append(mock_config, monkeypat
         await _await_at_bottom(display, pilot)
 
         assert display._user_scrolled_away is False
+
 
 @pytest.mark.asyncio
 async def test_tui_live_response_follows_tail_when_not_user_scrolled(
@@ -106,6 +103,7 @@ async def test_tui_live_response_follows_tail_when_not_user_scrolled(
 
         assert display._user_scrolled_away is False
         assert display._was_at_bottom()
+
 
 @pytest.mark.asyncio
 async def test_tui_live_response_respects_user_scrolled_away(mock_config, monkeypatch):
@@ -160,6 +158,7 @@ async def test_tui_live_response_respects_user_scrolled_away(mock_config, monkey
         assert display._user_scrolled_away is True
         assert not display._was_at_bottom()
 
+
 @pytest.mark.asyncio
 async def test_tui_content_growth_does_not_mark_user_scrolled_away(
     mock_config, monkeypatch
@@ -183,6 +182,7 @@ async def test_tui_content_growth_does_not_mark_user_scrolled_away(
         await pilot.pause()
         await _await_at_bottom(display, pilot)
         assert display._user_scrolled_away is False
+
 
 @pytest.mark.asyncio
 async def test_tui_user_scroll_wins_over_active_follow_tail(mock_config, monkeypatch):
@@ -222,6 +222,7 @@ async def test_tui_user_scroll_wins_over_active_follow_tail(mock_config, monkeyp
         assert display.max_scroll_y > 0
         assert display.scroll_y < display.max_scroll_y - 1.0
 
+
 @pytest.mark.asyncio
 async def test_tui_page_keys_scroll_transcript_while_turn_running(
     mock_config, monkeypatch
@@ -254,6 +255,7 @@ async def test_tui_page_keys_scroll_transcript_while_turn_running(
         assert display._user_scrolled_away is True
         assert not display._was_at_bottom()
 
+
 @pytest.mark.asyncio
 async def test_tui_backpressure_suppresses_mount_animation(mock_config, monkeypatch):
     """set_backpressure(True) skips append_widget's mount offset animation."""
@@ -279,6 +281,7 @@ async def test_tui_backpressure_suppresses_mount_animation(mock_config, monkeypa
         display.set_backpressure(False)
         assert display._under_backpressure is False
 
+
 @pytest.mark.asyncio
 async def test_tui_mode_switch_supports_chat_plan_agent(mock_config):
     console = RichConsole()
@@ -296,6 +299,7 @@ async def test_tui_mode_switch_supports_chat_plan_agent(mock_config):
             mode_select.value = mode
             await pilot.pause()
             assert agent_config.mode == mode
+
 
 @pytest.mark.asyncio
 async def test_tui_mode_switch_updates_default_agent_config(mock_config):
@@ -318,6 +322,7 @@ async def test_tui_mode_switch_updates_default_agent_config(mock_config):
 
         assert configs['Orchestrator'].mode == 'chat'
         assert configs['agent'].mode == 'agent'
+
 
 @pytest.mark.asyncio
 async def test_tui_mode_switch_updates_running_agent_config(mock_config):
@@ -353,4 +358,3 @@ async def test_tui_mode_switch_updates_running_agent_config(mock_config):
         assert running_config.mode == 'chat'
         assert agent.tools == ['read']
         assert 'active_run_mode' not in s._controller.state.extra_data
-

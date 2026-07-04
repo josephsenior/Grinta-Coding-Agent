@@ -29,6 +29,7 @@ from backend.core.enums import RuntimeStatus
 from backend.core.errors import AgentRuntimeDisconnectedError
 from backend.core.logging.logger import app_logger as logger
 from backend.core.providers.provider_handler import ProviderHandler
+from backend.execution.acceptance_criteria import AcceptanceCriteriaMixin
 from backend.execution.aes.policy_block_messages import action_timeout_message
 from backend.execution.aes.security_enforcement import SecurityEnforcementMixin
 from backend.execution.capabilities import RuntimeCapabilities
@@ -38,10 +39,10 @@ from backend.execution.runtime_mixins.command_timeout import CommandTimeoutMixin
 from backend.execution.runtime_mixins.env_manager import EnvManagerMixin
 from backend.execution.runtime_mixins.git_setup import GitSetupMixin
 from backend.execution.task_tracking import TaskTrackingMixin
-from backend.execution.acceptance_criteria import AcceptanceCriteriaMixin
 from backend.execution.utils.git.git_handler import CommandResult, GitHandler
 from backend.ledger import EventSource, EventStream, EventStreamSubscriber
 from backend.ledger.action import (
+    AcceptanceCriteriaAction,
     Action,
     AgentThinkAction,
     CmdRunAction,
@@ -49,7 +50,6 @@ from backend.ledger.action import (
     FileReadAction,
     SystemHintAction,
     TaskTrackingAction,
-    AcceptanceCriteriaAction,
     is_debugger_action,
 )
 from backend.ledger.action.mcp import MCPAction
@@ -446,7 +446,6 @@ class Runtime(
     def _agent_debugger_enabled(self) -> bool:
         """Whether agent config enables the interactive DAP debugger tool."""
         from backend.core.config.app_config import AppConfig
-
         from backend.core.constants import DEFAULT_AGENT_DEBUGGER_ENABLED
 
         cfg = self.config

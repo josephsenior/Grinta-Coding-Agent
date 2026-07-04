@@ -83,18 +83,6 @@ async def run_noninteractive(
     import time
 
     from backend.cli.event_renderer import CLIEventRenderer
-    from backend.cli.repl.slash_command_status import (
-        cmd_status,
-        cmd_cost,
-        cmd_health,
-    )
-    from backend.cli.repl.slash_command_actions import (
-        cmd_clear,
-        cmd_model,
-        cmd_diff,
-        cmd_copy,
-        cmd_help,
-    )
     from backend.core.enums import AgentState
     from backend.ledger.action import MessageAction
 
@@ -191,13 +179,20 @@ def _handle_slash_command(text: str, host: '_NonInteractiveHost') -> None:
     playbook / mutating command print a not-available message. Unknown
     commands are reported with a compact suggestion.
     """
+    from backend.cli.repl.slash_command_actions import (
+        cmd_clear,
+        cmd_copy,
+        cmd_help,
+        cmd_model,
+    )
+    from backend.cli.repl.slash_command_diff import cmd_diff
     from backend.cli.repl.slash_command_dispatch import (
         COMMAND_DISPATCH,
         _render_unknown_noninteractive,
     )
-
-    from backend.cli.repl.slash_registry_parsing import parse_slash_command
+    from backend.cli.repl.slash_command_status import cmd_cost, cmd_health, cmd_status
     from backend.cli.repl.slash_registry_models import SlashCommandParseError
+    from backend.cli.repl.slash_registry_parsing import parse_slash_command
 
     cmd = text.lower().strip()
     if cmd in ('/quit', '/q', '/exit'):

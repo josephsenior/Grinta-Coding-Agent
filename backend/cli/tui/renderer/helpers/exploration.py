@@ -113,6 +113,3 @@ def find_symbols_result_lines(
         elif qualified_name:
             result_lines.append(qualified_name)
     return result_lines, search_file_list_from_paths(paths)
-
-
-

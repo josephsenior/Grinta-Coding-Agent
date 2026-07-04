@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
 from unittest import TestCase
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from backend.inference.debug_mixin import MESSAGE_SEPARATOR, DebugMixin
 

@@ -684,7 +684,8 @@ class TestBuildLlmParams:
         plan_blocks = [
             m['content']
             for m in result
-            if isinstance(m.get('content'), str) and 'CURRENT MODE: PLAN' in m['content']
+            if isinstance(m.get('content'), str)
+            and 'CURRENT MODE: PLAN' in m['content']
         ]
         assert plan_blocks
         plan_text = plan_blocks[0]

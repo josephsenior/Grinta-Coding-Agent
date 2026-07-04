@@ -26,6 +26,10 @@ from backend.cli.theme import (
     NAVY_RUNNING,
 )
 from backend.cli.tui._a11y import animations_enabled
+from backend.cli.tui.constants import _tui_logger
+from backend.cli.tui.dialogs import ConfirmWidget, GrintaHelpDialog
+from backend.cli.tui.screen.lifecycle_bootstrap import ScreenLifecycleBootstrapMixin
+from backend.cli.tui.screen.lifecycle_dispatch import ScreenLifecycleDispatchMixin
 from backend.cli.tui.strings import (
     EMPTY_MCP,
     EMPTY_SKILLS,
@@ -33,10 +37,6 @@ from backend.cli.tui.strings import (
     LOADING_DAP,
     LOADING_LSP,
 )
-from backend.cli.tui.constants import _tui_logger
-from backend.cli.tui.dialogs import ConfirmWidget, GrintaHelpDialog
-from backend.cli.tui.screen.lifecycle_bootstrap import ScreenLifecycleBootstrapMixin
-from backend.cli.tui.screen.lifecycle_dispatch import ScreenLifecycleDispatchMixin
 from backend.cli.tui.widgets.collapsible import CollapsibleSection
 from backend.cli.tui.widgets.small import (
     HUD,
@@ -130,9 +130,7 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
         # *visual* animations; skip them in accessible mode.
         self._hud_tick = self.set_interval(1.0, self._refresh_runtime_feedback)
         if animations_enabled(self):
-            self._hud_pulse_tick = self.set_interval(
-                0.5, self._tick_hud_running_pulse
-            )
+            self._hud_pulse_tick = self.set_interval(0.5, self._tick_hud_running_pulse)
             self._scanline_refresh_tick = self.set_interval(
                 0.25, self._refresh_scanline_cards
             )
@@ -191,7 +189,9 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
                 self._hud.update_agent_state('error')
                 self._render_hud_bar()
                 try:
-                    from backend.core.logging.logger import format_active_session_log_path
+                    from backend.core.logging.logger import (
+                        format_active_session_log_path,
+                    )
 
                     log_path = format_active_session_log_path()
                     detail = f'{type(exc).__name__}: {exc}'

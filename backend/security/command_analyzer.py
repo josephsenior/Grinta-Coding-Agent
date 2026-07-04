@@ -135,7 +135,12 @@ def _collapse_ifs_and_empty_quotes(cmd: str) -> str:
     is still classified alongside the collapsed one (see
     :meth:`CommandAnalyzer.analyze`) so the worst-case risk wins.
     """
-    if '${IFS}' not in cmd and '$IFS' not in cmd and "''" not in cmd and '""' not in cmd:
+    if (
+        '${IFS}' not in cmd
+        and '$IFS' not in cmd
+        and "''" not in cmd
+        and '""' not in cmd
+    ):
         return cmd
     out = _IFS_TOKEN_RE.sub(' ', cmd)
     out = _EMPTY_QUOTE_PAIR_RE.sub('', out)

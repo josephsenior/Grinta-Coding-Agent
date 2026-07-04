@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
-from collections import Counter, defaultdict
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -94,7 +94,9 @@ def _ctx_autonomy(record: dict[str, Any]) -> str:
     return 'unknown'
 
 
-def _process_event(line_no: int, record: dict[str, Any], acc: _AuditAccumulator) -> None:
+def _process_event(
+    line_no: int, record: dict[str, Any], acc: _AuditAccumulator
+) -> None:
     acc.total += 1
     acc.events.append(record)
     level = str(record.get('level', 'INFO'))
@@ -185,9 +187,7 @@ def _compute_verdict(acc: _AuditAccumulator) -> tuple[str, list[str]]:
         notes.append(f'{acc.pending_timeouts} pending-action timeout(s) detected.')
 
     suspicious = [
-        (a, b, ln)
-        for a, b, ln in acc.state_transitions
-        if b in {'ERROR', 'STOPPED'}
+        (a, b, ln) for a, b, ln in acc.state_transitions if b in {'ERROR', 'STOPPED'}
     ]
     if suspicious:
         verdict = 'ISSUES FOUND'
@@ -266,7 +266,9 @@ def _write_report(
     w('-' * 40)
     w(f'  Pending action timeouts: {acc.pending_timeouts}')
     w(f'  Retry/recovery mentions: {acc.retries}')
-    w(f'  LLM steps (wire/agent): {acc.event_types.get("WIRE_RESPONSE", 0) + acc.event_types.get("AGENT_STEP", 0)}')
+    w(
+        f'  LLM steps (wire/agent): {acc.event_types.get("WIRE_RESPONSE", 0) + acc.event_types.get("AGENT_STEP", 0)}'
+    )
     if acc.llm_latencies_ms:
         sorted_lat = sorted(acc.llm_latencies_ms)
         w(
@@ -331,7 +333,9 @@ def _write_report(
     return '\n'.join(lines)
 
 
-def _write_metadata_breakdowns_to_lines(lines: list[str], acc: _AuditAccumulator) -> None:
+def _write_metadata_breakdowns_to_lines(
+    lines: list[str], acc: _AuditAccumulator
+) -> None:
     lines.append('METADATA BREAKDOWN')
     lines.append('-' * 40)
     lines.append('By model:')
@@ -384,9 +388,7 @@ def analyze_session(
 
     if acc.compaction_fallbacks == 0:
         acc.compaction_fallbacks = sum(
-            1
-            for line in acc.issue_lines
-            if 'Failed to parse summary tool call' in line
+            1 for line in acc.issue_lines if 'Failed to parse summary tool call' in line
         )
 
     verdict, notes = _compute_verdict(acc)

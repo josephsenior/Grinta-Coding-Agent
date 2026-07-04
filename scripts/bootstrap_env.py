@@ -87,7 +87,9 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
     except FileNotFoundError:
-        print('[bootstrap] warning: could not run linux host tool setup.', file=sys.stderr)
+        print(
+            '[bootstrap] warning: could not run linux host tool setup.', file=sys.stderr
+        )
     return completed.returncode
 
 

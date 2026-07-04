@@ -7,6 +7,7 @@ from backend.tests.unit.cli.frontend._shared import (
     patch,
 )
 
+
 def test_settings_ai_tab_shows_provider_and_model_separately() -> None:
     from backend.cli.settings.settings_tui import _render_ai_tab
 

@@ -498,8 +498,7 @@ def estimate_prompt_events_tokens(
 
 
 def set_current_tokenizer_model(model: str | None) -> Any:
-    """Bind *model* to a contextvar so nested estimator calls pick the
-    correct tiktoken encoding.
+    """Bind *model* to a contextvar so nested estimator calls pick the encoding.
 
     Returns a token usable with :func:`reset_current_tokenizer_model` to
     restore the previous value (useful in async code).

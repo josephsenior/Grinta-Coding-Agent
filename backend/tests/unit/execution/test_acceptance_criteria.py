@@ -164,9 +164,7 @@ class TestAcceptanceCriteriaMixin(TestCase):
             criteria_list=[
                 {'id': 'ac1', 'assertion': 'Tests pass', 'source': 'stated'}
             ],
-            audit_entries=[
-                {'criterion_id': 'ac1', 'evidence_ref': 'call_missing'}
-            ],
+            audit_entries=[{'criterion_id': 'ac1', 'evidence_ref': 'call_missing'}],
         )
         with patch(
             'backend.execution.acceptance_criteria.get_conversation_dir',

@@ -9,7 +9,6 @@ from unittest.mock import MagicMock, patch
 
 from backend.ledger.action.commands import CmdRunAction
 from backend.ledger.observation.commands import CmdOutputObservation
-from backend.ledger.observation.error import ErrorObservation
 from backend.orchestration.telemetry.tool_telemetry import ToolTelemetry
 from backend.orchestration.tool_pipeline import ToolInvocationContext
 

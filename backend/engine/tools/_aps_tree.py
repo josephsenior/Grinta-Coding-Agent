@@ -151,7 +151,9 @@ def _append_tree_file_lines(
         lines.append(f'  {relative_path}')
         indexed_lines = None
         try:
-            from backend.context.symbol_index.aps_bridge import tree_symbol_lines_for_file
+            from backend.context.symbol_index.aps_bridge import (
+                tree_symbol_lines_for_file,
+            )
 
             indexed_lines = tree_symbol_lines_for_file(relative_path)
         except Exception:

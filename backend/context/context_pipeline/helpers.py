@@ -101,9 +101,7 @@ def maybe_decay_consecutive_condensation_counter(
         current = pipe.get(_CONSECUTIVE_CONDENSATION_KEY, 0)
         if isinstance(current, int) and current > 0:
             pipe[_CONSECUTIVE_CONDENSATION_KEY] = 0
-            state.set_extra(
-                'context_pipeline_state', pipe, source='ContextPipeline'
-            )
+            state.set_extra('context_pipeline_state', pipe, source='ContextPipeline')
             logger.debug(
                 'Decayed consecutive-condensation counter after %.1fs of LLM idle',
                 time.time() - float(last_step),
@@ -190,9 +188,7 @@ def _projected_compaction_token_reduction(
     post_events = project_after_compact_boundary(
         _synthetic_history_after_action(history, action)
     )
-    post_tokens = estimate_boundary_event_tokens(
-        post_events, llm_config=llm_config
-    )
+    post_tokens = estimate_boundary_event_tokens(post_events, llm_config=llm_config)
     return budget.estimated_tokens - post_tokens
 
 

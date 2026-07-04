@@ -3,26 +3,14 @@
 """Tests for SessionOrchestrator — the main agent orchestration controller."""
 # pylint: disable=protected-access,too-many-lines
 
-import asyncio
 from types import SimpleNamespace
-from typing import cast
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
 
-from backend.core.enums import LifecyclePhase
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
-from backend.ledger.action import MessageAction
 from backend.orchestration.action_scheduler import ActionScheduler
-from backend.orchestration.orchestration_config import OrchestrationConfig
-from backend.orchestration.session_orchestrator import (
-    ERROR_ACTION_NOT_EXECUTED_ERROR,
-    ERROR_ACTION_NOT_EXECUTED_STOPPED,
-    ERROR_ACTION_NOT_EXECUTED_STOPPED_ID,
-    TRAFFIC_CONTROL_REMINDER,
-    SessionOrchestrator,
-)
 
 
 class TestLogging:
@@ -31,7 +19,6 @@ class TestLogging:
     @pytest.fixture(autouse=True)
     def _setup(self, ctrl):
         self.ctrl = ctrl
-
 
     @patch('backend.orchestration.mixins.action_mixin.logger')
     def test_log_info(self, mock_logger):
@@ -56,15 +43,12 @@ class TestLogging:
 # ── Step execution ───────────────────────────────────────────────────
 
 
-
-
 class TestLogTaskAudit:
     """Test log_task_audit."""
 
     @pytest.fixture(autouse=True)
     def _setup(self, ctrl):
         self.ctrl = ctrl
-
 
     @pytest.mark.asyncio
     async def test_no_audit_callback(self):
@@ -122,15 +106,12 @@ class TestLogTaskAudit:
 # ── Constants ────────────────────────────────────────────────────────
 
 
-
-
 class TestSessionOrchestratorExtendedCoverage:
     """Explicitly target missing lines."""
 
     @pytest.fixture(autouse=True)
     def _setup(self, ctrl):
         self.ctrl = ctrl
-
 
     @pytest.mark.asyncio
     async def test_set_agent_state_to(self):
@@ -296,9 +277,7 @@ class TestSessionOrchestratorExtendedCoverage:
                 failed_action,
                 overflow_action,
             ]
-            assert getattr(
-                failed_action, '_retry_serial_after_parallel_failure', False
-            )
+            assert getattr(failed_action, '_retry_serial_after_parallel_failure', False)
             assert mock_post.await_count == 1
 
             self.ctrl.services.action_execution.execute_action.reset_mock()
@@ -351,8 +330,6 @@ class TestSessionOrchestratorExtendedCoverage:
 
 
 # ── Step dispatch (cross-thread scheduling) ─────────────────────────
-
-
 
 
 class TestApplyUserDecision:

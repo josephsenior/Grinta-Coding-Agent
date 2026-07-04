@@ -210,9 +210,7 @@ async def test_lsp_query_success_and_failure(tmp_path: Path) -> None:
     ex = aes.RuntimeExecutor([], str(tmp_path), 'u', 1, False)
     action = LspQueryAction(file=str(py), command='hover', line=1, column=1)
     mock_client = MagicMock()
-    mock_client.query.return_value = LspResult(
-        available=True, hover_text='docs'
-    )
+    mock_client.query.return_value = LspResult(available=True, hover_text='docs')
     with patch(
         'backend.utils.lsp.lsp_client.get_lsp_client',
         return_value=mock_client,

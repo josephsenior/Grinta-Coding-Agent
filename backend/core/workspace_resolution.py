@@ -278,9 +278,12 @@ def infer_workspace_from_uv_style_launch(install_root: Path) -> Path | None:
     the install tree as the workspace. Walk ``/proc`` ancestors: after a ``uv`` runner
     chdir'd to *install_root*, use the first shell ancestor cwd that is not the install.
     """
-    if not sys.platform.startswith('linux'):
-        return None
+    if sys.platform.startswith('linux'):
+        return _infer_workspace_from_uv_style_launch_linux(install_root)
+    return None
 
+
+def _infer_workspace_from_uv_style_launch_linux(install_root: Path) -> Path | None:
     install = install_root.expanduser().resolve()
     try:
         if Path.cwd().resolve() != install:

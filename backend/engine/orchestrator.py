@@ -208,14 +208,15 @@ class Orchestrator(Agent):
                 with contextlib.suppress(Exception):
                     mm.compactor.llm = llm
 
-    def set_mcp_tools(self, mcp_tools: list[dict]) -> None:
+    def set_mcp_tools(self, mcp_tools: list[dict]) -> dict[str, list[str]]:
         """Set MCP tools and sync names to prompt manager for dynamic discovery."""
-        super().set_mcp_tools(mcp_tools)
+        names = super().set_mcp_tools(mcp_tools)
         from backend.engine.orchestrator_helpers.prompts import (
             _apply_mcp_tools,
         )
 
         _apply_mcp_tools(self, mcp_tools)
+        return names
 
     def clear_queued_actions(self, reason: str = '') -> int:
         from backend.engine.orchestrator_helpers.actions import (

@@ -106,9 +106,7 @@ def _explore_hint(_config: Any = None) -> str:
             '`grep`, `glob`, `find_symbols`, `read_file`, `lsp`, '
             '`analyze_project_structure`'
         )
-    return (
-        '`grep`, `glob`, `find_symbols`, `read_file`, `analyze_project_structure`'
-    )
+    return '`grep`, `glob`, `find_symbols`, `read_file`, `analyze_project_structure`'
 
 
 def _repo_discovery_contract(
@@ -120,8 +118,8 @@ def _repo_discovery_contract(
     """One line: prefer ladder tools for repo intelligence; shell details live in SHELL_IDENTITY."""
     if not is_windows:
         return (
-        'Repo/source intelligence: follow `<TOOL_ROUTING_LADDER>` and use '
-        '`read_file`—avoid improvised `find`/`grep`/`cat` tree walks; '
+            'Repo/source intelligence: follow `<TOOL_ROUTING_LADDER>` and use '
+            '`read_file`—avoid improvised `find`/`grep`/`cat` tree walks; '
             '`<SHELL_IDENTITY>` governs allowed shell usage.'
         )
     if windows_with_bash:
@@ -221,9 +219,7 @@ def _routing_memory_tool_placeholders(
             'tool observations remain your live grounding.'
         )
     else:
-        surviving_state_facts = (
-            'Only the visible conversation, current files, and tool observations are available.'
-        )
+        surviving_state_facts = 'Only the visible conversation, current files, and tool observations are available.'
     if criteria_on and tracker_on:
         remaining_work_source_of_truth = (
             'Trust persisted acceptance criteria for what must be true when done and your '

@@ -11,9 +11,7 @@ Covers:
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 
 # ---------------------------------------------------------------------------
@@ -22,8 +20,8 @@ import pytest
 class TestMemoryRecallTruncationMarker:
     def test_long_excerpt_gets_truncated_marker(self):
         from backend.engine.tools._tool_handlers import (
-            execute_memory_recall,
             _semantic_recall_registry,
+            execute_memory_recall,
         )
         from backend.ledger.action import MemoryRecallAction
 
@@ -41,8 +39,8 @@ class TestMemoryRecallTruncationMarker:
 
     def test_short_excerpt_has_no_marker(self):
         from backend.engine.tools._tool_handlers import (
-            execute_memory_recall,
             _semantic_recall_registry,
+            execute_memory_recall,
         )
         from backend.ledger.action import MemoryRecallAction
 
@@ -68,11 +66,21 @@ class TestFindSymbolsScopeTruncated:
 
         fake_paths = [Path(f'src/file_{i}.py') for i in range(300)]
 
-        with patch('backend.engine.tools._file_ops._workspace_root', return_value=Path('.')):
+        with patch(
+            'backend.engine.tools._file_ops._workspace_root', return_value=Path('.')
+        ):
             with patch.object(Path, 'rglob', return_value=iter(fake_paths)):
                 with patch.object(Path, 'is_file', return_value=True):
-                    with patch.object(Path, 'suffix', new_callable=lambda: property(lambda self: '.py')):
-                        with patch.object(Path, 'parts', new_callable=lambda: property(lambda self: (str(self),))):
+                    with patch.object(
+                        Path,
+                        'suffix',
+                        new_callable=lambda: property(lambda self: '.py'),
+                    ):
+                        with patch.object(
+                            Path,
+                            'parts',
+                            new_callable=lambda: property(lambda self: (str(self),)),
+                        ):
                             paths, capped = _candidate_paths_for_symbol_search()
                             assert capped is True
                             assert len(paths) == 200
@@ -84,11 +92,21 @@ class TestFindSymbolsScopeTruncated:
 
         fake_paths = [Path(f'src/file_{i}.py') for i in range(50)]
 
-        with patch('backend.engine.tools._file_ops._workspace_root', return_value=Path('.')):
+        with patch(
+            'backend.engine.tools._file_ops._workspace_root', return_value=Path('.')
+        ):
             with patch.object(Path, 'rglob', return_value=iter(fake_paths)):
                 with patch.object(Path, 'is_file', return_value=True):
-                    with patch.object(Path, 'suffix', new_callable=lambda: property(lambda self: '.py')):
-                        with patch.object(Path, 'parts', new_callable=lambda: property(lambda self: (str(self),))):
+                    with patch.object(
+                        Path,
+                        'suffix',
+                        new_callable=lambda: property(lambda self: '.py'),
+                    ):
+                        with patch.object(
+                            Path,
+                            'parts',
+                            new_callable=lambda: property(lambda self: (str(self),)),
+                        ):
                             paths, capped = _candidate_paths_for_symbol_search()
                             assert capped is False
 
@@ -131,8 +149,13 @@ class TestApsHelperSliceMarkers:
         mock_result.stdout = '\n'.join(f'file_{i}.py' for i in range(40))
         mock_result.returncode = 0
 
-        with patch('backend.engine.tools._aps_shared.shutil.which', return_value='/usr/bin/rg'):
-            with patch('backend.engine.tools._aps_shared._run_command', return_value=mock_result):
+        with patch(
+            'backend.engine.tools._aps_shared.shutil.which', return_value='/usr/bin/rg'
+        ):
+            with patch(
+                'backend.engine.tools._aps_shared._run_command',
+                return_value=mock_result,
+            ):
                 result = _imports_reverse_via_rg('test_module')
                 assert result is not None
                 assert '… (truncated)' in result
@@ -145,8 +168,14 @@ class TestApsHelperSliceMarkers:
         mock_result.stdout = '\n'.join(f'hit_{i}' for i in range(60))
         mock_result.returncode = 0
 
-        with patch('backend.engine.tools._aps_callers_coverage.shutil.which', return_value='/usr/bin/rg'):
-            with patch('backend.engine.tools._aps_callers_coverage._run_command', return_value=mock_result):
+        with patch(
+            'backend.engine.tools._aps_callers_coverage.shutil.which',
+            return_value='/usr/bin/rg',
+        ):
+            with patch(
+                'backend.engine.tools._aps_callers_coverage._run_command',
+                return_value=mock_result,
+            ):
                 result = _callers_lines_via_rg('symbol', '.')
                 assert result is not None
                 assert '… (truncated)' in result
@@ -266,28 +295,34 @@ class TestTerminalDroppedCharsMarker:
 # ---------------------------------------------------------------------------
 class TestRipgrepTruncationWarning:
     def test_truncated_result_emits_warning(self):
+        from backend.core.bounded_result import BoundedResult
         from backend.engine.tools._search_helpers import (
             get_ripgrep_truncation_warning,
         )
-        from backend.core.bounded_result import BoundedResult
 
         result = BoundedResult(
-            stdout='x' * 100, stderr='', returncode=0,
-            truncated=True, timed_out=False,
+            stdout='x' * 100,
+            stderr='',
+            returncode=0,
+            truncated=True,
+            timed_out=False,
         )
         warning = get_ripgrep_truncation_warning(result)
         assert 'ripgrep output exceeded' in warning
         assert '2 MiB' in warning
 
     def test_non_truncated_result_no_warning(self):
+        from backend.core.bounded_result import BoundedResult
         from backend.engine.tools._search_helpers import (
             get_ripgrep_truncation_warning,
         )
-        from backend.core.bounded_result import BoundedResult
 
         result = BoundedResult(
-            stdout='x' * 100, stderr='', returncode=0,
-            truncated=False, timed_out=False,
+            stdout='x' * 100,
+            stderr='',
+            returncode=0,
+            truncated=False,
+            timed_out=False,
         )
         assert get_ripgrep_truncation_warning(result) == ''
 

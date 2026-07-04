@@ -144,9 +144,7 @@ def test_persist_env_detected_settings_preserves_user_customisations(
     llm_cfg.model = 'openai/gpt-4.1'
 
     assert (
-        persist_env_detected_settings(
-            config, 'openai', api_key='sk-test-openai-key'
-        )
+        persist_env_detected_settings(config, 'openai', api_key='sk-test-openai-key')
         is True
     )
 

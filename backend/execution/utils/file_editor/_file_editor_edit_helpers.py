@@ -98,9 +98,7 @@ def _validate_replace_string_old_string(old_string: str | None) -> ToolResult | 
     return None
 
 
-def _replace_all_with_boundary_check(
-    content: str, old: str, new: str
-) -> str:
+def _replace_all_with_boundary_check(content: str, old: str, new: str) -> str:
     """Replace all occurrences of *old* with *new* in *content*.
 
     Unlike ``str.replace``, this function guards against unintended
@@ -118,7 +116,7 @@ def _replace_all_with_boundary_check(
 
     result_parts: list[str] = []
     last_end = 0
-    old_len = len(old)
+    len(old)
 
     for idx in _re.finditer(_re.escape(old), content):
         start, end = idx.start(), idx.end()
@@ -237,9 +235,7 @@ def handle_replace_string_impl(
                 old_content, old_match, new_replacement
             )
         else:
-            new_content = old_content.replace(
-                old_match, new_replacement, 1
-            )
+            new_content = old_content.replace(old_match, new_replacement, 1)
         return self._finalize_edit_result(
             file_path,
             old_content,

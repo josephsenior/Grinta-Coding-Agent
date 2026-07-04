@@ -10,25 +10,25 @@ transforms the event list and passes it to the next.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING, Any
 
 from backend.context.compactor.strategies.microcompact_compactor import (
-    _is_microcompactable,
     _clear_observation_content,
+    _is_microcompactable,
     _should_preserve_observation,
 )
-from backend.context.tool_result_storage import TOOL_RESULT_CLEARED_MESSAGE
 from backend.ledger.observation import Observation
 from backend.ledger.observation.agent import AgentCondensationObservation
-from backend.ledger.observation.commands import CmdOutputObservation
 from backend.ledger.observation.error import ErrorObservation
 from backend.ledger.observation.files import FileReadObservation
-from backend.ledger.serialization.event import event_from_dict, event_to_dict
 
 if TYPE_CHECKING:
     from backend.context.compactor.compactor import Compactor
     from backend.ledger.event import Event
     from backend.orchestration.state.state import State
+
+LayerFn = Callable[..., Awaitable[list[Any]]]
 
 
 MICROCOMPACT_RECENCY_WINDOW = 50
@@ -100,6 +100,7 @@ async def summary_layer(
 
     Args:
         events: Full event list.
+        state: Optional orchestration state for layer-specific metadata.
         summary_compactor: LLM-based compactor from StructuredSummaryCompactor.
         summary_recency: Number of recent events to keep raw.
 
@@ -176,7 +177,7 @@ async def post_compact_reattach_layer(
         try:
             obs = FileReadObservation(
                 path=fpath,
-                content=f"[re-attached by post-compact: {fpath}]",
+                content=f'[re-attached by post-compact: {fpath}]',
             )
             inserted.append(obs)
         except Exception:
@@ -204,11 +205,11 @@ async def reactive_compact_layer(
     return events
 
 
-LAYERS: list[tuple[str, object]] = [
-    ("microcompact", microcompact_layer),
-    ("snip", snip_layer),
-    ("summary", summary_layer),
-    ("recent_keep", recent_keep_layer),
-    ("post_compact_reattach", post_compact_reattach_layer),
-    ("reactive", reactive_compact_layer),
+LAYERS: list[tuple[str, LayerFn]] = [
+    ('microcompact', microcompact_layer),
+    ('snip', snip_layer),
+    ('summary', summary_layer),
+    ('recent_keep', recent_keep_layer),
+    ('post_compact_reattach', post_compact_reattach_layer),
+    ('reactive', reactive_compact_layer),
 ]

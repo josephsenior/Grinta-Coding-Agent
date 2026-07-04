@@ -245,15 +245,16 @@ def persist_env_detected_settings(
         )
     else:
         # Subsequent run — merge only the LLM-related keys.
-        settings: dict[str, Any] = dict(existing)
-        settings['llm_provider'] = provider
-        settings['llm_model'] = model
-        settings['llm_api_key'] = settings_api_key_value(
+        merged_settings: dict[str, Any] = dict(existing)
+        merged_settings['llm_provider'] = provider
+        merged_settings['llm_model'] = model
+        merged_settings['llm_api_key'] = settings_api_key_value(
             provider, secret, requires_key=True
         )
         if base_url:
-            settings['llm_base_url'] = base_url
+            merged_settings['llm_base_url'] = base_url
         # Never blank out a user-configured base_url when env has none.
+        settings = merged_settings
 
     try:
         _atomic_json_write(settings_path, settings)

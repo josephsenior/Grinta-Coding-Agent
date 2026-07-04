@@ -340,7 +340,8 @@ def test_canonical_state_reload_preserves_current_fields(tmp_path, monkeypatch) 
 
 def test_narrative_summary_merged_across_compactions() -> None:
     """Compaction #2 must not overwrite the session-arc narrative from
-    compaction #1 — it should merge them so 'Built from scratch' survives."""
+    compaction #1 — it should merge them so 'Built from scratch' survives.
+    """
     canonical = CanonicalTaskState()
     canonical = apply_canonical_patch(
         canonical,
@@ -381,11 +382,14 @@ def test_narrative_summary_merged_across_compactions() -> None:
 
 def test_narrative_summary_replaced_when_high_overlap() -> None:
     """If the new narrative is a superset of the old one (high word overlap),
-    the new one replaces the old — no unnecessary duplication."""
+    the new one replaces the old — no unnecessary duplication.
+    """
     canonical = CanonicalTaskState()
     canonical = apply_canonical_patch(
         canonical,
-        {'narrative_summary': 'Built an autograd engine from scratch with 10 operators'},
+        {
+            'narrative_summary': 'Built an autograd engine from scratch with 10 operators'
+        },
         event_id=50,
     )
     canonical = apply_canonical_patch(
@@ -404,7 +408,8 @@ def test_narrative_summary_replaced_when_high_overlap() -> None:
 
 def test_completed_tasks_preserved_in_canonical_state() -> None:
     """completed_tasks from the compaction patch must be stored in the
-    canonical state and rendered in the prompt."""
+    canonical state and rendered in the prompt.
+    """
     canonical = CanonicalTaskState()
     canonical = apply_canonical_patch(
         canonical,
@@ -430,17 +435,25 @@ class TestMergeNarrative:
     """Direct tests for the _merge_narrative helper."""
 
     def test_empty_existing_returns_incoming(self):
-        assert _merge_narrative('', 'Built engine from scratch') == 'Built engine from scratch'
+        assert (
+            _merge_narrative('', 'Built engine from scratch')
+            == 'Built engine from scratch'
+        )
 
     def test_empty_incoming_returns_existing(self):
-        assert _merge_narrative('Built engine from scratch', '') == 'Built engine from scratch'
+        assert (
+            _merge_narrative('Built engine from scratch', '')
+            == 'Built engine from scratch'
+        )
 
     def test_both_empty_returns_empty(self):
         assert _merge_narrative('', '') == ''
 
     def test_existing_substring_of_incoming_returns_incoming(self):
         existing = 'Built autograd engine from scratch'
-        incoming = 'Built autograd engine from scratch. Fixed row-major bug. All tests pass.'
+        incoming = (
+            'Built autograd engine from scratch. Fixed row-major bug. All tests pass.'
+        )
         result = _merge_narrative(existing, incoming)
         assert result == incoming
         assert result.count('from scratch') == 1
@@ -460,7 +473,9 @@ class TestMergeNarrative:
         assert 'Recent:' in result
 
     def test_high_overlap_replaces_with_incoming(self):
-        existing = 'Built autograd engine from scratch with 10 operators and JIT pipeline'
+        existing = (
+            'Built autograd engine from scratch with 10 operators and JIT pipeline'
+        )
         incoming = 'Built autograd engine from scratch with 10 operators and JIT pipeline. Fixed indexing bug.'
         result = _merge_narrative(existing, incoming)
         assert result == incoming
@@ -474,7 +489,8 @@ class TestMergeNarrative:
 
     def test_merge_does_not_double_count_when_superset(self):
         """The demo1 bug: compaction #3 focused only on recent fixes, losing
-        'from scratch'. _merge_narrative must prepend the original."""
+        'from scratch'. _merge_narrative must prepend the original.
+        """
         compaction_1 = (
             'Built a complete autograd engine from scratch in Python. '
             'Created 19 source files across autograd/, autograd/ops/, '

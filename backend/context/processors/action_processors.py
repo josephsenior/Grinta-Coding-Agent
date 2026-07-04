@@ -12,6 +12,7 @@ from backend.core.message import (
     ToolCall,
 )
 from backend.ledger.action import (
+    AcceptanceCriteriaAction,
     Action,
     AgentThinkAction,
     CmdRunAction,
@@ -20,7 +21,6 @@ from backend.ledger.action import (
     MessageAction,
     SystemHintAction,
     TaskTrackingAction,
-    AcceptanceCriteriaAction,
 )
 from backend.ledger.action.agent import (
     ClarificationRequestAction,

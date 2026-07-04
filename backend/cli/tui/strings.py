@@ -70,8 +70,7 @@ SLASH_RESULT_NOT_AVAILABLE_PIPED = (
     'Run `grinta` in a TTY for the full slash surface.'
 )
 SLASH_RESULT_REQUIRES_TTY = (
-    '`{name}` requires an interactive TTY session. '
-    'Run `grinta` (no pipe) to use it.'
+    '`{name}` requires an interactive TTY session. Run `grinta` (no pipe) to use it.'
 )
 SLASH_RESULT_UNKNOWN = 'Unknown command: `{cmd}`.'
 SLASH_RESULT_DID_YOU_MEAN = ' Did you mean {suggestions}?'

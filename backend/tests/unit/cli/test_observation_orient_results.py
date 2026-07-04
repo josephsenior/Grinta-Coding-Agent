@@ -99,7 +99,6 @@ class TestOrientGlobAndFindSymbols:
         )
 
 
-
 class TestOrientGrepGlobExtended:
     @pytest.mark.parametrize(
         ('output_mode', 'match_count', 'file_count', 'expected'),

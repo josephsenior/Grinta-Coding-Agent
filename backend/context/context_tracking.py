@@ -160,9 +160,7 @@ class ContextTracker:
             return []
         try:
             tenant_id = self._current_tenant_id()
-            results = self.vector_store.search(
-                query, k=k, tenant_id=tenant_id
-            )
+            results = self.vector_store.search(query, k=k, tenant_id=tenant_id)
             logger.debug(
                 'Retrieved %d relevant memories for query: %s', len(results), query[:50]
             )

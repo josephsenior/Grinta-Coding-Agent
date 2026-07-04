@@ -35,9 +35,7 @@ def create_lsp_query_tool(
     """
     servers = [s for s in (detected_servers or []) if s]
     if servers:
-        detected_line = (
-            f'Detected on THIS host: {", ".join(servers)}.'
-        )
+        detected_line = f'Detected on THIS host: {", ".join(servers)}.'
     else:
         detected_line = ''
     return {

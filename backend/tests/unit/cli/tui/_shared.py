@@ -129,6 +129,7 @@ async def _fill_scrollable_transcript(display, pilot, *, count: int = 80) -> Non
     await _await_at_bottom(display, pilot)
     assert display.max_scroll_y > 0
 
+
 __all__ = [
     'ActivityRenderer',
     'AgentCondensationObservation',

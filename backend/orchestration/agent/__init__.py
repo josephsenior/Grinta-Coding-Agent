@@ -266,7 +266,9 @@ class Agent(ABC):
         """
         rebuilt: list[Any] = []
         for tool in list(self.tools):
-            name = tool.get('function', {}).get('name') if isinstance(tool, dict) else None
+            name = (
+                tool.get('function', {}).get('name') if isinstance(tool, dict) else None
+            )
             if name and name in self.mcp_tools:
                 continue
             rebuilt.append(tool)

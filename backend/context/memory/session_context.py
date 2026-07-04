@@ -32,8 +32,10 @@ def resolve_session_id(
     state: State | None = None,
     session_id: str | None = None,
 ) -> str | None:
-    """Resolve session id: explicit arg, then state.session_id, then contextvar,
-    then the bound session event logger (process-wide fallback).
+    """Resolve session id from explicit arg, state, contextvar, or logger.
+
+    Order: explicit arg, then state.session_id, then contextvar, then the
+    bound session event logger (process-wide fallback).
     """
     for candidate in (
         session_id,

@@ -5,7 +5,7 @@ from __future__ import annotations
 import threading
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from backend.context.compactor.pre_condensation_snapshot import (
     extract_snapshot,
@@ -27,11 +27,21 @@ if TYPE_CHECKING:
 SESSION_MEMORY_FILENAME = 'session_memory.md'
 _PIPELINE_STATE_KEY = 'context_pipeline_state'
 
+
+class _SessionMemoryPayload(TypedDict):
+    markdown: str
+    path: Path
+    snapshot: dict[str, Any]
+    last_summarized: int | None
+    state: Any
+    session_id: str | None
+
+
 # Shared lock for session-memory file writes. Disk I/O on the
 # compaction hot path is the largest single source of agent-loop
 # latency, so we serialise writes here and run them off-thread.
 _SESSION_MEMORY_WRITE_LOCK = threading.Lock()
-_SESSION_MEMORY_PENDING: dict[str, tuple[str, Path, dict[str, Any]]] = {}
+_SESSION_MEMORY_PENDING: dict[str, _SessionMemoryPayload] = {}
 _SESSION_MEMORY_WRITE_THREAD: threading.Thread | None = None
 _SESSION_MEMORY_WRITE_STOP = threading.Event()
 
@@ -341,11 +351,13 @@ def build_compaction_summary(
                     state=state, snapshot=snapshot
                 )
                 if goal_block and goal_block not in memory:
-                    parts.append(
-                        '<GOAL_CONTEXT>\n' + goal_block + '\n</GOAL_CONTEXT>'
-                    )
+                    parts.append('<GOAL_CONTEXT>\n' + goal_block + '\n</GOAL_CONTEXT>')
                 block = format_snapshot_for_injection(snapshot, state=state)
-                if block and block not in memory and 'User messages (verbatim)' not in block:
+                if (
+                    block
+                    and block not in memory
+                    and 'User messages (verbatim)' not in block
+                ):
                     parts.append(block)
         except Exception:
             logger.debug('Snapshot merge for compaction summary failed', exc_info=True)

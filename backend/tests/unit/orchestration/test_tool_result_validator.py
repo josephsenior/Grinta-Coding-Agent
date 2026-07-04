@@ -413,7 +413,8 @@ class TestObserve:
     async def test_truncation_rule_detects_app_marker(self):
         """The output_truncated rule must detect the [APP: Output truncated]
         marker emitted by truncate_cmd_output, not just the processor-layer
-        'Observation truncated:' marker."""
+        'Observation truncated:' marker.
+        """
         validator = ToolResultValidator()
 
         action = CmdRunAction(command='test')
@@ -557,7 +558,8 @@ class TestObserve:
     @pytest.mark.asyncio
     async def test_truncation_rule_detects_mcp_marker(self):
         """The output_truncated rule must detect the [APP: MCP output truncated]
-        marker emitted by ``_truncate_mcp_output``."""
+        marker emitted by ``_truncate_mcp_output``.
+        """
         validator = ToolResultValidator()
 
         action = CmdRunAction(command='test')

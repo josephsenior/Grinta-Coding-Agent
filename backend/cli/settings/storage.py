@@ -91,9 +91,7 @@ def _settings_mcp_signature(data: dict[str, Any]) -> tuple:
     )
 
 
-def _save_raw_settings(
-    data: dict[str, Any], *, source: str = 'mutation'
-) -> None:
+def _save_raw_settings(data: dict[str, Any], *, source: str = 'mutation') -> None:
     """Persist ``data`` to ``settings.json`` and notify the MCP bus on change.
 
     Args:

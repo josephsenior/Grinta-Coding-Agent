@@ -306,9 +306,7 @@ def goto_line(line_number: int) -> str:
         return _output_error(f'Line number must be between 1 and {total_lines}.')
     CURRENT_LINE = _clamp(line_number, 1, total_lines)
     output = _cur_file_header(CURRENT_FILE, total_lines)
-    output += _format_window(
-        CURRENT_FILE, CURRENT_LINE, WINDOW, ignore_window=False
-    )
+    output += _format_window(CURRENT_FILE, CURRENT_LINE, WINDOW, ignore_window=False)
     return output
 
 
@@ -328,9 +326,7 @@ def scroll_down() -> str:
         total_lines = max(1, sum(1 for _ in file))
     CURRENT_LINE = _clamp(CURRENT_LINE + WINDOW, 1, total_lines)
     output = _cur_file_header(CURRENT_FILE, total_lines)
-    output += _format_window(
-        CURRENT_FILE, CURRENT_LINE, WINDOW, ignore_window=True
-    )
+    output += _format_window(CURRENT_FILE, CURRENT_LINE, WINDOW, ignore_window=True)
     return output
 
 
@@ -350,9 +346,7 @@ def scroll_up() -> str:
         total_lines = max(1, sum(1 for _ in file))
     CURRENT_LINE = _clamp(CURRENT_LINE - WINDOW, 1, total_lines)
     output = _cur_file_header(CURRENT_FILE, total_lines)
-    output += _format_window(
-        CURRENT_FILE, CURRENT_LINE, WINDOW, ignore_window=True
-    )
+    output += _format_window(CURRENT_FILE, CURRENT_LINE, WINDOW, ignore_window=True)
     return output
 
 
@@ -473,7 +467,9 @@ def search_file(search_term: str, file_path: str | None = None) -> str:
     if file_path is None:
         file_path = CURRENT_FILE
     if file_path is None:
-        return _output_error('No file specified or open. Use the open_file function first.')
+        return _output_error(
+            'No file specified or open. Use the open_file function first.'
+        )
     if not os.path.isfile(file_path):
         return _output_error(f'File {file_path} not found.')
     matches: list[tuple[int, str]] = []

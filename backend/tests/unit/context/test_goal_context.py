@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from backend.context.context_pipeline.goal_context import (
     build_goal_context_for_compaction,
@@ -30,11 +30,7 @@ def test_strip_verbatim_user_echo_replaces_echoed_goal():
         'and never echo user messages verbatim in summaries ever again.'
     )
     snapshot = {'user_messages': [{'text': long_user}]}
-    summary = (
-        '## USER GOAL\n'
-        + long_user
-        + '\n\n## NEXT STEPS\n- continue'
-    )
+    summary = '## USER GOAL\n' + long_user + '\n\n## NEXT STEPS\n- continue'
     with patch(
         'backend.context.context_pipeline.goal_context.build_goal_context_for_compaction',
         return_value='- Objective: Refactor compaction pipeline',
