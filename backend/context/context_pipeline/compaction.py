@@ -64,15 +64,22 @@ def should_skip_compaction(
     force: bool,
     explicit: bool = False,
     budget: ContextBudget | None = None,
+    events: list[Event] | None = None,
+    llm_config: object | None = None,
 ) -> bool:
     """Return True when compaction should not run again yet.
 
     * ``just_compacted`` — same-turn double ``prepare_step`` loop
     * post-compact snapshot — already compacted at this token level; wait until
-      new events push the estimate above the last committed post-compact count
+      projected post-boundary events grow past the last committed count
 
     Explicit ``/compact`` and CRITICAL memory pressure (``force=True``) bypass
     both guards.
+
+    When *events* are supplied, the snapshot comparison uses
+    :func:`estimate_boundary_event_tokens` so it matches the value stored at
+    commit time. ``budget.estimated_tokens`` can be inflated by API caches and
+    baseline heuristics and must not be used alone for the skip gate.
     """
     _ = boundary_compact_cooldown
     if explicit or force:
@@ -83,12 +90,23 @@ def should_skip_compaction(
         return True
 
     post_compact = pipe.get(_POST_COMPACT_TRUE_TOKENS_KEY)
-    if (
-        budget is not None
-        and isinstance(post_compact, int)
-        and post_compact > 0
-        and budget.estimated_tokens <= post_compact
-    ):
+    if not isinstance(post_compact, int) or post_compact <= 0:
+        return False
+
+    if events is not None:
+        current_tokens = estimate_boundary_event_tokens(events, llm_config=llm_config)
+        if current_tokens <= post_compact:
+            logger.debug(
+                'ContextPipeline: skipping compaction (boundary_tokens=%d '
+                'post_compact_snapshot=%d budget_estimate=%s)',
+                current_tokens,
+                post_compact,
+                getattr(budget, 'estimated_tokens', None) if budget else None,
+            )
+            return True
+        return False
+
+    if budget is not None and budget.estimated_tokens <= post_compact:
         return True
     return False
 
@@ -115,15 +133,17 @@ def record_boundary_compact(
     *,
     budget: ContextBudget | None = None,
     llm_config: object | None = None,
+    post_events: list[Event] | None = None,
 ) -> None:
-    post_events = project_after_compact_boundary(
-        _synthetic_history_after_action(history, action)
-    )
+    if post_events is None:
+        post_events = project_after_compact_boundary(
+            _synthetic_history_after_action(history, action)
+        )
     record_post_compact_baseline(state, post_events)
+    post_tokens = estimate_boundary_event_tokens(post_events, llm_config=llm_config)
+    pipe = _pipeline_state(state)
+    pipe[_POST_COMPACT_TRUE_TOKENS_KEY] = post_tokens
     if budget is not None:
-        post_tokens = estimate_boundary_event_tokens(post_events, llm_config=llm_config)
-        pipe = _pipeline_state(state)
-        pipe[_POST_COMPACT_TRUE_TOKENS_KEY] = post_tokens
         if post_tokens >= budget.autocompact_threshold:
             pipe[_WILL_RETRIGGER_HYSTERESIS_KEY] = True
             logger.warning(
@@ -134,7 +154,7 @@ def record_boundary_compact(
             )
         else:
             pipe.pop(_WILL_RETRIGGER_HYSTERESIS_KEY, None)
-        _set_pipeline_state(state, pipe)
+    _set_pipeline_state(state, pipe)
 
 
 # --------------------------------------------------------------------------- #

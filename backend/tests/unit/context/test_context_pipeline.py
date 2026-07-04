@@ -558,3 +558,44 @@ def test_will_retrigger_hysteresis_is_telemetry_only(pipeline):
         is False
     )
 
+
+def test_skip_compaction_ignores_inflated_budget_when_events_provided(pipeline):
+    """API/baseline budget inflation must not bypass the post-compact snapshot."""
+    events = [_user('task', 1), _cmd_output('ok', 2)]
+    state = _make_state(events)
+    action = CondensationAction(
+        pruned_event_ids=[1],
+        summary='summary',
+        summary_offset=0,
+    )
+    llm_config = SimpleNamespace(model='test-model')
+    with patch(
+        'backend.context.context_pipeline.compaction.estimate_boundary_event_tokens',
+        return_value=50_000,
+    ):
+        record_boundary_compact(
+            state, events, action, llm_config=llm_config,
+        )
+        inflated = SimpleNamespace(estimated_tokens=200_000)
+        assert should_skip_compaction(
+            state,
+            pipeline._boundary_compact_cooldown,
+            force=False,
+            budget=inflated,
+            events=events,
+            llm_config=llm_config,
+        ) is True
+
+    with patch(
+        'backend.context.context_pipeline.compaction.estimate_boundary_event_tokens',
+        return_value=55_000,
+    ):
+        assert should_skip_compaction(
+            state,
+            pipeline._boundary_compact_cooldown,
+            force=False,
+            budget=inflated,
+            events=events,
+            llm_config=llm_config,
+        ) is False
+
