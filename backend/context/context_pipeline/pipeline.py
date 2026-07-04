@@ -37,6 +37,7 @@ from backend.context.context_pipeline.compaction import (
 from backend.context.context_pipeline.goal_context import strip_verbatim_user_echo
 from backend.context.context_pipeline.helpers import (
     _drop_stale_prompt_state_artifacts,
+    _synthetic_history_after_action,
     clear_prewarm_signals,
     is_prewarm_stale,
 )
@@ -217,6 +218,9 @@ class ContextPipeline:
                             action,
                             budget=budget,
                             llm_config=llm_config,
+                            post_events=self._projected_post_boundary(
+                                history, action, state
+                            ),
                         )
                         increment_condensation_counter(state)
                         logger.info(
@@ -281,6 +285,8 @@ class ContextPipeline:
             force=force,
             explicit=explicit,
             budget=budget,
+            events=events,
+            llm_config=llm_config,
         ):
             delete_staging_snapshot(state=state)
             return CondensedHistory(history, None)
@@ -314,7 +320,8 @@ class ContextPipeline:
         finalize_compaction_artifacts(state=state)
         mark_just_compacted(state)
         record_boundary_compact(
-            state, history, action, budget=budget, llm_config=llm_config
+            state, history, action, budget=budget, llm_config=llm_config,
+            post_events=self._projected_post_boundary(history, action, state),
         )
         increment_condensation_counter(state)
         if pressure_active:
@@ -424,7 +431,8 @@ class ContextPipeline:
             boundary_compact_cooldown_seconds=self._boundary_compact_cooldown,
         )
         if should_skip_compaction(
-            state, self._boundary_compact_cooldown, force=False, budget=budget
+            state, self._boundary_compact_cooldown, force=False, budget=budget,
+            events=events, llm_config=llm_config,
         ):
             return None
         action = await self._compaction_engine._llm_structured_compaction(
@@ -472,6 +480,8 @@ class ContextPipeline:
             force=force,
             explicit=explicit,
             budget=budget,
+            events=events,
+            llm_config=llm_config,
         ):
             return False
         return bool(
@@ -501,6 +511,19 @@ class ContextPipeline:
             state=None if isinstance(state, _EmptyState) else state,
         )
         return events
+
+    def _projected_post_boundary(
+        self,
+        history: list[Event],
+        action: CondensationAction,
+        state: State,
+    ) -> list[Event]:
+        """Project post-boundary events the same way ``prepare_step`` measures budget."""
+        return self._project_layers_1_to_3(
+            _synthetic_history_after_action(history, action),
+            state,
+            apply_tool_budget=False,
+        )
 
     def _extract_pre_condensation_snapshot(
         self, state: State, history: list[Event]
