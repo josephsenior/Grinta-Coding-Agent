@@ -705,9 +705,7 @@ class LLM(RetryMixin, DebugMixin):
         normalized_messages = []
         for m in messages_list:
             if isinstance(m, Message):
-                from backend.core.pydantic_compat import model_dump_with_options
-
-                normalized_messages.append(model_dump_with_options(m))
+                normalized_messages.append(m.model_dump())
             else:
                 normalized_messages.append(m)
 
@@ -747,9 +745,7 @@ class LLM(RetryMixin, DebugMixin):
     def format_messages_for_llm(self, messages: Message | list[Message]) -> list[dict]:
         if isinstance(messages, Message):
             messages = [messages]
-        from backend.core.pydantic_compat import model_dump_with_options
-
-        return [model_dump_with_options(m) for m in messages]
+        return [m.model_dump() for m in messages]
 
     def __str__(self) -> str:
         return f'LLM(model={self.config.model})'

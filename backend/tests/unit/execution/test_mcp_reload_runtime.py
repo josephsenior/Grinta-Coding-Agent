@@ -154,6 +154,22 @@ async def test_reload_tolerates_disconnect_failure() -> None:
 
 
 @pytest.mark.asyncio
+async def test_reload_disconnects_when_server_disabled() -> None:
+    existing = _make_client('github')
+    s_enabled = _server('github')
+    s_disabled = _server('github', enabled=False)
+    clients, servers, summary = await mcp_runtime.reload_mcp_servers(
+        new_servers=[s_disabled],
+        current_clients=[existing],
+        current_servers_resolved=[s_enabled],
+    )
+    existing.disconnect.assert_awaited_once()
+    assert clients == []
+    assert servers == []
+    assert summary['removed'] == ['github']
+
+
+@pytest.mark.asyncio
 async def test_reload_empty_inputs_is_noop() -> None:
     clients, servers, summary = await mcp_runtime.reload_mcp_servers(
         new_servers=[],

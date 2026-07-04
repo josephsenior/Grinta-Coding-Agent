@@ -4,7 +4,6 @@ import pytest
 from pydantic import ValidationError
 
 from backend.core.config.compactor_config import (
-    AmortizedPruningCompactorConfig,
     CompactorPipelineConfig,
     ContextPipelineConfig,
     NoOpCompactorConfig,
@@ -60,18 +59,6 @@ class TestRecentEventsConfig:
             RecentEventsCompactorConfig(keep_first=-1)
 
 
-class TestAmortizedPruningConfig:
-    def test_defaults(self):
-        c = AmortizedPruningCompactorConfig()
-        assert c.type == 'amortized'
-        assert c.max_size >= 2
-        assert c.keep_first >= 0
-        assert c.token_budget is None
-
-    def test_with_token_budget(self):
-        c = AmortizedPruningCompactorConfig(token_budget=4096)
-        assert c.token_budget == 4096
-
 
 class TestCompactorPipelineConfig:
     def test_empty_pipeline(self):
@@ -116,12 +103,11 @@ class TestCreateCompactorConfig:
         assert isinstance(cfg, RecentEventsCompactorConfig)
         assert cfg.max_events == 100
 
-    def test_amortized(self):
-        cfg = create_compactor_config(
-            'amortized', {'type': 'amortized', 'max_size': 50}
-        )
-        assert isinstance(cfg, AmortizedPruningCompactorConfig)
-        assert cfg.max_size == 50
+    def test_amortized_type_raises(self):
+        with pytest.raises(ValueError, match='Unknown compactor type'):
+            create_compactor_config(
+                'amortized', {'type': 'amortized', 'max_size': 50}
+            )
 
     def test_observation_masking(self):
         cfg = create_compactor_config(

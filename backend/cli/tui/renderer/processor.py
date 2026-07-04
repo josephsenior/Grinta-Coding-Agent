@@ -309,7 +309,7 @@ def _process_event_check_user_message(
 ) -> None:
     source = getattr(event, 'source', None)
     if isinstance(event, MessageAction) and orch._is_user_source(source):
-        orch._last_thinking_text_hash = ''
+        orch._step_draft.reset()
         orch._last_thinking_artifact_hash = ''
         orch._last_final_response_text = ''
 
@@ -336,7 +336,8 @@ def _process_event_finalize_thinking(
 ) -> None:
     if orch._is_live_thinking_event(event):
         return
-    if getattr(orch, '_streaming_active', False):
+    is_tool = isinstance(event, _TOOL_EXECUTION_TYPES)
+    if getattr(orch, '_streaming_active', False) and not is_tool:
         return
     orch._finalize_live_thinking()
 
@@ -349,8 +350,11 @@ def _process_event_commit_response(
     if orch._live_response_dirty:
         if is_tool:
             orch.clear_live_response()
+            orch._step_draft.begin_stream_leg()
         else:
             orch._commit_final_response(orch._live_response)
+    elif is_tool:
+        orch._step_draft.begin_stream_leg()
     else:
         orch.clear_live_response()
 

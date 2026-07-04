@@ -6,10 +6,14 @@
   "agent": {
     "Orchestrator": {
       "mode": "agent",
-      "autonomy_level": "balanced",
-      "enable_lsp_query": false,
-      "enable_debugger": false
+      "autonomy_level": "balanced"
     }
+  },
+  "lsp_config": {
+    "enabled": false
+  },
+  "dap_config": {
+    "enabled": false
   },
   "security": {
     "windows_shell": "bash",

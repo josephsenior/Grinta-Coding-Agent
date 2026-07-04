@@ -12,7 +12,6 @@ from backend.core.providers.provider_models import (
     ProviderToken,
     ProviderType,
 )
-from backend.core.pydantic_compat import model_dump_with_options
 from backend.persistence.data_models.user_secrets import UserSecrets
 
 
@@ -77,7 +76,7 @@ class TestUserSecretsSerialization:
     def test_provider_tokens_hidden_by_default(self):
         token = ProviderToken(token=SecretStr('secret123'), host='gh.com')
         s = UserSecrets(provider_tokens={ProviderType.ENTERPRISE_SSO: token})
-        data = model_dump_with_options(s)
+        data = s.model_dump()
         # Token should NOT be exposed
         for v in data.get('provider_tokens', {}).values():
             assert 'secret123' not in str(v.get('token', ''))
@@ -85,7 +84,7 @@ class TestUserSecretsSerialization:
     def test_provider_tokens_exposed_with_context(self):
         token = ProviderToken(token=SecretStr('secret123'), host='gh.com')
         s = UserSecrets(provider_tokens={ProviderType.ENTERPRISE_SSO: token})
-        data = model_dump_with_options(s, context={'expose_secrets': True})
+        data = s.model_dump(context={'expose_secrets': True})
         found = False
         for v in data.get('provider_tokens', {}).values():
             if v.get('token') == 'secret123':
@@ -95,14 +94,14 @@ class TestUserSecretsSerialization:
     def test_custom_secrets_hidden_by_default(self):
         sec = CustomSecret(secret=SecretStr('mysecret'), description='d')
         s = UserSecrets(custom_secrets={'KEY': sec})
-        data = model_dump_with_options(s)
+        data = s.model_dump()
         for v in data.get('custom_secrets', {}).values():
             assert 'mysecret' not in str(v.get('secret', ''))
 
     def test_custom_secrets_exposed(self):
         sec = CustomSecret(secret=SecretStr('mysecret'), description='d')
         s = UserSecrets(custom_secrets={'KEY': sec})
-        data = model_dump_with_options(s, context={'expose_secrets': True})
+        data = s.model_dump(context={'expose_secrets': True})
         assert data['custom_secrets']['KEY']['secret'] == 'mysecret'
 
 

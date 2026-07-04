@@ -425,18 +425,6 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         description='Rolling window size for circuit breaker error-rate checks',
     )
 
-    @model_validator(mode='before')
-    @classmethod
-    def _drop_legacy_enable_prompt_caching(cls, data: Any) -> Any:
-        """Normalize legacy field names before model validation."""
-        if isinstance(data, dict):
-            data = dict(data)
-            data.pop('enable_prompt_caching', None)
-            data.pop('enable_web_search', None)
-            data.pop('enable_native_browser', None)
-            data.pop('system_prompt_filename', None)
-        return data
-
     @field_validator('name', 'autonomy_level')
     @classmethod
     def validate_required_strings(cls, v: str) -> str:

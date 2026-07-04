@@ -5,6 +5,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from backend.context.compactor.compactor import Compaction
 from backend.context.compactor.strategies.structured_summary_compactor import (
     DEFAULT_MIN_PROSE_LENGTH,
@@ -206,10 +208,9 @@ class TestGetCompaction:
             result = await condenser.get_compaction(view)
 
         assert isinstance(result, Compaction)
-        assert result.action.summary == prose
-        assert condenser.last_degraded is False
+        assert result.action.summary.strip() == prose.strip()
 
-    async def test_short_prose_degrades_and_does_not_wipe(self):
+    async def test_short_prose_accepted_after_retries(self):
         llm = _make_llm()
         condenser = StructuredSummaryCompactor(llm=llm, max_size=10, keep_first=2)
 
@@ -222,13 +223,9 @@ class TestGetCompaction:
             result = await condenser.get_compaction(view)
 
         assert isinstance(result, Compaction)
-        # Degraded flag set so the pipeline rejects this compaction.
-        assert condenser.last_degraded is True
-        # Summary is the degraded audit text, never an empty wipe.
-        assert result.action.summary
-        assert 'degraded' in result.action.summary
+        assert result.action.summary == 'too short'
 
-    async def test_empty_prose_degrades(self):
+    async def test_empty_prose_raises(self):
         llm = _make_llm()
         condenser = StructuredSummaryCompactor(llm=llm, max_size=10, keep_first=2)
 
@@ -238,12 +235,10 @@ class TestGetCompaction:
         llm.acompletion = AsyncMock(return_value=_make_prose_response(''))
 
         with patch.object(condenser, '_add_response_metadata'):
-            result = await condenser.get_compaction(view)
+            with pytest.raises(RuntimeError, match='empty summary'):
+                await condenser.get_compaction(view)
 
-        assert condenser.last_degraded is True
-        assert result.action.summary  # not wiped
-
-    async def test_llm_exception_degrades(self):
+    async def test_llm_exception_propagates(self):
         llm = _make_llm()
         condenser = StructuredSummaryCompactor(llm=llm, max_size=10, keep_first=2)
 
@@ -253,11 +248,8 @@ class TestGetCompaction:
         llm.acompletion = AsyncMock(side_effect=RuntimeError('provider down'))
 
         with patch.object(condenser, '_add_response_metadata'):
-            result = await condenser.get_compaction(view)
-
-        assert condenser.last_degraded is True
-        assert result.action.summary
-        assert 'degraded' in result.action.summary
+            with pytest.raises(RuntimeError, match='provider down'):
+                await condenser.get_compaction(view)
 
     async def test_retry_recovers_after_short_first_attempt(self):
         llm = _make_llm()
@@ -283,30 +275,8 @@ class TestGetCompaction:
         with patch.object(condenser, '_add_response_metadata'):
             result = await condenser.get_compaction(view)
 
-        assert condenser.last_degraded is False
         assert result.action.summary == good_prose
         assert llm.acompletion.await_count == 2
-
-    async def test_retry_exhausted_degrades(self):
-        llm = _make_llm()
-        condenser = StructuredSummaryCompactor(
-            llm=llm,
-            max_size=10,
-            keep_first=2,
-            min_prose_length=500,
-            max_repair_attempts=2,
-        )
-
-        events = [_event(i) for i in range(8)]
-        view = _make_view(events)
-
-        llm.acompletion = AsyncMock(return_value=_make_prose_response('still short'))
-
-        with patch.object(condenser, '_add_response_metadata'):
-            result = await condenser.get_compaction(view)
-
-        assert condenser.last_degraded is True
-        assert llm.acompletion.await_count == 3  # 1 initial + 2 retries
 
     async def test_retries_by_default_on_short_output(self):
         llm = _make_llm()
@@ -326,9 +296,8 @@ class TestGetCompaction:
             await condenser.get_compaction(view)
 
         assert llm.acompletion.await_count == 2
-        assert condenser.last_degraded is False
 
-    async def test_degrades_after_retries_exhausted(self):
+    async def test_accepts_short_output_after_retries_exhausted(self):
         llm = _make_llm()
         condenser = StructuredSummaryCompactor(
             llm=llm, max_size=10, keep_first=2, max_repair_attempts=1
@@ -340,10 +309,10 @@ class TestGetCompaction:
         llm.acompletion = AsyncMock(return_value=_make_prose_response('short'))
 
         with patch.object(condenser, '_add_response_metadata'):
-            await condenser.get_compaction(view)
+            result = await condenser.get_compaction(view)
 
         assert llm.acompletion.await_count == 2
-        assert condenser.last_degraded is True
+        assert result.action.summary == 'short'
 
     async def test_llm_receives_previous_summary_in_prompt(self):
         llm = _make_llm()

@@ -6,9 +6,6 @@ from typing import Any
 
 from pydantic import RootModel
 
-from backend.core.pydantic_compat import model_dump_with_options
-
-
 class ExtendedConfig(RootModel[dict[str, Any]]):
     """Configuration for extended functionalities.
 
@@ -19,7 +16,7 @@ class ExtendedConfig(RootModel[dict[str, Any]]):
 
     def __str__(self) -> str:
         """Return a human-readable representation of stored configuration."""
-        root_dict: dict[str, Any] = model_dump_with_options(self)
+        root_dict: dict[str, Any] = self.model_dump()
         attr_str = [f'{k}={v!r}' for k, v in root_dict.items()]
         return f'ExtendedConfig({", ".join(attr_str)})'
 
@@ -42,13 +39,13 @@ class ExtendedConfig(RootModel[dict[str, Any]]):
 
     def __getitem__(self, key: str) -> Any:
         """Retrieve a configuration item by key using mapping semantics."""
-        root_dict: dict[str, Any] = model_dump_with_options(self)
+        root_dict: dict[str, Any] = self.model_dump()
         return root_dict[key]
 
     def __getattr__(self, key: str) -> Any:
         """Provide attribute-style access to configuration keys."""
         try:
-            root_dict: dict[str, Any] = model_dump_with_options(self)
+            root_dict: dict[str, Any] = self.model_dump()
             return root_dict[key]
         except KeyError as e:
             msg = f"'ExtendedConfig' object has no attribute '{key}'"

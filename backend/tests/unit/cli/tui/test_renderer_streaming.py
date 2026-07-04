@@ -64,6 +64,7 @@ async def test_tui_final_stream_and_message_action_do_not_duplicate(mock_config)
 
 @pytest.mark.asyncio
 async def test_tui_final_stream_commits_response(mock_config):
+    """Stream previews only; MessageAction commits the permanent row."""
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -90,6 +91,13 @@ async def test_tui_final_stream_commits_response(mock_config):
         final_stream.source = EventSource.AGENT
         renderer._process_event(final_stream)
 
+        assert renderer._last_final_response_text == ''
+        assert renderer._live_response == 'Plain preview.'
+
+        final_message = MessageAction(content='Plain preview.', final_response=True)
+        final_message.source = EventSource.AGENT
+        renderer._process_event(final_message)
+
         assert renderer._last_final_response_text == 'Plain preview.'
         assert renderer._live_response == ''
 
@@ -99,13 +107,12 @@ async def test_tui_final_stream_commits_response(mock_config):
 
         assert renderer._last_final_response_text == 'Plain preview.'
         assert renderer._live_response == ''
-        assert (
-            len(renderer._history) == 1
-        )  # suppressed message should not add to history
+        assert len(renderer._history) == 1
 
 
 @pytest.mark.asyncio
 async def test_tui_final_stream_empty_accumulated_commits_live_response(mock_config):
+    """Final stream ends preview; MessageAction commits the live snapshot."""
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -125,7 +132,6 @@ async def test_tui_final_stream_empty_accumulated_commits_live_response(mock_con
         )
         s._renderer = renderer
 
-        # Stream chunk with content (not final)
         chunk = StreamingChunkAction(
             accumulated='Live content preview.',
             is_final=False,
@@ -136,7 +142,6 @@ async def test_tui_final_stream_empty_accumulated_commits_live_response(mock_con
         assert renderer._live_response == 'Live content preview.'
         assert len(renderer._history) == 0
 
-        # Final stream chunk with empty content
         final_stream = StreamingChunkAction(
             accumulated='',
             is_final=True,
@@ -144,13 +149,22 @@ async def test_tui_final_stream_empty_accumulated_commits_live_response(mock_con
         final_stream.source = EventSource.AGENT
         renderer._process_event(final_stream)
 
-        # Should fall back to live response and commit it
+        assert renderer._last_final_response_text == ''
+        assert renderer._live_response == 'Live content preview.'
+
+        message = MessageAction(
+            content='Live content preview.',
+            final_response=True,
+        )
+        message.source = EventSource.AGENT
+        renderer._process_event(message)
+
         assert renderer._last_final_response_text == 'Live content preview.'
         assert renderer._live_response == ''
         from backend.cli.tui.widgets.activity_card import AgentMessage
 
         msgs = list(s.query(AgentMessage).results())
-        assert len(msgs) >= 1
+        assert len(msgs) == 1
 
 
 @pytest.mark.asyncio
@@ -421,3 +435,133 @@ async def test_tui_thinking_indicator_shows_content_without_collapse(
         rendered = _static_render_plain(content)
         assert thought in rendered
         assert 'Thinking:' in rendered
+
+
+@pytest.mark.asyncio
+async def test_tui_stream_final_thinking_and_message_thought_do_not_duplicate(
+    mock_config, monkeypatch
+):
+    """Stream-finalized thinking must not replay on MessageAction.thought."""
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        thought = (
+            'This is an ambitious project — break it down and build phase by phase.'
+        )
+        renderer._process_event(
+            StreamingChunkAction(
+                thinking_accumulated=thought,
+                accumulated='',
+                is_final=True,
+            )
+        )
+        message = MessageAction(
+            content='Starting phase one.',
+            thought=thought,
+            final_response=True,
+        )
+        message.source = EventSource.AGENT
+        renderer._process_event(message)
+        await pilot.pause()
+
+        thinking_blocks = list(s.query(ThinkingIndicator).results())
+        assert len(thinking_blocks) == 1
+        rendered = _static_render_plain(
+            thinking_blocks[0].query_one('#thinking-content', Static)
+        )
+        assert rendered.count(thought) == 1
+
+
+@pytest.mark.asyncio
+async def test_tui_stream_final_and_transcript_only_message_do_not_duplicate(
+    mock_config,
+):
+    """MessageAction is the sole committer for assistant text."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        text = 'I will inspect the workspace.'
+        renderer._process_event(
+            StreamingChunkAction(accumulated=text, is_final=True)
+        )
+        renderer._process_event(
+            MessageAction(content=text, transcript_only=True)
+        )
+        await pilot.pause()
+
+        from backend.cli.tui.widgets.activity_card import AgentMessage, LiveResponse
+
+        assert len(list(s.query(AgentMessage).results())) == 1
+        assert len(list(s.query(LiveResponse).results())) == 0
+
+
+@pytest.mark.asyncio
+async def test_tui_stale_stream_snapshot_after_final_commit_is_ignored(mock_config):
+    """Late non-final chunks after a final commit must not spawn a second preview."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        full_text = (
+            'This is an extraordinary engineering challenge with many moving parts.'
+        )
+        renderer._process_event(
+            StreamingChunkAction(accumulated=full_text, is_final=True)
+        )
+        renderer._process_event(
+            MessageAction(content=full_text, final_response=True)
+        )
+        renderer._process_event(
+            StreamingChunkAction(
+                accumulated='This is an extraordinary engineering challenge',
+                is_final=False,
+            )
+        )
+        await pilot.pause()
+
+        from backend.cli.tui.widgets.activity_card import AgentMessage, LiveResponse
+
+        assert len(list(s.query(AgentMessage).results())) == 1
+        assert len(list(s.query(LiveResponse).results())) == 0

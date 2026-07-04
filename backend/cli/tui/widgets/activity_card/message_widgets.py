@@ -141,11 +141,17 @@ class LiveResponse(Container):
     def __init__(self, *, id: str | None = None) -> None:
         super().__init__(id=id)
         self._pending_text: str = ''
+        self._pending_renderable: Any = None
 
     def compose(self) -> ComposeResult:
         yield Static('', id='live-content')
 
     def on_mount(self) -> None:
+        if self._pending_renderable is not None:
+            pending = self._pending_renderable
+            self._pending_renderable = None
+            self.set_streaming_renderable(pending)
+            return
         if self._pending_text:
             self.set_streaming_content(self._pending_text)
 
@@ -157,36 +163,42 @@ class LiveResponse(Container):
 
     def set_streaming_renderable(self, renderable: Any) -> None:
         """Update visible streaming content."""
-        content = self._live_content()
-        if content is None:
-            return
         if renderable is None or renderable == '':
+            self._pending_renderable = None
+            content = self._live_content()
+            if content is None:
+                self._pending_text = ''
+                self.remove_class('-streaming')
+                return
             content.update('')
             self.remove_class('-streaming')
             return
+
+        content = self._live_content()
+        if content is None:
+            self._pending_renderable = renderable
+            self._pending_text = ''
+            self.add_class('-streaming')
+            return
+
+        self._pending_renderable = None
         self.add_class('-streaming')
         content.update(renderable)
 
     def set_streaming_content(self, text: str) -> None:
         """Highlight in-flight assistant markdown like finalized AgentMessage rows."""
         if not text:
+            self._pending_renderable = None
             self._pending_text = ''
             content = self._live_content()
             if content is not None:
                 content.update('')
             self.remove_class('-streaming')
             return
-        from backend.cli.tui.renderer.prep import prep_live_response_renderable
+        from backend.cli.tui.renderer.prep import prep_streaming_renderable
 
-        renderable = prep_live_response_renderable(text)
-        content = self._live_content()
-        if content is None:
-            self._pending_text = text
-            self.add_class('-streaming')
-            return
         self._pending_text = ''
-        self.add_class('-streaming')
-        content.update(renderable)
+        self.set_streaming_renderable(prep_streaming_renderable(text))
 
     def set_streaming_text(self, text: str) -> None:
         """Fallback plain-text update when highlighted prep is unavailable."""

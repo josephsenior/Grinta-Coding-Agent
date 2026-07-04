@@ -537,8 +537,8 @@ class Runtime(
                 return ErrorObservation(
                     content=(
                         'Interactive debugger is disabled for this session '
-                        '(enable_debugger is false in agent config). '
-                        'Set enable_debugger=true on the agent to use the DAP debugger tool.'
+                        '(dap_config.enabled is false). '
+                        'Set dap_config.enabled=true in settings.json to use the DAP debugger tool.'
                     )
                 )
             loop = asyncio.get_running_loop()
@@ -825,7 +825,7 @@ class Runtime(
     def _handle_debugger_action(self, action: Action) -> ErrorObservation | None:
         if not self._agent_debugger_enabled():
             return ErrorObservation(
-                content='Interactive debugger is disabled for this session (enable_debugger is false in agent config). Set enable_debugger=true on the agent to use the DAP debugger tool.'
+                content='Interactive debugger is disabled for this session (dap_config.enabled is false). Set dap_config.enabled=true in settings.json to use the DAP debugger tool.'
             )
         logger.warning(
             '[DEBUGGER_BRIDGE] run_action entered on worker thread (action id=%s)',

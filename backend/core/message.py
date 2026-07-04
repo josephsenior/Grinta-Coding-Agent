@@ -18,9 +18,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_serializer
 
-from backend.core.pydantic_compat import model_dump_with_options
-
-
 class ToolCallFunction(BaseModel):
     """Function call details within a tool call.
 
@@ -201,7 +198,7 @@ class Message(BaseModel):
         role_tool_with_prompt_caching = False
 
         for item in self.content:
-            d = model_dump_with_options(item)
+            d = item.model_dump()
             role_tool_with_prompt_caching = self._process_item_caching(
                 item, d, role_tool_with_prompt_caching
             )

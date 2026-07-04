@@ -8,9 +8,6 @@ from json_repair import repair_json
 from pydantic import BaseModel
 
 from backend.core.errors import LLMResponseError
-from backend.core.pydantic_compat import model_dump_with_options
-
-
 class AppJSONEncoder(json.JSONEncoder):
     """Custom JSON encoder that handles datetime and event objects."""
 
@@ -36,8 +33,8 @@ def _try_serialize_app_object(obj: Any) -> Any:
         (datetime, lambda o: o.isoformat()),
         (Event, event_to_dict),
         (Metrics, lambda o: o.get()),
-        (CmdOutputMetadata, model_dump_with_options),
-        (BaseModel, model_dump_with_options),
+        (CmdOutputMetadata, lambda o: o.model_dump()),
+        (BaseModel, lambda o: o.model_dump()),
     )
     for types_or_type, fn in handlers:
         if isinstance(obj, types_or_type):

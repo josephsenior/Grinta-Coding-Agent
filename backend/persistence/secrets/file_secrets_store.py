@@ -6,7 +6,6 @@ import json
 from typing import TYPE_CHECKING, Any
 
 from backend.core.constants import DEFAULT_SECRETS_FILENAME
-from backend.core.pydantic_compat import model_dump_json
 from backend.persistence import get_file_store
 from backend.persistence.data_models.user_secrets import UserSecrets
 from backend.persistence.secrets.secrets_store import SecretsStore
@@ -74,7 +73,7 @@ class FileSecretsStore(SecretsStore):
             secrets: UserSecrets to persist
 
         """
-        json_str = model_dump_json(secrets, context={'expose_secrets': True})
+        json_str = secrets.model_dump_json(context={'expose_secrets': True})
         await call_sync_from_async(self.file_store.write, self.path, json_str)
 
     @classmethod

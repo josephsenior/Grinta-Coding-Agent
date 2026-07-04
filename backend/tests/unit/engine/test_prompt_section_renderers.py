@@ -113,17 +113,17 @@ class TestRenderCriticalModeSpecific:
         self._assert_contains_body(body, 'audit_entries')
         self._assert_contains_body(body, 'evidence_ref')
 
-    def test_agent_mode_contains_exactly_11_rules(self):
+    def test_agent_mode_contains_exactly_10_rules(self):
         body = self._render_critical(mode='agent', terminal_manager_available=False)
         lines = [
             line
             for line in body.split('\n')
             if line.strip().startswith(
-                ('1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.', '10.', '11.')
+                ('1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.', '10.')
             )
         ]
-        assert len(lines) == 11, (
-            f'Expected 11 numbered rules with acceptance_criteria enabled, got {len(lines)}:\n{body}'
+        assert len(lines) == 10, (
+            f'Expected 10 numbered rules with acceptance_criteria enabled, got {len(lines)}:\n{body}'
         )
 
     def test_agent_mode_with_terminal_manager_adds_rule(self):
@@ -139,11 +139,11 @@ class TestRenderCriticalModeSpecific:
             line
             for line in body.split('\n')
             if line.strip().startswith(
-                ('1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.', '10.', '11.')
+                ('1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.', '10.')
             )
         ]
-        assert len(lines) == 11, (
-            f'Expected 11 numbered rules with terminal_manager, got {len(lines)}'
+        assert len(lines) == 10, (
+            f'Expected 10 numbered rules with terminal_manager, got {len(lines)}'
         )
 
     def test_agent_mode_has_mandatory_header(self):

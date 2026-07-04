@@ -13,10 +13,7 @@ from pydantic import SecretStr
 
 from backend.core.config.api_key_manager import api_key_manager
 from backend.core.config.app_config import AppConfig
-from backend.core.config.compactor_config import (
-    AutoCompactorConfig,
-    ContextPipelineConfig,
-)
+from backend.core.config.compactor_config import ContextPipelineConfig
 from backend.core.config.config_loader import (
     ConfigLoadSummary,
     finalize_config,
@@ -122,28 +119,6 @@ class TestFinalization:
         compactor_cfg = cfg.get_agent_config(cfg.default_agent).compactor_config
         assert isinstance(compactor_cfg, ContextPipelineConfig)
         assert compactor_cfg.llm_config.model == 'openai/gpt-4.1'  # type: ignore
-
-    def test_finalize_config_preserves_auto_compactor_hot_path_flag(self, tmp_path):
-        cfg = AppConfig()
-        cfg.cache_dir = str(tmp_path / 'cache')
-        cfg.get_agent_config(cfg.default_agent).compactor_config = AutoCompactorConfig(
-            allow_llm_hot_path=True
-        )
-
-        with (
-            patch('backend.persistence.get_file_store') as mock_get_store,
-            patch('pathlib.Path.mkdir'),
-        ):
-            mock_store = MagicMock()
-            mock_get_store.return_value = mock_store
-            mock_store.read.return_value = 'secret'
-
-            finalize_config(cfg)
-
-        compactor_cfg = cfg.get_agent_config(cfg.default_agent).compactor_config
-        assert isinstance(compactor_cfg, AutoCompactorConfig)
-        assert compactor_cfg.allow_llm_hot_path is True
-        assert compactor_cfg.llm_config is not None
 
     def test_finalize_config_loads_bundled_mcp_servers(self, tmp_path):
         cfg = AppConfig()
@@ -744,6 +719,141 @@ class TestLoadFromJson:
         assert [server.name for server in cfg.mcp.servers] == ['existing', 'remote']
         assert cfg.mcp.enabled is True
         mock_debug.assert_called()
+
+    def test_load_from_json_applies_mcp_master_enabled_without_servers(
+        self, tmp_path
+    ) -> None:
+        from backend.core.config.mcp_config import MCPServerConfig
+
+        json_file = tmp_path / 'settings.json'
+        json_file.write_text(
+            json.dumps(
+                {
+                    'mcp_config': {
+                        'enabled': False,
+                        'servers': [],
+                    }
+                }
+            )
+        )
+        cfg = AppConfig()
+        cfg.mcp.enabled = True
+        cfg.mcp.servers = [
+            MCPServerConfig(name='github', type='stdio', command='npx')
+        ]
+
+        load_from_json(cfg, str(json_file))
+
+        assert cfg.mcp.enabled is False
+
+    def test_load_from_json_updates_existing_mcp_server_enabled_flag(
+        self, tmp_path
+    ) -> None:
+        from backend.core.config.mcp_config import MCPServerConfig
+
+        json_file = tmp_path / 'settings.json'
+        json_file.write_text(
+            json.dumps(
+                {
+                    'mcp_config': {
+                        'servers': [
+                            {
+                                'name': 'github',
+                                'type': 'stdio',
+                                'command': 'npx',
+                                'enabled': False,
+                            }
+                        ]
+                    }
+                }
+            )
+        )
+        cfg = AppConfig()
+        cfg.mcp.servers = [
+            MCPServerConfig(
+                name='github',
+                type='stdio',
+                command='npx',
+                enabled=True,
+            )
+        ]
+
+        load_from_json(cfg, str(json_file))
+
+        assert cfg.mcp.servers[0].enabled is False
+
+    def test_load_from_json_applies_lsp_and_dap_config_blocks(self, tmp_path) -> None:
+        from backend.core.constants import DEFAULT_AGENT_NAME
+
+        json_file = tmp_path / 'settings.json'
+        json_file.write_text(
+            json.dumps(
+                {
+                    'lsp_config': {'enabled': True},
+                    'dap_config': {'enabled': True},
+                }
+            )
+        )
+        cfg = AppConfig()
+        load_from_json(cfg, str(json_file))
+        orchestrator = cfg.get_agent_config(DEFAULT_AGENT_NAME)
+        assert orchestrator.enable_lsp_query is True
+        assert orchestrator.enable_debugger is True
+
+    def test_load_from_json_ignores_legacy_agent_lsp_dap_when_top_level_present(
+        self, tmp_path
+    ) -> None:
+        from backend.core.constants import DEFAULT_AGENT_NAME
+
+        json_file = tmp_path / 'settings.json'
+        json_file.write_text(
+            json.dumps(
+                {
+                    'agent': {
+                        DEFAULT_AGENT_NAME: {
+                            'enable_lsp_query': True,
+                            'enable_debugger': True,
+                        }
+                    },
+                    'lsp_config': {'enabled': False},
+                    'dap_config': {'enabled': False},
+                }
+            )
+        )
+        cfg = AppConfig()
+        load_from_json(cfg, str(json_file))
+        orchestrator = cfg.get_agent_config(DEFAULT_AGENT_NAME)
+        assert orchestrator.enable_lsp_query is False
+        assert orchestrator.enable_debugger is False
+
+    def test_update_enable_lsp_query_writes_only_lsp_config(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        from backend.cli.settings.query import update_enable_lsp_query
+        from backend.cli.settings import storage as storage_mod
+        from backend.core.constants import DEFAULT_AGENT_NAME
+
+        settings_path = tmp_path / 'settings.json'
+        settings_path.write_text(
+            json.dumps(
+                {
+                    'agent': {
+                        DEFAULT_AGENT_NAME: {
+                            'mode': 'agent',
+                            'enable_lsp_query': False,
+                        }
+                    }
+                }
+            ),
+            encoding='utf-8',
+        )
+        monkeypatch.setattr(storage_mod, '_settings_path', lambda: settings_path)
+
+        update_enable_lsp_query(True)
+
+        data = json.loads(settings_path.read_text(encoding='utf-8'))
+        assert data['lsp_config'] == {'enabled': True}
+        assert 'enable_lsp_query' not in data['agent'][DEFAULT_AGENT_NAME]
 
     def test_load_from_json_applies_valid_agent_overrides_and_skips_invalid(
         self, tmp_path

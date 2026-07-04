@@ -26,7 +26,6 @@ from backend.core.config.mcp_config import (
     MCPServerConfig,
 )
 from backend.core.logging.logger import app_logger as logger
-from backend.core.pydantic_compat import model_dump_with_options
 from backend.execution import LocalRuntimeInProcess
 from backend.integrations.mcp.cache import get_cached, set_cache
 from backend.integrations.mcp.client import MCPClient
@@ -898,7 +897,7 @@ async def _execute_direct_tool(
         # Call tool
         response = await matching_client.call_tool(action.name, action.arguments)
         logger.debug('MCP response: %s', response)
-        result_dict = model_dump_with_options(response, mode='json')
+        result_dict = response.model_dump(mode='json')
 
         # Cache result
         try:
@@ -933,7 +932,7 @@ async def _execute_direct_tool(
                     response = await matching_client.call_tool(
                         action.name, repaired_args
                     )
-                    result_dict = model_dump_with_options(response, mode='json')
+                    result_dict = response.model_dump(mode='json')
                     payload = _normalize_mcp_success_payload(result_dict)
                     payload['mcp_arg_repair_applied'] = True
                     payload['repaired_arguments'] = repaired_args
@@ -1078,7 +1077,7 @@ async def _call_mcp_raw(mcps: list[MCPClient], action) -> dict:
     if cached := get_cached(action.name, action.arguments):
         return cached
     response = await matching_client.call_tool(resolved_exposed_name, action.arguments)
-    result_dict = model_dump_with_options(response, mode='json')
+    result_dict = response.model_dump(mode='json')
     set_cache(action.name, action.arguments, result_dict)
     return result_dict
 

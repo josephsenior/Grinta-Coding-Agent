@@ -142,32 +142,10 @@ def _save_raw_settings(data: dict[str, Any], *, source: str = 'mutation') -> Non
         return
 
     try:
-        from backend.core.config.mcp_config import MCPConfig
+        from backend.core.config.config_loader import load_mcp_config_from_json
         from backend.integrations.mcp.config_bus import get_mcp_config_bus
 
-        mcp_cfg = data.get('mcp_config') or {}
-        if not isinstance(mcp_cfg, dict):
-            mcp_cfg = {}
-        servers_data = _normalize_mcp_server_rows(mcp_cfg)
-        try:
-            servers = [
-                _server_dict_to_config(name=row.get('name') or '', row=row)
-                for row in servers_data
-            ]
-        except Exception as exc:
-            logger.warning(
-                'Skipping MCPConfigBus emit: could not validate new servers: %s',
-                exc,
-            )
-            return
-
-        new_config = MCPConfig(
-            enabled=bool(mcp_cfg.get('enabled', True)),
-            servers=servers,
-            mcp_exposed_name_reserved=frozenset(
-                mcp_cfg.get('mcp_exposed_name_reserved', []) or []
-            ),
-        )
+        new_config = load_mcp_config_from_json(_settings_path())
         get_mcp_config_bus().emit(new_config, source=source)
     except Exception as exc:
         logger.debug('MCPConfigBus emit skipped: %s', exc, exc_info=True)

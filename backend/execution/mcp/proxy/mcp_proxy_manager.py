@@ -13,8 +13,6 @@ from anyio import get_cancelled_exc_class
 from fastmcp import FastMCP
 from fastmcp.utilities.logging import get_logger as fastmcp_get_logger
 
-from backend.core.pydantic_compat import model_dump_with_options
-
 if TYPE_CHECKING:
     from fastapi import FastAPI
 
@@ -64,7 +62,7 @@ class MCPProxyManager:
         if mcp_config:
             if not isinstance(mcp_config, list):
                 mcp_config = [mcp_config]
-            tools = {t.name: model_dump_with_options(t) for t in mcp_config}
+            tools = {t.name: t.model_dump() for t in mcp_config}
             self.config['mcpServers'].update(tools)
 
         if not self.config['mcpServers']:
@@ -149,7 +147,7 @@ class MCPProxyManager:
             allow_origins: List of allowed origins for CORS
 
         """
-        tools = {t.name: model_dump_with_options(t) for t in stdio_servers}
+        tools = {t.name: t.model_dump() for t in stdio_servers}
         self.config['mcpServers'] = tools
         del self.proxy
         self.proxy = None

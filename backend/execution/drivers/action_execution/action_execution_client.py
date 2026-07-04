@@ -259,6 +259,26 @@ class ActionExecutionClient(Runtime):
         from backend.execution.utils.mcp_runtime import reload_mcp_servers
 
         new_cfg = getattr(self.config, 'mcp', None)
+        if not getattr(new_cfg, 'enabled', False):
+            removed_names: list[str] = []
+            for client in list(self._mcp_clients or []):
+                cfg = getattr(client, '_server_config', None)
+                if cfg is not None:
+                    removed_names.append(getattr(cfg, 'name', ''))
+                try:
+                    await client.disconnect()
+                except Exception as exc:
+                    logger.debug('MCP reload: disconnect on disable: %s', exc)
+            self._mcp_clients = []
+            self._mcp_servers_resolved = []
+            return {
+                'added': [],
+                'removed': [name for name in removed_names if name],
+                'reconnected': [],
+                'unchanged': [],
+                'failed': [],
+            }
+
         new_servers = list(getattr(new_cfg, 'servers', []) or [])
         reserved = getattr(new_cfg, 'mcp_exposed_name_reserved', None) or frozenset()
 

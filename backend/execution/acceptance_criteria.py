@@ -72,8 +72,7 @@ class AcceptanceCriteriaMixin:
                 command=action.command,
                 criteria_list=hydrated,
                 content=(
-                    'No acceptance criteria found. '
-                    'Use `update` at task start to define verifiable assertions.'
+                    'No acceptance criteria yet. Use `update` to define assertions.'
                 ),
             )
         except Exception as e:

@@ -11,7 +11,7 @@ Manual 45+ minute session replay checklist (workspace ``New folder (4)``):
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -99,7 +99,12 @@ async def test_six_hundred_event_pytest_session_commits_boundary_and_preserves_p
     state = _make_state(events)
     pipeline = ContextPipeline(
         llm_registry=MagicMock(),
-        config=ContextPipelineConfig(allow_llm_hot_path=False),
+        config=ContextPipelineConfig(),
+    )
+    llm_action = CondensationAction(
+        pruned_event_ids=list(range(2, 502)),
+        summary='LLM compaction summary for long pytest session ' * 40,
+        summary_offset=0,
     )
     llm_config = SimpleNamespace(
         max_input_tokens=32_000,
@@ -117,6 +122,11 @@ async def test_six_hundred_event_pytest_session_commits_boundary_and_preserves_p
             return_value=False,
         ),
         patch.object(pipeline, '_llm_config', return_value=llm_config),
+        patch.object(
+            pipeline._compaction_engine,
+            'run',
+            new=AsyncMock(return_value=llm_action),
+        ),
     ):
         condensed = await pipeline.prepare_step(state)
 

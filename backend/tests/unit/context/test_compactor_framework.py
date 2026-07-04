@@ -333,14 +333,15 @@ class TestBaseLLMCompactor:
         }
 
     def test_add_response_metadata_records_response_and_metrics(self):
+        from pydantic import BaseModel
+
+        class FakeResponse(BaseModel):
+            ok: bool = True
+
         c = ConcreteLLMCompactor(llm=MagicMock(), max_size=10)
         c.llm.metrics.get.return_value = {'tokens': 5}
 
-        with patch(
-            'backend.core.pydantic_compat.model_dump_with_options',
-            return_value={'ok': True},
-        ):
-            c._add_response_metadata(MagicMock())
+        c._add_response_metadata(FakeResponse())
 
         assert c._metadata_batch['response'] == {'ok': True}
         assert c._metadata_batch['metrics'] == {'tokens': 5}

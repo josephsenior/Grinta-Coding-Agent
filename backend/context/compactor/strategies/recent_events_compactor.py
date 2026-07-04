@@ -63,11 +63,7 @@ class RecentEventsCompactor(Compactor):
         cls, config: Any, llm_registry: LLMRegistry
     ) -> RecentEventsCompactor:
         """Create a compactor using values from the configuration object."""
-        from backend.core.pydantic_compat import model_dump_with_options
-
-        return RecentEventsCompactor(
-            **model_dump_with_options(config, exclude={'type'})
-        )
+        return RecentEventsCompactor(**config.model_dump(exclude={'type'}))
 
 
 # Lazy registration to avoid circular imports

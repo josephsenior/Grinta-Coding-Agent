@@ -135,17 +135,17 @@ class TestAgentConfigValidation:
         with pytest.raises(ValidationError):
             AgentConfig(**{'nonexistent_field': 'value'})
 
-    def test_legacy_enable_prompt_caching_input_dropped(self):
-        cfg = AgentConfig.model_validate({'enable_prompt_caching': False})
-        assert not hasattr(cfg, 'enable_prompt_caching')
+    def test_legacy_enable_prompt_caching_input_rejected(self):
+        with pytest.raises(ValidationError):
+            AgentConfig.model_validate({'enable_prompt_caching': False})
 
-    def test_legacy_enable_prompt_caching_in_model_validate_dropped(self):
-        cfg = AgentConfig.model_validate({'enable_prompt_caching': True})
-        assert not hasattr(cfg, 'enable_prompt_caching')
+    def test_legacy_enable_prompt_caching_in_model_validate_rejected(self):
+        with pytest.raises(ValidationError):
+            AgentConfig.model_validate({'enable_prompt_caching': True})
 
-    def test_legacy_system_prompt_filename_input_dropped(self):
-        cfg = AgentConfig.model_validate({'system_prompt_filename': 'custom.j2'})
-        assert not hasattr(cfg, 'system_prompt_filename')
+    def test_legacy_system_prompt_filename_rejected(self):
+        with pytest.raises(ValidationError):
+            AgentConfig.model_validate({'system_prompt_filename': 'custom.j2'})
 
     def test_legacy_condenser_config_kwarg_rejected(self):
         with pytest.raises(ValidationError):

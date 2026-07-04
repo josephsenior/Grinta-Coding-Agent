@@ -16,6 +16,7 @@ from textual.widgets import (
 from backend.cli.theme import CLR_REASONING_SNAP
 from backend.cli.tui.constants import (
     _TUI_HISTORY_RENDER_LIMIT,
+    _TUI_SCROLL_PAINT_INTERVAL_SECONDS,
 )
 from backend.cli.tui.transcript_typography import (
     THINKING_LABEL,
@@ -25,9 +26,6 @@ from backend.ledger import (
     EventStreamSubscriber,
 )
 
-_LIVE_SCROLL_PAINT_INTERVAL = 0.25
-
-
 class RendererLiveMixin:
     """subscribe + live thinking/response streaming."""
 
@@ -36,7 +34,7 @@ class RendererLiveMixin:
             return
         now = time.monotonic()
         last_scroll = getattr(self, '_last_scroll_paint_at', 0.0)
-        if (now - last_scroll) < _LIVE_SCROLL_PAINT_INTERVAL:
+        if (now - last_scroll) < _TUI_SCROLL_PAINT_INTERVAL_SECONDS:
             return
         self._last_scroll_paint_at = now
         follow_tail = getattr(display, 'follow_tail', None)
@@ -132,12 +130,20 @@ class RendererLiveMixin:
         ):
             return
 
+        from backend.cli.tui.renderer.prep import (
+            prep_streaming_renderable,
+            streaming_render_cache_key,
+        )
+
+        cache = getattr(self, '_streaming_render_cache', {})
+        renderable = cache.get(streaming_render_cache_key(text))
         try:
-            widget.set_streaming_content(text)
-            self._last_streaming_response_applied_text = text
+            if renderable is None:
+                renderable = prep_streaming_renderable(text)
+            widget.set_streaming_renderable(renderable)
         except Exception:
             widget.set_streaming_text(text)
-            self._last_streaming_response_applied_text = text
+        self._last_streaming_response_applied_text = text
 
     def _follow_transcript_tail_after_reflow(self, display: Any) -> None:
         """Scroll to tail after in-place widget reflow updates max_scroll_y."""
@@ -181,6 +187,8 @@ class RendererLiveMixin:
 
     def update_live_response(self, text: str) -> None:
         """Update the in-flight assistant response in-place."""
+        if not getattr(self, '_streaming_active', False) and self._step_draft.content_committed:
+            return
         self._live_response = text
         self._live_response_dirty = bool(text.strip())
 
@@ -271,11 +279,13 @@ class RendererLiveMixin:
         if self._live_thinking_widget:
             thoughts = list(self._live_thinking_widget._thoughts)
             if thoughts and self._live_thinking_dirty:
+                snapshot_text = '\n'.join(thoughts)
                 self._live_thinking_widget.finalize()
+                self._step_draft.note_thinking_committed()
                 snapshot = assemble_thinking_renderable(
                     'Thinking',
                     THINKING_LABEL,
-                    Text('\n'.join(thoughts), style=CLR_REASONING_SNAP),
+                    Text(snapshot_text, style=CLR_REASONING_SNAP),
                 )
                 self._history.append(snapshot)
                 self._history.append(Text(''))

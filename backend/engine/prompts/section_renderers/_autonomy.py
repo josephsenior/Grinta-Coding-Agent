@@ -73,8 +73,7 @@ def _build_context_discipline_section(
         )
         if condensation_on:
             parts.append(
-                'Post-condensation: persisted and auto-re-injected — use '
-                '`acceptance_criteria(view)` for stable ids; do not redefine unless scope changed.'
+                'Post-condensation: `acceptance_criteria(view)` for stable ids.'
             )
 
     parts.append('</CONTEXT_DISCIPLINE>')
@@ -99,12 +98,7 @@ def _build_when_to_use_context(
     if tracker_on:
         parts.append('- **task_tracker**: See `<TASK_TRACKING>`.')
     if criteria_on:
-        parts.append(
-            '- **acceptance_criteria**: See `<ACCEPTANCE_CRITERIA>`. '
-            'Persisted across condensation — use `update` before work, `view` after compaction '
-            'for stable ids, `refine` to correct one assertion, and `audit(audit_entries=[...])` '
-            'with `evidence_ref` before the final summary.'
-        )
+        parts.append('- **acceptance_criteria**: See `<ACCEPTANCE_CRITERIA>`.')
     if not tracker_on and not criteria_on:
         parts.append(
             '- Use fresh reads/searches and recent observations to stay grounded.'
@@ -215,7 +209,7 @@ def _render_autonomy(
             '<TASK_TRACKING>\n'
             '**task_tracker**: Coarse execution plan only — 3–7 parent steps, not micro-requirements.\n'
             'Task steps are activities/milestones, not verifiable outcomes (those belong in `<ACCEPTANCE_CRITERIA>`).\n'
-            'Use `task_tracker(update, task_list=[...])` when you commit to structured work.\n'
+            'Use `task_tracker(update, task_list=[...])` for a coarse milestone plan.\n'
             'Use `view` to inspect the plan, `update` to replace the full `task_list`, and `update_status` for single-task status changes.\n'
             'Quick status updates: use `update_status(task_id="...", status="done")` to change a single task status by ID. Optional `result` field captures outcome.\n'
             'Allowed statuses: `todo`, `in_progress`, `done`, `skipped`, `blocked`.\n'
@@ -228,7 +222,6 @@ def _render_autonomy(
         task_tracker_discipline_block = ''
 
     if criteria_on:
-        tracker_follow = ', then `task_tracker(update, ...)`' if tracker_on else ''
         during_work = (
             '**During work:** update only the coarse `task_tracker` plan — not criteria.\n'
             if tracker_on
@@ -239,24 +232,23 @@ def _render_autonomy(
             if tracker_on
             else ''
         )
+        workflow = (
+            '`update` → `task_tracker(update)` → implement + verify → `audit`'
+            if tracker_on
+            else '`update` → implement + verify → `audit`'
+        )
         acceptance_criteria_discipline_block = (
             '<ACCEPTANCE_CRITERIA>\n'
-            '**acceptance_criteria**: Flat verifiable assertions for what must be true when done.\n'
-            f'**Start ritual:** required before work — call '
-            f'`acceptance_criteria(update, criteria_list=[...])`{tracker_follow}.\n'
-            '**Condensation:** persisted and auto-re-injected after context compaction; '
-            'use `view` for stable ids — do not redefine unless scope changed.\n'
-            'See `<COMMON_PATTERNS>` for worked flows.\n'
-            'Tag each item `source: "stated"` (user/directive) or `"inferred"` (agent-proposed scope extension — proceed autonomously). '
-            'Use assertion phrasing, not activities.\n'
+            'Flat verifiable assertions for what must be true when done.\n'
+            f'**Workflow:** {workflow}. See `<COMMON_PATTERNS>` for examples.\n'
+            'Persisted per session; after compaction use `view` for stable ids.\n'
+            'Tag each item `source: "stated"` or `"inferred"`. Use assertion phrasing, not activities.\n'
             f'{_CRITERIA_VS_TASKS_EXAMPLE}\n'
             f'{during_work}'
             f'{checkpoint}'
-            '**Refine:** when implementation reveals a wrong assertion, `refine(criterion_id, new_assertion, reason)` — do not rewrite the full list.\n'
-            '**Audit:** before the final summary, `audit(audit_entries=[{criterion_id, evidence_ref}, ...])` citing prior tool output '
-            '(e.g. `call_<id>:lines[n-m]` or `event:<id>:lines[n-m]`); free-text only with `unverifiable: true`.\n'
-            'Legacy bulk `audit(criteria_list=[...])` with free-text evidence still works but is deprecated.\n'
-            'Use `view` to read ids; `append` only for rare gaps.\n'
+            '**Refine:** `refine(criterion_id, new_assertion, reason)` — do not rewrite the full list.\n'
+            '**Audit:** `audit(audit_entries=[{criterion_id, evidence_ref}, ...])` before the final summary; '
+            'cite prior tool output (e.g. `call_<id>:lines[n-m]`). Free-text only with `unverifiable: true`.\n'
             '</ACCEPTANCE_CRITERIA>'
         )
     else:

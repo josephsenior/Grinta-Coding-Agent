@@ -119,11 +119,17 @@ async def reload_mcp_servers(
     filtered_new = _filter_windows_stdio_servers(list(new_servers or []))
     filtered_old = _filter_windows_stdio_servers(list(current_servers_resolved or []))
 
+    def _is_active(server: Any) -> bool:
+        return bool(getattr(server, 'enabled', True))
+
+    active_new = [s for s in filtered_new if _is_active(s)]
+    active_old = [s for s in filtered_old if _is_active(s)]
+
     def _identity(server: Any) -> tuple[str, str]:
         return (getattr(server, 'name', ''), getattr(server, 'type', ''))
 
-    old_by_id: dict[tuple[str, str], Any] = {_identity(s): s for s in filtered_old}
-    new_by_id: dict[tuple[str, str], Any] = {_identity(s): s for s in filtered_new}
+    old_by_id: dict[tuple[str, str], Any] = {_identity(s): s for s in active_old}
+    new_by_id: dict[tuple[str, str], Any] = {_identity(s): s for s in active_new}
 
     added_ids = set(new_by_id) - set(old_by_id)
     removed_ids = set(old_by_id) - set(new_by_id)

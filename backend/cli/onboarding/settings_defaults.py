@@ -30,8 +30,6 @@ def default_init_agent_block() -> dict[str, Any]:
         'Orchestrator': {
             'mode': 'agent',
             'autonomy_level': 'balanced',
-            'enable_lsp_query': False,
-            'enable_debugger': False,
         },
     }
 
@@ -53,6 +51,10 @@ def build_init_settings(
 ) -> dict[str, Any]:
     """Build a full init-shaped ``settings.json`` payload."""
     from backend.core.config.mcp_defaults import default_user_mcp_config
+    from backend.core.config.tool_integration_defaults import (
+        default_dap_config,
+        default_lsp_config,
+    )
 
     return {
         'llm_provider': provider,
@@ -65,6 +67,8 @@ def build_init_settings(
         'llm_base_url': base_url,
         'agent': default_init_agent_block(),
         'security': default_init_security_block(),
+        'lsp_config': default_lsp_config(),
+        'dap_config': default_dap_config(),
         'mcp_config': default_user_mcp_config(),
     }
 

@@ -24,7 +24,6 @@ from backend.core.providers.provider_models import (
     ProviderTokenWithTypeSchema,
     ProviderType,
 )
-from backend.core.pydantic_compat import model_dump_with_options
 
 if TYPE_CHECKING:
     from backend.ledger.stream import EventStream
@@ -244,7 +243,7 @@ class UserSecrets(BaseModel):
             Dictionary mapping secret names to string values
 
         """
-        secret_store = model_dump_with_options(self, context={'expose_secrets': True})
+        secret_store = self.model_dump(context={'expose_secrets': True})
         custom_secrets = secret_store.get('custom_secrets', {})
         return {
             secret_name: value['secret']

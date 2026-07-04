@@ -292,8 +292,10 @@ class TUIRenderer(
         self._live_thinking_dirty: bool = False
         self._live_response: str = ''
         self._live_response_dirty: bool = False
+        from backend.cli.tui.renderer.step_draft import AssistantStepDraft
+
+        self._step_draft = AssistantStepDraft()
         self._last_final_response_text: str = ''
-        self._last_thinking_text_hash: str = ''
         self._last_thinking_artifact_hash: str = ''
 
         # Turn tracking for grouping tool calls by agent turn

@@ -200,13 +200,6 @@ class Orchestrator(Agent):
         if hasattr(self, 'executor') and hasattr(self.executor, '_llm'):
             with contextlib.suppress(Exception):
                 self.executor._llm = llm  # type: ignore[attr-defined]  # pylint: disable=protected-access
-        # Also update the memory manager's compactor's LLM reference so
-        # token budget calculations use the correct model after a swap.
-        if hasattr(self, 'memory_manager'):
-            mm = self.memory_manager
-            if hasattr(mm, 'compactor') and hasattr(mm.compactor, 'llm'):
-                with contextlib.suppress(Exception):
-                    mm.compactor.llm = llm
 
     def set_mcp_tools(self, mcp_tools: list[dict]) -> dict[str, list[str]]:
         """Set MCP tools and sync names to prompt manager for dynamic discovery."""

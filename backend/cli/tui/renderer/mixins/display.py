@@ -82,13 +82,13 @@ class RendererDisplayMixin:
         self._compaction_transcript_active = False
         self._pending_compaction_scan_card = None
         self._last_streamed_preamble_text = ''
+        self._step_draft.reset()
         self._history = []
         self._history_items_dropped = 0
         self._live_thinking = ''
         self._live_thinking_dirty = False
         self._live_response = ''
         self._live_response_dirty = False
-        self._last_thinking_text_hash = ''
         self._last_thinking_artifact_hash = ''
         self._min_rendered_event_id = -1
         self._max_rendered_event_id = -1
@@ -126,13 +126,7 @@ class RendererDisplayMixin:
                 False,
             )
             if current_state != self._last_sidebar_state:
-                self._update_sidebar_section(
-                    '#sidebar-mcp',
-                    'MCP Servers',
-                    [],
-                    empty_message='Disabled',
-                )
-                self._sync_sidebar_feature_switch('#sidebar-mcp', False)
+                self._sync_mcp_sidebar_disabled()
                 self._update_sidebar_section(
                     '#sidebar-skills',
                     'Skills' if skills_loading else f'Skills ({len(skill_items)})',
@@ -512,6 +506,18 @@ class RendererDisplayMixin:
         if skill_items:
             return False
         return self._is_runtime_bootstrap_pending()
+
+    def _sync_mcp_sidebar_disabled(self) -> None:
+        """Show the same muted ``● Disabled`` empty state as LSP/DAP."""
+        from backend.cli.tui.widgets.collapsible import CollapsibleSection
+
+        try:
+            section = self._tui.query_one('#sidebar-mcp', CollapsibleSection)
+        except Exception:
+            return
+        section.set_title('MCP Servers')
+        section.set_content('Disabled')
+        self._sync_sidebar_feature_switch('#sidebar-mcp', False)
 
     def _update_sidebar_section(
         self,

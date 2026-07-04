@@ -171,12 +171,9 @@ class TestFileSecretsStoreStore:
         store = FileSecretsStore(fs)
 
         mock_secrets = MagicMock()
+        mock_secrets.model_dump_json.return_value = '{"llm_api_key": "test"}'
 
         with (
-            patch(
-                'backend.persistence.secrets.file_secrets_store.model_dump_json',
-                return_value='{"llm_api_key": "test"}',
-            ),
             patch(
                 'backend.persistence.secrets.file_secrets_store.call_sync_from_async',
                 new_callable=AsyncMock,

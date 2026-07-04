@@ -24,6 +24,17 @@ def _bounded_int_env(name: str, default: int, minimum: int) -> int:
         return default
 
 
+def _bounded_float_env(name: str, default: float, minimum: float) -> float:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return max(minimum, float(raw))
+    except (TypeError, ValueError):
+        _tui_logger.warning('Invalid %s=%r; using default %s', name, raw, default)
+        return default
+
+
 _TUI_PENDING_EVENT_LIMIT = _bounded_int_env(
     'GRINTA_TUI_PENDING_EVENT_LIMIT',
     default=5000,
@@ -44,6 +55,16 @@ _TUI_DRAIN_FRAME_BUDGET_SECONDS = float(
 )
 _TUI_DRAIN_INVOCATION_BUDGET_SECONDS = float(
     os.getenv('GRINTA_TUI_DRAIN_INVOCATION_BUDGET_SECONDS', '0.012')
+)
+_TUI_STREAM_PAINT_INTERVAL_SECONDS = _bounded_float_env(
+    'GRINTA_TUI_STREAM_PAINT_INTERVAL',
+    default=0.066,
+    minimum=0.008,
+)
+_TUI_SCROLL_PAINT_INTERVAL_SECONDS = _bounded_float_env(
+    'GRINTA_TUI_SCROLL_PAINT_INTERVAL',
+    default=0.10,
+    minimum=0.016,
 )
 _TUI_TERMINAL_DISPLAY_LINE_CAP = _bounded_int_env(
     'GRINTA_TUI_TERMINAL_DISPLAY_LINE_CAP',

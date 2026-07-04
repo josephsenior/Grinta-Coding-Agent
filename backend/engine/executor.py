@@ -132,10 +132,10 @@ class OrchestratorExecutor(
         )
         if response is not None and event_stream is not None:
             from backend.engine.executor_response_helpers import (
-                suppress_cli_for_streamed_final_messages,
+                prepare_streamed_message_actions,
             )
 
-            suppress_cli_for_streamed_final_messages(
+            prepare_streamed_message_actions(
                 actions,
                 streamed_visible_text=self._extract_response_text(response),
             )
@@ -239,12 +239,13 @@ class OrchestratorExecutor(
             self._response_to_actions(response)
         )
         from backend.engine.executor_response_helpers import (
-            suppress_cli_for_streamed_final_messages,
+            prepare_streamed_message_actions,
         )
 
-        suppress_cli_for_streamed_final_messages(
+        prepare_streamed_message_actions(
             actions,
             streamed_visible_text=state.content_accumulate,
+            streamed_thinking_text=state.thinking_accumulate,
         )
         return ExecutionResult(actions, response, execution_time, error_message)
 
