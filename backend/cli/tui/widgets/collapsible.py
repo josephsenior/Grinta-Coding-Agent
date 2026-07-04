@@ -54,6 +54,12 @@ STATUS_ICONS = {
 
 SIDEBAR_BULLET = '●'
 SIDEBAR_BULLET_DIM = '○'
+SIDEBAR_DISABLED_COLOR = '#54597b'
+
+
+def sidebar_disabled_markup(text: str = 'Disabled') -> str:
+    """Muted bullet + label used for disabled LSP/DAP/MCP sidebar states."""
+    return f'[{SIDEBAR_DISABLED_COLOR}]{SIDEBAR_BULLET}[/] [{SIDEBAR_DISABLED_COLOR}]{text}[/]'
 
 
 class SidebarRow(Static):
@@ -263,10 +269,12 @@ class McpServerRow(Horizontal):
         if self._enabled:
             bullet = f'[{STATUS_COLORS["ok"]}]{SIDEBAR_BULLET}[/]'
             label_part = f'[#c8d4e8]{self._label}[/]'
-        else:
-            bullet = f'[#54597b]{SIDEBAR_BULLET_DIM}[/]'
-            label_part = f'[#54597b][strike]{self._label}[/][/]'
-        return f'{bullet} {label_part}'
+            return f'{bullet} {label_part}'
+        return (
+            f'[{SIDEBAR_DISABLED_COLOR}]{SIDEBAR_BULLET}[/] '
+            f'[{SIDEBAR_DISABLED_COLOR}]{self._label}[/] · '
+            f'[{SIDEBAR_DISABLED_COLOR}]Disabled[/]'
+        )
 
     def compose(self) -> ComposeResult:
         yield Static(self._label_markup(), classes='sidebar-row-label', id='row-label')
@@ -545,7 +553,7 @@ class CollapsibleSection(Container):
         )
 
     def _empty_markup(self, text: str) -> str:
-        return f'[#54597b]{SIDEBAR_BULLET}[/] [#54597b]{text}[/]'
+        return sidebar_disabled_markup(text)
 
     def _make_row(self, item: dict[str, Any]) -> SidebarRow | McpServerRow:
         if item.get('toggleable'):
@@ -694,14 +702,26 @@ class CollapsibleSection(Container):
         body.refresh(layout=True)
         self.refresh(layout=True)
 
-    def set_content(self, content: str) -> None:
-        """Update the body content."""
+    def _set_empty_content(self, content: str) -> None:
+        """Replace the body with one empty-state line, reusing ``#empty-text`` when possible."""
         self._content = content
         self._items = []
+        markup = self._empty_markup(content)
         body = self.query_one('#body', Vertical)
-        body.remove_children()
-        body.mount(Static(self._empty_markup(content), id='empty-text'))
+        try:
+            empty = body.query_one('#empty-text', Static)
+            for child in list(body.children):
+                if child is not empty:
+                    child.remove()
+            empty.update(markup)
+        except Exception:
+            body.remove_children()
+            body.mount(Static(markup, id='empty-text'))
         self._refresh_body_layout()
+
+    def set_content(self, content: str) -> None:
+        """Update the body content."""
+        self._set_empty_content(content)
 
     def set_title(self, title: str) -> None:
         """Update the section title."""
@@ -776,9 +796,8 @@ class CollapsibleSection(Container):
                 )
             body.mount(*mounts)
         else:
-            body.mount(
-                Static(self._empty_markup(self._content or 'No items'), id='empty-text')
-            )
+            self._set_empty_content(self._content or 'No items')
+            return
         self._refresh_body_layout()
 
     def expand(self) -> None:

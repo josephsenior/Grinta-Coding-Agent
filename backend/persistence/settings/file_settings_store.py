@@ -14,7 +14,6 @@ from pydantic import SecretStr
 from backend.core.app_paths import get_app_settings_root
 from backend.core.config.dotenv_keys import persist_llm_api_key_to_dotenv
 from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER, SETTINGS_CACHE_TTL
-from backend.core.pydantic_compat import model_dump_with_options
 from backend.persistence import get_file_store
 from backend.persistence.data_models.settings import Settings
 from backend.persistence.settings.settings_store import SettingsStore
@@ -87,8 +86,7 @@ class FileSettingsStore(SettingsStore):
         # Persist LLM connectivity plus MCP overrides. Grinta still supplies defaults;
         # merged MCP from GET is optional to save, but when the user edits MCP in the
         # UI we must not drop it on the next LLM-only save (merge happens before store).
-        minimal = model_dump_with_options(
-            settings,
+        minimal = settings.model_dump(
             context={'expose_secrets': True},
             include={'llm_model', 'llm_api_key', 'llm_base_url', 'mcp_config'},
             exclude_none=False,

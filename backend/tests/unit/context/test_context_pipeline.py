@@ -9,31 +9,20 @@ import pytest
 
 from backend.context.compactor.compactor import Compaction
 from backend.context.context_budget import ContextBudget
-from backend.context.context_pipeline import (
-    ContextPipeline,
-    _shrink_tail_for_token_reduction,
-    apply_ineffective_compaction_backoff,
-)
+from backend.context.context_pipeline import ContextPipeline
 from backend.context.context_pipeline.compaction import (
     mark_just_compacted,
     passes_effectiveness_gate,
-    record_autocompact_failure,
     record_boundary_compact,
     resolve_continuity_or_fallback,
     should_skip_compaction,
 )
 from backend.context.context_pipeline.helpers import is_prewarm_stale
 from backend.context.context_pipeline.types import (
-    _AUTOCOMPACT_FAILURE_STREAK_KEY,
-    _MAX_AUTOCOMPACT_FAILURES,
     _WILL_RETRIGGER_HYSTERESIS_KEY,
     _ContinuityGateDecision,
 )
 from backend.core.config.compactor_config import ContextPipelineConfig
-from backend.core.constants import (
-    DEFAULT_COMPACT_MIN_TOKEN_REDUCTION,
-    DEFAULT_INEFFECTIVE_COMPACT_SKIP_EVENTS,
-)
 from backend.ledger.action.agent import CondensationAction
 from backend.ledger.action.message import MessageAction
 from backend.ledger.event import EventSource
@@ -75,7 +64,7 @@ def _cmd_output(text: str, event_id: int) -> CmdOutputObservation:
 def pipeline() -> ContextPipeline:
     return ContextPipeline(
         llm_registry=MagicMock(),
-        config=ContextPipelineConfig(allow_llm_hot_path=False),
+        config=ContextPipelineConfig(),
     )
 
 
@@ -118,13 +107,18 @@ async def test_prepare_step_skips_compaction_under_threshold(pipeline):
 
 
 @pytest.mark.asyncio
-async def test_prepare_step_commits_degraded_boundary_when_over_threshold(pipeline):
+async def test_prepare_step_commits_llm_compaction_when_over_threshold(pipeline):
     events = [_user('run pytest', 1)]
     for i in range(2, 402):
         events.append(_cmd_output(f'output line {i}\n' * 20, i))
     state = _make_state(events)
     llm_config = SimpleNamespace(max_input_tokens=8_000, model='test-model')
     state.agent = SimpleNamespace(llm=SimpleNamespace(config=llm_config))
+    llm_action = CondensationAction(
+        pruned_event_ids=list(range(2, 182)),
+        summary='LLM compaction summary ' * 50,
+        summary_offset=0,
+    )
     with (
         patch(
             'backend.context.context_pipeline.session_memory_exists',
@@ -134,12 +128,16 @@ async def test_prepare_step_commits_degraded_boundary_when_over_threshold(pipeli
         patch('backend.context.context_pipeline.delete_staging_snapshot'),
         patch('backend.context.context_pipeline.maybe_update'),
         patch.object(pipeline, '_llm_config', return_value=llm_config),
+        patch.object(
+            pipeline._compaction_engine,
+            'run',
+            new=AsyncMock(return_value=llm_action),
+        ),
     ):
         result = await pipeline.prepare_step(state)
     assert result.pending_action is not None
     assert isinstance(result.pending_action, CondensationAction)
     assert result.pending_action.summary
-    assert len(result.pending_action.pruned) >= 20
     assert result.events == []
 
 
@@ -159,10 +157,6 @@ async def test_prepare_step_uses_prewarmed_compaction(pipeline):
     with (
         patch('backend.context.context_pipeline.finalize_compaction_artifacts'),
         patch('backend.context.context_pipeline.maybe_update'),
-        patch(
-            'backend.context.context_pipeline.pipeline.passes_effectiveness_gate',
-            return_value=True,
-        ),
         patch(
             'backend.context.context_pipeline.pipeline.resolve_continuity_or_fallback',
             return_value=action,
@@ -191,10 +185,6 @@ async def test_prepare_step_accepts_prewarmed_compaction_despite_continuity_issu
         patch('backend.context.context_pipeline.finalize_compaction_artifacts'),
         patch('backend.context.context_pipeline.delete_staging_snapshot'),
         patch('backend.context.context_pipeline.maybe_update'),
-        patch(
-            'backend.context.context_pipeline.pipeline.passes_effectiveness_gate',
-            return_value=True,
-        ),
     ):
         result = await pipeline.prepare_step(state)
 
@@ -202,65 +192,6 @@ async def test_prepare_step_accepts_prewarmed_compaction_despite_continuity_issu
     assert result.pending_action.summary == action.summary
     assert len(result.events) < len(events)
 
-
-@pytest.mark.asyncio
-async def test_prepare_step_rejects_micro_prune_and_respects_cooldown(pipeline):
-    """Ineffective 4-event prunes must not commit; cooldown blocks rapid re-compaction."""
-    events = [_user('fix tests', 1)]
-    for i in range(2, 52):
-        events.append(_cmd_output(f'small {i}', i))
-    state = _make_state(events)
-    llm_config = SimpleNamespace(max_input_tokens=200_000, model='test-model')
-    state.agent = SimpleNamespace(llm=SimpleNamespace(config=llm_config))
-
-    with (
-        patch(
-            'backend.context.context_pipeline.compaction._select_compaction_tail',
-            return_value=events[-47:],
-        ),
-        patch(
-            'backend.context.context_pipeline.compaction._shrink_tail_for_token_reduction',
-            side_effect=lambda _events, tail, **kwargs: tail,
-        ),
-        patch(
-            'backend.context.context_pipeline.finalize_compaction_artifacts'
-        ) as mock_finalize,
-        patch('backend.context.context_pipeline.delete_staging_snapshot'),
-        patch('backend.context.context_pipeline.maybe_update'),
-    ):
-        with patch.object(pipeline, '_llm_config', return_value=llm_config):
-            with patch(
-                'backend.context.context_pipeline.ContextBudget.from_events',
-                return_value=SimpleNamespace(
-                    should_autocompact=True,
-                    estimated_tokens=190_000,
-                    autocompact_threshold=180_000,
-                    effective_window=200_000,
-                    fixed_prompt_reserve_tokens=500,
-                    reserved_summary_tokens=100,
-                ),
-            ):
-                first = await pipeline.prepare_step(state)
-        assert first.pending_action is None
-        mock_finalize.assert_not_called()
-
-        state.extra_data['context_pipeline_state'] = {
-            'last_boundary_compact_at': __import__('time').time(),
-        }
-        with patch.object(pipeline, '_llm_config', return_value=llm_config):
-            with patch(
-                'backend.context.context_pipeline.ContextBudget.from_events',
-                return_value=SimpleNamespace(
-                    should_autocompact=True,
-                    estimated_tokens=190_000,
-                    autocompact_threshold=180_000,
-                    effective_window=200_000,
-                    fixed_prompt_reserve_tokens=500,
-                    reserved_summary_tokens=100,
-                ),
-            ):
-                second = await pipeline.prepare_step(state)
-        assert second.pending_action is None
 
 
 def test_structured_compactor_preserves_50_raw_events():
@@ -314,7 +245,7 @@ async def test_run_compaction_uses_llm_structured_compaction_when_available():
 
 
 @pytest.mark.asyncio
-async def test_run_compaction_falls_back_to_degraded_when_llm_exhausted():
+async def test_run_compaction_returns_none_when_llm_exhausted():
     from backend.context.context_pipeline.types import _MAX_LLM_COMPACTION_ATTEMPTS
 
     events = [_user('fix context', 1)]
@@ -323,12 +254,7 @@ async def test_run_compaction_falls_back_to_degraded_when_llm_exhausted():
     state = _make_state(events)
     pipeline = ContextPipeline(
         llm_registry=MagicMock(),
-        config=ContextPipelineConfig(allow_llm_hot_path=True),
-    )
-    degraded_action = CondensationAction(
-        pruned_event_ids=list(range(2, 60)),
-        summary='recovery summary',
-        summary_offset=0,
+        config=ContextPipelineConfig(),
     )
     budget = SimpleNamespace(
         should_autocompact=True,
@@ -337,18 +263,11 @@ async def test_run_compaction_falls_back_to_degraded_when_llm_exhausted():
         fixed_prompt_reserve_tokens=0,
     )
 
-    with (
-        patch.object(
-            pipeline._compaction_engine,
-            '_llm_structured_compaction',
-            new=AsyncMock(return_value=None),
-        ) as mock_llm,
-        patch.object(
-            pipeline._compaction_engine,
-            '_degraded_compaction',
-            return_value=degraded_action,
-        ) as mock_degraded,
-    ):
+    with patch.object(
+        pipeline._compaction_engine,
+        '_llm_structured_compaction',
+        new=AsyncMock(return_value=None),
+    ) as mock_llm:
         action = await pipeline._compaction_engine.run(
             state,
             events,
@@ -359,9 +278,8 @@ async def test_run_compaction_falls_back_to_degraded_when_llm_exhausted():
             critical=False,
         )
 
-    assert action is degraded_action
+    assert action is None
     assert mock_llm.await_count == _MAX_LLM_COMPACTION_ATTEMPTS
-    mock_degraded.assert_called_once()
 
 
 def test_build_prompt_events_injects_context_packet(pipeline):
@@ -414,150 +332,30 @@ def test_build_prompt_events_injects_context_packet_on_fresh_session(
     )
 
 
-def test_passes_effectiveness_gate_uses_full_post_boundary_estimate() -> None:
-    """Pruning old events must count even when API token cache is stale."""
+def test_passes_effectiveness_gate_accepts_nonempty_llm_summary() -> None:
     events = [_user('goal', 1)]
-    for event_id in range(2, 80):
-        events.append(_cmd_output('x' * 400, event_id))
-    state = _make_state(
-        events,
-        extra={
-            'prompt_token_accounting': {
-                'static_prompt_tokens': 20_000,
-                'tool_schema_tokens': 10_000,
-                'context_packet_tokens': 500,
-                'dynamic_history_tokens': 90_000,
-            }
-        },
-    )
-    state.metrics = MagicMock(
-        token_usages=[MagicMock(prompt_tokens=120_000, total_tokens=125_000)]
-    )
-    llm_config = SimpleNamespace(model='gpt-test', max_input_tokens=200_000)
-    budget = ContextBudget.from_events(events, llm_config=llm_config, state=state)
+    state = _make_state(events)
+    budget = SimpleNamespace(estimated_tokens=100_000)
     action = CondensationAction(
-        pruned_event_ids=list(range(2, 60)),
+        pruned_event_ids=[],
         summary='Condensed earlier tool output and file work.',
         summary_offset=0,
     )
 
-    assert passes_effectiveness_gate(events, events, action, budget, state, llm_config)
+    assert passes_effectiveness_gate(events, events, action, budget, state, None)
 
 
-def test_note_llm_step_does_not_clear_ineffective_compaction_backoff(pipeline):
-    events = [_user('fix tests', 1), _cmd_output('ok', 2)]
+def test_passes_effectiveness_gate_rejects_empty_summary() -> None:
+    events = [_user('goal', 1)]
     state = _make_state(events)
-    apply_ineffective_compaction_backoff(state)
-    pipe = state.extra_data['context_pipeline_state']
-    skip_until = pipe['skip_compaction_until_event_id']
-    streak = pipe['ineffective_compact_streak']
-
-    pipeline.note_llm_step(state)
-
-    after = state.extra_data['context_pipeline_state']
-    assert after['skip_compaction_until_event_id'] == skip_until
-    assert after['ineffective_compact_streak'] == streak
-    assert after['consecutive_condensation_steps'] == 0
-
-
-def test_ineffective_compaction_backoff_blocks_until_event_threshold(pipeline):
-    events = [_user('fix tests', 1)]
-    for i in range(2, 12):
-        events.append(_cmd_output(f'line {i}', i))
-    state = _make_state(events)
-    latest_id = events[-1].id
-    apply_ineffective_compaction_backoff(state)
-    skip_until = state.extra_data['context_pipeline_state'][
-        'skip_compaction_until_event_id'
-    ]
-    assert skip_until == latest_id + DEFAULT_INEFFECTIVE_COMPACT_SKIP_EVENTS
-    assert (
-        should_skip_compaction(state, pipeline._boundary_compact_cooldown, force=False)
-        is True
-    )
-
-    # Still blocked before threshold.
-    state.history.append(_cmd_output('mid', skip_until - 1))
-    assert (
-        should_skip_compaction(state, pipeline._boundary_compact_cooldown, force=False)
-        is True
-    )
-
-    # Unblocked once latest id reaches skip_until (and time backoff expired).
-    state.history.append(_cmd_output('past threshold', skip_until))
-    pipe = state.extra_data['context_pipeline_state']
-    pipe['ineffective_compact_until'] = 0
-    state.extra_data['context_pipeline_state'] = pipe
-    assert (
-        should_skip_compaction(state, pipeline._boundary_compact_cooldown, force=False)
-        is False
-    )
-
-
-def test_ineffective_compaction_backoff_escalates_streak(pipeline):
-    events = [_user('fix tests', 1)]
-    state = _make_state(events)
-    apply_ineffective_compaction_backoff(state)
-    first = state.extra_data['context_pipeline_state']['skip_compaction_until_event_id']
-    apply_ineffective_compaction_backoff(state)
-    second = state.extra_data['context_pipeline_state'][
-        'skip_compaction_until_event_id'
-    ]
-    assert second > first
-
-
-def test_shrink_tail_for_token_reduction_drops_oldest_events():
-    events = [_user('task', 1)]
-    for i in range(2, 52):
-        events.append(_cmd_output(f'line {i}', i))
-    llm_config = SimpleNamespace(max_input_tokens=200_000, model='test-model')
-    state = _make_state(events)
-    budget = SimpleNamespace(estimated_tokens=200_000)
-    tail = list(events[-25:])
-    summary = 'summary'
-
-    reductions = [2_000, 4_000, 6_000, 12_000]
-    calls: list[int] = []
-
-    def fake_reduction(*_args, **_kwargs) -> int:
-        value = reductions[min(len(calls), len(reductions) - 1)]
-        calls.append(value)
-        return value
-
-    with patch(
-        'backend.context.context_pipeline.helpers._projected_compaction_token_reduction',
-        side_effect=fake_reduction,
-    ):
-        shrunk = _shrink_tail_for_token_reduction(
-            events,
-            tail,
-            history=events,
-            budget=budget,
-            state=state,
-            llm_config=llm_config,
-            summary=summary,
-        )
-
-    assert len(shrunk) < len(tail)
-    assert calls[-1] >= DEFAULT_COMPACT_MIN_TOKEN_REDUCTION
-    assert len(calls) >= 3
-
-
-def test_successful_boundary_compact_clears_ineffective_backoff(pipeline):
-    events = [_user('fix tests', 1), _cmd_output('ok', 2)]
-    state = _make_state(events)
-    apply_ineffective_compaction_backoff(state)
+    budget = SimpleNamespace(estimated_tokens=100_000)
     action = CondensationAction(
-        pruned_event_ids=[1],
-        summary='summary',
+        pruned_event_ids=list(range(2, 60)),
+        summary='',
         summary_offset=0,
     )
-    record_boundary_compact(state, events, action)
-    pipe = state.extra_data['context_pipeline_state']
-    assert 'skip_compaction_until_event_id' not in pipe
-    assert 'ineffective_compact_streak' not in pipe
-    assert 'ineffective_compact_until' not in pipe
-    assert 'last_boundary_compact_at' in pipe
+
+    assert not passes_effectiveness_gate(events, events, action, budget, state, None)
 
 
 def test_resolve_continuity_or_fallback_logs_without_crash_on_canonical_failure():
@@ -691,10 +489,6 @@ async def test_prepare_step_never_compacts_twice_before_llm_step(pipeline):
         patch('backend.context.context_pipeline.finalize_compaction_artifacts'),
         patch('backend.context.context_pipeline.maybe_update'),
         patch(
-            'backend.context.context_pipeline.pipeline.passes_effectiveness_gate',
-            return_value=True,
-        ),
-        patch(
             'backend.context.context_pipeline.pipeline.resolve_continuity_or_fallback',
             side_effect=lambda _s, _h, _e, action, *_a, **_k: action,
         ),
@@ -715,7 +509,7 @@ async def test_prepare_step_never_compacts_twice_before_llm_step(pipeline):
     run_mock.assert_awaited_once()
 
 
-def test_will_retrigger_hysteresis_is_telemetry_only_not_skip_gate(pipeline):
+def test_will_retrigger_hysteresis_is_telemetry_only(pipeline):
     events = [_user('task', 1), _cmd_output('ok', 2)]
     state = _make_state(events)
     action = CondensationAction(
@@ -734,59 +528,33 @@ def test_will_retrigger_hysteresis_is_telemetry_only_not_skip_gate(pipeline):
         )
     pipe = state.extra_data['context_pipeline_state']
     assert pipe.get(_WILL_RETRIGGER_HYSTERESIS_KEY) is True
-    # Cooldown from record_post_compact_baseline is unrelated to hysteresis telemetry.
-    pipe['last_boundary_compact_at'] = 0
-    state.extra_data['context_pipeline_state'] = pipe
+    unchanged = SimpleNamespace(estimated_tokens=50_000)
+    grown = SimpleNamespace(estimated_tokens=55_000)
     assert (
-        should_skip_compaction(state, pipeline._boundary_compact_cooldown, force=True)
+        should_skip_compaction(
+            state,
+            pipeline._boundary_compact_cooldown,
+            force=True,
+            budget=unchanged,
+        )
         is False
     )
     assert (
-        should_skip_compaction(state, pipeline._boundary_compact_cooldown, force=False)
-        is False
-    )
-
-
-def test_autocompact_circuit_breaker_blocks_skip_gate(pipeline):
-    events = [_user('task', 1)]
-    state = _make_state(events)
-    for _ in range(_MAX_AUTOCOMPACT_FAILURES):
-        record_autocompact_failure(state)
-    assert (
-        should_skip_compaction(state, pipeline._boundary_compact_cooldown, force=False)
+        should_skip_compaction(
+            state,
+            pipeline._boundary_compact_cooldown,
+            force=False,
+            budget=unchanged,
+        )
         is True
     )
-
-
-@pytest.mark.asyncio
-async def test_ineffective_compact_does_not_loop_more_than_circuit_breaker(pipeline):
-    events = [_user('run pytest', 1)]
-    for i in range(2, 60):
-        events.append(_cmd_output(f'output {i}', i))
-    state = _make_state(events)
-    llm_config = SimpleNamespace(max_input_tokens=8_000, model='test-model')
-    pipeline._llm_config = MagicMock(return_value=llm_config)  # type: ignore[method-assign]
-
-    with (
-        patch('backend.context.context_pipeline.pipeline.ContextBudget') as mock_budget,
-        patch.object(
-            pipeline._compaction_engine,
-            'run',
-            new=AsyncMock(return_value=None),
-        ) as run_mock,
-        patch('backend.context.context_pipeline.maybe_update'),
-    ):
-        mock_budget.from_events.return_value = SimpleNamespace(
-            should_autocompact=True,
-            estimated_tokens=90_000,
-            autocompact_threshold=70_000,
-            effective_window=100_000,
-            fixed_prompt_reserve_tokens=500,
-            reserved_summary_tokens=100,
+    assert (
+        should_skip_compaction(
+            state,
+            pipeline._boundary_compact_cooldown,
+            force=False,
+            budget=grown,
         )
-        for _ in range(_MAX_AUTOCOMPACT_FAILURES + 1):
-            await pipeline.prepare_step(state)
+        is False
+    )
 
-    assert run_mock.await_count == _MAX_AUTOCOMPACT_FAILURES
-    pipe = state.extra_data['context_pipeline_state']
-    assert pipe[_AUTOCOMPACT_FAILURE_STREAK_KEY] >= _MAX_AUTOCOMPACT_FAILURES

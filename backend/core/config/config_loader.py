@@ -129,6 +129,8 @@ _JSON_TOP_LEVEL_KEYS = frozenset(
         'save_trajectory_path',
         'log_level',
         'mcp_config',
+        'lsp_config',
+        'dap_config',
         'agent',
         'security',
         'cli_tool_icons',
@@ -424,24 +426,61 @@ def _apply_json_mcp_servers(cfg: AppConfig, data: dict[str, object]) -> None:
     if not isinstance(mcp_config, dict):
         return
 
+    if 'enabled' in mcp_config:
+        cfg.mcp.enabled = bool(mcp_config.get('enabled'))
+
     raw_servers = mcp_config.get('servers') or []
     parsed = [
         server for entry in raw_servers if (server := _parse_mcp_server_entry(entry))
     ]
-    if not parsed:
-        return
+    if parsed:
+        by_name = {server.name: server for server in cfg.mcp.servers}
+        for server in parsed:
+            by_name[server.name] = server
+        cfg.mcp.servers = list(by_name.values())
+        if 'enabled' not in mcp_config:
+            cfg.mcp.enabled = True
 
-    existing_names = {server.name for server in cfg.mcp.servers}
-    cfg.mcp.servers = list(cfg.mcp.servers) + [
-        server for server in parsed if server.name not in existing_names
-    ]
-    cfg.mcp.enabled = True
+
+def _apply_agent_enable_flag(
+    cfg: AppConfig, agent_name: str, field: str, value: bool
+) -> None:
+    from backend.core.config.agent_config import AgentConfig
+
+    agent_base = cfg.get_agent_config(agent_name)
+    merged = {**agent_base.model_dump(), field: bool(value)}
+    cfg.agents[agent_name] = AgentConfig(**merged)
+
+
+def _apply_json_tool_integration_config(cfg: AppConfig, data: dict[str, object]) -> None:
+    """Map top-level ``lsp_config`` / ``dap_config`` onto the default agent."""
+    from backend.core.constants import DEFAULT_AGENT_NAME
+
+    lsp_config = data.get('lsp_config')
+    if isinstance(lsp_config, dict) and 'enabled' in lsp_config:
+        _apply_agent_enable_flag(
+            cfg,
+            DEFAULT_AGENT_NAME,
+            'enable_lsp_query',
+            bool(lsp_config.get('enabled')),
+        )
+
+    dap_config = data.get('dap_config')
+    if isinstance(dap_config, dict) and 'enabled' in dap_config:
+        _apply_agent_enable_flag(
+            cfg,
+            DEFAULT_AGENT_NAME,
+            'enable_debugger',
+            bool(dap_config.get('enabled')),
+        )
 
 
 def _filter_agent_updates(raw_updates: object) -> dict[str, object] | None:
     if not isinstance(raw_updates, dict):
         return None
-    allowed_fields = set(AgentConfig.model_fields)
+    from backend.core.config.tool_integration_defaults import LEGACY_AGENT_TOOL_KEYS
+
+    allowed_fields = set(AgentConfig.model_fields) - LEGACY_AGENT_TOOL_KEYS
     filtered = {
         key: value for key, value in raw_updates.items() if key in allowed_fields
     }
@@ -503,6 +542,16 @@ def _apply_json_security_config(cfg: AppConfig, data: dict[str, object]) -> None
 # ---------------------------------------------------------------------------
 
 
+def load_mcp_config_from_json(json_file: str | pathlib.Path) -> MCPConfig:
+    """Load and finalize MCP settings from a specific ``settings.json`` path."""
+    from backend.core.config.mcp_config import MCPConfig
+
+    cfg = AppConfig()
+    load_from_json(cfg, str(json_file))
+    finalize_config(cfg)
+    return cfg.mcp
+
+
 def load_from_json(cfg: AppConfig, json_file: str = 'settings.json') -> None:
     """Load the config from the flat settings.json file."""
     strict_config = os.getenv('APP_STRICT_CONFIG', 'false').lower() in (
@@ -525,6 +574,7 @@ def load_from_json(cfg: AppConfig, json_file: str = 'settings.json') -> None:
         _apply_json_top_level_fields(cfg, data)
         _apply_json_mcp_servers(cfg, data)
         _apply_json_agent_overrides(cfg, data, json_file)
+        _apply_json_tool_integration_config(cfg, data)
         _apply_json_security_config(cfg, data)
 
     finally:
@@ -562,10 +612,7 @@ def _get_active_agent_config(cfg: AppConfig) -> AgentConfig:
 
 
 def _ensure_active_agent_compactor_llm(cfg: AppConfig) -> None:
-    from backend.core.config.compactor_config import (
-        AutoCompactorConfig,
-        ContextPipelineConfig,
-    )
+    from backend.core.config.compactor_config import ContextPipelineConfig
 
     agent_config = _get_active_agent_config(cfg)
     compactor_config = getattr(agent_config, 'compactor_config', None)
@@ -576,7 +623,7 @@ def _ensure_active_agent_compactor_llm(cfg: AppConfig) -> None:
         )
         return
     if (
-        isinstance(compactor_config, (AutoCompactorConfig, ContextPipelineConfig))
+        isinstance(compactor_config, ContextPipelineConfig)
         and compactor_config.llm_config is None
     ):
         agent_config.compactor_config = compactor_config.model_copy(

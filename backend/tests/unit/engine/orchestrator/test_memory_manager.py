@@ -12,7 +12,6 @@ from backend.engine.memory_manager import (
     CondensedHistory,
     ContextMemoryManager,
 )
-from backend.ledger.action.agent import CondensationAction
 from backend.ledger.event import Event
 
 # ---------------------------------------------------------------------------
@@ -96,9 +95,9 @@ class TestContextMemoryManagerInit:
         m = _make_manager()
         assert m.conversation_memory is None
 
-    def test_compactor_none_initially(self):
+    def test_pipeline_none_initially(self):
         m = _make_manager()
-        assert m.compactor is None
+        assert m._pipeline is None
 
     def test_config_and_registry_stored(self):
         cfg = _make_config()
@@ -124,30 +123,22 @@ class TestShouldEmitCompactionStatus:
         )
         return state
 
-    def test_false_without_compactor(self):
+    def test_false_without_pipeline(self):
         m = _make_manager()
         assert m.should_emit_compaction_status(self._make_state()) is False
 
-    def test_true_for_explicit_request(self):
+    def test_delegates_to_pipeline(self):
         m = _make_manager()
-        m.compactor = MagicMock()
-        state = self._make_state()
-        state.view.unhandled_condensation_request = True
-
-        assert m.should_emit_compaction_status(state) is True
-
-    def test_delegates_to_compactor_predictor(self):
-        m = _make_manager()
-        predictor = MagicMock(return_value=True)
-        m.compactor = MagicMock(should_emit_compaction_status=predictor)
+        pipeline = MagicMock(should_emit_compaction_status=MagicMock(return_value=True))
+        m._pipeline = pipeline
         state = self._make_state()
 
         assert m.should_emit_compaction_status(state) is True
-        predictor.assert_called_once_with(state.view)
+        pipeline.should_emit_compaction_status.assert_called_once_with(state)
 
 
 # ---------------------------------------------------------------------------
-# initialize and _init_compactor
+# initialize
 # ---------------------------------------------------------------------------
 
 
@@ -160,25 +151,19 @@ class TestInitialize:
             m.initialize(pm)
         assert m.conversation_memory is not None
 
-    def test_initialize_no_compactor_config_leaves_compactor_none(self):
-        m = _make_manager(compactor_config=None)
+    def test_initialize_creates_pipeline(self):
+        m = _make_manager(compactor_config=MagicMock())
         pm = MagicMock()
-        with patch('backend.engine.memory_manager.ContextMemory'):
-            m.initialize(pm)
-        assert m.compactor is None
-
-    def test_initialize_with_compactor_config_creates_compactor(self):
-        compactor_config = MagicMock()
-        m = _make_manager(compactor_config=compactor_config)
-        pm = MagicMock()
-        fake_compactor = MagicMock()
+        fake_pipeline = MagicMock()
         with (
             patch('backend.engine.memory_manager.ContextMemory'),
-            patch('backend.engine.memory_manager.Compactor') as MockCompactor,
+            patch(
+                'backend.context.context_pipeline.ContextPipeline.from_config',
+                return_value=fake_pipeline,
+            ),
         ):
-            MockCompactor.from_config.return_value = fake_compactor
             m.initialize(pm)
-        assert m.compactor is fake_compactor
+        assert m._pipeline is fake_pipeline
 
     def test_initialize_context_pipeline_binds_registry_default_llm(self):
         from backend.core.config.agent_config import AgentConfig
@@ -224,7 +209,7 @@ class TestCondenseHistory:
         state.view = MagicMock(unhandled_condensation_request=False)
         return state
 
-    async def test_no_compactor_returns_all_history(self):
+    async def test_no_pipeline_returns_all_history(self):
         m = _make_manager()
         events = [MagicMock(), MagicMock()]
         state = self._make_state_with_history(events)
@@ -233,198 +218,17 @@ class TestCondenseHistory:
         assert result.events == events
         assert result.pending_action is None
 
-    async def test_compactor_view_result_returns_view_events(self):
+    async def test_delegates_to_pipeline(self):
         m = _make_manager()
-        from backend.context.view import View
-
-        mock_compactor = MagicMock()
-        view = MagicMock(spec=View)
-        view.events = cast(list[Event], [MagicMock(), MagicMock()])
-        mock_compactor.compacted_history = AsyncMock(return_value=view)
-        m.compactor = mock_compactor
-
+        expected = CondensedHistory(events=[MagicMock()], pending_action=None)
+        pipeline = MagicMock(prepare_step=AsyncMock(return_value=expected))
+        m._pipeline = pipeline
         state = self._make_state_with_history()
-        result = await m.condense_history(state)
-        assert result.events == view.events
-        assert result.pending_action is None
-
-    async def test_stale_prewarm_is_discarded_and_recomputed(self):
-        m = _make_manager()
-        from backend.context.view import View
-
-        prewarmed_view = MagicMock(spec=View)
-        prewarmed_view.events = [MagicMock(name='prewarmed')]
-        fresh_view = MagicMock(spec=View)
-        fresh_view.events = [MagicMock(name='fresh')]
-        mock_compactor = MagicMock()
-        mock_compactor.compacted_history = AsyncMock(return_value=fresh_view)
-        m.compactor = mock_compactor
-
-        latest = MagicMock()
-        latest.id = 99
-        state = self._make_state_with_history([MagicMock(), latest])
-        state.turn_signals.prewarmed_compaction = prewarmed_view
-        state.turn_signals.prewarm_history_len = 1
-        state.turn_signals.prewarm_latest_event_id = 50
 
         result = await m.condense_history(state)
 
-        mock_compactor.compacted_history.assert_awaited_once_with(state)
-        assert result.events == fresh_view.events
-        assert state.turn_signals.prewarmed_compaction is None
-
-    async def test_fresh_prewarm_is_used_without_recompute(self):
-        m = _make_manager()
-        from backend.context.view import View
-
-        prewarmed_view = MagicMock(spec=View)
-        prewarmed_view.events = [MagicMock(name='prewarmed')]
-        mock_compactor = MagicMock()
-        mock_compactor.compacted_history = AsyncMock()
-        m.compactor = mock_compactor
-
-        latest = MagicMock()
-        latest.id = 42
-        state = self._make_state_with_history([MagicMock(), latest])
-        state.turn_signals.prewarmed_compaction = prewarmed_view
-        state.turn_signals.prewarm_history_len = 2
-        state.turn_signals.prewarm_latest_event_id = 42
-
-        result = await m.condense_history(state)
-
-        mock_compactor.compacted_history.assert_not_awaited()
-        assert result.events == prewarmed_view.events
-
-    async def test_compactor_non_view_result_returns_action(self):
-        m = _make_manager()
-
-        mock_compactor = MagicMock()
-        condensation = MagicMock()
-        # Not a View instance → will reach the else branch
-        cast(Any, condensation).__class__ = object  # NOT a View
-        condensation.action = MagicMock(name='action')
-        mock_compactor.compacted_history = AsyncMock(return_value=condensation)
-        m.compactor = mock_compactor
-
-        state = self._make_state_with_history()
-        result = await m.condense_history(state)
-        assert result.events == []
-        assert result.pending_action is condensation.action
-
-    async def test_memory_pressure_not_set_skips_forced_condensation(self):
-        m = _make_manager()
-        from backend.context.view import View
-
-        mock_compactor = MagicMock()
-        view = MagicMock(spec=View)
-        view.events = []
-        mock_compactor.compacted_history = AsyncMock(return_value=view)
-        m.compactor = mock_compactor
-
-        state = self._make_state_with_history()
-        state.extra_data = {}  # no memory_pressure key
-        result = await m.condense_history(state)
-        assert isinstance(result, CondensedHistory)
-
-    async def test_memory_pressure_cleared_when_compactor_returns_compaction(self):
-        m = _make_manager()
-
-        mock_compactor = MagicMock()
-        condensation = MagicMock()
-        cast(Any, condensation).__class__ = object
-        condensation.action = MagicMock(name='action')
-        mock_compactor.compacted_history = AsyncMock(return_value=condensation)
-        m.compactor = mock_compactor
-
-        state = self._make_state_with_history([MagicMock()])
-        state.turn_signals.memory_pressure = 'CRITICAL'
-
-        result = await m.condense_history(state)
-
-        state.ack_memory_pressure.assert_called_once_with(source='ContextMemoryManager')
-        assert result.pending_action is condensation.action
-
-    async def test_short_history_skips_forced_compaction_under_memory_pressure(self):
-        m = _make_manager()
-        from backend.context.compactor.compactor import RollingCompactor
-        from backend.context.view import View
-
-        fake_view = MagicMock(spec=View)
-        fake_view.events = [MagicMock()]
-
-        fake_compactor = MagicMock(spec=RollingCompactor)
-        fake_compactor.compacted_history = AsyncMock(return_value=fake_view)
-        fake_compactor.get_compaction = AsyncMock(return_value=MagicMock())
-        m.compactor = fake_compactor
-
-        state = self._make_state_with_history([MagicMock() for _ in range(5)])
-        state.turn_signals.memory_pressure = 'CRITICAL'
-
-        result = await m.condense_history(state)
-
-        fake_compactor.get_compaction.assert_not_called()
-        state.ack_memory_pressure.assert_called_once_with(source='ContextMemoryManager')
-        assert result.events == fake_view.events
-
-    async def test_noop_condensation_without_request_returns_history(self):
-        m = _make_manager()
-
-        mock_compactor = MagicMock()
-        condensation = MagicMock()
-        cast(Any, condensation).__class__ = object
-        condensation.action = CondensationAction(pruned_event_ids=[])
-        mock_compactor.compacted_history = AsyncMock(return_value=condensation)
-        m.compactor = mock_compactor
-
-        history = [MagicMock(), MagicMock()]
-        state = self._make_state_with_history(history)
-
-        result = await m.condense_history(state)
-
-        assert result.events == history
-        assert result.pending_action is None
-
-    async def test_noop_condensation_request_is_still_returned(self):
-        m = _make_manager()
-
-        mock_compactor = MagicMock()
-        condensation = MagicMock()
-        cast(Any, condensation).__class__ = object
-        action = CondensationAction(pruned_event_ids=[])
-        condensation.action = action
-        mock_compactor.compacted_history = AsyncMock(return_value=condensation)
-        m.compactor = mock_compactor
-
-        state = self._make_state_with_history([MagicMock()])
-        state.view.unhandled_condensation_request = True
-
-        result = await m.condense_history(state)
-
-        assert result.pending_action is action
-
-    async def test_explicit_request_forces_rolling_compactor(self):
-        m = _make_manager()
-        from backend.context.compactor.compactor import Compaction, RollingCompactor
-        from backend.context.view import View
-
-        fake_view = MagicMock(spec=View)
-        fake_view.events = cast(list[Event], [MagicMock(), MagicMock()])
-        action = CondensationAction(pruned_event_ids=[1])
-        compaction = Compaction(action=action)
-
-        fake_compactor = MagicMock(spec=RollingCompactor)
-        fake_compactor.compacted_history = AsyncMock(return_value=fake_view)
-        fake_compactor.get_compaction = AsyncMock(return_value=compaction)
-        m.compactor = fake_compactor
-
-        state = self._make_state_with_history([MagicMock() for _ in range(5)])
-        state.view.unhandled_condensation_request = True
-
-        result = await m.condense_history(state)
-
-        fake_compactor.get_compaction.assert_awaited_once_with(fake_view)
-        assert result.events == []
-        assert result.pending_action is action
+        pipeline.prepare_step.assert_awaited_once()
+        assert result is expected
 
 
 # ---------------------------------------------------------------------------
@@ -544,6 +348,19 @@ class TestGetInitialUserMessage:
 
 
 class TestBuildMessages:
+    @staticmethod
+    def _attach_pipeline(m: ContextMemoryManager, *, window: int | None = None) -> None:
+        pipeline = MagicMock()
+
+        def _build_prompt_events(condensed, **kwargs):
+            events = list(condensed)
+            if window is not None and len(events) > window:
+                return events[-window:]
+            return events
+
+        pipeline.build_prompt_events = MagicMock(side_effect=_build_prompt_events)
+        m._pipeline = pipeline
+
     def test_raises_runtime_error_if_not_initialized(self):
         m = _make_manager()
         with pytest.raises(RuntimeError, match='not initialized'):
@@ -551,6 +368,7 @@ class TestBuildMessages:
 
     def test_returns_empty_list_when_process_events_returns_empty(self):
         m = _make_manager()
+        self._attach_pipeline(m)
         m.conversation_memory = MagicMock()
         m.conversation_memory.process_events.return_value = []
 
@@ -563,6 +381,7 @@ class TestBuildMessages:
         from backend.ledger.observation import CmdOutputObservation
 
         m = _make_manager()
+        self._attach_pipeline(m, window=8)
         m.conversation_memory = MagicMock()
         m.conversation_memory.process_events.return_value = []
         initial_user = MessageAction(content='start')
@@ -603,6 +422,7 @@ class TestBuildMessages:
         from backend.core.message import Message, TextContent
 
         m = _make_manager()
+        self._attach_pipeline(m)
         tc = TextContent(text='system prompt')
         msg = Message(role='system', content=[tc])
         m.conversation_memory = MagicMock()
@@ -621,6 +441,7 @@ class TestBuildMessages:
         from backend.core.message import Message, TextContent
 
         m = _make_manager()
+        self._attach_pipeline(m)
         system_tc = TextContent(text='sys')
         user_tc = TextContent(text='user msg')
         sys_msg = Message(role='system', content=[system_tc])
@@ -641,6 +462,7 @@ class TestBuildMessages:
         from backend.core.message import Message, TextContent
 
         m = _make_manager()
+        self._attach_pipeline(m)
         system_tc = TextContent(text='sys')
         user_tc = TextContent(text='user msg')
         sys_msg = Message(role='system', content=[system_tc])
@@ -662,6 +484,7 @@ class TestBuildMessages:
         from backend.core.message import Message, TextContent
 
         m = _make_manager()
+        self._attach_pipeline(m)
         tc = TextContent(text='system prompt')
         msg = Message(role='system', content=[tc])
         m.conversation_memory = MagicMock()

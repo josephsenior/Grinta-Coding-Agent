@@ -22,32 +22,16 @@ from backend.context.context_budget import (
     estimate_boundary_event_tokens,
     record_post_compact_baseline,
 )
-from backend.context.context_pipeline.helpers import (
-    _pruned_ids,
-    _select_compaction_tail,
-    _shrink_tail_for_token_reduction,
-    _synthetic_history_after_action,
-)
+from backend.context.context_pipeline.helpers import _synthetic_history_after_action
 from backend.context.context_pipeline.types import (
-    _AUTOCOMPACT_FAILURE_STREAK_KEY,
     _CONSECUTIVE_CONDENSATION_KEY,
-    _INEFFECTIVE_COMPACT_STREAK_KEY,
-    _INEFFECTIVE_COMPACT_UNTIL_KEY,
     _JUST_COMPACTED_KEY,
-    _LAST_BOUNDARY_COMPACT_KEY,
-    _MAX_AUTOCOMPACT_FAILURES,
     _MAX_LLM_COMPACTION_ATTEMPTS,
     _POST_COMPACT_TRUE_TOKENS_KEY,
-    _SKIP_COMPACTION_UNTIL_KEY,
     _WILL_RETRIGGER_HYSTERESIS_KEY,
     _ContinuityGateDecision,
 )
 from backend.context.continuity_eval import compaction_passes_continuity_gate
-from backend.core.constants import (
-    DEFAULT_COMPACT_MIN_PRUNED_EVENTS,
-    DEFAULT_COMPACT_MIN_TOKEN_REDUCTION,
-    DEFAULT_DEGRADED_COMPACT_TAIL_RATIO,
-)
 from backend.core.logging.logger import app_logger as logger
 from backend.ledger.action.agent import CondensationAction
 from backend.ledger.event import Event
@@ -79,77 +63,39 @@ def should_skip_compaction(
     *,
     force: bool,
     explicit: bool = False,
+    budget: ContextBudget | None = None,
 ) -> bool:
-    """Return True when autocompaction should not run on this prepare_step.
+    """Return True when compaction should not run again yet.
 
-    Primary cycle guard: ``just_compacted`` (cleared on ``note_llm_step``).
-    CRITICAL pressure (``force=True``) may bypass that guard. Explicit
-    ``/compact`` always runs. Retrigger hysteresis and the consecutive
-    condensation counter are telemetry-only — not skip gates.
+    * ``just_compacted`` — same-turn double ``prepare_step`` loop
+    * post-compact snapshot — already compacted at this token level; wait until
+      new events push the estimate above the last committed post-compact count
+
+    Explicit ``/compact`` and CRITICAL memory pressure (``force=True``) bypass
+    both guards.
     """
-    if explicit:
+    _ = boundary_compact_cooldown
+    if explicit or force:
         return False
 
     pipe = _pipeline_state(state)
-
-    if pipe.get(_JUST_COMPACTED_KEY) and not force:
+    if bool(pipe.get(_JUST_COMPACTED_KEY)):
         return True
 
-    if _autocompact_circuit_open(pipe):
-        return True
-
-    last = pipe.get(_LAST_BOUNDARY_COMPACT_KEY)
-    if isinstance(last, (int, float)):
-        if (time.time() - last) < boundary_compact_cooldown:
-            return True
-    skip_until = pipe.get(_SKIP_COMPACTION_UNTIL_KEY)
-    if isinstance(skip_until, int):
-        history = list(getattr(state, 'history', []))
-        latest_id = getattr(history[-1], 'id', None) if history else None
-        if isinstance(latest_id, int) and latest_id < skip_until:
-            return True
-    ineffective_until = pipe.get(_INEFFECTIVE_COMPACT_UNTIL_KEY)
-    if isinstance(ineffective_until, (int, float)) and time.time() < ineffective_until:
+    post_compact = pipe.get(_POST_COMPACT_TRUE_TOKENS_KEY)
+    if (
+        budget is not None
+        and isinstance(post_compact, int)
+        and post_compact > 0
+        and budget.estimated_tokens <= post_compact
+    ):
         return True
     return False
-
-
-def _autocompact_circuit_open(pipe: dict[str, Any]) -> bool:
-    streak = pipe.get(_AUTOCOMPACT_FAILURE_STREAK_KEY, 0)
-    return isinstance(streak, int) and streak >= _MAX_AUTOCOMPACT_FAILURES
-
-
-def record_autocompact_failure(state: State) -> None:
-    pipe = _pipeline_state(state)
-    streak = pipe.get(_AUTOCOMPACT_FAILURE_STREAK_KEY, 0)
-    if not isinstance(streak, int):
-        streak = 0
-    pipe[_AUTOCOMPACT_FAILURE_STREAK_KEY] = streak + 1
-    _set_pipeline_state(state, pipe)
-    logger.warning(
-        'Autocompact failure streak=%d/%d',
-        pipe[_AUTOCOMPACT_FAILURE_STREAK_KEY],
-        _MAX_AUTOCOMPACT_FAILURES,
-    )
-
-
-def clear_autocompact_failure(state: State) -> None:
-    pipe = _pipeline_state(state)
-    pipe.pop(_AUTOCOMPACT_FAILURE_STREAK_KEY, None)
-    _set_pipeline_state(state, pipe)
 
 
 def mark_just_compacted(state: State) -> None:
     pipe = _pipeline_state(state)
     pipe[_JUST_COMPACTED_KEY] = True
-    _set_pipeline_state(state, pipe)
-
-
-def clear_ineffective_compaction_backoff(state: State) -> None:
-    pipe = _pipeline_state(state)
-    pipe.pop(_SKIP_COMPACTION_UNTIL_KEY, None)
-    pipe.pop(_INEFFECTIVE_COMPACT_STREAK_KEY, None)
-    pipe.pop(_INEFFECTIVE_COMPACT_UNTIL_KEY, None)
     _set_pipeline_state(state, pipe)
 
 
@@ -170,8 +116,6 @@ def record_boundary_compact(
     budget: ContextBudget | None = None,
     llm_config: object | None = None,
 ) -> None:
-    clear_ineffective_compaction_backoff(state)
-    clear_autocompact_failure(state)
     post_events = project_after_compact_boundary(
         _synthetic_history_after_action(history, action)
     )
@@ -198,17 +142,6 @@ def record_boundary_compact(
 # --------------------------------------------------------------------------- #
 
 
-def action_meets_effectiveness(
-    history: list[Event],
-    events: list[Event],
-    action: CondensationAction,
-    budget: ContextBudget,
-    state: State,
-    llm_config: object | None,
-) -> bool:
-    return passes_effectiveness_gate(history, events, action, budget, state, llm_config)
-
-
 def passes_effectiveness_gate(
     history: list[Event],
     events: list[Event],
@@ -217,15 +150,9 @@ def passes_effectiveness_gate(
     state: State,
     llm_config: object | None,
 ) -> bool:
-    if len(action.pruned) < DEFAULT_COMPACT_MIN_PRUNED_EVENTS:
-        return False
-    post_events = project_after_compact_boundary(
-        _synthetic_history_after_action(history, action)
-    )
-    post_tokens = estimate_boundary_event_tokens(post_events, llm_config=llm_config)
-    return (
-        budget.estimated_tokens - post_tokens
-    ) >= DEFAULT_COMPACT_MIN_TOKEN_REDUCTION
+    """Accept any LLM compaction that produced a non-empty summary."""
+    _ = history, events, budget, state, llm_config
+    return bool((action.summary or '').strip())
 
 
 def evaluate_continuity_gate(
@@ -335,16 +262,15 @@ def resolve_continuity_or_fallback(
 
 
 # --------------------------------------------------------------------------- #
-# Compaction Engine — runs 5b (LLM) with retries, then 5d boundary fallback
+# Compaction Engine — LLM structured summary only
 # --------------------------------------------------------------------------- #
 
 
 class _CompactionEngine:
     """Stateless compaction runner — instantiated once by ContextPipeline.
 
-    Delegates to the structured compactor LLM with retries, then deterministic
-    boundary pruning. Session-memory template compaction is not used — persisted
-    task/criteria state is re-injected separately after compaction.
+    Uses only the structured-summary LLM compactor. No deterministic fallback.
+    Persisted task/criteria state is re-injected separately after compaction.
     """
 
     def __init__(
@@ -372,14 +298,8 @@ class _CompactionEngine:
         if not events:
             return None
 
-        if _autocompact_circuit_open(_pipeline_state(state)):
-            logger.warning(
-                'ContextPipeline: autocompact circuit open; skipping compaction engine'
-            )
-            return None
-
         logger.info(
-            'ContextPipeline: compaction triggered '
+            'ContextPipeline: LLM compaction triggered '
             '(should_autocompact=%s force=%s critical=%s dynamic_history_tokens=%d '
             'threshold=%d fixed_prompt_reserve=%d)',
             budget.should_autocompact,
@@ -390,51 +310,36 @@ class _CompactionEngine:
             budget.fixed_prompt_reserve_tokens,
         )
 
-        if self._config.allow_llm_hot_path:
-            for attempt in range(1, _MAX_LLM_COMPACTION_ATTEMPTS + 1):
+        for attempt in range(1, _MAX_LLM_COMPACTION_ATTEMPTS + 1):
+            try:
                 action = await self._llm_structured_compaction(
                     events, state, budget=budget, llm_config=llm_config
                 )
-                if action is None or not action.summary:
-                    logger.info(
-                        'ContextPipeline: 5b attempt %d/%d produced no summary',
-                        attempt,
-                        _MAX_LLM_COMPACTION_ATTEMPTS,
-                    )
-                    continue
-                compactor = (
-                    self._get_structured_compactor_cb(state)
-                    if self._get_structured_compactor_cb
-                    else None
+            except Exception as exc:
+                logger.warning(
+                    'ContextPipeline: LLM compaction attempt %d/%d failed: %s',
+                    attempt,
+                    _MAX_LLM_COMPACTION_ATTEMPTS,
+                    exc,
                 )
-                if compactor is not None and getattr(compactor, 'last_degraded', False):
-                    logger.warning(
-                        'ContextPipeline: 5b degraded on attempt %d/%d; '
-                        'retrying LLM compaction',
-                        attempt,
-                        _MAX_LLM_COMPACTION_ATTEMPTS,
-                    )
-                    continue
+                continue
+            if action is not None and (action.summary or '').strip():
                 logger.info(
-                    'ContextPipeline: LLM structured compaction (5b) '
-                    'after %d attempt(s)',
+                    'ContextPipeline: LLM compaction succeeded after %d attempt(s)',
                     attempt,
                 )
                 return action
-            logger.warning(
-                'ContextPipeline: LLM structured compaction exhausted '
-                '%d attempt(s); falling back to degraded boundary compaction',
+            logger.info(
+                'ContextPipeline: LLM compaction attempt %d/%d produced no summary',
+                attempt,
                 _MAX_LLM_COMPACTION_ATTEMPTS,
             )
-        else:
-            logger.debug('ContextPipeline: 5b skipped (allow_llm_hot_path=False)')
 
-        logger.warning(
-            'ContextPipeline: degraded boundary compaction (5d) — mandatory fallback'
+        logger.error(
+            'ContextPipeline: LLM compaction exhausted %d attempt(s) without summary',
+            _MAX_LLM_COMPACTION_ATTEMPTS,
         )
-        return self._degraded_compaction(
-            state, history, events, budget=budget, llm_config=llm_config
-        )
+        return None
 
     async def _llm_structured_compaction(
         self,
@@ -450,73 +355,23 @@ class _CompactionEngine:
             else None
         )
         if compactor is None:
-            logger.info(
-                'ContextPipeline: 5b skipped (no structured compactor / llm_config)'
+            raise RuntimeError(
+                'LLM compaction unavailable: no structured compactor / llm_config'
             )
-            return None
         compactor._pipeline_state = state  # type: ignore[attr-defined]
         from backend.context.view import View
 
         view = View(events=events)
-        try:
-            result = await compactor.get_compaction(view)
-        except Exception as exc:
-            logger.warning('LLM structured compaction failed: %s', exc)
-            return None
+        result = await compactor.get_compaction(view)
         if isinstance(result, Compaction):
             action = result.action
-            if action is not None and action.summary:
-                if getattr(compactor, 'last_degraded', False):
-                    logger.info(
-                        'ContextPipeline: 5b produced degraded summary '
-                        '(len=%d); caller may retry',
-                        len(action.summary),
-                    )
+            if action is not None and (action.summary or '').strip():
                 return action
             logger.info(
-                'ContextPipeline: 5b produced no summary (pruned=%d events=%d max_size=%d)',
+                'ContextPipeline: structured compactor returned no summary '
+                '(pruned=%d events=%d max_size=%d)',
                 len(action.pruned) if action is not None else 0,
                 len(events),
                 getattr(compactor, 'max_size', 0),
             )
         return None
-
-    def _degraded_compaction(
-        self,
-        state: State,
-        history: list[Event],
-        events: list[Event],
-        *,
-        budget: ContextBudget,
-        llm_config: object | None,
-    ) -> CondensationAction:
-        tail = _select_compaction_tail(
-            events,
-            budget,
-            llm_config=llm_config,
-            tail_ratio=DEFAULT_DEGRADED_COMPACT_TAIL_RATIO,
-        )
-        pruned_preview = _pruned_ids(events, tail)
-        from backend.context.compactor.strategies.amortized_pruning_compactor import (
-            AmortizedPruningCompactor,
-        )
-
-        pruned_events = [
-            event for event in events if getattr(event, 'id', None) in pruned_preview
-        ]
-        summary = AmortizedPruningCompactor._build_recovery_summary(pruned_events)
-        tail = _shrink_tail_for_token_reduction(
-            events,
-            tail,
-            history=history,
-            budget=budget,
-            state=state,
-            llm_config=llm_config,
-            summary=summary,
-        )
-        pruned = _pruned_ids(events, tail)
-        return CondensationAction(
-            pruned_event_ids=sorted(pruned),
-            summary=summary,
-            summary_offset=0,
-        )

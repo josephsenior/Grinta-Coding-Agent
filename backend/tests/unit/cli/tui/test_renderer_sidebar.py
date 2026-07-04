@@ -357,7 +357,57 @@ async def test_tui_mcp_sidebar_shows_disabled_when_feature_off(
         mcp_section = s.query_one('#sidebar-mcp', CollapsibleSection)
         assert mcp_section._section_title == 'MCP Servers'
         assert mcp_section._content == 'Disabled'
+        from textual.widgets import Static
+
+        empty = mcp_section.query_one('#empty-text', Static)
+        assert 'Disabled' in str(empty.render())
         assert mcp_section.feature_enabled is False
+
+
+@pytest.mark.asyncio
+async def test_tui_mcp_server_row_shows_disabled_label_when_server_off(
+    mock_config, monkeypatch
+):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_bootstrap', AsyncMock())
+    from backend.cli.event_rendering import sidebar as sidebar_module
+
+    monkeypatch.setattr(sidebar_module, 'load_sidebar_skill_items', lambda: [])
+    mock_config.mcp = SimpleNamespace(
+        enabled=True,
+        servers=[
+            SimpleNamespace(name='github', type='stdio', enabled=False),
+        ],
+    )
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        if s._bootstrapping is not None:
+            s._bootstrapping.set()
+        from backend.cli.tui.app import TUIRenderer
+        from backend.cli.tui.widgets.collapsible import McpServerRow
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        renderer._last_sidebar_state = None
+        renderer._refresh_display()
+        await pilot.pause()
+
+        row = s.query_one('McpServerRow', McpServerRow)
+        label = row.query_one('#row-label')
+        rendered = str(label.render())
+        assert 'github' in rendered
+        assert 'Disabled' in rendered
+        assert '[strike]' not in rendered
 
 
 @pytest.mark.asyncio

@@ -142,11 +142,7 @@ class MicrocompactCompactor(Compactor):
         config: Any,
         llm_registry: LLMRegistry,
     ) -> MicrocompactCompactor:
-        from backend.core.pydantic_compat import model_dump_with_options
-
-        return MicrocompactCompactor(
-            **model_dump_with_options(config, exclude={'type'})
-        )
+        return MicrocompactCompactor(**config.model_dump(exclude={'type'}))
 
 
 def _register_config() -> None:

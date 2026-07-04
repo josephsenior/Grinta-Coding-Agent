@@ -8,8 +8,6 @@ from dataclasses import asdict, dataclass, field
 
 from pydantic import BaseModel, Field
 
-from backend.core.pydantic_compat import model_dump_with_options
-
 
 @dataclass
 class Cost:
@@ -260,16 +258,12 @@ class Metrics:
         return {
             'accumulated_cost': self._accumulated_cost,
             'max_budget_per_task': self._max_budget_per_task,
-            'accumulated_token_usage': model_dump_with_options(
-                self.accumulated_token_usage
-            ),
+            'accumulated_token_usage': self.accumulated_token_usage.model_dump(),
             'costs': [asdict(cost) for cost in self._costs],
             'response_latencies': [
-                model_dump_with_options(latency) for latency in self._response_latencies
+                latency.model_dump() for latency in self._response_latencies
             ],
-            'token_usages': [
-                model_dump_with_options(usage) for usage in self._token_usages
-            ],
+            'token_usages': [usage.model_dump() for usage in self._token_usages],
         }
 
     def log(self) -> str:

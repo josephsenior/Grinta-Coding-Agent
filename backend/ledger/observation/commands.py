@@ -232,10 +232,8 @@ class CmdOutputObservation(Observation):
 
     def __str__(self) -> str:
         """Return a readable summary including metadata and agent-facing text."""
-        from backend.core.pydantic_compat import model_dump_with_options
-
         try:
-            metadata_json = json.dumps(model_dump_with_options(self.metadata), indent=2)
+            metadata_json = json.dumps(self.metadata.model_dump(), indent=2)
         except Exception:
             metadata_json = repr(self.metadata)
         return f'**CmdOutputObservation (source={self.source}, exit code={

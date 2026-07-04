@@ -52,6 +52,17 @@ def test_settings_template_mcp_matches_defaults() -> None:
     assert data['mcp_config'] == default_user_mcp_config()
 
 
+def test_settings_template_exposes_lsp_and_dap_config() -> None:
+    from backend.core.config.tool_integration_defaults import (
+        default_dap_config,
+        default_lsp_config,
+    )
+
+    data = json.loads(_TEMPLATE_PATH.read_text(encoding='utf-8'))
+    assert data['lsp_config'] == default_lsp_config()
+    assert data['dap_config'] == default_dap_config()
+
+
 def test_settings_template_security_matches_init_defaults() -> None:
     from backend.cli.onboarding.settings_defaults import default_init_security_block
 

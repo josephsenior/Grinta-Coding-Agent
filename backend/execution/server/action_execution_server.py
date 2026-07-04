@@ -285,6 +285,26 @@ class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
         """
         from backend.execution.utils.mcp_runtime import reload_mcp_servers
 
+        if not getattr(self._mcp_config, 'enabled', False):
+            removed_names: list[str] = []
+            for client in list(self._mcp_clients or []):
+                cfg = getattr(client, '_server_config', None)
+                if cfg is not None:
+                    removed_names.append(getattr(cfg, 'name', ''))
+                try:
+                    await client.disconnect()
+                except Exception as exc:
+                    logger.debug('MCP reload: disconnect on disable: %s', exc)
+            self._mcp_clients = []
+            self._mcp_servers_resolved = []
+            return {
+                'added': [],
+                'removed': [name for name in removed_names if name],
+                'reconnected': [],
+                'unchanged': [],
+                'failed': [],
+            }
+
         new_servers = list(getattr(self._mcp_config, 'servers', []) or [])
         reserved = (
             getattr(self._mcp_config, 'mcp_exposed_name_reserved', None) or frozenset()

@@ -787,13 +787,12 @@ class OrchestratorPlanner:
         )
         instruction = (
             '\n\n=== CURRENT MODE: PLAN ===\n'
-            'This is the authoritative current-mode instruction for this turn.\n'
-            'Current mode: PLAN\n\n'
+            'Authoritative instructions for this turn.\n\n'
             f'- Use discovery tools{hint} '
             'to inspect and search the codebase.\n'
             '- Use `ask_user` only when user input is required to continue.\n'
-            '- Workflow: `acceptance_criteria(update)` → `task_tracker(update)` (when enabled) → '
-            'discovery; define scope only — do not audit in Plan mode (no executable evidence yet).\n'
+            '- Workflow: see `<ACCEPTANCE_CRITERIA>` and `<COMMON_PATTERNS>`; then discovery.\n'
+            '- Do not audit in Plan mode.\n'
             '- Do not edit files or run shell commands.\n'
             '- Write the final plan in plain text when complete; that ends the run.\n'
             '==========================\n'
@@ -801,8 +800,6 @@ class OrchestratorPlanner:
         return self._apply_control_message(messages, instruction)
 
     def _inject_agent_mode_instructions(self, messages: list, state: State) -> list:
-        # Minimal per-turn mode signal — just enough for the agent to know its mode,
-        # like the OS/env one-liner. Full rules are already in the system prompt and tool schemas.
         instruction = '\n\nCurrent mode: AGENT'
         return self._apply_control_message(messages, instruction)
 
@@ -813,8 +810,7 @@ class OrchestratorPlanner:
         )
         instruction = (
             '\n\n=== CURRENT MODE: CHAT ===\n'
-            'This is the authoritative current-mode instruction for this turn.\n'
-            'Current mode: CHAT\n\n'
+            'Authoritative instructions for this turn.\n\n'
             f'- Use discovery tools{hint} '
             'to investigate the codebase when grounding helps.\n'
             '- Use `ask_user` only when user input is required to continue.\n'

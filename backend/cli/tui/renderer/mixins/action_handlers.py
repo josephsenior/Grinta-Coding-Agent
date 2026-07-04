@@ -6,6 +6,7 @@ import time
 from typing import Any
 
 from backend.cli.display.hud import HUDBar
+from backend.cli.tui.constants import _TUI_STREAM_PAINT_INTERVAL_SECONDS
 from backend.cli.event_rendering.text_utils import (
     sanitize_streaming_thinking_text,
     sanitize_visible_transcript_text,
@@ -23,7 +24,7 @@ from backend.ledger.action import (
 class RendererActionHandlersMixin:
     """action handlers (search/message/streaming/state)."""
 
-    _LIVE_STREAM_PAINT_INTERVAL = 0.066
+    _LIVE_STREAM_PAINT_INTERVAL = _TUI_STREAM_PAINT_INTERVAL_SECONDS
 
     def _sync_streaming_mount_mode(self) -> None:
         """Skip transcript mount animations while the LLM stream is active."""
@@ -53,12 +54,14 @@ class RendererActionHandlersMixin:
         self._streaming_active = False
         self._sync_streaming_mount_mode()
         self._finalize_live_thinking()
-        if self._live_response_dirty:
+        if self._live_response_dirty and not self._step_draft.content_committed:
             text = self._normalize_final_response_text(self._live_response)
-            if text and text != self._last_final_response_text:
+            if text:
                 self._commit_final_response(text)
             else:
                 self.clear_live_response()
+        elif self._live_response_dirty:
+            self.clear_live_response()
 
     @staticmethod
     def _is_user_source(source: Any) -> bool:
@@ -74,14 +77,15 @@ class RendererActionHandlersMixin:
         return sanitize_streaming_thinking_text(text or '').strip()
 
     def _commit_final_response(self, text: str) -> None:
-        """Commit a final assistant response once, regardless of event shape."""
+        """Commit a final assistant response once via ``MessageAction`` semantics."""
         content = self._normalize_final_response_text(text)
         self._tui.finalize_thinking()
         self.clear_live_response()
         if not content:
             return
-        if content == self._last_final_response_text:
+        if not self._step_draft.should_commit_content(content):
             return
+        self._step_draft.note_content_committed(content)
         self._last_final_response_text = content
         self._pending_final_commits.append(content)
         from backend.cli.tui.renderer.drain import _force_immediate_drain
@@ -120,14 +124,9 @@ class RendererActionHandlersMixin:
         normalized_content = (
             self._normalize_final_response_text(content) if content else ''
         )
-        if bool(getattr(action, 'final_response', False)) and normalized_content:
-            if normalized_content == self._last_final_response_text:
-                self._tui.finalize_thinking()
-                self.clear_live_response()
-                return
 
         thought = (getattr(action, 'thought', '') or '').strip()
-        if thought:
+        if thought and self._step_draft.should_render_thought():
             kind = getattr(action, 'kind', '') or ''
             self._render_thinking_payload(thought, finalize=True, kind=kind)
 
@@ -142,16 +141,18 @@ class RendererActionHandlersMixin:
             return
 
         if bool(getattr(action, 'transcript_only', False)):
-            normalized = self._normalize_final_response_text(content)
-            if normalized and normalized == getattr(
-                self, '_last_streamed_preamble_text', ''
+            if not self._step_draft.should_commit_content(
+                normalized_content, transcript_only=True
             ):
                 self._tui.finalize_thinking()
                 self.clear_live_response()
                 return
             self._append_plain_agent_message(content)
-            if normalized:
-                self._last_streamed_preamble_text = normalized
+            if normalized_content:
+                self._step_draft.note_content_committed(
+                    normalized_content, transcript_only=True
+                )
+                self._last_streamed_preamble_text = normalized_content
             return
 
         self._commit_final_response(content)
@@ -266,11 +267,18 @@ class RendererActionHandlersMixin:
         self._apply_streaming_chunk(action)
 
     def _apply_streaming_chunk(self, action: StreamingChunkAction) -> None:
+        content = self._normalize_final_response_text(action.accumulated or '')
+
+        if not self._step_draft.accept_stream_preview(
+            is_final=action.is_final,
+            incoming=content,
+        ):
+            return
+
         self._streaming_active = not action.is_final
         self._sync_streaming_mount_mode()
 
         thinking = self._normalize_thinking_text(action.thinking_accumulated or '')
-        content = self._normalize_final_response_text(action.accumulated or '')
 
         self._debug_log_thinking_chunk(thinking)
 
@@ -282,10 +290,14 @@ class RendererActionHandlersMixin:
             self._finalize_live_thinking()
 
         if action.is_final:
+            if content and not bool(getattr(action, 'suppress_live_response', False)):
+                self._step_draft.set_preview_content(content)
+                self.update_live_response(content)
             self._finalize_streaming_response(action, content)
             return
 
         if content:
+            self._step_draft.set_preview_content(content)
             self.update_live_response(content)
 
     def _debug_log_thinking_chunk(self, thinking: str) -> None:
@@ -310,14 +322,12 @@ class RendererActionHandlersMixin:
     ) -> None:
         if bool(getattr(action, 'suppress_live_response', False)):
             # Tool-step finals: keep the live preview until transcript_only
-            # MessageAction commits the canonical full text (avoids duplicate
-            # rows from committing a partial stream snapshot early).
+            # MessageAction commits the canonical full text.
             return
-        final_text = content or self._live_response
-        if final_text:
-            self._commit_final_response(final_text)
-        else:
-            self.clear_live_response()
+        # Streams are preview-only; MessageAction commits permanent rows.
+        preview = content or self._normalize_final_response_text(self._live_response)
+        if preview:
+            self._step_draft.set_preview_content(preview)
 
     def _update_metrics(self, event: Any) -> None:
         changed = False

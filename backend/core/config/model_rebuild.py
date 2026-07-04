@@ -32,8 +32,8 @@ def rebuild_config_models() -> None:
         return
 
     from backend.core.config.compactor_config import (
-        AmortizedPruningCompactorConfig,
         CompactorPipelineConfig,
+        ContextPipelineConfig,
         NoOpCompactorConfig,
         ObservationMaskingCompactorConfig,
         RecentEventsCompactorConfig,
@@ -69,10 +69,10 @@ def rebuild_config_models() -> None:
         NoOpCompactorConfig,
         ObservationMaskingCompactorConfig,
         RecentEventsCompactorConfig,
-        AmortizedPruningCompactorConfig,
         StructuredSummaryCompactorConfig,
         CompactorPipelineConfig,
         SmartCompactorConfig,
+        ContextPipelineConfig,
     ):
         compactor_cls.model_rebuild(_types_namespace=compactor_ns)
 

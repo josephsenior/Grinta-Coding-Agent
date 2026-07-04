@@ -1,10 +1,8 @@
 """Free-prose compactor that converts history into a state summary.
 
 A single unconstrained LLM call produces a rich narrative summary; the model
-allocates its full attention to synthesis instead of schema compliance. A
-minimal deterministic sanity gate (non-empty + substantial length) blocks
-empty / tiny outputs. On any failure the compactor flags itself degraded so
-the pipeline rejects the compaction and never replaces history with emptiness.
+allocates its full attention to synthesis instead of schema compliance. Empty
+outputs are retried; there is no deterministic fallback summary.
 
 Canonical task state is maintained independently by the deterministic
 ``reduce_events_into_state`` track; this compactor does not produce a
@@ -23,10 +21,9 @@ from backend.core.message import Message, TextContent
 from backend.ledger.event import Event
 from backend.ledger.observation.agent import AgentCondensationObservation
 
-# Default minimum length for an accepted prose summary. Shorter outputs are
-# treated as degraded (model refusal / truncation / empty) so the pipeline
-# falls back to deterministic compaction instead of wiping history.
-DEFAULT_MIN_PROSE_LENGTH = 2000
+# Default minimum length before a same-prompt retry nudge. Any non-empty prose
+# is accepted after retries — there is no deterministic fallback.
+DEFAULT_MIN_PROSE_LENGTH = 500
 # Default number of same-prompt retries when the sanity gate fails. 0 means a
 # short/empty output immediately degrades to the deterministic fallback; the
 # model is otherwise trusted to surface what matters without brittle repair.
@@ -117,19 +114,11 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         return extra_args
 
     async def get_compaction(self, view: View) -> Compaction:
-        """Generate condensation from view by summarizing pruned events.
-
-        If the LLM call fails (network, rate-limit, provider outage) or the
-        produced prose fails the sanity gate after any retries, the compactor
-        falls back to a non-LLM degraded summary and flags itself degraded so
-        the pipeline rejects the compaction instead of hard-stalling or wiping
-        context.
-        """
+        """Generate condensation from view by summarizing pruned events via LLM."""
         _head, pruned_events, summary_event = self._prepare_view_sections(view)
         if not pruned_events:
             return self._create_compaction_result(pruned_events, '')
 
-        # Extract previous ## USER GOAL section for tripwire comparison.
         previous_goal = ''
         if summary_event and summary_event.message:
             previous_goal = self._extract_section(summary_event.message, '## USER GOAL')
@@ -138,50 +127,28 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             summary_event, pruned_events, char_limit=self._get_summary_char_limit()
         )
 
-        self.last_degraded = False
-
-        try:
-            prose = await self._get_llm_prose_summary(prompt)
-            attempts = 0
-            while (
-                not self._passes_prose_sanity_gate(prose)
-                and attempts < self.max_repair_attempts
-            ):
-                attempts += 1
-                logger.info(
-                    'Condensation prose sanity gate failed (len=%d < %d); retry %d/%d',
-                    len(prose),
-                    self.min_prose_length,
-                    attempts,
-                    self.max_repair_attempts,
-                )
-                prose = await self._get_llm_prose_summary(prompt, nudge=True)
-
-            if self._passes_prose_sanity_gate(prose):
-                summary_text = self._sanitize_summary_prose(prose)
-                self._check_goal_regression(summary_text, previous_goal)
-            else:
-                self.last_degraded = True
-                logger.warning(
-                    'Condensation prose sanity gate failed after %d retry(es); '
-                    'falling back to degraded summary so history is not wiped.',
-                    attempts,
-                )
-                summary_text = self._degraded_summary(
-                    summary_event,
-                    pruned_events,
-                    ValueError('prose sanity gate failed'),
-                )
-        except Exception as e:
-            self.last_degraded = True
-            logger.warning(
-                'Condensation LLM call failed (%s: %s); falling back to '
-                'degraded summary so the agent can continue.',
-                type(e).__name__,
-                e,
+        prose = await self._get_llm_prose_summary(prompt)
+        attempts = 0
+        while (
+            not self._passes_prose_sanity_gate(prose)
+            and attempts < self.max_repair_attempts
+        ):
+            attempts += 1
+            logger.info(
+                'Condensation prose retry (len=%d < %d); attempt %d/%d',
+                len(prose or ''),
+                self.min_prose_length,
+                attempts,
+                self.max_repair_attempts,
             )
-            summary_text = self._degraded_summary(summary_event, pruned_events, e)
+            prose = await self._get_llm_prose_summary(prompt, nudge=True)
 
+        prose = (prose or '').strip()
+        if not prose:
+            raise RuntimeError('LLM compaction returned empty summary')
+
+        summary_text = self._sanitize_summary_prose(prose)
+        self._check_goal_regression(summary_text, previous_goal)
         return self._create_compaction_result(pruned_events, summary_text)
 
     def _sanitize_summary_prose(self, prose: str) -> str:
@@ -291,36 +258,6 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         except (AttributeError, IndexError, TypeError) as e:
             logger.warning('Failed to extract prose content from LLM response: %s', e)
             return ''
-
-    def _degraded_summary(
-        self,
-        summary_event: AgentCondensationObservation,
-        pruned_events: list[Event],
-        error: BaseException,
-    ) -> str:
-        """Build a non-LLM placeholder summary used when the summarizer fails.
-
-        Preserves the previous summary (if any) and lists the IDs and types of
-        the events being pruned so the agent retains a minimal audit trail.
-        """
-        prior = str(summary_event) if summary_event else ''
-        lines: list[str] = [
-            '# State Summary (degraded)',
-            f'NOTE: condensation summarizer unavailable ({type(error).__name__}). '
-            'Pruned events listed by id/type only; re-summarization will be '
-            'attempted on the next compaction cycle.',
-        ]
-        if prior and prior != 'No events summarized':
-            lines.append('## Previous Summary')
-            lines.append(prior)
-        if pruned_events:
-            lines.append('## Pruned Events')
-            for ev in pruned_events[:200]:  # hard cap to keep this small
-                ev_id = getattr(ev, 'id', '?')
-                lines.append(f'- {type(ev).__name__} id={ev_id}')
-            if len(pruned_events) > 200:
-                lines.append(f'- ... and {len(pruned_events) - 200} more')
-        return '\n'.join(lines)
 
     def _prepare_view_sections(
         self, view: View

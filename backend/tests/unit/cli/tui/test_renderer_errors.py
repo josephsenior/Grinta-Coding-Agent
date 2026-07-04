@@ -433,7 +433,7 @@ async def test_tui_final_stream_and_normalized_message_do_not_duplicate(mock_con
         from backend.cli.tui.widgets.activity_card import AgentMessage
 
         msgs = list(s.query(AgentMessage).results())
-        assert len(msgs) >= 2
+        assert len(msgs) == 1
 
 
 @pytest.mark.asyncio

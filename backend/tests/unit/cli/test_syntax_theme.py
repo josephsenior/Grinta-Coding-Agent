@@ -249,7 +249,7 @@ def test_apply_live_response_render_highlights_open_fence_without_deferred_flush
     partial = '```python\ndef stream_me():\n    return 1'
     renderer._apply_live_response_render(partial)
 
-    widget.set_streaming_content.assert_called_once_with(partial)
+    widget.set_streaming_renderable.assert_called_once()
     widget.set_streaming_text.assert_not_called()
 
 

@@ -401,13 +401,39 @@ def _update_agent_bool_field(
 
 
 def update_enable_lsp_query(enabled: bool, agent_name: str | None = None) -> None:
-    """Persist ``enable_lsp_query`` for the active agent."""
-    _update_agent_bool_field('enable_lsp_query', enabled, agent_name)
+    """Persist ``lsp_config.enabled``."""
+    from backend.core.config.tool_integration_defaults import (
+        default_lsp_config,
+        strip_legacy_agent_tool_keys,
+    )
+
+    _ = agent_name
+    settings = _load_raw_settings()
+    lsp_cfg = settings.get('lsp_config')
+    if not isinstance(lsp_cfg, dict):
+        lsp_cfg = dict(default_lsp_config())
+    lsp_cfg['enabled'] = bool(enabled)
+    settings['lsp_config'] = lsp_cfg
+    strip_legacy_agent_tool_keys(settings)
+    _save_raw_settings(settings)
 
 
 def update_enable_debugger(enabled: bool, agent_name: str | None = None) -> None:
-    """Persist ``enable_debugger`` for the active agent."""
-    _update_agent_bool_field('enable_debugger', enabled, agent_name)
+    """Persist ``dap_config.enabled``."""
+    from backend.core.config.tool_integration_defaults import (
+        default_dap_config,
+        strip_legacy_agent_tool_keys,
+    )
+
+    _ = agent_name
+    settings = _load_raw_settings()
+    dap_cfg = settings.get('dap_config')
+    if not isinstance(dap_cfg, dict):
+        dap_cfg = dict(default_dap_config())
+    dap_cfg['enabled'] = bool(enabled)
+    settings['dap_config'] = dap_cfg
+    strip_legacy_agent_tool_keys(settings)
+    _save_raw_settings(settings)
 
 
 def update_interaction_mode(mode: str, agent_name: str | None = None) -> None:

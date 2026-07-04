@@ -125,8 +125,6 @@ async def summary_layer(
     from backend.context.compactor.compactor import Compaction
 
     if isinstance(result, Compaction):
-        if getattr(summary_compactor, 'last_degraded', False):
-            return events
         summary_text = result.action.summary
         if summary_text:
             summary_obs = AgentCondensationObservation(content=summary_text)

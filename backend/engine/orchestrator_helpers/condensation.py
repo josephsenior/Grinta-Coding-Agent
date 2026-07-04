@@ -52,13 +52,6 @@ def _emit_compaction_status_if_needed(orch: Orchestrator, state: State) -> bool:
     return True
 
 
-def _set_skip_compaction_flag(state: State) -> None:
-    """Mark pipeline state so ineffective compactions are skipped on the next turn."""
-    from backend.context.context_pipeline import apply_ineffective_compaction_backoff
-
-    apply_ineffective_compaction_backoff(state)
-
-
 def _queue_post_condensation_recovery(orch: Orchestrator, task_text: str = '') -> None:
     """Queue a silent no-op after condensation to break the re-condensation loop.
 
@@ -78,10 +71,7 @@ def _queue_post_condensation_recovery(orch: Orchestrator, task_text: str = '') -
     so the TUI does not show a fake "Memory condensed" reasoning row — the
     compaction card already covers that UX.
     """
-    del task_text  # Currently unused; reserved for future personalization.
-    orch_state = getattr(orch, 'state', None)
-    if orch_state is not None:
-        _set_skip_compaction_flag(orch_state)
+    _ = task_text
     orch.pending_actions.append(NullAction(reason=NullActionReason.SENTINEL))
 
 

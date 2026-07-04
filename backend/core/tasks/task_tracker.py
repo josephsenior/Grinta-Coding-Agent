@@ -33,19 +33,24 @@ def _save_lock_for(path: Path) -> threading.Lock:
 
 
 class TaskTracker:
-    """Manage the persisted task plan stored under the workspace agent state dir."""
+    """Manage session-scoped task plan JSON under the workspace agent state dir."""
 
     def __init__(self, workspace_root: str | Path | None = None):
-        """Initialize the task tracker with a workspace root."""
+        """Initialize the task tracker with an optional explicit workspace root."""
         if workspace_root is None:
-            from backend.core.workspace_resolution import (
-                require_effective_workspace_root,
-            )
+            from backend.context.memory.session_context import scoped_agent_path
 
-            workspace_root = require_effective_workspace_root()
+            self.path = scoped_agent_path('active_plan', '.json')
+            return
+        from backend.context.memory.session_context import resolve_session_id
         from backend.core.workspace_resolution import workspace_agent_state_dir
 
-        self.path = workspace_agent_state_dir(workspace_root) / 'active_plan.json'
+        base = workspace_agent_state_dir(workspace_root)
+        sid = resolve_session_id()
+        if sid:
+            self.path = base / f'active_plan_{sid}.json'
+        else:
+            self.path = base / 'active_plan.json'
 
     def load_from_file(self) -> list[dict[str, Any]]:
         """Load the task list from disk."""

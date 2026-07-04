@@ -347,8 +347,7 @@ class _SessionOrchestratorParallelMixin(SessionOrchestratorAccessorsMixin):
 
         mm = getattr(self.agent, 'memory_manager', None)
         pipeline = getattr(mm, '_pipeline', None) if mm is not None else None
-        compactor = getattr(mm, 'compactor', None) if mm is not None else None
-        if mm is None or (pipeline is None and compactor is None):
+        if mm is None or pipeline is None:
             return
 
         import copy as _copy_mod
@@ -361,20 +360,7 @@ class _SessionOrchestratorParallelMixin(SessionOrchestratorAccessorsMixin):
         state_copy.turn_signals.prewarm_latest_event_id = getattr(latest, 'id', None)
 
         async def _run_bg():
-            import inspect
-
-            if pipeline is not None:
-                return await pipeline.prewarm_compaction(state_copy)
-            background_compact = getattr(
-                compactor, 'compacted_history_background', None
-            )
-            if callable(background_compact):
-                background_result = background_compact(state_copy)
-                if inspect.isawaitable(background_result):
-                    return await background_result
-            if compactor is None:
-                return None
-            return await compactor.compacted_history(state_copy)
+            return await pipeline.prewarm_compaction(state_copy)
 
         self.memory_pressure.start_prewarm(_run_bg)
         logger.debug('Kicked off background condensation pre-warm')

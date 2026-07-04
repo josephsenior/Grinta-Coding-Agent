@@ -103,6 +103,9 @@ def test_scratchpad_sync_is_idempotent(tmp_path, monkeypatch) -> None:
 
 
 def test_task_tracker_persists_active_plan_under_app_dir(tmp_path, monkeypatch) -> None:
+    from backend.engine.tools.working_memory import set_current_session_id
+
+    set_current_session_id(None)
     monkeypatch.setattr(
         'backend.core.workspace_resolution.workspace_agent_state_dir',
         lambda project_root=None: tmp_path,
@@ -128,6 +131,9 @@ def test_task_tracker_persists_active_plan_under_app_dir(tmp_path, monkeypatch) 
 def test_task_tracker_save_retries_transient_replace_error(
     tmp_path, monkeypatch
 ) -> None:
+    from backend.engine.tools.working_memory import set_current_session_id
+
+    set_current_session_id(None)
     monkeypatch.setattr(
         'backend.core.workspace_resolution.workspace_agent_state_dir',
         lambda project_root=None: tmp_path,
@@ -159,6 +165,9 @@ def test_task_tracker_concurrent_save_uses_unique_temp_files(
     """Concurrent saves must not share one fixed .tmp path (WinError 2 on replace)."""
     from concurrent.futures import ThreadPoolExecutor
 
+    from backend.engine.tools.working_memory import set_current_session_id
+
+    set_current_session_id(None)
     monkeypatch.setattr(
         'backend.core.workspace_resolution.workspace_agent_state_dir',
         lambda project_root=None: tmp_path,
@@ -182,14 +191,55 @@ def test_task_tracker_concurrent_save_uses_unique_temp_files(
     assert tracker.load_from_file()[0]['description'].startswith('task ')
 
 
-def test_smart_compactor_reads_in_progress_ids_from_app_plan(
-    tmp_path, monkeypatch
-) -> None:
+def test_acceptance_criteria_store_is_session_scoped(tmp_path, monkeypatch) -> None:
+    from backend.core.criteria.acceptance_criteria_store import AcceptanceCriteriaStore
+    from backend.engine.tools.working_memory import set_current_session_id
+
     monkeypatch.setattr(
         'backend.core.workspace_resolution.workspace_agent_state_dir',
         lambda project_root=None: tmp_path,
     )
-    plan_file = tmp_path / 'active_plan.json'
+    set_current_session_id('session-a')
+    store_a = AcceptanceCriteriaStore()
+    store_a.save_to_file([{'assertion': 'Tests pass', 'source': 'stated'}])
+
+    set_current_session_id('session-b')
+    store_b = AcceptanceCriteriaStore()
+    assert store_b.load_from_file() == []
+    assert store_b.path == tmp_path / 'acceptance_criteria_session-b.json'
+    assert store_a.path == tmp_path / 'acceptance_criteria_session-a.json'
+    set_current_session_id(None)
+
+
+def test_task_tracker_is_session_scoped_when_bound(tmp_path, monkeypatch) -> None:
+    from backend.engine.tools.working_memory import set_current_session_id
+
+    monkeypatch.setattr(
+        'backend.core.workspace_resolution.workspace_agent_state_dir',
+        lambda project_root=None: tmp_path,
+    )
+    set_current_session_id('session-a')
+    tracker_a = TaskTracker()
+    tracker_a.save_to_file([{'id': '1', 'description': 'A', 'status': 'todo'}])
+
+    set_current_session_id('session-b')
+    tracker_b = TaskTracker()
+    assert tracker_b.load_from_file() == []
+    assert tracker_b.path == tmp_path / 'active_plan_session-b.json'
+    set_current_session_id(None)
+
+
+def test_smart_compactor_reads_in_progress_ids_from_app_plan(
+    tmp_path, monkeypatch
+) -> None:
+    from backend.engine.tools.working_memory import set_current_session_id
+
+    monkeypatch.setattr(
+        'backend.core.workspace_resolution.workspace_agent_state_dir',
+        lambda project_root=None: tmp_path,
+    )
+    set_current_session_id('compact-test')
+    plan_file = tmp_path / 'active_plan_compact-test.json'
     plan_file.parent.mkdir(parents=True, exist_ok=True)
     plan_file.write_text(
         json.dumps(

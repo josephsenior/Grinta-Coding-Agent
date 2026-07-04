@@ -115,9 +115,7 @@ class CompositionCompactor(Compactor):
         config: Any,
         llm_registry: LLMRegistry,
     ) -> CompositionCompactor:
-        from backend.core.pydantic_compat import model_dump_with_options
-
-        kwargs = model_dump_with_options(config, exclude={'type', 'llm_config'})
+        kwargs = config.model_dump(exclude={'type', 'llm_config'})
         compactor = CompositionCompactor(**kwargs)
 
         llm_config = getattr(config, 'llm_config', None)

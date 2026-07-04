@@ -215,40 +215,14 @@ class SettingsFileWatcher:
             return None
 
     async def _emit_external(self, data: dict[str, Any]) -> None:
-        from backend.core.config.mcp_config import MCPConfig, MCPServerConfig
+        from backend.core.config.config_loader import load_mcp_config_from_json
         from backend.integrations.mcp.config_bus import get_mcp_config_bus
 
-        mcp_cfg = data.get('mcp_config') or {}
-        if not isinstance(mcp_cfg, dict):
-            return
-        raw_servers = mcp_cfg.get('servers', [])
-        if isinstance(raw_servers, dict):
-            raw_servers = [raw_servers]
-        servers: list[MCPServerConfig] = []
-        for row in raw_servers or []:
-            if not isinstance(row, dict):
-                continue
-            name = row.get('name')
-            if not name or name == 'default':
-                continue
-            try:
-                servers.append(MCPServerConfig(**{**row, 'name': name}))
-            except Exception as exc:
-                logger.warning(
-                    'SettingsFileWatcher: dropped invalid server %r: %s',
-                    name,
-                    exc,
-                )
-
-        new_config = MCPConfig(
-            enabled=bool(mcp_cfg.get('enabled', True)),
-            servers=servers,
-            mcp_exposed_name_reserved=frozenset(
-                mcp_cfg.get('mcp_exposed_name_reserved', []) or []
-            ),
-        )
         async with self._lock:
-            get_mcp_config_bus().emit(new_config, source='file_watch')
+            get_mcp_config_bus().emit(
+                load_mcp_config_from_json(self._path),
+                source='file_watch',
+            )
 
     async def _emit_removal(self) -> None:
         from backend.core.config.mcp_config import MCPConfig

@@ -30,20 +30,23 @@ def _save_lock_for(path: Path) -> threading.Lock:
 
 
 class AcceptanceCriteriaStore:
-    """Manage the persisted acceptance criteria list under the workspace agent state dir."""
+    """Manage session-scoped acceptance criteria JSON under the workspace agent dir."""
 
     def __init__(self, workspace_root: str | Path | None = None):
         if workspace_root is None:
-            from backend.core.workspace_resolution import (
-                require_effective_workspace_root,
-            )
+            from backend.context.memory.session_context import scoped_agent_path
 
-            workspace_root = require_effective_workspace_root()
+            self.path = scoped_agent_path('acceptance_criteria', '.json')
+            return
+        from backend.context.memory.session_context import resolve_session_id
         from backend.core.workspace_resolution import workspace_agent_state_dir
 
-        self.path = (
-            workspace_agent_state_dir(workspace_root) / 'acceptance_criteria.json'
-        )
+        base = workspace_agent_state_dir(workspace_root)
+        sid = resolve_session_id()
+        if sid:
+            self.path = base / f'acceptance_criteria_{sid}.json'
+        else:
+            self.path = base / 'acceptance_criteria.json'
 
     def load_from_file(self) -> list[dict[str, Any]]:
         """Load criteria from disk."""

@@ -7,28 +7,56 @@ from typing import Any
 from backend.ledger.action import Action
 
 
+def _normalize_streamed_content(text: str) -> str:
+    from backend.cli.event_rendering.text_utils import sanitize_visible_transcript_text
+
+    return sanitize_visible_transcript_text(text or '').strip()
+
+
+def _normalize_streamed_thinking(text: str) -> str:
+    from backend.cli.event_rendering.text_utils import sanitize_streaming_thinking_text
+
+    return sanitize_streaming_thinking_text(text or '').strip()
+
+
+def prepare_streamed_message_actions(
+    actions: list[Action],
+    *,
+    streamed_visible_text: str = '',
+    streamed_thinking_text: str = '',
+) -> None:
+    """Strip message fields the TUI already committed from the live stream.
+
+    Streams are preview-only in the TUI; ``MessageAction`` is the canonical
+    commit event for assistant text. Thinking finalized on the stream-final
+    chunk must not replay via ``MessageAction.thought``.
+    """
+    from backend.ledger.action import MessageAction
+
+    streamed_thinking = _normalize_streamed_thinking(streamed_thinking_text)
+
+    for action in actions:
+        if not isinstance(action, MessageAction):
+            continue
+        if streamed_thinking:
+            thought = _normalize_streamed_thinking(
+                str(getattr(action, 'thought', '') or '')
+            )
+            if thought and thought == streamed_thinking:
+                action.thought = ''
+
+
 def suppress_cli_for_streamed_final_messages(
     actions: list[Action],
     *,
     streamed_visible_text: str,
 ) -> None:
-    """Hide duplicate final MessageActions already shown via streaming."""
-    from backend.cli.event_rendering.text_utils import sanitize_visible_transcript_text
-    from backend.ledger.action import MessageAction
-
-    streamed = sanitize_visible_transcript_text(streamed_visible_text or '').strip()
-    if not streamed:
-        return
-    for action in actions:
-        if not isinstance(action, MessageAction):
-            continue
-        if not bool(getattr(action, 'final_response', False)):
-            continue
-        content = sanitize_visible_transcript_text(
-            str(getattr(action, 'content', '') or '')
-        ).strip()
-        if content and content == streamed:
-            action.suppress_cli = True
+    """Backward-compatible alias — content is no longer suppressed at source."""
+    _ = streamed_visible_text
+    prepare_streamed_message_actions(
+        actions,
+        streamed_visible_text=streamed_visible_text,
+    )
 
 
 def without_blank_agent_messages(actions: list[Action]) -> list[Action]:

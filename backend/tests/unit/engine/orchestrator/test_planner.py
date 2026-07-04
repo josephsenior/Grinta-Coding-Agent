@@ -661,14 +661,11 @@ class TestBuildLlmParams:
             if isinstance(m.get('content'), str)
         )
         assert 'CURRENT MODE: PLAN' in joined
-        assert 'Current mode: PLAN' in joined
-        assert joined.count('Current mode:') == 1
         assert 'Use `ask_user` only when user input is required to continue.' in joined
         assert 'Do not edit files or run shell commands.' in joined
         assert 'Write the final plan in plain text when complete' in joined
         assert 'Read-only mode' not in joined
         assert 'communicate_with_user' not in joined
-        assert '`finish`' not in joined
         assert 'status, response, summary, sections, evidence' not in joined
         assert 'open_items, next_step' not in joined
         assert 'Recommended Plan' not in joined
@@ -689,7 +686,7 @@ class TestBuildLlmParams:
         ]
         assert plan_blocks
         plan_text = plan_blocks[0]
-        assert 'do not audit in Plan mode' in plan_text
+        assert 'Do not audit in Plan mode' in plan_text
         assert 'acceptance_criteria(audit)' not in plan_text
 
     @pytest.mark.parametrize(

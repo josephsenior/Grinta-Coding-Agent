@@ -349,9 +349,10 @@ class BaseLLMCompactor(RollingCompactor, ABC):
 
     def _add_response_metadata(self, response: Any) -> None:
         """Add LLM response metadata to the compactor's metadata batch."""
-        from backend.core.pydantic_compat import model_dump_with_options
-
-        self.add_metadata('response', model_dump_with_options(response))
+        self.add_metadata(
+            'response',
+            response.model_dump() if isinstance(response, BaseModel) else response,
+        )
         if hasattr(self, 'llm') and self.llm:
             self.add_metadata('metrics', self.llm.metrics.get())
 

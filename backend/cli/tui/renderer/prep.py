@@ -313,7 +313,7 @@ async def prep_streaming_response_async(orch: Any, text: str) -> None:
     if key in cache:
         return
     try:
-        renderable = await asyncio.to_thread(prep_live_response_renderable, content)
+        renderable = await asyncio.to_thread(prep_streaming_renderable, content)
     except Exception:
         return
     cache[key] = renderable

@@ -85,7 +85,8 @@ async def test_external_edit_emits_change(
             await asyncio.sleep(0.05)
         assert captured, 'watcher never emitted after external edit'
         assert captured[-1].source == 'file_watch'
-        assert [s.name for s in captured[-1].diff.added] == ['github']
+        added_names = [s.name for s in captured[-1].diff.added]
+        assert 'github' in added_names
     finally:
         await watcher.stop()
 

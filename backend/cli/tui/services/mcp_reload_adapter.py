@@ -124,8 +124,23 @@ class MCPReloadAdapter:
 
     async def _reconcile(self, change: Any) -> None:
         diff = getattr(change, 'diff', None)
-        if diff is None or not diff.has_changes:
+        old_cfg = getattr(change, 'old_config', None)
+        new_cfg = getattr(change, 'new_config', None)
+        master_changed = old_cfg is None or bool(
+            getattr(old_cfg, 'enabled', False)
+        ) != bool(getattr(new_cfg, 'enabled', False))
+        if diff is None or (not diff.has_changes and not master_changed):
             return
+
+        from backend.core.config import load_app_config
+
+        cfg = load_app_config()
+        runtime = self._runtime
+        if hasattr(runtime, '_mcp_config'):
+            runtime._mcp_config = cfg.mcp
+        runtime_config = getattr(runtime, 'config', None)
+        if runtime_config is not None:
+            runtime_config.mcp = cfg.mcp
 
         # 1. Tell the runtime to drop / reconnect clients.
         reload_fn = getattr(self._runtime, 'reload_mcp', None)

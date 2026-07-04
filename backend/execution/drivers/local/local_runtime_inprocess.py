@@ -439,8 +439,8 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             return ErrorObservation(
                 content=(
                     'Interactive debugger is disabled for this session '
-                    '(enable_debugger is false in agent config). '
-                    'Set enable_debugger=true on the agent to use the DAP debugger tool.'
+                    '(dap_config.enabled is false). '
+                    'Set dap_config.enabled=true in settings.json to use the DAP debugger tool.'
                 )
             )
         if self._executor is None:

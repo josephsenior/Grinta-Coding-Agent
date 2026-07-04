@@ -77,31 +77,6 @@ class RecentEventsCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     model_config = ConfigDict(extra='forbid')
 
 
-class AmortizedPruningCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
-    """Configuration for AmortizedPruningCompactor."""
-
-    type: Literal['amortized'] = Field(default='amortized')
-    max_size: int = Field(
-        default=DEFAULT_COMPACTOR_MAX_SIZE,
-        description='Maximum size of the condensed history before triggering pruning.',
-        ge=2,
-    )
-    keep_first: int = Field(
-        default=DEFAULT_COMPACTOR_KEEP_FIRST,
-        description='Number of initial events to always keep in history.',
-        ge=0,
-    )
-    token_budget: int | None = Field(
-        default=None,
-        description=(
-            'Optional token budget.  When set, condensation also triggers if '
-            'the estimated token count of the view exceeds this limit.'
-        ),
-        ge=1,
-    )
-    model_config = ConfigDict(extra='forbid')
-
-
 class StructuredSummaryCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     """Configuration for StructuredSummaryCompactor instances."""
 
@@ -178,30 +153,6 @@ class ContextPipelineConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         default=DEFAULT_MICROCOMPACT_PRESERVE_RECENT,
         description='Microcompact preservation window (Layer 3).',
         ge=1,
-    )
-    model_config = ConfigDict(extra='forbid')
-
-
-class AutoCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
-    """Configuration for task-aware automatic compactor selection.
-
-    When ``type = "auto"`` the system analyses the current event stream
-    and picks the most appropriate compactor strategy dynamically.
-    """
-
-    type: Literal['auto'] = Field(default='auto')
-    llm_config: LLMConfig | str | None = Field(
-        default=None,
-        description='LLM config name made available to LLM-based strategies when auto-selected.',
-    )
-    allow_llm_hot_path: bool = Field(
-        default=True,
-        description=(
-            'Allow normal-turn auto compaction to use LLM-backed strategies. '
-            'Enabled by default for coding sessions so long runs get semantic '
-            'summaries instead of deterministic-only pruning; explicit condensation '
-            'may still use LLM summaries when this is disabled.'
-        ),
     )
     model_config = ConfigDict(extra='forbid')
 
@@ -296,12 +247,10 @@ CompactorConfig = (
     | ObservationMaskingCompactorConfig
     | MicrocompactCompactorConfig
     | RecentEventsCompactorConfig
-    | AmortizedPruningCompactorConfig
     | StructuredSummaryCompactorConfig
     | CompactorPipelineConfig
     | CompositionCompactorConfig
     | SmartCompactorConfig
-    | AutoCompactorConfig
     | ContextPipelineConfig
 )
 
@@ -380,12 +329,10 @@ def create_compactor_config(compactor_type: str, data: dict) -> CompactorConfig:
         'observation_masking': ObservationMaskingCompactorConfig,
         'microcompact': MicrocompactCompactorConfig,
         'recent': RecentEventsCompactorConfig,
-        'amortized': AmortizedPruningCompactorConfig,
         'structured': StructuredSummaryCompactorConfig,
         'composition': CompositionCompactorConfig,
         'pipeline': CompactorPipelineConfig,
         'smart': SmartCompactorConfig,
-        'auto': AutoCompactorConfig,
         'context_pipeline': ContextPipelineConfig,
     }
     if compactor_type not in compactor_classes:
@@ -403,5 +350,4 @@ def create_compactor_config(compactor_type: str, data: dict) -> CompactorConfig:
 StructuredSummaryCompactorConfig.model_rebuild()
 CompactorPipelineConfig.model_rebuild()
 SmartCompactorConfig.model_rebuild()
-AutoCompactorConfig.model_rebuild()
 ContextPipelineConfig.model_rebuild()

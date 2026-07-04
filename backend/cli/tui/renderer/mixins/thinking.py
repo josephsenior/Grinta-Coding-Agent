@@ -236,18 +236,6 @@ class RendererThinkingMixin:
                 return stripped
         return (text or '').strip()
 
-    def _should_render_thinking_text(self, text: str) -> bool:
-        thought = self._canonical_thinking_text(text)
-        if not self._is_visible_thinking_text(thought):
-            return False
-
-        digest = hashlib.sha256(thought.encode('utf-8')).hexdigest()[:16]
-        if digest == getattr(self, '_last_thinking_text_hash', ''):
-            return False
-
-        self._last_thinking_text_hash = digest
-        return True
-
     def _should_render_thinking_artifact(self, intent: ThinkingRenderIntent) -> bool:
         digest = hashlib.sha256(
             f'{intent.kind}:{intent.text}'.encode('utf-8')
@@ -270,11 +258,12 @@ class RendererThinkingMixin:
                 self._tui.finalize_thinking()
             return
         if finalize:
-            if self._should_render_thinking_text(display_text):
+            if self._step_draft.should_render_thought():
                 self._tui.add_thinking(display_text)
             self._tui.finalize_thinking()
             return
-        # Live stream snapshots must always refresh — hash dedup is for finalize only.
+        if not self._step_draft.should_render_thought():
+            return
         self._tui.add_thinking(display_text)
 
     def _render_error_intent(self, intent: ThinkingRenderIntent) -> None:

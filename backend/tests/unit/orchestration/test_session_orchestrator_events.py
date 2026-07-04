@@ -226,7 +226,7 @@ class TestPostExecution:
         )
 
     @pytest.mark.asyncio
-    async def test_warning_prewarm_uses_background_compaction_hook(self):
+    async def test_warning_prewarm_uses_pipeline(self):
         if hasattr(self.ctrl.state_tracker.state, 'metrics'):
             del self.ctrl.state_tracker.state.metrics
         self.ctrl.config.agent._last_llm_latency = None
@@ -239,11 +239,10 @@ class TestPostExecution:
         self.ctrl.state_tracker.state.turn_signals = MagicMock()
         self.ctrl.state_tracker.state.set_memory_pressure = MagicMock()
 
-        compactor = SimpleNamespace(
-            compacted_history_background=AsyncMock(return_value='background'),
-            compacted_history=AsyncMock(return_value='foreground'),
+        pipeline = SimpleNamespace(
+            prewarm_compaction=AsyncMock(return_value='background'),
         )
-        self.ctrl.config.agent.memory_manager = SimpleNamespace(compactor=compactor)
+        self.ctrl.config.agent.memory_manager = SimpleNamespace(_pipeline=pipeline)
 
         await self.ctrl._handle_post_execution()
 
@@ -251,8 +250,7 @@ class TestPostExecution:
         result = await coro_factory()
 
         assert result == 'background'
-        compactor.compacted_history_background.assert_awaited_once()
-        compactor.compacted_history.assert_not_awaited()
+        pipeline.prewarm_compaction.assert_awaited_once()
 
 
 # ── Action context management ────────────────────────────────────────

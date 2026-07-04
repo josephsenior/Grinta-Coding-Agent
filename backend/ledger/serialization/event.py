@@ -9,7 +9,6 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from backend.core.pydantic_compat import model_dump_with_options
 from backend.inference.metrics import Cost, Metrics, ResponseLatency, TokenUsage
 from backend.ledger.event import Event, EventSource
 from backend.ledger.infra.tool import ToolCallMetadata
@@ -184,7 +183,7 @@ def _populate_metrics_from_dict(metrics: Metrics, value: dict) -> None:
 
 
 def _convert_pydantic_to_dict(obj: BaseModel | dict) -> dict:
-    return model_dump_with_options(obj) if isinstance(obj, BaseModel) else obj
+    return obj.model_dump() if isinstance(obj, BaseModel) else obj
 
 
 def _extract_event_properties(event: Event) -> tuple[dict, bool]:
@@ -284,7 +283,10 @@ def _transform_recall_type_key(d: dict) -> None:
 def _transform_tool_call_metadata_key(d: dict) -> None:
     """Transform tool_call_metadata key using model dump."""
     if 'tool_call_metadata' in d:
-        d['tool_call_metadata'] = model_dump_with_options(d['tool_call_metadata'])
+        meta = d['tool_call_metadata']
+        d['tool_call_metadata'] = (
+            meta.model_dump() if isinstance(meta, BaseModel) else meta
+        )
 
 
 def _transform_llm_metrics_key(d: dict) -> None:

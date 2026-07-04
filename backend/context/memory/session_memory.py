@@ -144,13 +144,9 @@ def _count_tool_calls_since(events: list[Event], since_id: int | None) -> int:
 
 
 def _should_skip_during_condensation_loop(state: State | None) -> bool:
-    """Skip expensive session-memory writes during condensation-only loops."""
+    """Skip expensive session-memory writes during the post-compaction step."""
     pipe = _pipeline_state(state)
-    if pipe.get('consecutive_condensation_steps', 0) >= 1:
-        return True
-    if pipe.get('skip_compaction_until_event_id') is not None:
-        return True
-    return False
+    return pipe.get('consecutive_condensation_steps', 0) >= 1
 
 
 def maybe_update(

@@ -139,17 +139,14 @@ class TestFileSettingsStoreStore:
         _file_settings_cache[store.path] = (MagicMock(), time.time())
 
         mock_settings = MagicMock()
+        mock_settings.model_dump.return_value = {
+            'llm_model': None,
+            'llm_api_key': None,
+            'llm_base_url': None,
+            'mcp_config': None,
+        }
 
         with (
-            patch(
-                'backend.persistence.settings.file_settings_store.model_dump_with_options',
-                return_value={
-                    'llm_model': None,
-                    'llm_api_key': None,
-                    'llm_base_url': None,
-                    'mcp_config': None,
-                },
-            ),
             patch(
                 'backend.persistence.settings.file_settings_store.call_sync_from_async',
                 new_callable=AsyncMock,
@@ -166,17 +163,14 @@ class TestFileSettingsStoreStore:
         fs = MagicMock()
         store = FileSettingsStore(file_store=fs)
         mock_settings = MagicMock()
+        mock_settings.model_dump.return_value = {
+            'llm_model': 'openai/gpt-4.1',
+            'llm_api_key': SecretStr('file-store-secret'),
+            'llm_base_url': None,
+            'mcp_config': None,
+        }
 
         with (
-            patch(
-                'backend.persistence.settings.file_settings_store.model_dump_with_options',
-                return_value={
-                    'llm_model': 'openai/gpt-4.1',
-                    'llm_api_key': SecretStr('file-store-secret'),
-                    'llm_base_url': None,
-                    'mcp_config': None,
-                },
-            ),
             patch(
                 'backend.persistence.settings.file_settings_store.persist_llm_api_key_to_dotenv',
             ) as mock_persist,

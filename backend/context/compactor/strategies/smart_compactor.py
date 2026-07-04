@@ -162,7 +162,7 @@ class SmartCompactor(BaseLLMCompactor):
     ) -> None:
         """Anchor the active plan's TaskTrackingAction as essential.
 
-        Loads .app/active_plan.json and marks the most recent TaskTrackingAction
+        Loads the session-scoped active_plan JSON and marks the most recent TaskTrackingAction
         event as essential. This creates a hard condensation anchor so the LLM
         always wakes up after condensation knowing exactly which task it was on.
         """
@@ -173,10 +173,10 @@ class SmartCompactor(BaseLLMCompactor):
             self._anchor_last_task_tracker(events, essential)
 
     def _load_in_progress_task_ids(self) -> set[str]:
-        """Load in-progress task IDs from .app/active_plan.json, or empty set."""
-        from backend.core.workspace_resolution import workspace_agent_state_dir
+        """Load in-progress task IDs from session-scoped active_plan JSON, or empty set."""
+        from backend.core.tasks.task_tracker import TaskTracker
 
-        plan_path = workspace_agent_state_dir() / 'active_plan.json'
+        plan_path = TaskTracker().path
         tasks = self._parse_tasks_from_plan(plan_path)
         return self._extract_in_progress_ids(tasks)
 

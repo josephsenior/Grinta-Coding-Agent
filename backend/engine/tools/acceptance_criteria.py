@@ -11,14 +11,9 @@ from backend.engine.contracts import ChatCompletionToolParam
 from backend.engine.tools.param_defs import create_tool_definition, get_command_param
 
 _ACCEPTANCE_CRITERIA_DESCRIPTION = (
-    'Define flat verifiable acceptance criteria — what must be true when done. '
-    'REQUIRED before work: '
-    'call `update` with `criteria_list` to define verifiable completion assertions. '
-    'Persists across condensation (persisted and auto-re-injected). '
-    'Typical workflow: `update` (start) → implement + verify → `audit` (before final summary). '
-    'Use `view` to read criteria (includes stable `id` on each item). Use `append` for rare missing items. '
-    'Use `refine` to correct an existing assertion in place (requires `reason`). '
-    'Use `audit` before the final summary to attach verbatim tool output via `evidence_ref`. '
+    'Flat verifiable assertions — what must be true when done. '
+    'See `<ACCEPTANCE_CRITERIA>` for workflow; persisted per session across condensation. '
+    'Commands: `update` (scope), `view`, `append`, `refine`, `audit` (evidence_ref before final summary). '
     'Phrase criteria as auditable assertions, not activities.'
 )
 

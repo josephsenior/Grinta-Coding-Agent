@@ -68,11 +68,7 @@ class ObservationMaskingCompactor(Compactor):
         llm_registry: LLMRegistry,
     ) -> ObservationMaskingCompactor:
         """Instantiate a compactor from configuration values."""
-        from backend.core.pydantic_compat import model_dump_with_options
-
-        return ObservationMaskingCompactor(
-            **model_dump_with_options(config, exclude={'type'})
-        )
+        return ObservationMaskingCompactor(**config.model_dump(exclude={'type'}))
 
 
 # Lazy registration to avoid circular imports
