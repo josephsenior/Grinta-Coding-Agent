@@ -201,16 +201,11 @@ def prep_streaming_renderable(
         return Text('')
 
     if '```' not in content:
+        # Prose-only: full Markdown during streaming (matches finalized AgentMessage).
+        if base_text_style == NAVY_TEXT_PRIMARY:
+            return prep_markdown(content)
         if '`' in content:
             return _prep_inline_code_text(content, base_text_style=base_text_style)
-        if (
-            base_text_style == NAVY_TEXT_PRIMARY
-            and len(content) < 600
-            and any(
-                marker in content for marker in ('**', '__', '`', '\n#', '\n- ', '\n* ')
-            )
-        ):
-            return prep_markdown(content)
         return Text(content, style=base_text_style)
 
     raw_parts, _tail, _has_open = _split_streaming_fences(content)

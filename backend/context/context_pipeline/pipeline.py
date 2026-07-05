@@ -43,9 +43,6 @@ from backend.context.context_pipeline.helpers import (
     clear_prewarm_signals,
     is_prewarm_stale,
 )
-from backend.context.context_pipeline.post_compact_reinject import (
-    build_post_compact_attachment_text,
-)
 from backend.context.context_pipeline.types import _JUST_COMPACTED_KEY
 from backend.context.memory.session_context import bind_session_context
 from backend.context.memory.session_memory import maybe_update
@@ -351,20 +348,6 @@ class ContextPipeline:
         )
         if packet is not None:
             events = [packet, *events]
-
-        if just_compacted and state is not None:
-            attachment = build_post_compact_attachment_text(state, events)
-            if attachment and not any(
-                'POST_COMPACT_RESTORE' in str(getattr(event, 'content', '') or '')
-                for event in events
-            ):
-                from backend.ledger.observation.agent import (
-                    AgentCondensationObservation,
-                )
-
-                reinject = AgentCondensationObservation(content=attachment)
-                insert_at = 1 if packet is not None else 0
-                events = [*events[:insert_at], reinject, *events[insert_at:]]
 
         window = select_prompt_events(
             events,

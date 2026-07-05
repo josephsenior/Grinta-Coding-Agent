@@ -401,20 +401,23 @@ class ScreenInputMixin:
         if isinstance(focused, ScanLineCard):
             focused.action_open_detail()
             return
-        _tui_logger.debug(
-            f'action_submit_input: lock_locked={self._input_lock.locked()}'
-        )
-        if getattr(self, '_turn_in_flight', False):
-            _tui_logger.debug('action_submit_input: turn in flight, ignoring')
-            return
-        if self._input_lock.locked():
-            _tui_logger.debug('action_submit_input: lock held, ignoring')
-            return
         ta = self.query_one('#input', TextArea)
         clean_text = _strip_terminal_control_literals(ta.text)
         if clean_text != ta.text:
             ta.text = clean_text
         text = _strip_ansi(clean_text).strip()
+        is_slash = text.startswith('/')
+        _tui_logger.debug(
+            f'action_submit_input: lock_locked={self._input_lock.locked()} '
+            f'turn_in_flight={getattr(self, "_turn_in_flight", False)} '
+            f'is_slash={is_slash}'
+        )
+        if getattr(self, '_turn_in_flight', False) and not is_slash:
+            _tui_logger.debug('action_submit_input: turn in flight, ignoring')
+            return
+        if self._input_lock.locked() and not is_slash:
+            _tui_logger.debug('action_submit_input: lock held, ignoring')
+            return
         pending_images = list(getattr(self, '_pending_image_urls', []) or [])
         _tui_logger.debug(f'action_submit_input: text_len={len(text)}')
         if not text and not pending_images:
@@ -492,10 +495,19 @@ class ScreenInputMixin:
     async def _handle_input_dispatch(
         self, agent_text: str, *, image_urls: list[str] | None = None
     ) -> None:
+        from backend.ledger.action import MessageAction
+
+        action = MessageAction(
+            content=agent_text,
+            image_urls=image_urls or None,
+        )
+        await self._handle_input_dispatch_action(action)
+
+    async def _handle_input_dispatch_action(self, action: Any) -> None:
         try:
-            _tui_logger.debug('_handle_input: calling _dispatch_to_agent()')
+            _tui_logger.debug('_handle_input: calling _dispatch_action_event()')
             logger.info('[TUI] _handle_input: dispatching to agent')
-            await self._dispatch_to_agent(agent_text, image_urls=image_urls)
+            await self._dispatch_action_event(action)
             _tui_logger.debug(
                 f'_handle_input: _dispatch_to_agent done, state={self._controller.get_agent_state()}'
             )
@@ -540,46 +552,48 @@ class ScreenInputMixin:
 
         agent_text: str | None = None
         image_urls: list[str] | None = None
+        slash_followup: Any = None
         async with self._input_lock:
             if text.startswith('/'):
                 await self._handle_input_prepare_ui()
-                await self._handle_slash_command(text)
-                return
-
-            if self._turn_in_flight:
+                slash_followup = await self._handle_slash_command(text)
+            elif self._turn_in_flight:
                 _tui_logger.debug('_handle_input: turn already in flight, ignoring')
                 return
+            else:
+                image_urls = list(getattr(self, '_pending_image_urls', []) or [])
+                if image_urls and (blocked := self._image_input_blocked_reason()):
+                    self._reject_image_input(blocked)
+                    return
 
-            image_urls = list(getattr(self, '_pending_image_urls', []) or [])
-            if image_urls and (blocked := self._image_input_blocked_reason()):
-                self._reject_image_input(blocked)
-                return
+                await self._handle_input_prepare_ui()
 
-            await self._handle_input_prepare_ui()
+                self._pending_image_urls = []
+                self._refresh_input_attachment_hint()
+                self._render_hud_bar()
+                self.query_one('#input-bar', InputBar).add_class('processing')
 
-            self._pending_image_urls = []
-            self._refresh_input_attachment_hint()
-            self._render_hud_bar()
-            self.query_one('#input-bar', InputBar).add_class('processing')
-
-            try:
-                _tui_logger.debug(
-                    f'_handle_input: controller={self._controller is not None}'
-                )
-                await self._ensure_controller_ready()
-                assert self._controller is not None, (
-                    'Controller must be initialized after agent task setup'
-                )
-                if getattr(self, '_pending_llm_config_apply', False):
-                    self._apply_llm_config_to_active_session(self._config)
-                self.add_user_message(text, image_count=len(image_urls))
-                agent_text = text
-                self._turn_in_flight = True
-            except Exception as exc:
-                self._handle_input_error(exc)
-                return
+                try:
+                    _tui_logger.debug(
+                        f'_handle_input: controller={self._controller is not None}'
+                    )
+                    await self._ensure_controller_ready()
+                    assert self._controller is not None, (
+                        'Controller must be initialized after agent task setup'
+                    )
+                    if getattr(self, '_pending_llm_config_apply', False):
+                        self._apply_llm_config_to_active_session(self._config)
+                    self._last_user_message = text
+                    self.add_user_message(text, image_count=len(image_urls))
+                    agent_text = text
+                    self._turn_in_flight = True
+                except Exception as exc:
+                    self._handle_input_error(exc)
+                    return
 
         if agent_text is None:
+            if slash_followup is not None:
+                await slash_followup
             return
 
         await self._handle_input_dispatch(agent_text, image_urls=image_urls)

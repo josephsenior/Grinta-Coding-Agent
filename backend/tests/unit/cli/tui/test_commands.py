@@ -1,7 +1,10 @@
 """Headless TUI — commands."""
 
+from typing import Any
+
 from backend.tests.unit.cli.tui._shared import (
     GrintaHelpDialog,
+    GrintaScreen,
     GrintaSessionsDialog,
     GrintaTUIApp,
     Label,
@@ -304,3 +307,97 @@ async def test_tui_message_helpers(mock_config):
 
         log = s.query_one('#main-display')
         assert log is not None
+
+
+@pytest.mark.asyncio
+async def test_tui_slash_command_works_while_turn_in_flight(mock_config, monkeypatch):
+    """Slash commands must not be dropped while the agent is running."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        s._turn_in_flight = True
+        s.show_help = MagicMock()  # type: ignore[method-assign]
+
+        ta = s.query_one('#input', TextArea)
+        ta.text = '/help'
+        s.action_submit_input()
+        await pilot.pause()
+
+        s.show_help.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_tui_compact_slash_dispatches_condensation_action(mock_config, monkeypatch):
+    """`/compact` must queue a condensation request in the TUI."""
+    from backend.ledger.action.agent import CondensationRequestAction
+
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        dispatched = asyncio.Event()
+        captured: dict[str, Any] = {}
+
+        class FakeController:
+            def get_agent_state(self):
+                return 'awaiting_user_input'
+
+        s._controller = FakeController()
+        s._event_stream = object()
+
+        async def _fake_dispatch_action(action) -> None:
+            captured['action'] = action
+            dispatched.set()
+
+        s._handle_input_dispatch_action = _fake_dispatch_action  # type: ignore[method-assign]
+
+        followup = await s._handle_slash_command('/compact')
+        assert followup is not None
+        await followup
+        await asyncio.wait_for(dispatched.wait(), timeout=5)
+
+        assert isinstance(captured['action'], CondensationRequestAction)
+
+
+@pytest.mark.asyncio
+async def test_tui_slash_commands_work_in_sequence(mock_config, monkeypatch):
+    """Slash commands must keep working after a prior slash clobbered renderer."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(GrintaScreen, '_start_background_bootstrap', lambda self: None)
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        opened: dict[str, int] = {'help': 0, 'settings': 0}
+
+        def _fake_help() -> None:
+            opened['help'] += 1
+
+        async def _fake_settings() -> None:
+            opened['settings'] += 1
+
+        s.show_help = _fake_help  # type: ignore[method-assign]
+        s._open_settings_tui = _fake_settings  # type: ignore[method-assign]
+
+        for command in ('/help', '/settings'):
+            ta = s.query_one('#input', TextArea)
+            ta.text = command
+            s.action_submit_input()
+            await pilot.pause()
+
+        assert opened['help'] == 1
+        assert opened['settings'] == 1

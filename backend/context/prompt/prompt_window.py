@@ -632,7 +632,11 @@ def _is_valid_condensation_event(event, seen_ids):
         return False
     if '<DURABLE_WORKING_SET>' in content:
         return False
-    if '<POST_COMPACT_RESTORE>' in content or '<RESTORED_CONTEXT>' in content:
+    if (
+        '<COMPACT_SNAPSHOT>' in content
+        or '<POST_COMPACT_RESTORE>' in content
+        or '<RESTORED_CONTEXT>' in content
+    ):
         return False
     if id(event) in seen_ids:
         return False

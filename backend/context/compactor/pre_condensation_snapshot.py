@@ -958,8 +958,7 @@ def delete_staging_snapshot(*, state: State | None = None) -> None:
     ``condense_history``), so the eagerly-written staging file is cleaned up
     without touching the canonical snapshot.  The canonical file must remain
     intact so that the ``AgentCondensationObservation`` from the *previous*
-    compaction turn can still inject its ``<RESTORED_CONTEXT>`` block on
-    the current turn.
+    compaction turn can still inject its snapshot block on the current turn.
     """
     try:
         p = _snapshot_staging_path(state=state)
@@ -969,36 +968,49 @@ def delete_staging_snapshot(*, state: State | None = None) -> None:
         pass
 
 
-def format_snapshot_for_injection(
+def format_snapshot_body_lines(
     snapshot: dict[str, Any],
     *,
     state: object | None = None,
-    include_synthesized_goal: bool = True,
-) -> str:
-    """Format a snapshot into a human-readable block for LLM context injection.
-
-    Returns a compact string suitable for appending to the post-condensation
-    recovery message.
-    """
-    parts = ['<RESTORED_CONTEXT>']
-    parts.append(f'Events condensed: {snapshot.get("events_condensed", "?")}')
+    include_synthesized_goal: bool = False,
+) -> list[str]:
+    """Return inner compact-snapshot lines (no XML wrapper)."""
+    if not isinstance(snapshot, dict) or not snapshot:
+        return []
+    lines = [f'Events condensed: {snapshot.get("events_condensed", "?")}']
     if include_synthesized_goal:
-        parts.extend(_format_directive_section(snapshot, state=state))
-    parts.extend(_format_runtime_section(snapshot.get('runtime', {})))
-    parts.extend(_format_files_section(snapshot.get('files_touched', {})))
-    parts.extend(_format_errors_section(snapshot.get('recent_errors', [])))
-    parts.extend(_format_decisions_section(snapshot.get('decisions', [])))
-    parts.extend(
+        lines.extend(_format_directive_section(snapshot, state=state))
+    lines.extend(_format_runtime_section(snapshot.get('runtime', {})))
+    lines.extend(_format_files_section(snapshot.get('files_touched', {})))
+    lines.extend(_format_errors_section(snapshot.get('recent_errors', [])))
+    lines.extend(_format_decisions_section(snapshot.get('decisions', [])))
+    lines.extend(
         _format_invalidated_assumptions_section(
             snapshot.get('invalidated_assumptions', [])
         )
     )
-    parts.extend(_format_commands_section(snapshot.get('recent_commands', [])))
-    parts.extend(_format_test_results_section(snapshot.get('test_results', [])))
-    parts.extend(_format_background_tasks_section(snapshot.get('background_tasks', [])))
-    parts.extend(_format_approaches_section(snapshot.get('attempted_approaches', [])))
-    parts.append('</RESTORED_CONTEXT>')
-    return '\n'.join(parts)
+    lines.extend(_format_commands_section(snapshot.get('recent_commands', [])))
+    lines.extend(_format_test_results_section(snapshot.get('test_results', [])))
+    lines.extend(_format_background_tasks_section(snapshot.get('background_tasks', [])))
+    lines.extend(_format_approaches_section(snapshot.get('attempted_approaches', [])))
+    return lines
+
+
+def format_snapshot_for_injection(
+    snapshot: dict[str, Any],
+    *,
+    state: object | None = None,
+    include_synthesized_goal: bool = False,
+) -> str:
+    """Format a snapshot into a ``<COMPACT_SNAPSHOT>`` block for prompt injection."""
+    lines = format_snapshot_body_lines(
+        snapshot,
+        state=state,
+        include_synthesized_goal=include_synthesized_goal,
+    )
+    if not lines:
+        return ''
+    return '<COMPACT_SNAPSHOT>\n' + '\n'.join(lines) + '\n</COMPACT_SNAPSHOT>'
 
 
 def _format_directive_section(
