@@ -93,7 +93,10 @@ class TaskTrackingMixin:
 
         self._consecutive_task_view_count = 0
 
-        msg = f'✅ Plan updated with {n} tasks. Now begin implementing the first todo task.'
+        msg = (
+            f'✅ Plan updated with {n} tasks. '
+            'Begin the first todo milestone (edit, read, or run verification).'
+        )
 
         return TaskTrackingObservation(
             content=msg,

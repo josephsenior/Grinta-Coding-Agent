@@ -174,6 +174,7 @@ def reduce_snapshot_into_state(
         event_id = _snapshot_latest_event_id(snapshot)
 
     from backend.context.compactor.pre_condensation_snapshot import (
+        active_file_paths_from_files_touched,
         snapshot_user_objective,
     )
 
@@ -209,7 +210,7 @@ def reduce_snapshot_into_state(
     if isinstance(files, dict) and files:
         canonical.active_files = _merge_strings(
             canonical.active_files,
-            [path for path in files if isinstance(path, str) and path],
+            active_file_paths_from_files_touched(files, max_files=_MAX_ACTIVE_FILES),
             _MAX_ACTIVE_FILES,
         )
         _touch_field(canonical, 'active_files', event_id, source)
@@ -490,8 +491,6 @@ def render_canonical_state_for_prompt(
             _append(lines, f'  - {detail}')
     if canonical.prior_objectives:
         _append(lines, '- Prior objectives: ' + ' | '.join(canonical.prior_objectives[-3:]))
-    if canonical.active_files:
-        _append(lines, '- Active files: ' + ', '.join(canonical.active_files[-12:]))
     _append_list(lines, 'Blockers', canonical.blockers[-6:])
     if canonical.background_tasks:
         _append(lines, '- Background tasks:')

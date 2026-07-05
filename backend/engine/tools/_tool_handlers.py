@@ -356,6 +356,43 @@ def _task_tracker_existing_normalized(
         return []
 
 
+def _acceptance_criteria_tool_enabled() -> bool:
+    try:
+        from backend.core.config.config_loader import (
+            _get_active_agent_config,
+            load_app_config,
+        )
+
+        agent = _get_active_agent_config(load_app_config(set_logging_levels=False))
+        return bool(getattr(agent, 'enable_acceptance_criteria_tool', True))
+    except Exception:
+        from backend.core.constants import DEFAULT_AGENT_ACCEPTANCE_CRITERIA_TOOL_ENABLED
+
+        return DEFAULT_AGENT_ACCEPTANCE_CRITERIA_TOOL_ENABLED
+
+
+def _require_acceptance_criteria_before_initial_task_plan(
+    *,
+    command: str,
+    normalized_task_list: list[dict[str, Any]],
+    existing_normalized_task_list: list[dict[str, Any]],
+) -> None:
+    """Block first task plan creation until acceptance criteria are scoped."""
+    if command != 'update' or not normalized_task_list:
+        return
+    if existing_normalized_task_list:
+        return
+    if not _acceptance_criteria_tool_enabled():
+        return
+    if AcceptanceCriteriaStore().load_from_file():
+        return
+    raise FunctionCallValidationError(
+        'Define acceptance criteria before creating a task plan. '
+        'Call acceptance_criteria(update) with verifiable outcomes first, '
+        'then task_tracker(update). See <ACCEPTANCE_CRITERIA> and <COMMON_PATTERNS>.'
+    )
+
+
 def _maybe_noop_task_tracker_action(
     command: str,
     normalized_task_list: list[dict[str, Any]],
@@ -431,6 +468,12 @@ def _handle_task_tracker_tool(arguments: Mapping[str, Any]) -> Action:
 
     normalized_task_list = _normalize_task_tracker_list(list(raw_task_list))
 
+    _require_acceptance_criteria_before_initial_task_plan(
+        command=command,
+        normalized_task_list=normalized_task_list,
+        existing_normalized_task_list=existing_normalized_task_list,
+    )
+
     noop = _maybe_noop_task_tracker_action(
         command, normalized_task_list, existing_normalized_task_list
     )
@@ -500,33 +543,15 @@ def _normalize_audit_entry(entry: Mapping[str, Any]) -> dict[str, Any]:
         raise FunctionCallValidationError(
             'Each audit_entries item requires a non-empty criterion_id.'
         )
-    evidence_ref = str(entry.get('evidence_ref') or '').strip()
     evidence = str(entry.get('evidence') or '').strip()
-    unverifiable = parse_bool_argument(entry.get('unverifiable'))
-
-    if evidence_ref:
-        result: dict[str, Any] = {
-            'criterion_id': criterion_id,
-            'evidence_ref': evidence_ref,
-        }
-        if evidence:
-            result['evidence_fallback'] = evidence
-        return result
-    if evidence:
-        if not unverifiable:
-            raise FunctionCallValidationError(
-                f'Audit entry for {criterion_id!r} uses free-text evidence; '
-                'set unverifiable=true for subjective criteria or use evidence_ref.'
-            )
-        return {
-            'criterion_id': criterion_id,
-            'evidence': evidence,
-            'unverifiable': True,
-        }
-    raise FunctionCallValidationError(
-        f'Audit entry for {criterion_id!r} requires evidence_ref or '
-        'evidence with unverifiable=true.'
-    )
+    if not evidence:
+        raise FunctionCallValidationError(
+            f'Audit entry for {criterion_id!r} requires non-empty evidence.'
+        )
+    return {
+        'criterion_id': criterion_id,
+        'evidence': evidence,
+    }
 
 
 def _validate_audit_entries(

@@ -7,11 +7,6 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from backend.core.criteria.evidence_ref import (
-    EvidenceRefError,
-    collect_session_events,
-    resolve_evidence_ref_for_audit,
-)
 from backend.ledger.observation import (
     AcceptanceCriteriaObservation,
     ErrorObservation,
@@ -169,8 +164,11 @@ class AcceptanceCriteriaMixin:
         if action.command == 'audit' and action.audit_entries:
             try:
                 criteria_list = self._apply_audit_entries(action)
-            except EvidenceRefError as e:
+            except ValueError as e:
                 return ErrorObservation(str(e))
+            except Exception as e:
+                logger.warning('Acceptance criteria audit failed', exc_info=True)
+                return ErrorObservation(f'Acceptance criteria audit failed: {e!s}')
 
         try:
             content = self._generate_criteria_markdown(criteria_list)
@@ -194,12 +192,6 @@ class AcceptanceCriteriaMixin:
             msg = f'✅ Acceptance criteria updated ({n} total).'
         else:
             msg = f'✅ Acceptance criteria audit recorded for {n} item(s).'
-        audit_warnings = getattr(action, '_audit_warnings', None)
-        if isinstance(audit_warnings, list) and audit_warnings:
-            msg += '\n\n⚠️ Audit notes:\n' + '\n'.join(
-                f'- {warning}' for warning in audit_warnings[:6]
-            )
-
         return AcceptanceCriteriaObservation(
             content=msg,
             command=action.command,
@@ -209,45 +201,23 @@ class AcceptanceCriteriaMixin:
     def _apply_audit_entries(
         self, action: AcceptanceCriteriaAction
     ) -> list[dict[str, Any]]:
-        events = collect_session_events(self.event_stream)
         by_id = {
             str(item.get('id') or '').strip(): dict(item)
             for item in action.criteria_list
             if str(item.get('id') or '').strip()
         }
-        warnings: list[str] = []
         for entry in action.audit_entries:
             criterion_id = str(entry.get('criterion_id') or '').strip()
             row = by_id.get(criterion_id)
             if row is None:
                 msg = f'Audit entry references unknown criterion_id {criterion_id!r}'
-                raise EvidenceRefError(msg)
-
-            evidence_ref = str(entry.get('evidence_ref') or '').strip()
-            if evidence_ref:
-                fallback = str(
-                    entry.get('evidence_fallback') or entry.get('evidence') or ''
-                ).strip()
-                resolved, stored_ref, warning = resolve_evidence_ref_for_audit(
-                    evidence_ref,
-                    events,
-                    fallback_evidence=fallback,
-                )
-                row['evidence'] = resolved
-                row['evidence_ref'] = stored_ref
-                if warning:
-                    warnings.append(f'{criterion_id}: {warning}')
-                continue
+                raise ValueError(msg)
 
             evidence = str(entry.get('evidence') or '').strip()
             if not evidence:
-                msg = (
-                    f'Audit entry for {criterion_id!r} requires evidence_ref or '
-                    'evidence with unverifiable=true.'
-                )
-                raise EvidenceRefError(msg)
+                msg = f'Audit entry for {criterion_id!r} requires non-empty evidence.'
+                raise ValueError(msg)
             row['evidence'] = evidence
-            row['evidence_ref'] = None
 
         missing = [
             criterion_id
@@ -255,11 +225,9 @@ class AcceptanceCriteriaMixin:
             if not str(row.get('evidence') or '').strip()
         ]
         if missing:
-            raise EvidenceRefError(
+            raise ValueError(
                 f'Audit incomplete; missing evidence for: {", ".join(sorted(missing))}'
             )
-        if warnings:
-            setattr(action, '_audit_warnings', warnings)
         return list(by_id.values())
 
     def _persist_criteria(

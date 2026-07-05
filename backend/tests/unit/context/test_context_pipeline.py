@@ -449,7 +449,7 @@ def test_should_emit_compaction_status_true_when_prewarmed(pipeline):
     assert pipeline.should_emit_compaction_status(state) is True
 
 
-def test_just_compacted_skips_autocompact_but_critical_force_bypasses(pipeline):
+def test_just_compacted_skips_autocompact_but_explicit_bypasses(pipeline):
     events = [_user('task', 1)]
     state = _make_state(events)
     llm_config = SimpleNamespace(max_input_tokens=200_000, model='test-model')
@@ -460,7 +460,6 @@ def test_just_compacted_skips_autocompact_but_critical_force_bypasses(pipeline):
         events=events,
         llm_config=llm_config,
         history=list(state.history),
-        force=False,
         explicit=False,
     )
     assert not should_skip_compaction(
@@ -468,15 +467,6 @@ def test_just_compacted_skips_autocompact_but_critical_force_bypasses(pipeline):
         events=events,
         llm_config=llm_config,
         history=list(state.history),
-        force=True,
-        explicit=False,
-    )
-    assert not should_skip_compaction(
-        state,
-        events=events,
-        llm_config=llm_config,
-        history=list(state.history),
-        force=False,
         explicit=True,
     )
     assert not should_run_compaction(
@@ -486,7 +476,6 @@ def test_just_compacted_skips_autocompact_but_critical_force_bypasses(pipeline):
         history=list(state.history),
         llm_config=llm_config,
         explicit=False,
-        critical=False,
     )
     assert should_run_compaction(
         state,
@@ -494,8 +483,7 @@ def test_just_compacted_skips_autocompact_but_critical_force_bypasses(pipeline):
         budget=budget,
         history=list(state.history),
         llm_config=llm_config,
-        explicit=False,
-        critical=True,
+        explicit=True,
     )
 
 
@@ -565,7 +553,6 @@ def test_skip_compaction_when_boundary_at_or_below_snapshot(pipeline):
             events=events,
             llm_config=llm_config,
             history=history + [action],
-            force=False,
         ) is True
 
     with patch(
@@ -577,7 +564,6 @@ def test_skip_compaction_when_boundary_at_or_below_snapshot(pipeline):
             events=events,
             llm_config=llm_config,
             history=history + [action],
-            force=False,
         ) is False
 
 
@@ -604,7 +590,6 @@ def test_skip_compaction_when_snapshot_set_but_boundary_not_in_history(pipeline)
         events=events,
         llm_config=llm_config,
         history=list(state.history),
-        force=False,
     ) is True
 
 
@@ -627,7 +612,6 @@ def test_dismissed_explicit_request_does_not_retrigger_compaction():
         history=list(state.history),
         llm_config=llm_config,
         explicit=True,
-        critical=False,
     )
 
     dismiss_explicit_compaction_request(state, state.history)
@@ -640,6 +624,5 @@ def test_dismissed_explicit_request_does_not_retrigger_compaction():
         history=list(state.history),
         llm_config=llm_config,
         explicit=False,
-        critical=False,
     )
 

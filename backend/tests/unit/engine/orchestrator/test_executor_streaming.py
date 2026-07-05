@@ -71,6 +71,7 @@ def test_finalize_stream_tool_calls_filters_invalid_streamed_name() -> None:
     }
 
     assert executor._finalize_stream_tool_calls(state) is None
+    assert state.malformed_tool_call_dropped is True
 
 
 def test_finalize_stream_tool_calls_recovers_text_marker_after_bad_streamed_name() -> (
@@ -99,6 +100,45 @@ def test_finalize_stream_tool_calls_recovers_text_marker_after_bad_streamed_name
     assert calls is not None
     assert len(calls) == 1
     assert calls[0]['function']['name'] == 'execute_powershell'
+    assert state.malformed_tool_call_dropped is False
+
+
+def test_finalize_stream_tool_calls_flags_unparsed_tool_markup() -> None:
+    from backend.engine.executor import OrchestratorExecutor
+    from backend.engine.executor_mixins._executor_types import _AsyncStreamingState
+
+    executor = object.__new__(OrchestratorExecutor)
+    state = _AsyncStreamingState(
+        content_accumulate=(
+            'Now regenerate files:<tool_call>\n'
+            '<function=write_prog() {\n'
+            '    python3 -c "print(1)"\n'
+            '}</parameter>\n'
+            '</function>\n'
+            '</tool_call>'
+        )
+    )
+
+    assert executor._finalize_stream_tool_calls(state) is None
+    assert state.malformed_tool_call_dropped is True
+
+
+def test_emit_malformed_tool_call_observation_adds_error_event() -> None:
+    from backend.engine.executor import OrchestratorExecutor
+    from backend.ledger.event import EventSource
+    from backend.ledger.observation.error import ErrorObservation
+
+    executor = object.__new__(OrchestratorExecutor)
+    event_stream = _event_stream('malformed-tool-call')
+
+    executor._emit_malformed_tool_call_observation(event_stream)
+
+    event_stream.add_event.assert_called_once()
+    observation, source = event_stream.add_event.call_args[0]
+    assert isinstance(observation, ErrorObservation)
+    assert observation.error_id == 'MALFORMED_STREAMED_TOOL_CALL'
+    assert observation.agent_only is True
+    assert source == EventSource.ENVIRONMENT
 
 
 def test_final_stream_event_with_tool_call_suppresses_draft_reply():

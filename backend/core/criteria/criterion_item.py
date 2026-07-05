@@ -35,13 +35,6 @@ def normalize_criterion_payload(item: Any) -> dict[str, Any]:
     else:
         evidence = str(evidence_raw).strip() or None
 
-    evidence_ref_raw = item.get('evidence_ref')
-    evidence_ref: str | None
-    if evidence_ref_raw is None:
-        evidence_ref = None
-    else:
-        evidence_ref = str(evidence_ref_raw).strip() or None
-
     criterion_id = str(item.get('id') or '').strip() or None
 
     result: dict[str, Any] = {
@@ -49,7 +42,6 @@ def normalize_criterion_payload(item: Any) -> dict[str, Any]:
         'assertion': assertion,
         'source': source,
         'evidence': evidence,
-        'evidence_ref': evidence_ref,
     }
 
     changes = item.get('changes')

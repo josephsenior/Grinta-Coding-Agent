@@ -51,7 +51,7 @@ def _build_agent_execution_block(
     rules += [
         '**Verify before final summary** — run the narrowest relevant proof: reproducer, tests, lint, or typecheck'
         + (
-            '; then `acceptance_criteria(audit, audit_entries=[...])` with `evidence_ref` to prior tool output'
+            '; then `acceptance_criteria(audit, audit_entries=[...])` with `evidence` on every criterion'
             if criteria_on
             else ''
         )
@@ -154,13 +154,19 @@ def _render_critical(
     )
 
     task_tracker_antipattern = (
+        '- **Calling `task_tracker(update)` before `acceptance_criteria(update)` scopes outcomes.** '
+        'Criteria define done; milestones come second — see `<COMMON_PATTERNS>`.\n'
         '- **Writing the final summary with `task_tracker` items still `todo` or `in_progress`.** Sync the tracker first.'
-        if tracker_on and can_edit
-        else ''
+        if tracker_on and criteria_on and can_edit
+        else (
+            '- **Writing the final summary with `task_tracker` items still `todo` or `in_progress`.** Sync the tracker first.'
+            if tracker_on and can_edit
+            else ''
+        )
     )
     acceptance_criteria_antipattern = (
         '- **Writing the final summary when criteria exist but `acceptance_criteria(audit, audit_entries=[...])` was not done.** '
-        'Attach `evidence_ref` to prior tool output — do not paraphrase evidence from memory.\n'
+        'Record brief `evidence` per criterion from verification output or state an explicit gap.\n'
         '- **Rewriting the full criteria list to fix one assertion.** Use `refine(criterion_id, new_assertion, reason)` instead.'
         if criteria_on and can_edit
         else ''

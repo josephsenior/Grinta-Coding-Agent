@@ -19,7 +19,6 @@ def test_normalize_preserves_optional_fields():
             'assertion': 'Tests pass',
             'source': 'stated',
             'evidence': 'pytest ok',
-            'evidence_ref': 'call_1:lines[1-3]',
             'changes': [
                 {
                     'at': '2026-01-01T00:00:00Z',
@@ -31,7 +30,7 @@ def test_normalize_preserves_optional_fields():
         }
     )
     assert item['id'] == 'ac1'
-    assert item['evidence_ref'] == 'call_1:lines[1-3]'
+    assert item['evidence'] == 'pytest ok'
     assert len(item['changes']) == 1
 
 

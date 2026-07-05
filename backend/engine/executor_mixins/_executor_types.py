@@ -39,6 +39,7 @@ class ExecutionResult:
     response: ModelResponse | Any | None = None
     execution_time: float = 0.0
     error: str | None = None
+    malformed_tool_call_dropped: bool = False
 
 
 @dataclass(slots=True)
@@ -53,6 +54,7 @@ class _AsyncStreamingState:
     last_text_emit_len: int = 0
     last_thinking_emit_at: float = 0.0
     last_thinking_emit_len: int = 0
+    malformed_tool_call_dropped: bool = False
 
 
 class _FunctionCallingProxy:

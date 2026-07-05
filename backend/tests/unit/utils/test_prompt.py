@@ -958,7 +958,7 @@ class TestBuildSystemPromptRenders:
         assert '**Purpose:**' in result
         assert '**Live state:**' in result
         assert 'audit_entries' in result
-        assert 'evidence_ref' in result
+        assert 'evidence' in result
         assert 'audit(audit_entries)' in result
 
     def test_meta_cognition_enabled(self) -> None:

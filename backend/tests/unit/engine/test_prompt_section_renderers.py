@@ -111,7 +111,7 @@ class TestRenderCriticalModeSpecific:
     def test_agent_mode_verify_rule_mentions_audit_entries(self):
         body = self._render_critical(mode='agent', criteria_on=True)
         self._assert_contains_body(body, 'audit_entries')
-        self._assert_contains_body(body, 'evidence_ref')
+        self._assert_contains_body(body, 'evidence')
 
     def test_agent_mode_contains_exactly_10_rules(self):
         body = self._render_critical(mode='agent', terminal_manager_available=False)

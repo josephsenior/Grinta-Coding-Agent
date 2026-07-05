@@ -168,3 +168,95 @@ def test_continuity_eval_reports_missing_semantic_fact():
     assert not result.passed
     assert result.score < 1.0
     assert any(f.category == 'invalidated_assumption' for f in result.missing)
+
+
+def test_file_facts_capped_to_compact_snapshot_limit():
+    from backend.context.compactor.pre_condensation_snapshot import (
+        MAX_FILES_IN_COMPACT_SNAPSHOT,
+        active_file_paths_from_files_touched,
+    )
+    from backend.ledger.observation.files import FileEditObservation
+
+    events = [
+        FileEditObservation(
+            content='edited',
+            path=f'src/module_{index}.py',
+            new_content='x = 1\n',
+        )
+        for index in range(MAX_FILES_IN_COMPACT_SNAPSHOT + 10)
+    ]
+    facts = build_continuity_facts(events)
+    file_facts = [fact for fact in facts if fact.category == 'file']
+    assert len(file_facts) == MAX_FILES_IN_COMPACT_SNAPSHOT
+
+    snapshot = extract_snapshot(events)
+    assert active_file_paths_from_files_touched(
+        snapshot.get('files_touched', {})
+    ) == [fact.expected_text for fact in file_facts]
+
+
+def test_snapshot_in_restored_context_improves_file_continuity_score():
+    from backend.context.compactor.pre_condensation_snapshot import (
+        MAX_FILES_IN_COMPACT_SNAPSHOT,
+    )
+    from backend.ledger.observation.files import FileEditObservation
+
+    events = [
+        FileEditObservation(
+            content='edited',
+            path=f'ouroboros/compiler/file_{index}.py',
+            new_content='pass\n',
+        )
+        for index in range(MAX_FILES_IN_COMPACT_SNAPSHOT)
+    ]
+    snapshot = extract_snapshot(events)
+    snapshot_text = format_snapshot_for_injection(snapshot)
+    prose_only = 'Continued compiler work on ouroboros.'
+
+    prose_result = evaluate_restored_context(events, prose_only)
+    combined_result = evaluate_restored_context(
+        events, f'{prose_only}\n\n{snapshot_text}'
+    )
+
+    assert prose_result.score < 0.5
+    assert combined_result.score == 1.0
+
+
+def test_canonical_active_files_match_files_touched_cap() -> None:
+    from backend.context.canonical_state import reduce_events_into_state
+    from backend.context.canonical_state.types import CanonicalTaskState
+    from backend.context.compactor.pre_condensation_snapshot import (
+        MAX_FILES_IN_COMPACT_SNAPSHOT,
+        active_file_paths_from_files_touched,
+        extract_snapshot,
+    )
+    from backend.ledger.observation.files import FileEditObservation
+
+    events = [
+        FileEditObservation(
+            content='edited',
+            path=f'mod_{index}.py',
+            new_content='pass\n',
+        )
+        for index in range(MAX_FILES_IN_COMPACT_SNAPSHOT + 5)
+    ]
+    snapshot = extract_snapshot(events)
+    canonical = reduce_events_into_state(events, CanonicalTaskState(), persist=False)
+
+    expected = active_file_paths_from_files_touched(snapshot.get('files_touched', {}))
+    assert canonical.active_files[-len(expected) :] == expected
+
+
+def test_canonical_render_omits_active_files_list() -> None:
+    from backend.context.canonical_state import render_canonical_state_for_prompt
+    from backend.context.canonical_state.types import CanonicalTaskState
+
+    canonical = CanonicalTaskState(
+        objective='Build compiler',
+        active_files=['ouroboros/compiler/ast.py'],
+        blockers=['tests failing'],
+    )
+    rendered = render_canonical_state_for_prompt(canonical, char_budget=2000)
+
+    assert 'Active files' not in rendered
+    assert 'tests failing' in rendered

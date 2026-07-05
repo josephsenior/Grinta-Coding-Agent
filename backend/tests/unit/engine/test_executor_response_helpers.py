@@ -1,6 +1,11 @@
 """Executor response helper tests."""
 
-from backend.engine.executor_response_helpers import prepare_streamed_message_actions
+from __future__ import annotations
+
+from backend.engine.executor_response_helpers import (
+    apply_malformed_tool_call_recovery,
+    prepare_streamed_message_actions,
+)
 from backend.ledger.action import MessageAction
 
 
@@ -49,3 +54,19 @@ def test_prepare_streamed_message_actions_does_not_suppress_content() -> None:
     )
     assert actions[0].suppress_cli is False
     assert actions[0].content == 'Final answer.'
+
+
+def test_apply_malformed_tool_call_recovery_clears_final_response() -> None:
+    action = MessageAction(content='Continuing work.', final_response=True)
+
+    apply_malformed_tool_call_recovery([action], malformed_tool_call_dropped=True)
+
+    assert action.final_response is False
+
+
+def test_apply_malformed_tool_call_recovery_noop_when_not_dropped() -> None:
+    action = MessageAction(content='Done.', final_response=True)
+
+    apply_malformed_tool_call_recovery([action], malformed_tool_call_dropped=False)
+
+    assert action.final_response is True

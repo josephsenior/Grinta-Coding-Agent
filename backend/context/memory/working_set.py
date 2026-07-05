@@ -18,7 +18,6 @@ from backend.ledger.observation.agent import AgentCondensationObservation
 _WORKING_SET_MARKER = '<DURABLE_WORKING_SET>'
 _MAX_FAILED_APPROACH_RECORDS = 8
 _MAX_BACKGROUND_TASK_RECORDS = 5
-_MAX_CURRENT_STATE_FILES = 12
 
 
 def _sync_findings_block(
@@ -197,7 +196,6 @@ def _build_current_state(snapshot: dict[str, Any]) -> dict[str, Any]:
     return {
         'objective': objective[:500],
         'latest_directive': latest_directive[:500],
-        'active_files': _active_files(snapshot),
         'latest_test': latest_test,
         'unresolved_blockers': blockers,
         'invalidated_assumptions': _string_tail(
@@ -213,17 +211,6 @@ def _latest_test_result(snapshot: dict[str, Any]) -> dict[str, Any] | None:
         return None
     latest = results[-1]
     return latest if isinstance(latest, dict) else None
-
-
-def _active_files(snapshot: dict[str, Any]) -> list[str]:
-    files = snapshot.get('files_touched', {})
-    if not isinstance(files, dict):
-        return []
-    return [
-        path
-        for path in list(files.keys())[-_MAX_CURRENT_STATE_FILES:]
-        if isinstance(path, str)
-    ]
 
 
 def _current_blockers(
@@ -289,9 +276,6 @@ def _render_current_state(state: dict[str, Any]) -> str:
         'objective'
     ):
         lines.append(f'- Latest directive: {state["latest_directive"]}')
-    active_files = state.get('active_files')
-    if isinstance(active_files, list) and active_files:
-        lines.append('- Active files: ' + ', '.join(str(path) for path in active_files))
     latest_test = state.get('latest_test')
     if isinstance(latest_test, dict):
         status = str(latest_test.get('status', '?')).upper()

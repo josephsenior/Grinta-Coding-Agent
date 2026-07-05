@@ -12,7 +12,7 @@ from backend.engine.tools.param_defs import create_tool_definition, get_command_
 
 _ACCEPTANCE_CRITERIA_DESCRIPTION = (
     'Verifiable done-conditions (what must be true). See `<ACCEPTANCE_CRITERIA>`. '
-    'Commands: `view`, `update`, `append`, `refine`, `audit` (`evidence_ref` before final summary).'
+    'Commands: `view`, `update`, `append`, `refine`, `audit` (before final summary).'
 )
 
 _CRITERION_ITEM_SCHEMA: dict[str, Any] = {
@@ -39,8 +39,8 @@ _CRITERION_ITEM_SCHEMA: dict[str, Any] = {
         'evidence': {
             'type': 'string',
             'description': (
-                'Legacy audit field: free-text evidence or gap. Prefer `audit_entries` with '
-                '`evidence_ref` for objective checks; use free-text only with `unverifiable: true`.'
+                'Audit evidence or explicit gap (e.g. "pytest: 42 passed"). '
+                'Prefer `audit_entries` with `evidence` on each criterion.'
             ),
         },
     },
@@ -55,30 +55,15 @@ _AUDIT_ENTRY_SCHEMA: dict[str, Any] = {
             'type': 'string',
             'description': 'Stable id of the criterion being audited (from `view`).',
         },
-        'evidence_ref': {
-            'type': 'string',
-            'description': (
-                'Preferred: reference prior tool output from this session. Valid forms: '
-                '`call_<tool_call_id>:lines[n-m]`, `event:<event_id>:lines[n-m]`, or '
-                '`execute_bash:<command-or-label>` / `execute_powershell:<command-or-label>`. '
-                'If a ref cannot be matched, optional `evidence` is used as fallback.'
-            ),
-        },
         'evidence': {
             'type': 'string',
             'description': (
-                'Free-text evidence or explicit gap (e.g. "GAP: not implemented"). '
-                'Only for subjective/unverifiable criteria when paired with `unverifiable: true`.'
-            ),
-        },
-        'unverifiable': {
-            'type': 'boolean',
-            'description': (
-                'Required true when using free-text `evidence` instead of `evidence_ref`.'
+                'Free-text evidence or explicit gap (e.g. "pytest: 42 passed, 1 skipped" '
+                'or "GAP: not implemented"). Quote the relevant command output or observation.'
             ),
         },
     },
-    'required': ['criterion_id'],
+    'required': ['criterion_id', 'evidence'],
     'additionalProperties': False,
 }
 
