@@ -38,6 +38,23 @@ _MAX_TEST_RESULTS = 8
 _MAX_INVALIDATED_ASSUMPTIONS = 12
 _MAX_CONTENT_LENGTH = 500
 _MAX_TASKS = 20
+# Cap file paths listed in compact snapshot and continuity checks (aligned).
+MAX_FILES_IN_COMPACT_SNAPSHOT = 30
+
+
+def active_file_paths_from_files_touched(
+    files: object,
+    *,
+    max_files: int = MAX_FILES_IN_COMPACT_SNAPSHOT,
+) -> list[str]:
+    """Return capped path list derived from ``files_touched`` snapshot dict."""
+    if not isinstance(files, dict) or max_files <= 0:
+        return []
+    return [
+        path
+        for path, _info in list(files.items())[:max_files]
+        if isinstance(path, str) and path
+    ]
 
 
 def _agent_debug_log(
@@ -1081,7 +1098,7 @@ def _format_files_section(files: dict) -> list[str]:
     if not files:
         return []
     lines = ['\nFiles touched before condensation:']
-    for path, info in list(files.items())[:30]:
+    for path, info in list(files.items())[:MAX_FILES_IN_COMPACT_SNAPSHOT]:
         suffix = ''
         file_hash = info.get('sha256')
         if isinstance(file_hash, str) and file_hash:

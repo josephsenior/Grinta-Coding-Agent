@@ -51,19 +51,6 @@ def _build_context_discipline_section(
             '**checkpoint** — see System Capabilities and `<EDITOR_AND_FILE_OPERATIONS>`.'
         )
 
-    if tracker_on:
-        parts.extend(
-            [
-                '',
-                '**task_tracker** — milestones only; see `<TASK_TRACKING>`.',
-            ]
-        )
-        if condensation_on:
-            parts.append(
-                'Post-condensation: live ids/status are in `<EXECUTION_CONTRACT>`; '
-                'call `task_tracker(view)` only if you need the full markdown plan.'
-            )
-
     if criteria_on:
         parts.extend(
             [
@@ -75,6 +62,19 @@ def _build_context_discipline_section(
             parts.append(
                 'Post-condensation: live ids are in `<EXECUTION_CONTRACT>`; '
                 'call `acceptance_criteria(view)` only if you need the full list.'
+            )
+
+    if tracker_on:
+        parts.extend(
+            [
+                '',
+                '**task_tracker** — milestones only; see `<TASK_TRACKING>`.',
+            ]
+        )
+        if condensation_on:
+            parts.append(
+                'Post-condensation: live ids/status are in `<EXECUTION_CONTRACT>`; '
+                'call `task_tracker(view)` only if you need the full markdown plan.'
             )
 
     parts.append('</CONTEXT_DISCIPLINE>')
@@ -96,10 +96,10 @@ def _build_when_to_use_context(
         parts.append(
             '- **checkpoint**: before revert or when milestones are stale — see System Capabilities.'
         )
-    if tracker_on:
-        parts.append('- **task_tracker**: See `<TASK_TRACKING>`.')
     if criteria_on:
         parts.append('- **acceptance_criteria**: See `<ACCEPTANCE_CRITERIA>`.')
+    if tracker_on:
+        parts.append('- **task_tracker**: See `<TASK_TRACKING>`.')
     if not tracker_on and not criteria_on:
         parts.append(
             '- Use fresh reads/searches and recent observations to stay grounded.'
@@ -149,8 +149,8 @@ def _build_task_sync_instruction(*, tracker_on: bool, criteria_on: bool) -> str:
     steps.append('run the narrowest verification')
     if criteria_on:
         steps.append(
-            '`acceptance_criteria(audit, audit_entries=[...])` with `evidence_ref` '
-            'pointing at prior tool output'
+            '`acceptance_criteria(audit, audit_entries=[...])` with brief `evidence` '
+            'per criterion (command output, test summary, or explicit gap)'
         )
     steps.append('write the final summary')
     ordered = '; '.join(f'{index}. {step}' for index, step in enumerate(steps, 1))
@@ -210,7 +210,7 @@ def _render_autonomy(
             '<TASK_TRACKING>\n'
             '**Purpose:** Coarse execution milestones (3–7 steps) — activities and sequencing, '
             'not verifiable done-conditions.\n'
-            '**When:** After the first implementation directive in Agent mode, before editing '
+            '**When:** After `acceptance_criteria(update)` scopes outcomes and before editing '
             'files or running commands.\n'
             '**Commands:** `view` (read plan), `update` (replace full `task_list`), '
             '`update_status` (one step by `task_id`).\n'
@@ -231,16 +231,15 @@ def _render_autonomy(
             '<ACCEPTANCE_CRITERIA>\n'
             '**Purpose:** Flat auditable assertions — what must be true when done, '
             'not activity steps.\n'
-            '**When:** `update` to scope outcomes before implementation; '
+            '**When:** `update` to scope outcomes before `task_tracker` and implementation; '
             '`audit(audit_entries=[...])` before the final summary.\n'
             '**Commands:** `view`, `update` (full list), `append`, '
             '`refine(criterion_id, new_assertion, reason)`, `audit`.\n'
-            '**Audit evidence:** prefer `evidence_ref` '
-            '(`call_<id>:lines[n-m]`, `event:<id>`, or `execute_bash:<command>`). '
-            'If a ref cannot be matched, include short `evidence` text as fallback.\n'
+            '**Audit evidence:** each `audit_entries` item needs `criterion_id` and '
+            'short `evidence` text — quote the relevant command output, test summary, '
+            'or state an explicit gap (e.g. "GAP: not verified on this platform").\n'
             '**Item fields:** `assertion`, `source` (`stated`|`inferred`); stable `id` on write.\n'
-            '**Rules:** Fix one assertion with `refine` — never rewrite the full list. '
-            'Subjective checks may use free-text `evidence` with `unverifiable: true`.\n'
+            '**Rules:** Fix one assertion with `refine` — never rewrite the full list.\n'
             '**Live state:** `<EXECUTION_CONTRACT>` in `<CONTEXT_PACKET>` each turn.\n'
             f'{_CRITERIA_VS_TASKS_LINE}\n'
             '**Workflow examples:** see `<COMMON_PATTERNS>`.\n'

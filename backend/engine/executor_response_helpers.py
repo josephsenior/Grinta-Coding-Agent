@@ -59,6 +59,28 @@ def suppress_cli_for_streamed_final_messages(
     )
 
 
+_MALFORMED_TOOL_CALL_OBSERVATION = (
+    'A tool call in the previous response was malformed or could not be parsed '
+    'and was not executed. Re-issue the call with a valid tool name and JSON '
+    'arguments.'
+)
+
+
+def apply_malformed_tool_call_recovery(
+    actions: list[Action],
+    *,
+    malformed_tool_call_dropped: bool,
+) -> None:
+    """Keep the agent loop running after a dropped/unparsed streamed tool call."""
+    if not malformed_tool_call_dropped:
+        return
+    from backend.ledger.action import MessageAction
+
+    for action in actions:
+        if isinstance(action, MessageAction):
+            action.final_response = False
+
+
 def without_blank_agent_messages(actions: list[Action]) -> list[Action]:
     """Drop agent ``MessageAction``s with nothing user-visible."""
     from backend.ledger.action import MessageAction

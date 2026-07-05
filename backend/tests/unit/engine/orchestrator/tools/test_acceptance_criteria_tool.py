@@ -75,29 +75,7 @@ class TestHandleAcceptanceCriteriaTool:
         with pytest.raises(Exception, match='evidence'):
             _handle_acceptance_criteria_tool(args)
 
-    def test_audit_entries_requires_unverifiable_for_free_text(self):
-        stored = [
-            {
-                'id': 'ac1',
-                'assertion': 'Looks good',
-                'source': 'stated',
-                'evidence': None,
-            }
-        ]
-        args = {
-            'command': 'audit',
-            'audit_entries': [
-                {'criterion_id': 'ac1', 'evidence': 'subjective check passed'},
-            ],
-        }
-        with patch(
-            'backend.engine.tools._tool_handlers.AcceptanceCriteriaStore'
-        ) as store_cls:
-            store_cls.return_value.load_from_file.return_value = stored
-            with pytest.raises(Exception, match='unverifiable'):
-                _handle_acceptance_criteria_tool(args)
-
-    def test_audit_entries_accepts_evidence_ref(self):
+    def test_audit_entries_accepts_free_text_evidence(self):
         stored = [
             {
                 'id': 'ac1',
@@ -109,7 +87,10 @@ class TestHandleAcceptanceCriteriaTool:
         args = {
             'command': 'audit',
             'audit_entries': [
-                {'criterion_id': 'ac1', 'evidence_ref': 'call_abc:lines[1-5]'},
+                {
+                    'criterion_id': 'ac1',
+                    'evidence': 'pytest: 42 passed',
+                },
             ],
         }
         with patch(
@@ -118,7 +99,7 @@ class TestHandleAcceptanceCriteriaTool:
             store_cls.return_value.load_from_file.return_value = stored
             action = _handle_acceptance_criteria_tool(args)
         assert action.command == 'audit'
-        assert action.audit_entries[0]['evidence_ref'] == 'call_abc:lines[1-5]'
+        assert action.audit_entries[0]['evidence'] == 'pytest: 42 passed'
 
     def test_refine_requires_reason(self):
         stored = [{'id': 'ac1', 'assertion': 'A', 'source': 'stated'}]

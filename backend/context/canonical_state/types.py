@@ -32,6 +32,7 @@ _PIVOT_MARKERS = (
     'drop the',
     'abandon the',
 )
+# Keep aligned with ``MAX_FILES_IN_COMPACT_SNAPSHOT`` in pre_condensation_snapshot.
 _MAX_ACTIVE_FILES = 30
 _MAX_BLOCKERS = 12
 _MAX_DECISIONS = 12

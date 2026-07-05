@@ -423,7 +423,7 @@ def _collect_system_prompt_sections(
     )
     if is_plan_mode(mode):
         plan_tools_line = (
-            'Scope with `acceptance_criteria` and `task_tracker` — see `<ACCEPTANCE_CRITERIA>` and `<COMMON_PATTERNS>`. '
+            'Scope with `acceptance_criteria(update)` first, then `task_tracker(update)` — see `<ACCEPTANCE_CRITERIA>` and `<COMMON_PATTERNS>`. '
             'Do not audit in Plan mode (no executable evidence yet).\n'
             if bool(getattr(config, 'enable_acceptance_criteria_tool', True))
             and bool(getattr(config, 'enable_task_tracker_tool', True))

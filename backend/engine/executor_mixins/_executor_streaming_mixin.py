@@ -758,7 +758,10 @@ class _ExecutorStreamingMixin:
         self,
         state: _AsyncStreamingState,
     ) -> list[dict[str, Any]] | None:
-        tool_calls_list = self._valid_stream_tool_calls(state.tool_calls_dict)
+        state.malformed_tool_call_dropped = False
+        tool_calls_list, dropped_native = self._valid_stream_tool_calls(
+            state.tool_calls_dict
+        )
         if not tool_calls_list and state.content_accumulate:
             from backend.cli.display.tool_call_display import (
                 extract_tool_calls_from_text_markers,
@@ -774,15 +777,30 @@ class _ExecutorStreamingMixin:
                 )
                 for index, tool_call in enumerate(text_tool_calls):
                     state.tool_calls_dict[index] = tool_call
-                tool_calls_list = self._valid_stream_tool_calls(state.tool_calls_dict)
+                tool_calls_list, dropped_more = self._valid_stream_tool_calls(
+                    state.tool_calls_dict
+                )
+                dropped_native = dropped_native or dropped_more
 
-        return tool_calls_list or None
+        if tool_calls_list:
+            return tool_calls_list
+
+        if dropped_native:
+            state.malformed_tool_call_dropped = True
+        elif state.content_accumulate:
+            from backend.core.tools.tool_transport import contains_tool_transport_markup
+
+            if contains_tool_transport_markup(state.content_accumulate):
+                state.malformed_tool_call_dropped = True
+
+        return None
 
     @staticmethod
     def _valid_stream_tool_calls(
         tool_calls_dict: dict[int, dict[str, Any]],
-    ) -> list[dict[str, Any]]:
+    ) -> tuple[list[dict[str, Any]], bool]:
         tool_calls: list[dict[str, Any]] = []
+        dropped = False
         for idx in sorted(tool_calls_dict.keys()):
             tool_call = tool_calls_dict[idx]
             function = tool_call.get('function') or {}
@@ -790,11 +808,33 @@ class _ExecutorStreamingMixin:
             if is_valid_tool_call_name(name):
                 tool_calls.append(tool_call)
                 continue
+            dropped = True
             logger.warning(
                 'Ignoring malformed streamed tool call with invalid function name: %r',
                 name,
             )
-        return tool_calls
+        return tool_calls, dropped
+
+    def _emit_malformed_tool_call_observation(
+        self,
+        event_stream: EventStream | None,
+    ) -> None:
+        if event_stream is None:
+            return
+        from backend.engine.executor_response_helpers import (
+            _MALFORMED_TOOL_CALL_OBSERVATION,
+        )
+        from backend.ledger.event import EventSource
+        from backend.ledger.observation.error import ErrorObservation
+
+        event_stream.add_event(
+            ErrorObservation(
+                content=_MALFORMED_TOOL_CALL_OBSERVATION,
+                error_id='MALFORMED_STREAMED_TOOL_CALL',
+                agent_only=True,
+            ),
+            EventSource.ENVIRONMENT,
+        )
 
     async def _handle_first_chunk_timeout_fallback(
         self,

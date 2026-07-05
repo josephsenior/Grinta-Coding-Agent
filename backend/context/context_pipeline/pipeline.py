@@ -237,8 +237,6 @@ class ContextPipeline:
             state=state,
         )
         explicit = has_actionable_explicit_request(state, history)
-        memory_pressure = getattr(turn_signals, 'memory_pressure', None)
-        critical_pressure = memory_pressure == 'CRITICAL'
 
         self._log_budget_snapshot(
             stage='prepare_step',
@@ -246,7 +244,7 @@ class ContextPipeline:
             budget=budget,
             llm_config=llm_config,
             explicit=explicit,
-            memory_pressure=memory_pressure,
+            memory_pressure=getattr(turn_signals, 'memory_pressure', None),
         )
 
         if not should_run_compaction(
@@ -256,20 +254,18 @@ class ContextPipeline:
             history=history,
             llm_config=llm_config,
             explicit=explicit,
-            critical=critical_pressure,
         ):
             delete_staging_snapshot(state=state)
             return CondensedHistory(history, None)
 
-        force = explicit or critical_pressure
         action = await self._compaction_engine.run(
             state,
             history,
             events,
             budget,
             llm_config=llm_config,
-            force=force,
-            critical=critical_pressure,
+            force=explicit,
+            critical=False,
         )
         if action is None or not (action.summary or '').strip():
             if explicit:
@@ -301,9 +297,6 @@ class ContextPipeline:
         )
 
         merge_compaction_summary_into_canonical(state=state, summary=action.summary or '')
-        if critical_pressure:
-            state.ack_memory_pressure(source='ContextPipeline')
-            self._record_pressure_condensation()
         logger.info(
             'ContextPipeline committed compaction (pruned=%d elapsed=%.3fs)',
             len(action.pruned),
@@ -435,8 +428,6 @@ class ContextPipeline:
             state=state,
         )
         explicit = has_actionable_explicit_request(state, history)
-        memory_pressure = getattr(turn_signals, 'memory_pressure', None)
-        critical_pressure = memory_pressure == 'CRITICAL'
         return should_run_compaction(
             state,
             events=events,
@@ -444,7 +435,6 @@ class ContextPipeline:
             history=history,
             llm_config=llm_config,
             explicit=explicit,
-            critical=critical_pressure,
         )
 
     # ------------------------------------------------------------------ #
@@ -522,7 +512,7 @@ class ContextPipeline:
     ) -> None:
         limits = limits_from_config(llm_config, unknown_default=True)
         model = str(getattr(llm_config, 'model', '') or '<unknown>')
-        triggered = budget.should_autocompact or explicit or bool(memory_pressure)
+        triggered = budget.should_autocompact or explicit
         if not triggered and budget.estimated_tokens < int(
             budget.autocompact_threshold * 0.75
         ):

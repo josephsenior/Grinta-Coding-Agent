@@ -207,8 +207,7 @@ class TestPostExecution:
         self.ctrl.rate_governor.check_and_wait.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_memory_pressure_condensation(self):
-        # No metrics to avoid rate governor path; trigger condensation path
+    async def test_memory_pressure_logs_without_signalling_compaction(self):
         if hasattr(self.ctrl.state_tracker.state, 'metrics'):
             del self.ctrl.state_tracker.state.metrics
         self.ctrl.config.agent._last_llm_latency = None
@@ -221,12 +220,11 @@ class TestPostExecution:
         await self.ctrl._handle_post_execution()
 
         self.ctrl.memory_pressure.record_condensation.assert_not_called()
-        self.ctrl.state_tracker.state.set_memory_pressure.assert_called_once_with(
-            'WARNING', source='SessionOrchestrator'
-        )
+        self.ctrl.memory_pressure.start_prewarm.assert_not_called()
+        self.ctrl.state_tracker.state.set_memory_pressure.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_warning_prewarm_uses_pipeline(self):
+    async def test_warning_does_not_start_background_prewarm(self):
         if hasattr(self.ctrl.state_tracker.state, 'metrics'):
             del self.ctrl.state_tracker.state.metrics
         self.ctrl.config.agent._last_llm_latency = None
@@ -239,18 +237,9 @@ class TestPostExecution:
         self.ctrl.state_tracker.state.turn_signals = MagicMock()
         self.ctrl.state_tracker.state.set_memory_pressure = MagicMock()
 
-        pipeline = SimpleNamespace(
-            prewarm_compaction=AsyncMock(return_value='background'),
-        )
-        self.ctrl.config.agent.memory_manager = SimpleNamespace(_pipeline=pipeline)
-
         await self.ctrl._handle_post_execution()
 
-        coro_factory = self.ctrl.memory_pressure.start_prewarm.call_args.args[0]
-        result = await coro_factory()
-
-        assert result == 'background'
-        pipeline.prewarm_compaction.assert_awaited_once()
+        self.ctrl.memory_pressure.start_prewarm.assert_not_called()
 
 
 # ── Action context management ────────────────────────────────────────

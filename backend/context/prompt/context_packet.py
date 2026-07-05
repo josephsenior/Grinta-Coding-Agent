@@ -265,7 +265,6 @@ def _canonical_has_packet_details(canonical: CanonicalTaskState) -> bool:
         canonical.superseding_directive
         or canonical.active_plan
         or canonical.implementation_checkpoint
-        or canonical.active_files
         or canonical.verification.command
         or canonical.blockers
         or canonical.failed_approaches
@@ -478,8 +477,6 @@ def _operational_checkpoint(canonical: CanonicalTaskState) -> str:
         lines.append(f'Next action: {canonical.next_action}')
     if canonical.implementation_checkpoint:
         lines.append(f'Checkpoint: {canonical.implementation_checkpoint}')
-    if canonical.active_files:
-        lines.append('Active files: ' + ', '.join(canonical.active_files[-10:]))
     return '\n'.join(lines)
 
 

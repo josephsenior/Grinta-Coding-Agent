@@ -8,11 +8,9 @@ from unittest.mock import MagicMock, patch
 
 from backend.execution.acceptance_criteria import AcceptanceCriteriaMixin
 from backend.ledger.action import AcceptanceCriteriaAction
-from backend.ledger.infra.tool import ToolCallMetadata
 from backend.ledger.observation import (
     AcceptanceCriteriaObservation,
     ErrorObservation,
-    Observation,
 )
 
 
@@ -135,22 +133,17 @@ class TestAcceptanceCriteriaMixin(TestCase):
         self.assertEqual(obs.criteria_list[0]['assertion'], 'Timeout is 5 ticks')
         self.assertEqual(len(obs.criteria_list[0]['changes']), 1)
 
-    def test_audit_resolves_evidence_ref(self):
-        obs = Observation(content='line1\nline2\nline3')
-        obs.tool_call_metadata = ToolCallMetadata(
-            function_name='run',
-            tool_call_id='call_audit_1',
-            model_response={},
-            total_calls_in_response=1,
-        )
-        self.mixin.event_stream.search_events.return_value = [obs]
+    def test_audit_records_free_text_evidence(self):
         action = AcceptanceCriteriaAction(
             command='audit',
             criteria_list=[
                 {'id': 'ac1', 'assertion': 'Tests pass', 'source': 'stated'}
             ],
             audit_entries=[
-                {'criterion_id': 'ac1', 'evidence_ref': 'call_audit_1:lines[2]'}
+                {
+                    'criterion_id': 'ac1',
+                    'evidence': 'pytest: 42 passed, 1 skipped',
+                }
             ],
         )
         with patch(
@@ -163,28 +156,22 @@ class TestAcceptanceCriteriaMixin(TestCase):
                 result = self.mixin._handle_acceptance_criteria_action(action)
 
         obs_result = cast(AcceptanceCriteriaObservation, result)
-        self.assertEqual(obs_result.criteria_list[0]['evidence'], 'line2')
         self.assertEqual(
-            obs_result.criteria_list[0]['evidence_ref'], 'call_audit_1:lines[2]'
+            obs_result.criteria_list[0]['evidence'], 'pytest: 42 passed, 1 skipped'
         )
 
-    def test_audit_unresolved_evidence_ref_records_placeholder(self):
+    def test_audit_missing_evidence_returns_error(self):
         action = AcceptanceCriteriaAction(
             command='audit',
             criteria_list=[
                 {'id': 'ac1', 'assertion': 'Tests pass', 'source': 'stated'}
             ],
-            audit_entries=[{'criterion_id': 'ac1', 'evidence_ref': 'call_missing'}],
+            audit_entries=[{'criterion_id': 'ac1', 'evidence': ''}],
         )
         with patch(
             'backend.execution.acceptance_criteria.get_conversation_dir',
             return_value='/tmp/conv/',
         ):
-            with patch(
-                'backend.core.criteria.acceptance_criteria_store.AcceptanceCriteriaStore.save_to_file'
-            ):
-                result = self.mixin._handle_acceptance_criteria_action(action)
+            result = self.mixin._handle_acceptance_criteria_action(action)
 
-        obs_result = cast(AcceptanceCriteriaObservation, result)
-        self.assertIn('unresolved evidence_ref', obs_result.criteria_list[0]['evidence'])
-        self.assertIn('Audit notes', obs_result.content)
+        self.assertIsInstance(result, ErrorObservation)

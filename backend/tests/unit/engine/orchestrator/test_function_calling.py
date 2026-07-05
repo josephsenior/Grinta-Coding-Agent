@@ -268,6 +268,15 @@ class TestHandleMcpTool:
 
 
 class TestHandleTaskTrackerTool:
+    @pytest.fixture(autouse=True)
+    def _seed_acceptance_criteria(self, monkeypatch):
+        monkeypatch.setattr(
+            'backend.engine.tools._tool_handlers.AcceptanceCriteriaStore.load_from_file',
+            lambda self: [
+                {'id': 'c1', 'assertion': 'Work is verified', 'source': 'stated'},
+            ],
+        )
+
     def test_update_command_with_task_list(self):
         args = {
             'command': 'update',
@@ -398,6 +407,10 @@ class TestHandleTaskTrackerTool:
             'backend.core.workspace_resolution.workspace_agent_state_dir',
             lambda project_root=None: tmp_path,
         )
+        monkeypatch.setattr(
+            'backend.context.memory.session_context.scoped_agent_path',
+            lambda stem, ext, **kwargs: tmp_path / f'{stem}{ext}',
+        )
         args = {
             'command': 'update',
             'task_list': [{'id': '1', 'description': 'step', 'status': 'in_progress'}],
@@ -405,13 +418,89 @@ class TestHandleTaskTrackerTool:
 
         first = _handle_task_tracker_tool(args)
         assert isinstance(first, TaskTrackingAction)
-        from backend.engine.tools.task_tracker import TaskTracker
+        from backend.core.tasks.task_tracker import TaskTracker
 
-        TaskTracker(tmp_path).save_to_file(first.task_list)
+        TaskTracker().save_to_file(first.task_list)
 
         second = _handle_task_tracker_tool(args)
         assert isinstance(second, TaskTrackingAction)
         assert 'unchanged' in second.thought.lower()
+
+
+class TestTaskTrackerAcceptanceCriteriaOrdering:
+    def test_update_before_criteria_raises(self, monkeypatch):
+        monkeypatch.setattr(
+            'backend.engine.tools._tool_handlers._acceptance_criteria_tool_enabled',
+            lambda: True,
+        )
+        monkeypatch.setattr(
+            'backend.engine.tools._tool_handlers.AcceptanceCriteriaStore.load_from_file',
+            lambda self: [],
+        )
+        args = {
+            'command': 'update',
+            'task_list': [
+                {'id': 'task-1', 'description': 'Do X', 'status': 'todo'},
+            ],
+        }
+
+        with pytest.raises(FunctionCallValidationError, match='acceptance criteria'):
+            _handle_task_tracker_tool(args)
+
+    def test_update_allowed_after_criteria_exist(self, monkeypatch):
+        monkeypatch.setattr(
+            'backend.engine.tools._tool_handlers._acceptance_criteria_tool_enabled',
+            lambda: True,
+        )
+        monkeypatch.setattr(
+            'backend.engine.tools._tool_handlers.AcceptanceCriteriaStore.load_from_file',
+            lambda self: [
+                {'id': 'c1', 'assertion': 'Feature works', 'source': 'stated'},
+            ],
+        )
+        args = {
+            'command': 'update',
+            'task_list': [
+                {'id': 'task-1', 'description': 'Do X', 'status': 'todo'},
+            ],
+        }
+
+        action = _handle_task_tracker_tool(args)
+        assert isinstance(action, TaskTrackingAction)
+
+    def test_update_allowed_when_plan_already_exists(self, monkeypatch):
+        existing_plan = [
+            {
+                'id': 'task-1',
+                'description': 'Existing',
+                'status': 'in_progress',
+                'result': None,
+                'tags': [],
+                'subtasks': [],
+            }
+        ]
+        monkeypatch.setattr(
+            'backend.engine.tools._tool_handlers._acceptance_criteria_tool_enabled',
+            lambda: True,
+        )
+        monkeypatch.setattr(
+            'backend.engine.tools._tool_handlers.AcceptanceCriteriaStore.load_from_file',
+            lambda self: [],
+        )
+        monkeypatch.setattr(
+            'backend.engine.tools._tool_handlers._task_tracker_existing_normalized',
+            lambda tracker: existing_plan,
+        )
+        args = {
+            'command': 'update',
+            'task_list': [
+                {'id': 'task-1', 'description': 'Existing', 'status': 'done'},
+            ],
+        }
+
+        action = _handle_task_tracker_tool(args)
+        assert isinstance(action, TaskTrackingAction)
+        assert action.task_list[0]['status'] == 'done'
 
 
 # ---------------------------------------------------------------------------

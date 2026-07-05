@@ -434,6 +434,37 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         return text[start:next_header].strip()
 
     @staticmethod
+    def _latest_verification_block(pipeline_state: object | None) -> str:
+        """Inject authoritative latest verification so summaries do not revive stale blockers."""
+        if pipeline_state is None:
+            return ''
+        try:
+            from backend.context.canonical_state import load_canonical_state
+
+            canonical = load_canonical_state(state=pipeline_state)
+            verification = canonical.verification
+            command = str(verification.command or '').strip()
+            status = str(verification.status or '').strip().lower()
+            if not command or status != 'passed':
+                return ''
+            outcome = str(verification.outcome or '').strip()
+            lines = [
+                '<LATEST VERIFICATION (authoritative)>',
+                f'PASSED: {command}',
+            ]
+            if outcome:
+                lines.append(outcome)
+            lines.append(
+                'Earlier failures in <EVENT DIGEST> are superseded for '
+                '## UNRESOLVED & BLOCKING when this block is present.'
+            )
+            lines.append('</LATEST VERIFICATION>')
+            return '\n'.join(lines) + '\n\n'
+        except Exception:
+            logger.debug('Failed to build latest verification block', exc_info=True)
+            return ''
+
+    @staticmethod
     def _is_user_message_event(event: Event) -> bool:
         """Return True if *event* is a user MessageAction (skipped from raw EV blocks)."""
         if type(event).__name__ != 'MessageAction':
@@ -483,12 +514,15 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
                     'Failed to build goal context for 5b prompt', exc_info=True
                 )
 
+        verification_block = self._latest_verification_block(pipeline_state)
+
         base_prompt = (
             'You are maintaining the state summary of an interactive software '
             'agent. This summary is critical: it lets the agent resume work '
             'WITHOUT re-reading the full conversation history once it has been '
             'compacted for length.\n\n'
             f'{goal_context_block}'
+            f'{verification_block}'
             f'{previous_goal_section}'
             'You will be given:\n'
             '- <GOAL CONTEXT> (when present): synthesized objective, active scope, '
@@ -529,13 +563,13 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         base_prompt += (
             '1. ## UNRESOLVED & BLOCKING\n'
             'What is currently blocking, failing, untested, or incomplete. '
-            'Preserve this verbatim. Never paraphrase, never compress, never '
-            'drop. If a test was skipped, say exactly why. If a spec '
-            'requirement was not met, say exactly which one and what the gap '
-            'is. Flag any spec requirement that could not be verified on this '
-            'platform, or any test that is structural rather than behavioral, '
-            'with [UNVERIFIED] so the resuming agent knows to treat it as '
-            'unproven.\n\n'
+            'If <LATEST VERIFICATION> shows PASSED, treat earlier digest errors '
+            'as resolved and do not list them here. Preserve only still-open gaps. '
+            'If a test was skipped, say exactly why. If a spec requirement was not '
+            'met, say exactly which one and what the gap is. Flag any spec '
+            'requirement that could not be verified on this platform, or any test '
+            'that is structural rather than behavioral, with [UNVERIFIED] so the '
+            'resuming agent knows to treat it as unproven.\n\n'
             '2. ## NEXT STEPS\n'
             'What remains to do, with concrete immediate action items for the '
             'resuming agent.\n\n'

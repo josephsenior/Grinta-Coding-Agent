@@ -403,7 +403,7 @@ class _SessionOrchestratorParallelMixin(SessionOrchestratorAccessorsMixin):
             self.state.turn_signals.prewarmed_compaction = None
 
     def _signal_memory_pressure(self, history, history_events) -> None:
-        should_signal = (
+        should_log = (
             not self._draining_batch
             and self.memory_pressure.should_signal_pressure()
             and (
@@ -411,40 +411,24 @@ class _SessionOrchestratorParallelMixin(SessionOrchestratorAccessorsMixin):
                 or history_events >= self.memory_pressure._min_history_events
             )
         )
-        if not should_signal:
+        if not should_log:
             return
 
         level = 'CRITICAL' if self.memory_pressure.is_critical() else 'WARNING'
-        self._maybe_start_memory_prewarm(history, history_events)
-
         logger.warning(
-            'Memory pressure %s (RSS=%.0f MB) — signalling condensation',
+            'Memory pressure %s (RSS=%.0f MB) — monitor only; compaction is '
+            'driven by context budget or explicit /compact',
             level,
             self.memory_pressure._last_rss_mb,
         )
-
-        if (
-            level == 'CRITICAL'
-            and not self.memory_pressure.has_prewarmed
-            and not self.memory_pressure.is_prewarming
-        ):
-            self.memory_pressure.record_condensation()
-
-        if hasattr(self.state, 'turn_signals'):
-            self.state.set_memory_pressure(level, source='SessionOrchestrator')
 
     async def _handle_post_execution(self) -> None:
         """Handle post-execution tasks like rate limits and memory pressure."""
         self._apply_memory_pressure_feedback()
         await self._check_rate_limits_post_execution()
-
         history = getattr(self.state, 'history', None)
         history_events = len(history) if history is not None else None
         self._signal_memory_pressure(history, history_events)
-
-        if hasattr(self.state, 'turn_signals') and self.memory_pressure.is_critical():
-            await self._await_prewarm_if_critical('CRITICAL')
-            self._apply_prewarmed_compaction_signals()
 
     async def _run_control_flags_safely(self) -> bool:
         """Run control flags with exception handling."""

@@ -88,17 +88,16 @@ def should_skip_compaction(
     llm_config: object,
     history: list[Event],
     explicit: bool = False,
-    force: bool = False,
 ) -> bool:
     """Return True when compaction should not run again yet.
 
-    Guards (bypassed by explicit ``/compact`` or CRITICAL memory pressure):
+    Guards (bypassed only by explicit ``/compact``):
 
     * ``just_compacted`` — same-turn double ``prepare_step`` loop
     * pending boundary — snapshot recorded but ``CondensationAction`` not in history
     * post-compact snapshot — boundary tokens still at or below last commit
     """
-    if explicit or force:
+    if explicit:
         return False
 
     pipe = _pipeline_state(state)
@@ -137,20 +136,17 @@ def should_run_compaction(
     history: list[Event],
     llm_config: object,
     explicit: bool = False,
-    critical: bool = False,
 ) -> bool:
     """Return True when LLM compaction should run this step."""
-    force = explicit or critical
     if should_skip_compaction(
         state,
         events=events,
         llm_config=llm_config,
         history=history,
         explicit=explicit,
-        force=force,
     ):
         return False
-    return bool(budget.should_autocompact or explicit or critical)
+    return bool(budget.should_autocompact or explicit)
 
 
 def mark_just_compacted(state: State) -> None:
@@ -214,14 +210,45 @@ def evaluate_continuity_gate(
             matched=0,
             total=0,
         )
+    from backend.context.compactor.pre_condensation_snapshot import (
+        extract_snapshot,
+        format_snapshot_for_injection,
+    )
+
+    snapshot = extract_snapshot(history)
     restored_parts = [action.summary]
     try:
         canonical = load_canonical_state(state=state)
+        files_touched = snapshot.get('files_touched', {})
+        if (
+            isinstance(files_touched, dict)
+            and files_touched
+            and not canonical.active_files
+        ):
+            from backend.context.canonical_state.ops import (
+                reduce_snapshot_into_state,
+                save_canonical_state,
+            )
+            from backend.context.canonical_state.private import _latest_event_id
+
+            canonical = reduce_snapshot_into_state(
+                snapshot,
+                canonical,
+                latest_event_id=_latest_event_id(history),
+                source='continuity_gate',
+            )
+            save_canonical_state(canonical, state=state)
         canonical_rendered = render_canonical_state_for_prompt(canonical)
         if canonical_rendered:
             restored_parts.append(canonical_rendered)
     except Exception:
         logger.debug('Canonical continuity render failed', exc_info=True)
+    try:
+        snapshot_text = format_snapshot_for_injection(snapshot, state=state)
+        if snapshot_text.strip():
+            restored_parts.append(snapshot_text)
+    except Exception:
+        logger.debug('Snapshot continuity render failed', exc_info=True)
     restored = '\n\n'.join(part for part in restored_parts if part.strip())
     passed, result = compaction_passes_continuity_gate(history, restored)
     canonical_result = validate_canonical_state_for_compaction(

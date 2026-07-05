@@ -247,7 +247,13 @@ class OrchestratorExecutor(
             streamed_visible_text=state.content_accumulate,
             streamed_thinking_text=state.thinking_accumulate,
         )
-        return ExecutionResult(actions, response, execution_time, error_message)
+        return ExecutionResult(
+            actions,
+            response,
+            execution_time,
+            error_message,
+            malformed_tool_call_dropped=state.malformed_tool_call_dropped,
+        )
 
     def _prepare_call_params(self, params: dict) -> dict:
         call_params = dict(params)
@@ -288,6 +294,8 @@ class OrchestratorExecutor(
             raise asyncio.CancelledError()
         await self._flush_stream_paint_events(state, event_stream)
         tool_calls_list = self._finalize_stream_tool_calls(state)
+        if state.malformed_tool_call_dropped:
+            self._emit_malformed_tool_call_observation(event_stream)
         visible_accum = self._visible_stream_content(state.content_accumulate)
         self._emit_final_stream_event(
             event_stream,

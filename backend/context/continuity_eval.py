@@ -11,7 +11,10 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from backend.context.compactor.pre_condensation_snapshot import extract_snapshot
+from backend.context.compactor.pre_condensation_snapshot import (
+    MAX_FILES_IN_COMPACT_SNAPSHOT,
+    extract_snapshot,
+)
 from backend.core.constants import DEFAULT_CONTINUITY_GATE_MIN_SCORE
 
 if TYPE_CHECKING:
@@ -59,7 +62,8 @@ class ContinuityEvalResult:
 def _extract_file_facts(files: object, facts: list[ContinuityFact]) -> None:
     if not isinstance(files, dict):
         return
-    for path, info in files.items():
+    # Match ``_format_files_section`` / prompt reinjection — not every touched file.
+    for path, info in list(files.items())[:MAX_FILES_IN_COMPACT_SNAPSHOT]:
         if not isinstance(path, str) or not path:
             continue
         facts.append(ContinuityFact('file', path, path))

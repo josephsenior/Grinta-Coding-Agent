@@ -75,6 +75,33 @@ def _generate_delimiter_token(orch: Orchestrator) -> str:
     return token
 
 
+def _first_action_from_llm_result(orch: Orchestrator, result: Any) -> Action:
+    """Pick the next orchestrator action from an executor result."""
+    from backend.engine.executor_mixins._executor_types import ExecutionResult
+    from backend.engine.executor_response_helpers import (
+        apply_malformed_tool_call_recovery,
+    )
+    from backend.ledger.action import MessageAction
+
+    malformed = (
+        result.malformed_tool_call_dropped
+        if isinstance(result, ExecutionResult)
+        else bool(getattr(result, 'malformed_tool_call_dropped', False))
+    )
+    actions = result.actions or []
+    apply_malformed_tool_call_recovery(
+        actions,
+        malformed_tool_call_dropped=malformed,
+    )
+    if not actions:
+        action = _build_fallback_action(orch, result)
+        if malformed and isinstance(action, MessageAction):
+            action.final_response = False
+        return action
+    _queue_additional_actions(orch, actions[1:])
+    return actions[0]
+
+
 def _check_exit_command(orch: Orchestrator, state: State) -> Action | None:
     from backend.ledger.action import MessageAction
 
@@ -377,18 +404,15 @@ def _execute_llm_step(orch: Orchestrator, state: State, condensed: Any) -> Actio
     orch._last_llm_latency = result.execution_time
 
     actions = result.actions or []
-    if not actions:
-        return _build_fallback_action(orch, result)
-    # Real tool call: clear the plain-text streak.
-    current_count = _safe_plain_text_count(orch.executor)
-    if (
-        current_count > 0
-        and _should_reset_plain_text_count(actions)
-        and hasattr(orch.executor, '_consecutive_plain_text_blocks')
-    ):
-        orch.executor._consecutive_plain_text_blocks = 0  # type: ignore[attr-defined]
-    _queue_additional_actions(orch, actions[1:])
-    return actions[0]
+    if actions:
+        current_count = _safe_plain_text_count(orch.executor)
+        if (
+            current_count > 0
+            and _should_reset_plain_text_count(actions)
+            and hasattr(orch.executor, '_consecutive_plain_text_blocks')
+        ):
+            orch.executor._consecutive_plain_text_blocks = 0  # type: ignore[attr-defined]
+    return _first_action_from_llm_result(orch, result)
 
 
 async def _execute_llm_step_async(
@@ -487,14 +511,12 @@ async def _execute_llm_step_async(
     orch._last_llm_latency = result.execution_time
 
     actions = result.actions or []
-    if not actions:
-        return _build_fallback_action(orch, result)
-    current_count = _safe_plain_text_count(orch.executor)
-    if (
-        current_count > 0
-        and _should_reset_plain_text_count(actions)
-        and hasattr(orch.executor, '_consecutive_plain_text_blocks')
-    ):
-        orch.executor._consecutive_plain_text_blocks = 0  # type: ignore[attr-defined]
-    _queue_additional_actions(orch, actions[1:])
-    return actions[0]
+    if actions:
+        current_count = _safe_plain_text_count(orch.executor)
+        if (
+            current_count > 0
+            and _should_reset_plain_text_count(actions)
+            and hasattr(orch.executor, '_consecutive_plain_text_blocks')
+        ):
+            orch.executor._consecutive_plain_text_blocks = 0  # type: ignore[attr-defined]
+    return _first_action_from_llm_result(orch, result)
