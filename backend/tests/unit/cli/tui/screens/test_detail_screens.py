@@ -62,6 +62,27 @@ def test_render_command_syntax_is_rich_syntax():
     assert 'cargo test' in block.code
 
 
+def test_render_terminal_output_preserves_ansi_colors() -> None:
+    from rich.text import Text
+
+    from backend.cli.tui.screens.detail.helpers import render_terminal_output
+
+    block = render_terminal_output('ok \x1b[32mgreen\x1b[0m')
+    assert isinstance(block, Text)
+    assert 'green' in block.plain
+    assert '\x1b' not in block.plain
+
+
+def test_render_terminal_output_uses_console_lexer_for_plain_text() -> None:
+    from rich.syntax import Syntax
+
+    from backend.cli.tui.screens.detail.helpers import render_terminal_output
+
+    block = render_terminal_output('plain build log line')
+    assert isinstance(block, Syntax)
+    assert block.lexer.name != 'Text'
+
+
 def test_shell_detail_screen_uses_terminal_frame():
     screen = ShellDetailScreen(
         command='pytest -q',
