@@ -52,21 +52,42 @@ def render_command_syntax(command: str) -> Any:
 
 def render_terminal_output(text: str, *, language: str = 'text') -> Any:
     """Syntax-highlight terminal scrollback / shell output."""
-    from rich.syntax import Syntax
-
-    from backend.cli.theme.syntax_theme import grinta_syntax_kwargs
+    from backend.cli.tui.helpers import _format_terminal_output_for_display
 
     body = text or ' '
     if body.endswith('\n'):
         body = body.rstrip('\n')
+    if '\x1b' in body or '\u001b' in body:
+        return _format_terminal_output_for_display(body)
+
+    from rich.syntax import Syntax
+
+    from backend.cli.theme.syntax_theme import grinta_syntax_kwargs
+
+    lexer = language if language and language != 'text' else _guess_terminal_output_lexer(body)
     return Syntax(
         body,
-        language,
+        lexer,
         line_numbers=True,
         word_wrap=True,
         padding=(0, 1),
         **grinta_syntax_kwargs(background_color='#060a14'),
     )
+
+
+def _guess_terminal_output_lexer(text: str) -> str:
+    """Best-effort lexer for plain shell output without ANSI escapes."""
+    sample = (text or '').strip()
+    if not sample:
+        return 'text'
+    head = sample[:4000]
+    if head.lstrip().startswith(('{', '[')):
+        return 'json'
+    if 'Traceback (most recent call last)' in head or 'File "' in head:
+        return 'python'
+    if 'error[E' in head or ' --> ' in head:
+        return 'rust'
+    return 'console'
 
 
 def detail_accent_for_state(state: str) -> str:

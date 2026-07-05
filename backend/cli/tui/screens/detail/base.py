@@ -236,7 +236,6 @@ class DetailScreen(Screen):
         padding: 0;
         background: #060a14;
         border: none;
-        color: #c8d4e8;
     }
     DetailScreen .detail-empty {
         width: 100%;
@@ -270,7 +269,6 @@ class DetailScreen(Screen):
         width: 100%;
         height: auto;
         padding: 0;
-        color: #c8d4e8;
     }
     DetailScreen .detail-syntax-error {
         width: 100%;
