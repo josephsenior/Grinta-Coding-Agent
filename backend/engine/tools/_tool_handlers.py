@@ -397,7 +397,10 @@ def _handle_task_tracker_tool(arguments: Mapping[str, Any]) -> Action:
         status = require_tool_argument(arguments, 'status', TASK_TRACKER_TOOL_NAME)
         result = arguments.get('result')
         tracker = TaskTracker()
-        success, message = tracker.update_task_status(task_id, status, result)
+        current_plan = tracker.load_from_file()
+        success, message, updated_plan = tracker.apply_task_status_update(
+            current_plan, task_id, status, result
+        )
         if not success:
             from backend.ledger.action.agent import SystemHintAction
 
@@ -405,10 +408,9 @@ def _handle_task_tracker_tool(arguments: Mapping[str, Any]) -> Action:
                 thought=f'[TASK_TRACKER] {message}',
                 source_tool=TASK_TRACKER_TOOL_NAME,
             )
-        full_plan = tracker.load_from_file()
         return TaskTrackingAction(
             command='update_status',
-            task_list=full_plan,
+            task_list=updated_plan,
             thought=f'[TASK_TRACKER] {message}',
         )
 
@@ -502,12 +504,14 @@ def _normalize_audit_entry(entry: Mapping[str, Any]) -> dict[str, Any]:
     evidence = str(entry.get('evidence') or '').strip()
     unverifiable = parse_bool_argument(entry.get('unverifiable'))
 
-    if evidence_ref and evidence:
-        raise FunctionCallValidationError(
-            f'Audit entry for {criterion_id!r} must use evidence_ref OR evidence, not both.'
-        )
     if evidence_ref:
-        return {'criterion_id': criterion_id, 'evidence_ref': evidence_ref}
+        result: dict[str, Any] = {
+            'criterion_id': criterion_id,
+            'evidence_ref': evidence_ref,
+        }
+        if evidence:
+            result['evidence_fallback'] = evidence
+        return result
     if evidence:
         if not unverifiable:
             raise FunctionCallValidationError(

@@ -314,6 +314,84 @@ class TestGetCompaction:
         assert llm.acompletion.await_count == 2
         assert result.action.summary == 'short'
 
+    async def test_streamed_prose_is_extracted_from_accumulated_text(self):
+        """The TUI stream and committed summary must share the same accumulated text."""
+        llm = _make_llm()
+        condenser = StructuredSummaryCompactor(
+            llm=llm,
+            max_size=10,
+            keep_first=2,
+            min_prose_length=50,
+        )
+        events = [_event(i) for i in range(8)]
+        view = _make_view(events)
+        good_prose = '## USER GOAL\n' + ('detail ' * 40)
+
+        async def _astream(messages):
+            yield {
+                'choices': [
+                    {'delta': {'content': good_prose}, 'finish_reason': None}
+                ]
+            }
+            yield {'choices': [{'delta': {}, 'finish_reason': 'stop'}]}
+
+        llm.astream = _astream
+        llm.acompletion = AsyncMock()
+        emitted: list[str] = []
+        condenser.streaming_emitter = lambda _chunk, accumulated, _final: emitted.append(
+            accumulated
+        )
+
+        with patch.object(condenser, '_add_response_metadata'):
+            result = await condenser.get_compaction(view)
+
+        assert result.action.summary == good_prose.strip()
+        llm.acompletion.assert_not_awaited()
+        assert good_prose in emitted[-1]
+
+    async def test_streamed_reasoning_content_excluded_from_prose(self):
+        llm = _make_llm()
+        condenser = StructuredSummaryCompactor(
+            llm=llm,
+            max_size=10,
+            keep_first=2,
+            min_prose_length=50,
+        )
+        events = [_event(i) for i in range(8)]
+        view = _make_view(events)
+        good_prose = '## USER GOAL\n' + ('x' * 120)
+        reasoning = 'internal thinking ' * 40
+
+        async def _astream(messages):
+            yield {
+                'choices': [
+                    {
+                        'delta': {'reasoning_content': reasoning},
+                        'finish_reason': None,
+                    }
+                ]
+            }
+            yield {
+                'choices': [
+                    {'delta': {'content': good_prose}, 'finish_reason': None}
+                ]
+            }
+
+        llm.astream = _astream
+        llm.acompletion = AsyncMock()
+        emitted: list[str] = []
+        condenser.streaming_emitter = lambda _chunk, accumulated, _final: emitted.append(
+            accumulated
+        )
+
+        with patch.object(condenser, '_add_response_metadata'):
+            result = await condenser.get_compaction(view)
+
+        assert good_prose in result.action.summary
+        assert reasoning.strip() not in result.action.summary
+        assert emitted
+        assert reasoning.strip() not in emitted[-1]
+
     async def test_llm_receives_previous_summary_in_prompt(self):
         llm = _make_llm()
         condenser = StructuredSummaryCompactor(llm=llm, max_size=10, keep_first=2)

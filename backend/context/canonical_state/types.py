@@ -40,6 +40,8 @@ _MAX_BACKGROUND_TASKS = 8
 _MAX_INVALIDATED = 10
 _MAX_RECENT_WORK = 16
 _MAX_TASK_PLAN_ITEMS = 20
+_MAX_ACCEPTANCE_CRITERIA = 12
+_MAX_PRIOR_OBJECTIVES = 3
 _MAX_DEPENDENCIES = 20
 _MAX_OUTPUT_CHARS = 360
 # Durable storage cap for verification output. Larger than the rendered slice
@@ -176,6 +178,18 @@ class TaskPlanItem:
 
 
 @dataclass
+class CriterionSummary:
+    """Compact acceptance criterion preserved across compaction."""
+
+    criterion_id: str = ''
+    assertion: str = ''
+    evidence: str = ''
+    source: str = ''
+    event_id: int | None = None
+    updated_at: str = ''
+
+
+@dataclass
 class SessionMetadata:
     """Compaction tracking metadata (system-populated, not LLM-generated)."""
 
@@ -224,6 +238,8 @@ class CanonicalTaskState:
     next_action: str = ''
     implementation_checkpoint: str = ''
     task_plan: list[TaskPlanItem] = field(default_factory=list)
+    acceptance_criteria: list[CriterionSummary] = field(default_factory=list)
+    prior_objectives: list[str] = field(default_factory=list)
     active_files: list[str] = field(default_factory=list)
     verification: VerificationState = field(default_factory=VerificationState)
     blockers: list[str] = field(default_factory=list)
@@ -266,6 +282,7 @@ class CanonicalTaskState:
             'narrative_summary',
             'completed_tasks',
             'open_questions',
+            'prior_objectives',
             'source_event_ids',
             'last_updated',
         ):
@@ -318,6 +335,16 @@ class CanonicalTaskState:
             for item in data.get('task_plan', [])
             if isinstance(item, dict)
         ][-_MAX_TASK_PLAN_ITEMS:]
+        state.acceptance_criteria = [
+            CriterionSummary(**_known_dataclass_fields(CriterionSummary, item))
+            for item in data.get('acceptance_criteria', [])
+            if isinstance(item, dict)
+        ][-_MAX_ACCEPTANCE_CRITERIA:]
+        state.prior_objectives = [
+            str(item).strip()
+            for item in data.get('prior_objectives', [])
+            if str(item).strip()
+        ][-_MAX_PRIOR_OBJECTIVES:]
         freshness: dict[str, FieldFreshness] = {}
         raw_freshness = data.get('field_freshness', {})
         if isinstance(raw_freshness, dict):

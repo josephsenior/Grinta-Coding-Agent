@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 from backend.core.criteria.evidence_ref import (
     EvidenceRefError,
     collect_session_events,
-    resolve_evidence_ref,
+    resolve_evidence_ref_for_audit,
 )
 from backend.ledger.observation import (
     AcceptanceCriteriaObservation,
@@ -55,34 +55,58 @@ class AcceptanceCriteriaMixin:
             return self._handle_criteria_write_action(action, criteria_file_path)
         return NullObservation('')
 
+    def _load_criteria_for_view(
+        self, action: AcceptanceCriteriaAction
+    ) -> list[dict[str, Any]]:
+        """Load structured criteria from JSON store, falling back to hydrated action."""
+        try:
+            from backend.core.criteria.acceptance_criteria_store import (
+                AcceptanceCriteriaStore,
+            )
+
+            stored = AcceptanceCriteriaStore().load_from_file()
+            if stored:
+                return stored
+        except Exception:
+            logger.debug('Failed to load criteria from JSON store', exc_info=True)
+        return list(getattr(action, 'criteria_list', []) or [])
+
+    def _sync_criteria_markdown_cache(
+        self, criteria_file_path: str, content: str
+    ) -> None:
+        """Keep CRITERIA.md aligned with JSON-derived markdown."""
+        try:
+            assert self.event_stream is not None
+            self.event_stream.file_store.write(criteria_file_path, content)
+        except Exception:
+            logger.debug('Failed to sync CRITERIA.md cache', exc_info=True)
+
     def _handle_criteria_view_action(
         self, action: AcceptanceCriteriaAction, criteria_file_path: str
     ) -> Observation:
-        hydrated = list(getattr(action, 'criteria_list', []) or [])
-        try:
-            assert self.event_stream is not None
-            content = self.event_stream.file_store.read(criteria_file_path)
-            return AcceptanceCriteriaObservation(
-                content=content,
-                command=action.command,
-                criteria_list=hydrated,
-            )
-        except FileNotFoundError:
+        criteria_list = self._load_criteria_for_view(action)
+        if not criteria_list:
             return AcceptanceCriteriaObservation(
                 command=action.command,
-                criteria_list=hydrated,
+                criteria_list=[],
                 content=(
                     'No acceptance criteria yet. Use `update` to define assertions.'
                 ),
             )
-        except Exception as e:
+        try:
+            content = self._generate_criteria_markdown(criteria_list)
+        except ValueError as e:
             return AcceptanceCriteriaObservation(
                 command=action.command,
-                criteria_list=hydrated,
-                content=(
-                    f'Failed to read acceptance criteria from {criteria_file_path}. Error: {e!s}'
-                ),
+                criteria_list=criteria_list,
+                content=f'Invalid criteria list: {e!s}',
             )
+        self._sync_criteria_markdown_cache(criteria_file_path, content)
+        return AcceptanceCriteriaObservation(
+            content=content,
+            command=action.command,
+            criteria_list=criteria_list,
+        )
 
     def _handle_criteria_refine_action(
         self, action: AcceptanceCriteriaAction, criteria_file_path: str
@@ -170,6 +194,11 @@ class AcceptanceCriteriaMixin:
             msg = f'✅ Acceptance criteria updated ({n} total).'
         else:
             msg = f'✅ Acceptance criteria audit recorded for {n} item(s).'
+        audit_warnings = getattr(action, '_audit_warnings', None)
+        if isinstance(audit_warnings, list) and audit_warnings:
+            msg += '\n\n⚠️ Audit notes:\n' + '\n'.join(
+                f'- {warning}' for warning in audit_warnings[:6]
+            )
 
         return AcceptanceCriteriaObservation(
             content=msg,
@@ -186,6 +215,7 @@ class AcceptanceCriteriaMixin:
             for item in action.criteria_list
             if str(item.get('id') or '').strip()
         }
+        warnings: list[str] = []
         for entry in action.audit_entries:
             criterion_id = str(entry.get('criterion_id') or '').strip()
             row = by_id.get(criterion_id)
@@ -195,9 +225,18 @@ class AcceptanceCriteriaMixin:
 
             evidence_ref = str(entry.get('evidence_ref') or '').strip()
             if evidence_ref:
-                resolved = resolve_evidence_ref(evidence_ref, events)
-                row['evidence_ref'] = evidence_ref
+                fallback = str(
+                    entry.get('evidence_fallback') or entry.get('evidence') or ''
+                ).strip()
+                resolved, stored_ref, warning = resolve_evidence_ref_for_audit(
+                    evidence_ref,
+                    events,
+                    fallback_evidence=fallback,
+                )
                 row['evidence'] = resolved
+                row['evidence_ref'] = stored_ref
+                if warning:
+                    warnings.append(f'{criterion_id}: {warning}')
                 continue
 
             evidence = str(entry.get('evidence') or '').strip()
@@ -219,6 +258,8 @@ class AcceptanceCriteriaMixin:
             raise EvidenceRefError(
                 f'Audit incomplete; missing evidence for: {", ".join(sorted(missing))}'
             )
+        if warnings:
+            setattr(action, '_audit_warnings', warnings)
         return list(by_id.values())
 
     def _persist_criteria(

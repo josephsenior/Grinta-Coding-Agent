@@ -145,11 +145,13 @@ def extract_snapshot(events: list[Event]) -> dict[str, Any]:
         'attempted_approaches': [],
         'background_tasks': [],
         'task_plan': {},
+        'acceptance_criteria': {},
     }
 
     for event in events:
         _extract_user_directive(event, snapshot)
         _extract_task_plan(event, snapshot)
+        _extract_acceptance_criteria(event, snapshot)
         _extract_file_info(event, snapshot)
         _extract_errors(event, snapshot)
         _extract_decisions(event, snapshot)
@@ -163,17 +165,13 @@ def extract_snapshot(events: list[Event]) -> dict[str, Any]:
 
 
 def snapshot_user_objective(snapshot: dict[str, Any]) -> tuple[str, str]:
-    """Extract (objective, latest_directive) from the snapshot's user_messages.
-
-    Returns the first and last user messages. Falls back to old
-    objective/latest_directive fields for snapshots from older versions.
-    """
+    """Extract (objective, latest_directive) from substantive user messages."""
     messages = snapshot.get('user_messages')
     if isinstance(messages, list) and messages:
         texts = [
             str(m.get('text', '')).strip()
             for m in messages
-            if isinstance(m, dict) and str(m.get('text', '')).strip()
+            if isinstance(m, dict) and _is_substantive_user_directive(str(m.get('text', '')))
         ]
         if texts:
             return texts[0], texts[-1]
@@ -181,6 +179,26 @@ def snapshot_user_objective(snapshot: dict[str, Any]) -> tuple[str, str]:
         str(snapshot.get('objective', '')).strip(),
         str(snapshot.get('latest_directive', '')).strip(),
     )
+
+
+def _is_substantive_user_directive(text: str) -> bool:
+    stripped = str(text or '').strip()
+    if not stripped:
+        return False
+    if stripped.startswith('/'):
+        return False
+    lowered = stripped.casefold()
+    if any(
+        marker in lowered
+        for marker in (
+            'memory condensed',
+            'context condensed',
+            'post compact restore',
+            'restored context',
+        )
+    ):
+        return False
+    return True
 
 
 def _sha256_text(text: str) -> str:
@@ -371,6 +389,40 @@ def _extract_task_plan(event: Event, snapshot: dict) -> None:
         'command': str(getattr(event, 'command', '') or '').strip()[:80],
         'tasks': tasks,
         'next_action': _next_action_from_tasks(tasks),
+    }
+
+
+def _extract_acceptance_criteria(event: Event, snapshot: dict) -> None:
+    """Capture the latest structured acceptance criteria state."""
+    cls_name = type(event).__name__
+    if cls_name not in ('AcceptanceCriteriaAction', 'AcceptanceCriteriaObservation'):
+        return
+    criteria_list = getattr(event, 'criteria_list', None)
+    if not isinstance(criteria_list, list) or not criteria_list:
+        return
+
+    criteria: list[dict[str, Any]] = []
+    for raw in criteria_list[:20]:
+        if not isinstance(raw, dict):
+            continue
+        assertion = str(raw.get('assertion', '') or '').strip()
+        if not assertion:
+            continue
+        criteria.append(
+            {
+                'id': str(raw.get('id', '') or '').strip()[:80],
+                'assertion': assertion[:240],
+                'evidence': str(raw.get('evidence', '') or '').strip()[:240],
+                'source': str(raw.get('source', '') or '').strip()[:40] or 'stated',
+            }
+        )
+    if not criteria:
+        return
+    event_id = getattr(event, 'id', None)
+    snapshot['acceptance_criteria'] = {
+        'event_id': event_id if isinstance(event_id, int) else None,
+        'command': str(getattr(event, 'command', '') or '').strip()[:80],
+        'criteria': criteria,
     }
 
 
@@ -921,6 +973,7 @@ def format_snapshot_for_injection(
     snapshot: dict[str, Any],
     *,
     state: object | None = None,
+    include_synthesized_goal: bool = True,
 ) -> str:
     """Format a snapshot into a human-readable block for LLM context injection.
 
@@ -929,9 +982,9 @@ def format_snapshot_for_injection(
     """
     parts = ['<RESTORED_CONTEXT>']
     parts.append(f'Events condensed: {snapshot.get("events_condensed", "?")}')
-    parts.extend(_format_directive_section(snapshot, state=state))
+    if include_synthesized_goal:
+        parts.extend(_format_directive_section(snapshot, state=state))
     parts.extend(_format_runtime_section(snapshot.get('runtime', {})))
-    parts.extend(_format_task_plan_section(snapshot.get('task_plan', {})))
     parts.extend(_format_files_section(snapshot.get('files_touched', {})))
     parts.extend(_format_errors_section(snapshot.get('recent_errors', [])))
     parts.extend(_format_decisions_section(snapshot.get('decisions', [])))

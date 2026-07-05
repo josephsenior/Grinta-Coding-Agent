@@ -127,9 +127,9 @@ def test_explicit_pivot_records_superseding_directive() -> None:
     canonical = reduce_events_into_state(events, CanonicalTaskState(), persist=False)
     rendered = render_canonical_state_for_prompt(canonical, char_budget=2000)
 
-    # Original objective is preserved verbatim ...
-    assert canonical.objective == 'Refactor the parser module for readability'
-    # ... and the pivot is surfaced separately, never overwriting it.
+    # Pivot updates the active objective and archives the prior one.
+    assert canonical.objective == 'actually, forget the refactor, just fix the failing test'
+    assert any('Refactor the parser' in item for item in canonical.prior_objectives)
     assert (
         canonical.superseding_directive
         == 'actually, forget the refactor, just fix the failing test'
@@ -163,7 +163,8 @@ def test_superseding_directive_survives_round_trip(tmp_path, monkeypatch) -> Non
     save_canonical_state(canonical)
     reloaded = load_canonical_state()
 
-    assert reloaded.objective == 'Add a caching layer'
+    assert reloaded.objective == 'scrap that, new task: migrate the database schema'
+    assert any('caching layer' in item for item in reloaded.prior_objectives)
     assert 'migrate the database schema' in reloaded.superseding_directive
 
 
@@ -541,3 +542,69 @@ class TestNarrativeOverlap:
     def test_superset_b_covers_all_a(self):
         result = _narrative_overlap('built engine', 'built engine fixed tests')
         assert result == 1.0
+
+
+def test_validate_canonical_state_flags_missing_task_plan():
+    from backend.context.canonical_state.ops import validate_canonical_state_for_compaction
+    from unittest.mock import patch
+
+    events = [_user('build api', 1)]
+    canonical = CanonicalTaskState()
+    snapshot = {
+        'user_messages': [{'text': 'build api'}],
+        'task_plan': {'tasks': [{'description': 'Ship API', 'status': 'todo'}]},
+    }
+
+    with patch(
+        'backend.context.compactor.pre_condensation_snapshot.extract_snapshot',
+        return_value=snapshot,
+    ):
+        result = validate_canonical_state_for_compaction(canonical, events)
+    assert not result.ok
+    assert 'task_plan' in result.missing
+
+
+def test_hydrate_persisted_task_plan_populates_canonical():
+    from backend.context.canonical_state.ops import reduce_snapshot_into_state
+    from unittest.mock import patch
+
+    snapshot = {'user_messages': [{'text': 'build feature'}]}
+    tasks = [{'id': '1', 'description': 'Implement feature', 'status': 'todo'}]
+    with patch('backend.core.task_tracker.TaskTracker') as mock_tracker:
+        mock_tracker.return_value.load_from_file.return_value = tasks
+        canonical = reduce_snapshot_into_state(snapshot, CanonicalTaskState())
+    assert canonical.task_plan
+    assert canonical.task_plan[0].description == 'Implement feature'
+
+
+def test_pivot_updates_objective_and_prior_objectives():
+    from backend.context.canonical_state.ops import reduce_snapshot_into_state
+
+    snapshot = {
+        'user_messages': [
+            {'text': 'Build a GC in Rust'},
+            {'text': 'Actually, forget the GC. Build a web server instead.'},
+        ]
+    }
+    canonical = CanonicalTaskState(objective='Build a GC in Rust')
+    updated = reduce_snapshot_into_state(snapshot, canonical)
+    assert 'web server' in updated.objective.casefold()
+    assert updated.prior_objectives
+    assert any('GC' in item for item in updated.prior_objectives)
+
+
+def test_merge_acceptance_criteria_from_snapshot():
+    from backend.context.canonical_state.private import _merge_acceptance_criteria
+
+    canonical = CanonicalTaskState()
+    snapshot = {
+        'acceptance_criteria': {
+            'event_id': 5,
+            'criteria': [
+                {'id': 'ac1', 'assertion': 'Tests pass', 'source': 'stated'},
+            ],
+        }
+    }
+    _merge_acceptance_criteria(canonical, snapshot, 5, 'snapshot')
+    assert len(canonical.acceptance_criteria) == 1
+    assert canonical.acceptance_criteria[0].assertion == 'Tests pass'

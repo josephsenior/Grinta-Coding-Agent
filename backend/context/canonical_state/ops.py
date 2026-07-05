@@ -19,6 +19,7 @@ from backend.context.canonical_state.private import (
     _latest_event_id,
     _merge_background_tasks,
     _merge_failed_approaches,
+    _merge_acceptance_criteria,
     _merge_recent_work,
     _merge_strings,
     _merge_task_plan,
@@ -37,6 +38,7 @@ from backend.context.canonical_state.types import (
     _MAX_ACTIVE_FILES,
     _MAX_BLOCKERS,
     _MAX_DECISIONS,
+    _MAX_PRIOR_OBJECTIVES,
     _MAX_DEPENDENCIES,
     _MAX_INVALIDATED,
     _MAX_OUTPUT_CHARS,
@@ -194,6 +196,14 @@ def reduce_snapshot_into_state(
                 event_id,
                 source,
             )
+            if canonical.objective:
+                prior = [
+                    item
+                    for item in [*canonical.prior_objectives, canonical.objective]
+                    if item and item not in canonical.prior_objectives
+                ]
+                canonical.prior_objectives = prior[-_MAX_PRIOR_OBJECTIVES:]
+            _set_field(canonical, 'objective', latest_directive, event_id, source)
 
     files = snapshot.get('files_touched', {})
     if isinstance(files, dict) and files:
@@ -211,6 +221,13 @@ def reduce_snapshot_into_state(
     _merge_failed_approaches(canonical, snapshot, event_id, source)
     _merge_background_tasks(canonical, snapshot, event_id, source)
     _merge_task_plan(canonical, snapshot, event_id, source)
+    from backend.core.constants import (
+        DEFAULT_CONTEXT_HYDRATE_CANONICAL_FROM_JSON_STORES,
+    )
+
+    if DEFAULT_CONTEXT_HYDRATE_CANONICAL_FROM_JSON_STORES:
+        _hydrate_persisted_task_plan(canonical, snapshot, event_id)
+    _merge_acceptance_criteria(canonical, snapshot, event_id, source)
     _merge_recent_work(canonical, snapshot, event_id, source)
     _update_blockers(canonical, snapshot, event_id, source)
     canonical.decisions = _merge_strings(
@@ -238,6 +255,56 @@ def reduce_snapshot_into_state(
             _set_field(canonical, 'next_action', inferred, event_id, source)
     canonical.last_updated = _now()
     return canonical
+
+
+def _hydrate_persisted_task_plan(
+    canonical: CanonicalTaskState,
+    snapshot: dict[str, Any],
+    event_id: int | None,
+) -> None:
+    """Fill task plan from JSON store when event snapshot has no tracker data."""
+    raw_plan = snapshot.get('task_plan')
+    if isinstance(raw_plan, dict) and raw_plan.get('tasks'):
+        return
+    try:
+        from backend.context.compactor.pre_condensation_snapshot import (
+            _next_action_from_tasks,
+        )
+        from backend.core.task_tracker import TaskTracker
+
+        tasks = TaskTracker().load_from_file()
+    except Exception:
+        logger.debug('Persisted task plan hydration failed', exc_info=True)
+        return
+    if not tasks:
+        return
+    hydrated_plan = {
+        'event_id': event_id,
+        'tasks': tasks,
+        'next_action': _next_action_from_tasks(tasks),
+    }
+    _merge_task_plan(
+        canonical,
+        {**snapshot, 'task_plan': hydrated_plan},
+        event_id,
+        'persisted_store',
+    )
+
+
+def merge_compaction_summary_into_canonical(
+    *,
+    state: State | None,
+    summary: str,
+) -> None:
+    """Merge committed compaction prose into durable narrative summary."""
+    if state is None or not summary.strip():
+        return
+    canonical = load_canonical_state(state=state)
+    merged = _merge_narrative(canonical.narrative_summary, summary.strip())
+    if merged == canonical.narrative_summary:
+        return
+    canonical.narrative_summary = merged
+    save_canonical_state(canonical, state=state)
 
 
 def apply_canonical_patch(
@@ -367,6 +434,7 @@ def render_canonical_state_for_prompt(
     include_objective: bool = True,
     include_latest_directive: bool = True,
     include_next_action: bool = True,
+    include_task_plan_and_criteria: bool = True,
 ) -> str:
     lines = [CANONICAL_STATE_MARKER, 'Canonical task state:']
     if include_objective:
@@ -404,13 +472,24 @@ def render_canonical_state_for_prompt(
             ),
         )
     _append(lines, f'- Active plan: {canonical.active_plan}')
-    if canonical.task_plan:
+    if include_task_plan_and_criteria and canonical.task_plan:
         _append(lines, '- Task tracker:')
         for plan_item in canonical.task_plan[-10:]:
             detail = f'[{plan_item.status}] {plan_item.description}'
             if plan_item.result:
                 detail += f' -> {plan_item.result}'
             _append(lines, f'  - {detail}')
+    if include_task_plan_and_criteria and canonical.acceptance_criteria:
+        _append(lines, '- Acceptance criteria:')
+        for item in canonical.acceptance_criteria[-8:]:
+            detail = item.assertion
+            if item.criterion_id:
+                detail = f'[{item.criterion_id}] {detail}'
+            if item.evidence:
+                detail += f' (evidence: {item.evidence})'
+            _append(lines, f'  - {detail}')
+    if canonical.prior_objectives:
+        _append(lines, '- Prior objectives: ' + ' | '.join(canonical.prior_objectives[-3:]))
     if canonical.active_files:
         _append(lines, '- Active files: ' + ', '.join(canonical.active_files[-12:]))
     _append_list(lines, 'Blockers', canonical.blockers[-6:])
@@ -519,6 +598,18 @@ def validate_canonical_state_for_compaction(
         missing.append('task_plan')
     if snapshot.get('task_plan') and not canonical.next_action:
         missing.append('next_action')
+    has_ac = bool(snapshot.get('acceptance_criteria'))
+    if not has_ac:
+        try:
+            from backend.core.criteria.acceptance_criteria_store import (
+                AcceptanceCriteriaStore,
+            )
+
+            has_ac = bool(AcceptanceCriteriaStore().load_from_file())
+        except Exception:
+            has_ac = False
+    if has_ac and not canonical.acceptance_criteria:
+        missing.append('acceptance_criteria')
     fingerprints = [
         item.fingerprint for item in canonical.failed_approaches if item.fingerprint
     ]

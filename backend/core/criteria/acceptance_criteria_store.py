@@ -124,6 +124,23 @@ class AcceptanceCriteriaStore:
             self.save_to_file(updated)
         return updated
 
+    def render_for_prompt_lines(
+        self,
+        *,
+        max_items: int = 10,
+        header: str = '- Acceptance gates:',
+        show_empty: bool = False,
+    ) -> list[str]:
+        """Render acceptance criteria as prompt lines."""
+        from backend.context.render.task_context import render_acceptance_gates
+
+        return render_acceptance_gates(
+            self.load_from_file(),
+            max_items=max_items,
+            header=header,
+            show_empty=show_empty,
+        )
+
 
 def build_refined_criteria_list(
     existing: list[dict[str, Any]],

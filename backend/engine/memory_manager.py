@@ -234,6 +234,11 @@ class ContextMemoryManager:
     def invalidate_build_messages_cache(self) -> None:
         """Clear incremental build cache after history-shaping events."""
         self._build_messages_cache = None
+        from backend.context.prompt.context_packet_cache import (
+            clear_context_packet_cache,
+        )
+
+        clear_context_packet_cache()
 
     def get_user_messages_for_prompt(
         self,

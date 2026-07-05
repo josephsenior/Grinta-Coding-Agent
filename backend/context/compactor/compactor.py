@@ -356,6 +356,35 @@ class BaseLLMCompactor(RollingCompactor, ABC):
         if hasattr(self, 'llm') and self.llm:
             self.add_metadata('metrics', self.llm.metrics.get())
 
+    @staticmethod
+    def _stream_delta_content(delta: dict[str, Any]) -> str:
+        """Extract answer text from a streaming delta (never reasoning/thinking)."""
+        content = delta.get('content')
+        if isinstance(content, str) and content:
+            return content
+        if isinstance(content, list):
+            parts: list[str] = []
+            for block in content:
+                if isinstance(block, str):
+                    parts.append(block)
+                    continue
+                if isinstance(block, dict):
+                    text = block.get('text')
+                    if isinstance(text, str) and text:
+                        parts.append(text)
+            if parts:
+                return ''.join(parts)
+        return ''
+
+    @staticmethod
+    def _synthetic_prose_response(text: str) -> Any:
+        """Build an acompletion-shaped response from streamed prose text."""
+        from types import SimpleNamespace
+
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=text))]
+        )
+
     async def _stream_llm_completion(
         self, messages: list[dict[str, Any]]
     ) -> dict[str, Any]:
@@ -388,9 +417,7 @@ class BaseLLMCompactor(RollingCompactor, ABC):
                 if not choices:
                     continue
                 delta = choices[0].get('delta') or {}
-                piece = delta.get('content') or ''
-                if not isinstance(piece, str):
-                    piece = '' if piece is None else str(piece)
+                piece = self._stream_delta_content(delta)
                 if piece:
                     accumulated += piece
                     try:
@@ -418,7 +445,12 @@ class BaseLLMCompactor(RollingCompactor, ABC):
                 logger.warning(
                     'compactor streaming emitter (final) raised: %s', emit_exc
                 )
+            if accumulated.strip():
+                return self._synthetic_prose_response(accumulated)
             return last_chunk
+
+        if accumulated.strip():
+            return self._synthetic_prose_response(accumulated)
 
         # Stream produced no chunks — fall back to acompletion.
         return await self.llm.acompletion(messages=messages)

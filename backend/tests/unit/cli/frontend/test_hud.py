@@ -181,6 +181,30 @@ def test_hud_apply_prompt_token_accounting_overlays_internal_estimate() -> None:
     assert hud.state.context_limit == 200_000
 
 
+def test_hud_apply_prompt_token_accounting_can_decrease_after_compaction() -> None:
+    hud = HUDBar()
+    hud.state.context_tokens = 120_000
+    hud.apply_prompt_token_accounting({'full_request_tokens': 35_000})
+    assert hud.state.context_tokens == 35_000
+
+
+def test_hud_apply_post_compaction_context_uses_boundary_snapshot() -> None:
+    hud = HUDBar()
+    hud.state.context_tokens = 120_000
+    extra = {
+        'context_pipeline_state': {'post_compact_true_tokens': 28_000},
+        'prompt_token_accounting': {
+            'static_prompt_tokens': 5_000,
+            'tool_schema_tokens': 3_000,
+            'context_packet_tokens': 1_000,
+            'full_request_tokens': 120_000,
+        },
+    }
+    hud.apply_post_compaction_context(extra)
+    assert hud.state.context_tokens == 37_000
+    assert hud.state.token_usage_estimated is True
+
+
 def test_hud_context_pressure_resets_after_condensation_epoch() -> None:
     hud = HUDBar()
     metrics = Metrics()

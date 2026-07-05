@@ -54,8 +54,7 @@ class TaskTrackingMixin:
         if action.command in {'create', 'update'}:
             return self._handle_task_update_action(action, task_file_path)
         if action.command == 'view':
-            # Always read TASKS.md for view. The engine may hydrate task_list from
-            # active_plan.json on the same action; that must not be treated as a task-list write.
+            # JSON is authoritative; markdown is rendered for display only.
             count = getattr(self, '_consecutive_task_view_count', 0) + 1
             self._consecutive_task_view_count = count
             return self._handle_task_view_action(
@@ -102,52 +101,63 @@ class TaskTrackingMixin:
             task_list=action.task_list,
         )
 
+    def _load_task_list_for_view(self, action: TaskTrackingAction) -> list[dict[str, Any]]:
+        """Load structured task plan from JSON store, falling back to hydrated action."""
+        try:
+            from backend.core.task_tracker import TaskTracker
+
+            stored = TaskTracker().load_from_file()
+            if stored:
+                return stored
+        except Exception:
+            logger.debug('Failed to load task plan from JSON store', exc_info=True)
+        return list(getattr(action, 'task_list', []) or [])
+
+    def _render_task_view_content(
+        self, task_list: list[dict[str, Any]], *, suffix: str = ''
+    ) -> str:
+        if not task_list:
+            return 'No task list found. Use the "update" command to create one.' + suffix
+        try:
+            content = self._generate_task_list_content(task_list)
+        except ValueError as e:
+            return f'Invalid task list: {e!s}' + suffix
+        return content + suffix
+
+    def _sync_task_markdown_cache(self, task_file_path: str, content: str) -> None:
+        """Keep TASKS.md aligned with JSON-derived markdown."""
+        try:
+            assert self.event_stream is not None
+            self.event_stream.file_store.write(task_file_path, content)
+        except Exception:
+            logger.debug('Failed to sync TASKS.md cache', exc_info=True)
+
     def _handle_task_view_action(
         self, action: TaskTrackingAction, task_file_path: str, view_count: int = 1
     ) -> Observation:
-        """Handle task view command — read and display task list."""
-        hydrated_task_list = list(getattr(action, 'task_list', []) or [])
-        # After 2+ consecutive views without a plan update, give a strong directive
-        # so the agent breaks out of the view loop and starts implementing.
+        """Handle task view command — render task list from JSON store."""
+        task_list = self._load_task_list_for_view(action)
+        suffix = ''
         if view_count >= 2:
-            try:
-                assert self.event_stream is not None
-                content = self.event_stream.file_store.read(task_file_path)
-            except FileNotFoundError:
-                content = 'No task list found.'
-            except Exception as e:
-                content = f'Failed to read task list: {e!s}'
-            intervention = (
+            suffix = (
                 '\n\n⚠️ LOOP DETECTED: You have viewed your task list '
                 f'{view_count} times without making progress. '
                 'STOP calling task_tracker view. '
                 'Pick the first todo task and start working on it directly or you will fail.'
             )
-            return TaskTrackingObservation(
-                content=content + intervention,
-                command=action.command,
-                task_list=hydrated_task_list,
-            )
-        try:
-            assert self.event_stream is not None
-            content = self.event_stream.file_store.read(task_file_path)
-            return TaskTrackingObservation(
-                content=content + '\n\n→ Now implement the first todo (⏳) task.',
-                command=action.command,
-                task_list=hydrated_task_list,
-            )
-        except FileNotFoundError:
-            return TaskTrackingObservation(
-                command=action.command,
-                task_list=hydrated_task_list,
-                content='No task list found. Use the "update" command to create one.',
-            )
-        except Exception as e:
-            return TaskTrackingObservation(
-                command=action.command,
-                task_list=hydrated_task_list,
-                content=f'Failed to read the task list from session directory {task_file_path}. Error: {e!s}',
-            )
+        elif task_list:
+            suffix = '\n\n→ Now implement the first todo (⏳) task.'
+
+        content = self._render_task_view_content(task_list, suffix=suffix)
+        if task_list:
+            base_content = content[: -len(suffix)] if suffix else content
+            self._sync_task_markdown_cache(task_file_path, base_content)
+
+        return TaskTrackingObservation(
+            content=content,
+            command=action.command,
+            task_list=task_list,
+        )
 
     def _handle_task_update_status_action(
         self, action: TaskTrackingAction, task_file_path: str

@@ -9,6 +9,7 @@ from backend.core.criteria.evidence_ref import (
     apply_line_slice,
     parse_evidence_ref,
     resolve_evidence_ref,
+    resolve_evidence_ref_for_audit,
 )
 from backend.ledger.infra.tool import ToolCallMetadata
 from backend.ledger.observation import Observation
@@ -60,3 +61,49 @@ def test_resolve_by_tool_call_id():
 def test_resolve_missing_ref_raises():
     with pytest.raises(EvidenceRefError, match='no matching tool output'):
         resolve_evidence_ref('call_missing', [])
+
+
+def test_resolve_execute_bash_command_hint():
+    from backend.ledger.action.commands import CmdRunAction
+    from backend.ledger.observation.commands import CmdOutputObservation
+
+    action = CmdRunAction(
+        command='cd ouroboros && python3 -m pytest tests/ -v --tb=short'
+    )
+    obs = CmdOutputObservation(
+        content='[TEST_SUMMARY] ============================== 34 passed in 33.05s',
+        command='cd ouroboros && python3 -m pytest tests/ -v --tb=short',
+    )
+    ref = (
+        'execute_bash: cd ouroboros && python3 -m pytest tests/ -v --tb=short '
+        '-> [TEST_SUMMARY] ============================== 34 passed in 33.05s'
+    )
+    resolved = resolve_evidence_ref(ref, [action, obs])
+    assert '34 passed' in resolved
+
+
+def test_resolve_execute_bash_display_label_hint():
+    from backend.ledger.action.commands import CmdRunAction
+    from backend.ledger.observation.commands import CmdOutputObservation
+
+    action = CmdRunAction(
+        command='python3 -m pytest tests/ -q',
+        display_label='pytest_all_34_passed',
+    )
+    obs = CmdOutputObservation(
+        content='34 passed in 33.05s',
+        command='python3 -m pytest tests/ -q',
+    )
+    resolved = resolve_evidence_ref('execute_bash:pytest_all_34_passed', [action, obs])
+    assert '34 passed' in resolved
+
+
+def test_resolve_evidence_ref_for_audit_uses_fallback_text():
+    evidence, stored_ref, warning = resolve_evidence_ref_for_audit(
+        'call_missing',
+        [],
+        fallback_evidence='pytest summary: 34 passed',
+    )
+    assert evidence == 'pytest summary: 34 passed'
+    assert stored_ref is None
+    assert warning is not None

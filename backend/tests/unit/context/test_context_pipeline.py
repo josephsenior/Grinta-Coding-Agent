@@ -11,6 +11,8 @@ from backend.context.compactor.compactor import Compaction
 from backend.context.context_budget import ContextBudget
 from backend.context.context_pipeline import ContextPipeline
 from backend.context.context_pipeline.compaction import (
+    dismiss_explicit_compaction_request,
+    has_actionable_explicit_request,
     mark_just_compacted,
     passes_effectiveness_gate,
     record_boundary_compact,
@@ -18,7 +20,11 @@ from backend.context.context_pipeline.compaction import (
     should_run_compaction,
     should_skip_compaction,
 )
-from backend.context.compactor.compact_boundary import find_last_condensation_action
+from backend.context.compactor.compact_boundary import (
+    find_last_condensation_action,
+    find_pending_condensation_request,
+)
+from backend.ledger.action.agent import CondensationRequestAction
 from backend.context.context_pipeline.helpers import is_prewarm_stale
 from backend.context.context_pipeline.types import _ContinuityGateDecision
 from backend.core.config.compactor_config import ContextPipelineConfig
@@ -600,4 +606,40 @@ def test_skip_compaction_when_snapshot_set_but_boundary_not_in_history(pipeline)
         history=list(state.history),
         force=False,
     ) is True
+
+
+def test_dismissed_explicit_request_does_not_retrigger_compaction():
+    """Failed explicit compaction must not loop on every subsequent step."""
+    events = [_user('task', 1)]
+    request = CondensationRequestAction()
+    request.id = 99
+    events.append(request)
+    state = _make_state(events)
+    llm_config = SimpleNamespace(max_input_tokens=200_000, model='test-model')
+    budget = ContextBudget.from_events(events, llm_config=llm_config, state=state)
+
+    assert find_pending_condensation_request(state.history) is request
+    assert has_actionable_explicit_request(state, state.history) is True
+    assert should_run_compaction(
+        state,
+        events=events,
+        budget=budget,
+        history=list(state.history),
+        llm_config=llm_config,
+        explicit=True,
+        critical=False,
+    )
+
+    dismiss_explicit_compaction_request(state, state.history)
+
+    assert has_actionable_explicit_request(state, state.history) is False
+    assert not should_run_compaction(
+        state,
+        events=events,
+        budget=budget,
+        history=list(state.history),
+        llm_config=llm_config,
+        explicit=False,
+        critical=False,
+    )
 

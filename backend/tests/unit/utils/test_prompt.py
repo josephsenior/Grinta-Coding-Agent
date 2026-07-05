@@ -955,8 +955,8 @@ class TestBuildSystemPromptRenders:
         )
         assert '<COMMON_PATTERNS>' in result
         assert '<ACCEPTANCE_CRITERIA>' in result
-        assert '**Workflow:**' in result
-        assert '`update` → `task_tracker(update)` → implement + verify → `audit`' in result
+        assert '**Purpose:**' in result
+        assert '**Live state:**' in result
         assert 'audit_entries' in result
         assert 'evidence_ref' in result
         assert 'audit(audit_entries)' in result

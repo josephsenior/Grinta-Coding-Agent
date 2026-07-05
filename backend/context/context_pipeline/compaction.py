@@ -16,6 +16,7 @@ from backend.context.canonical_state import (
 )
 from backend.context.compactor.compact_boundary import (
     find_last_condensation_action,
+    find_pending_condensation_request,
     project_after_compact_boundary,
 )
 from backend.context.compactor.compactor import Compaction
@@ -25,6 +26,7 @@ from backend.context.context_budget import (
 )
 from backend.context.context_pipeline.helpers import _synthetic_history_after_action
 from backend.context.context_pipeline.types import (
+    _EXPLICIT_COMPACT_DISMISSED_REQUEST_ID_KEY,
     _JUST_COMPACTED_KEY,
     _MAX_LLM_COMPACTION_ATTEMPTS,
     _POST_COMPACT_TRUE_TOKENS_KEY,
@@ -54,6 +56,29 @@ def _pipeline_state(state: State) -> dict[str, Any]:
 
 def _set_pipeline_state(state: State, pipe: dict[str, Any]) -> None:
     state.set_extra(_PIPELINE_STATE_KEY, pipe, source='ContextPipeline')
+
+
+def has_actionable_explicit_request(state: State, history: list[Event]) -> bool:
+    """True when history has an explicit request that has not already failed."""
+    request = find_pending_condensation_request(history)
+    if request is None:
+        return False
+    dismissed = _pipeline_state(state).get(_EXPLICIT_COMPACT_DISMISSED_REQUEST_ID_KEY)
+    return dismissed != request.id
+
+
+def dismiss_explicit_compaction_request(state: State, history: list[Event]) -> None:
+    """Stop retrying an explicit request after compaction exhausts its attempts."""
+    request = find_pending_condensation_request(history)
+    if request is None:
+        return
+    pipe = _pipeline_state(state)
+    pipe[_EXPLICIT_COMPACT_DISMISSED_REQUEST_ID_KEY] = request.id
+    _set_pipeline_state(state, pipe)
+    logger.warning(
+        'ContextPipeline: explicit compaction request %d dismissed after failure',
+        request.id,
+    )
 
 
 def should_skip_compaction(
@@ -203,6 +228,21 @@ def evaluate_continuity_gate(
         load_canonical_state(state=state),
         history,
     )
+    task_plan_source, ac_source = _continuity_source_labels(history)
+    goal_context_chars = _goal_context_char_count(state)
+    fuzzy_missing = tuple(
+        f'{fact.category}:{fact.key[:80]}' for fact in result.missing[:8]
+    )
+    logger.info(
+        'Compaction continuity telemetry canonical_missing=%s fuzzy_missing=%s '
+        'goal_context_chars=%d task_plan_source=%s ac_source=%s score=%.2f',
+        ', '.join(canonical_result.missing) or 'none',
+        ', '.join(fuzzy_missing) or 'none',
+        goal_context_chars,
+        task_plan_source,
+        ac_source,
+        result.score,
+    )
     if not canonical_result.ok:
         logger.warning(
             'Compaction canonical continuity failed: missing=%s',
@@ -255,6 +295,51 @@ def evaluate_continuity_gate(
         matched=result.matched,
         total=result.total,
     )
+
+
+def _continuity_source_labels(history: list[Event]) -> tuple[str, str]:
+    from backend.context.compactor.pre_condensation_snapshot import extract_snapshot
+
+    snapshot = extract_snapshot(history)
+    task_source = 'none'
+    task_plan = snapshot.get('task_plan')
+    if isinstance(task_plan, dict) and task_plan.get('tasks'):
+        task_source = 'events'
+    else:
+        try:
+            from backend.core.task_tracker import TaskTracker
+
+            if TaskTracker().load_from_file():
+                task_source = 'json'
+        except Exception:
+            pass
+
+    ac_source = 'none'
+    acceptance = snapshot.get('acceptance_criteria')
+    if isinstance(acceptance, dict) and acceptance.get('criteria'):
+        ac_source = 'events'
+    else:
+        try:
+            from backend.core.criteria.acceptance_criteria_store import (
+                AcceptanceCriteriaStore,
+            )
+
+            if AcceptanceCriteriaStore().load_from_file():
+                ac_source = 'json'
+        except Exception:
+            pass
+    return task_source, ac_source
+
+
+def _goal_context_char_count(state: State) -> int:
+    try:
+        from backend.context.context_pipeline.goal_context import (
+            build_goal_context_for_compaction,
+        )
+
+        return len(build_goal_context_for_compaction(state=state) or '')
+    except Exception:
+        return 0
 
 
 def resolve_continuity_or_fallback(

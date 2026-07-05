@@ -6,16 +6,19 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from backend.context.canonical_state.types import (
+    _MAX_ACCEPTANCE_CRITERIA,
     _MAX_BACKGROUND_TASKS,
     _MAX_BLOCKERS,
     _MAX_FAILED_APPROACHES,
     _MAX_OUTPUT_CHARS,
+    _MAX_PRIOR_OBJECTIVES,
     _MAX_RECENT_WORK,
     _MAX_TASK_PLAN_ITEMS,
     _MAX_VERIFICATION_OUTPUT_CHARS,
     _PIVOT_MARKERS,
     BackgroundTaskState,
     CanonicalTaskState,
+    CriterionSummary,
     FailedApproach,
     FieldFreshness,
     RecentWorkItem,
@@ -215,6 +218,83 @@ def _merge_task_plan(
             plan_event_id,
             source,
         )
+
+
+def _merge_acceptance_criteria(
+    canonical: CanonicalTaskState,
+    snapshot: dict[str, Any],
+    event_id: int | None,
+    source: str,
+) -> None:
+    raw = snapshot.get('acceptance_criteria')
+    criteria_event_id = event_id
+    items: list[dict[str, Any]] = []
+    if isinstance(raw, dict):
+        criteria_event_id = raw.get('event_id')
+        if not isinstance(criteria_event_id, int):
+            criteria_event_id = event_id
+        raw_items = raw.get('criteria')
+        if isinstance(raw_items, list):
+            items = [item for item in raw_items if isinstance(item, dict)]
+    if not items:
+        try:
+            from backend.core.criteria.acceptance_criteria_store import (
+                AcceptanceCriteriaStore,
+            )
+
+            items = AcceptanceCriteriaStore().load_from_file()
+            source = 'persisted_store'
+        except Exception:
+            items = []
+
+    if not items:
+        return
+    if not _can_update(canonical, 'acceptance_criteria', criteria_event_id):
+        return
+
+    summaries: list[CriterionSummary] = []
+    for item in items[:_MAX_ACCEPTANCE_CRITERIA]:
+        assertion = _clean(item.get('assertion'))[:240]
+        if not assertion:
+            continue
+        summaries.append(
+            CriterionSummary(
+                criterion_id=_clean(item.get('id'))[:80],
+                assertion=assertion,
+                evidence=_clean(item.get('evidence'))[:240],
+                source=_clean(item.get('source'))[:40] or 'stated',
+                event_id=criteria_event_id,
+                updated_at=_now(),
+            )
+        )
+    if not summaries:
+        return
+    canonical.acceptance_criteria = summaries
+    _touch_field(canonical, 'acceptance_criteria', criteria_event_id, source)
+
+
+def _blocked_task_blockers(snapshot: dict[str, Any]) -> list[str]:
+    task_plan = snapshot.get('task_plan')
+    if not isinstance(task_plan, dict):
+        return []
+    tasks = task_plan.get('tasks')
+    if not isinstance(tasks, list):
+        return []
+    blockers: list[str] = []
+    for task in tasks:
+        if not isinstance(task, dict):
+            continue
+        status = _normalize_task_status(task.get('status'))
+        if status != 'blocked':
+            continue
+        desc = _clean(task.get('description'))[:160]
+        reason = _clean(task.get('result'))[:160]
+        if desc:
+            detail = f'Task blocked: {desc}'
+            if reason:
+                detail += f' ({reason})'
+            blockers.append(detail)
+    return blockers
 
 
 def _coerce_task_plan(value: object, event_id: int | None) -> list[TaskPlanItem]:
@@ -439,6 +519,7 @@ def _update_blockers(
     blockers.extend(
         _string_tail(snapshot.get('recent_errors', []), 6, _MAX_OUTPUT_CHARS)
     )
+    blockers.extend(_blocked_task_blockers(snapshot))
     canonical.blockers = _merge_strings([], blockers, _MAX_BLOCKERS)
     if blockers:
         _touch_field(canonical, 'blockers', event_id, source)
@@ -457,10 +538,16 @@ def _update_vcs_status(
         if not isinstance(command_info, dict):
             continue
         command = str(command_info.get('command', ''))
-        if command.strip().startswith('git status'):
+        lowered = command.strip().casefold()
+        if lowered.startswith('git status') or lowered.startswith('git diff --stat'):
             output = str(command_info.get('output', ''))[:_MAX_OUTPUT_CHARS]
             _set_field(canonical, 'vcs_status', output or command, event_id, source)
             return
+        if lowered.startswith('git log -1') or lowered.startswith('git log --oneline -1'):
+            output = str(command_info.get('output', ''))[:_MAX_OUTPUT_CHARS]
+            if output:
+                _set_field(canonical, 'vcs_status', output, event_id, source)
+                return
 
 
 def _infer_next_action(canonical: CanonicalTaskState) -> str:

@@ -304,7 +304,7 @@ class HUDBar:
         return raw if isinstance(raw, dict) else None
 
     def apply_prompt_token_accounting(self, accounting: dict[str, Any] | None) -> None:
-        """Overlay internal prompt composition when provider usage undercounts."""
+        """Apply the latest internal prompt composition estimate to HUD context pressure."""
         if not isinstance(accounting, dict):
             return
         full = accounting.get('full_request_tokens')
@@ -313,7 +313,7 @@ class HUDBar:
                 parsed_full = int(full)
             except (TypeError, ValueError):
                 parsed_full = 0
-            if parsed_full > self.state.context_tokens:
+            if parsed_full > 0:
                 self.state.context_tokens = parsed_full
         window = accounting.get('context_window')
         if window is not None and not isinstance(window, bool):
@@ -407,6 +407,45 @@ class HUDBar:
             self.state.context_tokens = 0
             self._context_usage_ignore_prefix = self._observed_usage_count
         self.state.condensation_count = next_count
+
+    @staticmethod
+    def estimate_full_request_from_post_compact(extra_data: Any) -> int | None:
+        """Estimate full prompt size from the post-compaction boundary snapshot."""
+        if not isinstance(extra_data, dict):
+            return None
+        pipe = extra_data.get('context_pipeline_state')
+        if not isinstance(pipe, dict):
+            return None
+        post_compact = pipe.get('post_compact_true_tokens')
+        if not isinstance(post_compact, int) or post_compact <= 0:
+            return None
+        accounting = HUDBar._prompt_token_accounting_from_extra(extra_data) or {}
+        fixed = 0
+        for key in (
+            'static_prompt_tokens',
+            'context_packet_tokens',
+            'tool_schema_tokens',
+        ):
+            value = accounting.get(key)
+            if value is None or isinstance(value, bool):
+                continue
+            try:
+                parsed = int(value)
+            except (TypeError, ValueError):
+                continue
+            if parsed > 0:
+                fixed += parsed
+        return post_compact + fixed
+
+    def apply_post_compaction_context(self, extra_data: Any) -> None:
+        """Refresh HUD context pressure after a committed compaction."""
+        estimate = self.estimate_full_request_from_post_compact(extra_data)
+        if estimate is not None:
+            self.state.context_tokens = estimate
+        else:
+            self.state.context_tokens = 0
+        self._context_usage_ignore_prefix = self._observed_usage_count
+        self.state.token_usage_estimated = True
 
     def update_workspace(self, root: str | Path | None) -> None:
         """Set resolved workspace path for footer / Live HUD (empty if unknown)."""

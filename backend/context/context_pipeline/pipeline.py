@@ -28,6 +28,8 @@ from backend.context.compactor.pre_condensation_snapshot import (
 from backend.context.context_budget import ContextBudget
 from backend.context.context_pipeline.compaction import (
     _CompactionEngine,
+    dismiss_explicit_compaction_request,
+    has_actionable_explicit_request,
     mark_just_compacted,
     record_boundary_compact,
     resolve_continuity_or_fallback,
@@ -237,8 +239,7 @@ class ContextPipeline:
             llm_config=llm_config,
             state=state,
         )
-        view = getattr(state, 'view', None)
-        explicit = bool(getattr(view, 'unhandled_condensation_request', False))
+        explicit = has_actionable_explicit_request(state, history)
         memory_pressure = getattr(turn_signals, 'memory_pressure', None)
         critical_pressure = memory_pressure == 'CRITICAL'
 
@@ -274,6 +275,8 @@ class ContextPipeline:
             critical=critical_pressure,
         )
         if action is None or not (action.summary or '').strip():
+            if explicit:
+                dismiss_explicit_compaction_request(state, history)
             logger.error(
                 'ContextPipeline: LLM compaction produced no action; history unchanged'
             )
@@ -296,6 +299,11 @@ class ContextPipeline:
             state, history, action, llm_config=llm_config,
             post_events=self._projected_post_boundary(history, action, state),
         )
+        from backend.context.canonical_state.ops import (
+            merge_compaction_summary_into_canonical,
+        )
+
+        merge_compaction_summary_into_canonical(state=state, summary=action.summary or '')
         if critical_pressure:
             state.ack_memory_pressure(source='ContextPipeline')
             self._record_pressure_condensation()
@@ -443,8 +451,7 @@ class ContextPipeline:
             llm_config=llm_config,
             state=state,
         )
-        view = getattr(state, 'view', None)
-        explicit = bool(getattr(view, 'unhandled_condensation_request', False))
+        explicit = has_actionable_explicit_request(state, history)
         memory_pressure = getattr(turn_signals, 'memory_pressure', None)
         critical_pressure = memory_pressure == 'CRITICAL'
         return should_run_compaction(

@@ -36,7 +36,15 @@ def _finish_compaction_card(
     count = max(orch._condensation_count, 1)
     orch._condensation_count = count
     orch._hud.update_condensation_count(count)
+    controller = getattr(orch._tui, '_controller', None)
+    state = getattr(controller, 'state', None) if controller is not None else None
+    extra = getattr(state, 'extra_data', None) if state is not None else None
+    orch._hud.apply_post_compaction_context(extra)
     orch._complete_compaction_scan_card(summary=summary)
+    try:
+        orch._tui._render_hud_bar()
+    except Exception:
+        pass
 
 
 def show_compaction_started_card(orch: 'RendererEventProcessorMixin') -> None:
