@@ -20,6 +20,11 @@ from backend.cli.event_rendering.panels import (
     task_panel_signature,
 )
 from backend.cli.tool_display.orient_tools import OrientLineModel
+from backend.cli.tui.constants import (
+    _TUI_HISTORY_RENDER_LIMIT,
+    _TUI_RENDER_CACHE_EVICT_BATCH,
+    _TUI_RENDER_CACHE_MAX,
+)
 from backend.cli.tui.renderer.mixins.terminal import RendererTerminalMixin
 
 
@@ -28,6 +33,67 @@ class RendererDisplayMixin:
 
     _playbook_skills_cache: list[str] | None = None
     _playbook_skills_cache_sig: tuple[float, float] | None = None
+    _sidebar_section_cache: dict[str, Any] | None = None
+    _cached_display_is_mock: bool | None = None
+
+    def _display_is_mock(self) -> bool:
+        cached = self._cached_display_is_mock
+        if cached is not None:
+            return cached
+        try:
+            display = self._tui._get_display()
+            result = type(display).__name__ == 'MagicMock'
+        except Exception:
+            result = False
+        self._cached_display_is_mock = result
+        return result
+
+    def _append_history_items(self, *items: Any) -> None:
+        history = self._history
+        for item in items:
+            if history.maxlen is not None and len(history) >= history.maxlen:
+                self._history_items_dropped += 1
+            history.append(item)
+
+    @staticmethod
+    def _bound_event_id_cache(cache: dict[int, Any]) -> None:
+        if len(cache) <= _TUI_RENDER_CACHE_MAX:
+            return
+        excess = len(cache) - (_TUI_RENDER_CACHE_MAX - _TUI_RENDER_CACHE_EVICT_BATCH)
+        for key in sorted(cache.keys())[:excess]:
+            cache.pop(key, None)
+
+    def _get_sidebar_section(self, widget_id: str) -> Any | None:
+        from backend.cli.tui.widgets.collapsible import CollapsibleSection
+
+        cache = self._sidebar_section_cache
+        if cache is None:
+            cache = {}
+            self._sidebar_section_cache = cache
+        section = cache.get(widget_id)
+        if section is not None:
+            return section
+        try:
+            section = self._tui.query_one(widget_id, CollapsibleSection)
+        except Exception:
+            return None
+        cache[widget_id] = section
+        return section
+
+    def _get_sidebar_container(self) -> Any | None:
+        cache = self._sidebar_section_cache
+        if cache is None:
+            cache = {}
+            self._sidebar_section_cache = cache
+        container = cache.get('#sidebar-container')
+        if container is not None:
+            return container
+        try:
+            container = self._tui.query_one('#sidebar-container')
+        except Exception:
+            return None
+        cache['#sidebar-container'] = container
+        return container
 
     def _register_widget_event_id(self, widget: Any) -> None:
         event_id = getattr(self, '_current_event_id', -1)
@@ -83,7 +149,7 @@ class RendererDisplayMixin:
         self._pending_compaction_scan_card = None
         self._last_streamed_preamble_text = ''
         self._step_draft.reset()
-        self._history = []
+        self._history = deque(maxlen=_TUI_HISTORY_RENDER_LIMIT)
         self._history_items_dropped = 0
         self._live_thinking = ''
         self._live_thinking_dirty = False
@@ -97,6 +163,7 @@ class RendererDisplayMixin:
         self._mounted_event_ids = set()
         self._event_order = []
         self._last_task_sidebar_signature = None
+        self._sidebar_section_cache = None
         self._file_edit_actions_by_id: dict[int, Any] = {}
         RendererTerminalMixin._init_terminal_state(self)
         try:
@@ -259,9 +326,8 @@ class RendererDisplayMixin:
             if signature == getattr(self, '_last_lsp_sidebar_signature', None):
                 return
             self._last_lsp_sidebar_signature = signature
-            try:
-                section = self._tui.query_one('#sidebar-lsp', CollapsibleSection)
-            except Exception:
+            section = self._get_sidebar_section('#sidebar-lsp')
+            if section is None:
                 return
             section.set_title('LSP Servers')
             try:
@@ -277,9 +343,8 @@ class RendererDisplayMixin:
             return
         self._last_lsp_sidebar_signature = signature
 
-        try:
-            section = self._tui.query_one('#sidebar-lsp', CollapsibleSection)
-        except Exception:
+        section = self._get_sidebar_section('#sidebar-lsp')
+        if section is None:
             return
 
         cache = getattr(self, '_lsp_servers_cache', None)
@@ -348,9 +413,8 @@ class RendererDisplayMixin:
             if signature == getattr(self, '_last_dap_sidebar_signature', None):
                 return
             self._last_dap_sidebar_signature = signature
-            try:
-                section = self._tui.query_one('#sidebar-dap', CollapsibleSection)
-            except Exception:
+            section = self._get_sidebar_section('#sidebar-dap')
+            if section is None:
                 return
             section.set_title('Debug Adapters')
             try:
@@ -366,9 +430,8 @@ class RendererDisplayMixin:
             return
         self._last_dap_sidebar_signature = signature
 
-        try:
-            section = self._tui.query_one('#sidebar-dap', CollapsibleSection)
-        except Exception:
+        section = self._get_sidebar_section('#sidebar-dap')
+        if section is None:
             return
 
         cache = getattr(self, '_dap_adapters_cache', None)
@@ -456,7 +519,9 @@ class RendererDisplayMixin:
                 break
 
         try:
-            section = self._tui.query_one('#sidebar-tasks', CollapsibleSection)
+            section = self._get_sidebar_section('#sidebar-tasks')
+            if section is None:
+                return
             if active_task_id:
                 section.expand()
             for row in section.query(SidebarRow):
@@ -478,8 +543,9 @@ class RendererDisplayMixin:
         def _relayout() -> None:
             try:
                 section.refresh(layout=True)
-                container = self._tui.query_one('#sidebar-container')
-                container.refresh(layout=True)
+                container = self._get_sidebar_container()
+                if container is not None:
+                    container.refresh(layout=True)
             except Exception:
                 pass
 
@@ -511,9 +577,8 @@ class RendererDisplayMixin:
         """Show the same muted ``● Disabled`` empty state as LSP/DAP."""
         from backend.cli.tui.widgets.collapsible import CollapsibleSection
 
-        try:
-            section = self._tui.query_one('#sidebar-mcp', CollapsibleSection)
-        except Exception:
+        section = self._get_sidebar_section('#sidebar-mcp')
+        if section is None:
             return
         section.set_title('MCP Servers')
         section.set_content('Disabled')
@@ -529,8 +594,10 @@ class RendererDisplayMixin:
     ) -> bool:
         from backend.cli.tui.widgets.collapsible import CollapsibleSection
 
+        widget = self._get_sidebar_section(widget_id)
+        if widget is None:
+            return False
         try:
-            widget = self._tui.query_one(widget_id, CollapsibleSection)
             widget.set_title(title)
             if empty_message is not None:
                 widget._content = empty_message
@@ -542,8 +609,10 @@ class RendererDisplayMixin:
     def _sync_sidebar_feature_switch(self, widget_id: str, enabled: bool) -> None:
         from backend.cli.tui.widgets.collapsible import CollapsibleSection
 
+        section = self._get_sidebar_section(widget_id)
+        if section is None:
+            return
         try:
-            section = self._tui.query_one(widget_id, CollapsibleSection)
             section.set_feature_enabled(enabled)
         except Exception:
             pass
@@ -770,7 +839,7 @@ class RendererDisplayMixin:
             display = self._tui._get_display()
         except (AttributeError, NoMatches):
             return
-        if type(display).__name__ == 'MagicMock':
+        if self._display_is_mock():
             return
         sync = getattr(display, 'sync_viewport', None)
         if callable(sync):

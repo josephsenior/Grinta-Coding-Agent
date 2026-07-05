@@ -32,7 +32,8 @@ class RendererActionHandlersMixin:
             display = self._tui._get_display()
         except Exception:
             return
-        if type(display).__name__ == 'MagicMock':
+        is_mock = getattr(self, '_display_is_mock', None)
+        if callable(is_mock) and is_mock():
             return
         display._suppress_mount_animation = bool(self._streaming_active)
 
@@ -100,7 +101,7 @@ class RendererActionHandlersMixin:
         for content in list(self._pending_final_commits):
             widget = AgentMessage(content)
             self._append_transcript_widget(widget)
-            self._history.append(widget)
+            self._append_history_items(widget)
         self._pending_final_commits.clear()
 
     async def flush_pending_final_commits(self) -> None:
@@ -111,7 +112,7 @@ class RendererActionHandlersMixin:
         for content in list(self._pending_final_commits):
             widget = AgentMessage(content)
             self._append_transcript_widget(widget)
-            self._history.append(widget)
+            self._append_history_items(widget)
         self._pending_final_commits.clear()
 
     def _handle_message_action(self, action: MessageAction) -> None:
@@ -168,7 +169,7 @@ class RendererActionHandlersMixin:
 
         widget = AgentMessage(content, plain=True)
         self._append_transcript_widget(widget)
-        self._history.append(widget)
+        self._append_history_items(widget)
 
     @staticmethod
     def _format_retry_status_message(

@@ -28,10 +28,10 @@ from backend.context.compactor.pre_condensation_snapshot import (
 from backend.context.context_budget import ContextBudget
 from backend.context.context_pipeline.compaction import (
     _CompactionEngine,
-    increment_condensation_counter,
     mark_just_compacted,
     record_boundary_compact,
     resolve_continuity_or_fallback,
+    should_run_compaction,
     should_skip_compaction,
 )
 from backend.context.context_pipeline.goal_context import strip_verbatim_user_echo
@@ -54,7 +54,6 @@ from backend.context.tool_result_storage import (
     apply_tool_result_budget,
 )
 from backend.core.constants import (
-    DEFAULT_BOUNDARY_COMPACT_COOLDOWN_SECONDS,
     DEFAULT_EMERGENCY_PROMPT_MIN_EVENTS,
     DEFAULT_MICROCOMPACT_PRESERVE_RECENT,
 )
@@ -89,13 +88,11 @@ class ContextPipeline:
         llm_registry: LLMRegistry,
         config: ContextPipelineConfig,
         preserve_recent: int = DEFAULT_MICROCOMPACT_PRESERVE_RECENT,
-        boundary_compact_cooldown_seconds: int = DEFAULT_BOUNDARY_COMPACT_COOLDOWN_SECONDS,
         condensation_recorder: Callable[[], None] | None = None,
     ) -> None:
         self._llm_registry = llm_registry
         self._config = config
         self._preserve_recent = preserve_recent
-        self._boundary_compact_cooldown = boundary_compact_cooldown_seconds
         self._condensation_recorder = condensation_recorder
 
         self._structured_compactor: Any = None
@@ -200,8 +197,15 @@ class ContextPipeline:
                         post_boundary,
                         llm_config=llm_config,
                         state=state,
-                        boundary_compact_cooldown_seconds=self._boundary_compact_cooldown,
                     )
+                    if should_skip_compaction(
+                        state,
+                        events=post_boundary,
+                        llm_config=llm_config,
+                        history=history,
+                    ):
+                        delete_staging_snapshot(state=state)
+                        return CondensedHistory(history, None)
                     resolved_action = resolve_continuity_or_fallback(
                         state, history, post_boundary, action, budget, llm_config
                     )
@@ -216,13 +220,11 @@ class ContextPipeline:
                             state,
                             history,
                             action,
-                            budget=budget,
                             llm_config=llm_config,
                             post_events=self._projected_post_boundary(
                                 history, action, state
                             ),
                         )
-                        increment_condensation_counter(state)
                         logger.info(
                             'ContextPipeline used pre-warmed compaction in %.3fs',
                             time.perf_counter() - started,
@@ -234,16 +236,11 @@ class ContextPipeline:
             events,
             llm_config=llm_config,
             state=state,
-            boundary_compact_cooldown_seconds=self._boundary_compact_cooldown,
         )
         view = getattr(state, 'view', None)
         explicit = bool(getattr(view, 'unhandled_condensation_request', False))
         memory_pressure = getattr(turn_signals, 'memory_pressure', None)
-        pressure_active = isinstance(memory_pressure, str) and bool(
-            memory_pressure.strip()
-        )
         critical_pressure = memory_pressure == 'CRITICAL'
-        force = explicit or critical_pressure
 
         self._log_budget_snapshot(
             stage='prepare_step',
@@ -254,43 +251,19 @@ class ContextPipeline:
             memory_pressure=memory_pressure,
         )
 
-        near_token_budget = budget.estimated_tokens >= int(
-            budget.autocompact_threshold * 0.85
-        )
-        if (
-            pressure_active
-            and not budget.should_autocompact
-            and not explicit
-            and not critical_pressure
-            and not near_token_budget
-        ):
-            logger.info(
-                'ContextPipeline: non-critical memory pressure ignored for '
-                'context compaction because prompt budget is below near-threshold '
-                '(estimated=%d threshold=%d pressure=%s)',
-                budget.estimated_tokens,
-                budget.autocompact_threshold,
-                memory_pressure,
-            )
-            delete_staging_snapshot(state=state)
-            return CondensedHistory(history, None)
-
-        if not (budget.should_autocompact or explicit or pressure_active):
-            delete_staging_snapshot(state=state)
-            return CondensedHistory(history, None)
-
-        if should_skip_compaction(
+        if not should_run_compaction(
             state,
-            self._boundary_compact_cooldown,
-            force=force,
-            explicit=explicit,
-            budget=budget,
             events=events,
+            budget=budget,
+            history=history,
             llm_config=llm_config,
+            explicit=explicit,
+            critical=critical_pressure,
         ):
             delete_staging_snapshot(state=state)
             return CondensedHistory(history, None)
 
+        force = explicit or critical_pressure
         action = await self._compaction_engine.run(
             state,
             history,
@@ -320,11 +293,10 @@ class ContextPipeline:
         finalize_compaction_artifacts(state=state)
         mark_just_compacted(state)
         record_boundary_compact(
-            state, history, action, budget=budget, llm_config=llm_config,
+            state, history, action, llm_config=llm_config,
             post_events=self._projected_post_boundary(history, action, state),
         )
-        increment_condensation_counter(state)
-        if pressure_active:
+        if critical_pressure:
             state.ack_memory_pressure(source='ContextPipeline')
             self._record_pressure_condensation()
         logger.info(
@@ -428,12 +400,15 @@ class ContextPipeline:
             events,
             llm_config=llm_config,
             state=state,
-            boundary_compact_cooldown_seconds=self._boundary_compact_cooldown,
         )
         if should_skip_compaction(
-            state, self._boundary_compact_cooldown, force=False, budget=budget,
-            events=events, llm_config=llm_config,
+            state,
+            events=events,
+            llm_config=llm_config,
+            history=history,
         ):
+            return None
+        if not budget.should_autocompact:
             return None
         action = await self._compaction_engine._llm_structured_compaction(
             events, state, budget=budget, llm_config=llm_config
@@ -443,12 +418,12 @@ class ContextPipeline:
         return Compaction(action=action)
 
     def note_llm_step(self, state: State) -> None:
-        """Reset condensation-loop counters after a real LLM step."""
+        """Reset compaction guard after a real LLM step."""
         from backend.context.context_pipeline.helpers import (
-            reset_consecutive_condensation_counter,
+            clear_compact_guard_after_llm_step,
         )
 
-        reset_consecutive_condensation_counter(state)
+        clear_compact_guard_after_llm_step(state)
 
     def should_emit_compaction_status(self, state: State) -> bool:
         """Check if the next ``prepare_step`` is likely to compact."""
@@ -467,27 +442,19 @@ class ContextPipeline:
             events,
             llm_config=llm_config,
             state=state,
-            boundary_compact_cooldown_seconds=self._boundary_compact_cooldown,
         )
         view = getattr(state, 'view', None)
         explicit = bool(getattr(view, 'unhandled_condensation_request', False))
         memory_pressure = getattr(turn_signals, 'memory_pressure', None)
         critical_pressure = memory_pressure == 'CRITICAL'
-        force = explicit or critical_pressure
-        if should_skip_compaction(
+        return should_run_compaction(
             state,
-            self._boundary_compact_cooldown,
-            force=force,
-            explicit=explicit,
-            budget=budget,
             events=events,
+            budget=budget,
+            history=history,
             llm_config=llm_config,
-        ):
-            return False
-        return bool(
-            budget.should_autocompact
-            or explicit
-            or (isinstance(memory_pressure, str) and memory_pressure.strip())
+            explicit=explicit,
+            critical=critical_pressure,
         )
 
     # ------------------------------------------------------------------ #

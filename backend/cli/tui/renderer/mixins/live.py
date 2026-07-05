@@ -15,7 +15,6 @@ from textual.widgets import (
 
 from backend.cli.theme import CLR_REASONING_SNAP
 from backend.cli.tui.constants import (
-    _TUI_HISTORY_RENDER_LIMIT,
     _TUI_SCROLL_PAINT_INTERVAL_SECONDS,
 )
 from backend.cli.tui.transcript_typography import (
@@ -60,16 +59,10 @@ class RendererLiveMixin:
         self.commit_live_thinking()
         self.clear_live_response()
         register = getattr(self, '_register_widget_event_id', None)
-
-        self._history.append(renderable)
-        self._history.append(Text(''))
-        overflow = len(self._history) - _TUI_HISTORY_RENDER_LIMIT
-        if overflow > 0:
-            del self._history[:overflow]
-            self._history_items_dropped += overflow
+        self._append_history_items(renderable, Text(''))
 
         display = self._tui._get_display()
-        if type(display).__name__ == 'MagicMock':
+        if self._display_is_mock():
             display.write(renderable)
         else:
             from textual.widget import Widget
@@ -84,7 +77,6 @@ class RendererLiveMixin:
                 display.prepend_widget(widget)
             else:
                 display.append_widget(widget)
-        self._refresh_display()
         sync = getattr(self, '_sync_transcript_viewport', None)
         if callable(sync):
             sync()
@@ -99,7 +91,7 @@ class RendererLiveMixin:
         self._live_thinking_dirty = bool(text.strip())
 
         display = self._tui._get_display()
-        if type(display).__name__ == 'MagicMock':
+        if self._display_is_mock():
             display.clear()
             display.write(text)
             return
@@ -131,7 +123,7 @@ class RendererLiveMixin:
             return
 
         from backend.cli.tui.renderer.prep import (
-            prep_streaming_renderable,
+            prep_streaming_renderable_incremental,
             streaming_render_cache_key,
         )
 
@@ -139,7 +131,10 @@ class RendererLiveMixin:
         renderable = cache.get(streaming_render_cache_key(text))
         try:
             if renderable is None:
-                renderable = prep_streaming_renderable(text)
+                state = getattr(self, '_streaming_render_state', None)
+                renderable, self._streaming_render_state = (
+                    prep_streaming_renderable_incremental(text, state)
+                )
             widget.set_streaming_renderable(renderable)
         except Exception:
             widget.set_streaming_text(text)
@@ -182,7 +177,7 @@ class RendererLiveMixin:
             display = self._tui._get_display()
         except (AttributeError, Exception):
             return
-        if type(display).__name__ != 'MagicMock':
+        if not self._display_is_mock():
             self._follow_transcript_tail_after_reflow(display)
 
     def update_live_response(self, text: str) -> None:
@@ -193,7 +188,7 @@ class RendererLiveMixin:
         self._live_response_dirty = bool(text.strip())
 
         display = self._tui._get_display()
-        if type(display).__name__ == 'MagicMock':
+        if self._display_is_mock():
             if not self._live_response_dirty:
                 self.clear_live_response()
                 return
@@ -254,20 +249,24 @@ class RendererLiveMixin:
         self._live_response_dirty = False
         self._live_response_pending_text = ''
         self._last_streaming_response_applied_text = ''
+        self._streaming_render_state = None
 
         display = self._tui._get_display()
-        if type(display).__name__ == 'MagicMock':
+        if self._display_is_mock():
             display.clear()
             return
 
         if self._live_response_widget:
+            removed = getattr(display, '_note_content_widget_removed', None)
+            if callable(removed):
+                removed()
             self._live_response_widget.remove()
             self._live_response_widget = None
 
     def commit_live_thinking(self) -> None:
         """Freeze the current live thinking block at its transcript position."""
         display = self._tui._get_display()
-        if type(display).__name__ == 'MagicMock':
+        if self._display_is_mock():
             if self._live_thinking_dirty:
                 if self._live_thinking.strip():
                     self._history.append(self._live_thinking)
@@ -287,13 +286,11 @@ class RendererLiveMixin:
                     THINKING_LABEL,
                     Text(snapshot_text, style=CLR_REASONING_SNAP),
                 )
-                self._history.append(snapshot)
-                self._history.append(Text(''))
-                overflow = len(self._history) - _TUI_HISTORY_RENDER_LIMIT
-                if overflow > 0:
-                    del self._history[:overflow]
-                    self._history_items_dropped += overflow
+                self._append_history_items(snapshot, Text(''))
             else:
+                removed = getattr(display, '_note_content_widget_removed', None)
+                if callable(removed):
+                    removed()
                 self._live_thinking_widget.remove()
             self._live_thinking_widget = None
             self._live_thinking_dirty = False

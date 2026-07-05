@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import time
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from backend.context.context_budget import (
     ContextBudget,
     estimate_boundary_event_tokens,
-    record_post_compact_baseline,
 )
 from backend.core.constants import DEFAULT_COMPACTION_RESERVED_SUMMARY_TOKENS
 from backend.ledger.action.message import MessageAction
@@ -36,39 +34,34 @@ def test_autocompact_threshold_reserves_summary_headroom():
     assert budget.should_autocompact is False
 
 
-def test_should_autocompact_when_estimate_exceeds_threshold():
+def test_should_autocompact_when_boundary_tokens_exceed_threshold():
     llm_config = SimpleNamespace(max_input_tokens=1_000, model='gpt-test')
     huge = _user_event('x' * 50_000, 1)
     budget = ContextBudget.from_events([huge], llm_config=llm_config)
     assert budget.should_autocompact is True
 
 
-def test_post_compact_estimate_uses_post_boundary_events_not_api_tokens():
+def test_budget_uses_boundary_tokens_not_api_cache():
     llm_config = SimpleNamespace(max_input_tokens=200_000, model='claude-test')
     state = MagicMock()
-    state.extra_data = {}
-    events = [_user_event('hello', 1)]
-    for i in range(2, 52):
-        events.append(_user_event(f'chunk {i} ' * 50, i))
-
-    def _set_extra(key, value, source='test'):
-        state.extra_data[key] = value
-
-    state.set_extra = _set_extra
+    state.extra_data = {
+        'prompt_token_accounting': {
+            'static_prompt_tokens': 2_000,
+            'tool_schema_tokens': 3_000,
+            'context_packet_tokens': 1_000,
+            'dynamic_history_tokens': 80_000,
+        }
+    }
     state.metrics = SimpleNamespace(
         token_usages=[SimpleNamespace(prompt_tokens=500_000, total_tokens=500_000)]
     )
+    events = [_user_event('hello', 1)]
 
-    pre_compact = ContextBudget.from_events(events, llm_config=llm_config, state=state)
-    assert pre_compact.estimated_tokens > 500_000
+    budget = ContextBudget.from_events(events, llm_config=llm_config, state=state)
+    full = estimate_boundary_event_tokens(events, llm_config=llm_config)
 
-    post_boundary = events[-10:]
-    record_post_compact_baseline(state, post_boundary)
-    post_compact = ContextBudget.from_events(
-        post_boundary, llm_config=llm_config, state=state
-    )
-    assert post_compact.estimated_tokens < pre_compact.estimated_tokens // 2
-    assert post_compact.estimated_tokens < 500_000
+    assert budget.estimated_tokens == full
+    assert budget.estimated_tokens < 5_000
 
 
 def test_budget_uses_dynamic_history_and_fixed_prompt_reserve() -> None:
@@ -82,9 +75,6 @@ def test_budget_uses_dynamic_history_and_fixed_prompt_reserve() -> None:
             'dynamic_history_tokens': 7_000,
         }
     }
-    state.metrics = SimpleNamespace(
-        token_usages=[SimpleNamespace(prompt_tokens=50_000, total_tokens=55_000)]
-    )
     events = [_user_event('hello', 1)]
 
     budget = ContextBudget.from_events(events, llm_config=llm_config, state=state)
@@ -95,63 +85,3 @@ def test_budget_uses_dynamic_history_and_fixed_prompt_reserve() -> None:
         == 20_000 - DEFAULT_COMPACTION_RESERVED_SUMMARY_TOKENS - 6_000
     )
     assert budget.estimated_tokens < 8_000
-
-
-def test_estimate_boundary_event_tokens_ignores_stale_api_cache() -> None:
-    llm_config = SimpleNamespace(max_input_tokens=200_000, model='gpt-test')
-    state = MagicMock()
-    state.extra_data = {
-        'prompt_token_accounting': {
-            'static_prompt_tokens': 2_000,
-            'tool_schema_tokens': 3_000,
-            'context_packet_tokens': 1_000,
-            'dynamic_history_tokens': 80_000,
-        }
-    }
-    state.metrics = SimpleNamespace(
-        token_usages=[SimpleNamespace(prompt_tokens=90_000, total_tokens=95_000)]
-    )
-    events = [_user_event('x' * 200, 1), _user_event('y' * 200, 2)]
-
-    cached = ContextBudget.from_events(events, llm_config=llm_config, state=state)
-    full = estimate_boundary_event_tokens(events, llm_config=llm_config)
-
-    assert cached.estimated_tokens > full
-    assert full < 5_000
-
-
-def test_recent_compaction_respects_custom_boundary_cooldown() -> None:
-    llm_config = SimpleNamespace(max_input_tokens=200_000, model='gpt-test')
-    state = MagicMock()
-    state.extra_data = {
-        'context_pipeline_state': {
-            'last_boundary_compact_at': time.time() - 90,
-        },
-        'prompt_token_accounting': {
-            'static_prompt_tokens': 2_000,
-            'tool_schema_tokens': 3_000,
-            'context_packet_tokens': 1_000,
-            'dynamic_history_tokens': 80_000,
-        },
-    }
-    state.metrics = SimpleNamespace(
-        token_usages=[SimpleNamespace(prompt_tokens=90_000, total_tokens=95_000)]
-    )
-    events = [_user_event('hello', 1)]
-
-    short_cooldown_budget = ContextBudget.from_events(
-        events,
-        llm_config=llm_config,
-        state=state,
-        boundary_compact_cooldown_seconds=60,
-    )
-    long_cooldown_budget = ContextBudget.from_events(
-        events,
-        llm_config=llm_config,
-        state=state,
-        boundary_compact_cooldown_seconds=120,
-    )
-
-    assert (
-        short_cooldown_budget.estimated_tokens > long_cooldown_budget.estimated_tokens
-    )

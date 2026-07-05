@@ -86,6 +86,16 @@ _TUI_RESUME_HYDRATE_EVENTS = _bounded_int_env(
     default=80,
     minimum=10,
 )
+_TUI_RENDER_CACHE_MAX = _bounded_int_env(
+    'GRINTA_TUI_RENDER_CACHE_MAX',
+    default=200,
+    minimum=50,
+)
+_TUI_RENDER_CACHE_EVICT_BATCH = _bounded_int_env(
+    'GRINTA_TUI_RENDER_CACHE_EVICT_BATCH',
+    default=100,
+    minimum=10,
+)
 
 _WELCOME_SUGGESTIONS = [
     'Run /health and tell me whether git and ripgrep are detected.',

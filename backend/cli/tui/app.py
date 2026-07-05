@@ -286,7 +286,9 @@ class TUIRenderer(
         self._streaming_active: bool = False
 
         # Unit test compatibility
-        self._history: list[Any] = []
+        from backend.cli.tui.constants import _TUI_HISTORY_RENDER_LIMIT
+
+        self._history: deque[Any] = deque(maxlen=_TUI_HISTORY_RENDER_LIMIT)
         self._history_items_dropped: int = 0
         self._live_thinking: str = ''
         self._live_thinking_dirty: bool = False
@@ -312,6 +314,7 @@ class TUIRenderer(
         self._pending_shell_cards_by_command: dict[str, deque[Any]] = defaultdict(deque)
         RendererTerminalMixin._init_terminal_state(self)
         self._streaming_render_cache: dict[str, Any] = {}
+        self._streaming_render_state: Any | None = None
         self._pending_file_read_cards_by_path: dict[str, deque[Any]] = defaultdict(
             deque
         )

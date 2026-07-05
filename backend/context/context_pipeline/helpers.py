@@ -6,10 +6,8 @@ import time
 from typing import TYPE_CHECKING
 
 from backend.context.context_pipeline.types import (
-    _CONSECUTIVE_CONDENSATION_KEY,
     _JUST_COMPACTED_KEY,
     _LAST_LLM_STEP_KEY,
-    _WILL_RETRIGGER_HYSTERESIS_KEY,
 )
 from backend.context.prompt.context_packet import CONTEXT_PACKET_MARKER
 from backend.ledger.action.agent import CondensationAction
@@ -35,13 +33,11 @@ def _drop_stale_prompt_state_artifacts(events: list[Event]) -> list[Event]:
     return filtered
 
 
-def reset_consecutive_condensation_counter(state: State) -> None:
-    """Reset condensation-loop tracking after a real LLM step."""
+def clear_compact_guard_after_llm_step(state: State) -> None:
+    """Clear same-turn compaction guard after a real LLM step completes."""
     pipe = dict(getattr(state, 'extra_data', {}).get('context_pipeline_state', {}))
-    pipe[_CONSECUTIVE_CONDENSATION_KEY] = 0
     pipe[_LAST_LLM_STEP_KEY] = time.time()
     pipe[_JUST_COMPACTED_KEY] = False
-    pipe.pop(_WILL_RETRIGGER_HYSTERESIS_KEY, None)
     state.set_extra('context_pipeline_state', pipe, source='ContextPipeline')
 
 
