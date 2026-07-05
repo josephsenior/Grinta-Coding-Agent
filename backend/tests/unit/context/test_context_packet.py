@@ -228,6 +228,44 @@ def test_context_packet_prioritizes_task_checkpoint_after_compaction(
     assert 'remaining: Implement cluster.py' in packet.content
 
 
+def test_context_packet_includes_compact_snapshot_after_compaction(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setattr(
+        'backend.context.canonical_state.canonical_state_path',
+        lambda state=None: tmp_path / 'canonical_task_state.json',
+    )
+    monkeypatch.setattr(
+        'backend.context.compactor.pre_condensation_snapshot.load_snapshot',
+        lambda state=None: {
+            'events_condensed': 9,
+            'files_touched': {'src/main.py': {'action': 'edit'}},
+            'recent_errors': ['boom'],
+            'decisions': [],
+            'recent_commands': [],
+            'attempted_approaches': [],
+            'background_tasks': [],
+            'test_results': [],
+        },
+    )
+    events = [_user('Continue after compaction', 1)]
+
+    packet = build_context_packet(
+        events,
+        events,
+        state=SimpleNamespace(),
+        just_compacted=True,
+        char_budget=2400,
+    )
+
+    assert packet is not None
+    assert '<COMPACT_SNAPSHOT>' in packet.content
+    assert '<EXECUTION_CONTRACT>' in packet.content
+    assert 'src/main.py' in packet.content
+    assert 'boom' in packet.content
+    assert 'Compact restore hints' not in packet.content
+
+
 def test_context_packet_ignores_old_packets_as_validated_summaries(
     tmp_path, monkeypatch
 ) -> None:
@@ -290,7 +328,7 @@ def test_repeated_compaction_replay_keeps_one_current_state(
         event.id = index + 1
         stale_packets.append(event)
     restore_noise = AgentCondensationObservation(
-        content='<POST_COMPACT_RESTORE>\nold restore block\n</POST_COMPACT_RESTORE>',
+        content='<COMPACT_SNAPSHOT>\nold restore block\n</COMPACT_SNAPSHOT>',
         is_working_set=True,
     )
     restore_noise.id = 10

@@ -29,6 +29,15 @@ def test_prep_markdown_accepts_loosened_text() -> None:
     assert rendered is not None
 
 
+def test_prep_streaming_renderable_uses_full_markdown_for_prose() -> None:
+    from rich.markdown import Markdown
+
+    from backend.cli.tui.renderer.prep import prep_streaming_renderable
+
+    renderable = prep_streaming_renderable('**bold** and plain prose')
+    assert isinstance(renderable, Markdown)
+
+
 def test_incremental_streaming_freezes_complete_fences() -> None:
     first = 'Intro\n\n```python\nprint(1)\n```\n'
     second = first + 'More\n\n```python\nprint(2)\n```\n'

@@ -267,36 +267,30 @@ class ScreenLifecycleDispatchMixin:
 
         return state
 
-    async def _dispatch_to_agent(
-        self, text: str, *, image_urls: list[str] | None = None
-    ) -> None:
-        _tui_logger.debug('_dispatch_to_agent: ENTER')
+    async def _dispatch_action_event(self, action: MessageAction | Any) -> None:
+        _tui_logger.debug('_dispatch_action_event: ENTER')
         if self._controller is None or self._event_stream is None:
             _tui_logger.debug(
-                '_dispatch_to_agent: missing controller or event_stream, returning'
+                '_dispatch_action_event: missing controller or event_stream, returning'
             )
             return
 
         await self._ensure_environment_ready()
 
-        action = MessageAction(
-            content=text,
-            image_urls=image_urls or None,
-        )
         self._event_stream.add_event(action, EventSource.USER)
-        _tui_logger.debug('_dispatch_to_agent: event added')
+        _tui_logger.debug('_dispatch_action_event: event added')
         try:
-            logger.info('[TUI] _dispatch_to_agent: event added')
+            logger.info('[TUI] _dispatch_action_event: event added')
         except Exception as exc:
             _tui_logger.debug(
-                f'_dispatch_to_agent: logger.info FAILED: {type(exc).__name__}: {exc}'
+                f'_dispatch_action_event: logger.info FAILED: {type(exc).__name__}: {exc}'
             )
         try:
             await self._ensure_agent_task()
-            _tui_logger.debug('_dispatch_to_agent: _ensure_agent_task OK')
+            _tui_logger.debug('_dispatch_action_event: _ensure_agent_task OK')
         except Exception as exc:
             _tui_logger.debug(
-                f'_dispatch_to_agent: _ensure_agent_task FAILED: {type(exc).__name__}: {exc}'
+                f'_dispatch_action_event: _ensure_agent_task FAILED: {type(exc).__name__}: {exc}'
             )
             raise
         try:
@@ -307,10 +301,10 @@ class ScreenLifecycleDispatchMixin:
                 AgentState.STOPPED,
                 AgentState.AWAITING_USER_CONFIRMATION,
             }
-            _tui_logger.debug('_dispatch_to_agent: end_states created')
+            _tui_logger.debug('_dispatch_action_event: end_states created')
         except Exception as exc:
             _tui_logger.debug(
-                f'_dispatch_to_agent: end_states FAILED: {type(exc).__name__}: {exc}'
+                f'_dispatch_action_event: end_states FAILED: {type(exc).__name__}: {exc}'
             )
             raise
 
@@ -322,6 +316,16 @@ class ScreenLifecycleDispatchMixin:
                 continue
             break
 
-        _tui_logger.debug('_dispatch_to_agent: poll loop exited')
+        _tui_logger.debug('_dispatch_action_event: poll loop exited')
         if self._renderer:
             await self._renderer.drain_events_async()
+
+    async def _dispatch_to_agent(
+        self, text: str, *, image_urls: list[str] | None = None
+    ) -> None:
+        _tui_logger.debug('_dispatch_to_agent: ENTER')
+        action = MessageAction(
+            content=text,
+            image_urls=image_urls or None,
+        )
+        await self._dispatch_action_event(action)

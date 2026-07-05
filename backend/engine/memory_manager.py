@@ -181,7 +181,7 @@ class ContextMemoryManager:
         snapshot = load_snapshot(state=state)
         if not snapshot:
             return ''
-        return format_snapshot_for_injection(snapshot)
+        return format_snapshot_for_injection(snapshot, include_synthesized_goal=False)
 
     def get_initial_user_message(self, events: Iterable[Event]) -> MessageAction:
         from backend.core.schemas import ActionType

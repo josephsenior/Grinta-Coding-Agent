@@ -21,6 +21,7 @@ def _drop_stale_prompt_state_artifacts(events: list[Event]) -> list[Event]:
     """Remove old prompt-only state blocks before injecting the fresh packet."""
     markers = (
         CONTEXT_PACKET_MARKER,
+        '<COMPACT_SNAPSHOT>',
         '<POST_COMPACT_RESTORE>',
         '<RESTORED_CONTEXT>',
     )

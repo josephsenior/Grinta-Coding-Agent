@@ -54,7 +54,7 @@ def test_sync_snapshot_to_working_memory_updates_sections(tmp_path) -> None:
         ),
         patch(
             'backend.context.compactor.pre_condensation_snapshot.format_snapshot_for_injection',
-            return_value='<RESTORED_CONTEXT>summary</RESTORED_CONTEXT>',
+            return_value='<COMPACT_SNAPSHOT>summary</COMPACT_SNAPSHOT>',
         ),
     ):
         updated = sync_snapshot_to_working_memory(snapshot)

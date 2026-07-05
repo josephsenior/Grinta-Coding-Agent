@@ -191,6 +191,8 @@ class GrintaScreen(
         self._agent_running = True
         self._input_lock = asyncio.Lock()
         self._turn_in_flight = False
+        self._next_action = None
+        self._last_user_message: str | None = None
         self._pending_llm_config_apply = False
         self._bootstrapping: asyncio.Event | None = None
         self._bootstrap_task: asyncio.Task[Any] | None = None

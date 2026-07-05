@@ -123,6 +123,7 @@ class RendererLiveMixin:
             return
 
         from backend.cli.tui.renderer.prep import (
+            prep_streaming_renderable,
             prep_streaming_renderable_incremental,
             streaming_render_cache_key,
         )
@@ -131,10 +132,14 @@ class RendererLiveMixin:
         renderable = cache.get(streaming_render_cache_key(text))
         try:
             if renderable is None:
-                state = getattr(self, '_streaming_render_state', None)
-                renderable, self._streaming_render_state = (
-                    prep_streaming_renderable_incremental(text, state)
-                )
+                if '```' in text:
+                    state = getattr(self, '_streaming_render_state', None)
+                    renderable, self._streaming_render_state = (
+                        prep_streaming_renderable_incremental(text, state)
+                    )
+                else:
+                    self._streaming_render_state = None
+                    renderable = prep_streaming_renderable(text)
             widget.set_streaming_renderable(renderable)
         except Exception:
             widget.set_streaming_text(text)

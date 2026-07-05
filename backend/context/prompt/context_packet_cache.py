@@ -204,6 +204,7 @@ def _boundary_summary_token(history: list[Event]) -> str:
         '<CONTEXT_PACKET>',
         '<CANONICAL_TASK_STATE>',
         '<DURABLE_WORKING_SET>',
+        '<COMPACT_SNAPSHOT>',
         '<POST_COMPACT_RESTORE>',
         '<RESTORED_CONTEXT>',
     )

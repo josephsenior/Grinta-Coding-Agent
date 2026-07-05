@@ -312,9 +312,8 @@ _CONDENSATION_BANNER = (
 
 _POST_CONDENSATION_RECOVERY = (
     '\n' + '─' * 60 + '\n'
-    'Context was condensed. The canonical task state and restored context '
-    'above are your source of truth — do not hallucinate next actions.\n'
-    'Continue from the next_action field in the canonical state.\n'
+    'Context was condensed. On the next turn, trust `<EXECUTION_CONTRACT>` and '
+    '`<COMPACT_SNAPSHOT>` inside `<CONTEXT_PACKET>` — do not hallucinate next actions.\n'
     'Do NOT re-read files you already created — trust your prior writes.\n'
 )
 
@@ -392,27 +391,6 @@ def _load_working_memory_snapshot() -> str:
         return ''
 
 
-def _load_restored_context_snapshot() -> str:
-    """Load durable pre-condensation snapshot for recovery injection."""
-    try:
-        from backend.context.compactor.pre_condensation_snapshot import (
-            format_snapshot_for_injection,
-            load_snapshot,
-        )
-
-        snapshot = load_snapshot()
-        if not snapshot:
-            return ''
-
-        block = format_snapshot_for_injection(
-            snapshot,
-            include_synthesized_goal=False,
-        )
-        return '\n' + '─' * 60 + '\n' + f'{_sanitize_memory_content(block)}\n'
-    except Exception:
-        return ''
-
-
 def _is_working_set_observation(obs: AgentCondensationObservation) -> bool:
     if getattr(obs, 'is_working_set', False):
         return True
@@ -430,7 +408,6 @@ def _handle_condensation_observation(
         return Message(role='system', content=[TextContent(text=text)])
 
     summary = obs.content or '(no summary provided)'
-    restored_context = _load_restored_context_snapshot()
     working_memory = _load_working_memory_snapshot()
 
     banner = _CONDENSATION_BANNER if not getattr(obs, 'is_prewarmed', False) else ''
@@ -438,7 +415,6 @@ def _handle_condensation_observation(
     text = truncate_content(
         banner
         + summary
-        + restored_context
         + working_memory
         + _POST_CONDENSATION_RECOVERY,
         max_message_chars,

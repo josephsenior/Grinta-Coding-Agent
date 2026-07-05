@@ -13,6 +13,7 @@ from backend.context.canonical_state import (
     render_canonical_state_for_prompt,
 )
 from backend.context.compactor.pre_condensation_snapshot import load_snapshot
+from backend.context.prompt.compact_snapshot import build_compact_snapshot_body
 from backend.context.prompt.context_packet_cache import (
     compute_context_packet_cache_key,
     get_cached_context_packet,
@@ -35,9 +36,8 @@ MAX_CONTEXT_PACKET_CHAR_BUDGET = 32_000
 
 _POST_COMPACT_FRAMING = (
     '⚠️ SYSTEM NOTE: Conversation history was compressed. '
-    'The EXECUTION_CONTRACT and canonical task state above are your '
-    'source of truth — do not hallucinate next actions. '
-    'Continue from the next_action field.\n\n'
+    '`<EXECUTION_CONTRACT>` and `<COMPACT_SNAPSHOT>` in this packet are your '
+    'source of truth for what to do next.\n\n'
 )
 
 
@@ -143,6 +143,19 @@ def build_context_packet(
             ),
         )
     )
+    if just_compacted:
+        compact_snapshot = build_compact_snapshot_body(state, history)
+        if compact_snapshot:
+            sections.append(
+                (
+                    'compact_snapshot',
+                    _bounded_section(
+                        'COMPACT_SNAPSHOT',
+                        compact_snapshot,
+                        max(2400, int(char_budget * 0.22)),
+                    ),
+                )
+            )
     checkpoint = _operational_checkpoint(canonical)
     if checkpoint:
         sections.append(
@@ -199,25 +212,6 @@ def build_context_packet(
                     'Recent causal tail',
                     tail,
                     max(1200, int(char_budget * 0.14)),
-                ),
-            )
-        )
-    restore_hints = (
-        _restore_hints(
-            state=state,
-            include_latest_directive=not bool(user_context),
-        )
-        if just_compacted
-        else ''
-    )
-    if restore_hints:
-        sections.append(
-            (
-                'restore_hints',
-                _bounded_section(
-                    'Compact restore hints',
-                    restore_hints,
-                    max(900, int(char_budget * 0.07)),
                 ),
             )
         )
@@ -304,6 +298,7 @@ def _latest_summary(history: list[Event]) -> str:
                 CONTEXT_PACKET_MARKER,
                 CANONICAL_STATE_MARKER,
                 '<DURABLE_WORKING_SET>',
+                '<COMPACT_SNAPSHOT>',
                 '<POST_COMPACT_RESTORE>',
                 '<RESTORED_CONTEXT>',
             )
@@ -521,51 +516,6 @@ def _active_status(canonical: CanonicalTaskState, state: State | None = None) ->
             f'- {session_id}: background output since last turn:\n'
             f'{_safe_truncate(content, 1200)}'
         )
-    return '\n'.join(lines)
-
-
-def _restore_hints(
-    *,
-    state: State | None,
-    include_latest_directive: bool = True,
-) -> str:
-    snapshot = load_snapshot(state=state)
-    if not snapshot:
-        return ''
-    lines: list[str] = []
-    from backend.context.compactor.pre_condensation_snapshot import (
-        snapshot_user_objective,
-    )
-
-    _, latest = snapshot_user_objective(snapshot)
-    if latest and include_latest_directive:
-        lines.append(
-            f'Latest directive before compaction: {_safe_truncate(latest, 240)}'
-        )
-    tests = snapshot.get('test_results')
-    if isinstance(tests, list) and tests:
-        latest_test = next(
-            (item for item in reversed(tests) if isinstance(item, dict)), None
-        )
-        if latest_test:
-            lines.append(
-                'Last test before compaction: '
-                f'{str(latest_test.get("status", "?")).upper()} '
-                f'(exit={latest_test.get("exit_code")}): '
-                f'{_safe_truncate(str(latest_test.get("command", "")), 180)}'
-            )
-    tasks = snapshot.get('background_tasks')
-    if isinstance(tasks, list) and tasks:
-        lines.append('Background tasks before compaction:')
-        for task in tasks[-3:]:
-            if isinstance(task, dict):
-                lines.append(
-                    f'- {task.get("session_id", "unknown")}: '
-                    f'{_safe_truncate(str(task.get("next_action", "terminal_read")), 160)}'
-                )
-    errors = snapshot.get('recent_errors')
-    if isinstance(errors, list) and errors:
-        lines.append(f'Recent error: {_safe_truncate(str(errors[-1]), 240)}')
     return '\n'.join(lines)
 
 

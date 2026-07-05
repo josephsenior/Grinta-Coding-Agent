@@ -102,7 +102,7 @@ def test_window_protects_only_latest_real_condensation_summary() -> None:
     )
     restore = _with_id(
         AgentCondensationObservation(
-            content='<POST_COMPACT_RESTORE>\nold restore\n</POST_COMPACT_RESTORE>'
+            content='<COMPACT_SNAPSHOT>\nold restore\n</COMPACT_SNAPSHOT>'
         ),
         3,
     )

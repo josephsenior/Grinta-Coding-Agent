@@ -272,7 +272,7 @@ class TestPreCondensationSnapshot(unittest.TestCase):
         }
 
         formatted = format_snapshot_for_injection(snapshot)
-        assert '<RESTORED_CONTEXT>' in formatted
+        assert '<COMPACT_SNAPSHOT>' in formatted
         assert 'Events condensed: 10' in formatted
         assert 'User messages (verbatim)' not in formatted
         assert 'test.py' in formatted

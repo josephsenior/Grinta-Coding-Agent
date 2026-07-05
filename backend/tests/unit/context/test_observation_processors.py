@@ -216,7 +216,7 @@ class TestConvertObservation:
         assert 'WORKING_MEMORY' in text
         assert 'Context was condensed' in text
 
-    def test_condensation_observation_restores_snapshot_once(
+    def test_condensation_observation_does_not_embed_snapshot_block(
         self, monkeypatch, tmp_path
     ):
         monkeypatch.setattr(
@@ -238,12 +238,12 @@ class TestConvertObservation:
         first = convert_observation_to_message(obs, max_message_chars=None)
         first_text = extract_first_text(first)
         assert first_text is not None
-        assert '<RESTORED_CONTEXT>' in first_text
-        assert 'src/main.py' in first_text
-        assert 'failure' in first_text
+        assert 'summary' in first_text
+        assert '\n<COMPACT_SNAPSHOT>\n' not in first_text
+        assert 'src/main.py' not in first_text
+        assert '`<COMPACT_SNAPSHOT>`' in first_text
 
         second = convert_observation_to_message(obs, max_message_chars=None)
         second_text = extract_first_text(second)
         assert second_text is not None
-        assert '<RESTORED_CONTEXT>' in second_text
-        assert 'src/main.py' in second_text
+        assert '\n<COMPACT_SNAPSHOT>\n' not in second_text

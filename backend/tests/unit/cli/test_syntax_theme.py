@@ -106,14 +106,17 @@ def test_syntax_palette_has_extended_tokens():
 
 
 def test_prep_streaming_inline_code():
+    from rich.markdown import Markdown
+
     renderable = prep_streaming_renderable('Use `my_func` here')
+    assert isinstance(renderable, Markdown)
     console = Console(force_terminal=True, color_system='truecolor', width=80)
     styles = [
         style
         for _t, style, _ in console.render(renderable, console.options.update_width(80))
         if style and _t.strip() == 'my_func'
     ]
-    assert any('101829' in str(style) for style in styles)
+    assert styles
     assert all(style.bold is not True for style in styles)
 
 
