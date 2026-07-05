@@ -11,10 +11,8 @@ from backend.engine.contracts import ChatCompletionToolParam
 from backend.engine.tools.param_defs import create_tool_definition, get_command_param
 
 _ACCEPTANCE_CRITERIA_DESCRIPTION = (
-    'Flat verifiable assertions — what must be true when done. '
-    'See `<ACCEPTANCE_CRITERIA>` for workflow; persisted per session across condensation. '
-    'Commands: `update` (scope), `view`, `append`, `refine`, `audit` (evidence_ref before final summary). '
-    'Phrase criteria as auditable assertions, not activities.'
+    'Verifiable done-conditions (what must be true). See `<ACCEPTANCE_CRITERIA>`. '
+    'Commands: `view`, `update`, `append`, `refine`, `audit` (`evidence_ref` before final summary).'
 )
 
 _CRITERION_ITEM_SCHEMA: dict[str, Any] = {
@@ -60,9 +58,10 @@ _AUDIT_ENTRY_SCHEMA: dict[str, Any] = {
         'evidence_ref': {
             'type': 'string',
             'description': (
-                'Reference to prior tool output in this session, e.g. '
-                '"call_abc123:lines[10-25]" or "event:847:lines[1-5]". '
-                'Resolved verbatim at audit time — do not paraphrase.'
+                'Preferred: reference prior tool output from this session. Valid forms: '
+                '`call_<tool_call_id>:lines[n-m]`, `event:<event_id>:lines[n-m]`, or '
+                '`execute_bash:<command-or-label>` / `execute_powershell:<command-or-label>`. '
+                'If a ref cannot be matched, optional `evidence` is used as fallback.'
             ),
         },
         'evidence': {

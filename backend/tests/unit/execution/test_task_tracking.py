@@ -57,41 +57,49 @@ class TestTaskTrackingMixin(TestCase):
         self.assertIn('2 tasks', result.content)
         self.mixin.event_stream.file_store.write.assert_called_once()
 
-    def test_view_with_hydrated_task_list_still_reads_tasks_md(self):
-        """Engine may pass task_list from JSON on view; runtime must read TASKS.md, not write."""
-        hydrated = [{'description': 'Hydrated from JSON', 'status': 'todo', 'id': '1'}]
+    def test_view_with_hydrated_task_list_uses_json_when_md_diverges(self):
+        """View must render from JSON even when TASKS.md on disk is stale."""
+        hydrated = [
+            {
+                'id': '1',
+                'description': 'Hydrated from JSON',
+                'status': 'todo',
+            }
+        ]
         action = TaskTrackingAction(command='view', task_list=hydrated)
-        stored = '# Task List\n\n1. ⏳ **On disk** `[todo]`\n'
-        self.mixin.event_stream.file_store.read.return_value = stored
 
         with self.assertPathHandling():
-            result = self.mixin._handle_task_tracking_action(action)
+            with patch('backend.core.task_tracker.TaskTracker') as mock_tracker_cls:
+                mock_tracker_cls.return_value.load_from_file.return_value = hydrated
+                result = self.mixin._handle_task_tracking_action(action)
 
         self.assertIsInstance(result, TaskTrackingObservation)
-        self.mixin.event_stream.file_store.write.assert_not_called()
-        self.mixin.event_stream.file_store.read.assert_called_once()
+        self.mixin.event_stream.file_store.read.assert_not_called()
         result_obs = cast(TaskTrackingObservation, result)
-        self.assertIn('On disk', result_obs.content)
+        self.assertIn('Hydrated from JSON', result_obs.content)
+        self.assertNotIn('On disk', result_obs.content)
         self.assertEqual(result_obs.task_list, hydrated)
+        self.mixin.event_stream.file_store.write.assert_called_once()
 
     def test_handle_task_tracking_view_command(self):
         """Test handling task view command."""
-        action = TaskTrackingAction(command='view', task_list=[])
-        stored_content = '# Task List\n\n1. ⏳ Task 1\nNotes here\n'
-        self.mixin.event_stream.file_store.read.return_value = stored_content
+        task_list = [
+            {'description': 'Task 1', 'status': 'todo', 'id': '1'},
+        ]
+        action = TaskTrackingAction(command='view', task_list=task_list)
 
         with self.assertPathHandling():
-            result = self.mixin._handle_task_tracking_action(action)
+            with patch('backend.core.task_tracker.TaskTracker') as mock_tracker_cls:
+                mock_tracker_cls.return_value.load_from_file.return_value = task_list
+                result = self.mixin._handle_task_tracking_action(action)
 
         self.assertIsInstance(result, TaskTrackingObservation)
         result_obs = cast(TaskTrackingObservation, result)
         self.assertEqual(result_obs.command, 'view')
-        self.assertEqual(
-            result.content,
-            stored_content + '\n\n→ Now implement the first todo (⏳) task.',
-        )
-        self.assertEqual(result_obs.task_list, [])
-        self.mixin.event_stream.file_store.read.assert_called_once()
+        self.assertIn('Task 1', result.content)
+        self.assertIn('→ Now implement the first todo', result.content)
+        self.assertEqual(result_obs.task_list, task_list)
+        self.mixin.event_stream.file_store.read.assert_not_called()
 
     def test_handle_task_tracking_unknown_command(self):
         """Test handling unknown command returns NullObservation."""
@@ -204,21 +212,20 @@ class TestTaskTrackingMixin(TestCase):
 
     def test_handle_task_view_action_successful(self):
         """Test successful task view action."""
-        action = TaskTrackingAction(command='view', task_list=[])
+        task_list = [{'description': 'My Task', 'status': 'todo', 'id': '1'}]
+        action = TaskTrackingAction(command='view', task_list=task_list)
         task_file_path = '/path/to/TASKS.md'
-        stored_content = '# Task List\n\n1. ⏳ My Task\nNotes\n'
-        self.mixin.event_stream.file_store.read.return_value = stored_content
 
-        result = self.mixin._handle_task_view_action(action, task_file_path)
+        with patch('backend.core.task_tracker.TaskTracker') as mock_tracker_cls:
+            mock_tracker_cls.return_value.load_from_file.return_value = task_list
+            result = self.mixin._handle_task_view_action(action, task_file_path)
 
         self.assertIsInstance(result, TaskTrackingObservation)
         result_obs = cast(TaskTrackingObservation, result)
         self.assertEqual(result_obs.command, 'view')
-        self.assertEqual(
-            result.content,
-            stored_content + '\n\n→ Now implement the first todo (⏳) task.',
-        )
-        self.assertEqual(result_obs.task_list, [])
+        self.assertIn('My Task', result.content)
+        self.assertIn('→ Now implement the first todo', result.content)
+        self.assertEqual(result_obs.task_list, task_list)
 
     def test_handle_task_view_action_preserves_hydrated_task_list(self):
         """View responses should carry the hydrated plan so UI sidebars do not clear."""
@@ -227,22 +234,24 @@ class TestTaskTrackingMixin(TestCase):
         ]
         action = TaskTrackingAction(command='view', task_list=hydrated)
         task_file_path = '/path/to/TASKS.md'
-        stored_content = '# Task List\n\n1. 🔄 Persisted task\n'
-        self.mixin.event_stream.file_store.read.return_value = stored_content
 
-        result = self.mixin._handle_task_view_action(action, task_file_path)
+        with patch('backend.core.task_tracker.TaskTracker') as mock_tracker_cls:
+            mock_tracker_cls.return_value.load_from_file.return_value = hydrated
+            result = self.mixin._handle_task_view_action(action, task_file_path)
 
         self.assertIsInstance(result, TaskTrackingObservation)
         result_obs = cast(TaskTrackingObservation, result)
         self.assertEqual(result_obs.task_list, hydrated)
+        self.assertIn('Persisted task', result_obs.content)
 
     def test_handle_task_view_action_file_not_found(self):
-        """Test task view action when file doesn't exist."""
+        """Test task view action when no plan exists."""
         action = TaskTrackingAction(command='view', task_list=[])
         task_file_path = '/path/to/TASKS.md'
-        self.mixin.event_stream.file_store.read.side_effect = FileNotFoundError()
 
-        result = self.mixin._handle_task_view_action(action, task_file_path)
+        with patch('backend.core.task_tracker.TaskTracker') as mock_tracker_cls:
+            mock_tracker_cls.return_value.load_from_file.return_value = []
+            result = self.mixin._handle_task_view_action(action, task_file_path)
 
         self.assertIsInstance(result, TaskTrackingObservation)
         result_obs = cast(TaskTrackingObservation, result)
@@ -251,20 +260,22 @@ class TestTaskTrackingMixin(TestCase):
         self.assertEqual(result_obs.task_list, [])
 
     def test_handle_task_view_action_read_error(self):
-        """Test task view action when file read fails."""
-        action = TaskTrackingAction(command='view', task_list=[])
+        """Test task view action when JSON load fails falls back to hydrated list."""
+        hydrated = [{'id': '1', 'description': 'Fallback task', 'status': 'todo'}]
+        action = TaskTrackingAction(command='view', task_list=hydrated)
         task_file_path = '/path/to/TASKS.md'
-        self.mixin.event_stream.file_store.read.side_effect = PermissionError(
-            'Access denied'
-        )
 
-        result = self.mixin._handle_task_view_action(action, task_file_path)
+        with patch('backend.core.task_tracker.TaskTracker') as mock_tracker_cls:
+            mock_tracker_cls.return_value.load_from_file.side_effect = OSError(
+                'disk error'
+            )
+            result = self.mixin._handle_task_view_action(action, task_file_path)
 
         self.assertIsInstance(result, TaskTrackingObservation)
         result_obs = cast(TaskTrackingObservation, result)
         self.assertEqual(result_obs.command, 'view')
-        self.assertIn('Failed to read', result.content)
-        self.assertIn(task_file_path, result.content)
+        self.assertIn('Fallback task', result.content)
+        self.assertEqual(result_obs.task_list, hydrated)
 
     def test_generate_task_list_content_all_statuses(self):
         """Test task list content generation with all status types."""
@@ -360,13 +371,12 @@ class TestTaskTrackingMixin(TestCase):
         self.assertIsInstance(plan_result, TaskTrackingObservation)
 
         # Then view them
-        view_action = TaskTrackingAction(command='view', task_list=[])
-        self.mixin.event_stream.file_store.read.return_value = (
-            '# Task List\n\n1. ⏳ Task 1\n'
-        )
+        view_action = TaskTrackingAction(command='view', task_list=task_list)
 
         with self.assertPathHandling():
-            view_result = self.mixin._handle_task_tracking_action(view_action)
+            with patch('backend.core.task_tracker.TaskTracker') as mock_tracker_cls:
+                mock_tracker_cls.return_value.load_from_file.return_value = task_list
+                view_result = self.mixin._handle_task_tracking_action(view_action)
 
         self.assertIsInstance(view_result, TaskTrackingObservation)
         self.assertIn('Task 1', view_result.content)

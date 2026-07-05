@@ -103,10 +103,14 @@ class TaskTracker:
                     tmp_path.unlink(missing_ok=True)
                 raise
 
-    def update_task_status(
-        self, task_id: str, status: str, result: str | None = None
-    ) -> tuple[bool, str]:
-        """Update status of a single task by ID."""
+    def apply_task_status_update(
+        self,
+        task_list: list[dict[str, Any]],
+        task_id: str,
+        status: str,
+        result: str | None = None,
+    ) -> tuple[bool, str, list[dict[str, Any]]]:
+        """Apply a status update in memory without persisting."""
         valid_statuses = {
             TASK_STATUS_TODO,
             TASK_STATUS_IN_PROGRESS,
@@ -118,22 +122,38 @@ class TaskTracker:
             return (
                 False,
                 f"Invalid status '{status}'. Valid: {', '.join(sorted(valid_statuses))}",
+                task_list,
             )
 
-        task_list = self.load_from_file()
         if not task_list:
-            return False, 'No tasks found. Create a plan first with update command.'
+            return False, 'No tasks found. Create a plan first with update command.', []
 
         task = _find_task_by_id(task_list, task_id)
         if task is None:
-            return False, f"Task '{task_id}' not found."
+            return False, f"Task '{task_id}' not found.", task_list
 
         old_status = task.get('status', 'unknown')
         task['status'] = status
         if result is not None:
             task['result'] = result
-        self.save_to_file(task_list)
-        return True, f"Task '{task_id}' status updated: {old_status} -> {status}"
+        return (
+            True,
+            f"Task '{task_id}' status updated: {old_status} -> {status}",
+            task_list,
+        )
+
+    def update_task_status(
+        self, task_id: str, status: str, result: str | None = None
+    ) -> tuple[bool, str]:
+        """Update status of a single task by ID and persist."""
+        task_list = self.load_from_file()
+        ok, message, updated = self.apply_task_status_update(
+            task_list, task_id, status, result
+        )
+        if not ok:
+            return ok, message
+        self.save_to_file(updated)
+        return True, message
 
 
 def _find_task_by_id(

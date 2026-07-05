@@ -16,6 +16,14 @@ _LINE_SLICE_RE = re.compile(
     re.IGNORECASE,
 )
 _EVENT_REF_RE = re.compile(r'^event:(\d+)$', re.IGNORECASE)
+_SHELL_TOOL_PREFIXES = frozenset(
+    {
+        'execute_bash',
+        'execute_powershell',
+        'terminal_command',
+        'run',
+    }
+)
 
 
 class EvidenceRefError(ValueError):
@@ -109,6 +117,60 @@ def _observation_content(event: Event) -> str:
     return content
 
 
+def _normalize_hint(text: str) -> str:
+    return ' '.join(str(text or '').split()).casefold()
+
+
+def _resolve_shell_hint(hint: str, events: Iterable[Event]) -> str | None:
+    """Match a shell command or internal display_label to its output observation."""
+    from backend.ledger.action.commands import CmdRunAction
+    from backend.ledger.observation.commands import CmdOutputObservation
+
+    hint_norm = _normalize_hint(hint)
+    if not hint_norm:
+        return None
+    command_hint = hint.split('->', 1)[0].strip()
+    command_hint_norm = _normalize_hint(command_hint)
+
+    pending: CmdRunAction | None = None
+    matches: list[str] = []
+    for event in events:
+        if isinstance(event, CmdRunAction):
+            pending = event
+            continue
+        if not isinstance(event, CmdOutputObservation) or pending is None:
+            continue
+        label = _normalize_hint(getattr(pending, 'display_label', '') or '')
+        command = _normalize_hint(getattr(pending, 'command', '') or '')
+        content = _observation_content(event)
+        output_norm = _normalize_hint(content)
+        matched = (
+            hint_norm == label
+            or command_hint_norm in command
+            or command in command_hint_norm
+            or (command_hint_norm and command_hint_norm in output_norm)
+            or (hint_norm and hint_norm in output_norm)
+        )
+        if matched and content:
+            matches.append(content)
+        pending = None
+    return matches[-1] if matches else None
+
+
+def _resolve_tool_prefixed_ref(ref: str, events: Iterable[Event]) -> str | None:
+    """Resolve ``execute_bash:<command-or-label>`` style refs from session history."""
+    raw = str(ref or '').strip()
+    if ':' not in raw:
+        return None
+    prefix, _, hint = raw.partition(':')
+    if prefix.strip().casefold() not in _SHELL_TOOL_PREFIXES:
+        return None
+    hint = hint.strip()
+    if not hint:
+        return None
+    return _resolve_shell_hint(hint, events)
+
+
 def _lookup_content(parsed: ParsedEvidenceRef, events: Iterable[Event]) -> str | None:
     if parsed.event_id is not None:
         for event in events:
@@ -143,10 +205,36 @@ def resolve_evidence_ref(ref: str, events: Iterable[Event]) -> str:
     parsed = parse_evidence_ref(ref)
     content = _lookup_content(parsed, events)
     if not content:
+        content = _resolve_tool_prefixed_ref(ref, events)
+    if not content:
         raise EvidenceRefError(
             f'Could not resolve evidence_ref {ref!r}: no matching tool output in session'
         )
     return apply_line_slice(content, parsed.line_start, parsed.line_end)
+
+
+def resolve_evidence_ref_for_audit(
+    ref: str,
+    events: Iterable[Event],
+    *,
+    fallback_evidence: str = '',
+) -> tuple[str, str | None, str | None]:
+    """Resolve audit evidence without blocking the agent on a bad ref.
+
+    Returns ``(evidence_text, stored_ref_or_none, warning_or_none)``.
+    """
+    try:
+        resolved = resolve_evidence_ref(ref, events)
+        return resolved, ref, None
+    except EvidenceRefError as exc:
+        fallback = str(fallback_evidence or '').strip()
+        if fallback:
+            return fallback, None, f'{exc}; used provided evidence text instead'
+        return (
+            f'[unresolved evidence_ref: {ref}]',
+            ref,
+            str(exc),
+        )
 
 
 def collect_session_events(event_stream: Any) -> list[Event]:
@@ -174,4 +262,5 @@ __all__ = [
     'collect_session_events',
     'parse_evidence_ref',
     'resolve_evidence_ref',
+    'resolve_evidence_ref_for_audit',
 ]

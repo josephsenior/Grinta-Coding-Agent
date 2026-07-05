@@ -62,20 +62,30 @@ class TestAcceptanceCriteriaMixin(TestCase):
         self.assertEqual(len(obs.criteria_list), 2)
         self.mixin.event_stream.file_store.write.assert_called_once()
 
-    def test_handle_view_reads_criteria_md(self):
-        action = AcceptanceCriteriaAction(command='view', criteria_list=[])
-        stored = '# Acceptance Criteria\n\n1. (stated) Example assertion\n'
-        self.mixin.event_stream.file_store.read.return_value = stored
+    def test_handle_view_renders_from_json_store(self):
+        criteria_list = [
+            {
+                'id': 'ac1',
+                'assertion': 'Example assertion',
+                'source': 'stated',
+            }
+        ]
+        action = AcceptanceCriteriaAction(command='view', criteria_list=criteria_list)
 
         with patch(
             'backend.execution.acceptance_criteria.get_conversation_dir',
             return_value='/tmp/conv/',
         ):
-            result = self.mixin._handle_acceptance_criteria_action(action)
+            with patch(
+                'backend.core.criteria.acceptance_criteria_store.AcceptanceCriteriaStore.load_from_file',
+                return_value=criteria_list,
+            ):
+                result = self.mixin._handle_acceptance_criteria_action(action)
 
         obs = cast(AcceptanceCriteriaObservation, result)
         self.assertIn('Example assertion', obs.content)
-        self.mixin.event_stream.file_store.write.assert_not_called()
+        self.mixin.event_stream.file_store.read.assert_not_called()
+        self.mixin.event_stream.file_store.write.assert_called_once()
 
     def test_generate_criteria_markdown_with_evidence_and_id(self):
         content = AcceptanceCriteriaMixin._generate_criteria_markdown(
@@ -158,7 +168,7 @@ class TestAcceptanceCriteriaMixin(TestCase):
             obs_result.criteria_list[0]['evidence_ref'], 'call_audit_1:lines[2]'
         )
 
-    def test_audit_unresolved_evidence_ref_returns_error(self):
+    def test_audit_unresolved_evidence_ref_records_placeholder(self):
         action = AcceptanceCriteriaAction(
             command='audit',
             criteria_list=[
@@ -170,6 +180,11 @@ class TestAcceptanceCriteriaMixin(TestCase):
             'backend.execution.acceptance_criteria.get_conversation_dir',
             return_value='/tmp/conv/',
         ):
-            result = self.mixin._handle_acceptance_criteria_action(action)
+            with patch(
+                'backend.core.criteria.acceptance_criteria_store.AcceptanceCriteriaStore.save_to_file'
+            ):
+                result = self.mixin._handle_acceptance_criteria_action(action)
 
-        self.assertIsInstance(result, ErrorObservation)
+        obs_result = cast(AcceptanceCriteriaObservation, result)
+        self.assertIn('unresolved evidence_ref', obs_result.criteria_list[0]['evidence'])
+        self.assertIn('Audit notes', obs_result.content)

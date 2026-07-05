@@ -17,11 +17,8 @@ from backend.engine.prompts.section_renderers._env_hints import (
     _path_uncertainty_hint,
 )
 
-_CRITERIA_VS_TASKS_EXAMPLE = (
-    '**Example (criteria vs tasks):** '
-    'Criteria (outcomes): ac1 "pytest backend/tests/unit/foo.py exits 0" (stated); '
-    'ac2 "No new public API exports" (inferred). '
-    'Tasks (milestones): 1 Reproduce failure; 2 Fix root cause; 3 Verify and audit.'
+_CRITERIA_VS_TASKS_LINE = (
+    '**Separation:** tasks = execution milestones (how); criteria = verifiable outcomes (what must be true).'
 )
 
 
@@ -58,22 +55,26 @@ def _build_context_discipline_section(
         parts.extend(
             [
                 '',
-                '**task_tracker** — see `<TASK_TRACKING>`.',
+                '**task_tracker** — milestones only; see `<TASK_TRACKING>`.',
             ]
         )
         if condensation_on:
-            parts.append('Post-condensation: `task_tracker(view)` first.')
+            parts.append(
+                'Post-condensation: live ids/status are in `<EXECUTION_CONTRACT>`; '
+                'call `task_tracker(view)` only if you need the full markdown plan.'
+            )
 
     if criteria_on:
         parts.extend(
             [
                 '',
-                '**acceptance_criteria** — see `<ACCEPTANCE_CRITERIA>`.',
+                '**acceptance_criteria** — outcomes only; see `<ACCEPTANCE_CRITERIA>`.',
             ]
         )
         if condensation_on:
             parts.append(
-                'Post-condensation: `acceptance_criteria(view)` for stable ids.'
+                'Post-condensation: live ids are in `<EXECUTION_CONTRACT>`; '
+                'call `acceptance_criteria(view)` only if you need the full list.'
             )
 
     parts.append('</CONTEXT_DISCIPLINE>')
@@ -207,48 +208,42 @@ def _render_autonomy(
     if tracker_on:
         task_tracker_discipline_block = (
             '<TASK_TRACKING>\n'
-            '**task_tracker**: Coarse execution plan only — 3–7 parent steps, not micro-requirements.\n'
-            'Task steps are activities/milestones, not verifiable outcomes (those belong in `<ACCEPTANCE_CRITERIA>`).\n'
-            'Use `task_tracker(update, task_list=[...])` for a coarse milestone plan.\n'
-            'Use `view` to inspect the plan, `update` to replace the full `task_list`, and `update_status` for single-task status changes.\n'
-            'Quick status updates: use `update_status(task_id="...", status="done")` to change a single task status by ID. Optional `result` field captures outcome.\n'
-            'Allowed statuses: `todo`, `in_progress`, `done`, `skipped`, `blocked`.\n'
-            'Each step object has: `id` (string, e.g. "1"), `description` (string), `status` (one of the allowed statuses), `result` (optional string), `tags` (optional LIST of strings — never a bare string).\n'
-            '**Completion**: Before the final summary, no task should remain `todo` or `in_progress`. Mark truly completed work `done`, intentionally omitted work `skipped`, and only genuinely blocked work `blocked` with a reason.\n'
-            f'{_CRITERIA_VS_TASKS_EXAMPLE}\n'
+            '**Purpose:** Coarse execution milestones (3–7 steps) — activities and sequencing, '
+            'not verifiable done-conditions.\n'
+            '**When:** After the first implementation directive in Agent mode, before editing '
+            'files or running commands.\n'
+            '**Commands:** `view` (read plan), `update` (replace full `task_list`), '
+            '`update_status` (one step by `task_id`).\n'
+            '**Step fields:** `id`, `description`, `status` '
+            '(`todo`|`in_progress`|`done`|`skipped`|`blocked`), optional `result`, '
+            'optional `tags` (list of strings).\n'
+            '**Completion:** Before the final summary, no step stays `todo`/`in_progress` '
+            'unless genuinely `blocked` with a reason.\n'
+            '**Live state:** `<EXECUTION_CONTRACT>` in `<CONTEXT_PACKET>` each turn.\n'
+            f'{_CRITERIA_VS_TASKS_LINE}\n'
             '</TASK_TRACKING>'
         )
     else:
         task_tracker_discipline_block = ''
 
     if criteria_on:
-        during_work = (
-            '**During work:** update only the coarse `task_tracker` plan — not criteria.\n'
-            if tracker_on
-            else '**During work:** do not rewrite criteria unless something important was missed (`append`).\n'
-        )
-        checkpoint = (
-            '**Component checkpoint:** when marking a `task_tracker` step done, glance at related criteria.\n'
-            if tracker_on
-            else ''
-        )
-        workflow = (
-            '`update` → `task_tracker(update)` → implement + verify → `audit`'
-            if tracker_on
-            else '`update` → implement + verify → `audit`'
-        )
         acceptance_criteria_discipline_block = (
             '<ACCEPTANCE_CRITERIA>\n'
-            'Flat verifiable assertions for what must be true when done.\n'
-            f'**Workflow:** {workflow}. See `<COMMON_PATTERNS>` for examples.\n'
-            'Persisted per session; after compaction use `view` for stable ids.\n'
-            'Tag each item `source: "stated"` or `"inferred"`. Use assertion phrasing, not activities.\n'
-            f'{_CRITERIA_VS_TASKS_EXAMPLE}\n'
-            f'{during_work}'
-            f'{checkpoint}'
-            '**Refine:** `refine(criterion_id, new_assertion, reason)` — do not rewrite the full list.\n'
-            '**Audit:** `audit(audit_entries=[{criterion_id, evidence_ref}, ...])` before the final summary; '
-            'cite prior tool output (e.g. `call_<id>:lines[n-m]`). Free-text only with `unverifiable: true`.\n'
+            '**Purpose:** Flat auditable assertions — what must be true when done, '
+            'not activity steps.\n'
+            '**When:** `update` to scope outcomes before implementation; '
+            '`audit(audit_entries=[...])` before the final summary.\n'
+            '**Commands:** `view`, `update` (full list), `append`, '
+            '`refine(criterion_id, new_assertion, reason)`, `audit`.\n'
+            '**Audit evidence:** prefer `evidence_ref` '
+            '(`call_<id>:lines[n-m]`, `event:<id>`, or `execute_bash:<command>`). '
+            'If a ref cannot be matched, include short `evidence` text as fallback.\n'
+            '**Item fields:** `assertion`, `source` (`stated`|`inferred`); stable `id` on write.\n'
+            '**Rules:** Fix one assertion with `refine` — never rewrite the full list. '
+            'Subjective checks may use free-text `evidence` with `unverifiable: true`.\n'
+            '**Live state:** `<EXECUTION_CONTRACT>` in `<CONTEXT_PACKET>` each turn.\n'
+            f'{_CRITERIA_VS_TASKS_LINE}\n'
+            '**Workflow examples:** see `<COMMON_PATTERNS>`.\n'
             '</ACCEPTANCE_CRITERIA>'
         )
     else:
@@ -259,7 +254,9 @@ def _render_autonomy(
         'For debug/fix tasks, re-run the same reproducer when possible.'
     )
     if tracker_on:
-        problem_solving_workflow_body += '\n\nWith **task_tracker** enabled, sync the plan after verify when progress changed.'
+        problem_solving_workflow_body += (
+            '\n\nSync the `task_tracker` plan after verify when milestone status changed.'
+        )
 
     task_sync_instruction = _build_task_sync_instruction(
         tracker_on=tracker_on, criteria_on=criteria_on

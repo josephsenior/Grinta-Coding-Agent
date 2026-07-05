@@ -190,18 +190,18 @@ def _routing_memory_tool_placeholders(
         memory_and_context_section = ''
     if criteria_on and tracker_on:
         post_condensation_retrieval = (
-            'Resume from the summary and the re-injected acceptance criteria / task plan; '
-            'use `acceptance_criteria(view)` and `task_tracker(view)` if you need stable ids or step status.'
+            'Resume from the summary and `<EXECUTION_CONTRACT>`; '
+            'call `view` on either tool only when you need the full markdown list.'
         )
     elif criteria_on:
         post_condensation_retrieval = (
-            'Resume from the summary and the re-injected acceptance criteria; '
-            'use `acceptance_criteria(view)` if you need stable criterion ids.'
+            'Resume from the summary and `<EXECUTION_CONTRACT>`; '
+            'call `acceptance_criteria(view)` only when you need the full list.'
         )
     elif tracker_on:
         post_condensation_retrieval = (
-            'Resume from the summary and the re-injected task plan; '
-            'use `task_tracker(view)` if you need step ids or status.'
+            'Resume from the summary and `<EXECUTION_CONTRACT>`; '
+            'call `task_tracker(view)` only when you need the full markdown plan.'
         )
     else:
         post_condensation_retrieval = (
@@ -222,17 +222,18 @@ def _routing_memory_tool_placeholders(
         surviving_state_facts = 'Only the visible conversation, current files, and tool observations are available.'
     if criteria_on and tracker_on:
         remaining_work_source_of_truth = (
-            'Trust persisted acceptance criteria for what must be true when done and your '
-            '`task_tracker` plan for what execution steps remain.'
+            '`<EXECUTION_CONTRACT>` shows live task ids/status and criterion ids each turn; '
+            'criteria define done, tasks define remaining milestones.'
         )
     elif criteria_on:
         remaining_work_source_of_truth = (
-            'Trust persisted acceptance criteria as the source of truth for what must be '
-            'true when done.'
+            '`<EXECUTION_CONTRACT>` shows live criterion ids each turn — '
+            'trust those for what must be true when done.'
         )
     elif tracker_on:
         remaining_work_source_of_truth = (
-            'Trust your `task_tracker` plan as the source of truth for what remains.'
+            '`<EXECUTION_CONTRACT>` shows live task ids/status each turn — '
+            'trust those for what milestones remain.'
         )
     else:
         remaining_work_source_of_truth = (

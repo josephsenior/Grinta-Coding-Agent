@@ -404,7 +404,10 @@ def _load_restored_context_snapshot() -> str:
         if not snapshot:
             return ''
 
-        block = format_snapshot_for_injection(snapshot)
+        block = format_snapshot_for_injection(
+            snapshot,
+            include_synthesized_goal=False,
+        )
         return '\n' + '─' * 60 + '\n' + f'{_sanitize_memory_content(block)}\n'
     except Exception:
         return ''

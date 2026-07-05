@@ -102,6 +102,25 @@ def _extract_failed_approach_facts(snapshot: dict, facts: list[ContinuityFact]) 
             facts.append(ContinuityFact('failed_outcome', detail[:80], outcome))
 
 
+def _extract_acceptance_criteria_facts(
+    snapshot: dict, facts: list[ContinuityFact]
+) -> None:
+    raw = snapshot.get('acceptance_criteria')
+    items: list[dict] = []
+    if isinstance(raw, dict):
+        criteria = raw.get('criteria')
+        if isinstance(criteria, list):
+            items = [item for item in criteria if isinstance(item, dict)]
+    for item in items[-8:]:
+        assertion = str(item.get('assertion', '')).strip()
+        criterion_id = str(item.get('id', '')).strip()
+        if assertion:
+            key = criterion_id or assertion[:80]
+            facts.append(
+                ContinuityFact('acceptance_criterion', key[:80], assertion[:200])
+            )
+
+
 def build_continuity_facts(events: list[Event]) -> tuple[ContinuityFact, ...]:
     """Extract coding-agent facts that should remain visible after compaction."""
     snapshot = extract_snapshot(events)
@@ -115,6 +134,7 @@ def build_continuity_facts(events: list[Event]) -> tuple[ContinuityFact, ...]:
     _extract_string_fact_facts(snapshot, 'recent_errors', 'error', facts)
     _extract_test_result_facts(snapshot, facts)
     _extract_failed_approach_facts(snapshot, facts)
+    _extract_acceptance_criteria_facts(snapshot, facts)
 
     return tuple(facts)
 

@@ -337,17 +337,9 @@ def build_compaction_summary(
             from backend.context.compactor.pre_condensation_snapshot import (
                 load_snapshot,
             )
-            from backend.context.context_pipeline.goal_context import (
-                build_goal_context_for_compaction,
-            )
 
             snapshot = load_snapshot(state=state)
             if snapshot:
-                goal_block = build_goal_context_for_compaction(
-                    state=state, snapshot=snapshot
-                )
-                if goal_block and goal_block not in memory:
-                    parts.append('<GOAL_CONTEXT>\n' + goal_block + '\n</GOAL_CONTEXT>')
                 block = format_snapshot_for_injection(snapshot, state=state)
                 if (
                     block

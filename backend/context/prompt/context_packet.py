@@ -13,6 +13,13 @@ from backend.context.canonical_state import (
     render_canonical_state_for_prompt,
 )
 from backend.context.compactor.pre_condensation_snapshot import load_snapshot
+from backend.context.prompt.context_packet_cache import (
+    compute_context_packet_cache_key,
+    get_cached_context_packet,
+    store_context_packet_cache,
+)
+from backend.context.render.execution_contract import build_execution_contract
+from backend.core.constants import DEFAULT_EXECUTION_CONTRACT_MAX_CHARS
 from backend.core.logging.logger import app_logger as logger
 from backend.ledger.action import MessageAction
 from backend.ledger.observation.agent import AgentCondensationObservation
@@ -28,7 +35,7 @@ MAX_CONTEXT_PACKET_CHAR_BUDGET = 32_000
 
 _POST_COMPACT_FRAMING = (
     '⚠️ SYSTEM NOTE: Conversation history was compressed. '
-    'The canonical task state and restored context above are your '
+    'The EXECUTION_CONTRACT and canonical task state above are your '
     'source of truth — do not hallucinate next actions. '
     'Continue from the next_action field.\n\n'
 )
@@ -83,9 +90,21 @@ def build_context_packet(
     char_budget: int = DEFAULT_CONTEXT_PACKET_CHAR_BUDGET,
 ) -> ContextPacket | None:
     char_budget = _resolve_packet_char_budget(llm_config, char_budget)
+    snapshot = _load_snapshot_for_request_context(state=state)
+    cache_key = compute_context_packet_cache_key(
+        events=events,
+        history=history,
+        state=state,
+        snapshot=snapshot,
+        just_compacted=just_compacted,
+        char_budget=char_budget,
+    )
+    cached = get_cached_context_packet(state, cache_key)
+    if cached is not None:
+        return cached
     canonical = _canonical_for_packet(history, state=state)
     sections: list[tuple[str, str]] = []
-    snapshot = _load_snapshot_for_request_context(state=state)
+    snapshot = snapshot or _load_snapshot_for_request_context(state=state)
     user_context = _user_request_context(
         history,
         prompt_events=events,
@@ -102,6 +121,28 @@ def build_context_packet(
                 ),
             )
         )
+    execution_contract = build_execution_contract(
+        state=state,
+        snapshot=snapshot,
+        canonical=canonical,
+        max_chars=min(
+            DEFAULT_EXECUTION_CONTRACT_MAX_CHARS,
+            max(1800, int(char_budget * 0.18)),
+        ),
+        only_open_tasks=False,
+        include_goal_header=False,
+        show_empty_states=True,
+    )
+    sections.append(
+        (
+            'execution_contract',
+            _bounded_section(
+                'EXECUTION_CONTRACT',
+                execution_contract,
+                max(1800, int(char_budget * 0.18)),
+            ),
+        )
+    )
     checkpoint = _operational_checkpoint(canonical)
     if checkpoint:
         sections.append(
@@ -121,6 +162,7 @@ def build_context_packet(
             include_objective=False,
             include_latest_directive=False,
             include_next_action=False,
+            include_task_plan_and_criteria=False,
         )
         if canonical_block:
             sections.append(('canonical_state', canonical_block))
@@ -185,7 +227,9 @@ def build_context_packet(
     if just_compacted:
         content = _POST_COMPACT_FRAMING + content
         lengths['_post_compact_framing'] = len(_POST_COMPACT_FRAMING)
-    return ContextPacket(content=content, section_lengths=lengths)
+    packet = ContextPacket(content=content, section_lengths=lengths)
+    store_context_packet_cache(state, cache_key, packet)
+    return packet
 
 
 def _resolve_packet_char_budget(llm_config: object | None, configured: int) -> int:
@@ -227,7 +271,6 @@ def _canonical_has_packet_details(canonical: CanonicalTaskState) -> bool:
         canonical.superseding_directive
         or canonical.active_plan
         or canonical.implementation_checkpoint
-        or canonical.task_plan
         or canonical.active_files
         or canonical.verification.command
         or canonical.blockers
@@ -442,13 +485,6 @@ def _operational_checkpoint(canonical: CanonicalTaskState) -> str:
         lines.append(f'Checkpoint: {canonical.implementation_checkpoint}')
     if canonical.active_files:
         lines.append('Active files: ' + ', '.join(canonical.active_files[-10:]))
-    if canonical.task_plan:
-        lines.append('Current task tracker:')
-        for item in canonical.task_plan[-8:]:
-            detail = f'- [{item.status}] {item.description}'
-            if item.result:
-                detail += f' -> {item.result}'
-            lines.append(detail)
     return '\n'.join(lines)
 
 

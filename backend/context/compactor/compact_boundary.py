@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from backend.context.view import View
-from backend.ledger.action.agent import CondensationAction
+from backend.ledger.action.agent import CondensationAction, CondensationRequestAction
 
 if TYPE_CHECKING:
     from backend.ledger.event import Event
@@ -31,6 +31,18 @@ def find_last_condensation_action(events: list[Event]) -> CondensationAction | N
     """Return the most recent condensation action in *events*."""
     for event in reversed(events):
         if isinstance(event, CondensationAction):
+            return event
+    return None
+
+
+def find_pending_condensation_request(
+    events: list[Event],
+) -> CondensationRequestAction | None:
+    """Return the newest unhandled condensation request, if any."""
+    for event in reversed(events):
+        if isinstance(event, CondensationAction):
+            return None
+        if isinstance(event, CondensationRequestAction):
             return event
     return None
 
@@ -60,5 +72,6 @@ __all__ = [
     'CompactBoundaryInfo',
     'boundary_info',
     'find_last_condensation_action',
+    'find_pending_condensation_request',
     'project_after_compact_boundary',
 ]

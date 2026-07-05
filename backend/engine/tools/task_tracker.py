@@ -15,12 +15,8 @@ from backend.engine.contracts import ChatCompletionToolParam
 from backend.engine.tools.param_defs import create_tool_definition, get_command_param
 
 _TASK_TRACKER_DESCRIPTION = (
-    'Maintain a structured plan to track progress. '
-    'Use `update` with a task_list to create or overwrite the plan. '
-    'Use `view` (without a task_list) to read the current plan. '
-    'Use `update_status` to change a single task status by ID (no need to re-emit full list). '
-    'Statuses must be exactly one of: `todo`, `in_progress`, `done`, `skipped`, `blocked`. '
-    'Terminal states before completion are `done`, `skipped`, `blocked`.'
+    'Coarse execution milestone plan (how). See `<TASK_TRACKING>`. '
+    'Commands: `view`, `update` (full task_list), `update_status` (one step by id).'
 )
 
 _TASK_STATUS_DESCRIPTION = (
