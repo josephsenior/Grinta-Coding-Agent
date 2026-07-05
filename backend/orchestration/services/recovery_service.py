@@ -171,12 +171,13 @@ class RecoveryService:
     def _record_circuit_breaker_error(self, controller, exc: Exception) -> None:
         from backend.orchestration.services.error_formatting import (
             exception_is_notify_ui_only,
+            is_transient_llm_infra,
         )
 
-        # API/provider/runtime failures are HUD-only and retried automatically.
-        # They must not advance the consecutive-error counter or false-trip the
-        # circuit breaker into CIRCUIT_BREAKER_WARNING spam.
-        if exception_is_notify_ui_only(
+        # Transient provider/network failures are retried automatically and must
+        # not advance the consecutive-error counter or false-trip the circuit
+        # breaker into CIRCUIT_BREAKER_WARNING spam.
+        if is_transient_llm_infra(exc) or exception_is_notify_ui_only(
             exc,
             _HARD_STOP_EXCEPTIONS,
             _RATE_LIMITED_EXCEPTIONS,
@@ -557,9 +558,8 @@ class RecoveryService:
         # Rate-limited errors (429, 503) and provider/network timeouts:
         #   → AWAITING_USER_INPUT + retry queue — the queue handles the
         #     back-off delay and transitions back to RUNNING automatically.
-        #     For 429/503/Timeout and transient LLM infra (connection, 5xx,
-        #     empty response) the ``ErrorObservation`` is ``notify_ui_only``
-        #     (HUD), not embedded in the LLM transcript.
+        #     For 429/503/Timeout and transient LLM infra the ``ErrorObservation`` is
+        #     ``notify_ui_only`` (HUD/backoff only); the model is not told.
         #
         # All other errors (unexpected runtime exceptions, tool failures):
         #   → Stay RUNNING — the error observation is already in the model's

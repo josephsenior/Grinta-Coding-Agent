@@ -19,6 +19,7 @@ from backend.ledger.observation import (
     CmdOutputObservation,
     Observation,
 )
+from backend.ledger.observation.commands import CmdOutputMetadata
 from backend.ledger.observation.terminal import TerminalObservation
 from backend.orchestration.middleware.tool_result_validator import (
     ToolResultValidator,
@@ -576,3 +577,34 @@ class TestObserve:
         result = ctx.metadata['validation_result']
         warning_text = ' '.join(result.warnings)
         assert 'truncated' in warning_text.lower()
+
+
+class TestBackgroundDetachStallHints:
+    """Background detach validation should include interactive stall hints."""
+
+    @pytest.mark.asyncio
+    async def test_sudo_password_stall_in_background_detach_warning(self) -> None:
+        validator = ToolResultValidator()
+        action = CmdRunAction(command='sudo apt install llvm')
+        obs = CmdOutputObservation(
+            content='[sudo] password for dev: ',
+            command='sudo apt install llvm',
+            metadata=CmdOutputMetadata(
+                exit_code=-2,
+                timeout_kind='idle_detach',
+                command_still_running=True,
+                suffix='session_id="terminal_7"',
+            ),
+        )
+        ctx = ToolInvocationContext(
+            controller=MagicMock(),
+            action=action,
+            state=MagicMock(),
+        )
+
+        await validator.observe(ctx, obs)
+
+        warning_text = ' '.join(ctx.metadata['validation_result'].warnings)
+        assert '[BACKGROUND_DETACH]' in warning_text
+        assert 'terminal_read' in warning_text
+        assert 'cannot supply' in warning_text.lower()

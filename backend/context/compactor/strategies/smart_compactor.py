@@ -152,8 +152,10 @@ class SmartCompactor(BaseLLMCompactor):
     def _add_critical_error_ids(self, events: list[Event], essential: set[int]) -> None:
         """Add IDs of ErrorObservation events with critical keywords to essential."""
         for event in events:
-            if isinstance(event, ErrorObservation) and any(
-                kw in event.content.lower() for kw in _CRITICAL_ERROR_KEYWORDS
+            if (
+                isinstance(event, ErrorObservation)
+                and not getattr(event, 'notify_ui_only', False)
+                and any(kw in event.content.lower() for kw in _CRITICAL_ERROR_KEYWORDS)
             ):
                 essential.add(event.id)
 

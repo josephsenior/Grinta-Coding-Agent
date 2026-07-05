@@ -49,16 +49,8 @@ TIMEOUT_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
     _GuidanceRule(
         _any('timeout', 'timed out'),
         ErrorGuidance(
-            summary="The model didn't finish within Grinta's wait window.",
-            steps=(
-                'Confirm your network and the provider status page, then retry.',
-                'Shorter prompts or a faster model in /settings usually help.',
-                'If the first token is slow, raise APP_LLM_FIRST_CHUNK_TIMEOUT_SECONDS '
-                '(default 120s). If chunks pause too long mid-stream, raise '
-                'APP_LLM_STREAM_CHUNK_TIMEOUT_SECONDS (default 120s).',
-                'If streaming often stalls, Grinta may retry non-streaming automatically—'
-                'watch for the cyan "Still working" note in the transcript.',
-            ),
+            summary='LLM provider timed out.',
+            steps=('Grinta will retry automatically.',),
             error_code='ERR-TIMEOUT-004',
         ),
     ),

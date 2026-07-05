@@ -164,12 +164,14 @@ def _handle_error_observation(
     content = event.content or 'An unknown error occurred'
     if getattr(event, 'agent_only', False):
         return
+    error_category = getattr(event, 'error_category', None)
+    if error_category in TRANSIENT_HUD_ONLY_CATEGORIES:
+        return
     error_id = str(getattr(event, 'error_id', '') or '')
     if error_id == 'CIRCUIT_BREAKER_WARNING':
         _notify_guard_warning_once(orch, content, error_id=error_id)
         return
     if getattr(event, 'notify_ui_only', False):
-        error_category = getattr(event, 'error_category', None)
         _notify_ui_only_error(orch, content, error_category, error_id=error_id or None)
         return
 

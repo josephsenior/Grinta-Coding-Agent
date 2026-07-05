@@ -336,6 +336,8 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
                         errors.append(f'{cmd} (exit={exit_code}): {content}')
                     commands_run.append((cmd, exit_code))
             elif type_name == 'ErrorObservation':
+                if getattr(event, 'notify_ui_only', False):
+                    continue
                 content = str(event)[:200]
                 errors.append(content)
             elif type_name == 'MessageAction':

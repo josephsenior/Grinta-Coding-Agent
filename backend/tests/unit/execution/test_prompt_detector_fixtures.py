@@ -17,6 +17,15 @@ FIXTURE_APT_CONTINUE = (
 )
 FIXTURE_GENERIC_YN = 'Really delete all files (y/n)? '
 FIXTURE_PRESS_KEY = 'Build succeeded.\nPress any key to continue . . .\n'
+FIXTURE_SUDO_PASSWORD = 'Reading state information...\n[sudo] password for dev: '
+
+
+def test_sudo_password_detected_but_not_auto_responded() -> None:
+    det = InteractivePromptDetector(min_confidence=0.5)
+    match = det.detect_prompt(FIXTURE_SUDO_PASSWORD, last_n_lines=20)
+    assert match is not None
+    assert match.prompt_type == PromptType.SUDO_PASSWORD
+    assert det.should_auto_respond(match) is False
 
 
 @pytest.mark.parametrize(

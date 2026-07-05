@@ -313,6 +313,14 @@ class ToolResultValidator(ToolInvocationMiddleware):
                     bg_session = suffix.split('session_id="')[1].split('"')[0]
                 except (IndexError, ValueError):
                     pass
+            from backend.execution.utils.shell.stall_hints import (
+                detect_shell_stall_reason,
+            )
+
+            content = str(getattr(obs, 'content', '') or '')
+            command = str(getattr(obs, 'command', '') or '')
+            stall = detect_shell_stall_reason(content, command)
+            stall_suffix = f' {stall}' if stall else ''
             if bg_session:
                 return (
                     f'[BACKGROUND_DETACH] The command exceeded the idle-output '
@@ -321,6 +329,7 @@ class ToolResultValidator(ToolInvocationMiddleware):
                     f'terminal_read(session_id="{bg_session}") to check its '
                     f'progress before taking any other action. Do NOT assume '
                     f'the command failed — it is running in the background.'
+                    f'{stall_suffix}'
                 )
             return (
                 '[BACKGROUND_DETACH] The command exceeded the idle-output '
@@ -328,6 +337,7 @@ class ToolResultValidator(ToolInvocationMiddleware):
                 'The process is STILL RUNNING. You MUST use terminal_read '
                 'with the session ID shown in the output to check its '
                 'progress before taking any other action.'
+                f'{stall_suffix}'
             )
 
         self.add_rule(

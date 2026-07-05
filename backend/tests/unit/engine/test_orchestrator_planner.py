@@ -84,6 +84,21 @@ class TestOrchestratorPromptTierFromHistory:
         orch._set_prompt_tier_from_recent_history(state)
         mock_pm.set_prompt_tier.assert_called_with('debug')
 
+    def test_base_tier_when_only_notify_ui_only_provider_error(self):
+        orch = Orchestrator.__new__(Orchestrator)
+        mock_pm = MagicMock()
+        object.__setattr__(orch, '_prompt_manager', mock_pm)
+        state = MagicMock()
+        state.history = [
+            ErrorObservation(
+                content='LLM provider timed out.',
+                notify_ui_only=True,
+                error_category='timeout',
+            ),
+        ]
+        orch._set_prompt_tier_from_recent_history(state)
+        mock_pm.set_prompt_tier.assert_called_with('base')
+
 
 class TestCondensationRecoveryHandling:
     def test_noop_condensation_does_not_queue_recovery(self):
