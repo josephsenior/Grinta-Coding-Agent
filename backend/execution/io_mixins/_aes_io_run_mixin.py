@@ -87,6 +87,11 @@ class _AesIoRunMixin:
             observation.content = truncate_cmd_output(observation.content)
 
         self._annotate_environment_errors(observation)
+        from backend.execution.utils.shell.stall_hints import (
+            append_stall_hint_to_observation,
+        )
+
+        append_stall_hint_to_observation(observation)
 
         if not action.is_static:
             self._attach_detected_server(

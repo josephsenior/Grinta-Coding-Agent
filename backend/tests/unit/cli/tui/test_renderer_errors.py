@@ -522,7 +522,7 @@ async def test_tui_error_observations_follow_visibility_policy(mock_config):
         # Transient timeout -> HUD/backoff only; no toast popup.
         renderer._process_event(
             ErrorObservation(
-                content='Timeout: provider timed out',
+                content='LLM provider timed out.',
                 notify_ui_only=True,
                 error_category='timeout',
             )

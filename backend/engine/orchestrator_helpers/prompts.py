@@ -43,7 +43,10 @@ def _set_prompt_tier_from_recent_history(orch: Orchestrator, state: State) -> No
         from backend.ledger.observation import ErrorObservation
 
         recent = state.history[-12:] if len(state.history) > 12 else state.history
-        if any(isinstance(e, ErrorObservation) for e in recent):
+        if any(
+            isinstance(e, ErrorObservation) and not getattr(e, 'notify_ui_only', False)
+            for e in recent
+        ):
             orch.prompt_manager.set_prompt_tier('debug')
             return
         for e in recent:

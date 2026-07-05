@@ -51,6 +51,8 @@ def resolve_error_id(exc: Exception) -> str:
 
 
 def format_error_text(exc: Exception) -> str:
+    if isinstance(exc, Timeout):
+        return 'LLM provider timed out.'
     if isinstance(exc, AuthenticationError):
         model = getattr(exc, 'model', None) or '?'
         provider = getattr(exc, 'llm_provider', None) or '?'
@@ -97,13 +99,9 @@ def format_error_guidance(exc: Exception) -> str:
         return _format_rate_limit_guidance(
             getattr(exc, 'kind', None), getattr(exc, 'retry_after', None)
         )
+    if isinstance(exc, Timeout):
+        return ''
     if isinstance(exc, _TRANSIENT_LLM_INFRA_EXCEPTIONS):
-        if isinstance(exc, Timeout):
-            return (
-                'Transient provider or network issue. The provider timed out on '
-                'this step. Automatic backoff and retry will run if the retry '
-                'queue is available; otherwise the agent will return to the prompt.'
-            )
         return (
             'Transient provider or network issue. Automatic backoff and retry '
             'will run if the retry queue is available; otherwise the agent will '
@@ -159,6 +157,11 @@ def _format_rate_limit_guidance(rate_kind, retry_after) -> str:
         )
 
 
+def is_transient_llm_infra(exc: Exception) -> bool:
+    """True for provider/network failures retried by the outer queue."""
+    return isinstance(exc, _TRANSIENT_LLM_INFRA_EXCEPTIONS)
+
+
 def exception_is_notify_ui_only(
     exc: Exception,
     hard_stop_exceptions: tuple[type[Exception], ...],
@@ -168,11 +171,9 @@ def exception_is_notify_ui_only(
     """Return True when an exception is HUD/toast-only (not agent-actionable)."""
     from backend.core.errors import AgentRuntimeError
     from backend.inference.exceptions import APIError
-    from backend.inference.exceptions import Timeout as InfraTimeout
 
     return (
         isinstance(exc, hard_stop_exceptions)
-        or isinstance(exc, InfraTimeout)
         or isinstance(exc, rate_limited_exceptions)
         or isinstance(exc, transient_exceptions)
         or isinstance(exc, (APIError, AgentRuntimeError))

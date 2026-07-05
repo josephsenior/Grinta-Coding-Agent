@@ -98,6 +98,13 @@ PROMPT_PATTERNS = [
         description='apt-get installation confirmation',
         confidence=1.0,
     ),
+    PromptPattern(
+        pattern=r'\[sudo\]\s*password\s+for\s+\S',
+        prompt_type=PromptType.SUDO_PASSWORD,
+        response='',
+        description='sudo password prompt',
+        confidence=1.0,
+    ),
     # File overwrite confirmations
     PromptPattern(
         pattern=r'(overwrite|replace)\s+.*\?\s*\(y/n\)',

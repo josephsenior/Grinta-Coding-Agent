@@ -60,6 +60,15 @@ def ctrl(mock_context):
 
 
 class TestRecoveryService:
+    def test_timeout_error_text_is_user_facing_not_agent_guidance(self) -> None:
+        from backend.inference.exceptions import Timeout
+        from backend.orchestration.services.error_formatting import format_error_text
+
+        text = format_error_text(Timeout('LLM chunk timeout after 150s'))
+        assert text == 'LLM provider timed out.'
+        assert '/settings' not in text
+        assert 'terminal_read' not in text
+
     @pytest.mark.asyncio
     async def test_emits_error_and_schedules_retry_on_timeout(self, mock_context, ctrl):
         ctrl.retry_service.schedule_retry_after_failure = AsyncMock(return_value=True)
@@ -72,7 +81,7 @@ class TestRecoveryService:
         err_obs, source = mock_context.emit_event.call_args[0]
         assert isinstance(err_obs, ErrorObservation)
         assert err_obs.error_id == 'LLM_TIMEOUT'
-        assert 'Timeout' in err_obs.content
+        assert err_obs.content == 'LLM provider timed out.'
         assert err_obs.notify_ui_only is True
         ctrl.retry_service.schedule_retry_after_failure.assert_awaited_once()
         mock_context.set_agent_state.assert_awaited_once_with(AgentState.RATE_LIMITED)

@@ -133,7 +133,7 @@ LLM_HTTP_POOL_TIMEOUT_SECONDS = float(
 # Inter-chunk streaming budget: shared by the executor chunk watchdog,
 # ``llm.py`` stream iterator, and httpx read timeout for ``astream``.
 LLM_STREAM_CHUNK_TIMEOUT_SECONDS = float(
-    os.getenv('APP_LLM_STREAM_CHUNK_TIMEOUT_SECONDS', '120')
+    os.getenv('APP_LLM_STREAM_CHUNK_TIMEOUT_SECONDS', '150')
 )
 # Time to wait for the first streamed token before timeout/fallback.
 LLM_FIRST_CHUNK_TIMEOUT_SECONDS = float(
@@ -721,7 +721,7 @@ ENV_VAR_REGISTRY: dict[str, tuple[str, str]] = {
         'so long sessions are never forcibly terminated.',
     ),
     'APP_LLM_STREAM_CHUNK_TIMEOUT_SECONDS': (
-        '120',
+        '150',
         'Max seconds between streamed LLM chunks before timeout; also sets httpx read '
         'timeout for streaming and the executor chunk watchdog',
     ),

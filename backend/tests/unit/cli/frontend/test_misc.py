@@ -124,12 +124,14 @@ async def test_renderer_notice_panel_does_not_repeat_summary_under_next_steps() 
         console, HUDBar(), ReasoningDisplay(), loop=asyncio.get_running_loop()
     )
     await renderer.handle_event(
-        ErrorObservation(content='TimeoutError: LLM call timed out after 120s')
+        ErrorObservation(content='TimeoutError: LLM call timed out after 150s')
     )
     output = _console_output(console)
-    needle = "The model didn't finish within Grinta's wait window"
+    needle = 'LLM provider timed out'
     assert needle in output
     assert output.count(needle) == 1
+    assert 'What you can try' not in output
+    assert '/settings' not in output
 
 
 @pytest.mark.asyncio
@@ -144,19 +146,13 @@ async def test_renderer_timeout_error_with_autonomous_retry_uses_recovery_copy()
     )
     await renderer.handle_event(
         ErrorObservation(
-            content=(
-                'Timeout: slow\n\nThe provider timed out on this step. Automatic '
-                'backoff and retry will run if the retry queue is available; '
-                'otherwise the agent will return to the prompt.'
-            )
+            content='LLM provider timed out.',
+            error_category='timeout',
+            notify_ui_only=True,
         )
     )
     output = _console_output(console)
-    # Autonomous recovery panel removed per user request (ugly UI)
-    assert 'Autonomous recovery' not in output
-    assert 'Automatic retry is running. No action needed.' not in output
-    # Should show generic timeout error guidance instead
-    assert 'Request timed out' in output
+    assert output == ''
 
 
 @pytest.mark.asyncio
