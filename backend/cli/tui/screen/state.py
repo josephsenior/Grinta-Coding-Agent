@@ -100,6 +100,35 @@ class ScreenStateMixin:
             return display_state
         return f'{display_state} [worked for {duration}]'
 
+    def _begin_user_turn_tracking(self) -> None:
+        """Start timing a user-initiated agent turn (clears prior HUD duration)."""
+        self._last_turn_duration = None
+        renderer = getattr(self, '_renderer', None)
+        if renderer is None:
+            return
+        renderer._in_agent_turn = True
+        renderer._turn_start_time = time.monotonic()
+
+    def _finalize_turn_duration(self) -> None:
+        """Record HUD ``[worked for …]`` when a user turn completes."""
+        if getattr(self, '_last_turn_duration', None):
+            return
+        renderer = getattr(self, '_renderer', None)
+        if renderer is None or not getattr(renderer, '_in_agent_turn', False):
+            return
+        started = float(getattr(renderer, '_turn_start_time', 0) or 0)
+        if started <= 0:
+            return
+        from backend.cli.tui.renderer.mixins.action_handlers import (
+            RendererActionHandlersMixin,
+        )
+
+        elapsed = max(0, int(time.monotonic() - started))
+        self._last_turn_duration = RendererActionHandlersMixin._format_turn_duration(
+            elapsed
+        )
+        renderer._in_agent_turn = False
+
     @classmethod
     def _resolve_state_display(cls, raw_state: str | None) -> tuple[str, str]:
         raw = (raw_state or 'Ready').strip()
@@ -223,7 +252,7 @@ class ScreenStateMixin:
 
     @staticmethod
     def _build_hud_line2_leading(ws_display: str) -> str:
-        return f'[#91abec].Grinta[/]  [{NAVY_TEXT_DIM}]Ws: {ws_display}[/]'
+        return f'[#91abec]● Grinta[/]  [{NAVY_TEXT_DIM}]Ws: {ws_display}[/]'
 
     @staticmethod
     def _build_context_display(used: int, limit: int) -> str:

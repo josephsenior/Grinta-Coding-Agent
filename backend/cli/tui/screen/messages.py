@@ -360,6 +360,7 @@ class ScreenMessagesMixin:
             spinner.add_class('-hidden')
             self.query_one('#input-bar', InputBar).remove_class('processing')
         if getattr(self, '_hud', None) is not None:
+            self._finalize_turn_duration()
             self._hud.update_agent_state('Ready')
             with contextlib.suppress(Exception):
                 self._render_hud_bar()
