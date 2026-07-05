@@ -15,13 +15,12 @@ from backend.context.context_pipeline.compaction import (
     passes_effectiveness_gate,
     record_boundary_compact,
     resolve_continuity_or_fallback,
+    should_run_compaction,
     should_skip_compaction,
 )
+from backend.context.compactor.compact_boundary import find_last_condensation_action
 from backend.context.context_pipeline.helpers import is_prewarm_stale
-from backend.context.context_pipeline.types import (
-    _WILL_RETRIGGER_HYSTERESIS_KEY,
-    _ContinuityGateDecision,
-)
+from backend.context.context_pipeline.types import _ContinuityGateDecision
 from backend.core.config.compactor_config import ContextPipelineConfig
 from backend.ledger.action.agent import CondensationAction
 from backend.ledger.action.message import MessageAction
@@ -447,24 +446,50 @@ def test_should_emit_compaction_status_true_when_prewarmed(pipeline):
 def test_just_compacted_skips_autocompact_but_critical_force_bypasses(pipeline):
     events = [_user('task', 1)]
     state = _make_state(events)
+    llm_config = SimpleNamespace(max_input_tokens=200_000, model='test-model')
+    budget = ContextBudget.from_events(events, llm_config=llm_config, state=state)
     mark_just_compacted(state)
-    assert (
-        should_skip_compaction(
-            state, pipeline._boundary_compact_cooldown, force=False, explicit=False
-        )
-        is True
+    assert should_skip_compaction(
+        state,
+        events=events,
+        llm_config=llm_config,
+        history=list(state.history),
+        force=False,
+        explicit=False,
     )
-    assert (
-        should_skip_compaction(
-            state, pipeline._boundary_compact_cooldown, force=True, explicit=False
-        )
-        is False
+    assert not should_skip_compaction(
+        state,
+        events=events,
+        llm_config=llm_config,
+        history=list(state.history),
+        force=True,
+        explicit=False,
     )
-    assert (
-        should_skip_compaction(
-            state, pipeline._boundary_compact_cooldown, force=False, explicit=True
-        )
-        is False
+    assert not should_skip_compaction(
+        state,
+        events=events,
+        llm_config=llm_config,
+        history=list(state.history),
+        force=False,
+        explicit=True,
+    )
+    assert not should_run_compaction(
+        state,
+        events=events,
+        budget=budget,
+        history=list(state.history),
+        llm_config=llm_config,
+        explicit=False,
+        critical=False,
+    )
+    assert should_run_compaction(
+        state,
+        events=events,
+        budget=budget,
+        history=list(state.history),
+        llm_config=llm_config,
+        explicit=False,
+        critical=True,
     )
 
 
@@ -509,58 +534,49 @@ async def test_prepare_step_never_compacts_twice_before_llm_step(pipeline):
     run_mock.assert_awaited_once()
 
 
-def test_will_retrigger_hysteresis_is_telemetry_only(pipeline):
+def test_skip_compaction_when_boundary_at_or_below_snapshot(pipeline):
+    """Do not re-compact until projected boundary tokens grow past the snapshot."""
     events = [_user('task', 1), _cmd_output('ok', 2)]
     state = _make_state(events)
     action = CondensationAction(
         pruned_event_ids=[1],
-        summary='huge summary ' * 5000,
+        summary='summary',
         summary_offset=0,
     )
-    budget = SimpleNamespace(autocompact_threshold=1000)
     llm_config = SimpleNamespace(model='test-model')
+    history = list(state.history)
+    # Simulate CondensationAction already committed to history.
+    state.history.append(action)
     with patch(
         'backend.context.context_pipeline.compaction.estimate_boundary_event_tokens',
         return_value=50_000,
     ):
         record_boundary_compact(
-            state, events, action, budget=budget, llm_config=llm_config
+            state, events, action, llm_config=llm_config,
         )
-    pipe = state.extra_data['context_pipeline_state']
-    assert pipe.get(_WILL_RETRIGGER_HYSTERESIS_KEY) is True
-    unchanged = SimpleNamespace(estimated_tokens=50_000)
-    grown = SimpleNamespace(estimated_tokens=55_000)
-    assert (
-        should_skip_compaction(
+        assert should_skip_compaction(
             state,
-            pipeline._boundary_compact_cooldown,
-            force=True,
-            budget=unchanged,
-        )
-        is False
-    )
-    assert (
-        should_skip_compaction(
-            state,
-            pipeline._boundary_compact_cooldown,
+            events=events,
+            llm_config=llm_config,
+            history=history + [action],
             force=False,
-            budget=unchanged,
-        )
-        is True
-    )
-    assert (
-        should_skip_compaction(
+        ) is True
+
+    with patch(
+        'backend.context.context_pipeline.compaction.estimate_boundary_event_tokens',
+        return_value=55_000,
+    ):
+        assert should_skip_compaction(
             state,
-            pipeline._boundary_compact_cooldown,
+            events=events,
+            llm_config=llm_config,
+            history=history + [action],
             force=False,
-            budget=grown,
-        )
-        is False
-    )
+        ) is False
 
 
-def test_skip_compaction_ignores_inflated_budget_when_events_provided(pipeline):
-    """API/baseline budget inflation must not bypass the post-compact snapshot."""
+def test_skip_compaction_when_snapshot_set_but_boundary_not_in_history(pipeline):
+    """Avoid stacking LLM compactions before CondensationAction lands in history."""
     events = [_user('task', 1), _cmd_output('ok', 2)]
     state = _make_state(events)
     action = CondensationAction(
@@ -576,26 +592,12 @@ def test_skip_compaction_ignores_inflated_budget_when_events_provided(pipeline):
         record_boundary_compact(
             state, events, action, llm_config=llm_config,
         )
-        inflated = SimpleNamespace(estimated_tokens=200_000)
-        assert should_skip_compaction(
-            state,
-            pipeline._boundary_compact_cooldown,
-            force=False,
-            budget=inflated,
-            events=events,
-            llm_config=llm_config,
-        ) is True
-
-    with patch(
-        'backend.context.context_pipeline.compaction.estimate_boundary_event_tokens',
-        return_value=55_000,
-    ):
-        assert should_skip_compaction(
-            state,
-            pipeline._boundary_compact_cooldown,
-            force=False,
-            budget=inflated,
-            events=events,
-            llm_config=llm_config,
-        ) is False
+    assert find_last_condensation_action(state.history) is None
+    assert should_skip_compaction(
+        state,
+        events=events,
+        llm_config=llm_config,
+        history=list(state.history),
+        force=False,
+    ) is True
 

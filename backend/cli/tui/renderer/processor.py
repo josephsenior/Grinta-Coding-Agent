@@ -388,10 +388,9 @@ def _process_event(orch: 'RendererEventProcessorMixin', event: Any) -> None:
         if mounted is not None:
             mounted.add(event_id)
             if len(mounted) > _MOUNTED_EVENT_ID_CAP:
-                # Keep only the most recent ids; older events are long pruned.
-                keep = sorted(mounted)[-_MOUNTED_EVENT_ID_RETAIN:]
-                mounted.clear()
-                mounted.update(keep)
+                # Event ids are monotonic — drop the oldest without sorting.
+                threshold = max(mounted) - _MOUNTED_EVENT_ID_RETAIN
+                mounted -= {eid for eid in mounted if eid < threshold}
     orch._current_event_id = -1
     if not getattr(orch, '_async_drain_active', False):
         flush_sync = getattr(orch, 'flush_pending_final_commits_sync', None)

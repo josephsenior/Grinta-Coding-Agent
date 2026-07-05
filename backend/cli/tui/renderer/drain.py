@@ -306,15 +306,13 @@ def _record_dropped_events(orch: 'RendererEventProcessorMixin', dropped: int) ->
         except Exception:
             pass
 
-    from backend.cli.tui.renderer.mixins.event_processor import (
-        _TUI_HISTORY_RENDER_LIMIT,
-    )
+    append_history = getattr(orch, '_append_history_items', None)
+    if callable(append_history):
+        append_history(notice, Text(''))
+        return
 
     orch._history.append(notice)
     orch._history.append(Text(''))
-    overflow = len(orch._history) - _TUI_HISTORY_RENDER_LIMIT
-    if overflow > 0:
-        del orch._history[:overflow]
 
 
 def _flush_and_refresh(
@@ -371,6 +369,9 @@ async def _preprocess_event_async(
     encoded = await prep_file_edit_encoded_diff_async(orch, event)
     if encoded:
         cache[event_id] = encoded
+        bound = getattr(orch, '_bound_event_id_cache', None)
+        if callable(bound):
+            bound(cache)
 
 
 async def _process_events_with_frame_budget(
@@ -466,15 +467,16 @@ async def drain_events_async(orch: 'RendererEventProcessorMixin') -> None:
     finally:
         orch._async_drain_active = False
         _set_display_backpressure(orch, False)
+        with orch._pending_lock:
+            orch._drain_requested_while_active = False
+            if orch._pending_events:
+                _force_immediate_drain(orch)
+                return
 
     elapsed_ms = (time.monotonic() - invocation_started) * 1000.0
     pending_depth = 0
     with orch._pending_lock:
         pending_depth = len(orch._pending_events)
-        requested_while_active = (
-            getattr(orch, '_drain_requested_while_active', False) is True
-        )
-        orch._drain_requested_while_active = False
     prep_depth = len(getattr(orch, '_render_prep_cache', {}) or {})
     len(getattr(orch, '_mounted_event_ids', set()) or set())
     _tui_logger.debug(
@@ -486,8 +488,6 @@ async def drain_events_async(orch: 'RendererEventProcessorMixin') -> None:
         len(last_batch),
         last_streaming_only,
     )
-    if pending_depth and requested_while_active:
-        _force_immediate_drain(orch)
 
 
 async def wait_for_activity(

@@ -7,7 +7,6 @@ or receive their dependencies as parameters.
 
 from __future__ import annotations
 
-import time
 from typing import TYPE_CHECKING, Any
 
 from backend.context.canonical_state import (
@@ -15,20 +14,20 @@ from backend.context.canonical_state import (
     render_canonical_state_for_prompt,
     validate_canonical_state_for_compaction,
 )
-from backend.context.compactor.compact_boundary import project_after_compact_boundary
+from backend.context.compactor.compact_boundary import (
+    find_last_condensation_action,
+    project_after_compact_boundary,
+)
 from backend.context.compactor.compactor import Compaction
 from backend.context.context_budget import (
     ContextBudget,
     estimate_boundary_event_tokens,
-    record_post_compact_baseline,
 )
 from backend.context.context_pipeline.helpers import _synthetic_history_after_action
 from backend.context.context_pipeline.types import (
-    _CONSECUTIVE_CONDENSATION_KEY,
     _JUST_COMPACTED_KEY,
     _MAX_LLM_COMPACTION_ATTEMPTS,
     _POST_COMPACT_TRUE_TOKENS_KEY,
-    _WILL_RETRIGGER_HYSTERESIS_KEY,
     _ContinuityGateDecision,
 )
 from backend.context.continuity_eval import compaction_passes_continuity_gate
@@ -59,29 +58,21 @@ def _set_pipeline_state(state: State, pipe: dict[str, Any]) -> None:
 
 def should_skip_compaction(
     state: State,
-    boundary_compact_cooldown: int,
     *,
-    force: bool,
+    events: list[Event],
+    llm_config: object,
+    history: list[Event],
     explicit: bool = False,
-    budget: ContextBudget | None = None,
-    events: list[Event] | None = None,
-    llm_config: object | None = None,
+    force: bool = False,
 ) -> bool:
     """Return True when compaction should not run again yet.
 
+    Guards (bypassed by explicit ``/compact`` or CRITICAL memory pressure):
+
     * ``just_compacted`` — same-turn double ``prepare_step`` loop
-    * post-compact snapshot — already compacted at this token level; wait until
-      projected post-boundary events grow past the last committed count
-
-    Explicit ``/compact`` and CRITICAL memory pressure (``force=True``) bypass
-    both guards.
-
-    When *events* are supplied, the snapshot comparison uses
-    :func:`estimate_boundary_event_tokens` so it matches the value stored at
-    commit time. ``budget.estimated_tokens`` can be inflated by API caches and
-    baseline heuristics and must not be used alone for the skip gate.
+    * pending boundary — snapshot recorded but ``CondensationAction`` not in history
+    * post-compact snapshot — boundary tokens still at or below last commit
     """
-    _ = boundary_compact_cooldown
     if explicit or force:
         return False
 
@@ -93,22 +84,48 @@ def should_skip_compaction(
     if not isinstance(post_compact, int) or post_compact <= 0:
         return False
 
-    if events is not None:
-        current_tokens = estimate_boundary_event_tokens(events, llm_config=llm_config)
-        if current_tokens <= post_compact:
-            logger.debug(
-                'ContextPipeline: skipping compaction (boundary_tokens=%d '
-                'post_compact_snapshot=%d budget_estimate=%s)',
-                current_tokens,
-                post_compact,
-                getattr(budget, 'estimated_tokens', None) if budget else None,
-            )
-            return True
-        return False
+    if find_last_condensation_action(history) is None:
+        logger.info(
+            'ContextPipeline: skipping compaction (post_compact_snapshot=%d '
+            'but CondensationAction not yet in history)',
+            post_compact,
+        )
+        return True
 
-    if budget is not None and budget.estimated_tokens <= post_compact:
+    boundary_tokens = estimate_boundary_event_tokens(events, llm_config=llm_config)
+    if boundary_tokens <= post_compact:
+        logger.info(
+            'ContextPipeline: skipping compaction (boundary_tokens=%d '
+            'post_compact_snapshot=%d)',
+            boundary_tokens,
+            post_compact,
+        )
         return True
     return False
+
+
+def should_run_compaction(
+    state: State,
+    *,
+    events: list[Event],
+    budget: ContextBudget,
+    history: list[Event],
+    llm_config: object,
+    explicit: bool = False,
+    critical: bool = False,
+) -> bool:
+    """Return True when LLM compaction should run this step."""
+    force = explicit or critical
+    if should_skip_compaction(
+        state,
+        events=events,
+        llm_config=llm_config,
+        history=history,
+        explicit=explicit,
+        force=force,
+    ):
+        return False
+    return bool(budget.should_autocompact or explicit or critical)
 
 
 def mark_just_compacted(state: State) -> None:
@@ -117,21 +134,11 @@ def mark_just_compacted(state: State) -> None:
     _set_pipeline_state(state, pipe)
 
 
-def increment_condensation_counter(state: State) -> None:
-    pipe = _pipeline_state(state)
-    count = pipe.get(_CONSECUTIVE_CONDENSATION_KEY, 0)
-    if not isinstance(count, int):
-        count = 0
-    pipe[_CONSECUTIVE_CONDENSATION_KEY] = count + 1
-    _set_pipeline_state(state, pipe)
-
-
 def record_boundary_compact(
     state: State,
     history: list[Event],
     action: CondensationAction,
     *,
-    budget: ContextBudget | None = None,
     llm_config: object | None = None,
     post_events: list[Event] | None = None,
 ) -> None:
@@ -139,22 +146,14 @@ def record_boundary_compact(
         post_events = project_after_compact_boundary(
             _synthetic_history_after_action(history, action)
         )
-    record_post_compact_baseline(state, post_events)
     post_tokens = estimate_boundary_event_tokens(post_events, llm_config=llm_config)
     pipe = _pipeline_state(state)
     pipe[_POST_COMPACT_TRUE_TOKENS_KEY] = post_tokens
-    if budget is not None:
-        if post_tokens >= budget.autocompact_threshold:
-            pipe[_WILL_RETRIGGER_HYSTERESIS_KEY] = True
-            logger.warning(
-                'will_retrigger_next_turn: post_compact_tokens=%d '
-                'autocompact_threshold=%d',
-                post_tokens,
-                budget.autocompact_threshold,
-            )
-        else:
-            pipe.pop(_WILL_RETRIGGER_HYSTERESIS_KEY, None)
     _set_pipeline_state(state, pipe)
+    logger.info(
+        'ContextPipeline: recorded post-compact snapshot (boundary_tokens=%d)',
+        post_tokens,
+    )
 
 
 # --------------------------------------------------------------------------- #

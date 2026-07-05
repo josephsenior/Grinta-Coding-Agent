@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -228,6 +228,77 @@ def prep_streaming_renderable(
     if len(parts) == 1:
         return parts[0]
     return Group(*parts)
+
+
+@dataclass
+class StreamingRenderState:
+    """Incremental streaming render state — frozen segments plus a mutable tail."""
+
+    committed_parts: list[Any] = field(default_factory=list)
+    committed_upto: int = 0
+
+
+def _last_complete_fence_end(text: str) -> int:
+    """Return the index after the last fully closed fenced code block."""
+    last_end = 0
+    for match in _COMPLETE_FENCE_RE.finditer(text):
+        last_end = match.end()
+    return last_end
+
+
+def _flatten_renderable(renderable: Any) -> list[Any]:
+    if isinstance(renderable, Group):
+        return list(renderable.renderables)
+    return [renderable]
+
+
+def prep_streaming_renderable_incremental(
+    text: str,
+    state: StreamingRenderState | None,
+    *,
+    base_text_style: str = NAVY_TEXT_PRIMARY,
+) -> tuple[Any, StreamingRenderState]:
+    """Render streaming text incrementally by freezing complete fenced blocks.
+
+    Complete ```...``` segments are parsed once and retained. Only the trailing
+    slice (open fence or prose still growing) is re-highlighted each frame.
+    """
+    content = text or ''
+    if not content.strip():
+        return Text(''), StreamingRenderState()
+
+    if state is None:
+        state = StreamingRenderState()
+
+    if state.committed_upto > len(content):
+        state = StreamingRenderState()
+
+    stable_end = _last_complete_fence_end(content)
+    if stable_end > state.committed_upto:
+        segment = content[state.committed_upto : stable_end]
+        if segment.strip():
+            rendered = prep_streaming_renderable(
+                segment, base_text_style=base_text_style
+            )
+            state.committed_parts.extend(_flatten_renderable(rendered))
+        state.committed_upto = stable_end
+
+    tail = content[state.committed_upto :]
+    parts = list(state.committed_parts)
+    if tail:
+        tail_renderable = prep_streaming_renderable(
+            tail, base_text_style=base_text_style
+        )
+        parts.extend(_flatten_renderable(tail_renderable))
+
+    if not parts:
+        renderable: Any = Text(content, style=base_text_style)
+    elif len(parts) == 1:
+        renderable = parts[0]
+    else:
+        renderable = Group(*parts)
+
+    return renderable, state
 
 
 def streaming_render_interval(text: str) -> float:

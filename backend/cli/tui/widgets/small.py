@@ -108,6 +108,22 @@ class Transcript(VerticalScroll):
         self._last_max_scroll_y = 0.0
         self._load_earlier_button: Static | None = None
         self._follow_tail_pending = False
+        self._content_widget_count = 0
+
+    def _is_content_widget(self, child: Widget) -> bool:
+        if child is self._scroll_badge:
+            return False
+        if child is self._load_earlier_button:
+            return False
+        if getattr(child, '_tui_removing', False):
+            return False
+        return True
+
+    def _note_content_widget_added(self) -> None:
+        self._content_widget_count += 1
+
+    def _note_content_widget_removed(self) -> None:
+        self._content_widget_count = max(0, self._content_widget_count - 1)
 
     def compose(self) -> ComposeResult:
         yield ScrollTailBadge()
@@ -226,13 +242,8 @@ class Transcript(VerticalScroll):
     def _content_widgets(self) -> list[Widget]:
         widgets: list[Widget] = []
         for child in self.children:
-            if child is self._scroll_badge:
-                continue
-            if child is self._load_earlier_button:
-                continue
-            if getattr(child, '_tui_removing', False):
-                continue
-            widgets.append(child)
+            if self._is_content_widget(child):
+                widgets.append(child)
         return widgets
 
     def sync_viewport(self, renderer: Any) -> None:
@@ -248,11 +259,11 @@ class Transcript(VerticalScroll):
             _TUI_VIEWPORT_OVERSCAN,
         )
 
-        widgets = self._content_widgets()
         max_mounted = _TUI_VIEWPORT_MAX_MOUNTED
-        if len(widgets) <= max_mounted:
+        if self._content_widget_count <= max_mounted:
             return
 
+        widgets = self._content_widgets()
         overflow = len(widgets) - max_mounted
 
         if not self.should_follow_tail():
@@ -274,6 +285,7 @@ class Transcript(VerticalScroll):
         forget = getattr(renderer, '_forget_event_state', None)
         for widget in to_unmount:
             setattr(widget, '_tui_removing', True)
+            self._note_content_widget_removed()
             if callable(forget):
                 forget(getattr(widget, '_ledger_event_id', None))
             try:
@@ -326,6 +338,7 @@ class Transcript(VerticalScroll):
         removed = 0
         for widget in prunable:
             setattr(widget, '_tui_removing', True)
+            self._note_content_widget_removed()
             if callable(forget):
                 forget(getattr(widget, '_ledger_event_id', None))
             try:
@@ -456,6 +469,7 @@ class Transcript(VerticalScroll):
         if use_animation:
             widget.styles.offset = (0, -1)
         self.mount(widget)
+        self._note_content_widget_added()
         if use_animation:
             try:
                 widget.animate('offset', (0, 0), duration=0.2)
@@ -483,6 +497,7 @@ class Transcript(VerticalScroll):
         """Compatibility method for RichLog interface."""
         self.remove_children()
         self._scroll_badge = None
+        self._content_widget_count = 0
         self._user_scrolled_away = False
         self._user_initiated_scroll_away = False
         self._follow_tail_pending = False
@@ -494,16 +509,7 @@ class Transcript(VerticalScroll):
     @property
     def child_widget_count(self) -> int:
         """Count of content widgets (excludes system widgets like scroll-badge)."""
-        count = 0
-        for child in self.children:
-            if child is self._scroll_badge:
-                continue
-            if child is self._load_earlier_button:
-                continue
-            if getattr(child, '_tui_removing', False):
-                continue
-            count += 1
-        return count
+        return self._content_widget_count
 
     def prune_oldest(self, count: int) -> int:
         """Unmount the N oldest content widgets. Returns count of widgets removed."""
@@ -520,6 +526,7 @@ class Transcript(VerticalScroll):
             try:
                 setattr(child, '_tui_removing', True)
                 child.remove()
+                self._note_content_widget_removed()
                 removed += 1
             except Exception:
                 pass
@@ -535,16 +542,19 @@ class Transcript(VerticalScroll):
         if button is not None and button in self.children:
             try:
                 self.mount(widget, after=button)
+                self._note_content_widget_added()
                 return
             except Exception:
                 pass
         if self._scroll_badge is not None and self._scroll_badge in self.children:
             try:
                 self.mount(widget, after=self._scroll_badge)
+                self._note_content_widget_added()
                 return
             except Exception:
                 pass
         self.mount(widget)
+        self._note_content_widget_added()
 
 
 class InputBar(Horizontal):

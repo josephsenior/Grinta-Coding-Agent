@@ -59,7 +59,10 @@ async def test_tui_renderer_latches_drain_request_while_active():
 
 @pytest.mark.asyncio
 async def test_tui_renderer_history_is_bounded(monkeypatch):
-    monkeypatch.setattr(_live_mod, '_TUI_HISTORY_RENDER_LIMIT', 3)
+    monkeypatch.setattr(
+        'backend.cli.tui.constants._TUI_HISTORY_RENDER_LIMIT',
+        3,
+    )
     display = MagicMock()
     sidebar = MagicMock()
     fake_tui = SimpleNamespace(
