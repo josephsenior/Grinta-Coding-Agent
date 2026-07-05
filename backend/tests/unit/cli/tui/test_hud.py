@@ -31,7 +31,7 @@ async def test_tui_hud_bar_shows_workspace_path(mock_config):
         stats = s.query_one('#hud-line-2-ws', Label)
         rendered = str(stats.renderable)
         assert 'Ws:' in rendered
-        assert '.Grinta' in rendered
+        assert '● Grinta' in rendered
         assert '…/' in rendered or 'Ws:' in rendered
 
 

@@ -504,6 +504,7 @@ class ScreenInputMixin:
         await self._handle_input_dispatch_action(action)
 
     async def _handle_input_dispatch_action(self, action: Any) -> None:
+        self._begin_user_turn_tracking()
         try:
             _tui_logger.debug('_handle_input: calling _dispatch_action_event()')
             logger.info('[TUI] _handle_input: dispatching to agent')
@@ -530,11 +531,12 @@ class ScreenInputMixin:
                     self._render_hud_bar()
         finally:
             self.finalize_thinking()
-            self._render_hud_bar()
-            self.query_one('#input-bar', InputBar).remove_class('processing')
             if self._renderer:
                 self._renderer.flush_live_ui(terminal=True)
                 await self._renderer.drain_events_async()
+            self._finalize_turn_duration()
+            self._render_hud_bar()
+            self.query_one('#input-bar', InputBar).remove_class('processing')
             actual_state = (
                 str(self._controller.get_agent_state()) if self._controller else ''
             )
