@@ -1,0 +1,161 @@
+SESSION LOG AUDIT
+========================================================================
+Source: C:\Users\GIGABYTE\Desktop\Grinta\logs\workspaces\ouroboros1__91dd4639ec24\sessions\40be5214-79e7-46-f10166a92eb2b86\session.jsonl
+Transcript: C:\Users\GIGABYTE\Desktop\Grinta\logs\workspaces\ouroboros1__91dd4639ec24\sessions\40be5214-79e7-46-f10166a92eb2b86\session.txt
+Total events: 14,079
+Duration: 105.7 min (2026-07-05T21:36:03.465675+00:00 -> 2026-07-05T23:21:46.817194+00:00)
+Final agent state: finished
+
+LEVEL COUNTS
+----------------------------------------
+  INFO: 14,066
+  WARNING: 13
+
+HEALTH SIGNALS
+----------------------------------------
+  Pending action timeouts: 14
+  Retry/recovery mentions: 25
+  LLM steps (wire/agent): 4259
+  LLM latency ms — min=3196 median=9175 max=60878
+  File events: 84
+  Tool outcomes: ok=309 fail=1
+
+VERDICT: REVIEW
+  • 14 pending-action timeout(s) detected.
+  • 13 WARNING(s) — worth scanning.
+
+CONFIG AT FIRST ISSUE
+----------------------------------------
+{
+  "mode": null,
+  "active_run_mode": null,
+  "autonomy": null,
+  "model": "opencode/mimo-v2.5-free",
+  "provider": "opencode",
+  "reasoning_effort": "high",
+  "llm_config": {
+    "temperature": null,
+    "top_p": 0.95,
+    "top_k": null,
+    "reasoning_effort": "high",
+    "native_tool_calling": null,
+    "context_window_tokens": 200000,
+    "max_output_tokens": 32000,
+    "prompt_history_token_budget": null,
+    "prompt_history_budget_ratio": null,
+    "prompt_history_max_events": null
+  },
+  "astep_id": null
+}
+
+ISSUES / WARNINGS (13 lines)
+----------------------------------------
+L18: [ISSUE] Failed to initialize vector memory: Vector memory requires the optional [rag] extra. Install with: pip install ".[rag]" (source) or pip install "grinta-ai[rag]" (PyPI).
+Continuing without persistent memory. To enable:
+  pip install ".[rag]" (source) or pip install "grinta-ai[rag]" (PyPI)
+L131: [ISSUE] Recoverable tool-call error from LLM output: Define acceptance criteria before creating a task plan. Call acceptance_criteria(update) with verifiable outcomes first, then task_tracker(update). See <ACCEPTANCE_CRITERIA> and <COMMON_PATTERNS>.
+L633: [ISSUE] Recoverable tool-call error from LLM output: CONTENT_APPEARS_SERIALIZED: content contains literal JSON escape sequences (e.g. \n, \").
+Field: file_text
+L2008: [ISSUE] Recoverable tool-call error from LLM output: CONTENT_APPEARS_SERIALIZED: content contains literal JSON escape sequences (e.g. \n, \").
+Field: file_text
+L2310: [ISSUE] Recoverable tool-call error from LLM output: CONTENT_APPEARS_SERIALIZED: content contains literal JSON escape sequences (e.g. \n, \").
+Field: file_text
+L2334: [ISSUE] Recoverable tool-call error from LLM output: CONTENT_APPEARS_SERIALIZED: content contains literal JSON escape sequences (e.g. \n, \").
+Field: file_text
+L2575: [ISSUE] Context window threshold 70% crossed for session 40be5214-79e7-46-f10166a92eb2b86 — 141615/200000 tokens
+L5932: [ISSUE] Recoverable tool-call error from LLM output: Tool call arguments appear truncated (stream ended before JSON object was closed). Last 60 chars: ...'{"end_line": 155'
+L7317: [ISSUE] [Agent Controller 40be5214-79e7-46-f10166a92eb2b86] Pending action timed out after 120.9s, auto-clearing: TerminalCloseAction (id=55518)
+L8275: [ISSUE] DESTRUCTIVE COMMAND DETECTED [rm-recursive-force]: find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null; timeout 20 python3 -m pytest tests/test_effect_safety.py::test_effect_checker_processes_all -v
+L8692: [ISSUE] [Agent Controller 40be5214-79e7-46-f10166a92eb2b86] Pending action timed out after 120.9s, auto-clearing: TerminalCloseAction (id=58258)
+L10559: [ISSUE] [Agent Controller 40be5214-79e7-46-f10166a92eb2b86] Pending action timed out after 121.1s, auto-clearing: TerminalCloseAction (id=60213)
+L13350: [ISSUE] Recoverable tool-call error from LLM output: audit_entries must cover every current criterion exactly once (missing: ac11, ac12, ac13, ac14, ac15, ac16, ac17, ac18)
+
+EVENT TYPE BREAKDOWN
+----------------------------------------
+   8353  RUNTIME
+   3362  WIRE_RESPONSE
+    897  AGENT_STEP
+    349  PROMPT_SHAPE
+    349  WIRE_PROMPT
+    347  METRICS
+    310  TOOL_RESULT
+     84  FILE_EVENT
+     13  ISSUE
+      7  AGENT_THINK
+      4  SESSION_CONTEXT
+      2  STATE_CHANGE
+      1  SESSION_START
+      1  USER_TURN
+
+RUNTIME MSG_TYPE BREAKDOWN
+----------------------------------------
+    349  PLANNER_TURN
+    347  EXECUTOR_TOOLS
+    347  LLM_STEP_DONE
+    310  TOOL_OBSERVATION_RESOLVED
+      3  PLANNER_TOOLSET
+      3  PENDING_ACTION_TIMEOUT_CLEARED
+
+STATE TRANSITION TIMELINE
+----------------------------------------
+L79: loading -> running
+L14079: running -> finished
+
+METADATA BREAKDOWN
+----------------------------------------
+By model:
+  14072  opencode/mimo-v2.5-free
+      7  unknown
+By mode:
+  14018  agent
+     61  unknown
+By autonomy:
+  14018  full
+     61  unknown
+Issues by model:
+     13  opencode/mimo-v2.5-free
+Tool failures by model:
+      1  opencode/mimo-v2.5-free
+
+FILE EVENTS (first 40 of 84)
+----------------------------------------
+L350 [create] ouroboros/compiler/__init__.py
+L379 [create] ouroboros/compiler/ast.py
+L412 [create] ouroboros/compiler/lexer.py
+L448 [create] ouroboros/compiler/parser.py
+L481 [create] ouroboros/compiler/types.py
+L514 [create] ouroboros/compiler/infer.py
+L549 [create] ouroboros/compiler/linearity.py
+L576 [create] ouroboros/compiler/effects.py
+L609 [create] ouroboros/compiler/desugar.py
+L717 [create] ouroboros/compiler/anf.py
+L751 [create] ouroboros/compiler/closure.py
+L786 [create] ouroboros/compiler/emit.py
+L822 [create] ouroboros/compiler/link.py
+L951 [create] ouroboros/runtime/gc.h
+L979 [create] ouroboros/runtime/gc.c
+L1063 [create] ouroboros/runtime/scheduler.h
+L1096 [create] ouroboros/runtime/scheduler.c
+L1180 [create] ouroboros/runtime/raft.h
+L1217 [create] ouroboros/runtime/raft.c
+L1302 [create] ouroboros/runtime/distgc.h
+L1332 [create] ouroboros/runtime/distgc.c
+L1370 [create] ouroboros/runtime/failure.h
+L1400 [create] ouroboros/runtime/failure.c
+L1435 [create] ouroboros/runtime/serialize.h
+L1477 [create] ouroboros/runtime/serialize.c
+L1514 [create] ouroboros/runtime/runtime.h
+L1544 [create] ouroboros/runtime/runtime.c
+L1580 [create] ouroboros/runtime/Makefile
+L1669 [edit] ouroboros\runtime\serialize.c
+L1781 [edit] ouroboros\runtime\serialize.c
+L1852 [create] ouroboros/tests/generate_tests.py
+L1983 [create] tests/test_type_inference.py
+L2044 [create] tests/test_linear_types.py
+L2080 [create] tests/test_effect_safety.py
+L2120 [create] tests/test_memory_safety.py
+L2150 [create] tests/test_gc_stress.py
+L2181 [create] tests/test_gc_correctness.py
+L2220 [create] tests/test_scheduler.py
+L2250 [create] tests/test_raft.py
+L2286 [create] tests/test_distributed_gc.py
