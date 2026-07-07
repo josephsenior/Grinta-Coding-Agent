@@ -167,6 +167,95 @@ def check_llm_config(*, model_hint: str | None = None) -> DoctorCheck:
     return DoctorCheck('llm', True, f'provider={provider} model={model} key=resolved')
 
 
+def check_legacy_autonomy_alias() -> DoctorCheck:
+    """Warn when settings.json still uses retired autonomy spellings."""
+    from backend.core.app_paths import get_canonical_settings_path
+    from backend.core.autonomy import normalize_autonomy_level
+    from backend.core.constants import DEFAULT_AGENT_NAME
+
+    path = Path(get_canonical_settings_path())
+    if not path.is_file():
+        return DoctorCheck(
+            'autonomy_alias', True, 'settings.json not found', critical=False
+        )
+
+    try:
+        raw = json.loads(path.read_text(encoding='utf-8'))
+    except Exception as exc:
+        return DoctorCheck(
+            'autonomy_alias', False, f'parse failed: {exc}', critical=False
+        )
+
+    agent_section = raw.get('agent')
+    if not isinstance(agent_section, dict):
+        return DoctorCheck('autonomy_alias', True, 'no agent section', critical=False)
+
+    legacy_hits: list[str] = []
+    for name, entry in agent_section.items():
+        if not isinstance(entry, dict):
+            continue
+        raw_level = entry.get('autonomy_level')
+        if not isinstance(raw_level, str):
+            continue
+        if normalize_autonomy_level(raw_level) == 'supervised':
+            legacy_hits.append(str(name))
+
+    if legacy_hits:
+        agents = ', '.join(sorted(legacy_hits))
+        return DoctorCheck(
+            'autonomy_alias',
+            False,
+            f"legacy autonomy_level 'supervised' for {agents}; use 'conservative'",
+            critical=False,
+        )
+    from backend.cli.settings.query import get_persisted_autonomy_level
+
+    effective = get_persisted_autonomy_level(DEFAULT_AGENT_NAME)
+    return DoctorCheck(
+        'autonomy_alias',
+        True,
+        f"no legacy aliases (effective={effective or 'default'})",
+        critical=False,
+    )
+
+
+def check_security_settings_values() -> DoctorCheck:
+    """Validate raw security.execution_profile before config merge."""
+    from backend.core.app_paths import get_canonical_settings_path
+
+    path = Path(get_canonical_settings_path())
+    if not path.is_file():
+        return DoctorCheck(
+            'security_values', True, 'settings.json not found', critical=False
+        )
+
+    try:
+        raw = json.loads(path.read_text(encoding='utf-8'))
+    except Exception as exc:
+        return DoctorCheck(
+            'security_values', False, f'parse failed: {exc}', critical=False
+        )
+
+    security = raw.get('security')
+    if not isinstance(security, dict):
+        return DoctorCheck('security_values', True, 'no security section', critical=False)
+
+    profile = security.get('execution_profile')
+    if profile is None:
+        return DoctorCheck('security_values', True, 'execution_profile=default', critical=False)
+
+    allowed = {'standard', 'hardened_local', 'sandboxed_local'}
+    text = str(profile).strip()
+    if text not in allowed:
+        return DoctorCheck(
+            'security_values',
+            False,
+            f"invalid execution_profile '{text}'; use one of {sorted(allowed)}",
+            critical=False,
+        )
+    return DoctorCheck('security_values', True, f'execution_profile={text}', critical=False)
+
+
 def check_execution_profile() -> DoctorCheck:
     from backend.core.app_paths import get_canonical_settings_path
     from backend.core.config import AppConfig
@@ -465,6 +554,8 @@ def collect_doctor_checks(*, verbose: bool = False) -> list[DoctorCheck]:
         check_platform(),
         check_settings_file(),
         check_settings_schema(),
+        check_legacy_autonomy_alias(),
+        check_security_settings_values(),
         check_llm_config(),
         check_execution_profile(),
         check_binary('git'),
@@ -492,6 +583,8 @@ def collect_health_checks(*, model_hint: str | None = None) -> list[DoctorCheck]
         check_binary('git'),
         check_binary('rg'),
         check_llm_config(model_hint=model_hint),
+        check_security_settings_values(),
+        check_execution_profile(),
         *collect_wsl_checks(),
     ]
 
@@ -511,10 +604,12 @@ __all__ = [
     'check_debugpy',
     'check_editing_stack',
     'check_execution_profile',
+    'check_legacy_autonomy_alias',
     'check_llm_config',
     'check_optional_imports',
     'check_platform',
     'check_python',
+    'check_security_settings_values',
     'check_settings_file',
     'check_settings_schema',
     'check_tmux_tmpdir',

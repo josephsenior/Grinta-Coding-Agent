@@ -1,6 +1,6 @@
 # 00. The Meaning of Grinta
 
-If you spend seven months building, deleting, and rebuilding an autonomous system alone in the dark, the name you give it stops being a branding decision and becomes a reflection of what the project required out of you.
+If you spend ten months building, deleting, and rebuilding an autonomous system alone in the dark, the name you give it stops being a branding decision and becomes a reflection of what the project required out of you.
 
 I named this engine **Grinta**.
 
@@ -14,7 +14,7 @@ But as I chased the reality of what actually makes an AI agent capable of finish
 
 The Docker containers died. The Redis clusters died. The multi-agent swarm died. The prompt-optimizing loops died. The heavy browsing agent died. The conflict predictor died. The patch scoring system died. The cloud runtime providers died. The elaborate Textual TUI died.
 
-I learned more watching them die than I ever learned in a lecture hall. University gives you the theory to build a system; building a system alone while exhausted forces you to learn how to keep it alive. What was left was the raw engine. A single, local-first agent loop that uses an event-sourced ledger with Write-Ahead Logging. A model-agnostic inference layer with native clients for Anthropic, Google, OpenAI, and a fallback compatible with everything else. A cross-platform terminal abstraction that runs on Linux, Mac, and Windows without requiring a single mandatory system dependency. And an uncompromising validation service that blocks the agent from calling itself done until every tracked step is actually complete.
+I learned more watching them die than I ever learned in a lecture hall. University gives you the theory to build a system; building a system alone while exhausted forces you to learn how to keep it alive. What was left was the raw engine. A single, local-first agent loop that uses an event-sourced ledger with Write-Ahead Logging. A model-agnostic inference layer with native clients for Anthropic, Google, OpenAI, and a fallback compatible with everything else. A cross-platform terminal abstraction that runs on Linux, Mac, and Windows without requiring a single mandatory system dependency. And a strict validation service that blocks the agent from calling itself done until every tracked step passes its completion-quality checks.
 
 It is not the fanciest architecture I ever drew on a whiteboard. But it is the architecture that survived the trenches of solo development.
 

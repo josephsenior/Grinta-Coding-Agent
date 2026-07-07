@@ -325,11 +325,11 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     )
     max_autonomous_iterations: int = Field(
         default=DEFAULT_AGENT_MAX_AUTONOMOUS_ITERATIONS,
-        description='Maximum self-directed iterations when autonomy is full',
+        description='Maximum self-directed iterations per task (config flag; not gated by autonomy level)',
     )
     stuck_detection_enabled: bool = Field(
         default=DEFAULT_AGENT_STUCK_DETECTION_ENABLED,
-        description='Enable stuck detection when autonomy is full',
+        description='Enable stuck-loop detection (config flag; not gated by autonomy level)',
     )
     stuck_threshold_iterations: int = Field(
         default=DEFAULT_AGENT_STUCK_THRESHOLD_ITERATIONS,

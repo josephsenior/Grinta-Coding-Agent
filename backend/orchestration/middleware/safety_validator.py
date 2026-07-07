@@ -30,6 +30,8 @@ class SafetyValidatorMiddleware(ToolInvocationMiddleware):
         from backend.ledger.observation_cause import attach_observation_cause
         from backend.orchestration.safety_validator import ExecutionContext
 
+        from backend.core.autonomy import AutonomyLevel, normalize_autonomy_level
+
         context = ExecutionContext(
             session_id=self.controller.id or '',
             iteration=self.controller.state.iteration_flag.current_value,
@@ -37,10 +39,10 @@ class SafetyValidatorMiddleware(ToolInvocationMiddleware):
             recent_errors=[self.controller.state.last_error]
             if self.controller.state.last_error
             else [],
-            is_autonomous=bool(
+            is_autonomous=normalize_autonomy_level(
                 getattr(self.controller.autonomy_controller, 'autonomy_level', '')
-                == 'full'
-            ),
+            )
+            == AutonomyLevel.FULL.value,
         )
 
         validation = await validator.validate(ctx.action, context)

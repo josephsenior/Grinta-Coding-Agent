@@ -22,7 +22,7 @@ Only matters in **Agent** mode. Controls confirmation prompts, not execution pol
 
 | Level | Behavior |
 | --- | --- |
-| conservative | Confirm most actions |
+| conservative | Confirm shell, edits, terminal, browser, MCP, and delegation |
 | balanced | Confirm high-risk (default) |
 | full | No prompts; CRITICAL blocks still apply |
 
@@ -36,7 +36,7 @@ Execution hardening: `security.execution_profile` in [SETTINGS.md](SETTINGS.md).
 | `/settings` | Model, API key, MCP |
 | `/sessions` `/resume` | Past sessions |
 | `/model` `/mode` `/autonomy` | HUD controls |
-| `/health` | Fast env check in TUI (`grinta doctor` outside TUI) |
+| `/health` | Fast env check (LLM, git, execution profile); run `grinta doctor` outside TUI for full schema checks |
 | `/diff` `/checkpoint` `/compact` | Workspace tools |
 
 ## Safety

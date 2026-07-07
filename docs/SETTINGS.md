@@ -71,18 +71,20 @@ See `backend/core/config/agent_config.py` for the full schema.
 | `execution_profile` | `standard` | `standard`, `hardened_local`, or `sandboxed_local` |
 | `enforce_security` | `true` | Enable security analyzer enforcement |
 | `block_high_risk` | `false` | Block HIGH-risk actions outright |
-| `allow_network_commands` | `false` | Allow network shell commands in hardened profiles |
-| `allow_package_installs` | `false` | Allow package installs in hardened profiles |
-| `allow_background_processes` | `false` | Allow background processes in hardened profiles |
-| `allow_sensitive_path_access` | `false` | Allow sensitive workspace paths in hardened profiles |
+| `allow_network_commands` | `false` | Allow network shell commands in `hardened_local` / `sandboxed_local` |
+| `allow_package_installs` | `false` | Allow package installs in `hardened_local` / `sandboxed_local` |
+| `allow_background_processes` | `false` | Allow background processes in `hardened_local` / `sandboxed_local` |
+| `allow_sensitive_path_access` | `false` | Allow sensitive workspace paths in `hardened_local` / `sandboxed_local` |
 | `allow_read_outside_workspace` | `false` | Opt in to read-only paths outside the project |
 | `additional_read_roots` | `[]` | Approved absolute paths when outside reads are enabled |
 | `validation_mode` | `permissive` | `permissive` (single-user default) or `strict` conversation ownership |
-| `hardened_local_git_allowlist` | `[]` | Git subcommands allowed when `execution_profile` is `hardened_local` |
-| `hardened_local_package_allowlist` | `[]` | Package installs allowed in `hardened_local` |
-| `hardened_local_network_allowlist` | `[]` | Network command families allowed in `hardened_local` |
+| `hardened_local_git_allowlist` | `status`, `diff`, `log`, `show`, `branch`, `rev-parse`, `ls-files` | Git subcommands allowed in `hardened_local` / `sandboxed_local` |
+| `hardened_local_package_allowlist` | `[]` | Package installs allowed in `hardened_local` / `sandboxed_local` |
+| `hardened_local_network_allowlist` | `[]` | Network command families allowed in `hardened_local` / `sandboxed_local` |
 
-Set `APP_STRICT_CONFIG=true` before launch to fail fast on invalid `settings.json` (default: warn and continue with defaults).
+Set `APP_STRICT_CONFIG=true` before launch to fail fast on invalid `settings.json` (default: warn and continue with defaults). Invalid `security.execution_profile` values are skipped entirely — the previous profile is kept; run `grinta doctor` to validate raw settings, or `/health` in-session for a quick profile summary (restart still required to apply changes).
+
+`security.execution_profile` changes take effect after restart (not hot-reloaded like `/mode` or `/autonomy`). Legacy autonomy spelling `supervised` in `settings.json` is auto-migrated to `conservative` on read and at config load.
 
 ### Read-only paths outside the workspace
 
