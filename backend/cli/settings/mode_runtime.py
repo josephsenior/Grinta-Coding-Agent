@@ -43,6 +43,28 @@ def rebuild_agent_toolset(agent: object, *, mode: str | None = None) -> None:
             logger.warning('Failed to rebuild toolset after mode change', exc_info=True)
 
 
+def apply_autonomy_to_controller(controller: object) -> None:
+    """Refresh agent tools after autonomy changes (security_risk schema)."""
+    agent = getattr(controller, 'agent', None)
+    if agent is None:
+        return
+    ac = getattr(controller, 'autonomy_controller', None)
+    if ac is not None:
+        from backend.core.autonomy import normalize_autonomy_level
+
+        level = normalize_autonomy_level(getattr(ac, 'autonomy_level', None))
+        running_config = getattr(agent, 'config', None)
+        if running_config is not None:
+            try:
+                running_config.autonomy_level = level
+            except Exception:
+                logger.debug(
+                    'Failed to mirror autonomy onto agent config',
+                    exc_info=True,
+                )
+    rebuild_agent_toolset(agent)
+
+
 def apply_interaction_mode_to_controller(controller: object, mode: str) -> None:
     """Propagate mode to agent config, toolset, and run-scoped extra_data."""
     agent = getattr(controller, 'agent', None)
@@ -80,6 +102,7 @@ def apply_agent_tool_flags_to_controller(
 
 __all__ = [
     'apply_agent_tool_flags_to_controller',
+    'apply_autonomy_to_controller',
     'apply_interaction_mode_to_controller',
     'rebuild_agent_toolset',
     'sync_active_run_mode_extra_data',

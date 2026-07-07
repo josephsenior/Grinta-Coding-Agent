@@ -221,6 +221,9 @@ class PermissionsConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     def get_preset(cls, autonomy_level: str) -> PermissionsConfig:
         """Get a preset permissions configuration for an autonomy level.
 
+        Schema/helper only — runtime does not apply these presets automatically.
+        Set permission flags explicitly in config when you need non-default behavior.
+
         Permission *flags* (sudo, force-push, system ops, branch deletion)
         are still tied to autonomy mode because they describe what the
         agent is allowed to do at all. Resource limits — ``max_cost_per_task``,

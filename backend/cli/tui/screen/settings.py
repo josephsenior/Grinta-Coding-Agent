@@ -82,17 +82,20 @@ class ScreenSettingsMixin:
             return
         if level != persisted:
             update_autonomy_level(level, agent_name)
-        controller = self._controller
-        if controller is not None:
-            ac = getattr(controller, 'autonomy_controller', None)
-            if ac is not None:
-                ac.autonomy_level = level
         agent_config = self._active_agent_config()
         if agent_config is not None:
             try:
                 agent_config.autonomy_level = level
             except Exception:
                 pass
+        controller = self._controller
+        if controller is not None:
+            ac = getattr(controller, 'autonomy_controller', None)
+            if ac is not None:
+                ac.autonomy_level = level
+            from backend.cli.settings.mode_runtime import apply_autonomy_to_controller
+
+            apply_autonomy_to_controller(controller)
         try:
             setattr(self._config, 'autonomy_level', level)
         except Exception:
@@ -108,7 +111,18 @@ class ScreenSettingsMixin:
         except Exception:
             pass
         if runtime != level or persisted != level:
-            self.notify(f'Autonomy: {level}', severity='information', timeout=2.0)
+            from backend.core.autonomy import autonomy_runtime_notice
+
+            self.notify(
+                autonomy_runtime_notice(level),
+                severity='information',
+                timeout=3.0,
+            )
+            renderer = self._renderer
+            if renderer is not None and hasattr(renderer, 'add_system_message'):
+                renderer.add_system_message(
+                    autonomy_runtime_notice(level), title='autonomy'
+                )
 
     def _apply_hud_reasoning_effort(self, effort_value: str) -> None:
         if getattr(self, '_hud_reasoning_syncing', False):

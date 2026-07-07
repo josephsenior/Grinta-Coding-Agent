@@ -5,6 +5,11 @@ from __future__ import annotations
 from enum import Enum
 
 
+_LEGACY_AUTONOMY_ALIASES: dict[str, str] = {
+    'supervised': 'conservative',
+}
+
+
 class AutonomyLevel(str, Enum):
     """Agent autonomy levels.
 
@@ -23,6 +28,15 @@ class AutonomyLevel(str, Enum):
     FULL = 'full'
 
 
+_VALID_AUTONOMY_LEVELS = frozenset(
+    {
+        AutonomyLevel.CONSERVATIVE.value,
+        AutonomyLevel.BALANCED.value,
+        AutonomyLevel.FULL.value,
+    }
+)
+
+
 def normalize_autonomy_level(level: object) -> str:
     """Return the stable string value for an autonomy level."""
     raw = getattr(level, 'value', level)
@@ -38,3 +52,30 @@ def security_risk_required_for_autonomy(level: object) -> bool:
     In full autonomy the label does not gate confirmation, so it is optional.
     """
     return normalize_autonomy_level(level) != AutonomyLevel.FULL.value
+
+
+def resolve_persisted_autonomy_level(raw: object) -> str:
+    """Normalize a settings value, applying legacy aliases when recognized."""
+    level = normalize_autonomy_level(raw)
+    return _LEGACY_AUTONOMY_ALIASES.get(level, level)
+
+
+def autonomy_runtime_notice(level: object) -> str:
+    """Short user-facing note after an autonomy change."""
+    normalized = normalize_autonomy_level(level)
+    risk_note = (
+        'security_risk is optional on shell and file-write tools.'
+        if normalized == AutonomyLevel.FULL.value
+        else 'security_risk is required on shell and file-write tools.'
+    )
+    if normalized == AutonomyLevel.FULL.value:
+        return f'Autonomy set to full: no confirmation prompts; {risk_note}'
+    if normalized == AutonomyLevel.CONSERVATIVE.value:
+        return (
+            'Autonomy set to conservative: confirmation before shell, edits, '
+            f'terminal, browser, MCP, and delegation actions; {risk_note}'
+        )
+    return (
+        'Autonomy set to balanced: confirmation for high-risk actions only; '
+        f'{risk_note}'
+    )

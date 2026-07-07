@@ -2,11 +2,11 @@
 
 > **Not a product spec.** This memoir is historical narrative. For current install, settings, modes, and CLI behavior use [USER_GUIDE.md](../USER_GUIDE.md), [SETTINGS.md](../SETTINGS.md), and [ARCHITECTURE.md](../ARCHITECTURE.md). Do not configure Grinta from journey chapters.
 
-**An 8-month journey from multi-tenant SaaS to a coherent local-first coding agent.**
+**A 10-month journey from multi-tenant SaaS to a coherent local-first coding agent.**
 
 By Youssef Mejdi, AI Engineering Student, 4th Year
 
-**Inventory note:** Chapter-specific counts (services, tools, heuristics, compactors, and similar) and file paths are snapshots unless a chapter says otherwise. Chapters through **[45](45-the-product-surface-became-real.md)** track the productization arc around **[v1.0.0-rc1](../RELEASE_NOTES_v1.0.0-rc1.md)**; **[46](46-the-decomposition-wave.md)** and later updates track the 8.1 → 9.0 decomposition wave. For current behavior, prefer **[Architecture](../ARCHITECTURE.md)**, **[REFACTOR_BASELINE](../REFACTOR_BASELINE.md)**, and the source under `backend/`.
+**Inventory note:** Chapter-specific counts (services, tools, heuristics, compactors, and similar) and file paths are snapshots unless a chapter says otherwise. Chapters through **[45](45-the-product-surface-became-real.md)** track the productization arc around **[v1.0.0-rc1](../RELEASE_NOTES_v1.0.0-rc1.md)**; **[46](46-the-decomposition-wave.md)** and later updates track the 8.1 → 9.0 decomposition wave. Post-rc1 work renamed the model-facing file API (`read` → `read_file`, `create` → `create_file`, `edit_symbol` removed in favor of `replace_string`, new `read_symbol` and `undo_last_edit` tools) and folded document parsers into the base install — chapters written before that wave still use the earlier names. For current behavior, prefer **[Architecture](../ARCHITECTURE.md)**, **[REFACTOR_BASELINE](../REFACTOR_BASELINE.md)**, the **[CHANGELOG](../../CHANGELOG.md)**, and the source under `backend/`.
 
 ---
 
@@ -38,7 +38,7 @@ What survived was the engine: a single, focused agent that plans, implements, te
 
 ## The Arc
 
-Eight months. Several distinct phases. One principle.
+Ten months. Several distinct phases. One principle.
 
 **Month 1 (September 2025):** Research. I spent the entire first month not writing code. I studied tech stacks, architectures, agent behaviors, terminal multiplexing, event sourcing patterns, and the design decisions of every major coding agent I could find — Claude Code, OpenHands, SWE-Agent, Devin, Aider, LangChain. I mapped out what they did well, where they cut corners, and where the gaps were. I learned how OpenHands treats sessions as durable event streams. I analyzed how SWE-Agent makes tool design the center of agent behavior. This month produced no code, but it produced the design convictions that survived every pivot.
 
@@ -50,7 +50,7 @@ Eight months. Several distinct phases. One principle.
 
 **Month 7 (March–April 2026):** The Refinement. Decomposing monoliths into focused modules, pushing orchestration responsibilities into clearer service boundaries, and consolidating the context subsystem after a wave of exploratory variants. Hardening the local security profile. Building the CLI with tab completion, fuzzy command matching, slash commands, and an animated ASCII splash screen. Writing this document. Alongside that work, the terminal story grew a deliberate second layer: a native, OS-agnostic PTY path for **opt-in** interactive shells (no Docker required), sitting next to the original batch/tmux model instead of replacing it — because growing means adding truth, not erasing the chapter you already wrote about the console wars.
 
-**Current Phase (May–June 2026 onward):** Productization, then legibility at scale. The architecture was always serious; the interface caught up first (mode split — Chat, Plan, Agent; autonomy as one honest knob; Textual TUI as operational cockpit; piped stdin on a non-interactive path; six intent-oriented file tools; curated MCP; launch hardening against namespace collisions; Raft/RFT empty-folder receipts). Then the **decomposition wave** landed: CLI/TUI monoliths split into `event_rendering/`, `tui/renderer/handlers/`, `settings/`, `session/`, `display/`, and mirrored tests; backend facades for context, ledger, inference, execution, and orchestration; file-size advisory and phase-based reliability gates; vocabulary locked in ADR-016 before the next rename sweep; MCP tool catalogs moved to per-turn addenda for prompt-cache hygiene; `sandboxed_local` as a third execution profile beside `standard` and `hardened_local`; stuck detection narrowed to provable hard signals while soft heuristics feed telemetry only. In parallel, the context layer gained a dedicated `ContextBudget` estimator for precise post-compaction token pressure and autocompact thresholds; the terminal path matured with a full native PTY session manager supporting interactive shells, debugger mixins, and exploration handlers; task tracking gained workspace-state path validation and tighter integration with the ledger; and rendering became fully mixin-driven for terminal, live display, and event observation. These refinements deepen the product surface without erasing any prior chapter. The project is not finished, but it is no longer just an engine — it is a coherent product strangers can navigate.
+**Current Phase (May–July 2026):** Productization, legibility at scale, and then the cleanup wave that sharpened everything the decomposition left behind. The architecture was always serious; the interface caught up first (mode split — Chat, Plan, Agent; autonomy as one honest knob; Textual TUI as operational cockpit; piped stdin on a non-interactive path; curated MCP; launch hardening against namespace collisions; Raft/RFT empty-folder receipts). Then the **decomposition wave** landed: CLI/TUI monoliths split into `event_rendering/`, `tui/renderer/handlers/`, `settings/`, `session/`, `display/`, and mirrored tests; backend facades for context, ledger, inference, execution, and orchestration; file-size advisory and phase-based reliability gates; vocabulary locked in ADR-016 before the next rename sweep; MCP tool catalogs moved to per-turn addenda for prompt-cache hygiene; `sandboxed_local` as a third execution profile beside `standard` and `hardened_local`; stuck detection narrowed to provable hard signals while soft heuristics feed telemetry only. In parallel, the context layer gained a dedicated `ContextBudget` estimator for precise post-compaction token pressure and autocompact thresholds; the terminal path matured with a full native PTY session manager supporting interactive shells, debugger mixins, and exploration handlers; task tracking gained workspace-state path validation and tighter integration with the ledger; and rendering became fully mixin-driven for terminal, live display, and event observation. After the decomposition settled, a **file-API cleanup wave** simplified the model-facing editing surface: `read` became `read_file`, `create` became `create_file`, `edit_symbol` was removed entirely (the model was not using it confidently — `replace_string` covers the same ground with a simpler schema), a new `read_symbol` tool restored targeted symbol reads, and `undo_last_edit` completed the rollback story — bringing the public file API to seven tools: `read_file`, `read_symbol`, `find_symbols`, `create_file`, `replace_string`, `multiedit`, `undo_last_edit`. Alongside that, PDF/DOCX/PPTX/LaTeX parsers moved from the `[documents]` optional extra into the base install (44 required packages now), `debugpy` was unbundled from the base wheel to match how other DAP adapters work, the `supervised` autonomy spelling was retired in favor of `conservative`, ADR-017 codified a non-code document edit protocol, CI gates expanded to run the full unit test corpus on both Linux and Windows, and OSS governance docs landed (`GOVERNANCE.md`, `MAINTAINERS.md`, `SUPPORT_MATRIX.md`, `THIRD_PARTY_NOTICES.md`). These refinements deepen the product surface without erasing any prior chapter. The project is not finished, but it is no longer just an engine — it is a coherent product strangers can navigate.
 
 ---
 
@@ -134,13 +134,15 @@ Chapter 07 was written earlier in the repo's life, but it now reads best as the 
 
 ### Short reading paths
 
-If you will not read linearly, three curated arcs:
+If you will not read linearly, five curated arcs:
 
 - **Reliability and proof:** [18 · Surviving the Crash](19-surviving-the-crash.md) → [19 · Circuit Breakers](20-circuit-breakers-and-hallucinations.md) → [20 · Safety Sandbox](21-the-safety-sandbox-is-not-optional.md) → [21 · Who Grades the Agent](22-who-grades-the-agent.md) → [22 · Middleware Contract](23-the-middleware-contract.md).
 - **Pivot and subtraction:** [02 · Killed Darlings](02-the-killed-darlings.md) → [12 · Open Source Was the Better Business](12-open-source-was-the-better-business.md) (the multi-agent committee material now lives inside chapter 02).
 - **Terminal and execution:** [11 · Console Wars](11-the-console-wars.md) → [28 · Two Lives of the Terminal](32-the-two-lives-of-the-terminal.md) → [29 · Small Async Wars](33-the-small-async-wars.md) → [30 · Fuzzy Match Heresy](34-the-fuzzy-match-heresy.md).
 - **Memory and retrieval:** [04 · Context War](04-the-context-war.md) → [17 · Mind of the Agent](18-the-mind-of-the-agent.md) → [39 · Semantic Memory That Survived](39-the-semantic-memory-that-survived.md).
 - **Productization and maintainability:** [45 · Product Surface](45-the-product-surface-became-real.md) → [46 · Decomposition Wave](46-the-decomposition-wave.md) → [07 · Road Ahead](07-the-road-ahead.md).
+
+> **Tool-name note for chapters 05, 06, 34, 35, 40, 43, and 45:** These chapters reference the earlier file-API surface (`read`, `create`, `edit_symbol`, six tools). The post-rc1 cleanup renamed `read` → `read_file`, `create` → `create_file`, removed `edit_symbol`, and added `read_symbol` and `undo_last_edit` — bringing the public API to seven tools. The chapters remain historically accurate; the [CHANGELOG](../../CHANGELOG.md) tracks the current names.
 
 ### Reference companion
 
@@ -154,10 +156,11 @@ Use these when a chapter names a subsystem and you want current behavior in pros
 | Terms and symbols | [Vocabulary](../VOCABULARY.md) |
 | Security posture | [Security checklist](../SECURITY_CHECKLIST.md), [Reliability](../RELIABILITY.md) |
 | Memory and RAG stack | [39 · Semantic Memory That Survived](39-the-semantic-memory-that-survived.md); implementation under `backend/context/` |
-| Tool design and the editing facade | [40 · The Facade Pattern and the Smaller File API](40-the-facade-pattern-and-the-smaller-file-api.md); implementation under `backend/engine/tools/` |
+| Tool design and the editing facade | [40 · The Facade Pattern and the Smaller File API](40-the-facade-pattern-and-the-smaller-file-api.md) (historical names); current API in [CHANGELOG](../../CHANGELOG.md); implementation under `backend/engine/tools/` |
 | CLI/TUI module layout and size budget | [CLI Module Map](../CLI_MODULE_MAP.md), [46 · Decomposition Wave](46-the-decomposition-wave.md) |
 | Refactor metrics and phase receipts | [Refactor Baseline](../REFACTOR_BASELINE.md) |
 | Canonical terminology | [Vocabulary](../VOCABULARY.md), [ADR-016](../ADR.md#adr-016-grinta-vocabulary-contract) |
+| Non-code document edits | [ADR-017](../ADR.md#adr-017-non-code-document-edit-protocol) |
 | Security execution profiles | [36 · Required Risk](36-the-required-risk.md), [33 · Small Async Wars](33-the-small-async-wars.md) (`sandboxed_local`), [Security checklist](../SECURITY_CHECKLIST.md) |
 
 ---
@@ -170,7 +173,7 @@ Use these when a chapter names a subsystem and you want current behavior in pros
 
 ## Learning First, Business Second
 
-The business experiment was important, but my primary goal through these seven months was learning.
+The business experiment was important, but my primary goal through these ten months was learning.
 
 I wanted to learn how to build reliable autonomous systems end-to-end: architecture, validation, tool design, cross-platform execution, cost discipline, and recovery after failure.
 

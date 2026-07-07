@@ -493,6 +493,15 @@ def _apply_json_agent_override(
     cfg: AppConfig, agent_name: str, filtered: dict[str, object], json_file: str
 ) -> None:
     try:
+        if 'autonomy_level' in filtered:
+            from backend.core.autonomy import resolve_persisted_autonomy_level
+
+            filtered = {
+                **filtered,
+                'autonomy_level': resolve_persisted_autonomy_level(
+                    filtered['autonomy_level']
+                ),
+            }
         agent_base = cfg.get_agent_config(agent_name)
         merged = {**agent_base.model_dump(), **filtered}
         agent_configs: dict[str, AgentConfig] = cfg.agents
@@ -522,7 +531,12 @@ def _apply_json_agent_overrides(
         _apply_json_agent_override(cfg, agent_name, filtered, json_file)
 
 
-def _apply_json_security_config(cfg: AppConfig, data: dict[str, object]) -> None:
+def _apply_json_security_config(
+    cfg: AppConfig,
+    data: dict[str, object],
+    *,
+    summary: ConfigLoadSummary | None = None,
+) -> None:
     security = data.get('security')
     if not isinstance(security, dict):
         return
@@ -534,7 +548,12 @@ def _apply_json_security_config(cfg: AppConfig, data: dict[str, object]) -> None
         merged = {**cfg.security.model_dump(), **filtered}
         cfg.security = SecurityConfig.model_validate(merged)
     except Exception as exc:
-        logger.app_logger.warning('Skipping invalid security config overrides: %s', exc)
+        detail = str(exc).strip() or repr(exc)
+        logger.app_logger.warning(
+            'Skipping invalid security config overrides: %s', exc
+        )
+        if summary is not None:
+            summary.record('security', 'invalid', detail)
 
 
 # ---------------------------------------------------------------------------
@@ -575,7 +594,7 @@ def load_from_json(cfg: AppConfig, json_file: str = 'settings.json') -> None:
         _apply_json_mcp_servers(cfg, data)
         _apply_json_agent_overrides(cfg, data, json_file)
         _apply_json_tool_integration_config(cfg, data)
-        _apply_json_security_config(cfg, data)
+        _apply_json_security_config(cfg, data, summary=summary)
 
     finally:
         summary.emit()

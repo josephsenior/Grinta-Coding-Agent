@@ -882,8 +882,38 @@ class TestLoadFromJson:
         assert 'ignore_unknown' not in cfg.agents
         mock_warn.assert_called()
 
+    def test_load_from_json_invalid_execution_profile_keeps_defaults(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        json_file = tmp_path / 'settings.json'
+        json_file.write_text(
+            json.dumps({'security': {'execution_profile': 'ultra_hardened'}})
+        )
+        cfg = AppConfig()
+        cfg.security.execution_profile = 'standard'
+        monkeypatch.setenv('APP_STRICT_CONFIG', 'true')
 
-# â”€â”€ Agent Registration Extra â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        with pytest.raises(ValueError, match='Strict config mode'):
+            load_from_json(cfg, str(json_file))
+
+        assert cfg.security.execution_profile == 'standard'
+
+    def test_load_from_json_migrates_supervised_autonomy_level(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        json_file = tmp_path / 'settings.json'
+        json_file.write_text(
+            json.dumps({'agent': {'agent': {'autonomy_level': 'supervised'}}})
+        )
+        cfg = AppConfig()
+        monkeypatch.delenv('APP_STRICT_CONFIG', raising=False)
+
+        load_from_json(cfg, str(json_file))
+
+        assert cfg.get_agent_config('agent').autonomy_level == 'conservative'
+
+
+# ── Agent Registration Extra ──
 
 
 class TestAgentRegistrationExtra:

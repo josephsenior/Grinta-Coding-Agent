@@ -73,7 +73,7 @@ You can still extract patterns:
 
 ### 4. The business goal was real, but the primary goal was learning
 
-This project was built in the margins: between classes, during exams, and often at the cost of sleep. I did chase the SaaS path for a while, but my primary goal across these seven months was learning: how to build autonomous systems that survive real usage, not demo usage.
+This project was built in the margins: between classes, during exams, and often at the cost of sleep. I did chase the SaaS path for a while, but my primary goal across these ten months was learning: how to build autonomous systems that survive real usage, not demo usage.
 
 I wanted to learn:
 
@@ -83,7 +83,7 @@ I wanted to learn:
 - how to evaluate trade-offs between cost, speed, and correctness
 - how to recover after bad decisions, dead ends, and full rewrites
 
-What I learned over seven months is simple and hard at the same time:
+What I learned over ten months is simple and hard at the same time:
 
 - reliability is mostly deterministic engineering wrapped around non-deterministic models
 - deleting impressive features is often a higher-skill move than shipping them

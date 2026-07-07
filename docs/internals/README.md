@@ -24,6 +24,12 @@ The architecture note for the confirmation-state ownership fix. It records why
 orchestration is the only layer allowed to set `AWAITING_CONFIRMATION`, and why
 runtime execution only reads that state or blocks unsafe actions.
 
+## `mode-switching.md`
+
+Maps switch entry points, sync functions, and enforcement layers for
+interaction mode (`chat`/`plan`/`agent`), autonomy (`conservative`/`balanced`/`full`),
+and execution profile (`standard`/`hardened_local`/`sandboxed_local`).
+
 ### How to regenerate
 
 ```bash

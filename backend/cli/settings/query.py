@@ -225,6 +225,10 @@ def sync_persisted_autonomy_to_controller(
                 exc_info=True,
             )
 
+    from backend.cli.settings.mode_runtime import apply_autonomy_to_controller
+
+    apply_autonomy_to_controller(controller)
+
     try:
         from backend.core.logging.session_event_logger import (
             emit_session_context_if_changed,
@@ -289,7 +293,12 @@ def sync_persisted_interaction_mode_to_controller(
 
 def get_persisted_autonomy_level(agent_name: str | None = None) -> str:
     """Return the user-configured autonomy level from settings.json (empty = default)."""
-    from backend.core.autonomy import normalize_autonomy_level
+    from backend.core.autonomy import (
+        _LEGACY_AUTONOMY_ALIASES,
+        _VALID_AUTONOMY_LEVELS,
+        normalize_autonomy_level,
+        resolve_persisted_autonomy_level,
+    )
     from backend.core.constants import DEFAULT_AGENT_NAME
 
     agent_section = _load_raw_settings().get('agent')
@@ -315,19 +324,30 @@ def get_persisted_autonomy_level(agent_name: str | None = None) -> str:
         entry = agent_section.get(name)
         if not isinstance(entry, dict):
             continue
-        level = normalize_autonomy_level(entry.get('autonomy_level'))
-        if level in {'conservative', 'balanced', 'full'}:
+        raw = entry.get('autonomy_level')
+        if (
+            isinstance(raw, str)
+            and normalize_autonomy_level(raw) in _LEGACY_AUTONOMY_ALIASES
+        ):
+            migrated = resolve_persisted_autonomy_level(raw)
+            update_autonomy_level(migrated, name)
+            return migrated
+        level = resolve_persisted_autonomy_level(raw)
+        if level in _VALID_AUTONOMY_LEVELS:
             return level
     return ''
 
 
 def update_autonomy_level(level: str, agent_name: str | None = None) -> None:
     """Persist autonomy level without touching other agent fields."""
-    from backend.core.autonomy import normalize_autonomy_level
+    from backend.core.autonomy import (
+        _VALID_AUTONOMY_LEVELS,
+        resolve_persisted_autonomy_level,
+    )
     from backend.core.constants import DEFAULT_AGENT_NAME
 
-    normalized = normalize_autonomy_level(level)
-    if normalized not in {'conservative', 'balanced', 'full'}:
+    normalized = resolve_persisted_autonomy_level(level)
+    if normalized not in _VALID_AUTONOMY_LEVELS:
         return
 
     target_agent = (agent_name or DEFAULT_AGENT_NAME).strip() or DEFAULT_AGENT_NAME

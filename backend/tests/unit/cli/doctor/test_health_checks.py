@@ -11,7 +11,9 @@ from backend.cli.doctor.checks import (
 def test_collect_health_checks_returns_fast_subset() -> None:
     checks = collect_health_checks()
     names = {check.name for check in checks}
-    assert {'debugpy', 'git', 'rg', 'llm'}.issubset(names)
+    assert {'debugpy', 'git', 'rg', 'llm', 'security_values', 'execution'}.issubset(
+        names
+    )
 
 
 def test_collect_health_checks_uses_model_hint() -> None:

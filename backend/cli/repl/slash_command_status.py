@@ -166,6 +166,9 @@ def cmd_health(host: Any, parsed: Any) -> bool:
     checks = collect_health_checks(model_hint=model_hint)
     lines = format_health_report_lines(checks)
     lines.append('  For a fuller report, run `grinta doctor` outside the session.')
+    lines.append(
+        '  execution_profile changes in settings.json require a session restart.'
+    )
 
     if host._renderer is not None:
         host._renderer.add_system_message('\n'.join(lines), title='health')
@@ -212,6 +215,8 @@ def _host_active_agent_name(host: Any) -> str:
 
 def apply_autonomy_level(host: Any, new_level: str) -> None:
     from backend.cli.settings import get_persisted_autonomy_level, update_autonomy_level
+    from backend.cli.settings.mode_runtime import apply_autonomy_to_controller
+    from backend.core.autonomy import autonomy_runtime_notice
 
     agent_name = _host_active_agent_name(host)
     persisted = get_persisted_autonomy_level(agent_name)
@@ -231,6 +236,8 @@ def apply_autonomy_level(host: Any, new_level: str) -> None:
     if new_level != persisted:
         update_autonomy_level(new_level, agent_name)
 
+    notice = autonomy_runtime_notice(new_level)
+
     if controller is not None and ac is not None:
         ac.autonomy_level = new_level
         config = getattr(host, '_config', None)
@@ -241,17 +248,24 @@ def apply_autonomy_level(host: Any, new_level: str) -> None:
                 setattr(config, 'autonomy_level', new_level)
             except Exception:
                 pass
+        apply_autonomy_to_controller(controller)
+        try:
+            from backend.core.logging.session_event_logger import (
+                emit_session_context_if_changed,
+            )
+
+            emit_session_context_if_changed()
+        except Exception:
+            pass
         hud = getattr(host, '_hud', None)
         if hud is not None and hasattr(hud, 'update_autonomy'):
             hud.update_autonomy(new_level)
         if host._renderer is not None:
-            host._renderer.add_system_message(
-                f'Autonomy set to: {new_level}', title='autonomy'
-            )
+            host._renderer.add_system_message(notice, title='autonomy')
         return
     if host._renderer is not None:
         host._renderer.add_system_message(
-            f'Autonomy set to: {new_level} (saved; applies on next session)',
+            f'{notice} (saved; applies on next session)',
             title='autonomy',
         )
 
