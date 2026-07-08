@@ -1487,17 +1487,17 @@ def test_response_to_actions_gates_conversational_plain_message(monkeypatch):
 def test_response_to_actions_allows_structured_non_runnable_action(monkeypatch):
     from backend.engine import executor as executor_module
     from backend.engine.executor import OrchestratorExecutor
-    from backend.ledger.action import ProposalAction
+    from backend.ledger.action import MessageAction
 
-    proposal = ProposalAction(
-        options=[{'approach': 'Direct answer', 'pros': [], 'cons': []}],
-        rationale='Prepared options for the user.',
+    waiting_message = MessageAction(
+        content='Option A or Option B — which do you prefer?',
+        wait_for_response=True,
     )
 
     monkeypatch.setattr(
         executor_module.orchestrator_function_calling,
         'response_to_actions',
-        lambda *args, **kwargs: [proposal],
+        lambda *args, **kwargs: [waiting_message],
     )
 
     executor = OrchestratorExecutor(
@@ -1519,7 +1519,7 @@ def test_response_to_actions_allows_structured_non_runnable_action(monkeypatch):
 
     actions = executor._response_to_actions(response)
 
-    assert actions == [proposal]
+    assert actions == [waiting_message]
 
 
 def test_response_to_actions_converts_core_tool_call_validation_error_to_recoverable_action(

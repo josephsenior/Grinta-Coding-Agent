@@ -198,7 +198,6 @@ def _render_critical(
     tracker_on: bool,
     criteria_on: bool = True,
     checkpoints_on: bool,
-    meta_cognition_on: bool,
     mode: str = 'agent',
 ) -> str:
     return _render_critical_impl(
@@ -208,7 +207,6 @@ def _render_critical(
         tracker_on=tracker_on,
         criteria_on=criteria_on,
         checkpoints_on=checkpoints_on,
-        meta_cognition_on=meta_cognition_on,
         mode=mode,
     )
 
@@ -219,7 +217,6 @@ def _render_examples(
     tracker_on: bool,
     criteria_on: bool = True,
     working_memory_on: bool,
-    meta_cognition_on: bool,
     lsp_available: bool,
     checkpoints_on: bool,
     web_on: bool = True,
@@ -230,7 +227,6 @@ def _render_examples(
         tracker_on=tracker_on,
         criteria_on=criteria_on,
         working_memory_on=working_memory_on,
-        meta_cognition_on=meta_cognition_on,
         lsp_available=lsp_available,
         checkpoints_on=checkpoints_on,
         web_on=web_on,
@@ -563,9 +559,6 @@ def _collect_system_prompt_sections(
                     working_memory_on=bool(
                         getattr(config, 'enable_working_memory', True)
                     ),
-                    meta_cognition_on=bool(
-                        getattr(config, 'enable_meta_cognition', False)
-                    ),
                     lsp_available=lsp_available,
                     checkpoints_on=bool(getattr(config, 'enable_checkpoints', True)),
                     web_on=bool(getattr(config, 'enable_web', True)),
@@ -586,7 +579,6 @@ def _collect_system_prompt_sections(
                     getattr(config, 'enable_acceptance_criteria_tool', True)
                 ),
                 checkpoints_on=bool(getattr(config, 'enable_checkpoints', True)),
-                meta_cognition_on=bool(getattr(config, 'enable_meta_cognition', False)),
                 mode=mode,
             ),
         ),

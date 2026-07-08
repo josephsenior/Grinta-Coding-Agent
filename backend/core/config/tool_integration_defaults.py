@@ -4,8 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
-# Agent-block keys replaced by ``lsp_config`` / ``dap_config`` in settings.json.
-LEGACY_AGENT_TOOL_KEYS = frozenset({'enable_lsp_query', 'enable_debugger'})
+# Agent-block keys must not appear in settings.json; use top-level lsp_config/dap_config.
+DEPRECATED_AGENT_SETTINGS_KEYS = frozenset({
+    'enable_lsp_query',
+    'enable_debugger',
+    'enable_meta_cognition',
+})
 
 
 def default_lsp_config() -> dict[str, Any]:
@@ -18,21 +22,8 @@ def default_dap_config() -> dict[str, Any]:
     return {'enabled': False}
 
 
-def strip_legacy_agent_tool_keys(settings: dict[str, Any]) -> None:
-    """Remove deprecated LSP/DAP agent keys from a settings payload in place."""
-    agent_section = settings.get('agent')
-    if not isinstance(agent_section, dict):
-        return
-    for agent_entry in agent_section.values():
-        if not isinstance(agent_entry, dict):
-            continue
-        for key in LEGACY_AGENT_TOOL_KEYS:
-            agent_entry.pop(key, None)
-
-
 __all__ = [
-    'LEGACY_AGENT_TOOL_KEYS',
+    'DEPRECATED_AGENT_SETTINGS_KEYS',
     'default_dap_config',
     'default_lsp_config',
-    'strip_legacy_agent_tool_keys',
 ]

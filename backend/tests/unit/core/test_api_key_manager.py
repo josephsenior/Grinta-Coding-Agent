@@ -137,25 +137,6 @@ class TestCheckPrefixMatch:
 
 
 # ===================================================================
-# _check_keyword_match
-# ===================================================================
-
-
-class TestCheckKeywordMatch:
-    def setup_method(self):
-        self.mgr = APIKeyManager()
-
-    def test_gemini_keyword(self):
-        assert self.mgr._check_keyword_match('some-gemini-model') is None
-
-    def test_grok_keyword(self):
-        assert self.mgr._check_keyword_match('some-grok-model') is None
-
-    def test_no_keyword_match(self):
-        assert self.mgr._check_keyword_match('mistral-large-2') is None
-
-
-# ===================================================================
 # get_api_key_for_model
 # ===================================================================
 
@@ -555,10 +536,6 @@ class TestApiKeyManagerInternals:
             pass
 
         assert mgr.suppress_env_export is False
-
-    def test_check_fallback_patterns_returns_unknown(self):
-        mgr = APIKeyManager()
-        assert mgr._check_fallback_patterns('anything') == 'unknown'
 
     def test_extract_provider_delegates_to_private_helper(self):
         mgr = APIKeyManager()

@@ -20,14 +20,6 @@ from backend.ledger.action import (
     Action,
     ChangeAgentStateAction,
 )
-from backend.ledger.action.agent import (
-    ClarificationRequestAction,
-    ConfirmRequestAction,
-    EscalateToHumanAction,
-    InformAction,
-    ProposalAction,
-    UncertaintyAction,
-)
 
 if TYPE_CHECKING:
     from backend.orchestration.services.event_router_service import EventRouterService
@@ -66,20 +58,6 @@ class _EventRouterStateMixin(EventRouterService if TYPE_CHECKING else object):
     async def _run_critics(self) -> None:
         """Retained lifecycle hook after finish; review critics were removed."""
         return
-
-    @staticmethod
-    def _is_meta_cognition_action(action: Action) -> bool:
-        return isinstance(
-            action,
-            (
-                ClarificationRequestAction,
-                ConfirmRequestAction,
-                InformAction,
-                ProposalAction,
-                UncertaintyAction,
-                EscalateToHumanAction,
-            ),
-        )
 
     def _task_tracker_has_unfinished_tasks(self) -> bool:
         state = getattr(self._ctrl, 'state', None)

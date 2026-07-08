@@ -167,58 +167,6 @@ def check_llm_config(*, model_hint: str | None = None) -> DoctorCheck:
     return DoctorCheck('llm', True, f'provider={provider} model={model} key=resolved')
 
 
-def check_legacy_autonomy_alias() -> DoctorCheck:
-    """Warn when settings.json still uses retired autonomy spellings."""
-    from backend.core.app_paths import get_canonical_settings_path
-    from backend.core.autonomy import normalize_autonomy_level
-    from backend.core.constants import DEFAULT_AGENT_NAME
-
-    path = Path(get_canonical_settings_path())
-    if not path.is_file():
-        return DoctorCheck(
-            'autonomy_alias', True, 'settings.json not found', critical=False
-        )
-
-    try:
-        raw = json.loads(path.read_text(encoding='utf-8'))
-    except Exception as exc:
-        return DoctorCheck(
-            'autonomy_alias', False, f'parse failed: {exc}', critical=False
-        )
-
-    agent_section = raw.get('agent')
-    if not isinstance(agent_section, dict):
-        return DoctorCheck('autonomy_alias', True, 'no agent section', critical=False)
-
-    legacy_hits: list[str] = []
-    for name, entry in agent_section.items():
-        if not isinstance(entry, dict):
-            continue
-        raw_level = entry.get('autonomy_level')
-        if not isinstance(raw_level, str):
-            continue
-        if normalize_autonomy_level(raw_level) == 'supervised':
-            legacy_hits.append(str(name))
-
-    if legacy_hits:
-        agents = ', '.join(sorted(legacy_hits))
-        return DoctorCheck(
-            'autonomy_alias',
-            False,
-            f"legacy autonomy_level 'supervised' for {agents}; use 'conservative'",
-            critical=False,
-        )
-    from backend.cli.settings.query import get_persisted_autonomy_level
-
-    effective = get_persisted_autonomy_level(DEFAULT_AGENT_NAME)
-    return DoctorCheck(
-        'autonomy_alias',
-        True,
-        f"no legacy aliases (effective={effective or 'default'})",
-        critical=False,
-    )
-
-
 def check_security_settings_values() -> DoctorCheck:
     """Validate raw security.execution_profile before config merge."""
     from backend.core.app_paths import get_canonical_settings_path
@@ -554,7 +502,6 @@ def collect_doctor_checks(*, verbose: bool = False) -> list[DoctorCheck]:
         check_platform(),
         check_settings_file(),
         check_settings_schema(),
-        check_legacy_autonomy_alias(),
         check_security_settings_values(),
         check_llm_config(),
         check_execution_profile(),
@@ -604,7 +551,6 @@ __all__ = [
     'check_debugpy',
     'check_editing_stack',
     'check_execution_profile',
-    'check_legacy_autonomy_alias',
     'check_llm_config',
     'check_optional_imports',
     'check_platform',

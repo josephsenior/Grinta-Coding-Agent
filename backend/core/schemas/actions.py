@@ -378,80 +378,6 @@ class AgentThinkActionSchema(ActionSchemaV1):
     runnable: bool = Field(False, frozen=True)
 
 
-class ClarificationRequestActionSchema(ActionSchemaV1):
-    """Schema for ClarificationRequestAction.
-
-    An action where the agent asks for clarification before proceeding.
-    This enables the LLM to proactively request clarification rather than
-    making assumptions that may lead to errors.
-    """
-
-    action_type: Literal['clarification'] = Field(
-        ActionType.CLARIFICATION.value, frozen=True
-    )
-    runnable: bool = Field(False, frozen=True)
-    question: str = Field(..., description='The clarification question')
-    options: list[str] = Field(
-        default_factory=list, description='Optional multiple choice options'
-    )
-    context: str = Field(default='', description='Why clarification is needed')
-
-
-class ConfirmRequestActionSchema(ActionSchemaV1):
-    """Schema for ConfirmRequestAction.
-
-    An action where the agent requires explicit user OK before a risky step.
-    Used for destructive or irreversible actions. The orchestrator pauses
-    until the user picks one of the two options; on timeout the default_index
-    is selected (1 = deny, the safe choice).
-    """
-
-    action_type: Literal['confirm'] = Field(ActionType.CONFIRM.value, frozen=True)
-    runnable: bool = Field(False, frozen=True)
-    question: str = Field(..., description='The confirm question')
-    options: list[str] = Field(
-        default_factory=list,
-        description='Exactly two options: positive then negative',
-    )
-    default_index: int = Field(
-        default=1,
-        description='0=auto-confirm on timeout, 1=auto-deny (safe default)',
-    )
-    context: str = Field(default='', description='Why confirmation is needed')
-
-
-class InformActionSchema(ActionSchemaV1):
-    """Schema for InformAction.
-
-    A non-blocking status update from the agent. The orchestrator does NOT
-    pause; the user sees the message in the transcript and the agent continues.
-    """
-
-    action_type: Literal['inform'] = Field(ActionType.INFORM.value, frozen=True)
-    runnable: bool = Field(False, frozen=True)
-    text: str = Field(..., description='The status update to share')
-    context: str = Field(default='', description='Optional background')
-
-
-class EscalateToHumanActionSchema(ActionSchemaV1):
-    """Schema for EscalateToHumanAction.
-
-    An action where the agent requests escalation to human assistance.
-    This enables the LLM to explicitly request help when it's stuck,
-    has tried multiple approaches without success, or needs human intervention.
-    """
-
-    action_type: Literal['escalate'] = Field(ActionType.ESCALATE.value, frozen=True)
-    runnable: bool = Field(False, frozen=True)
-    reason: str = Field(..., description='Why escalation is being requested')
-    attempts_made: list[str] = Field(
-        default_factory=list, description='Summary of approaches already tried'
-    )
-    specific_help_needed: str = Field(
-        default='', description='What kind of help is needed'
-    )
-
-
 class MCPActionSchema(ActionSchemaV1):
     """Schema for MCPAction.
 
@@ -463,25 +389,6 @@ class MCPActionSchema(ActionSchemaV1):
     name: str = Field(..., description='Name of the MCP tool to call')
     arguments: dict[str, Any] = Field(
         default_factory=dict, description='Arguments to pass to the tool'
-    )
-
-
-class ProposalActionSchema(ActionSchemaV1):
-    """Schema for ProposalAction.
-
-    An action where the agent proposes options before committing to a path.
-    This enables the LLM to suggest different approaches and get user feedback
-    before executing potentially risky or irreversible actions.
-    """
-
-    action_type: Literal['proposal'] = Field(ActionType.PROPOSAL.value, frozen=True)
-    runnable: bool = Field(False, frozen=True)
-    options: list[dict[str, Any]] = Field(
-        default_factory=list, description='List of proposed options'
-    )
-    recommended: int = Field(default=0, description='Index of the recommended option')
-    rationale: str = Field(
-        default='', description='Why these options are being proposed'
     )
 
 
@@ -561,29 +468,6 @@ class TaskTrackingActionSchema(ActionSchemaV1):
     command: str = Field(default='view', description='Task tracking command')
     task_list: list[dict[str, Any]] = Field(
         default_factory=list, description='List of task items'
-    )
-
-
-class UncertaintyActionSchema(ActionSchemaV1):
-    """Schema for UncertaintyAction.
-
-    An action where the agent expresses uncertainty about its current understanding or observations.
-    This enables the LLM to explicitly flag doubt rather than guessing or hallucinating.
-    The system can then provide clarification, additional context, or switch strategy.
-    """
-
-    action_type: Literal['uncertainty'] = Field(
-        ActionType.UNCERTAINTY.value, frozen=True
-    )
-    runnable: bool = Field(False, frozen=True)
-    uncertainty_level: float = Field(
-        default=0.5, description='Confidence level 0.0-1.0'
-    )
-    specific_concerns: list[str] = Field(
-        default_factory=list, description='Specific things the agent is uncertain about'
-    )
-    requested_information: str = Field(
-        default='', description='What information would help resolve uncertainty'
     )
 
 
@@ -667,17 +551,11 @@ ActionSchemaUnion = (
     | TerminalCloseActionSchema
     | DebuggerActionSchema
     | AgentThinkActionSchema
-    | ClarificationRequestActionSchema
-    | ConfirmRequestActionSchema
-    | InformActionSchema
-    | EscalateToHumanActionSchema
     | MCPActionSchema
-    | ProposalActionSchema
     | RecallActionSchema
     | StreamingChunkActionSchema
     | AcceptanceCriteriaActionSchema
     | TaskTrackingActionSchema
-    | UncertaintyActionSchema
     | DelegateTaskActionSchema
     | CondensationActionSchema
     | CondensationRequestActionSchema

@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from backend.core.tools.tool_names import CODE_INTELLIGENCE_TOOL_NAME, LSP_TOOL_NAME
+from backend.core.tools.tool_names import LSP_TOOL_NAME
 from backend.ledger.action.code_nav import LspQueryAction
 
 
@@ -135,11 +135,11 @@ def build_lsp_query_action(arguments: dict) -> LspQueryAction:
 
     if not command:
         raise FunctionCallValidationError(
-            f'Missing required argument "command" in tool call {CODE_INTELLIGENCE_TOOL_NAME}'
+            f'Missing required argument "command" in tool call {LSP_TOOL_NAME}'
         )
     if not file:
         raise FunctionCallValidationError(
-            f'Missing required argument "file" in tool call {CODE_INTELLIGENCE_TOOL_NAME}'
+            f'Missing required argument "file" in tool call {LSP_TOOL_NAME}'
         )
 
     return LspQueryAction(

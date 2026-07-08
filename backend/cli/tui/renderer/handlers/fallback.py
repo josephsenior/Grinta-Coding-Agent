@@ -26,13 +26,6 @@ def _handle_noop_event(orch: 'RendererEventProcessorMixin', event: Any) -> None:
     del orch, event
 
 
-def _handle_legacy_meta_cognition_dispatch(
-    orch: 'RendererEventProcessorMixin', event: Any
-) -> None:
-    """Legacy clarify/confirm/proposal actions; superseded by ask_user."""
-    del orch, event
-
-
 def _handle_streaming_chunk_dispatch(
     orch: 'RendererEventProcessorMixin', event: StreamingChunkAction
 ) -> None:

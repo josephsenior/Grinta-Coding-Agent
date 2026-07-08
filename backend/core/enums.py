@@ -90,13 +90,6 @@ class ActionType(str, Enum):
     TASK_TRACKING = 'task_tracking'
     ACCEPTANCE_CRITERIA = 'acceptance_criteria'
     STREAMING_CHUNK = 'streaming_chunk'
-    # New meta-cognition actions for uncertainty handling
-    UNCERTAINTY = 'uncertainty'
-    PROPOSAL = 'proposal'
-    CLARIFICATION = 'clarification'
-    CONFIRM = 'confirm'
-    INFORM = 'inform'
-    ESCALATE = 'escalate'
     DELEGATE_TASK = 'delegate_task'
     BLACKBOARD = 'blackboard'
     LSP_QUERY = 'lsp_query'

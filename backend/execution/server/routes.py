@@ -35,40 +35,6 @@ from backend.ledger.serialization import event_from_dict, event_to_dict
 if TYPE_CHECKING:
     pass
 
-_RUNTIME_TOKEN_ENV = 'GRINTA_RUNTIME_API_TOKEN'
-
-
-def _runtime_api_token() -> str:
-    return os.environ.get(_RUNTIME_TOKEN_ENV, '').strip()
-
-
-def _request_has_runtime_token(request: Request, token: str) -> bool:
-    auth_header = request.headers.get('Authorization', '')
-    if auth_header == f'Bearer {token}':
-        return True
-    return request.headers.get('X-Grinta-Runtime-Token', '') == token
-
-
-def register_runtime_auth_middleware(app: FastAPI) -> None:
-    """Require a shared token on runtime HTTP routes when configured.
-
-    Set ``GRINTA_RUNTIME_API_TOKEN`` in the environment to enable. When unset,
-    the middleware is a no-op for backward-compatible local development.
-    """
-    token = _runtime_api_token()
-    if not token:
-        return
-
-    @app.middleware('http')
-    async def enforce_runtime_token(request: Request, call_next):
-        if _request_has_runtime_token(request, token):
-            return await call_next(request)
-        return JSONResponse(
-            status_code=401,
-            content={'detail': 'Unauthorized runtime request'},
-        )
-
-
 def _ensure_path_in_workspace(path: str, workspace_root: str) -> str:
     """Validate path is within workspace and return resolved path. Raises HTTPException on violation."""
     try:

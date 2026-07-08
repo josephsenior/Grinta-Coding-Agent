@@ -48,15 +48,6 @@ TASK_STATUS_MARKDOWN_ICONS = {
     TASK_STATUS_BLOCKED: '🚫',
 }
 
-TASK_STATUS_ALIASES: dict[str, str] = {
-    'pending': TASK_STATUS_TODO,
-    'active': TASK_STATUS_IN_PROGRESS,
-    'running': TASK_STATUS_IN_PROGRESS,
-    'completed': TASK_STATUS_DONE,
-    'finished': TASK_STATUS_DONE,
-    'waiting': TASK_STATUS_BLOCKED,
-}
-
 
 def normalize_task_status(raw_status: Any, *, default: str = TASK_STATUS_TODO) -> str:
     """Return a canonical task status or raise for unsupported values."""
@@ -66,7 +57,6 @@ def normalize_task_status(raw_status: Any, *, default: str = TASK_STATUS_TODO) -
     status = str(raw_status).strip().lower()
     if not status:
         return default
-    status = TASK_STATUS_ALIASES.get(status, status)
     if status not in TASK_STATUS_VALUES:
         allowed = ', '.join(sorted(TASK_STATUS_VALUES))
         raise ValueError(f'Invalid task status {status!r}. Use one of: {allowed}.')

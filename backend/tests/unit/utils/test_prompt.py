@@ -174,7 +174,6 @@ class TestOrchestratorPromptManager:
             enable_lsp_query=False,
             enable_task_tracker_tool=False,
             enable_permissions=False,
-            enable_meta_cognition=False,
             enable_working_memory=True,
         )
 
@@ -196,7 +195,6 @@ class TestOrchestratorPromptManager:
             enable_lsp_query=False,
             enable_task_tracker_tool=False,
             enable_permissions=False,
-            enable_meta_cognition=False,
             enable_working_memory=True,
         )
 
@@ -215,7 +213,6 @@ class TestOrchestratorPromptManager:
             enable_lsp_query=False,
             enable_task_tracker_tool=False,
             enable_permissions=False,
-            enable_meta_cognition=False,
             enable_working_memory=False,
             enable_condensation_request=False,
         )
@@ -235,7 +232,6 @@ class TestOrchestratorPromptManager:
             enable_lsp_query=True,
             enable_task_tracker_tool=False,
             enable_permissions=False,
-            enable_meta_cognition=False,
             enable_working_memory=True,
             enable_condensation_request=False,
             enable_terminal=True,
@@ -259,7 +255,6 @@ class TestOrchestratorPromptManager:
             enable_lsp_query=True,
             enable_task_tracker_tool=False,
             enable_permissions=False,
-            enable_meta_cognition=False,
             enable_working_memory=True,
             enable_condensation_request=False,
             enable_terminal=True,
@@ -285,7 +280,6 @@ class TestOrchestratorPromptManager:
             enable_lsp_query=False,
             enable_task_tracker_tool=False,
             enable_permissions=False,
-            enable_meta_cognition=False,
             enable_working_memory=True,
             enable_condensation_request=False,
             enable_terminal=False,
@@ -522,8 +516,6 @@ class TestPromptBuilderSectionTokens:
         cfg.enable_lsp_query = False
         cfg.enable_task_tracker_tool = False
         cfg.enable_permissions = False
-        cfg.enable_meta_cognition = False
-
         kwargs: _PromptBuilderKwargs = {
             'active_llm_model': 'gpt-4',
             'is_windows': False,
@@ -551,7 +543,6 @@ def _make_budget_cfg(**overrides: object) -> MagicMock:
         overrides.get('enable_task_tracker_tool', False)
     )
     cfg.enable_permissions = False
-    cfg.enable_meta_cognition = False
     cfg.cli_mode = bool(overrides.get('cli_mode', False))
     return cfg
 
@@ -646,7 +637,6 @@ def _base_config(**overrides: object) -> SimpleNamespace:
         ),
         enable_permissions=bool(overrides.get('enable_permissions', False)),
         permissions=overrides.get('permissions'),
-        enable_meta_cognition=bool(overrides.get('enable_meta_cognition', False)),
         enable_working_memory=bool(overrides.get('enable_working_memory', True)),
         enable_condensation_request=bool(
             overrides.get('enable_condensation_request', False)
@@ -961,11 +951,11 @@ class TestBuildSystemPromptRenders:
         assert 'evidence' in result
         assert 'audit(audit_entries)' in result
 
-    def test_meta_cognition_enabled(self) -> None:
+    def test_ask_user_in_system_prompt(self) -> None:
         result = self._assert_renders_cleanly(
             active_llm_model='gpt-4o',
             is_windows=False,
-            config=_base_config(enable_meta_cognition=True),
+            config=_base_config(),
             function_calling_mode='native',
         )
         assert 'ask_user' in result

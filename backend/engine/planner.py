@@ -328,10 +328,6 @@ class OrchestratorPlanner:
                 )
                 tools.append(getattr(mod, factory_name)())
 
-    def _add_meta_cognition_tools(self, tools: list) -> None:
-        """Compatibility no-op; ask_user is part of the core simplified toolset."""
-        return
-
     def _add_browsing_tool(self, tools: list) -> None:
         from backend.utils.optional_extras import browser_tool_enabled
 

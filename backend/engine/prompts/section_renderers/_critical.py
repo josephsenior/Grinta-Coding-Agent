@@ -129,7 +129,6 @@ def _render_critical(
     tracker_on: bool,
     criteria_on: bool = True,
     checkpoints_on: bool,
-    meta_cognition_on: bool,
     mode: str = 'agent',
 ) -> str:
     """Render last-mile critical execution rules with dynamic terminal tool naming."""

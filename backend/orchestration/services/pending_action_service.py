@@ -144,8 +144,7 @@ class PendingActionService:
         self._context = context
         self._timeout = timeout
         self._outstanding: dict[int, tuple[Action, float]] = {}
-        self._legacy_pending: tuple[Action, float] | None = None
-        self._progress_log_buckets: dict[int | str, int] = {}
+        self._progress_log_buckets: dict[int, int] = {}
         self._timing_out_ids: set[int] = set()
         self._watchdog_handle: asyncio.TimerHandle | threading.Timer | None = None
         self._watchdog_delay_s: float = timeout + 2
@@ -184,30 +183,30 @@ class PendingActionService:
             for act, ts in list(self._outstanding.values()):
                 self._log_clear(controller, act, ts, clear_reason='clear_all')
             self._outstanding.clear()
-            if self._legacy_pending is not None:
-                act, ts = self._legacy_pending
-                self._log_clear(controller, act, ts, clear_reason='clear_all')
-                self._legacy_pending = None
             self._progress_log_buckets.clear()
             self._timing_out_ids.clear()
             return
 
         action_id = getattr(action, 'id', 'unknown')
         action_type = type(action).__name__
+        aid = self._int_action_id(action)
+        if aid is None:
+            controller.log(
+                'warning',
+                f'Skipping pending action without integer stream id: {action_type} '
+                f'(id={action_id!r})',
+                extra={'msg_type': 'PENDING_ACTION_SKIPPED_NO_ID'},
+            )
+            return
+
         controller.log(
             'debug',
             f'Set pending action: {action_type} (id={action_id})',
             extra={'msg_type': 'PENDING_ACTION_SET'},
         )
         now = time.time()
-        aid = self._int_action_id(action)
-        if aid is not None:
-            self._outstanding[aid] = (action, now)
-            self._progress_log_buckets.pop(aid, None)
-        else:
-            self._legacy_pending = (action, now)
-            self._progress_log_buckets.pop('legacy', None)
-
+        self._outstanding[aid] = (action, now)
+        self._progress_log_buckets.pop(aid, None)
         self._schedule_watchdog_if_needed()
 
     def peek_for_cause(self, cause: object | None) -> Action | None:
@@ -256,38 +255,25 @@ class PendingActionService:
     def elapsed_ms_for_action(self, action: Action) -> int | None:
         """Return milliseconds since *action* was marked pending, if still outstanding."""
         aid = self._int_action_id(action)
-        if aid is not None:
-            entry = self._outstanding.get(aid)
-            if entry is None:
-                return None
-            _, ts = entry
-            return int((time.time() - ts) * 1000)
-        if self._legacy_pending is not None:
-            legacy_action, ts = self._legacy_pending
-            if legacy_action is action:
-                return int((time.time() - ts) * 1000)
-        return None
+        if aid is None:
+            return None
+        entry = self._outstanding.get(aid)
+        if entry is None:
+            return None
+        _, ts = entry
+        return int((time.time() - ts) * 1000)
 
     def clear_for_action(self, action: Action) -> None:
         """Remove only the outstanding row for *action* (parallel-safe clear)."""
         controller = self._context.get_controller()
         aid = self._int_action_id(action)
-        if aid is not None and aid in self._outstanding:
-            act, ts = self._outstanding.pop(aid)
-            self._progress_log_buckets.pop(aid, None)
-            self._timing_out_ids.discard(aid)
-            self._log_clear(controller, act, ts, clear_reason='clear_for_action')
-            self._schedule_watchdog_if_needed()
+        if aid is None or aid not in self._outstanding:
             return
-        if self._legacy_pending is not None:
-            legacy_action, ts = self._legacy_pending
-            if legacy_action is action:
-                self._legacy_pending = None
-                self._progress_log_buckets.pop('legacy', None)
-                self._log_clear(
-                    controller, legacy_action, ts, clear_reason='clear_for_action'
-                )
-                self._schedule_watchdog_if_needed()
+        act, ts = self._outstanding.pop(aid)
+        self._progress_log_buckets.pop(aid, None)
+        self._timing_out_ids.discard(aid)
+        self._log_clear(controller, act, ts, clear_reason='clear_for_action')
+        self._schedule_watchdog_if_needed()
 
     def get_primary(self) -> Action | None:
         """Return the latest outstanding action without progress side effects."""
@@ -303,40 +289,29 @@ class PendingActionService:
         """Clear only the latest outstanding row (step-liveness / single-action recovery)."""
         controller = self._context.get_controller()
         with self._lock:
-            if self._outstanding:
-                try:
-                    best_id = max(self._outstanding.keys())
-                except ValueError:
-                    best_id = None
-                if best_id is not None:
-                    act, ts = self._outstanding.pop(best_id)
-                    self._progress_log_buckets.pop(best_id, None)
-                    self._timing_out_ids.discard(best_id)
-                    self._log_clear(controller, act, ts, clear_reason='clear_primary')
-                    self._schedule_watchdog_if_needed()
-                    return
-            if self._legacy_pending is not None:
-                act, ts = self._legacy_pending
-                self._legacy_pending = None
-                self._progress_log_buckets.pop('legacy', None)
-                self._log_clear(controller, act, ts, clear_reason='clear_primary')
-                self._schedule_watchdog_if_needed()
+            if not self._outstanding:
+                return
+            try:
+                best_id = max(self._outstanding.keys())
+            except ValueError:
+                return
+            act, ts = self._outstanding.pop(best_id)
+            self._progress_log_buckets.pop(best_id, None)
+            self._timing_out_ids.discard(best_id)
+            self._log_clear(controller, act, ts, clear_reason='clear_primary')
+            self._schedule_watchdog_if_needed()
 
     def has_outstanding(self) -> bool:
         """Return True when any action is still awaiting its observation."""
         self._purge_timeouts()
         with self._lock:
-            return bool(self._outstanding) or self._legacy_pending is not None
+            return bool(self._outstanding)
 
     def _collect_outstanding_entries(self) -> list[tuple[Action, float]]:
         """Snapshot outstanding rows as (action, registered_at) pairs."""
         self._purge_timeouts()
         with self._lock:
-            entries = list(self._outstanding.values())
-            legacy = self._legacy_pending
-        if legacy is not None:
-            entries.append(legacy)
-        return entries
+            return list(self._outstanding.values())
 
     def barrier_wait_budget_seconds(
         self,
@@ -372,17 +347,17 @@ class PendingActionService:
         """Latest / highest-id outstanding row (for step guards and logging)."""
         with self._lock:
             if not self._outstanding:
-                return self._legacy_pending
+                return None
             try:
                 active_ids = [
                     aid for aid in self._outstanding if aid not in self._timing_out_ids
                 ]
                 if not active_ids:
-                    return self._legacy_pending
+                    return None
                 best_id = max(active_ids)
                 return self._outstanding[best_id]
             except (ValueError, KeyError):
-                return self._legacy_pending
+                return None
 
     def _purge_timeouts(self) -> None:
         """Remove timed-out actions; defer observation emission to async path."""
@@ -397,17 +372,6 @@ class PendingActionService:
                         continue
                     self._timing_out_ids.add(aid)
                     dead.append((action, elapsed))
-
-            if self._legacy_pending is not None:
-                action, ts = self._legacy_pending
-                elapsed = now - ts
-                limit = self._effective_timeout_seconds(self._timeout, action)
-                if math.isfinite(limit) and elapsed > limit:
-                    legacy_id = self._int_action_id(action)
-                    if legacy_id is None or legacy_id not in self._timing_out_ids:
-                        if legacy_id is not None:
-                            self._timing_out_ids.add(legacy_id)
-                        dead.append((action, elapsed))
 
         # Defer observation emission to async path to avoid recursive
         # event delivery when called from the sync step loop.
@@ -540,7 +504,6 @@ class PendingActionService:
         """Cancel watchdog and clear pending state during controller shutdown."""
         self._cancel_watchdog()
         self._outstanding.clear()
-        self._legacy_pending = None
         self._progress_log_buckets.clear()
 
     def _log_progress_update(
@@ -555,11 +518,12 @@ class PendingActionService:
             return
 
         action_id = self._int_action_id(action)
-        progress_key: int | str = action_id if action_id is not None else 'legacy'
-        if self._progress_log_buckets.get(progress_key) == bucket:
+        if action_id is None:
+            return
+        if self._progress_log_buckets.get(action_id) == bucket:
             return
 
-        self._progress_log_buckets[progress_key] = bucket
+        self._progress_log_buckets[action_id] = bucket
         controller.log(
             'info',
             f'Pending action still running for {elapsed:.1f}s '
@@ -569,10 +533,7 @@ class PendingActionService:
         )
 
     def _outstanding_count(self) -> int:
-        count = len(self._outstanding)
-        if self._legacy_pending is not None:
-            count += 1
-        return count
+        return len(self._outstanding)
 
     def _log_clear(
         self,
@@ -607,12 +568,6 @@ class PendingActionService:
         delays: list[float] = []
         for action, _ts in self._outstanding.values():
             eff = self._effective_timeout_seconds(self._timeout, action)
-            if math.isfinite(eff):
-                delays.append(eff + 2.0)
-        if self._legacy_pending is not None:
-            eff = self._effective_timeout_seconds(
-                self._timeout, self._legacy_pending[0]
-            )
             if math.isfinite(eff):
                 delays.append(eff + 2.0)
         if not delays:
@@ -658,10 +613,10 @@ class PendingActionService:
         unnecessary.
         """
         self._watchdog_handle = None
-        if not self._outstanding and self._legacy_pending is None:
+        if not self._outstanding:
             return
         self._purge_timeouts()
-        if not self._outstanding and self._legacy_pending is None:
+        if not self._outstanding:
             logger.warning(
                 'Pending action watchdog fired; purged timed-out actions. '
                 'No further step trigger needed.'

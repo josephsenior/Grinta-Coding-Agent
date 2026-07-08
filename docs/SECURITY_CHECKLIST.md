@@ -25,7 +25,6 @@ Grinta is **local-first** and runs with **your** user privileges. It is **not** 
 | **Secret masker** | Known secret patterns stripped from output before display/logging |
 | **Shell guard** | Detects `rm -rf /`, force pushes, encoded payloads, privilege escalation, network exfiltration |
 | **File viewer scoping** | Localhost-only file preview server rejects paths outside configured workspace roots |
-| **Runtime HTTP token (optional)** | Set `GRINTA_RUNTIME_API_TOKEN` to require `Authorization: Bearer …` on the legacy in-process action server |
 
 ## Read-outside-workspace (`allow_read_outside_workspace`)
 
@@ -49,7 +48,6 @@ Grinta is **local-first** and runs with **your** user privileges. It is **not** 
 - [ ] Scope API keys to per-project with low spend limits
 - [ ] Pin Grinta to a known version in production-adjacent workflows; track `CHANGELOG.md`
 - [ ] Disable network-using commands when working offline (`security.allow_network_commands: false` in `settings.json`)
-- [ ] When using the legacy in-process runtime HTTP server, set `GRINTA_RUNTIME_API_TOKEN` and pass it on every request
 
 ## Trust boundary: `settings.json` and plugins
 

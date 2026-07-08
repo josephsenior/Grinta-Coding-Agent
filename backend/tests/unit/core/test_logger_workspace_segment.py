@@ -119,7 +119,7 @@ def test_bind_session_logging_creates_session_jsonl(
     assert 'SESSION_START' in jsonl.read_text(encoding='utf-8')
 
 
-def test_workspace_logs_dir_migrates_legacy_backend_logs(
+def test_workspace_logs_dir_uses_canonical_root_only(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
     install_root = tmp_path / 'install'
@@ -131,38 +131,10 @@ def test_workspace_logs_dir_migrates_legacy_backend_logs(
         logger_mod, '_grinta_install_tree_root', lambda: str(install_root)
     )
     monkeypatch.setattr(logger_mod, '_workspace_logs_segment', lambda: 'sample_ws')
-    monkeypatch.setattr(logger_mod, '_LEGACY_LOGS_MIGRATION_DONE', False)
 
     ws_dir = Path(logger_mod._workspace_logs_dir() or '')
     canonical_ws = install_root / 'logs' / 'workspaces' / 'sample_ws'
     assert ws_dir == canonical_ws
-    assert (canonical_ws / 'app.log').read_text(encoding='utf-8') == 'legacy\n'
-    assert not legacy_ws.exists()
-
-
-def test_workspace_logs_dir_migration_keeps_existing_canonical_files(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-):
-    install_root = tmp_path / 'install'
-    canonical_ws = install_root / 'logs' / 'workspaces' / 'sample_ws'
-    canonical_ws.mkdir(parents=True)
-    (canonical_ws / 'app.log').write_text('canonical\n', encoding='utf-8')
-
-    legacy_ws = install_root / 'backend' / 'logs' / 'workspaces' / 'sample_ws'
-    legacy_ws.mkdir(parents=True)
-    (legacy_ws / 'app.log').write_text('legacy\n', encoding='utf-8')
-
-    monkeypatch.setattr(
-        logger_mod, '_grinta_install_tree_root', lambda: str(install_root)
-    )
-    monkeypatch.setattr(logger_mod, '_workspace_logs_segment', lambda: 'sample_ws')
-    monkeypatch.setattr(logger_mod, '_LEGACY_LOGS_MIGRATION_DONE', False)
-
-    logger_mod._workspace_logs_dir()
-
-    assert (canonical_ws / 'app.log').read_text(encoding='utf-8') == 'canonical\n'
-    legacy_copies = sorted(canonical_ws.glob('app.legacy-*.log'))
-    assert len(legacy_copies) == 1
-    assert legacy_copies[0].read_text(encoding='utf-8') == 'legacy\n'
-    assert not legacy_ws.exists()
-    assert not (install_root / 'backend' / 'logs').exists()
+    assert not canonical_ws.exists() or not (canonical_ws / 'app.log').exists()
+    assert legacy_ws.exists()
+    assert (legacy_ws / 'app.log').read_text(encoding='utf-8') == 'legacy\n'

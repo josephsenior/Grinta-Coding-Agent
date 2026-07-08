@@ -1,17 +1,13 @@
-"""TUI surface for ``communicate_with_user`` structured actions.
+"""TUI helpers for interactive prompt cards (``ask_user`` and related flows).
 
-Renders interactive cards (clarification, proposal, confirm, inform, escalate)
-via :class:`~backend.cli.tui.widgets.welcome.CommunicatePromptWidget`.
-
-Newer flows may use ``ask_user`` elsewhere in the screen stack; this module
-remains the handler for legacy communicate action types and is covered by
-``backend/tests/unit/cli/tui/test_communicate.py``.
+Renders option lists via :class:`~backend.cli.tui.widgets.welcome.CommunicatePromptWidget`
+and routes keyboard selection back into the input bar.
 """
 
 from __future__ import annotations
 
 import shlex
-from typing import Any, Mapping
+from typing import Any
 
 from textual.widget import Widget
 from textual.widgets import (
@@ -25,178 +21,10 @@ from backend.cli.tui.helpers import (
     _strip_ansi,
     _strip_terminal_control_literals,
 )
-from backend.cli.tui.widgets.welcome import (
-    CommunicatePromptWidget,
-)
-from backend.ledger.action import (
-    ClarificationRequestAction,
-    ConfirmRequestAction,
-    EscalateToHumanAction,
-    InformAction,
-    ProposalAction,
-    UncertaintyAction,
-)
-
-
-def _stringify_attempt(attempt: object) -> str:
-    """Render a single attempt entry as a displayable line."""
-    if isinstance(attempt, Mapping):
-        action = str(attempt.get('action', '') or '').strip()
-        result = str(attempt.get('result', '') or '').strip()
-        if action and result:
-            return f'{action} \u2192 {result}'
-        return action or str(attempt)
-    return str(attempt)
 
 
 class ScreenCommunicateMixin:
-    """Communicate-related methods of GrintaScreen."""
-
-    def add_communicate_clarification(self, action: ClarificationRequestAction) -> None:
-        """Agent asks a question — render an interactive communicate card."""
-        options = self._materialize_options(action.options)
-        details = [action.context] if action.context else []
-        card = CommunicatePromptWidget(
-            'Question',
-            action.question or 'The agent needs your input.',
-            context=action.thought,
-            details=details,
-            options=options,
-        )
-        self._write_log(card)
-        self._set_active_communicate_card(card if options else None)
-
-    def add_communicate_uncertainty(self, action: UncertaintyAction) -> None:
-        """Agent expresses uncertainty. Non-blocking — informational."""
-        details = list((action.specific_concerns or [])[:5])
-        if action.requested_information:
-            details.append(f'Needed: {action.requested_information}')
-        card = CommunicatePromptWidget(
-            'Needs Context',
-            'The agent needs more context before it can continue confidently.',
-            context=action.thought,
-            details=details,
-        )
-        self._write_log(card)
-        # Uncertainty is informational, not a gate; do not block the input.
-
-    def add_communicate_proposal(self, action: ProposalAction) -> None:
-        """Agent proposes a plan.
-
-        The recommended option is marked with a ``(recommended)`` suffix in
-        its label; the user navigates to it and presses Enter to accept.
-        We deliberately do NOT pre-highlight it: visual cues are enough and
-        pre-selection would require racing the widget's mount order.
-        """
-        options: list[tuple[str, str, str, bool]] = []
-        for i, opt in enumerate(action.options or []):
-            label = opt.get(
-                'name',
-                opt.get('title', opt.get('approach', f'Option {i + 1}')),
-            )
-            description = opt.get('description', '')
-            if not description:
-                pros = ', '.join(opt.get('pros') or [])
-                cons = ', '.join(opt.get('cons') or [])
-                fragments = []
-                if pros:
-                    fragments.append(f'Pros: {pros}')
-                if cons:
-                    fragments.append(f'Cons: {cons}')
-                description = ' | '.join(fragments)
-            options.append((label, label, description, i == action.recommended))
-
-        card = CommunicatePromptWidget(
-            'Options',
-            'Choose a path for the agent to take.',
-            context=action.thought,
-            details=[action.rationale] if action.rationale else [],
-            options=options,
-        )
-        self._write_log(card)
-        self._set_active_communicate_card(card if options else None)
-
-    def add_communicate_confirm(self, action: ConfirmRequestAction) -> None:
-        """Agent requires explicit user OK before a risky step.
-
-        Always blocking. Two options expected: positive then negative. The
-        default is the deny option (index 1) so a misclick or timeout
-        rejects — safety first.
-        """
-        options = self._materialize_options(action.options)
-        if not options:
-            options = [
-                ('Yes, do it', 'Yes, do it', '', False),
-                ('No, abort', 'No, abort', '', False),
-            ]
-        details: list[str] = []
-        if action.context:
-            details.append(action.context)
-        if action.default_index == 0:
-            details.append('Auto-confirms if you do not respond in time.')
-        else:
-            details.append('Auto-denies if you do not respond in time (safe default).')
-        default_index = (
-            1
-            if not (0 <= action.default_index < len(options))
-            else action.default_index
-        )
-        card = CommunicatePromptWidget(
-            'Confirm',
-            action.question or 'The agent wants to perform a risky action.',
-            context=action.thought,
-            details=details,
-            options=options,
-            preselected_index=default_index,
-        )
-        self._write_log(card)
-        self._set_active_communicate_card(card)
-
-    def add_communicate_inform(self, action: InformAction) -> None:
-        """Non-blocking status update from the agent."""
-        details = [action.context] if action.context else []
-        card = CommunicatePromptWidget(
-            'Status',
-            action.text or 'Status update.',
-            context=action.thought,
-            details=details,
-        )
-        self._write_log(card)
-        # Inform never blocks; the turn continues.
-
-    def add_communicate_escalate(self, action: EscalateToHumanAction) -> None:
-        """Agent escalates to human after repeated failures."""
-        details = [_stringify_attempt(a) for a in (action.attempts_made or [])]
-        if action.specific_help_needed:
-            details.append(f'Help needed: {action.specific_help_needed}')
-        card = CommunicatePromptWidget(
-            'Need Your Input',
-            action.reason or 'The agent needs your input to continue.',
-            context=action.thought,
-            details=details,
-        )
-        self._write_log(card)
-        # Escalation is informational unless the agent also supplied a
-        # specific question via specific_help_needed. If so, the human
-        # should be able to reply with a free-form answer, but we don't
-        # block the orchestrator here — same as uncertainty.
-
-    @staticmethod
-    def _materialize_options(
-        raw: list[object] | tuple[object, ...] | None,
-    ) -> list[tuple[str, str, str, bool]]:
-        """Convert a list of str or {label, description} dicts to widget rows."""
-        out: list[tuple[str, str, str, bool]] = []
-        for opt in raw or []:
-            if isinstance(opt, Mapping):
-                label = str(opt.get('label', '') or '').strip()
-                if not label:
-                    continue
-                description = str(opt.get('description', '') or '').strip()
-                out.append((label, label, description, False))
-            elif opt:
-                out.append((str(opt), str(opt), '', False))
-        return out
+    """Communicate-card navigation helpers for GrintaScreen."""
 
     def _find_focusable_cards(self) -> list[Widget]:
         """Return all focusable scan-line cards in the transcript in DOM order."""

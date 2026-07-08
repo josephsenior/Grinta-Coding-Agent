@@ -32,9 +32,6 @@ def _load_raw_settings() -> dict[str, Any]:
         return {}
     with path.open('r', encoding='utf-8') as f:
         settings = json.load(f)
-    legacy_reasoning = settings.pop('reasoningEffort', None)
-    if legacy_reasoning is not None and 'llm_reasoning_effort' not in settings:
-        settings['llm_reasoning_effort'] = legacy_reasoning
     return settings
 
 

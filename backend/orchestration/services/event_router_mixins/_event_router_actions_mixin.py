@@ -182,9 +182,6 @@ class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
                 await handler(action)  # type: ignore[arg-type]
                 return
 
-        if self._is_meta_cognition_action(action):
-            await self._handle_meta_cognition_action(action)
-
     async def _handle_task_tracking_action(self, action: TaskTrackingAction) -> None:
         """Handle task tracking action to update active plan."""
         from backend.orchestration.state.state import build_active_plan_from_payload
@@ -255,20 +252,3 @@ class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
                     pass
                 await self._ctrl.set_agent_state_to(AgentState.FINISHED)
                 await self._ctrl.log_task_audit(status='success')
-
-    async def _handle_meta_cognition_action(self, action: Action) -> None:
-        """Handle meta-cognition actions (clarification, proposal, uncertainty, escalation).
-
-        In FULL autonomy mode, the agent continues without pausing.
-        In BALANCED or CONSERVATIVE mode, the agent pauses and waits for user input.
-
-        Exceptions:
-          - ``InformAction`` never pauses (it's a non-blocking status update).
-          - In FULL autonomy, even explicit confirm requests do not pause; the
-            safety validator remains the hard stop for forbidden operations.
-        """
-        self._ctrl.log(
-            'debug',
-            'Ignoring legacy meta-cognition action; ask_user is the model-facing communication tool.',
-            extra={'action_type': type(action).__name__},
-        )

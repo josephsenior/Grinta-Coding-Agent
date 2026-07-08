@@ -363,7 +363,10 @@ class TestHandleTaskTrackerTool:
         assert nested_status['enum'] == status['enum']
         assert 'in_progress' in status['description']
 
-    @pytest.mark.parametrize('legacy_status', ['doing', 'invalid_xyz'])
+    @pytest.mark.parametrize(
+        'legacy_status',
+        ['doing', 'invalid_xyz', 'pending', 'completed', 'active', 'running'],
+    )
     def test_rejects_legacy_task_status_aliases(self, legacy_status: str):
         args = {
             'command': 'update',
@@ -374,28 +377,6 @@ class TestHandleTaskTrackerTool:
 
         with pytest.raises(FunctionCallValidationError, match='Invalid task status'):
             _handle_task_tracker_tool(args)
-
-    @pytest.mark.parametrize(
-        'alias,expected',
-        [
-            ('pending', 'todo'),
-            ('completed', 'done'),
-            ('active', 'in_progress'),
-            ('running', 'in_progress'),
-            ('finished', 'done'),
-            ('waiting', 'blocked'),
-        ],
-    )
-    def test_normalizes_task_status_aliases(self, alias, expected):
-        args = {
-            'command': 'update',
-            'task_list': [
-                {'id': '1', 'description': 'Step 1', 'status': alias},
-            ],
-        }
-        action = cast(TaskTrackingAction, _handle_task_tracker_tool(args))
-        task = action.task_list[0]
-        assert task['status'] == expected
 
     def test_non_plan_command_with_empty_task_list(self):
         args = {'command': 'update', 'task_list': []}

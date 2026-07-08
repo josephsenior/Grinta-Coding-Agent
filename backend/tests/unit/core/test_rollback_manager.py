@@ -1,4 +1,4 @@
-"""Unit tests for backend.execution.rollback.rollback_manager — checkpoint/rollback system."""
+"""Unit tests for backend.execution.rollback.rollback_manager -- checkpoint/rollback system."""
 
 from __future__ import annotations
 
@@ -7,7 +7,10 @@ import time
 
 import pytest
 
-from backend.execution.rollback.rollback_manager import Checkpoint, RollbackManager
+pytest.importorskip('pygit2')  # skip entire module if pygit2 not installed
+
+from backend.execution.rollback.rollback_manager import Checkpoint, RollbackManager  # noqa: E402
+from backend.execution.rollback.shadow_repo import ShadowRepoError  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Checkpoint dataclass
@@ -148,10 +151,12 @@ class TestRollbackManager:
     def test_file_snapshot_created(self, workspace):
         rm = RollbackManager(str(workspace))
         cp_id = rm.create_checkpoint('snapshot')
-        snapshot_dir = rm.checkpoints_dir / cp_id
-        assert snapshot_dir.exists()
-        assert (snapshot_dir / 'manifest.json').exists()
-        assert (snapshot_dir / 'files' / 'hello.py').exists()
+        cp = rm.get_checkpoint(cp_id)
+        assert cp is not None
+        # Shadow-repo backend: content is stored inside .grinta/shadow_repo,
+        # not in a per-checkpoint subdirectory under checkpoints_dir.
+        assert cp.git_commit_sha is not None
+        assert len(cp.git_commit_sha) == 40
 
     def test_file_based_rollback(self, workspace):
         rm = RollbackManager(str(workspace))
@@ -196,16 +201,15 @@ class TestRollbackManager:
         assert cp.file_snapshots == {}
         assert not (rm.checkpoints_dir / cp_id / 'files').exists()
 
-    def test_drvfs_workspace_skips_manual_file_snapshot(self, workspace, monkeypatch):
-        from backend.core import wsl as wsl_mod
-
-        monkeypatch.setattr(wsl_mod, 'is_windows_mount', lambda _path: True)
+    def test_drvfs_workspace_skips_manual_file_snapshot(self, workspace):
+        """With hard-dep shadow repo, WSL drvfs logic is removed; snapshot always runs."""
         rm = RollbackManager(str(workspace))
         (workspace / 'app.py').write_text('print(1)', encoding='utf-8')
-        cp_id = rm.create_checkpoint('manual on drvfs', use_git=False)
+        cp_id = rm.create_checkpoint('manual', use_git=False)
         cp = rm.get_checkpoint(cp_id)
         assert cp is not None
-        assert cp.file_snapshots == {}
+        # Shadow repo always runs -- SHA must be present
+        assert cp.git_commit_sha is not None
 
     def test_checkpoint_metadata(self, workspace):
         rm = RollbackManager(str(workspace))
@@ -236,147 +240,43 @@ class TestRollbackManager:
         # Should have empty checkpoints list due to graceful error handling
         assert not rm2.checkpoints
 
-    def test_git_available_check_failure(self, workspace, monkeypatch):
-        """Test when git command fails."""
-
-        def mock_subprocess_run(*args, **kwargs):
-            class Result:
-                returncode = 1
-                stderr = 'not a git repo'
-                stdout = ''
-
-            return Result()
-
-        monkeypatch.setattr('subprocess.run', mock_subprocess_run)
+    def test_shadow_repo_available(self, workspace):
+        """vcs_available reflects shadow-repo availability (pygit2 in-process)."""
         rm = RollbackManager(str(workspace))
-        assert rm.vcs_available is False
-
-    def test_git_available_check_exception(self, workspace, monkeypatch):
-        """Test when git command raises exception."""
-
-        def mock_subprocess_run(*args, **kwargs):
-            raise RuntimeError('git not found')
-
-        monkeypatch.setattr('subprocess.run', mock_subprocess_run)
-        rm = RollbackManager(str(workspace))
-        assert rm.vcs_available is False
-
-    def test_create_checkpoint_with_git_snapshot(self, workspace, monkeypatch):
-        """Test checkpoint creation when git is available."""
-
-        def mock_subprocess_run(cmd, *args, **kwargs):
-            class Result:
-                returncode = 0
-                stdout = 'abc123def456\n'
-                stderr = ''
-
-            # For git rev-parse --git-dir
-            if 'rev-parse' in cmd and '--git-dir' in cmd:
-                return Result()
-            # For git add
-            if 'add' in cmd:
-                result = Result()
-                result.returncode = 0
-                return result
-            # For git commit
-            if 'commit' in cmd or 'commit-tree' in cmd:
-                result = Result()
-                result.returncode = 0
-                return result
-            # For git rev-parse HEAD
-            if 'rev-parse' in cmd and 'HEAD' in cmd:
-                result = Result()
-                result.returncode = 0
-                result.stdout = 'abc123def456\n'
-                return result
-            return Result()
-
-        monkeypatch.setattr('subprocess.run', mock_subprocess_run)
-        rm = RollbackManager(str(workspace))
+        # pygit2 was importable (we skip the whole module otherwise), so True.
         assert rm.vcs_available is True
+        assert rm._shadow_repo is not None
 
-        cp_id = rm.create_checkpoint('with git')
+    def test_shadow_repo_unavailable_raises(self, workspace, monkeypatch):
+        """RollbackManager raises when ShadowRepo cannot be initialised (hard dep)."""
+        def failing_init(*args, **kwargs):
+            raise ImportError('pygit2 not available')
+
+        monkeypatch.setattr(
+            'backend.execution.rollback.rollback_manager.ShadowRepo', failing_init
+        )
+        with pytest.raises(ImportError):
+            RollbackManager(str(workspace))
+
+    def test_create_checkpoint_with_shadow_snapshot(self, workspace):
+        """Checkpoint creation records a shadow SHA in git_commit_sha field."""
+        rm = RollbackManager(str(workspace))
+        cp_id = rm.create_checkpoint('with shadow')
         cp = rm.get_checkpoint(cp_id)
         assert cp is not None
-        assert cp.git_commit_sha == 'abc123def456'
+        assert cp.git_commit_sha is not None  # shadow SHA stored here
+        assert len(cp.git_commit_sha) == 40
 
-    def test_create_checkpoint_git_disabled(self, workspace, monkeypatch):
-        """Test checkpoint creation with use_git=False."""
-
-        def mock_subprocess_run(cmd, *args, **kwargs):
-            class Result:
-                returncode = 0
-                stdout = 'abc123\n'
-                stderr = ''
-
-            if 'rev-parse' in cmd and '--git-dir' in cmd:
-                return Result()
-            return Result()
-
-        monkeypatch.setattr('subprocess.run', mock_subprocess_run)
+    def test_create_checkpoint_shadow_exception_graceful(self, workspace, monkeypatch):
+        """Exceptions from shadow repo propagate (no silent fallback with hard dep)."""
         rm = RollbackManager(str(workspace))
-        assert rm.vcs_available is True
 
-        # Create with use_git=False
-        cp_id = rm.create_checkpoint('no git', use_git=False)
-        cp = rm.get_checkpoint(cp_id)
-        assert cp is not None
-        assert cp.git_commit_sha is None
+        def boom(label=''):
+            raise ShadowRepoError('simulated failure')
 
-    def test_create_git_snapshot_fails(self, workspace, monkeypatch):
-        """Test git snapshot creation failure."""
-
-        def mock_subprocess_run(cmd, *args, **kwargs):
-            class Result:
-                returncode = 0
-                stdout = 'abc123\n'
-                stderr = ''
-
-            if 'rev-parse' in cmd and '--git-dir' in cmd:
-                return Result()
-
-            # Fail the commit
-            if 'commit' in cmd or 'commit-tree' in cmd:
-                result = Result()
-                result.returncode = 1
-                result.stderr = 'nothing to commit'
-                return result
-
-            return Result()
-
-        monkeypatch.setattr('subprocess.run', mock_subprocess_run)
-        rm = RollbackManager(str(workspace))
-        assert rm.vcs_available is True
-
-        cp_id = rm.create_checkpoint('failed git')
-        cp = rm.get_checkpoint(cp_id)
-        assert cp is not None
-        # git_commit_sha should be None when commit fails
-        assert cp.git_commit_sha is None
-
-
-
-    def test_create_git_snapshot_exception(self, workspace, monkeypatch):
-        """Test git snapshot exception handling."""
-
-        def mock_subprocess_run(cmd, *args, **kwargs):
-            if 'rev-parse' in cmd and '--git-dir' in cmd:
-
-                class Result:
-                    returncode = 0
-
-                return Result()
-            raise RuntimeError('git subprocess error')
-
-        monkeypatch.setattr('subprocess.run', mock_subprocess_run)
-        rm = RollbackManager(str(workspace))
-        assert rm.vcs_available is True
-
-        # Should not crash, git snapshot should return None
-        cp_id = rm.create_checkpoint('git exception')
-        cp = rm.get_checkpoint(cp_id)
-        assert cp is not None
-        assert cp.git_commit_sha is None
+        monkeypatch.setattr(rm._shadow_repo, 'snapshot', boom)
+        with pytest.raises(ShadowRepoError):
+            rm.create_checkpoint('exception test')
 
     def test_file_snapshot_exception(self, workspace):
         """Test file snapshot exception handling - creation succeeds despite errors."""
@@ -430,186 +330,59 @@ class TestRollbackManager:
         # Should keep all 5
         assert len(rm.checkpoints) == 5
 
-    def test_git_rollback_command_fails_falls_back_to_file(self, workspace, monkeypatch):
-        """Test that file rollback is used when git checkout command fails."""
-        seen_checkout = False
-
-        def mock_subprocess_run(cmd, *args, **kwargs):
-            nonlocal seen_checkout
-
-            class Result:
-                returncode = 0
-                stdout = 'abc123\n'
-                stderr = ''
-
-            if 'rev-parse' in cmd and '--git-dir' in cmd:
-                return Result()
-            if 'commit' in cmd or 'commit-tree' in cmd:
-                return Result()
-            if 'checkout' in cmd:
-                seen_checkout = True
-                result = Result()
-                result.returncode = 1
-                result.stderr = 'checkout failed'
-                return result
-            if 'rev-parse' in cmd:
-                return Result()
-            return Result()
-
-        monkeypatch.setattr('subprocess.run', mock_subprocess_run)
+    def test_shadow_rollback_success(self, workspace):
+        """Shadow-based rollback restores workspace correctly."""
         rm = RollbackManager(str(workspace))
-
         cp_id = rm.create_checkpoint('before')
-        (workspace / 'hello.py').write_text("print('changed')")
+        original_content = (workspace / 'hello.py').read_text()
 
+        (workspace / 'hello.py').write_text('changed')
         success = rm.rollback_to(cp_id)
+
         assert success is True
-        assert seen_checkout is True
-        assert (workspace / 'hello.py').read_text() == "print('hello')"
+        assert (workspace / 'hello.py').read_text() == original_content
 
-    def test_git_rollback_success(self, workspace, monkeypatch):
-        """Test successful git-based rollback."""
-        seen_checkout = False
-
-        def mock_subprocess_run(cmd, *args, **kwargs):
-            nonlocal seen_checkout
-
-            class Result:
-                returncode = 0
-                stdout = 'abc123\n'
-                stderr = ''
-
-            if 'rev-parse' in cmd and '--git-dir' in cmd:
-                return Result()
-            if 'commit' in cmd or 'commit-tree' in cmd:
-                return Result()
-            if 'checkout' in cmd:
-                seen_checkout = True
-                return Result()
-            if 'rev-parse' in cmd:
-                return Result()
-            return Result()
-
-        monkeypatch.setattr('subprocess.run', mock_subprocess_run)
+    def test_shadow_rollback_fails_propagates(self, workspace, monkeypatch):
+        """ShadowRepoError from restore propagates up through rollback_to."""
         rm = RollbackManager(str(workspace))
-
         cp_id = rm.create_checkpoint('before')
+
+        def boom(sha, **kw):
+            raise ShadowRepoError('simulated restore failure')
+
+        monkeypatch.setattr(rm._shadow_repo, 'restore', boom)
         success = rm.rollback_to(cp_id)
-        assert success is True
-        assert seen_checkout is True
+        # The outer try/except in rollback_to catches it and returns False
+        assert success is False
 
-    def test_git_rollback_failure_fallback_to_file(self, workspace):
-        """Test that file rollback is used when git rollback fails."""
+    def test_rollback_checkpoint_without_sha_returns_false(self, workspace):
+        """Checkpoints with no SHA (phase-boundary) return False from rollback."""
         rm = RollbackManager(str(workspace))
-
         cp_id = rm.create_checkpoint('before')
-        assert rm.get_checkpoint(cp_id) is not None
-
-        # Manually create scenario where git_commit_sha is None (no git)
-        # by creating a checkpoint without git available
-        checkpoint = rm.get_checkpoint(cp_id)
-        assert checkpoint is not None
-        checkpoint.git_commit_sha = None  # Simulate failed git snapshot
-
-        # Modify workspace
-        (workspace / 'new.txt').write_text('new')
-
-        # Should use file-based rollback
-        success = rm.rollback_to(cp_id)
-        assert success is True
-        # File-based rollback should have restored original state
-        assert not (workspace / 'new.txt').exists()
-
-    def test_file_based_rollback_quarantines_extra_files(self, workspace):
-        """File rollback moves non-checkpoint files aside instead of deleting them."""
-        rm = RollbackManager(str(workspace))
-        cp_id = rm.create_checkpoint('before extras', use_git=False)
-
-        extra = workspace / 'new.txt'
-        extra.write_text('new data', encoding='utf-8')
-
-        success = rm.rollback_to(cp_id)
-
-        assert success is True
-        assert not extra.exists()
-        quarantines = list(rm.checkpoints_dir.glob(f'{cp_id}_restore_quarantine_*'))
-        assert quarantines
-        assert (quarantines[0] / 'new.txt').read_text(encoding='utf-8') == 'new data'
-
-    def test_git_rollback_without_sha(self, workspace, monkeypatch):
-        """Test git rollback when commit sha is None."""
-
-        def mock_subprocess_run(cmd, *args, **kwargs):
-            class Result:
-                returncode = 0
-                stdout = ''
-                stderr = ''
-
-            if 'rev-parse' in cmd and '--git-dir' in cmd:
-                return Result()
-            # Commit fails, so git_commit_sha will be None
-            if 'commit' in cmd or 'commit-tree' in cmd:
-                result = Result()
-                result.returncode = 1
-                return result
-
-            return Result()
-
-        monkeypatch.setattr('subprocess.run', mock_subprocess_run)
-        rm = RollbackManager(str(workspace))
-
-        cp_id = rm.create_checkpoint('no sha')
         cp = rm.get_checkpoint(cp_id)
         assert cp is not None
-        assert cp.git_commit_sha is None
-
-        # Should fall back to file-based rollback
-        (workspace / 'test.txt').write_text('modified')
-        success = rm.rollback_to(cp_id)
-        assert success is True
-
-    def test_rollback_git_not_available(self, workspace, monkeypatch):
-        """Test rollback when vcs_available is False."""
-
-        def mock_subprocess_run(cmd, *args, **kwargs):
-            class Result:
-                returncode = 1
-
-            if 'rev-parse' in cmd and '--git-dir' in cmd:
-                return Result()
-            return Result()
-
-        monkeypatch.setattr('subprocess.run', mock_subprocess_run)
-        rm = RollbackManager(str(workspace))
-        assert rm.vcs_available is False
-
-        cp_id = rm.create_checkpoint('no git available')
-        (workspace / 'file.txt').write_text('modified')
+        cp.git_commit_sha = None  # simulate a phase-boundary checkpoint
 
         success = rm.rollback_to(cp_id)
-        assert success is True
-        assert not (workspace / 'file.txt').exists()
-
-    def test_file_based_rollback_missing_snapshot(self, workspace):
-        """Test file-based rollback when snapshot dir is missing."""
-        rm = RollbackManager(str(workspace))
-
-        # Manually create a fake checkpoint without creating snapshot
-        from backend.execution.rollback.rollback_manager import Checkpoint
-
-        fake_cp = Checkpoint(
-            id='fake_cp',
-            timestamp=1000.0,
-            description='fake',
-            checkpoint_type='manual',
-            workspace_path=str(workspace),
-            file_snapshots={},
-            git_commit_sha=None,
-        )
-        rm.checkpoints.append(fake_cp)
-
-        success = rm.rollback_to('fake_cp')
         assert success is False
+
+    def test_rollback_nonexistent_checkpoint(self, workspace):
+        rm = RollbackManager(str(workspace))
+        assert rm.rollback_to('nonexistent') is False
+
+    def test_non_git_workspace_checkpoint_and_rollback(self, workspace):
+        """Checkpoint + rollback must work on workspaces with no .git directory."""
+        assert not (workspace / '.git').exists()
+        rm = RollbackManager(str(workspace))
+        cp_id = rm.create_checkpoint('plain workspace')
+        cp = rm.get_checkpoint(cp_id)
+        assert cp is not None
+        assert cp.git_commit_sha is not None
+
+        (workspace / 'hello.py').write_text('modified')
+        success = rm.rollback_to(cp_id)
+        assert success is True
+        assert (workspace / 'hello.py').read_text() == "print('hello')"
 
     def test_restore_snapshot_with_nested_dirs(self, workspace):
         """Test snapshot restoration with nested directory structure."""
@@ -666,7 +439,11 @@ class TestRollbackManager:
         assert custom_dir.exists()
 
         cp_id = rm.create_checkpoint('custom dir test')
-        assert (custom_dir / cp_id).exists()
+        # Shadow backend: no per-checkpoint subdir; verify manifest was written.
+        assert (custom_dir / 'manifest.json').exists()
+        cp = rm.get_checkpoint(cp_id)
+        assert cp is not None
+        assert cp.git_commit_sha is not None
 
     def test_find_checkpoint_not_found(self, workspace):
         """Test _find_checkpoint with nonexistent ID."""

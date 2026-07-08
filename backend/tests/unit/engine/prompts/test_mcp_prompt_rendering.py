@@ -27,7 +27,6 @@ def _base_config(**overrides: Any) -> SimpleNamespace:
         enable_lsp_query=False,
         enable_task_tracker_tool=False,
         enable_permissions=False,
-        enable_meta_cognition=False,
         enable_web=True,
         enable_docs=True,
         enable_debugger=False,

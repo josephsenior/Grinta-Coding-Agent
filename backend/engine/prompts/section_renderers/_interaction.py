@@ -6,8 +6,7 @@ from collections.abc import Callable
 from typing import Any
 
 
-def _build_response_style_block(_mode: str, *, meta_cognition_on: bool = False) -> str:
-    _ = meta_cognition_on
+def _build_response_style_block(_mode: str) -> str:
     return (
         'Use the output form required for this turn:\n'
         '- use tools for investigation or implementation when the protocol calls for action\n'
@@ -27,7 +26,6 @@ def _render_interaction_tail(
     )
     response_style_body = _build_response_style_block(
         resolved_mode,
-        meta_cognition_on=False,
     )
     communicate_tool_section = (
         '<ASK_USER_TOOL>\n'

@@ -6,10 +6,10 @@ from collections.abc import Callable
 
 from backend.core.tools.tool_names import (
     ANALYZE_PROJECT_STRUCTURE_TOOL_NAME,
-    CODE_INTELLIGENCE_TOOL_NAME,
     FIND_SYMBOLS_TOOL_NAME,
     GLOB_TOOL_NAME,
     GREP_TOOL_NAME,
+    LSP_TOOL_NAME,
     MULTIEDIT_TOOL_NAME,
     READ_FILE_TOOL_NAME,
     REPLACE_STRING_TOOL_NAME,
@@ -27,7 +27,7 @@ def _build_search_tools(*, lsp_available: bool) -> str:
         _tool_ref(FIND_SYMBOLS_TOOL_NAME),
     ]
     if lsp_available:
-        parts.append(_tool_ref(CODE_INTELLIGENCE_TOOL_NAME))
+        parts.append(_tool_ref(LSP_TOOL_NAME))
     return '/'.join(parts)
 
 
@@ -102,13 +102,12 @@ def _render_examples(
     tracker_on: bool,
     criteria_on: bool = True,
     working_memory_on: bool,
-    meta_cognition_on: bool,
     lsp_available: bool,
     checkpoints_on: bool,
     web_on: bool = True,
 ) -> str:
     """Render the worked-examples partial with capability-aware tool references."""
-    _ = (meta_cognition_on, working_memory_on, web_on, terminal_command_tool)
+    _ = (working_memory_on, web_on, terminal_command_tool)
     search_tools = _build_search_tools(lsp_available=lsp_available)
 
     destructive_confirmation_step = 'See `<ASK_USER_TOOL>` to confirm scope and target'
@@ -118,7 +117,7 @@ def _render_examples(
         checkpoint_step = 'If approved, keep the change surface small and verify immediately after the action'
     adjacent_tool_fallback = (
         f'symbol lookup → {_tool_ref(GREP_TOOL_NAME)}; '
-        f'{_tool_ref(CODE_INTELLIGENCE_TOOL_NAME)} → {_tool_ref(GREP_TOOL_NAME)}'
+        f'{_tool_ref(LSP_TOOL_NAME)} → {_tool_ref(GREP_TOOL_NAME)}'
         if lsp_available
         else f'symbol lookup → {_tool_ref(GREP_TOOL_NAME)}; refine the query and read nearby files'
     )
