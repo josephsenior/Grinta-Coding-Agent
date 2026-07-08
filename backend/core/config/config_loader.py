@@ -337,7 +337,7 @@ def _build_json_llm_config(
                 llm_dict['context_window_tokens'] = int(str(raw))
             except (ValueError, TypeError):
                 pass
-    reasoning_raw = data.get('llm_reasoning_effort', data.get('reasoningEffort'))
+    reasoning_raw = data.get('llm_reasoning_effort')
     if reasoning_raw is not None and str(reasoning_raw).strip():
         llm_dict['reasoning_effort'] = str(reasoning_raw).strip()
     _apply_json_llm_temperature(llm_dict, data)
@@ -478,9 +478,11 @@ def _apply_json_tool_integration_config(cfg: AppConfig, data: dict[str, object])
 def _filter_agent_updates(raw_updates: object) -> dict[str, object] | None:
     if not isinstance(raw_updates, dict):
         return None
-    from backend.core.config.tool_integration_defaults import LEGACY_AGENT_TOOL_KEYS
+    from backend.core.config.tool_integration_defaults import (
+        DEPRECATED_AGENT_SETTINGS_KEYS,
+    )
 
-    allowed_fields = set(AgentConfig.model_fields) - LEGACY_AGENT_TOOL_KEYS
+    allowed_fields = set(AgentConfig.model_fields) - DEPRECATED_AGENT_SETTINGS_KEYS
     filtered = {
         key: value for key, value in raw_updates.items() if key in allowed_fields
     }

@@ -800,7 +800,7 @@ class TestLoadFromJson:
         assert orchestrator.enable_lsp_query is True
         assert orchestrator.enable_debugger is True
 
-    def test_load_from_json_ignores_legacy_agent_lsp_dap_when_top_level_present(
+    def test_load_from_json_ignores_deprecated_agent_lsp_dap_keys(
         self, tmp_path
     ) -> None:
         from backend.core.constants import DEFAULT_AGENT_NAME
@@ -840,7 +840,6 @@ class TestLoadFromJson:
                     'agent': {
                         DEFAULT_AGENT_NAME: {
                             'mode': 'agent',
-                            'enable_lsp_query': False,
                         }
                     }
                 }
@@ -853,7 +852,9 @@ class TestLoadFromJson:
 
         data = json.loads(settings_path.read_text(encoding='utf-8'))
         assert data['lsp_config'] == {'enabled': True}
-        assert 'enable_lsp_query' not in data['agent'][DEFAULT_AGENT_NAME]
+        assert 'enable_lsp_query' not in data.get('agent', {}).get(
+            DEFAULT_AGENT_NAME, {}
+        )
 
     def test_load_from_json_applies_valid_agent_overrides_and_skips_invalid(
         self, tmp_path
@@ -898,7 +899,7 @@ class TestLoadFromJson:
 
         assert cfg.security.execution_profile == 'standard'
 
-    def test_load_from_json_migrates_supervised_autonomy_level(
+    def test_load_from_json_rejects_supervised_autonomy_level(
         self, tmp_path, monkeypatch
     ) -> None:
         json_file = tmp_path / 'settings.json'
@@ -908,9 +909,9 @@ class TestLoadFromJson:
         cfg = AppConfig()
         monkeypatch.delenv('APP_STRICT_CONFIG', raising=False)
 
+        # Invalid agent overrides should be skipped (no silent migration).
         load_from_json(cfg, str(json_file))
-
-        assert cfg.get_agent_config('agent').autonomy_level == 'conservative'
+        assert cfg.get_agent_config('agent').autonomy_level != 'conservative'
 
 
 # ── Agent Registration Extra ──

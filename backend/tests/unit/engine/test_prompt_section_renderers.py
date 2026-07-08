@@ -81,7 +81,6 @@ class TestRenderCriticalModeSpecific:
             terminal_manager_available=kwargs.get('terminal_manager_available', False),
             tracker_on=kwargs.get('tracker_on', False),
             checkpoints_on=kwargs.get('checkpoints_on', False),
-            meta_cognition_on=kwargs.get('meta_cognition_on', False),
             mode=mode,
         )
 
@@ -411,7 +410,6 @@ class TestRenderCriticalFullRender:
             terminal_manager_available=kwargs.get('terminal_manager_available', False),
             tracker_on=kwargs.get('tracker_on', False),
             checkpoints_on=kwargs.get('checkpoints_on', False),
-            meta_cognition_on=kwargs.get('meta_cognition_on', False),
             mode=mode,
         )
 

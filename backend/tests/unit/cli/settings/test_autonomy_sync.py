@@ -92,7 +92,7 @@ def test_sync_persisted_autonomy_rebuilds_toolset_for_full() -> None:
     assert 'security_risk' not in required
 
 
-def test_get_persisted_autonomy_migrates_supervised(tmp_path, monkeypatch) -> None:
+def test_get_persisted_autonomy_rejects_supervised(tmp_path, monkeypatch) -> None:
     import backend.cli.settings.storage as storage_mod
 
     settings_path = tmp_path / 'settings.json'
@@ -104,6 +104,5 @@ def test_get_persisted_autonomy_migrates_supervised(tmp_path, monkeypatch) -> No
 
     level = get_persisted_autonomy_level('agent')
 
-    assert level == 'conservative'
-    data = json.loads(settings_path.read_text(encoding='utf-8'))
-    assert data['agent']['agent']['autonomy_level'] == 'conservative'
+    # Settings should be treated as invalid; no silent migration.
+    assert level == ''

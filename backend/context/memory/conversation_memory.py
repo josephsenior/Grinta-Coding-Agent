@@ -457,12 +457,6 @@ class ContextMemory:
                 'CmdRunAction',
                 'AgentThinkAction',
                 'SystemHintAction',
-                'ClarificationRequestAction',
-                'ConfirmRequestAction',
-                'InformAction',
-                'ProposalAction',
-                'UncertaintyAction',
-                'EscalateToHumanAction',
             }
         return is_observation_event(event)
 

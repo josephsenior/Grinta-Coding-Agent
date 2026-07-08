@@ -4,32 +4,26 @@ from __future__ import annotations
 
 from unittest import TestCase
 
-from backend.core import tools as _core_tools
-
-# Re-export for backward compat in tests that use `from backend.core import tool_names`
-tool_names = _core_tools.tool_names
+from backend.core.tools import tool_names
 
 EXPECTED_EXPORTS = [
+    'ACCEPTANCE_CRITERIA_TOOL_NAME',
     'ANALYZE_PROJECT_STRUCTURE_TOOL_NAME',
     'ASK_USER_TOOL_NAME',
-    'BLACKBOARD_TOOL_NAME',
     'BROWSER_TOOL_NAME',
     'CALL_MCP_TOOL_NAME',
     'CHECKPOINT_TOOL_NAME',
-    'CODE_INTELLIGENCE_TOOL_NAME',
     'CREATE_FILE_TOOL_NAME',
     'DEBUGGER_TOOL_NAME',
     'DELEGATE_TASK_TOOL_NAME',
     'DOCS_QUERY_TOOL_NAME',
     'DOCS_RESOLVE_TOOL_NAME',
     'EXECUTE_BASH_TOOL_NAME',
-    'EXECUTE_MCP_TOOL_TOOL_NAME',
     'EXECUTE_POWERSHELL_TOOL_NAME',
     'FIND_SYMBOLS_TOOL_NAME',
     'GLOB_TOOL_NAME',
     'GREP_TOOL_NAME',
     'LSP_TOOL_NAME',
-    'MEMORY_MANAGER_TOOL_NAME',
     'MEMORY_TOOL_NAME',
     'MULTIEDIT_TOOL_NAME',
     'NOTE_TOOL_NAME',
@@ -108,32 +102,7 @@ class TestToolNames(TestCase):
             self.assertIsInstance(value, str)
             self.assertTrue(value)
 
-    def test_legacy_aliases_match_canonical_names(self):
-        """Legacy constant names must reference the same runtime strings."""
-        self.assertEqual(
-            tool_names.CODE_INTELLIGENCE_TOOL_NAME, tool_names.LSP_TOOL_NAME
-        )
-        self.assertEqual(
-            tool_names.EXECUTE_MCP_TOOL_TOOL_NAME, tool_names.CALL_MCP_TOOL_NAME
-        )
-        self.assertEqual(
-            tool_names.BLACKBOARD_TOOL_NAME, tool_names.SHARED_TASK_BOARD_TOOL_NAME
-        )
-        self.assertEqual(
-            tool_names.MEMORY_MANAGER_TOOL_NAME, tool_names.MEMORY_TOOL_NAME
-        )
-
     def test_runtime_strings_are_unique(self):
         """Canonical tool name strings must not collide."""
-        canonical = [
-            getattr(tool_names, name)
-            for name in EXPECTED_EXPORTS
-            if name
-            not in {
-                'CODE_INTELLIGENCE_TOOL_NAME',
-                'EXECUTE_MCP_TOOL_TOOL_NAME',
-                'BLACKBOARD_TOOL_NAME',
-                'MEMORY_MANAGER_TOOL_NAME',
-            }
-        ]
+        canonical = [getattr(tool_names, name) for name in EXPECTED_EXPORTS]
         self.assertEqual(len(canonical), len(set(canonical)))

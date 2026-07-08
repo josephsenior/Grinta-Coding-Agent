@@ -42,6 +42,7 @@ dependencies = [
   "pathspec>=0.12,<2",
   "prompt-toolkit>=3.0.50,<4",
   "psutil>=7,<8",
+  "pygit2>=1.16,<2",
   "ptyprocess>=0.7,<1; sys_platform!='win32'",
   "pyfiglet>=1.0.4",
   "pylatexenc>=2.10,<3",

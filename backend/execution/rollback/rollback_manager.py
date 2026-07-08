@@ -9,7 +9,6 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import subprocess
 import tempfile
 import time
 from dataclasses import asdict, dataclass, field
@@ -19,12 +18,8 @@ from typing import Any
 
 from backend.core.logging.logger import app_logger as logger
 from backend.core.workspace_resolution import workspace_agent_state_dir
-from backend.execution.rollback.workspace_checkpoint import (
-    restore_checkpoint as restore_workspace_checkpoint,
-)
-from backend.execution.rollback.workspace_checkpoint import (
-    save_checkpoint as save_workspace_checkpoint,
-)
+from backend.execution.rollback.shadow_repo import ShadowRepo, ShadowRepoError
+
 
 
 @dataclass
@@ -60,13 +55,17 @@ class RollbackManager:
     Features:
     - Automatic checkpoints before risky operations
     - Manual checkpoint creation
-    - Git-based snapshots (if available)
-    - File-level snapshots
+    - pygit2-backed shadow-repo snapshots (always available, no system git needed)
     - Rollback to any checkpoint
     - Cleanup of old checkpoints
 
-    Example:
-        ```python
+    The checkpoint backend is a private bare git object-store (``ShadowRepo``)
+    maintained entirely via pygit2 inside ``.grinta/shadow_repo/``.  It is
+    completely independent of any ``.git`` the workspace may have, requires no
+    system ``git`` binary, and works identically on Windows, macOS and Linux.
+
+    Example::
+
         rollback = RollbackManager(workspace_path="/workspace")
 
         # Create checkpoint before risky operation
@@ -80,7 +79,6 @@ class RollbackManager:
         # Rollback if something went wrong
         if error:
             rollback.rollback_to(checkpoint_id)
-        ```
 
     """
 
@@ -95,11 +93,14 @@ class RollbackManager:
         """Initialize rollback manager.
 
         Args:
-            workspace_path: Path to the workspace
-            checkpoints_dir: Directory to store checkpoints (default: workspace_path/.app/checkpoints)
-            max_checkpoints: Maximum number of checkpoints to keep
-            auto_cleanup: Whether to automatically clean up old checkpoints
-            allow_destructive_git_rollback: Whether to allow destructive git rollback
+            workspace_path: Path to the workspace.
+            checkpoints_dir: Directory to store the checkpoint manifest
+                (default: ``<workspace>/.grinta/rollback_checkpoints``).
+            max_checkpoints: Maximum number of checkpoints to keep.
+            auto_cleanup: Whether to automatically clean up old checkpoints.
+            allow_destructive_git_rollback: Unused; kept for API compatibility
+                with existing call-sites.  Has no effect -- the shadow-repo
+                approach is inherently non-destructive.
 
         """
         self.workspace_path = Path(workspace_path)
@@ -110,11 +111,8 @@ class RollbackManager:
         )
         self.max_checkpoints = max_checkpoints
         self.auto_cleanup = auto_cleanup
-        if allow_destructive_git_rollback is None:
-            allow_destructive_git_rollback = os.getenv(
-                'GRINTA_ENABLE_DESTRUCTIVE_GIT_ROLLBACK', ''
-            ).strip().lower() in {'1', 'true', 'yes', 'on'}
-        self.allow_destructive_git_rollback = allow_destructive_git_rollback
+        # Retained for API compat -- has no effect with the shadow-repo backend.
+        self.allow_destructive_git_rollback = bool(allow_destructive_git_rollback or False)
 
         # Create checkpoints directory
         self.checkpoints_dir.mkdir(parents=True, exist_ok=True)
@@ -129,23 +127,13 @@ class RollbackManager:
             default=0.0,
         )
 
-        # Check if git is available
-        self.vcs_available = self._check_git_available()
+        # Initialise the shadow repo (pygit2, no subprocess).
+        # pygit2 is a hard dependency -- if it is missing or the shadow repo
+        # cannot be initialised the exception propagates to the caller.
+        self._shadow_repo = ShadowRepo(workspace_root=self.workspace_path)
 
-    def _check_git_available(self) -> bool:
-        """Check if git is available and workspace is a git repo."""
-        try:
-            result = subprocess.run(
-                ['git', 'rev-parse', '--git-dir'],
-                check=False,
-                cwd=self.workspace_path,
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            return result.returncode == 0
-        except Exception:
-            return False
+        # vcs_available kept for API compatibility with existing call-sites.
+        self.vcs_available: bool = True
 
     def _load_checkpoints(self) -> list[Checkpoint]:
         """Load existing checkpoints from disk."""
@@ -194,155 +182,51 @@ class RollbackManager:
         """Generate a unique checkpoint ID."""
         return f'cp_{int(time.time() * 1000)}_{os.urandom(4).hex()}'
 
-    def _create_git_snapshot(self) -> str | None:
-        """Create a detached git commit object without touching HEAD or the branch.
+    def _create_shadow_snapshot(self, label: str) -> str:
+        """Create a shadow-repo snapshot via pygit2 and return the commit SHA.
 
-        Uses git plumbing commands (``read-tree`` → ``write-tree`` →
-        ``commit-tree``) with a *temporary* index file so that the user's
-        working index and active branch are never modified.  The resulting
-        commit SHA is stored in the checkpoint manifest and used for
-        non-destructive restoration via ``git checkout <sha> -- .``.
-
-        Returns:
-            Git commit SHA if successful, None otherwise.
-
-        """
-        if not self.vcs_available:
-            return None
-
-        tmp_index = self.workspace_path / '.git' / 'grinta_snapshot_index'
-        env = {**os.environ, 'GIT_INDEX_FILE': str(tmp_index)}
-
-        try:
-            # 1. Seed a fresh temp index from HEAD so we only diff changes.
-            subprocess.run(
-                ['git', 'read-tree', 'HEAD'],
-                check=False,
-                cwd=self.workspace_path,
-                capture_output=True,
-                env=env,
-                timeout=15,
-            )
-
-            # 2. Stage all current changes into the temp index.
-            subprocess.run(
-                ['git', 'add', '-A'],
-                check=False,
-                cwd=self.workspace_path,
-                capture_output=True,
-                env=env,
-                timeout=30,
-            )
-
-            # 3. Write a tree object from the temp index.
-            tree_result = subprocess.run(
-                ['git', 'write-tree'],
-                check=False,
-                cwd=self.workspace_path,
-                capture_output=True,
-                text=True,
-                env=env,
-                timeout=30,
-            )
-            if tree_result.returncode != 0:
-                logger.warning('git write-tree failed: %s', tree_result.stderr)
-                return None
-            tree_sha = tree_result.stdout.strip()
-
-            # 4. Resolve current HEAD SHA to use as parent (may be absent on
-            #    empty repositories — commit-tree handles no -p gracefully).
-            head_result = subprocess.run(
-                ['git', 'rev-parse', '--verify', 'HEAD'],
-                check=False,
-                cwd=self.workspace_path,
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            parent_args = (
-                ['-p', head_result.stdout.strip()]
-                if head_result.returncode == 0
-                else []
-            )
-
-            # 5. Create a detached commit object — HEAD is NOT updated.
-            commit_result = subprocess.run(
-                [
-                    'git',
-                    'commit-tree',
-                    tree_sha,
-                    *parent_args,
-                    '-m',
-                    '[Grinta Snapshot] detached auto-checkpoint',
-                ],
-                check=False,
-                cwd=self.workspace_path,
-                capture_output=True,
-                text=True,
-                timeout=15,
-            )
-            if commit_result.returncode != 0:
-                logger.warning('git commit-tree failed: %s', commit_result.stderr)
-                return None
-
-            commit_sha = commit_result.stdout.strip()
-            logger.debug('Detached git snapshot created: %s', commit_sha)
-            return commit_sha
-
-        except Exception as e:
-            logger.warning('Failed to create detached git snapshot: %s', e)
-            return None
-
-        finally:
-            # Always clean up the temp index to avoid leaving stale files.
-            try:
-                if tmp_index.exists():
-                    tmp_index.unlink()
-            except OSError:
-                pass
-
-    def _create_file_snapshot(self, checkpoint_id: str) -> dict[str, str]:
-        """Create file-level snapshots for the checkpoint.
-
-        Args:
-            checkpoint_id: ID of the checkpoint
+        Uses the ``ShadowRepo`` engine: an in-process bare git object-store
+        located in ``.grinta/shadow_repo/``.  No subprocess is spawned.  The
+        stat-cache skips re-hashing files that have not changed since the last
+        snapshot, making incremental checkpoints very fast.
 
         Returns:
-            Dictionary mapping file paths to content hashes
+            Commit SHA string (40 hex chars).
+
+        Raises:
+            ShadowRepoError: If the pygit2 snapshot fails.
 
         """
-        snapshot_dir = self.checkpoints_dir / checkpoint_id
-        try:
-            manifest = save_workspace_checkpoint(
-                self.workspace_path,
-                snapshot_dir,
-                label=checkpoint_id,
-            )
-            return {entry.path: 'saved' for entry in manifest.files}
-        except Exception as e:
-            logger.error('Failed to create file snapshot: %s', e)
-            return {}
+        return self._shadow_repo.snapshot(label=label)
 
     def create_checkpoint(
         self,
         description: str,
         checkpoint_type: str = 'manual',
         metadata: dict[str, Any] | None = None,
-        use_git: bool = True,
+        use_git: bool = True,  # noqa: ARG002 -- kept for API compat; shadow repo always used
         tier: int = 2,
     ) -> str:
         """Create a new checkpoint.
 
+        The checkpoint is backed by the ``ShadowRepo`` engine (pygit2, in-process,
+        zero subprocess).  The ``use_git`` parameter is accepted for API
+        compatibility with existing call-sites but has no effect.
+
         Args:
-            description: Human-readable description
-            checkpoint_type: Type of checkpoint ('auto', 'manual', 'before_risky')
-            metadata: Additional metadata to store
-            use_git: Whether to use git for snapshot (if available)
-            tier: Visibility tier. 2 = user-visible manual snapshot (default).
+            description: Human-readable description.
+            checkpoint_type: Type of checkpoint ('auto', 'manual', 'before_risky',
+                'phase_boundary', etc.).
+            metadata: Additional metadata to store.
+            use_git: Accepted for API compatibility; has no effect.
+            tier: Visibility tier.  2 = user-visible manual snapshot (default).
                   1 = system transaction (hidden from /checkpoint list by default).
 
         Returns:
-            Checkpoint ID
+            Checkpoint ID string.
+
+        Raises:
+            ShadowRepoError: If the shadow-repo snapshot fails.
 
         """
         checkpoint_id = self._generate_checkpoint_id()
@@ -354,28 +238,15 @@ class RollbackManager:
 
         logger.info('Creating checkpoint: %s (ID: %s)', description, checkpoint_id)
 
-        # Create git snapshot if available
-        git_commit_sha = None
-        if use_git and self.vcs_available:
-            git_commit_sha = self._create_git_snapshot()
-
-        # Phase-boundary and drvfs workspaces: skip full file snapshots (slow on WSL /mnt/c).
-        # Tier-1 system transactions also skip file snapshots when git plumbing succeeded —
-        # the detached commit already contains the full workspace state, so duplicating
-        # it via shutil would be pure write amplification.
-        from backend.core.wsl import is_windows_mount
-
-        skip_file_snapshot = (
-            checkpoint_type == 'phase_boundary'
-            or is_windows_mount(self.workspace_path)
-            or (tier == 1 and git_commit_sha is not None)
-        )
-        if skip_file_snapshot:
-            file_snapshots: dict[str, str] = {}
+        # Phase-boundary checkpoints skip the snapshot -- they record a lifecycle
+        # transition marker only, not workspace content.
+        if checkpoint_type == 'phase_boundary':
+            shadow_sha: str | None = None
         else:
-            file_snapshots = self._create_file_snapshot(checkpoint_id)
+            shadow_sha = self._create_shadow_snapshot(label=description)
 
-        # Create checkpoint object
+        # Create checkpoint object.  The shadow commit SHA is stored in the
+        # existing ``git_commit_sha`` field so old manifests stay compatible.
         checkpoint = Checkpoint(
             id=checkpoint_id,
             timestamp=checkpoint_ts,
@@ -383,8 +254,8 @@ class RollbackManager:
             checkpoint_type=checkpoint_type,
             workspace_path=str(self.workspace_path),
             metadata=metadata or {},
-            git_commit_sha=git_commit_sha,
-            file_snapshots=file_snapshots,
+            git_commit_sha=shadow_sha,
+            file_snapshots={},
             tier=tier,
         )
 
@@ -406,10 +277,10 @@ class RollbackManager:
         """Rollback workspace to a specific checkpoint.
 
         Args:
-            checkpoint_id: ID of the checkpoint to rollback to
+            checkpoint_id: ID of the checkpoint to rollback to.
 
         Returns:
-            True if rollback was successful, False otherwise
+            ``True`` if rollback was successful, ``False`` otherwise.
 
         """
         checkpoint = self._find_checkpoint(checkpoint_id)
@@ -421,13 +292,7 @@ class RollbackManager:
         )
 
         try:
-            # Try git-based rollback first
-            if self._try_git_rollback(checkpoint):
-                return True
-
-            # Fallback to file-based rollback
-            return self._try_file_based_rollback(checkpoint_id)
-
+            return self._try_shadow_rollback(checkpoint)
         except Exception as e:
             logger.error('Rollback failed: %s', e)
             return False
@@ -436,10 +301,10 @@ class RollbackManager:
         """Find a checkpoint by ID.
 
         Args:
-            checkpoint_id: Checkpoint ID to find
+            checkpoint_id: Checkpoint ID to find.
 
         Returns:
-            Checkpoint object or None if not found
+            Checkpoint object or None if not found.
 
         """
         checkpoint = next(
@@ -449,78 +314,39 @@ class RollbackManager:
             logger.error('Checkpoint not found: %s', checkpoint_id)
         return checkpoint
 
-    def _try_git_rollback(self, checkpoint: Checkpoint) -> bool:
-        """Restore workspace files from a detached snapshot commit.
-
-        Uses ``git checkout <sha> -- .`` which overwrites tracked files in the
-        working directory without moving HEAD or altering the active branch.
-        This is safe by default and does NOT require
-        ``allow_destructive_git_rollback``.
+    def _try_shadow_rollback(self, checkpoint: Checkpoint) -> bool:
+        """Restore workspace from the shadow-repo commit recorded in *checkpoint*.
 
         Args:
-            checkpoint: Checkpoint containing git commit SHA
+            checkpoint: Checkpoint whose ``git_commit_sha`` holds a shadow SHA.
 
         Returns:
-            True if git rollback succeeded, False otherwise
+            ``True`` if the shadow restore succeeded, ``False`` if the checkpoint
+            has no SHA (e.g. a phase-boundary marker).
+
+        Raises:
+            ShadowRepoError: If the shadow restore encounters a pygit2 error.
 
         """
-        if not (checkpoint.git_commit_sha and self.vcs_available):
+        if not checkpoint.git_commit_sha:
+            logger.warning(
+                'Checkpoint %s has no snapshot SHA (phase-boundary marker); nothing to restore.',
+                checkpoint.id,
+            )
             return False
 
-        result = subprocess.run(
-            ['git', 'checkout', checkpoint.git_commit_sha, '--', '.'],
-            check=False,
-            cwd=self.workspace_path,
-            capture_output=True,
-            text=True,
-            timeout=60,
+        quarantine_dir = (
+            self.checkpoints_dir
+            / f'{checkpoint.id}_restore_quarantine_{int(time.time())}'
         )
-
-        if result.returncode == 0:
-            logger.info(
-                'Non-destructive git restore successful from detached commit %s',
-                checkpoint.git_commit_sha,
-            )
-            return True
-        logger.warning('git checkout restore failed: %s', result.stderr)
-        return False
-
-    def _try_file_based_rollback(self, checkpoint_id: str) -> bool:
-        """Attempt to rollback using file snapshots.
-
-        Args:
-            checkpoint_id: Checkpoint ID to restore from
-
-        Returns:
-            True if file-based rollback succeeded, False otherwise
-
-        """
-        snapshot_dir = self.checkpoints_dir / checkpoint_id
-
-        if not snapshot_dir.exists():
-            logger.error('Checkpoint snapshot directory not found: %s', snapshot_dir)
-            return False
-
-        try:
-            quarantine_dir = restore_workspace_checkpoint(
-                self.workspace_path,
-                snapshot_dir,
-                quarantine_dir=(
-                    self.checkpoints_dir
-                    / f'{checkpoint_id}_restore_quarantine_{int(time.time())}'
-                ),
-            )
-        except Exception as exc:
-            logger.error('File-based rollback failed while restoring snapshot: %s', exc)
-            return False
-
-        if quarantine_dir is not None:
-            logger.info(
-                'File-based rollback successful; extra workspace files quarantined in %s',
-                quarantine_dir,
-            )
-        else:
-            logger.info('File-based rollback successful')
+        self._shadow_repo.restore(
+            checkpoint.git_commit_sha,
+            quarantine_dir=quarantine_dir,
+        )
+        logger.info(
+            'Shadow-repo restore successful from commit %s',
+            checkpoint.git_commit_sha,
+        )
         return True
 
     def _snapshot_relative_files(self, snapshot_dir: Path) -> set[Path]:

@@ -5,11 +5,6 @@ from __future__ import annotations
 from enum import Enum
 
 
-_LEGACY_AUTONOMY_ALIASES: dict[str, str] = {
-    'supervised': 'conservative',
-}
-
-
 class AutonomyLevel(str, Enum):
     """Agent autonomy levels.
 
@@ -55,9 +50,8 @@ def security_risk_required_for_autonomy(level: object) -> bool:
 
 
 def resolve_persisted_autonomy_level(raw: object) -> str:
-    """Normalize a settings value, applying legacy aliases when recognized."""
-    level = normalize_autonomy_level(raw)
-    return _LEGACY_AUTONOMY_ALIASES.get(level, level)
+    """Normalize a persisted settings value."""
+    return normalize_autonomy_level(raw)
 
 
 def autonomy_runtime_notice(level: object) -> str:

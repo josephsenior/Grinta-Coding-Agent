@@ -294,9 +294,7 @@ def sync_persisted_interaction_mode_to_controller(
 def get_persisted_autonomy_level(agent_name: str | None = None) -> str:
     """Return the user-configured autonomy level from settings.json (empty = default)."""
     from backend.core.autonomy import (
-        _LEGACY_AUTONOMY_ALIASES,
         _VALID_AUTONOMY_LEVELS,
-        normalize_autonomy_level,
         resolve_persisted_autonomy_level,
     )
     from backend.core.constants import DEFAULT_AGENT_NAME
@@ -325,13 +323,6 @@ def get_persisted_autonomy_level(agent_name: str | None = None) -> str:
         if not isinstance(entry, dict):
             continue
         raw = entry.get('autonomy_level')
-        if (
-            isinstance(raw, str)
-            and normalize_autonomy_level(raw) in _LEGACY_AUTONOMY_ALIASES
-        ):
-            migrated = resolve_persisted_autonomy_level(raw)
-            update_autonomy_level(migrated, name)
-            return migrated
         level = resolve_persisted_autonomy_level(raw)
         if level in _VALID_AUTONOMY_LEVELS:
             return level
@@ -422,10 +413,7 @@ def _update_agent_bool_field(
 
 def update_enable_lsp_query(enabled: bool, agent_name: str | None = None) -> None:
     """Persist ``lsp_config.enabled``."""
-    from backend.core.config.tool_integration_defaults import (
-        default_lsp_config,
-        strip_legacy_agent_tool_keys,
-    )
+    from backend.core.config.tool_integration_defaults import default_lsp_config
 
     _ = agent_name
     settings = _load_raw_settings()
@@ -434,16 +422,12 @@ def update_enable_lsp_query(enabled: bool, agent_name: str | None = None) -> Non
         lsp_cfg = dict(default_lsp_config())
     lsp_cfg['enabled'] = bool(enabled)
     settings['lsp_config'] = lsp_cfg
-    strip_legacy_agent_tool_keys(settings)
     _save_raw_settings(settings)
 
 
 def update_enable_debugger(enabled: bool, agent_name: str | None = None) -> None:
     """Persist ``dap_config.enabled``."""
-    from backend.core.config.tool_integration_defaults import (
-        default_dap_config,
-        strip_legacy_agent_tool_keys,
-    )
+    from backend.core.config.tool_integration_defaults import default_dap_config
 
     _ = agent_name
     settings = _load_raw_settings()
@@ -452,7 +436,6 @@ def update_enable_debugger(enabled: bool, agent_name: str | None = None) -> None
         dap_cfg = dict(default_dap_config())
     dap_cfg['enabled'] = bool(enabled)
     settings['dap_config'] = dap_cfg
-    strip_legacy_agent_tool_keys(settings)
     _save_raw_settings(settings)
 
 

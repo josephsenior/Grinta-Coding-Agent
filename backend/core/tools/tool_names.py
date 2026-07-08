@@ -34,10 +34,9 @@ ACCEPTANCE_CRITERIA_TOOL_NAME = 'acceptance_criteria'
 # ── Memory & checkpoints ──────────────────────────────────────────────
 MEMORY_TOOL_NAME = 'memory'
 CHECKPOINT_TOOL_NAME = 'checkpoint'
-# Internal-only legacy names (not exposed to the LLM tool surface).
+# Internal-only tool names (not exposed to the LLM tool surface).
 NOTE_TOOL_NAME = 'note'
 RECALL_TOOL_NAME = 'recall'
-MEMORY_MANAGER_TOOL_NAME = MEMORY_TOOL_NAME
 
 # ── Web & MCP ───────────────────────────────────────────────────────
 WEB_SEARCH_TOOL_NAME = 'web_search'
@@ -50,32 +49,23 @@ DEBUGGER_TOOL_NAME = 'debugger'
 DELEGATE_TASK_TOOL_NAME = 'delegate_task'
 SHARED_TASK_BOARD_TOOL_NAME = 'shared_task_board'
 
-# ── Legacy aliases (prefer the canonical names above in new code) ─────
-CODE_INTELLIGENCE_TOOL_NAME = LSP_TOOL_NAME
-EXECUTE_MCP_TOOL_TOOL_NAME = CALL_MCP_TOOL_NAME
-BLACKBOARD_TOOL_NAME = SHARED_TASK_BOARD_TOOL_NAME
-
 __all__ = [
     'ANALYZE_PROJECT_STRUCTURE_TOOL_NAME',
     'ASK_USER_TOOL_NAME',
-    'BLACKBOARD_TOOL_NAME',
     'BROWSER_TOOL_NAME',
     'CALL_MCP_TOOL_NAME',
     'CHECKPOINT_TOOL_NAME',
-    'CODE_INTELLIGENCE_TOOL_NAME',
     'CREATE_FILE_TOOL_NAME',
     'DEBUGGER_TOOL_NAME',
     'DOCS_QUERY_TOOL_NAME',
     'DOCS_RESOLVE_TOOL_NAME',
     'DELEGATE_TASK_TOOL_NAME',
     'EXECUTE_BASH_TOOL_NAME',
-    'EXECUTE_MCP_TOOL_TOOL_NAME',
     'EXECUTE_POWERSHELL_TOOL_NAME',
     'FIND_SYMBOLS_TOOL_NAME',
     'GLOB_TOOL_NAME',
     'GREP_TOOL_NAME',
     'LSP_TOOL_NAME',
-    'MEMORY_MANAGER_TOOL_NAME',
     'MEMORY_TOOL_NAME',
     'MULTIEDIT_TOOL_NAME',
     'NOTE_TOOL_NAME',

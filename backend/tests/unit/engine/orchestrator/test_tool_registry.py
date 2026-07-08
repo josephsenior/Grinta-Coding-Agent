@@ -175,13 +175,8 @@ class TestFeatureFlagToolPresence:
         names = _build_toolset(enable_mcp=False)
         assert 'call_mcp_tool' in names
 
-    def test_meta_cognition_enabled(self):
-        names = _build_toolset(enable_meta_cognition=True)
-        assert 'ask_user' in names
-        self._assert_dispatch_covered(names)
-
-    def test_meta_cognition_disabled(self):
-        names = _build_toolset(enable_meta_cognition=False)
+    def test_ask_user_always_in_toolset(self):
+        names = _build_toolset()
         assert 'ask_user' in names
         self._assert_dispatch_covered(names)
 
@@ -244,7 +239,6 @@ class TestFeatureFlagToolPresence:
             enable_editor=False,
             enable_checkpoints=False,
             enable_mcp=False,
-            enable_meta_cognition=False,
             enable_task_tracker_tool=False,
             enable_working_memory=False,
             enable_swarming=False,
@@ -267,7 +261,6 @@ class TestFeatureFlagToolPresence:
                 enable_editor=True,
                 enable_checkpoints=True,
                 enable_mcp=True,
-                enable_meta_cognition=True,
                 enable_task_tracker_tool=True,
                 enable_working_memory=True,
                 enable_swarming=True,
@@ -287,7 +280,6 @@ class TestModeToolVisibility:
         ):
             names = _build_toolset(
                 mode='plan',
-                enable_meta_cognition=False,
                 enable_terminal=True,
                 enable_editor=True,
                 enable_task_tracker_tool=True,
@@ -311,6 +303,7 @@ class TestModeToolVisibility:
             'docs_query',
             'ask_user',
             'task_tracker',
+            'acceptance_criteria',
         }
         assert {
             'create_file',
@@ -335,7 +328,6 @@ class TestModeToolVisibility:
             mode='agent',
             enable_terminal=True,
             enable_editor=True,
-            enable_meta_cognition=True,
             enable_checkpoints=False,
             enable_working_memory=False,
             enable_debugger=False,
@@ -364,7 +356,6 @@ class TestModeToolVisibility:
         ):
             names = _build_toolset(
                 mode='chat',
-                enable_meta_cognition=True,
                 enable_terminal=True,
                 enable_editor=True,
                 enable_task_tracker_tool=True,

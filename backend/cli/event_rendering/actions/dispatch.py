@@ -30,12 +30,10 @@ from backend.ledger.action import (  # noqa: E402
     AnalyzeProjectStructureAction,
     BrowseInteractiveAction,
     BrowserToolAction,
-    ClarificationRequestAction,
     CmdRunAction,
     CondensationAction,
     DebuggerAction,
     DelegateTaskAction,
-    EscalateToHumanAction,
     FileEditAction,
     FileReadAction,
     FindSymbolsAction,
@@ -44,7 +42,6 @@ from backend.ledger.action import (  # noqa: E402
     LspQueryAction,
     MCPAction,
     MessageAction,
-    ProposalAction,
     RecallAction,
     StreamingChunkAction,
     SystemHintAction,
@@ -55,7 +52,6 @@ from backend.ledger.action import (  # noqa: E402
     TerminalReadAction,
     TerminalRunAction,
     TerminalWaitAction,
-    UncertaintyAction,
 )
 
 _ORIENT_MCP_NAMES: frozenset[str] = ORIENT_MCP_TOOL_NAMES
@@ -106,10 +102,6 @@ class _ActionDispatchMixin(_ActionRenderersBase):
         (TerminalListAction, '_render_terminal_list_action'),
         (TerminalCloseAction, '_render_terminal_close_action'),
         (DelegateTaskAction, '_render_delegate_task_action'),
-        (EscalateToHumanAction, '_render_escalate_to_human_action'),
-        (ClarificationRequestAction, '_render_clarification_request_action'),
-        (UncertaintyAction, '_render_uncertainty_action'),
-        (ProposalAction, '_render_proposal_action'),
     )
 
     _NO_MATCH_FRAGMENTS: tuple[str, ...] = (

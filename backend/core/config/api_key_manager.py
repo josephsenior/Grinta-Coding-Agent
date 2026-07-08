@@ -383,14 +383,6 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
 
         return None
 
-    def _check_keyword_match(self, model_lower: str) -> str | None:
-        """Legacy no-op retained for compatibility with older tests/helpers."""
-        return None
-
-    def _check_fallback_patterns(self, model_lower: str) -> str:
-        """Legacy no-op retained for compatibility with older tests/helpers."""
-        return 'unknown'
-
     def extract_provider(self, model: str) -> str:
         """Return the provider identifier for a model string."""
         return self._extract_provider(model)

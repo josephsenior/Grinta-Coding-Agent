@@ -22,14 +22,6 @@ from backend.ledger.action import (
     SystemHintAction,
     TaskTrackingAction,
 )
-from backend.ledger.action.agent import (
-    ClarificationRequestAction,
-    ConfirmRequestAction,
-    EscalateToHumanAction,
-    InformAction,
-    ProposalAction,
-    UncertaintyAction,
-)
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.mcp import MCPAction
 from backend.ledger.action.terminal import (
@@ -41,14 +33,6 @@ from backend.ledger.action.terminal import (
     TerminalWaitAction,
 )
 
-_META_COGNITION_ACTION_TYPES = (
-    ClarificationRequestAction,
-    ConfirmRequestAction,
-    InformAction,
-    ProposalAction,
-    UncertaintyAction,
-    EscalateToHumanAction,
-)
 from backend.ledger.action.message import SystemMessageAction  # noqa: E402
 from backend.ledger.event import EventSource  # noqa: E402
 from backend.ledger.model_response_lite import ModelResponseLite  # noqa: E402
@@ -116,7 +100,6 @@ def _is_tool_based_action(action: Action) -> bool:
         TerminalWaitAction,
         TerminalListAction,
         TerminalCloseAction,
-        *_META_COGNITION_ACTION_TYPES,
     )
     if isinstance(action, tool_action_classes):
         return True
@@ -136,9 +119,6 @@ def _handle_tool_based_action(
 
     if isinstance(action, SystemHintAction):
         return _build_system_hint_message(action)
-
-    if isinstance(action, _META_COGNITION_ACTION_TYPES):
-        return _build_meta_cognition_message(action)
 
     # Synthetic/injected actions (e.g. stale-read prevention) carry no LLM
     # tool-call metadata. They were handled transparently by the runtime and
@@ -222,13 +202,6 @@ def _build_system_hint_message(action: Action) -> list[Message]:
         TextContent(text=f'[SYSTEM] {hint_text}')
     ]
     return [Message(role='user', content=content)]
-
-
-def _build_meta_cognition_message(action: Action) -> list[Message]:
-    """Build a user-visible assistant message from a meta-cognition action."""
-    msg_text = getattr(action, 'message', '') or str(action)
-    content: list[TextContent | ImageContent] = [TextContent(text=msg_text)]
-    return [Message(role='assistant', content=content)]
 
 
 def _require_tool_metadata(action: Action):

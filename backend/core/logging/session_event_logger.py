@@ -74,6 +74,9 @@ class SessionEventLogger:
         self._session_dir: str | None = None
         self._session_id: str | None = None
         self._workspace: str | None = None
+        self._queue: Any = None
+        self._thread: threading.Thread | None = None
+        self._sentinel = object()
 
     @property
     def is_bound(self) -> bool:
@@ -90,41 +93,111 @@ class SessionEventLogger:
         *,
         workspace_segment: str | None = None,
     ) -> None:
+        import queue
+        import atexit
+
         self.close()
         os.makedirs(log_dir, exist_ok=True)
         path = os.path.join(log_dir, SESSION_LOG_FILENAME)
-        stream = open(path, 'a', encoding='utf-8', buffering=1)  # noqa: SIM115
-        self._stream = stream
+        
+        # Keep a dummy stream to satisfy is_bound checks and global refs
+        self._stream = open(os.devnull, 'w', encoding='utf-8')
         self._session_dir = log_dir
         self._session_id = session_id
         self._workspace = workspace_segment
+        
+        # Set up async queue and background writer thread
+        self._queue = queue.Queue()
+        self._thread = threading.Thread(
+            target=self._writer_loop,
+            args=(path, self._queue),
+            name='grinta-session-logger-writer',
+            daemon=True,
+        )
+        self._thread.start()
+        
+        # Register atexit shutdown to ensure we drain the queue on clean exit
+        atexit.register(self._shutdown)
+
         global _STREAM, _SESSION_DIR, _SESSION_ID, _WORKSPACE_SEGMENT
         with _LOCK:
-            _STREAM = stream
+            _STREAM = self._stream
             _SESSION_DIR = log_dir
             _SESSION_ID = session_id
             _WORKSPACE_SEGMENT = workspace_segment
 
     def close(self) -> None:
         global _STREAM, _SESSION_DIR, _SESSION_ID, _WORKSPACE_SEGMENT
+        # Shutdown background thread first to flush everything
+        self._shutdown()
+        
         if self._stream is not None:
             try:
-                self._stream.flush()
                 self._stream.close()
             except Exception:
                 pass
         self._stream = None
         self._session_dir = None
         with _LOCK:
-            if _STREAM is self._stream:
+            if _STREAM is self._stream or _STREAM is not None:
                 _STREAM = None
                 _SESSION_DIR = None
                 _SESSION_ID = None
                 _WORKSPACE_SEGMENT = None
 
     def flush(self) -> None:
-        if self._stream is not None:
-            self._stream.flush()
+        pass
+
+    def _writer_loop(self, path: str, q: Any) -> None:
+        import queue as q_mod
+        
+        try:
+            with open(path, 'a', encoding='utf-8') as f:
+                fd = f.fileno()
+                while True:
+                    item = q.get()
+                    if item is self._sentinel:
+                        q.task_done()
+                        break
+                    
+                    batch = [item]
+                    q.task_done()
+                    
+                    while not q.empty():
+                        try:
+                            next_item = q.get_nowait()
+                            if next_item is self._sentinel:
+                                q.put(next_item)
+                                break
+                            batch.append(next_item)
+                            q.task_done()
+                        except q_mod.Empty:
+                            break
+                    
+                    f.write('\n'.join(batch) + '\n')
+                    f.flush()
+                    try:
+                        os.fsync(fd)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+    def _shutdown(self) -> None:
+        import atexit
+        
+        try:
+            atexit.unregister(self._shutdown)
+        except Exception:
+            pass
+            
+        if self._queue is not None:
+            self._queue.put(self._sentinel)
+            self._queue = None
+            
+        if self._thread is not None:
+            self._thread.join(timeout=2.0)
+            self._thread = None
 
     def emit(
         self,
@@ -158,10 +231,8 @@ class SessionEventLogger:
         }
         line = json.dumps(record, default=_json_default, ensure_ascii=False)
         with _LOCK:
-            if self._stream is None:
-                return
-            self._stream.write(line + '\n')
-            self._stream.flush()
+            if self._queue is not None:
+                self._queue.put(line)
 
         if event == 'SESSION_CONTEXT':
             return
@@ -202,10 +273,8 @@ class SessionEventLogger:
         }
         line = json.dumps(record, default=_json_default, ensure_ascii=False)
         with _LOCK:
-            if self._stream is None:
-                return
-            self._stream.write(line + '\n')
-            self._stream.flush()
+            if self._queue is not None:
+                self._queue.put(line)
 
 
 _SESSION_LOGGER = SessionEventLogger()

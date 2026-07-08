@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from backend.engine.contracts import NoopSafetyManager
-from backend.ledger.action import MessageAction, ProposalAction
+from backend.ledger.action import MessageAction
 
 
 def test_safety_blocks_explicit_file_claim_in_plain_message():
@@ -54,11 +54,9 @@ def test_safety_allows_structured_non_runnable_actions():
     proceed, actions = safety.apply(
         "I've prepared two approaches for your feedback.",
         [
-            ProposalAction(
-                options=[
-                    {'approach': 'Summarize tradeoffs directly', 'pros': [], 'cons': []}
-                ],
-                rationale='Two approaches are available.',
+            MessageAction(
+                content='Option A: summarize tradeoffs directly. Option B: ask for preference.',
+                wait_for_response=True,
             )
         ],
     )
