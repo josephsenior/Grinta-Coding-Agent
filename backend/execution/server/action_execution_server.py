@@ -38,6 +38,7 @@ from backend.execution.server.action_execution_server_io import (
 from backend.execution.server.debugger import DAPDebugManager
 from backend.execution.server.routes import (
     register_exception_handlers,
+    register_runtime_auth_middleware,
     register_routes,
 )
 from backend.execution.utils.file_editor import FileEditor
@@ -612,6 +613,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 register_exception_handlers(app)
+register_runtime_auth_middleware(app)
 register_routes(app, get_client, get_mcp_proxy)
 
 
