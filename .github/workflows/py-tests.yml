@@ -373,7 +373,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: gates-on-linux-extended
-    continue-on-error: true
     strategy:
       matrix:
         python-version: ['3.13']
@@ -395,7 +394,7 @@ jobs:
         run: python backend/scripts/verify/verify_optional_imports.py
       - name: Compile backend (syntax gate)
         run: uv run python -m compileall backend
-      - name: Run unit tests (Python 3.13 advisory)
+      - name: Run unit tests (Python 3.13)
         run: PYTHONPATH=".:$PYTHONPATH" uv run pytest -q backend/tests/unit
 
   gates-on-windows:

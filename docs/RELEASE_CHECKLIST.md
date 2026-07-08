@@ -18,10 +18,12 @@ These workflows run on every PR and on pushes to `main`. All **required** jobs m
 | **Run Python Tests** | `gates-on-windows-extended` | Integration, e2e, and stress suites on Windows (runs after unit gates pass; Python 3.12). |
 | **Run Python Tests** | `gates-on-macos` | Full unit corpus on macOS. |
 | **Run Python Tests** | `gates-on-macos-extended` | Integration, e2e, and stress suites on macOS (runs after unit gate passes). |
+| **Run Python Tests** | `gates-on-linux-py313` | Full unit corpus on Python 3.13 (runs after Linux extended). |
 | **Lint** | pre-commit, mypy, version consistency | See [`.github/workflows/lint.yml`](../.github/workflows/lint.yml). |
 | **CodeQL** | Python analysis | Static security analysis. |
 | **Security Scan (Bandit)** | Bandit | Python SAST. |
 | **Dependency Review** | PR dependency diff | Blocks high-severity dependency risk (PRs). |
+| **Dependency Audit (pip-audit)** | pip-audit | Audits locked runtime dependencies for known CVEs. |
 | **Smoke Install** | Linux + Windows | Wheel + source onboarding smoke — see [`.github/workflows/smoke-install.yml`](../.github/workflows/smoke-install.yml). |
 | **CLI Regression Tests** | When paths match | CLI/orchestration regression — see [`.github/workflows/e2e-tests.yml`](../.github/workflows/e2e-tests.yml). |
 
@@ -29,7 +31,6 @@ These workflows run on every PR and on pushes to `main`. All **required** jobs m
 
 | Job | Notes |
 | --- | --- |
-| `gates-on-linux-py313` | Full unit corpus on Python 3.13; `continue-on-error: true`. |
 | **Heavy / Integration Tests** | Marker-filtered `heavy \| integration \| benchmark` slice; runs on `main`, schedule, and manual dispatch only. |
 
 See [CI.md](CI.md) for the full matrix and local equivalents.

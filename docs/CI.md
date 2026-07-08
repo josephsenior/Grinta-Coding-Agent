@@ -16,10 +16,12 @@ For release tagging and GA promotion, see [RELEASE_CHECKLIST.md](RELEASE_CHECKLI
 | **Run Python Tests** | `gates-on-windows-extended` | Integration, e2e, and stress suites on Windows (runs after unit gates pass; Python 3.12). |
 | **Run Python Tests** | `gates-on-macos` | Full unit corpus on macOS. |
 | **Run Python Tests** | `gates-on-macos-extended` | Integration, e2e, and stress suites on macOS (runs after unit gate passes). |
+| **Run Python Tests** | `gates-on-linux-py313` | Full unit corpus on Python 3.13 (runs after Linux extended). |
 | **Lint** | pre-commit, mypy, version check | See [`.github/workflows/lint.yml`](../.github/workflows/lint.yml). |
 | **CodeQL** | `analyze` | Static security analysis for Python on PRs and main. |
 | **Security Scan (Bandit)** | Bandit | Python SAST; fails on medium/high findings. See [`.github/workflows/bandit.yml`](../.github/workflows/bandit.yml). |
 | **Dependency Review** | `dependency-review` | Blocks high-severity dependency risk on pull requests. |
+| **Dependency Audit (pip-audit)** | `pip-audit` | Audits locked runtime dependencies for known CVEs. |
 | **CLI Regression Tests** | (when paths match) | CLI integration smoke and selected orchestration tests; see [`.github/workflows/e2e-tests.yml`](../.github/workflows/e2e-tests.yml). |
 | **Smoke Install** | `smoke-install` | Clean venv wheel install + source onboarding smoke (`scripts/smoke_install.*`, `scripts/smoke_source_onboarding.*`) on Linux and Windows; see [`.github/workflows/smoke-install.yml`](../.github/workflows/smoke-install.yml). |
 
@@ -27,7 +29,6 @@ For release tagging and GA promotion, see [RELEASE_CHECKLIST.md](RELEASE_CHECKLI
 
 | Job | Notes |
 | --- | --- |
-| `gates-on-linux-py313` | Full unit corpus on Python 3.13; `continue-on-error: true`. |
 | **Heavy / Integration Tests** | Marker-filtered `heavy \| integration \| benchmark` slice; runs on `main`, schedule, and manual dispatch only. |
 
 ### Coverage

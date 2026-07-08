@@ -98,6 +98,7 @@ dev = [
   "grpcio>=1.70",
   "grpcio-tools>=1.70",
   "mypy==2.1",
+  "pip-audit>=2.9.0",
   "pre-commit==4.6",
   "pylint>=4.0.5,<5",
   "pytest>=9.0.3",
