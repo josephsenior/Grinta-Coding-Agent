@@ -352,8 +352,26 @@ def _ensure_linux_host_tools_early() -> None:
         pass
 
 
+def _start_tokenizer_preloader() -> None:
+    """Pre-load tiktoken encodings in a background thread to prevent first-call latency spikes."""
+    import threading
+
+    def _preload():
+        try:
+            import tiktoken  # type: ignore
+            # Warm up standard encodings
+            tiktoken.get_encoding('cl100k_base')
+            tiktoken.get_encoding('o200k_base')
+        except Exception:
+            pass
+
+    t = threading.Thread(target=_preload, name='grinta-tokenizer-preloader', daemon=True)
+    t.start()
+
+
 def main() -> None:
     """Parse flags and launch the interactive REPL or a subcommand."""
+    _start_tokenizer_preloader()
     parser = build_parser(include_subcommands=True)
 
     args = parser.parse_args(sys.argv[1:])

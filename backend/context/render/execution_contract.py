@@ -125,7 +125,8 @@ def _acceptance_criteria_lines(*, show_empty: bool = False) -> list[str]:
     try:
         from backend.core.criteria import AcceptanceCriteriaStore
 
-        return AcceptanceCriteriaStore().render_for_prompt_lines(show_empty=show_empty)
+        criteria = AcceptanceCriteriaStore().load_from_file()
+        return render_acceptance_gates(criteria, show_empty=show_empty)
     except Exception:
         return []
 

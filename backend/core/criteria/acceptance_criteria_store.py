@@ -29,24 +29,37 @@ def _save_lock_for(path: Path) -> threading.Lock:
         return lock
 
 
+def _resolve_session_id() -> str | None:
+    """Resolve session ID using working memory or bound session logger without context imports."""
+    import sys
+    try:
+        if 'backend.engine.tools.working_memory' in sys.modules:
+            wm = sys.modules['backend.engine.tools.working_memory']
+            sid = wm.get_current_session_id()
+            if isinstance(sid, str) and sid.strip():
+                return sid.strip()
+    except Exception:
+        pass
+    try:
+        from backend.core.logging.session_event_logger import get_bound_session_id
+        return get_bound_session_id()
+    except Exception:
+        pass
+    return None
+
+
 class AcceptanceCriteriaStore:
     """Manage session-scoped acceptance criteria JSON under the workspace agent dir."""
 
     def __init__(self, workspace_root: str | Path | None = None):
-        if workspace_root is None:
-            from backend.context.memory.session_context import scoped_agent_path
-
-            self.path = scoped_agent_path('acceptance_criteria', '.json')
-            return
-        from backend.context.memory.session_context import resolve_session_id
         from backend.core.workspace_resolution import workspace_agent_state_dir
 
         base = workspace_agent_state_dir(workspace_root)
-        sid = resolve_session_id()
+        sid = _resolve_session_id()
         if sid:
             self.path = base / f'acceptance_criteria_{sid}.json'
         else:
-            self.path = base / 'acceptance_criteria.json'
+            self.path = base / '.session_context_unbound' / 'acceptance_criteria.json'
 
     def load_from_file(self) -> list[dict[str, Any]]:
         """Load criteria from disk."""
@@ -124,22 +137,7 @@ class AcceptanceCriteriaStore:
             self.save_to_file(updated)
         return updated
 
-    def render_for_prompt_lines(
-        self,
-        *,
-        max_items: int = 10,
-        header: str = '- Acceptance gates:',
-        show_empty: bool = False,
-    ) -> list[str]:
-        """Render acceptance criteria as prompt lines."""
-        from backend.context.render.task_context import render_acceptance_gates
 
-        return render_acceptance_gates(
-            self.load_from_file(),
-            max_items=max_items,
-            header=header,
-            show_empty=show_empty,
-        )
 
 
 def build_refined_criteria_list(
