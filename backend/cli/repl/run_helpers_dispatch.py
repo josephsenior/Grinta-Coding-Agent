@@ -368,6 +368,19 @@ async def _ensure_controller_loop(
             config=config,
             hud=getattr(host, '_hud', None),
         )
+        from backend.cli.workspace_trust_prompt import (
+            maybe_apply_unfamiliar_workspace_hardening,
+        )
+        from backend.core.workspace_resolution import resolve_cli_workspace_directory
+
+        workspace = resolve_cli_workspace_directory(config)
+        await maybe_apply_unfamiliar_workspace_hardening(
+            controller,
+            workspace,
+            agent_name=agent_name,
+            host=None,
+            console=getattr(host, '_console', None),
+        )
 
     current_state = controller.get_agent_state()
     if current_state in {

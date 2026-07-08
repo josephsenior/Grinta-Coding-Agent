@@ -1,5 +1,7 @@
 # The Book of Grinta
 
+> **QUARANTINED — historical narrative only.** Chapters in this folder describe past pivots, deleted systems, and development memoir. They are **not** the current product specification. For install, settings, security, and CLI behavior use [USER_GUIDE.md](../USER_GUIDE.md), [SETTINGS.md](../SETTINGS.md), [ARCHITECTURE.md](../ARCHITECTURE.md), and [SECURITY_CHECKLIST.md](../SECURITY_CHECKLIST.md). Do not configure Grinta from journey chapters.
+
 > **Not a product spec.** This memoir is historical narrative. For current install, settings, modes, and CLI behavior use [USER_GUIDE.md](../USER_GUIDE.md), [SETTINGS.md](../SETTINGS.md), and [ARCHITECTURE.md](../ARCHITECTURE.md). Do not configure Grinta from journey chapters.
 
 **A 10-month journey from multi-tenant SaaS to a coherent local-first coding agent.**

@@ -12,4 +12,4 @@
 
 **Reference:** [SETTINGS.md](SETTINGS.md) · [SECURITY_CHECKLIST.md](SECURITY_CHECKLIST.md) · [ENGINES.md](ENGINES.md) · [PLUGIN_GUIDE.md](PLUGIN_GUIDE.md) · [mcp/integration_examples.md](mcp/integration_examples.md)
 
-**Historical (not current spec):** [journey/README.md](journey/README.md)
+**Historical (quarantined memoir — not current spec):** [journey/README.md](journey/README.md)

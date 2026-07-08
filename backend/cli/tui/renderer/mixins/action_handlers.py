@@ -384,7 +384,11 @@ class RendererActionHandlersMixin:
             self._clear_retry_strip('Idle')
             if state not in (AgentState.ERROR,):
                 self._clear_runtime_strip('Idle')
-            self._hud.update_agent_state(str(state))
+            if state == AgentState.RUNNING:
+                self._hud.update_ledger('Healthy')
+                self._hud.update_agent_state('Running')
+            else:
+                self._hud.update_agent_state(str(state))
             self._tui.set_agent_phase(str(state))
 
         self._maybe_start_agent_turn(state)

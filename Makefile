@@ -34,6 +34,10 @@ reliability-gate: pretest
 reliability-gate-integration: pretest
 	@uv run python backend/scripts/verify/reliability_gate.py --phase full --include-integration --include-stress
 
+.PHONY: ga-onboarding-gate
+ga-onboarding-gate:
+	@uv run python backend/scripts/verify/ga_onboarding_gate.py --update-status
+
 .PHONY: docker-up
 docker-up:
 	@if [ -f "docker-compose.yml" ] || [ -f "compose.yml" ]; then \

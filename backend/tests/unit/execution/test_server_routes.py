@@ -169,6 +169,15 @@ def test_exception_handler_request_validation_error() -> None:
     assert 'errors' in body
 
 
+def test_ping_returns_ok(tmp_path: Path) -> None:
+    workspace = tmp_path / 'workspace'
+    workspace.mkdir()
+    client = _make_app(workspace)
+    response = client.get('/ping')
+    assert response.status_code == 200
+    assert response.json() == {'status': 'ok'}
+
+
 def test_get_server_info_includes_uptime(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
