@@ -91,6 +91,7 @@ from backend.cli.tui.renderer.handlers.status import (
     _handle_error_observation,
     _handle_status_observation,
     _handle_success_observation,
+    maybe_restore_running_hud_after_backoff,
 )
 from backend.cli.tui.renderer.handlers.task_tracking import (
     _handle_task_tracking_action,
@@ -376,6 +377,7 @@ def _process_event(orch: 'RendererEventProcessorMixin', event: Any) -> None:
         _process_event_commit_response(orch, event, is_tool)
     _maybe_flush_orient_burst(orch, event)
     _dispatch_event(orch, event)
+    maybe_restore_running_hud_after_backoff(orch, event)
     if event_id >= 0:
         mounted = getattr(orch, '_mounted_event_ids', None)
         if mounted is not None:

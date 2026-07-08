@@ -1,8 +1,12 @@
-"""FastAPI route handlers for the runtime action execution server.
+"""FastAPI route handlers for the local runtime action execution server.
 
 Extracted from action_execution_server.py to separate HTTP route definitions
-from the RuntimeExecutor class. Contains: exception handlers, auth middleware,
-and all REST endpoints (execute_action, upload, download, list_files, etc.).
+from the RuntimeExecutor class. Contains exception handlers and REST endpoints
+(``/ping``, ``/server_info``, ``/execute_action``, upload/download/list_files).
+
+These routes are intended for **localhost-only** use when the runtime is
+started out-of-process. There is no HTTP authentication layer; the product
+default runs the executor in-process instead of over HTTP.
 """
 
 from __future__ import annotations
@@ -106,6 +110,11 @@ def register_routes(
         get_client: Callable that returns the current RuntimeExecutor instance
         get_mcp_proxy: Callable that returns the current MCPProxyManager instance
     """
+
+    @app.get('/ping')
+    async def ping():
+        """Lightweight liveness probe used by ActionExecutionClient.check_if_alive."""
+        return {'status': 'ok'}
 
     @app.get('/server_info')
     async def get_server_info():

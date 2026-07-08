@@ -372,6 +372,7 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
                 config=config,
                 hud=self._hud,
             )
+            await self._maybe_harden_unfamiliar_workspace(controller, config)
             self._render_hud_bar()
 
             from backend.utils.async_helpers.async_utils import set_main_event_loop
@@ -407,6 +408,20 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
                 and self._environment_probe_task is None
             ):
                 ready.set()
+
+    async def _maybe_harden_unfamiliar_workspace(self, controller: object, config: object) -> None:
+        from backend.cli.workspace_trust_prompt import (
+            maybe_apply_unfamiliar_workspace_hardening,
+        )
+        from backend.core.workspace_resolution import resolve_cli_workspace_directory
+
+        workspace = resolve_cli_workspace_directory(config)
+        await maybe_apply_unfamiliar_workspace_hardening(
+            controller,
+            workspace,
+            agent_name=self._active_agent_name(),
+            host=self,
+        )
 
     def _show_wsl_startup_warnings(self) -> None:
         """One-shot WSL2 layout warnings after bootstrap (official supported tier)."""

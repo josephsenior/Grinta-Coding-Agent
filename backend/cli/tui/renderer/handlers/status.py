@@ -27,6 +27,15 @@ if TYPE_CHECKING:
         RendererEventProcessorMixin,
     )
 
+_RETRY_STATUS_TYPES = frozenset(
+    {
+        'retry_pending',
+        'retry_resuming',
+        'llm_retry_pending',
+        'llm_retry_resuming',
+    }
+)
+
 _ACTION_REQUIRED_CATEGORIES = frozenset(
     {
         ERROR_CATEGORY_AUTH,
@@ -230,6 +239,59 @@ def _show_dap_install_hint_if_needed(
     tui.notify_warning(hint, timeout=6.0)
 
 
+def _backoff_hud_label_active(hud: Any) -> bool:
+    label = (getattr(getattr(hud, 'state', None), 'agent_state_label', '') or '').strip()
+    return label.startswith(('Backoff', 'Retrying'))
+
+
+def _restore_running_hud_after_backoff(orch: 'RendererEventProcessorMixin') -> None:
+    """Drop stale backoff/retry HUD chrome once the agent is working again."""
+    if not _backoff_hud_label_active(orch._hud):
+        return
+
+    from backend.core.enums import AgentState
+
+    state = getattr(orch, '_current_state', None)
+    if isinstance(state, str):
+        try:
+            state = AgentState(state)
+        except ValueError:
+            state = None
+    if state != AgentState.RUNNING:
+        return
+
+    orch._clear_retry_strip('Idle')
+    orch._hud.update_ledger('Healthy')
+    orch._hud.update_agent_state('Running')
+    orch._tui.set_agent_phase('running')
+    orch._tui._render_hud_bar()
+
+
+def _event_clears_backoff_hud(event: Any) -> bool:
+    """Return True when *event* signals the agent resumed productive work."""
+    from backend.core.enums import AgentState
+    from backend.ledger.action import Action
+    from backend.ledger.observation import AgentStateChangedObservation
+
+    if isinstance(event, AgentStateChangedObservation):
+        try:
+            return AgentState(event.agent_state) == AgentState.RUNNING
+        except (ValueError, TypeError):
+            return False
+
+    if isinstance(event, Action):
+        return not bool(getattr(event, 'suppress_cli', False))
+
+    return False
+
+
+def maybe_restore_running_hud_after_backoff(
+    orch: 'RendererEventProcessorMixin', event: Any
+) -> None:
+    if _event_clears_backoff_hud(event):
+        _restore_running_hud_after_backoff(orch)
+
+
 def _handle_success_observation(
     orch: 'RendererEventProcessorMixin', event: SuccessObservation
 ) -> None:
@@ -302,12 +364,7 @@ def _handle_status_observation(
 ) -> None:
     status_type = str(getattr(event, 'status_type', '') or '')
     extras = getattr(event, 'extras', None) or {}
-    if status_type in (
-        'retry_pending',
-        'retry_resuming',
-        'llm_retry_pending',
-        'llm_retry_resuming',
-    ):
+    if status_type in _RETRY_STATUS_TYPES:
         _handle_status_retry(orch, status_type, extras)
         return
     if status_type == 'compaction':

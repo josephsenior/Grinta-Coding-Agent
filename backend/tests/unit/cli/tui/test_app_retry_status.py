@@ -171,3 +171,44 @@ async def test_tui_renderer_preserves_retry_label_on_rate_limited_state() -> Non
 
     assert hud.state.ledger_status == 'Backoff'
     assert hud.state.agent_state_label == 'Backoff 2/3 (retrying in 8s)'
+
+
+@pytest.mark.asyncio
+async def test_tui_renderer_clears_retry_hud_when_work_resumes_while_running() -> None:
+    hud = HUDBar()
+    tui = MagicMock()
+    renderer = TUIRenderer(
+        console=MagicMock(),
+        hud=hud,
+        reasoning=ReasoningDisplay(),
+        tui=tui,
+        loop=asyncio.get_running_loop(),
+    )
+    renderer._current_state = AgentState.RUNNING
+
+    renderer._process_event(
+        StatusObservation(
+            content='',
+            status_type='retry_resuming',
+            extras={
+                'attempt': 3,
+                'max_attempts': 5,
+                'reason': 'APIConnectionError',
+            },
+        )
+    )
+    assert hud.state.agent_state_label == 'Retrying 3/5'
+
+    from backend.ledger.action import StreamingChunkAction
+
+    renderer._process_event(
+        StreamingChunkAction(
+            chunk='hello',
+            accumulated='hello',
+            is_final=False,
+        )
+    )
+
+    assert hud.state.ledger_status == 'Healthy'
+    assert hud.state.agent_state_label == 'Running'
+    tui.set_agent_phase.assert_called_with('running')

@@ -648,6 +648,7 @@ class ScreenStateMixin:
         else:
             label = f'Backoff {attempt}/{max_attempts} (retrying now)'
             meta = f'Resuming {retry_target} after {reason}'
+            self._clear_retry_countdown()
 
         self._hud.update_agent_state(label)
         self._retry_summary = label
