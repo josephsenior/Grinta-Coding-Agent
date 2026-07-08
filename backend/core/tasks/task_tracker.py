@@ -32,25 +32,38 @@ def _save_lock_for(path: Path) -> threading.Lock:
         return lock
 
 
+def _resolve_session_id() -> str | None:
+    """Resolve session ID using working memory or bound session logger without context imports."""
+    import sys
+    try:
+        if 'backend.engine.tools.working_memory' in sys.modules:
+            wm = sys.modules['backend.engine.tools.working_memory']
+            sid = wm.get_current_session_id()
+            if isinstance(sid, str) and sid.strip():
+                return sid.strip()
+    except Exception:
+        pass
+    try:
+        from backend.core.logging.session_event_logger import get_bound_session_id
+        return get_bound_session_id()
+    except Exception:
+        pass
+    return None
+
+
 class TaskTracker:
     """Manage session-scoped task plan JSON under the workspace agent state dir."""
 
     def __init__(self, workspace_root: str | Path | None = None):
         """Initialize the task tracker with an optional explicit workspace root."""
-        if workspace_root is None:
-            from backend.context.memory.session_context import scoped_agent_path
-
-            self.path = scoped_agent_path('active_plan', '.json')
-            return
-        from backend.context.memory.session_context import resolve_session_id
         from backend.core.workspace_resolution import workspace_agent_state_dir
 
         base = workspace_agent_state_dir(workspace_root)
-        sid = resolve_session_id()
+        sid = _resolve_session_id()
         if sid:
             self.path = base / f'active_plan_{sid}.json'
         else:
-            self.path = base / 'active_plan.json'
+            self.path = base / '.session_context_unbound' / 'active_plan.json'
 
     def load_from_file(self) -> list[dict[str, Any]]:
         """Load the task list from disk."""

@@ -279,7 +279,7 @@ class TestRollbackManager:
                 result.returncode = 0
                 return result
             # For git commit
-            if 'commit' in cmd:
+            if 'commit' in cmd or 'commit-tree' in cmd:
                 result = Result()
                 result.returncode = 0
                 return result
@@ -336,7 +336,7 @@ class TestRollbackManager:
                 return Result()
 
             # Fail the commit
-            if 'commit' in cmd:
+            if 'commit' in cmd or 'commit-tree' in cmd:
                 result = Result()
                 result.returncode = 1
                 result.stderr = 'nothing to commit'
@@ -354,40 +354,7 @@ class TestRollbackManager:
         # git_commit_sha should be None when commit fails
         assert cp.git_commit_sha is None
 
-    def test_create_git_snapshot_sha_read_fails(self, workspace, monkeypatch):
-        """Test when git commit succeeds but reading SHA fails."""
 
-        def mock_subprocess_run(cmd, *args, **kwargs):
-            class Result:
-                returncode = 0
-                stdout = ''
-                stderr = ''
-
-            if 'rev-parse' in cmd and '--git-dir' in cmd:
-                return Result()
-
-            # Commit succeeds
-            if 'commit' in cmd:
-                result = Result()
-                result.returncode = 0
-                return result
-
-            # But reading HEAD SHA fails
-            if 'rev-parse' in cmd and 'HEAD' in cmd:
-                result = Result()
-                result.returncode = 1
-                result.stderr = 'failed'
-                return result
-
-            return Result()
-
-        monkeypatch.setattr('subprocess.run', mock_subprocess_run)
-        rm = RollbackManager(str(workspace))
-
-        cp_id = rm.create_checkpoint('sha read fail')
-        cp = rm.get_checkpoint(cp_id)
-        assert cp is not None
-        assert cp.git_commit_sha is None
 
     def test_create_git_snapshot_exception(self, workspace, monkeypatch):
         """Test git snapshot exception handling."""
@@ -463,14 +430,12 @@ class TestRollbackManager:
         # Should keep all 5
         assert len(rm.checkpoints) == 5
 
-    def test_git_rollback_disabled_by_default_falls_back_to_file(
-        self, workspace, monkeypatch
-    ):
-        """Git rollback stays disabled unless explicitly enabled."""
-        seen_reset = False
+    def test_git_rollback_command_fails_falls_back_to_file(self, workspace, monkeypatch):
+        """Test that file rollback is used when git checkout command fails."""
+        seen_checkout = False
 
         def mock_subprocess_run(cmd, *args, **kwargs):
-            nonlocal seen_reset
+            nonlocal seen_checkout
 
             class Result:
                 returncode = 0
@@ -479,11 +444,14 @@ class TestRollbackManager:
 
             if 'rev-parse' in cmd and '--git-dir' in cmd:
                 return Result()
-            if 'commit' in cmd:
+            if 'commit' in cmd or 'commit-tree' in cmd:
                 return Result()
-            if 'reset' in cmd and '--hard' in cmd:
-                seen_reset = True
-                return Result()
+            if 'checkout' in cmd:
+                seen_checkout = True
+                result = Result()
+                result.returncode = 1
+                result.stderr = 'checkout failed'
+                return result
             if 'rev-parse' in cmd:
                 return Result()
             return Result()
@@ -493,17 +461,18 @@ class TestRollbackManager:
 
         cp_id = rm.create_checkpoint('before')
         (workspace / 'hello.py').write_text("print('changed')")
+
         success = rm.rollback_to(cp_id)
         assert success is True
-        assert seen_reset is False
+        assert seen_checkout is True
         assert (workspace / 'hello.py').read_text() == "print('hello')"
 
-    def test_git_rollback_success_when_explicitly_enabled(self, workspace, monkeypatch):
-        """Test successful git-based rollback when explicitly enabled."""
-        seen_reset = False
+    def test_git_rollback_success(self, workspace, monkeypatch):
+        """Test successful git-based rollback."""
+        seen_checkout = False
 
         def mock_subprocess_run(cmd, *args, **kwargs):
-            nonlocal seen_reset
+            nonlocal seen_checkout
 
             class Result:
                 returncode = 0
@@ -512,25 +481,22 @@ class TestRollbackManager:
 
             if 'rev-parse' in cmd and '--git-dir' in cmd:
                 return Result()
-            if 'commit' in cmd:
+            if 'commit' in cmd or 'commit-tree' in cmd:
                 return Result()
-            if 'reset' in cmd and '--hard' in cmd:
-                seen_reset = True
+            if 'checkout' in cmd:
+                seen_checkout = True
                 return Result()
             if 'rev-parse' in cmd:
                 return Result()
             return Result()
 
         monkeypatch.setattr('subprocess.run', mock_subprocess_run)
-        rm = RollbackManager(
-            str(workspace),
-            allow_destructive_git_rollback=True,
-        )
+        rm = RollbackManager(str(workspace))
 
         cp_id = rm.create_checkpoint('before')
         success = rm.rollback_to(cp_id)
         assert success is True
-        assert seen_reset is True
+        assert seen_checkout is True
 
     def test_git_rollback_failure_fallback_to_file(self, workspace):
         """Test that file rollback is used when git rollback fails."""
@@ -582,7 +548,7 @@ class TestRollbackManager:
             if 'rev-parse' in cmd and '--git-dir' in cmd:
                 return Result()
             # Commit fails, so git_commit_sha will be None
-            if 'commit' in cmd:
+            if 'commit' in cmd or 'commit-tree' in cmd:
                 result = Result()
                 result.returncode = 1
                 return result

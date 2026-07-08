@@ -228,5 +228,5 @@ def test_analyze_session_counts_compaction_fallbacks_and_file_events(
 
     assert result.verdict == 'REVIEW'
     assert 'Compaction summary fallbacks: 1' in report
-    assert 'Test file writes/edits: 1' in report
-    assert 'test file write/edit event(s)' in report
+    assert 'File events: 1' in report
+    assert 'compaction summary fallback(s)' in report

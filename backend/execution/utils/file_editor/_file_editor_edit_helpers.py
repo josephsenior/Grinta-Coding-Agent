@@ -105,8 +105,9 @@ def _replace_all_with_boundary_check(content: str, old: str, new: str) -> str:
     substring collisions when ``replace_all`` is requested.  For each
     potential match position it checks that the characters immediately
     before and after the match are *not* identifier-tail / identifier-head
-    characters respectively.  This prevents ``snap->data`` from also
-    matching inside ``snap->data_size``.
+    characters respectively, provided the matched pattern itself begins
+    or ends with an identifier character.  This prevents ``snap->data``
+    from also matching inside ``snap->data_size``.
 
     When the old string is surrounded by non-identifier characters (the
     common case for full-line or token-level replacements), the check
@@ -116,16 +117,18 @@ def _replace_all_with_boundary_check(content: str, old: str, new: str) -> str:
 
     result_parts: list[str] = []
     last_end = 0
-    len(old)
+
+    old_starts_with_id = bool(old and (old[0].isalnum() or old[0] == '_'))
+    old_ends_with_id = bool(old and (old[-1].isalnum() or old[-1] == '_'))
 
     for idx in _re.finditer(_re.escape(old), content):
         start, end = idx.start(), idx.end()
 
         # Guard: skip matches that are substrings of an identifier.
         # An "identifier continuation" character is alnum or '_'.
-        if start > 0 and (content[start - 1].isalnum() or content[start - 1] == '_'):
+        if old_starts_with_id and start > 0 and (content[start - 1].isalnum() or content[start - 1] == '_'):
             continue
-        if end < len(content) and (content[end].isalnum() or content[end] == '_'):
+        if old_ends_with_id and end < len(content) and (content[end].isalnum() or content[end] == '_'):
             continue
 
         result_parts.append(content[last_end:start])

@@ -22,10 +22,7 @@ def test_build_execution_contract_loads_tasks_from_json_store():
         with patch(
             'backend.core.criteria.AcceptanceCriteriaStore'
         ) as store_cls:
-            store_cls.return_value.render_for_prompt_lines.return_value = [
-                '- Acceptance gates:',
-                '  - [ac-1] pytest passes',
-            ]
+            store_cls.return_value.load_from_file.return_value = criteria
             body = build_execution_contract(state=SimpleNamespace())
 
     assert '(id=1)' in body
@@ -39,10 +36,7 @@ def test_build_execution_contract_shows_empty_states_when_unconfigured():
         with patch(
             'backend.core.criteria.AcceptanceCriteriaStore'
         ) as store_cls:
-            store_cls.return_value.render_for_prompt_lines.return_value = [
-                '- Acceptance gates:',
-                '  (no acceptance criteria defined yet — use acceptance_criteria(update) to scope outcomes)',
-            ]
+            store_cls.return_value.load_from_file.return_value = []
             body = build_execution_contract(
                 state=SimpleNamespace(),
                 show_empty_states=True,
@@ -64,10 +58,7 @@ def test_context_packet_includes_empty_execution_contract_when_unconfigured(
         with patch(
             'backend.core.criteria.AcceptanceCriteriaStore'
         ) as store_cls:
-            store_cls.return_value.render_for_prompt_lines.return_value = [
-                '- Acceptance gates:',
-                '  (no acceptance criteria defined yet — use acceptance_criteria(update) to scope outcomes)',
-            ]
+            store_cls.return_value.load_from_file.return_value = []
             packet = build_context_packet(
                 [],
                 [],
@@ -94,7 +85,7 @@ def test_context_packet_includes_execution_contract_without_canonical_task_block
         with patch(
             'backend.core.criteria.AcceptanceCriteriaStore'
         ) as store_cls:
-            store_cls.return_value.render_for_prompt_lines.return_value = []
+            store_cls.return_value.load_from_file.return_value = []
             packet = build_context_packet(
                 [],
                 [],
