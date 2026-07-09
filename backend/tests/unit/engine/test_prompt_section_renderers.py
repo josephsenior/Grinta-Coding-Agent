@@ -78,7 +78,7 @@ class TestRenderCriticalModeSpecific:
         return _render_critical(
             _fake_render_partial,
             'execute_command',
-            terminal_manager_available=kwargs.get('terminal_manager_available', False),
+            terminal_available=kwargs.get('terminal_available', False),
             tracker_on=kwargs.get('tracker_on', False),
             checkpoints_on=kwargs.get('checkpoints_on', False),
             mode=mode,
@@ -113,7 +113,7 @@ class TestRenderCriticalModeSpecific:
         self._assert_contains_body(body, 'evidence')
 
     def test_agent_mode_contains_exactly_10_rules(self):
-        body = self._render_critical(mode='agent', terminal_manager_available=False)
+        body = self._render_critical(mode='agent', terminal_available=False)
         lines = [
             line
             for line in body.split('\n')
@@ -125,15 +125,15 @@ class TestRenderCriticalModeSpecific:
             f'Expected 10 numbered rules with acceptance_criteria enabled, got {len(lines)}:\n{body}'
         )
 
-    def test_agent_mode_with_terminal_manager_adds_rule(self):
-        body = self._render_critical(mode='agent', terminal_manager_available=True)
+    def test_agent_mode_with_terminal_adds_rule(self):
+        body = self._render_critical(mode='agent', terminal_available=True)
         self._assert_contains_body(body, 'Shell vs interactive terminal')
         self._assert_contains_body(body, 'execute_command')
         self._assert_not_contains_body(body, '{terminal_command_tool}')
         self._assert_contains_body(body, 'is_background=true')
-        self._assert_contains_body(body, 'terminal_manager action=wait')
+        self._assert_contains_body(body, 'terminal action=wait')
         self._assert_contains_body(body, 'action=stop')
-        self._assert_contains_body(body, 'terminal_manager action=open')
+        self._assert_contains_body(body, 'action='start'')
         lines = [
             line
             for line in body.split('\n')
@@ -142,7 +142,7 @@ class TestRenderCriticalModeSpecific:
             )
         ]
         assert len(lines) == 10, (
-            f'Expected 10 numbered rules with terminal_manager, got {len(lines)}'
+            f'Expected 10 numbered rules with terminal, got {len(lines)}'
         )
 
     def test_agent_mode_has_mandatory_header(self):
@@ -154,7 +154,7 @@ class TestRenderCriticalModeSpecific:
         assert body.endswith('</CRITICAL_TOOL_EXECUTION_RULES>')
 
     def test_agent_rules_numbered_sequentially(self):
-        body = self._render_critical(mode='agent', terminal_manager_available=False)
+        body = self._render_critical(mode='agent', terminal_available=False)
         numbered_lines = [
             line.strip()
             for line in body.split('\n')
@@ -407,7 +407,7 @@ class TestRenderCriticalFullRender:
         return _render_critical(
             self._mock_render_partial,
             'execute_command',
-            terminal_manager_available=kwargs.get('terminal_manager_available', False),
+            terminal_available=kwargs.get('terminal_available', False),
             tracker_on=kwargs.get('tracker_on', False),
             checkpoints_on=kwargs.get('checkpoints_on', False),
             mode=mode,
@@ -461,3 +461,4 @@ class TestRenderCriticalFullRender:
     def test_chat_tracker_antipattern_not_present(self):
         result = self._render(mode='chat', tracker_on=True)
         assert 'Sync the tracker first' not in result
+

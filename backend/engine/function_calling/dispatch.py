@@ -23,7 +23,7 @@ import backend.engine.tools.checkpoint as checkpoint_tools
 import backend.engine.tools.debugger as debugger_tools
 import backend.engine.tools.delegate_task as delegate_task_tools
 import backend.engine.tools.lsp_query as lsp_query_tools
-import backend.engine.tools.terminal_manager as terminal_manager_tools
+import backend.engine.tools.lsp_query as lsp_query_tools
 from backend.core.errors import FunctionCallNotExistsError, FunctionCallValidationError
 from backend.core.interaction_modes import (
     CHAT_MODE_ALLOWED_TOOLS,
@@ -50,7 +50,7 @@ from backend.core.tools.tool_names import (
     MEMORY_TOOL_NAME,
     SHARED_TASK_BOARD_TOOL_NAME,
     TASK_TRACKER_TOOL_NAME,
-    TERMINAL_MANAGER_TOOL_NAME,
+    TERMINAL_TOOL_NAME,
     UNDO_LAST_EDIT_TOOL_NAME,
     WEB_FETCH_TOOL_NAME,
     WEB_SEARCH_TOOL_NAME,
@@ -58,7 +58,6 @@ from backend.core.tools.tool_names import (
 from backend.engine.function_calling.helpers import combine_thought
 from backend.engine.response_processing import common_response_to_actions
 from backend.engine.tools import (
-    create_cmd_run_tool,
     create_create_file_tool,
     create_find_symbols_tool,
     create_multiedit_tool,
@@ -89,18 +88,12 @@ build_delegate_task_action = cast(
 build_lsp_query_action = cast(
     ToolHandler, cast(Any, lsp_query_tools).build_lsp_query_action
 )
-handle_terminal_manager_tool = cast(
-    ToolHandler, cast(Any, terminal_manager_tools).handle_terminal_manager_tool
-)
 handle_debugger_tool = cast(ToolHandler, cast(Any, debugger_tools).handle_debugger_tool)
 
 
 def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
     """Create dispatch map for tool handlers."""
     return {
-        cast(
-            str, create_cmd_run_tool().get('function', {}).get('name', '')
-        ): _handle_cmd_run_tool,
         cast(
             str, create_read_file_tool().get('function', {}).get('name', '')
         ): _handle_read_file_tool,
@@ -126,9 +119,7 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         LSP_TOOL_NAME: lambda args: build_lsp_query_action(dict(args)),
         DEBUGGER_TOOL_NAME: lambda args: handle_debugger_tool(dict(args)),
         SHARED_TASK_BOARD_TOOL_NAME: lambda args: build_blackboard_action(dict(args)),
-        TERMINAL_MANAGER_TOOL_NAME: lambda args: handle_terminal_manager_tool(
-            dict(args)
-        ),
+        TERMINAL_TOOL_NAME: _handle_terminal_tool,
         ASK_USER_TOOL_NAME: _handle_ask_user_tool,
         CALL_MCP_TOOL_NAME: _handle_execute_mcp_tool_tool,
         CHECKPOINT_TOOL_NAME: _handle_checkpoint_tool,
@@ -311,7 +302,7 @@ from backend.engine.tools._tool_handlers import (  # noqa: E402, F401  # noqa: E
     _handle_ask_user_tool,
     _handle_browser_tool,
     _handle_checkpoint_tool,
-    _handle_cmd_run_tool,
+    _handle_terminal_tool,
     _handle_docs_query_tool,
     _handle_docs_resolve_tool,
     _handle_execute_mcp_tool_tool,

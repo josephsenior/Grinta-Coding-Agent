@@ -20,7 +20,7 @@ from backend.cli.display.tool_call_display import (
 
 class TestToolCallDisplay(unittest.TestCase):
     def test_summarize_bash(self) -> None:
-        s = summarize_tool_arguments('execute_bash', {'command': 'git status --short'})
+        s = summarize_tool_arguments('terminal', {'command': 'git status --short'})
         self.assertIn('git status', s)
         self.assertTrue(s.startswith('$'))
 
@@ -30,9 +30,9 @@ class TestToolCallDisplay(unittest.TestCase):
         )
         self.assertIn('filesystem', s)
 
-    def test_summarize_terminal_manager_open(self) -> None:
+    def test_summarize_terminal_open(self) -> None:
         s = summarize_tool_arguments(
-            'terminal_manager',
+            'terminal',
             {
                 'action': 'open',
                 'command': 'pytest -q',
@@ -44,9 +44,9 @@ class TestToolCallDisplay(unittest.TestCase):
         self.assertIn('cwd', s)
         self.assertNotIn('open · $', s)
 
-    def test_summarize_terminal_manager_read(self) -> None:
+    def test_summarize_terminal_read(self) -> None:
         s = summarize_tool_arguments(
-            'terminal_manager',
+            'terminal',
             {'action': 'read', 'session_id': 'sess-abc-123'},
         )
         self.assertIn('read', s)
@@ -54,19 +54,19 @@ class TestToolCallDisplay(unittest.TestCase):
 
     def test_streaming_hint_terminal_open_partial(self) -> None:
         h = streaming_args_hint(
-            'terminal_manager',
+            'terminal',
             '{"action": "open", "command": "npm test',
         )
         self.assertIn('open', h)
         h2 = streaming_args_hint(
-            'terminal_manager',
+            'terminal',
             '{"action": "open", "command": "npm test", "cwd": "x"}',
         )
         self.assertIn('npm test', h2)
 
     def test_format_invocation_line(self) -> None:
         icon, line = format_tool_invocation_line(
-            'execute_bash',
+            'terminal',
             {'command': 'npm test', 'cwd': 'x'},
         )
         self.assertIsInstance(icon, str)
@@ -75,7 +75,7 @@ class TestToolCallDisplay(unittest.TestCase):
 
     def test_streaming_args_hint_partial(self) -> None:
         h = streaming_args_hint(
-            'execute_bash',
+            'terminal',
             '{"command": "npm test',
         )
         self.assertIn('npm', h)
@@ -85,7 +85,7 @@ class TestToolCallDisplay(unittest.TestCase):
         self.assertFalse(looks_like_streaming_tool_arguments('Hello {'))
 
     def test_redact_streamed_tool_call_markers(self) -> None:
-        raw = '[Tool call] execute_bash({"command":"pwd"})'
+        raw = '[Tool call] terminal({"command":"pwd"})'
         self.assertEqual(redact_streamed_tool_call_markers(raw).strip(), '')
 
     def test_redact_removes_bracket_tool_transport(self) -> None:
@@ -107,7 +107,7 @@ class TestToolCallDisplay(unittest.TestCase):
         raw = (
             'Checking the file now.'
             ']<]minimax[>[<tool_call>\n'
-            ']<]minimax[>[<invoke name="execute_powershell">\n'
+            ']<]minimax[>[<invoke name="terminal">\n'
             '<parameter name="command">pwd</parameter>\n'
             '[END_TOOL_CALL]'
         )
@@ -120,7 +120,7 @@ class TestToolCallDisplay(unittest.TestCase):
     def test_extracts_minimax_invoke_tool_call(self) -> None:
         raw = (
             ']<]minimax[>[<tool_call>\n'
-            '<invoke name="execute_powershell">\n'
+            '<invoke name="terminal">\n'
             '<parameter name="command">pwd</parameter>\n'
             '<parameter name="security_risk">LOW</parameter>\n'
             '</invoke>\n'
@@ -128,7 +128,7 @@ class TestToolCallDisplay(unittest.TestCase):
         )
         calls = extract_tool_calls_from_text_markers(raw)
         self.assertEqual(len(calls), 1)
-        self.assertEqual(calls[0]['function']['name'], 'execute_powershell')
+        self.assertEqual(calls[0]['function']['name'], 'terminal')
         args = json.loads(calls[0]['function']['arguments'])
         self.assertEqual(args['command'], 'pwd')
         self.assertEqual(args['security_risk'], 'LOW')
@@ -148,11 +148,11 @@ class TestToolCallDisplay(unittest.TestCase):
         self.assertFalse(contains_tool_transport_markup('plain final answer'))
 
     def test_strip_tool_call_marker_lines_keeps_json_shape(self) -> None:
-        raw = '[Tool call] execute_bash({"command":"pwd"})'
+        raw = '[Tool call] terminal({"command":"pwd"})'
 
     def test_redact_removes_friendly_tool_call_lines(self) -> None:
         friendly = flatten_tool_call_for_history(
-            'execute_bash',
+            'terminal',
             '{"command":"npm test"}',
         )
         raw = f'Intro line.\n{friendly}\n\nHello.'
@@ -164,7 +164,7 @@ class TestToolCallDisplay(unittest.TestCase):
     def test_redact_removes_tool_result_protocol_blocks(self) -> None:
         raw = (
             'Done.\n\n'
-            '[Tool result from execute_bash]\n'
+            '[Tool result from terminal]\n'
             '[CMD_OUTPUT exit=0]\n'
             '[Below is the output of the previous command.]\n'
             '.eslintrc.cjs\n'
@@ -180,7 +180,7 @@ class TestToolCallDisplay(unittest.TestCase):
 
     def test_flatten_tool_call_for_history_no_raw_json(self) -> None:
         line = flatten_tool_call_for_history(
-            'execute_bash',
+            'terminal',
             '{"command":"npm test"}',
         )
         self.assertNotIn('{', line)
@@ -194,7 +194,7 @@ class TestToolCallDisplay(unittest.TestCase):
     def test_try_format_message_tool_json(self) -> None:
         payload = (
             '{"tool_calls":[{"id":"1","type":"function",'
-            '"function":{"name":"execute_bash","arguments":"{\\"command\\": \\"pwd\\"}"}}]}'
+            '"function":{"name":"terminal","arguments":"{\\"command\\": \\"pwd\\"}"}}]}'
         )
         got = try_format_message_as_tool_json(payload)
         if got is None:
@@ -207,7 +207,7 @@ class TestToolCallDisplay(unittest.TestCase):
     def test_try_format_message_tool_json_no_icons(self) -> None:
         payload = (
             '{"tool_calls":[{"id":"1","type":"function",'
-            '"function":{"name":"execute_bash","arguments":"{\\"command\\": \\"pwd\\"}"}}]}'
+            '"function":{"name":"terminal","arguments":"{\\"command\\": \\"pwd\\"}"}}]}'
         )
         got = try_format_message_as_tool_json(payload, use_icons=False)
         if got is None:
@@ -218,13 +218,14 @@ class TestToolCallDisplay(unittest.TestCase):
         self.assertNotIn('⚡', text)
 
     def test_tool_headline_respects_use_icons(self) -> None:
-        em, label = tool_headline('execute_bash', use_icons=True)
+        em, label = tool_headline('terminal', use_icons=True)
         self.assertEqual(em, '')
         self.assertEqual(label, 'Shell')
-        em2, label2 = tool_headline('execute_bash', use_icons=False)
+        em2, label2 = tool_headline('terminal', use_icons=False)
         self.assertEqual(em2, '')
         self.assertEqual(label2, 'Shell')
 
 
 if __name__ == '__main__':
     unittest.main()
+

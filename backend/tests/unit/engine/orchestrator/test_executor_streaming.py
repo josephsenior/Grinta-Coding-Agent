@@ -65,7 +65,7 @@ def test_finalize_stream_tool_calls_filters_invalid_streamed_name() -> None:
         'id': 'bad',
         'type': 'function',
         'function': {
-            'name': 'Progress! <invoke name="execute_powershell',
+            'name': 'Progress! <invoke name="terminal',
             'arguments': '{"command":"pwd"}',
         },
     }
@@ -83,14 +83,14 @@ def test_finalize_stream_tool_calls_recovers_text_marker_after_bad_streamed_name
     executor = object.__new__(OrchestratorExecutor)
     state = _AsyncStreamingState(
         content_accumulate=(
-            '[Tool call] execute_powershell({"command":"pwd","security_risk":"LOW"})'
+            '[Tool call] terminal({"command":"pwd","security_risk":"LOW"})'
         )
     )
     state.tool_calls_dict[0] = {
         'id': 'bad',
         'type': 'function',
         'function': {
-            'name': 'execute_powershell is not registered',
+            'name': 'terminal is not registered',
             'arguments': '{}',
         },
     }
@@ -99,7 +99,7 @@ def test_finalize_stream_tool_calls_recovers_text_marker_after_bad_streamed_name
 
     assert calls is not None
     assert len(calls) == 1
-    assert calls[0]['function']['name'] == 'execute_powershell'
+    assert calls[0]['function']['name'] == 'terminal'
     assert state.malformed_tool_call_dropped is False
 
 
@@ -1719,3 +1719,4 @@ def test_ensure_stream_response_id_generates_stable_synthetic_id() -> None:
     second = executor._ensure_stream_response_id(state)
     assert first == second
     assert first.startswith('grinta-synthetic-')
+

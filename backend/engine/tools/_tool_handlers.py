@@ -32,15 +32,11 @@ from backend.engine.function_calling.helpers import (
     set_security_risk,
     validate_security_risk,
 )
-from backend.engine.tools import create_cmd_run_tool
-from backend.engine.tools._file_ops import (
-    _relative_display_path,
-    _safe_workspace_path,
-)
 from backend.engine.tools.browser_native import (
     BROWSER_TOOL_NAME,
     build_browser_tool_action,
 )
+from backend.core.tools.tool_names import TERMINAL_TOOL_NAME
 from backend.engine.tools.glob import build_glob_action
 from backend.engine.tools.grep import build_grep_action
 from backend.ledger.action import (
@@ -57,6 +53,13 @@ from backend.ledger.action import (
 )
 from backend.ledger.action.mcp import MCPAction
 from backend.ledger.action.search import GlobAction, GrepAction
+from backend.ledger.action.terminal import (
+    TerminalCloseAction,
+    TerminalInputAction,
+    TerminalReadAction,
+    TerminalRunAction,
+    TerminalWaitAction,
+)
 from backend.ledger.observation.memory_tools import (
     MemoryPersistObservation,
     MemoryRecallObservation,
@@ -123,43 +126,102 @@ def _handle_docs_query_tool(arguments: Mapping[str, Any]) -> MCPAction:
     return build_docs_query_action(dict(arguments))
 
 
-def _handle_cmd_run_tool(arguments: Mapping[str, Any]) -> CmdRunAction:
-    """Handle CmdRunTool (Bash) tool call."""
-    from backend.engine.tools.bash import (
-        windows_drive_glued_hint,
-        windows_drive_glued_in_command,
-    )
+def _handle_terminal_tool(arguments: Mapping[str, Any]) -> Action:
+    """Handle unified Terminal tool call."""
+    action_type = require_tool_argument(arguments, 'action', TERMINAL_TOOL_NAME)
+    validate_security_risk(arguments, TERMINAL_TOOL_NAME)
+    
+    if action_type == 'run':
+        from backend.utils.terminal.terminal_contract import (
+            uses_powershell_terminal,
+        )
 
-    tool_name = cast(str, create_cmd_run_tool().get('function', {}).get('name', ''))
-    command = require_tool_argument(arguments, 'command', tool_name)
-    validate_security_risk(arguments, tool_name)
-    raw_is_input = arguments.get('is_input', False)
-    is_input = parse_bool_argument(raw_is_input)
-    is_background = parse_bool_argument(arguments.get('is_background', False))
-    grep_pattern = arguments.get('grep_pattern')
+        command = require_tool_argument(arguments, 'command', TERMINAL_TOOL_NAME)
+        raw_is_input = arguments.get('is_input', False)
+        is_input = parse_bool_argument(raw_is_input)
+        is_background = parse_bool_argument(arguments.get('is_background', False))
+        grep_pattern = arguments.get('grep_pattern')
 
-    glue_hint = (
-        windows_drive_glued_hint() if windows_drive_glued_in_command(command) else ''
-    )
+        # Logic from previous cmd run handler: checking for drive letter missing space
+        glue_hint = ''
+        if command and len(command) > 2 and command[0].isalpha() and command[1:3] == ':\\':
+            glue_hint = "Windows drive glued in command. Make sure to use spaces."
 
-    action = CmdRunAction(
-        command=command,
-        is_input=is_input,
-        is_background=is_background,
-        grep_pattern=grep_pattern,
-        truncation_strategy=cast(Any, arguments.get('truncation_strategy')),
-        thought=glue_hint,
+        action = CmdRunAction(
+            command=command,
+            is_input=is_input,
+            is_background=is_background,
+            grep_pattern=grep_pattern,
+            truncation_strategy=cast(Any, arguments.get('truncation_strategy')),
+            thought=glue_hint,
+        )
+        if 'timeout' in arguments:
+            try:
+                action.set_hard_timeout(float(arguments['timeout']))
+            except ValueError as e:
+                msg = f"Invalid float passed to 'timeout' argument: {arguments['timeout']}"
+                raise FunctionCallValidationError(msg) from e
+        set_security_risk(action, arguments)
+        return action
+        
+    elif action_type == 'start':
+        command = require_tool_argument(arguments, 'command', TERMINAL_TOOL_NAME)
+        action = TerminalRunAction(
+            command=command,
+            cwd=arguments.get('cwd'),
+            rows=arguments.get('rows'),
+            cols=arguments.get('cols'),
+        )
+        set_security_risk(action, arguments)
+        return action
+        
+    elif action_type == 'input':
+        session_id = require_tool_argument(arguments, 'session_id', TERMINAL_TOOL_NAME)
+        action = TerminalInputAction(
+            session_id=session_id,
+            input=str(arguments.get('input', '')),
+            is_control=parse_bool_argument(arguments.get('is_control', False)),
+            control=arguments.get('control'),
+            submit=parse_bool_argument(arguments.get('submit', True)),
+            rows=arguments.get('rows'),
+            cols=arguments.get('cols'),
+        )
+        set_security_risk(action, arguments)
+        return action
+        
+    elif action_type == 'read':
+        session_id = require_tool_argument(arguments, 'session_id', TERMINAL_TOOL_NAME)
+        action = TerminalReadAction(
+            session_id=session_id,
+            offset=arguments.get('offset'),
+            mode=str(arguments.get('mode', 'delta')),
+            rows=arguments.get('rows'),
+            cols=arguments.get('cols'),
+        )
+        set_security_risk(action, arguments)
+        return action
+        
+    elif action_type == 'wait':
+        session_id = require_tool_argument(arguments, 'session_id', TERMINAL_TOOL_NAME)
+        pattern = require_tool_argument(arguments, 'pattern', TERMINAL_TOOL_NAME)
+        action = TerminalWaitAction(
+            session_id=session_id,
+            pattern=str(pattern),
+            timeout=int(arguments.get('timeout', 30)),
+        )
+        set_security_risk(action, arguments)
+        return action
+        
+    elif action_type == 'kill':
+        session_id = require_tool_argument(arguments, 'session_id', TERMINAL_TOOL_NAME)
+        action = TerminalCloseAction(session_id=session_id)
+        set_security_risk(action, arguments)
+        return action
+        
+    raise FunctionCallValidationError(
+        f'Unknown terminal action: {action_type!r}. '
+        'Valid actions: run, start, input, read, wait, kill.'
     )
-    if 'timeout' in arguments:
-        try:
-            action.set_hard_timeout(float(arguments['timeout']))
-        except ValueError as e:
-            msg = f"Invalid float passed to 'timeout' argument: {arguments['timeout']}"
-            raise FunctionCallValidationError(
-                msg,
-            ) from e
-    set_security_risk(action, arguments)
-    return action
 
 
 def execute_memory_persist(action: MemoryPersistAction) -> MemoryPersistObservation:

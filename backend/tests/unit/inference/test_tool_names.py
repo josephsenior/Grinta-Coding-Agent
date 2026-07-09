@@ -18,8 +18,8 @@ EXPECTED_EXPORTS = [
     'DELEGATE_TASK_TOOL_NAME',
     'DOCS_QUERY_TOOL_NAME',
     'DOCS_RESOLVE_TOOL_NAME',
-    'EXECUTE_BASH_TOOL_NAME',
-    'EXECUTE_POWERSHELL_TOOL_NAME',
+    'TERMINAL_TOOL_NAME',
+    'TERMINAL_TOOL_NAME',
     'FIND_SYMBOLS_TOOL_NAME',
     'GLOB_TOOL_NAME',
     'GREP_TOOL_NAME',
@@ -32,7 +32,7 @@ EXPECTED_EXPORTS = [
     'REPLACE_STRING_TOOL_NAME',
     'SHARED_TASK_BOARD_TOOL_NAME',
     'TASK_TRACKER_TOOL_NAME',
-    'TERMINAL_MANAGER_TOOL_NAME',
+    'terminal_TOOL_NAME',
     'UNDO_LAST_EDIT_TOOL_NAME',
     'WEB_FETCH_TOOL_NAME',
     'WEB_SEARCH_TOOL_NAME',
@@ -106,3 +106,4 @@ class TestToolNames(TestCase):
         """Canonical tool name strings must not collide."""
         canonical = [getattr(tool_names, name) for name in EXPECTED_EXPORTS]
         self.assertEqual(len(canonical), len(set(canonical)))
+

@@ -17,7 +17,7 @@ from backend.engine.prompts.section_renderers._security import _render_security
 from backend.engine.tools._tool_handlers import _handle_cmd_run_tool
 from backend.engine.tools.bash import create_cmd_run_tool
 from backend.engine.tools.param_defs import relax_security_risk_in_tools
-from backend.engine.tools.terminal_manager import create_terminal_manager_tool
+from backend.engine.tools.terminal import create_terminal_tool
 
 
 def test_security_risk_required_for_autonomy_by_level():
@@ -28,7 +28,7 @@ def test_security_risk_required_for_autonomy_by_level():
 
 def test_validate_security_risk_optional_in_full_autonomy_scope():
     with security_risk_validation_scope(required=False):
-        validate_security_risk({'command': 'ls'}, 'execute_powershell')
+        validate_security_risk({'command': 'ls'}, 'terminal')
 
 
 def test_validate_security_risk_still_rejects_invalid_when_optional():
@@ -36,7 +36,7 @@ def test_validate_security_risk_still_rejects_invalid_when_optional():
         with pytest.raises(FunctionCallValidationError, match='security_risk'):
             validate_security_risk(
                 {'command': 'ls', 'security_risk': 'CRITICAL'},
-                'execute_powershell',
+                'terminal',
             )
 
 
@@ -47,7 +47,7 @@ def test_handle_cmd_run_without_security_risk_in_full_autonomy():
 
 
 def test_relax_security_risk_in_tools_for_full_autonomy():
-    tools = [create_cmd_run_tool(), create_terminal_manager_tool()]
+    tools = [create_cmd_run_tool(), create_terminal_tool()]
     relaxed = relax_security_risk_in_tools(tools, AutonomyLevel.FULL.value)
 
     shell_required = relaxed[0]['function']['parameters']['required']
@@ -78,5 +78,6 @@ def test_render_security_prompt_required_for_balanced_autonomy():
 def test_render_security_prompt_background_server_followup():
     text = _render_security(autonomy_level=AutonomyLevel.FULL.value)
     assert 'is_background=true' in text
-    assert 'terminal_manager' in text
+    assert 'terminal' in text
     assert '`wait`' in text
+

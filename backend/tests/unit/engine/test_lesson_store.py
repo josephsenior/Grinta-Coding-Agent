@@ -14,7 +14,7 @@ def test_lessons_are_similar_does_not_merge_short_distinct_entries() -> None:
 def test_append_markdown_lesson_skips_duplicate_sections(tmp_path) -> None:
     lessons_path = tmp_path / 'state' / 'lessons.md'
     lesson = (
-        'PowerShell terminal input raced the PTY flush, so terminal_manager input '
+        'PowerShell terminal input raced the PTY flush, so terminal input '
         'must poll for output after every submitted command.'
     )
 
@@ -37,3 +37,4 @@ def test_append_markdown_lesson_skips_duplicate_sections(tmp_path) -> None:
     assert stored.count('## ') == 1
     assert 'Terminal run' in stored
     assert 'Terminal rerun' not in stored
+

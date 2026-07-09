@@ -255,13 +255,13 @@ class TestParseFunctionCallFromText:
 
     def test_named_function_tag_still_parses(self):
         content = (
-            '<function=execute_powershell>\n'
+            '<function=terminal>\n'
             '<parameter=command>pwd</parameter>\n'
             '</function>'
         )
         parsed = _parse_function_call_from_text(content)
         assert parsed is not None
-        assert parsed['fn_name'] == 'execute_powershell'
+        assert parsed['fn_name'] == 'terminal'
 
 
 # ── strict malformed parameter handling ────────────────────────────────
@@ -413,13 +413,13 @@ class TestExampleStepBuilder:
         builder = ExampleStepBuilder(set())
         assert builder.build_all_steps() == ''
 
-    def test_with_execute_bash(self):
-        builder = ExampleStepBuilder({'execute_bash'})
+    def test_with_terminal(self):
+        builder = ExampleStepBuilder({'terminal'})
         result = builder.build_all_steps()
-        assert 'execute_bash' in result
+        assert 'terminal' in result
 
     def test_with_tool_steps_ends_in_plain_text(self):
-        builder = ExampleStepBuilder({'execute_bash'})
+        builder = ExampleStepBuilder({'terminal'})
         result = builder.build_all_steps()
         assert '<function=finish>' not in result
         assert 'ASSISTANT:' in result
@@ -774,7 +774,7 @@ class TestXmlParserRegression:
         return {
             'type': 'function',
             'function': {
-                'name': 'execute_bash',
+                'name': 'terminal',
                 'description': 'Run a bash command',
                 'parameters': {
                     'type': 'object',
@@ -802,7 +802,7 @@ class TestXmlParserRegression:
         """Regression: trailing text after a parsed tool call is tolerated."""
         tools = [self._make_sample_tool()]
         content = (
-            '<function=execute_bash>\n'
+            '<function=terminal>\n'
             '<parameter=command>pwd && ls</parameter>\n'
             '</function>\n'
             '\n'
@@ -811,7 +811,7 @@ class TestXmlParserRegression:
         result = self._parse_payload(content, tools)
         assert result is not None
         assert len(result) == 1
-        assert result[0]['name'] == 'execute_bash'
+        assert result[0]['name'] == 'terminal'
 
     def test_content_with_pseudo_tags_quotes_braces(self):
         """Regression: pseudo-tags, quotes, braces in content are not parsed as XML.
@@ -821,7 +821,7 @@ class TestXmlParserRegression:
         """
         tools = [self._make_sample_tool()]
         content = (
-            '<function=execute_bash>\n<parameter=command>pwd</parameter>\n</function>'
+            '<function=terminal>\n<parameter=command>pwd</parameter>\n</function>'
         )
         result = self._parse_payload(content, tools)
         assert result is not None
@@ -836,10 +836,10 @@ class TestXmlParserRegression:
         """
         tools = [self._make_sample_tool()]
         content = (
-            '<function=execute_bash>\n'
+            '<function=terminal>\n'
             '<parameter=command>pwd</parameter>\n'
             '</function>\n'
-            '<function=execute_bash>\n'
+            '<function=terminal>\n'
             '<parameter=command>ls</parameter>\n'
             '</function>'
         )
@@ -856,7 +856,7 @@ class TestXmlParserRegression:
         """
         tools = [self._make_sample_tool()]
         content = (
-            '<function=execute_bash>\n'
+            '<function=terminal>\n'
             '<parameter=command>pwd</parameter>\n'
             '</function>\n'
             '\n'
@@ -866,3 +866,4 @@ class TestXmlParserRegression:
         assert result is not None
         assert len(result) == 1
         assert result[0]['arguments']['command'] == 'pwd'
+

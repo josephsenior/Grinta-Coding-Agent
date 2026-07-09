@@ -237,15 +237,15 @@ class OrchestratorPlanner:
         self._add_terminal_and_special_tools(tools)
 
     def _add_basic_tools(self, tools: list) -> None:
-        """Add shell, ask_user, and basic file tools."""
-        from backend.engine.tools.bash import create_cmd_run_tool
+        """Add terminal, ask_user, and basic file tools."""
+        from backend.engine.tools.terminal import create_terminal_tool
         from backend.engine.tools.meta_cognition import create_ask_user_tool
         from backend.engine.tools.native_file_tools import (
             create_find_symbols_tool,
             create_read_file_tool,
         )
 
-        tools.append(create_cmd_run_tool())
+        tools.append(create_terminal_tool())
         tools.append(create_ask_user_tool())
         tools.append(create_read_file_tool())
         tools.append(create_find_symbols_tool())
@@ -277,12 +277,6 @@ class OrchestratorPlanner:
 
     def _add_terminal_tools(self, tools: list) -> None:
         """Add terminal manager tool when terminal support is enabled."""
-        if getattr(self._config, 'enable_terminal', True):
-            from backend.engine.tools.terminal_manager import (
-                create_terminal_manager_tool,
-            )
-
-            tools.append(create_terminal_manager_tool())
         if getattr(self._config, 'enable_debugger', DEFAULT_AGENT_DEBUGGER_ENABLED):
             from backend.utils.runtime_detect import has_any_debug_adapter
 

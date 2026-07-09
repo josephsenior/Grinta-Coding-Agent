@@ -22,9 +22,7 @@ LSP_TOOL_NAME = 'lsp'
 ANALYZE_PROJECT_STRUCTURE_TOOL_NAME = 'analyze_project_structure'
 
 # ── Shell & terminal ──────────────────────────────────────────────────
-EXECUTE_BASH_TOOL_NAME = 'execute_bash'
-EXECUTE_POWERSHELL_TOOL_NAME = 'execute_powershell'
-TERMINAL_MANAGER_TOOL_NAME = 'terminal_manager'
+TERMINAL_TOOL_NAME = 'terminal'
 
 # ── Agent interaction & planning ────────────────────────────────────────
 ASK_USER_TOOL_NAME = 'ask_user'
@@ -60,8 +58,6 @@ __all__ = [
     'DOCS_QUERY_TOOL_NAME',
     'DOCS_RESOLVE_TOOL_NAME',
     'DELEGATE_TASK_TOOL_NAME',
-    'EXECUTE_BASH_TOOL_NAME',
-    'EXECUTE_POWERSHELL_TOOL_NAME',
     'FIND_SYMBOLS_TOOL_NAME',
     'GLOB_TOOL_NAME',
     'GREP_TOOL_NAME',
@@ -75,7 +71,7 @@ __all__ = [
     'SHARED_TASK_BOARD_TOOL_NAME',
     'ACCEPTANCE_CRITERIA_TOOL_NAME',
     'TASK_TRACKER_TOOL_NAME',
-    'TERMINAL_MANAGER_TOOL_NAME',
+    'TERMINAL_TOOL_NAME',
     'UNDO_LAST_EDIT_TOOL_NAME',
     'WEB_FETCH_TOOL_NAME',
     'WEB_SEARCH_TOOL_NAME',
