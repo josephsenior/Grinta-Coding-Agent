@@ -194,7 +194,12 @@ class SimpleBashSession(BaseShellSession):
         ``bounded_communicate`` can enforce a precise byte cap. Decoding to
         UTF-8 (with ``errors='replace'``) happens in the bounded reader.
         """
-        argv = self._wrap_subprocess_argv(['bash', '-c', command], cwd=self._cwd)
+        from backend.execution.utils.tool_registry import ToolRegistry
+        reg = ToolRegistry()
+        bash_info = reg.get_tool_info('bash')
+        bash_exe = bash_info.path if (bash_info and bash_info.available and bash_info.path) else 'bash'
+
+        argv = self._wrap_subprocess_argv([bash_exe, '-c', command], cwd=self._cwd)
         process = subprocess.Popen(
             argv,
             cwd=self._cwd,
@@ -211,7 +216,12 @@ class SimpleBashSession(BaseShellSession):
 
     def _update_cwd_if_needed(self) -> None:
         """Update current working directory by querying the shell."""
-        self._update_cwd_from_output(['bash', '-c', 'pwd'])
+        from backend.execution.utils.tool_registry import ToolRegistry
+        reg = ToolRegistry()
+        bash_info = reg.get_tool_info('bash')
+        bash_exe = bash_info.path if (bash_info and bash_info.available and bash_info.path) else 'bash'
+
+        self._update_cwd_from_output([bash_exe, '-c', 'pwd'])
 
     def _handle_subprocess_timeout(
         self, command: str, timeout: int | None

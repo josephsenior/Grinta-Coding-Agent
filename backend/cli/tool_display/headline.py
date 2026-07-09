@@ -31,6 +31,8 @@ def tool_headline(tool_name: str, *, use_icons: bool = True) -> tuple[str, str]:
 # ---------------------------------------------------------------------------
 
 _TERMINAL_MANAGER_VERBS = {
+    'run': 'Ran',
+    'start': 'Started',
     'open': 'Started',
     'input': 'Sent',
     'read': 'Read',
@@ -39,6 +41,7 @@ _TERMINAL_MANAGER_VERBS = {
     'list': 'Listed',
     'close': 'Stopped',
     'stop': 'Stopped',
+    'kill': 'Stopped',
 }
 
 _DEBUGGER_VERBS = {
@@ -95,7 +98,10 @@ def friendly_verb_for_tool(tool_name: str, args: dict[str, Any] | None = None) -
     """Short English verb for the activity row (no emoji)."""
     tn = (tool_name or '').strip()
     a = args or {}
-    if tn in {'execute_bash', 'execute_powershell'}:
+    if tn in {'execute_bash', 'execute_powershell', 'terminal'}:
+        verb = _verb_terminal_manager(a)
+        if verb != 'Tool':
+            return verb
         return 'Ran'
     if tn == 'terminal_manager':
         verb = _verb_terminal_manager(a)

@@ -184,7 +184,7 @@ class TestConvertToolCallsProc:
         call.model_dump.return_value = {
             'id': 'call_2',
             'type': 'function',
-            'function': {'name': 'execute_bash', 'arguments': '{}'},
+            'function': {'name': 'terminal', 'arguments': '{}'},
         }
         result = _convert_tool_calls([call])
         assert result is not None
@@ -321,3 +321,4 @@ class TestConvertActionToMessagesProc:
         action.tool_call_metadata = None
         msgs = convert_action_to_messages(action, {})
         assert msgs == []
+

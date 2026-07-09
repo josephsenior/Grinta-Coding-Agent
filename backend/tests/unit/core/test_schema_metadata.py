@@ -81,7 +81,7 @@ class TestToolCallMetadataSchema:
 
     def test_with_model_response(self):
         m = ToolCallMetadataSchema(
-            function_name='execute_bash',
+            function_name='terminal',
             tool_call_id='tc_002',
             total_calls_in_response=2,
             model_response={'id': 'resp_1'},
@@ -119,3 +119,4 @@ class TestToolCallMetadataSchema:
             total_calls_in_response=5,
         )
         assert m.total_calls_in_response == 5
+

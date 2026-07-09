@@ -56,4 +56,4 @@ def _resolve_terminal_command_tool(
     """Resolve the active terminal command tool for prompt rendering."""
     if terminal_tool_name:
         return terminal_tool_name
-    return 'execute_powershell' if is_windows else 'execute_bash'
+    return 'terminal'

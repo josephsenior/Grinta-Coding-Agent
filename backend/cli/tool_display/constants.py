@@ -33,6 +33,7 @@ ORIENT_TOOLS: frozenset[str] = frozenset(
 
 # (icon, short verb phrase for the activity line)
 _TOOL_HEADLINE: dict[str, tuple[str, str]] = {
+    'terminal': ('', 'Terminal'),
     'execute_bash': ('', 'Shell'),
     'execute_powershell': ('', 'Shell'),
     'read_file': ('↳', 'Read'),
