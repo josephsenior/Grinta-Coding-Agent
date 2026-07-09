@@ -289,7 +289,7 @@ class _AesIoTerminalMixin:
             state=state,
         )
         obs.tool_result = {
-            'tool': 'terminal_manager',
+            'tool': 'terminal',
             'ok': True,
             'error_code': None,
             'retryable': False,
@@ -323,8 +323,8 @@ class _AesIoTerminalMixin:
                 content=(
                     f'TERMINAL_RUN_TIMEOUT: opening the interactive terminal exceeded '
                     f'{TERMINAL_RUN_EXECUTION_TIMEOUT_SECONDS:.0f}s. '
-                    'The session was not opened successfully. Use execute_powershell '
-                    'for one-shot commands, or retry terminal_manager action=open.'
+                    'The session was not opened successfully. Use action=\\'run\\' '
+                    'for one-shot commands, or retry action=\\'start\\'.'
                 ),
                 error_id='TERMINAL_RUN_TIMEOUT',
             )
@@ -428,7 +428,7 @@ class _AesIoTerminalMixin:
             self.session_manager.close_session(session_id)
             self._clear_terminal_read_cursor(session_id)
             preflight_err.tool_result = {
-                'tool': 'terminal_manager',
+                'tool': 'terminal',
                 'ok': False,
                 'error_code': 'TERMINAL_INPUT_PREFLIGHT_REJECTED',
                 'retryable': True,
@@ -555,7 +555,7 @@ class _AesIoTerminalMixin:
             )
             if preflight_err is not None:
                 preflight_err.tool_result = {
-                    'tool': 'terminal_manager',
+                    'tool': 'terminal',
                     'ok': False,
                     'error_code': 'TERMINAL_INPUT_PREFLIGHT_REJECTED',
                     'retryable': True,
@@ -746,7 +746,7 @@ class _AesIoTerminalMixin:
                             f'produced no new output for {streak} consecutive '
                             'terminal_read calls and was closed to prevent a ghost '
                             'session loop. Open a new terminal session or use '
-                            'execute_powershell for one-shot commands.'
+                            'action=''run'' for one-shot commands.'
                         ),
                         error_id='TERMINAL_EMPTY_READ_STREAK',
                     )
@@ -771,7 +771,7 @@ class _AesIoTerminalMixin:
                 state=state,
             )
             obs.tool_result = {
-                'tool': 'terminal_manager',
+                'tool': 'terminal',
                 'ok': True,
                 'error_code': None,
                 'retryable': False,
@@ -838,7 +838,7 @@ class _AesIoTerminalMixin:
                             has_new_output=True,
                         )
                         obs.tool_result = {
-                            'tool': 'terminal_manager',
+                            'tool': 'terminal',
                             'ok': True,
                             'error_code': None,
                             'retryable': False,
@@ -878,7 +878,7 @@ class _AesIoTerminalMixin:
                             has_new_output=bool(combined),
                         )
                         obs.tool_result = {
-                            'tool': 'terminal_manager',
+                            'tool': 'terminal',
                             'ok': False,
                             'error_code': 'SESSION_EXITED_BEFORE_MATCH',
                             'retryable': False,
@@ -909,7 +909,7 @@ class _AesIoTerminalMixin:
                 has_new_output=bool(combined),
             )
             obs.tool_result = {
-                'tool': 'terminal_manager',
+                'tool': 'terminal',
                 'ok': False,
                 'error_code': 'SESSION_WAIT_TIMEOUT',
                 'retryable': True,
@@ -950,7 +950,7 @@ class _AesIoTerminalMixin:
                 content = 'Active sessions:\n' + '\n'.join(lines)
             obs = Observation(content=content)
             obs.tool_result = {
-                'tool': 'terminal_manager',
+                'tool': 'terminal',
                 'ok': True,
                 'error_code': None,
                 'retryable': False,
@@ -985,7 +985,7 @@ class _AesIoTerminalMixin:
                     )
                 )
                 obs.tool_result = {
-                    'tool': 'terminal_manager',
+                    'tool': 'terminal',
                     'ok': True,
                     'error_code': None,
                     'retryable': False,
@@ -1000,7 +1000,7 @@ class _AesIoTerminalMixin:
             self._clear_terminal_read_cursor(session_id)
             obs = Observation(content=f'Closed terminal session {session_id!r}.')
             obs.tool_result = {
-                'tool': 'terminal_manager',
+                'tool': 'terminal',
                 'ok': True,
                 'error_code': None,
                 'retryable': False,
@@ -1013,3 +1013,4 @@ class _AesIoTerminalMixin:
         except Exception as exc:
             logger.error('Error closing terminal %s: %s', action.session_id, exc)
             return ErrorObservation(f'Failed to close terminal: {exc}')
+

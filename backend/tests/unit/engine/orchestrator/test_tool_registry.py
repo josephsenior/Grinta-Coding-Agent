@@ -99,13 +99,13 @@ class TestFeatureFlagToolPresence:
 
     def test_terminal_enabled(self):
         names = _build_toolset(enable_terminal=True)
-        assert {'execute_bash', 'execute_powershell'} & names
-        assert 'terminal_manager' in names
+        assert {'terminal', 'terminal'} & names
+        assert 'terminal' in names
         self._assert_dispatch_covered(names)
 
     def test_terminal_disabled(self):
         names = _build_toolset(enable_terminal=False)
-        assert 'terminal_manager' not in names
+        assert 'terminal' not in names
 
     def test_debugger_enabled(self):
         names = _build_toolset(enable_debugger=True)
@@ -309,9 +309,9 @@ class TestModeToolVisibility:
             'create_file',
             'replace_string',
             'multiedit',
-            'execute_bash',
-            'execute_powershell',
-            'terminal_manager',
+            'terminal',
+            'terminal',
+            'terminal',
             'debugger',
             'call_mcp_tool',
             'browser_tool',
@@ -333,9 +333,9 @@ class TestModeToolVisibility:
             enable_debugger=False,
         )
         assert {'create_file', 'replace_string', 'multiedit'} <= names
-        assert {'execute_bash', 'execute_powershell'} & names
+        assert {'terminal', 'terminal'} & names
         assert 'ask_user' in names
-        assert 'terminal_manager' in names
+        assert 'terminal' in names
         assert 'call_mcp_tool' in names
         assert {
             'communicate_with_user',
@@ -384,8 +384,9 @@ class TestModeToolVisibility:
             'create_file',
             'replace_string',
             'multiedit',
-            'execute_bash',
-            'execute_powershell',
-            'terminal_manager',
+            'terminal',
+            'terminal',
+            'terminal',
             'call_mcp_tool',
         }.isdisjoint(names)
+

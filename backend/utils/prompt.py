@@ -280,7 +280,7 @@ class OrchestratorPromptManager(PromptManager):
             context.setdefault('cli_mode', True)
 
         # Keep prompt shell identity aligned with the same terminal contract
-        # used by runtime execution (execute_bash vs execute_powershell).
+        # used by runtime execution.
         from backend.utils.terminal.terminal_contract import (
             get_terminal_tool_name,
             is_windows_with_bash,

@@ -269,7 +269,7 @@ class TestOrchestratorPromptManager:
         assert '→ `lsp`' not in result
         assert 'definitions/references, `lsp`' not in result
 
-    def test_get_system_message_omits_terminal_manager_when_terminal_disabled(
+    def test_get_system_message_omits_terminal_when_terminal_disabled(
         self, tmp_path
     ):
         from backend.utils.prompt import OrchestratorPromptManager
@@ -288,8 +288,8 @@ class TestOrchestratorPromptManager:
         opm = OrchestratorPromptManager(prompt_dir=str(tmp_path), config=config)
         result = opm.get_system_message()
 
-        assert '`terminal_manager action=open`' not in result
-        assert 'do not refer to `terminal_manager`' not in result
+        assert '`action='start'`' not in result
+        assert 'do not refer to `terminal`' not in result
 
     def test_build_knowledge_base_info(self, tmp_path):
         from backend.utils.prompt import PromptManager
@@ -441,7 +441,7 @@ class TestOrchestratorPromptManager:
             patch('backend.utils.prompt.OS_CAPS') as mock_caps,
             patch(
                 'backend.utils.terminal.terminal_contract.get_terminal_tool_name',
-                return_value='execute_powershell',
+                return_value='terminal',
             ),
             patch(
                 'backend.utils.terminal.terminal_contract.is_windows_with_bash',
@@ -1084,7 +1084,7 @@ class TestBuildSystemPromptRenders:
             config=_base_config(enable_terminal=False),
             function_calling_mode='native',
         )
-        assert 'do not refer to `terminal_manager`' not in result
+        assert 'do not refer to `terminal`' not in result
 
     def test_lsp_available(self) -> None:
         with patch(
@@ -1649,7 +1649,7 @@ def test_terminal_helpers_prefer_powershell_when_available_on_windows():
         mock_caps.is_windows = True
         assert uses_powershell_terminal() is True
         assert get_shell_name() == 'powershell'
-        assert get_terminal_tool_name() == 'execute_powershell'
+        assert get_terminal_tool_name() == 'terminal'
     prompt_mod.set_active_tool_registry(None)
     prompt_mod._get_global_tool_registry.cache_clear()
 
@@ -1674,7 +1674,7 @@ def test_terminal_helpers_fall_back_to_bash_when_powershell_unavailable_on_windo
         mock_caps.is_windows = True
         assert uses_powershell_terminal() is False
         assert get_shell_name() == 'bash'
-        assert get_terminal_tool_name() == 'execute_bash'
+        assert get_terminal_tool_name() == 'terminal'
     prompt_mod.set_active_tool_registry(None)
     prompt_mod._get_global_tool_registry.cache_clear()
 
@@ -1792,3 +1792,4 @@ def test_build_python_exec_command_matches_active_registry_git_bash_on_windows()
     finally:
         prompt_mod.set_active_tool_registry(None)
         prompt_mod._get_global_tool_registry.cache_clear()
+

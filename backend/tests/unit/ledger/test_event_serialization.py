@@ -209,7 +209,7 @@ class TestEventToDict:
             has_new_output=True,
         )
         obs.tool_result = {
-            'tool': 'terminal_manager',
+            'tool': 'terminal',
             'ok': True,
             'state': 'SESSION_OUTPUT_DELTA',
             'payload': {'next_offset': 10},
@@ -279,3 +279,4 @@ class TestEventToTrajectory:
         extras = result.get('extras', {})
         assert 'screenshot' not in extras
         assert 'set_of_marks' not in extras
+

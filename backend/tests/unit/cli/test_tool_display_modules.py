@@ -20,7 +20,7 @@ from backend.cli.tool_display.renderers.file_editor import (
 
 class TestToolHeadline(unittest.TestCase):
     def test_known_tool(self) -> None:
-        _, label = tool_headline('execute_bash')
+        _, label = tool_headline('terminal')
         self.assertEqual(label, 'Shell')
 
     def test_debugger_tool(self) -> None:
@@ -36,7 +36,7 @@ class TestToolHeadline(unittest.TestCase):
         self.assertEqual(label, 'Tool')
 
     def test_icon_always_empty(self) -> None:
-        icon, _ = tool_headline('execute_bash', use_icons=True)
+        icon, _ = tool_headline('terminal', use_icons=True)
         self.assertEqual(icon, '')
 
 
@@ -78,33 +78,33 @@ class TestFileEditorRenderers(unittest.TestCase):
 
 
 class TestFriendlyVerbForTool(unittest.TestCase):
-    def test_execute_bash(self) -> None:
-        v = friendly_verb_for_tool('execute_bash', {})
+    def test_terminal(self) -> None:
+        v = friendly_verb_for_tool('terminal', {})
         self.assertEqual(v, 'Ran')
 
-    def test_execute_powershell(self) -> None:
-        v = friendly_verb_for_tool('execute_powershell', {})
+    def test_terminal(self) -> None:
+        v = friendly_verb_for_tool('terminal', {})
         self.assertEqual(v, 'Ran')
 
-    def test_terminal_manager_open(self) -> None:
-        v = friendly_verb_for_tool('terminal_manager', {'action': 'open'})
+    def test_terminal_open(self) -> None:
+        v = friendly_verb_for_tool('terminal', {'action': 'open'})
         self.assertEqual(v, 'Started')
 
-    def test_terminal_manager_input(self) -> None:
-        v = friendly_verb_for_tool('terminal_manager', {'action': 'input'})
+    def test_terminal_input(self) -> None:
+        v = friendly_verb_for_tool('terminal', {'action': 'input'})
         self.assertEqual(v, 'Sent')
 
-    def test_terminal_manager_read(self) -> None:
-        v = friendly_verb_for_tool('terminal_manager', {'action': 'read'})
+    def test_terminal_read(self) -> None:
+        v = friendly_verb_for_tool('terminal', {'action': 'read'})
         self.assertEqual(v, 'Read')
 
     def test_debugger_evaluate(self) -> None:
         v = friendly_verb_for_tool('debugger', {'action': 'evaluate'})
         self.assertEqual(v, 'Evaluated')
 
-    def test_terminal_manager_unknown_action(self) -> None:
+    def test_terminal_unknown_action(self) -> None:
         # Falls back to title-cased tool name
-        v = friendly_verb_for_tool('terminal_manager', {'action': 'whatever'})
+        v = friendly_verb_for_tool('terminal', {'action': 'whatever'})
         self.assertEqual(v, 'Terminal Manager')
 
     def test_simple_map_tools(self) -> None:
@@ -158,9 +158,9 @@ class TestToolActivityStatsHint(unittest.TestCase):
         hint = tool_activity_stats_hint('task_tracker', {'task_list': []})
         self.assertIsNone(hint)
 
-    def test_terminal_manager_stats(self) -> None:
+    def test_terminal_stats(self) -> None:
         hint = tool_activity_stats_hint(
-            'terminal_manager',
+            'terminal',
             {
                 'action': 'read',
                 'session_id': 'sess-abc',
@@ -169,9 +169,9 @@ class TestToolActivityStatsHint(unittest.TestCase):
         self.assertIsNotNone(hint)
         self.assertIn('sess-abc', hint)  # type: ignore[arg-type]
 
-    def test_terminal_manager_open_no_stats(self) -> None:
+    def test_terminal_open_no_stats(self) -> None:
         hint = tool_activity_stats_hint(
-            'terminal_manager',
+            'terminal',
             {
                 'action': 'open',
                 'session_id': 'sess-abc',
@@ -297,7 +297,7 @@ class TestArgStr(unittest.TestCase):
 
 class TestSummarizeToolArguments(unittest.TestCase):
     def test_bash(self) -> None:
-        s = summarize_tool_arguments('execute_bash', {'command': 'ls -la'})
+        s = summarize_tool_arguments('terminal', {'command': 'ls -la'})
         self.assertIn('ls -la', s)
 
     def test_replace_string(self) -> None:
@@ -470,54 +470,54 @@ class TestParseToolArgumentsJson(unittest.TestCase):
 class TestFormatToolActivityRows(unittest.TestCase):
     def test_bash(self) -> None:
         verb, detail, stats = format_tool_activity_rows(
-            'execute_bash', {'command': 'ls'}
+            'terminal', {'command': 'ls'}
         )
         self.assertEqual(verb, 'Ran')
         self.assertIn('ls', detail)
 
     def test_vague_summary_replaced(self) -> None:
-        verb, detail, _ = format_tool_activity_rows('execute_bash', {})
+        verb, detail, _ = format_tool_activity_rows('terminal', {})
         # When summary is vague (command…), it gets replaced by tool name
         self.assertIsInstance(detail, str)
 
 
 class TestFormatToolInvocationLine(unittest.TestCase):
     def test_known_tool_with_args(self) -> None:
-        icon, line = format_tool_invocation_line('execute_bash', {'command': 'ls'})
+        icon, line = format_tool_invocation_line('terminal', {'command': 'ls'})
         self.assertIn('ls', line)
 
     def test_empty_args(self) -> None:
-        icon, line = format_tool_invocation_line('execute_bash', None)
+        icon, line = format_tool_invocation_line('terminal', None)
         self.assertTrue(line.endswith('…'))
 
 
 class TestStreamingArgsHint(unittest.TestCase):
     def test_complete_json(self) -> None:
-        hint = streaming_args_hint('execute_bash', '{"command": "git log"}')
+        hint = streaming_args_hint('terminal', '{"command": "git log"}')
         self.assertIn('git log', hint)
 
     def test_partial_json_command(self) -> None:
-        hint = streaming_args_hint('execute_bash', '{"command": "npm test')
+        hint = streaming_args_hint('terminal', '{"command": "npm test')
         self.assertIn('npm test', hint)
 
     def test_empty(self) -> None:
-        self.assertEqual(streaming_args_hint('execute_bash', ''), '')
+        self.assertEqual(streaming_args_hint('terminal', ''), '')
 
-    def test_terminal_manager_open(self) -> None:
+    def test_terminal_open(self) -> None:
         hint = streaming_args_hint(
-            'terminal_manager', '{"action": "open", "command": "bash"}'
+            'terminal', '{"action": "open", "command": "bash"}'
         )
         self.assertIn('open', hint)
 
-    def test_terminal_manager_read(self) -> None:
+    def test_terminal_read(self) -> None:
         hint = streaming_args_hint(
-            'terminal_manager', '{"action": "read", "session_id": "sess-x"}'
+            'terminal', '{"action": "read", "session_id": "sess-x"}'
         )
         self.assertIn('read', hint)
 
-    def test_terminal_manager_input_ctrl(self) -> None:
+    def test_terminal_input_ctrl(self) -> None:
         hint = streaming_args_hint(
-            'terminal_manager', '{"action": "input", "control": "C"}'
+            'terminal', '{"action": "input", "control": "C"}'
         )
         self.assertIn('ctrl', hint)
 
@@ -566,7 +566,7 @@ class TestStripProtocolEchoBlocks(unittest.TestCase):
         self.assertEqual(strip_protocol_echo_blocks(text), text)
 
     def test_strips_tool_result_block(self) -> None:
-        text = 'Done.\n\n[Tool result from execute_bash]\n[CMD_OUTPUT exit=0]\nfiles\n\nNext.'
+        text = 'Done.\n\n[Tool result from terminal]\n[CMD_OUTPUT exit=0]\nfiles\n\nNext.'
         result = strip_protocol_echo_blocks(text)
         self.assertIn('Done.', result)
         self.assertNotIn('[Tool result from', result)
@@ -613,22 +613,22 @@ class TestRedactStreamedToolCallMarkers(unittest.TestCase):
         self.assertNotIn('read_file', result)
 
     def test_keeps_surrounding_text(self) -> None:
-        text = 'Before.\n[Tool call] execute_bash({"command": "ls"})\nAfter.'
+        text = 'Before.\n[Tool call] terminal({"command": "ls"})\nAfter.'
         result = redact_streamed_tool_call_markers(text)
         self.assertIn('Before.', result)
         self.assertIn('After.', result)
         self.assertNotIn('[Tool call]', result)
 
     def test_incomplete_marker_truncated(self) -> None:
-        text = 'Intro [Tool call] execute_bash({"command": "ls'
+        text = 'Intro [Tool call] terminal({"command": "ls'
         result = redact_streamed_tool_call_markers(text)
         # Truncates at prefix
         self.assertNotIn('[Tool call]', result)
 
     def test_multiple_markers(self) -> None:
         text = (
-            '[Tool call] execute_bash({"command": "ls"})\n'
-            '[Tool call] execute_bash({"command": "pwd"})\n'
+            '[Tool call] terminal({"command": "ls"})\n'
+            '[Tool call] terminal({"command": "pwd"})\n'
             'Done.'
         )
         result = redact_streamed_tool_call_markers(text)
@@ -658,24 +658,24 @@ class TestExtractToolCallsFromTextMarkers(unittest.TestCase):
         self.assertEqual(result, [])
 
     def test_single_marker(self) -> None:
-        text = '[Tool call] execute_bash({"command": "ls -la"})'
+        text = '[Tool call] terminal({"command": "ls -la"})'
         result = extract_tool_calls_from_text_markers(text)
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]['function']['name'], 'execute_bash')
+        self.assertEqual(result[0]['function']['name'], 'terminal')
 
     def test_multiple_markers(self) -> None:
         text = (
-            '[Tool call] execute_bash({"command": "ls"})\n'
+            '[Tool call] terminal({"command": "ls"})\n'
             '[Tool call] read_file({"path": "a.py"})\n'
         )
         result = extract_tool_calls_from_text_markers(text)
         self.assertEqual(len(result), 2)
         names = [r['function']['name'] for r in result]
-        self.assertIn('execute_bash', names)
+        self.assertIn('terminal', names)
         self.assertIn('read_file', names)
 
     def test_arguments_preserved(self) -> None:
-        text = '[Tool call] execute_bash({"command": "git status"})'
+        text = '[Tool call] terminal({"command": "git status"})'
         result = extract_tool_calls_from_text_markers(text)
         self.assertEqual(len(result), 1)
         import json
@@ -824,3 +824,4 @@ class TestMcpErrorSummary(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+

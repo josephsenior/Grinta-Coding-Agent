@@ -412,7 +412,7 @@ class TestAnthropicClientHelpers:
             {
                 'type': 'function',
                 'function': {
-                    'name': 'terminal_manager',
+                    'name': 'terminal',
                     'description': 'Manage terminals',
                     'parameters': {
                         'type': 'object',
@@ -984,3 +984,4 @@ class TestBoundedLlmHttpTimeout:
         assert isinstance(kwargs['timeout'], httpx.Timeout)
         assert kwargs['timeout'].read <= 30.0
         assert kwargs['timeout'].connect <= 10.0
+

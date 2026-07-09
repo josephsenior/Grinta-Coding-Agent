@@ -266,6 +266,13 @@ class _AesIoRunMixin:
             detached_pane,
         )
 
+        if registered_bg_id is not None and isinstance(observation, CmdOutputObservation):
+            observation.content = (
+                f"Command exceeded timeout. Process detached and running in background "
+                f"as session_id: {registered_bg_id}. Use action='read' or action='wait' to interact.\n\n"
+                f"Partial output before detach:\n{observation.content}"
+            )
+
         return observation
 
     async def _run_static_cmd(

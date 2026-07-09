@@ -88,7 +88,7 @@ class TestCheckTools:
             {
                 'type': 'function',
                 'function': {
-                    'name': 'terminal_manager',
+                    'name': 'terminal',
                     'parameters': {
                         'type': 'object',
                         'properties': {'action': {'type': 'string'}},
@@ -394,3 +394,4 @@ class TestCreatePretrainedTokenizer:
         """Test with empty string."""
         result = create_pretrained_tokenizer('')
         assert result == ''
+

@@ -104,17 +104,10 @@ def build_python_exec_command(script: str) -> str:
 
 
 def get_terminal_tool_name() -> str:
-    """Return the terminal tool name that matches the runtime shell."""
-    from backend.core.tools.tool_names import (
-        EXECUTE_BASH_TOOL_NAME,
-        EXECUTE_POWERSHELL_TOOL_NAME,
-    )
+    """Return the terminal tool name."""
+    from backend.core.tools.tool_names import TERMINAL_TOOL_NAME
 
-    return (
-        EXECUTE_POWERSHELL_TOOL_NAME
-        if uses_powershell_terminal()
-        else EXECUTE_BASH_TOOL_NAME
-    )
+    return TERMINAL_TOOL_NAME
 
 
 __all__ = [

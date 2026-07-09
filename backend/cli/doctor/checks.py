@@ -250,17 +250,7 @@ def check_binary(name: str, *, critical: bool = True) -> DoctorCheck:
     return DoctorCheck(name, False, 'not found on PATH', critical=critical)
 
 
-def check_debugpy() -> DoctorCheck:
-    try:
-        importlib.import_module('debugpy.adapter')
-    except Exception as exc:
-        return DoctorCheck(
-            'debugpy',
-            False,
-            f'not installed (optional): {exc}',
-            critical=False,
-        )
-    return DoctorCheck('debugpy', True, 'importable', critical=False)
+
 
 
 def check_optional_imports() -> DoctorCheck:
@@ -513,7 +503,6 @@ def collect_doctor_checks(*, verbose: bool = False) -> list[DoctorCheck]:
         checks.append(check_binary('bash', critical=False))
     checks.extend(
         [
-            check_debugpy(),
             check_optional_imports(),
             *collect_wsl_checks(),
         ]
@@ -526,7 +515,6 @@ def collect_doctor_checks(*, verbose: bool = False) -> list[DoctorCheck]:
 def collect_health_checks(*, model_hint: str | None = None) -> list[DoctorCheck]:
     """Fast in-session subset shared with ``/health``."""
     return [
-        check_debugpy(),
         check_binary('git'),
         check_binary('rg'),
         check_llm_config(model_hint=model_hint),
@@ -548,7 +536,6 @@ def format_health_report_lines(checks: list[DoctorCheck]) -> list[str]:
 __all__ = [
     'DoctorCheck',
     'check_binary',
-    'check_debugpy',
     'check_editing_stack',
     'check_execution_profile',
     'check_llm_config',
