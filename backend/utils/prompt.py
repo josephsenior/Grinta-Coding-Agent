@@ -291,7 +291,7 @@ class OrchestratorPromptManager(PromptManager):
         context.setdefault('is_windows', _on_windows)
         context.setdefault(
             'windows_with_bash',
-            _on_windows and terminal_tool == 'execute_bash' and is_windows_with_bash(),
+            is_windows_with_bash(),
         )
         context.setdefault('terminal_tool_name', terminal_tool)
         context.setdefault('mcp_tool_names', self.mcp_tool_names)

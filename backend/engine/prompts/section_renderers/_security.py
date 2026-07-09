@@ -28,7 +28,7 @@ def _render_security(
     )
     if security_risk_required_for_autonomy(autonomy_level):
         requirement = (
-            '`security_risk` is **required** on every call to `execute_bash`/`execute_powershell`, '
+            '`security_risk` is **required** on every call to `terminal` '
             'and the file write tools `create_file`, `replace_string`, and `multiedit`. '
             f'Read-only observation tools ({read_only_tools}) do **not** require it. '
             'Pick one of `LOW` / `MEDIUM` / `HIGH` based on the action you are about to take. '
@@ -37,9 +37,8 @@ def _render_security(
         )
     else:
         requirement = (
-            '`security_risk` is **optional** in full autonomy on `execute_bash`/`execute_powershell`, '
-            'file write tools (`create_file`, `replace_string`, `multiedit`), and '
-            '`terminal_manager` open. '
+            '`security_risk` is **optional** in full autonomy on `terminal` '
+            'and file write tools (`create_file`, `replace_string`, `multiedit`). '
             f'Read-only observation tools ({read_only_tools}) never need it. '
             'When omitted, the runtime classifies risk server-side. If you provide '
             '`LOW` / `MEDIUM` / `HIGH`, invalid values still fail the call.'
@@ -50,8 +49,6 @@ def _render_security(
         f'{risk_block}\n\n'
         '**Global Rules**\n'
         '- Always escalate to **HIGH** if sensitive data leaves the environment.\n'
-        '- Long-running shell commands: pass an explicit `timeout` (seconds) instead of '
-        'guessing.\n'
-        '- For servers and log tails, start with `is_background=true` on shell executors, then '
-        'use `terminal_manager` (`wait`, `logs`, `stop`) — do not start duplicate shell processes.'
+        '- For servers and log tails, start with `action=start` or `is_background=true` on terminal, then '
+        'use the terminal interaction actions (`wait`, `read`, `kill`) — do not start duplicate terminal sessions.'
     )

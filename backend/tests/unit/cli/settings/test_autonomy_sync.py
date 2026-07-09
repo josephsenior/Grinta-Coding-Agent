@@ -16,7 +16,7 @@ from backend.engine.tools.param_defs import relax_security_risk_in_tools
 _BALANCED_TOOL = {
     'type': 'function',
     'function': {
-        'name': 'execute_bash',
+        'name': 'terminal',
         'parameters': {
             'type': 'object',
             'properties': {},
@@ -106,3 +106,4 @@ def test_get_persisted_autonomy_rejects_supervised(tmp_path, monkeypatch) -> Non
 
     # Settings should be treated as invalid; no silent migration.
     assert level == ''
+

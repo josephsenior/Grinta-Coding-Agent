@@ -194,26 +194,41 @@ def _summary_debugger(args: dict[str, Any]) -> str:
 
 
 def _streaming_hint_terminal_manager(partial_json: str) -> str:
-    """Best-effort label while ``terminal_manager`` JSON is still streaming."""
-    m_act = re.search(r'"action"\s*:\s*"(open|input|read)"', partial_json)
+    """Best-effort label while terminal JSON is still streaming."""
+    m_act = re.search(
+        r'"action"\s*:\s*"(open|start|input|read|run|kill)"', partial_json
+    )
     if not m_act:
-        return ''  # type: ignore[unreachable]
+        return ''
     op = m_act.group(1)
-    if op == 'open':
+    if op in {'open', 'start'}:
         m_cmd = re.search(
             r'"command"\s*:\s*"((?:\\.|[^"\\])*)"', partial_json, re.DOTALL
         )
         if m_cmd:
             raw_c = m_cmd.group(1).replace('\\n', '\n').replace('\\"', '"')
-            return f'open · {_trunc(raw_c, 90)}'
-        return 'open'  # type: ignore[unreachable]
+            return f'start · {_trunc(raw_c, 90)}'
+        return 'start'
+    if op == 'run':
+        m_cmd = re.search(
+            r'"command"\s*:\s*"((?:\\.|[^"\\])*)"', partial_json, re.DOTALL
+        )
+        if m_cmd:
+            raw_c = m_cmd.group(1).replace('\\n', '\n').replace('\\"', '"')
+            return f'$ {_trunc(raw_c, 90)}'
+        return 'run'
     if op == 'input':
         return _stream_hint_input(partial_json)
     if op == 'read':
         m_sid = re.search(r'"session_id"\s*:\s*"((?:\\.|[^"\\])*)"', partial_json)
         if m_sid:
             return f'read · {_trunc(m_sid.group(1), 40)}'
-        return 'read'  # type: ignore[unreachable]
+        return 'read'
+    if op == 'kill':
+        m_sid = re.search(r'"session_id"\s*:\s*"((?:\\.|[^"\\])*)"', partial_json)
+        if m_sid:
+            return f'kill · {_trunc(m_sid.group(1), 40)}'
+        return 'kill'
     return ''
 
 
@@ -408,6 +423,18 @@ def _summary_checkpoint(args: dict[str, Any]) -> str:
     return _trunc(label, 80) if label else 'save state'
 
 
+def _summary_terminal(args: dict[str, Any]) -> str:
+    op = str(args.get('action') or '').strip().lower()
+    if op == 'run':
+        return _summary_shell(args)
+    if op == 'start':
+        return _term_open_summary(args)
+    if op == 'kill':
+        sid = args.get('session_id') or ''
+        return f'kill · {sid}' if sid else 'kill'
+    return _summarize_terminal_manager_args(args)
+
+
 def _summary_shared_board(args: dict[str, Any]) -> str:
     op = args.get('operation') or args.get('command')
     return str(op) if op else 'board…'
@@ -437,6 +464,7 @@ _TOOL_SUMMARIZERS: dict[str, Callable[[dict[str, Any]], str]] = {
     'call_mcp_tool': _summary_call_mcp,
     'checkpoint': _summary_checkpoint,
     'terminal_manager': _summarize_terminal_manager_args,
+    'terminal': _summary_terminal,
     'debugger': _summary_debugger,
     'shared_task_board': _summary_shared_board,
 }
@@ -567,7 +595,7 @@ def streaming_args_hint(tool_name: str, partial_json: str) -> str:
         return ''
 
     tn = (tool_name or '').strip()
-    if tn == 'terminal_manager':
+    if tn in {'terminal_manager', 'terminal'}:
         frag = _streaming_hint_terminal_manager(partial_json)
         if frag:
             return frag

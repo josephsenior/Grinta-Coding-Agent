@@ -97,7 +97,7 @@ class StreamingChunkAction(Action):
     accumulated: str = ''  # All text accumulated so far
     is_final: bool = False  # True when streaming is complete
     is_tool_call: bool = False  # True when streaming tool call arguments (not content)
-    tool_call_name: str = ''  # Name of the tool being called (e.g. "execute_bash")
+    tool_call_name: str = ''  # Name of the tool being called (e.g. "terminal")
     suppress_live_response: bool = (
         False  # True when draft content must not be committed
     )

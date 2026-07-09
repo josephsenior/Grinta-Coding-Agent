@@ -64,7 +64,7 @@ def create_lsp_query_tool(
                 '  • Workspace-wide text/symbol search → use `grep` or `glob` '
                 '(ripgrep). `list_symbols` only enumerates symbols in a single file.\n'
                 '  • Code formatting / quick-fix application → run the project '
-                'formatter or linter via `execute_bash` / `execute_powershell`.\n'
+                'formatter or linter via `terminal`.\n'
                 'When no LSP server is installed this tool is hidden from the '
                 'toolset entirely — its absence here means the user has at least '
                 'one server on PATH. Do NOT attempt to install servers yourself; '

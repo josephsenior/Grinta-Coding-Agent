@@ -323,8 +323,8 @@ class _AesIoTerminalMixin:
                 content=(
                     f'TERMINAL_RUN_TIMEOUT: opening the interactive terminal exceeded '
                     f'{TERMINAL_RUN_EXECUTION_TIMEOUT_SECONDS:.0f}s. '
-                    'The session was not opened successfully. Use action=\\'run\\' '
-                    'for one-shot commands, or retry action=\\'start\\'.'
+                    "The session was not opened successfully. Use action='run' "
+                    "for one-shot commands, or retry action='start'."
                 ),
                 error_id='TERMINAL_RUN_TIMEOUT',
             )

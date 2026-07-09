@@ -12,7 +12,7 @@ from backend.engine.tools.param_defs import relax_security_risk_in_tools
 _BALANCED_TOOL = {
     'type': 'function',
     'function': {
-        'name': 'execute_bash',
+        'name': 'terminal',
         'parameters': {
             'type': 'object',
             'properties': {},
@@ -98,3 +98,4 @@ def test_tui_apply_autonomy_level_updates_tool_schema_immediately(
     assert screen._controller.autonomy_controller.autonomy_level == 'full'
     required = agent.tools[0]['function']['parameters'].get('required', [])
     assert 'security_risk' not in required
+
