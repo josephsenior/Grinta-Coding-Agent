@@ -71,7 +71,7 @@ grinta
 git clone https://github.com/josephsenior/Grinta-Coding-Agent.git Grinta
 cd Grinta
 .\START_HERE.ps1
-pipx install -e .    # optional; then daily `grinta` works from anywhere (way A)
+# START_HERE.ps1 will automatically install `grinta` globally via `uv tool install -e .`
 ```
 
 Bootstrap does **not** open the TUI. Then:

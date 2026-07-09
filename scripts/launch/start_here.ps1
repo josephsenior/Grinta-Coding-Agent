@@ -4,6 +4,7 @@
 # Syncs deps, runs init + doctor. Does NOT launch the TUI — cd to your project and run grinta.
 
 $ErrorActionPreference = 'Stop'
+$env:UV_SYSTEM_CERTS = "true"
 
 function Refresh-UvPath {
     $localBin = Join-Path $env:USERPROFILE '.local\bin'
@@ -50,7 +51,10 @@ function Ensure-Python {
         exit 1
     }
 
-    $pythonVersion = & uv run python --version 2>&1
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $pythonVersion = & uv run python --version 2>&1 | Out-String
+    $ErrorActionPreference = $prevEAP
     if ($pythonVersion -match 'Python 3\.(1[2-9]|[2-9][0-9])') {
         Write-Host "[OK] Python ok (via uv): $pythonVersion" -ForegroundColor Green
         return
@@ -61,6 +65,35 @@ function Ensure-Python {
     exit 1
 }
 
+function Ensure-Ripgrep {
+    if (Get-Command rg -ErrorAction SilentlyContinue) {
+        Write-Host "[OK] ripgrep found: $((Get-Command rg).Source)" -ForegroundColor Green
+        return
+    }
+
+    Write-Host "ripgrep not found. Downloading prebuilt Windows binary..." -ForegroundColor Yellow
+    $rgUrl = "https://github.com/BurntSushi/ripgrep/releases/download/14.1.0/ripgrep-14.1.0-x86_64-pc-windows-msvc.zip"
+    $rgZip = Join-Path $env:TEMP "rg.zip"
+    $rgExtract = Join-Path $env:TEMP "rg_extracted"
+    
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Invoke-WebRequest -Uri $rgUrl -OutFile $rgZip
+        Expand-Archive -Path $rgZip -DestinationPath $rgExtract -Force
+        
+        $localBin = Join-Path $env:USERPROFILE '.local\bin'
+        if (-not (Test-Path $localBin)) { New-Item -ItemType Directory -Path $localBin -Force | Out-Null }
+        
+        $rgExeSource = Join-Path $rgExtract "ripgrep-14.1.0-x86_64-pc-windows-msvc\rg.exe"
+        Copy-Item $rgExeSource -Destination (Join-Path $localBin "rg.exe") -Force
+        
+        Write-Host "[OK] ripgrep installed to $localBin." -ForegroundColor Green
+    } catch {
+        Write-Host "[WARN] Failed to install ripgrep automatically: $_" -ForegroundColor Yellow
+        Write-Host "Please install ripgrep manually using: winget install BurntSushi.ripgrep.MSVC" -ForegroundColor Yellow
+    }
+}
+
 Write-Host 'Starting Grinta bootstrap...' -ForegroundColor Cyan
 
 # Change to repository root (this script lives in scripts/launch/)
@@ -69,6 +102,7 @@ Set-Location -Path (Resolve-Path (Join-Path $PSScriptRoot '..\..'))
 Write-Host 'Step 0: Toolchain...' -ForegroundColor Yellow
 Ensure-Uv
 Ensure-Python
+Ensure-Ripgrep
 
 Write-Host 'Step 1: Syncing dependencies (dev-test profile)...' -ForegroundColor Yellow
 & uv run python scripts/bootstrap_env.py dev-test
@@ -114,10 +148,18 @@ Write-Host '[OK] Bootstrap complete.' -ForegroundColor Green
 Write-Host "Settings: $repoRoot\settings.json" -ForegroundColor Cyan
 Write-Host 'Logs: logs\workspaces\...' -ForegroundColor Cyan
 Write-Host ''
+Write-Host 'Step 3: Installing Grinta CLI globally...' -ForegroundColor Yellow
+& uv tool install -e .
+if ($LASTEXITCODE -ne 0) {
+    Write-Host '[WARN] Failed to install Grinta globally. You can still run it via uv run.' -ForegroundColor Yellow
+} else {
+    Write-Host '[OK] Grinta CLI installed globally!' -ForegroundColor Green
+}
+
+Write-Host ''
 Write-Host 'Next — open your project (not the Grinta repo):' -ForegroundColor Yellow
 Write-Host '  cd "<project>"'
-Write-Host "  uv run --directory `"$repoRoot`" grinta"
+Write-Host "  grinta"
 Write-Host ''
-Write-Host 'Optional: pipx install -e .  (from repo root) then run grinta from any directory' -ForegroundColor Yellow
 Write-Host 'Docs: docs\QUICK_START.md' -ForegroundColor Cyan
 Write-Host ''

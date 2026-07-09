@@ -23,14 +23,14 @@ Windows PowerShell:
 .\START_HERE.ps1
 ```
 
-That installs `uv` and Python 3.12 if needed, syncs `dev-test` dependencies, runs setup when `settings.json` is missing, then launches the CLI.
+That installs `uv` and Python 3.12 if needed, natively downloads `ripgrep`, syncs `dev-test` dependencies, runs setup when `settings.json` is missing, and installs the `grinta` CLI globally via `uv tool install`.
 
 Manual equivalent:
 
 ```bash
 uv python install 3.12
 uv run python scripts/bootstrap_env.py dev-test
-uv run python -m backend.cli.entry
+uv tool install -e .
 ```
 
 **Windows note:** `make` targets in the Makefile are aimed at macOS, Linux, and WSL.
