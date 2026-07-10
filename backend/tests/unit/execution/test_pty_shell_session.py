@@ -482,3 +482,34 @@ class TestLiveBashPs1Execute:
             assert obs.metadata.exit_code == 1
         finally:
             s.close()
+
+
+class TestPowerShellPs1Execute:
+    def test_want_ps1_metadata_with_powershell(self) -> None:
+        session = PtyInteractiveShellSession(
+            work_dir='.',
+            shell_argv=['powershell.exe', '-NoProfile']
+        )
+        assert session._want_ps1_metadata() is True
+
+        session = PtyInteractiveShellSession(
+            work_dir='.',
+            shell_argv=['powershell.exe', '-NoProfile'],
+            enable_ps1_metadata=False
+        )
+        assert session._want_ps1_metadata() is False
+
+    def test_install_powershell_ps1(self) -> None:
+        session = PtyInteractiveShellSession(
+            work_dir='.',
+            shell_argv=['powershell.exe', '-NoProfile']
+        )
+        fake_pty = MagicMock()
+        fake_pty.is_alive.return_value = True
+        session._pty = fake_pty
+        fake_pty.wait_for_output.return_value = True
+
+        session._install_powershell_json_ps1()
+        assert session._ps1_ready is True
+        fake_pty.write.assert_called()
+

@@ -182,7 +182,7 @@ async def connect_redis(env_prefix: str, connection_name: str) -> dict[str, Any]
     except ImportError as exc:
         msg = (
             'redis not installed. Run: uv sync --extra redis or '
-            "pip install 'grinta-ai[redis]'"
+            "pip install 'grinta[redis]'"
         )
         raise ImportError(msg) from exc
 

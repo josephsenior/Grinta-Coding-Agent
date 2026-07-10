@@ -46,11 +46,6 @@ class _TUIRendererAdapter:
     def suspend_live(self):
         yield
 
-
-    @contextmanager
-    def suspend_live(self):
-        yield
-
     async def drain_events_async(self) -> None:
         return
 

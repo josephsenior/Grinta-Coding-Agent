@@ -32,6 +32,18 @@ def _reset_session_logger() -> None:
     clear_runtime_context()
 
 
+def _read_session_lines(path: Path) -> list[str]:
+    close_session_event_logger()
+    p = path / 'session.jsonl'
+    if not p.is_file():
+        return []
+    return [
+        line
+        for line in p.read_text(encoding='utf-8').splitlines()
+        if line.strip()
+    ]
+
+
 def test_is_noise_message_filters_streaming_chunks() -> None:
     assert is_noise_message('on_event received StreamingChunkAction (id=1)')
     assert is_noise_message('[streaming-dbg] chunk')
@@ -42,13 +54,7 @@ def test_emit_writes_jsonl(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr('backend.core.logging.session_event_logger.LOG_TO_FILE', True)
     bind_session_event_logger('sess-1', str(tmp_path), workspace_segment='ws-seg')
     emit_session_event('USER_TURN', {'text': 'hello'})
-    lines = [
-        line
-        for line in (tmp_path / 'session.jsonl')
-        .read_text(encoding='utf-8')
-        .splitlines()
-        if line.strip()
-    ]
+    lines = _read_session_lines(tmp_path)
     assert len(lines) >= 1
     record = json.loads(lines[-1])
     assert record['event'] == 'USER_TURN'
@@ -70,10 +76,7 @@ def test_wire_events_respect_grinta_log_wire(
     emit_session_event('PROMPT_SHAPE', {'roles': {'user': 1}})
     events = [
         json.loads(line)['event']
-        for line in (tmp_path / 'session.jsonl')
-        .read_text(encoding='utf-8')
-        .splitlines()
-        if line.strip()
+        for line in _read_session_lines(tmp_path)
     ]
     assert 'WIRE_PROMPT' not in events
     assert 'PROMPT_SHAPE' in events
@@ -86,10 +89,7 @@ def test_bind_emits_session_start(
     bind_session_event_logger('abc', str(tmp_path), workspace_segment='ws')
     events = [
         json.loads(line)['event']
-        for line in (tmp_path / 'session.jsonl')
-        .read_text(encoding='utf-8')
-        .splitlines()
-        if line.strip()
+        for line in _read_session_lines(tmp_path)
     ]
     assert events[0] == 'SESSION_START'
 
@@ -107,10 +107,7 @@ def test_bind_suppresses_empty_session_context(
     bind_session_event_logger('sess-2', str(tmp_path))
     events = [
         json.loads(line)['event']
-        for line in (tmp_path / 'session.jsonl')
-        .read_text(encoding='utf-8')
-        .splitlines()
-        if line.strip()
+        for line in _read_session_lines(tmp_path)
     ]
     assert events == ['SESSION_START']
     assert 'SESSION_CONTEXT' not in events
@@ -151,10 +148,7 @@ def test_bind_emits_session_context_when_runtime_resolved(
     bind_session_event_logger('sess-3', str(tmp_path))
     events = [
         json.loads(line)['event']
-        for line in (tmp_path / 'session.jsonl')
-        .read_text(encoding='utf-8')
-        .splitlines()
-        if line.strip()
+        for line in _read_session_lines(tmp_path)
     ]
     assert events[0] == 'SESSION_START'
     assert 'SESSION_CONTEXT' in events
@@ -211,10 +205,7 @@ def test_emit_merges_caller_ctx_with_snapshot(
     )
     lines = [
         json.loads(line)
-        for line in (tmp_path / 'session.jsonl')
-        .read_text(encoding='utf-8')
-        .splitlines()
-        if line.strip()
+        for line in _read_session_lines(tmp_path)
     ]
     tool_result = [r for r in lines if r['event'] == 'TOOL_RESULT'][0]
     assert tool_result['ctx']['model'] == 'test/model'
@@ -263,10 +254,7 @@ def test_emit_caller_ctx_can_override_snapshot_fields(
     )
     lines = [
         json.loads(line)
-        for line in (tmp_path / 'session.jsonl')
-        .read_text(encoding='utf-8')
-        .splitlines()
-        if line.strip()
+        for line in _read_session_lines(tmp_path)
     ]
     tool_result = [r for r in lines if r['event'] == 'TOOL_RESULT'][0]
     assert tool_result['ctx']['model'] == 'debug/override'

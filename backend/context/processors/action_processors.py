@@ -24,6 +24,7 @@ from backend.ledger.action import (
 )
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.mcp import MCPAction
+from backend.ledger.action.message import SystemMessageAction  # noqa: E402
 from backend.ledger.action.terminal import (
     TerminalCloseAction,
     TerminalInputAction,
@@ -32,8 +33,6 @@ from backend.ledger.action.terminal import (
     TerminalRunAction,
     TerminalWaitAction,
 )
-
-from backend.ledger.action.message import SystemMessageAction  # noqa: E402
 from backend.ledger.event import EventSource  # noqa: E402
 from backend.ledger.model_response_lite import ModelResponseLite  # noqa: E402
 

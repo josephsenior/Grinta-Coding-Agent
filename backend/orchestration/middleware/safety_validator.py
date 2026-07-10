@@ -25,12 +25,11 @@ class SafetyValidatorMiddleware(ToolInvocationMiddleware):
         if not validator:
             return
 
+        from backend.core.autonomy import AutonomyLevel, normalize_autonomy_level
         from backend.ledger.event import EventSource
         from backend.ledger.observation import ErrorObservation
         from backend.ledger.observation_cause import attach_observation_cause
         from backend.orchestration.safety_validator import ExecutionContext
-
-        from backend.core.autonomy import AutonomyLevel, normalize_autonomy_level
 
         context = ExecutionContext(
             session_id=self.controller.id or '',

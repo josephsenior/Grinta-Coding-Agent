@@ -545,8 +545,11 @@ class TestNarrativeOverlap:
 
 
 def test_validate_canonical_state_flags_missing_task_plan():
-    from backend.context.canonical_state.ops import validate_canonical_state_for_compaction
     from unittest.mock import patch
+
+    from backend.context.canonical_state.ops import (
+        validate_canonical_state_for_compaction,
+    )
 
     events = [_user('build api', 1)]
     canonical = CanonicalTaskState()
@@ -565,8 +568,9 @@ def test_validate_canonical_state_flags_missing_task_plan():
 
 
 def test_hydrate_persisted_task_plan_populates_canonical():
-    from backend.context.canonical_state.ops import reduce_snapshot_into_state
     from unittest.mock import patch
+
+    from backend.context.canonical_state.ops import reduce_snapshot_into_state
 
     snapshot = {'user_messages': [{'text': 'build feature'}]}
     tasks = [{'id': '1', 'description': 'Implement feature', 'status': 'todo'}]

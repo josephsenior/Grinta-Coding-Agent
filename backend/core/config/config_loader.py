@@ -33,6 +33,7 @@ from backend.core.config.env_loader import (
     load_from_env,
 )
 from backend.core.config.llm_config import LLMConfig
+from backend.core.config.mcp_config import MCPConfig
 from backend.core.config.model_rebuild import rebuild_config_models
 from backend.core.config.security_config import SecurityConfig
 from backend.core.constants import JWT_SECRET_FILE as JWT_SECRET
@@ -565,8 +566,6 @@ def _apply_json_security_config(
 
 def load_mcp_config_from_json(json_file: str | pathlib.Path) -> MCPConfig:
     """Load and finalize MCP settings from a specific ``settings.json`` path."""
-    from backend.core.config.mcp_config import MCPConfig
-
     cfg = AppConfig()
     load_from_json(cfg, str(json_file))
     finalize_config(cfg)

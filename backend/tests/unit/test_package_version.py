@@ -40,6 +40,6 @@ def test_version_from_pyproject_reads_local_pyproject() -> None:
 
 
 def test_package_exports() -> None:
-    assert backend.__package_name__ == 'grinta-ai'
+    assert backend.__package_name__ == 'grinta'
     assert isinstance(backend.__version__, str)
     assert backend.get_version()

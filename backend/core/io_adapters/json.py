@@ -8,6 +8,8 @@ from json_repair import repair_json
 from pydantic import BaseModel
 
 from backend.core.errors import LLMResponseError
+
+
 class AppJSONEncoder(json.JSONEncoder):
     """Custom JSON encoder that handles datetime and event objects."""
 

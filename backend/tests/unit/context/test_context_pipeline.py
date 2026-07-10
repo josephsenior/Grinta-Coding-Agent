@@ -7,6 +7,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from backend.context.compactor.compact_boundary import (
+    find_last_condensation_action,
+    find_pending_condensation_request,
+)
 from backend.context.compactor.compactor import Compaction
 from backend.context.context_budget import ContextBudget
 from backend.context.context_pipeline import ContextPipeline
@@ -20,15 +24,10 @@ from backend.context.context_pipeline.compaction import (
     should_run_compaction,
     should_skip_compaction,
 )
-from backend.context.compactor.compact_boundary import (
-    find_last_condensation_action,
-    find_pending_condensation_request,
-)
-from backend.ledger.action.agent import CondensationRequestAction
 from backend.context.context_pipeline.helpers import is_prewarm_stale
 from backend.context.context_pipeline.types import _ContinuityGateDecision
 from backend.core.config.compactor_config import ContextPipelineConfig
-from backend.ledger.action.agent import CondensationAction
+from backend.ledger.action.agent import CondensationAction, CondensationRequestAction
 from backend.ledger.action.message import MessageAction
 from backend.ledger.event import EventSource
 from backend.ledger.observation.commands import CmdOutputObservation

@@ -3246,6 +3246,434 @@
         }
       }
     },
+    "gpt-5.6": {
+      "runtime": {
+        "client": "openai_responses_compatible",
+        "aliases": [
+          "opencode/gpt-5.6",
+          "gpt-5.6"
+        ],
+        "context_window_tokens": 1050000,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 5,
+        "cached_input_price_per_m": 0.5,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 30,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_vision": true,
+        "max_input_tokens": 922000,
+        "strip_temperature": true,
+        "inference_endpoint": "/responses",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "medium",
+          "none",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_reasoning_effort": true,
+        "supports_response_schema": true
+      },
+      "metadata": {
+        "source": "user_provided_opencode_internal_config",
+        "provider_id": "opencode",
+        "display_name": "GPT-5.6",
+        "family": "gpt",
+        "status": "active",
+        "release_date": "2026-07-09",
+        "api": {
+          "id": "gpt-5.6",
+          "url": "https://opencode.ai/zen/v1",
+          "npm": "@ai-sdk/openai"
+        },
+        "inference_url": "https://opencode.ai/zen/v1/responses",
+        "options": {},
+        "capabilities": {
+          "temperature": false,
+          "reasoning": true,
+          "attachment": true,
+          "toolcall": true,
+          "input": {
+            "text": true,
+            "audio": false,
+            "image": true,
+            "video": false,
+            "pdf": true
+          },
+          "output": {
+            "text": true,
+            "audio": false,
+            "image": false,
+            "video": false,
+            "pdf": false
+          },
+          "interleaved": false
+        },
+        "variants": {
+          "none": {
+            "reasoningEffort": "none",
+            "reasoningSummary": "auto",
+            "include": [
+              "reasoning.encrypted_content"
+            ]
+          },
+          "low": {
+            "reasoningEffort": "low",
+            "reasoningSummary": "auto",
+            "include": [
+              "reasoning.encrypted_content"
+            ]
+          },
+          "medium": {
+            "reasoningEffort": "medium",
+            "reasoningSummary": "auto",
+            "include": [
+              "reasoning.encrypted_content"
+            ]
+          },
+          "high": {
+            "reasoningEffort": "high",
+            "reasoningSummary": "auto",
+            "include": [
+              "reasoning.encrypted_content"
+            ]
+          },
+          "xhigh": {
+            "reasoningEffort": "xhigh",
+            "reasoningSummary": "auto",
+            "include": [
+              "reasoning.encrypted_content"
+            ]
+          }
+        }
+      }
+    },
+    "gpt-5.6-sol": {
+      "runtime": {
+        "client": "openai_responses_compatible",
+        "aliases": [
+          "opencode/gpt-5.6-sol",
+          "gpt-5.6-sol"
+        ],
+        "context_window_tokens": 1050000,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 5,
+        "cached_input_price_per_m": 0.5,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 30,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_vision": true,
+        "max_input_tokens": 922000,
+        "strip_temperature": true,
+        "inference_endpoint": "/responses",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "medium",
+          "none",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_reasoning_effort": true,
+        "supports_response_schema": true
+      },
+      "metadata": {
+        "source": "user_provided_opencode_internal_config",
+        "provider_id": "opencode",
+        "display_name": "GPT-5.6 Sol",
+        "family": "gpt",
+        "status": "active",
+        "release_date": "2026-07-09",
+        "api": {
+          "id": "gpt-5.6-sol",
+          "url": "https://opencode.ai/zen/v1",
+          "npm": "@ai-sdk/openai"
+        },
+        "inference_url": "https://opencode.ai/zen/v1/responses",
+        "options": {},
+        "capabilities": {
+          "temperature": false,
+          "reasoning": true,
+          "attachment": true,
+          "toolcall": true,
+          "input": {
+            "text": true,
+            "audio": false,
+            "image": true,
+            "video": false,
+            "pdf": true
+          },
+          "output": {
+            "text": true,
+            "audio": false,
+            "image": false,
+            "video": false,
+            "pdf": false
+          },
+          "interleaved": false
+        },
+        "variants": {
+          "none": {
+            "reasoningEffort": "none",
+            "reasoningSummary": "auto",
+            "include": [
+              "reasoning.encrypted_content"
+            ]
+          },
+          "low": {
+            "reasoningEffort": "low",
+            "reasoningSummary": "auto",
+            "include": [
+              "reasoning.encrypted_content"
+            ]
+          },
+          "medium": {
+            "reasoningEffort": "medium",
+            "reasoningSummary": "auto",
+            "include": [
+              "reasoning.encrypted_content"
+            ]
+          },
+          "high": {
+            "reasoningEffort": "high",
+            "reasoningSummary": "auto",
+            "include": [
+              "reasoning.encrypted_content"
+            ]
+          },
+          "xhigh": {
+            "reasoningEffort": "xhigh",
+            "reasoningSummary": "auto",
+            "include": [
+              "reasoning.encrypted_content"
+            ]
+          }
+        }
+      }
+    },
+    "gpt-5.6-terra": {
+      "runtime": {
+        "client": "openai_responses_compatible",
+        "aliases": [
+          "opencode/gpt-5.6-terra",
+          "gpt-5.6-terra"
+        ],
+        "context_window_tokens": 1050000,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 2.5,
+        "cached_input_price_per_m": 0.25,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 15,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_vision": true,
+        "max_input_tokens": 922000,
+        "strip_temperature": true,
+        "inference_endpoint": "/responses",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "medium",
+          "none",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_reasoning_effort": true,
+        "supports_response_schema": true
+      },
+      "metadata": {
+        "source": "user_provided_opencode_internal_config",
+        "provider_id": "opencode",
+        "display_name": "GPT-5.6 Terra",
+        "family": "gpt",
+        "status": "active",
+        "release_date": "2026-07-09",
+        "api": {
+          "id": "gpt-5.6-terra",
+          "url": "https://opencode.ai/zen/v1",
+          "npm": "@ai-sdk/openai"
+        },
+        "inference_url": "https://opencode.ai/zen/v1/responses",
+        "options": {},
+        "capabilities": {
+          "temperature": false,
+          "reasoning": true,
+          "attachment": true,
+          "toolcall": true,
+          "input": {
+            "text": true,
+            "audio": false,
+            "image": true,
+            "video": false,
+            "pdf": true
+          },
+          "output": {
+            "text": true,
+            "audio": false,
+            "image": false,
+            "video": false,
+            "pdf": false
+          },
+          "interleaved": false
+        },
+        "variants": {
+          "none": {
+            "reasoningEffort": "none",
+            "reasoningSummary": "auto",
+            "include": [
+              "reasoning.encrypted_content"
+            ]
+          },
+          "low": {
+            "reasoningEffort": "low",
+            "reasoningSummary": "auto",
+            "include": [
+              "reasoning.encrypted_content"
+            ]
+          },
+          "medium": {
+            "reasoningEffort": "medium",
+            "reasoningSummary": "auto",
+            "include": [
+              "reasoning.encrypted_content"
+            ]
+          },
+          "high": {
+            "reasoningEffort": "high",
+            "reasoningSummary": "auto",
+            "include": [
+              "reasoning.encrypted_content"
+            ]
+          },
+          "xhigh": {
+            "reasoningEffort": "xhigh",
+            "reasoningSummary": "auto",
+            "include": [
+              "reasoning.encrypted_content"
+            ]
+          }
+        }
+      }
+    },
+    "gpt-5.6-luna": {
+      "runtime": {
+        "client": "openai_responses_compatible",
+        "aliases": [
+          "opencode/gpt-5.6-luna",
+          "gpt-5.6-luna"
+        ],
+        "context_window_tokens": 1050000,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 1.0,
+        "cached_input_price_per_m": 0.1,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 6,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_vision": true,
+        "max_input_tokens": 922000,
+        "strip_temperature": true,
+        "inference_endpoint": "/responses",
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "high",
+          "low",
+          "medium",
+          "none",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort",
+        "supports_reasoning_effort": true,
+        "supports_response_schema": true
+      },
+      "metadata": {
+        "source": "user_provided_opencode_internal_config",
+        "provider_id": "opencode",
+        "display_name": "GPT-5.6 Luna",
+        "family": "gpt",
+        "status": "active",
+        "release_date": "2026-07-09",
+        "api": {
+          "id": "gpt-5.6-luna",
+          "url": "https://opencode.ai/zen/v1",
+          "npm": "@ai-sdk/openai"
+        },
+        "inference_url": "https://opencode.ai/zen/v1/responses",
+        "options": {},
+        "capabilities": {
+          "temperature": false,
+          "reasoning": true,
+          "attachment": true,
+          "toolcall": true,
+          "input": {
+            "text": true,
+            "audio": false,
+            "image": true,
+            "video": false,
+            "pdf": true
+          },
+          "output": {
+            "text": true,
+            "audio": false,
+            "image": false,
+            "video": false,
+            "pdf": false
+          },
+          "interleaved": false
+        },
+        "variants": {
+          "none": {
+            "reasoningEffort": "none",
+            "reasoningSummary": "auto",
+            "include": [
+              "reasoning.encrypted_content"
+            ]
+          },
+          "low": {
+            "reasoningEffort": "low",
+            "reasoningSummary": "auto",
+            "include": [
+              "reasoning.encrypted_content"
+            ]
+          },
+          "medium": {
+            "reasoningEffort": "medium",
+            "reasoningSummary": "auto",
+            "include": [
+              "reasoning.encrypted_content"
+            ]
+          },
+          "high": {
+            "reasoningEffort": "high",
+            "reasoningSummary": "auto",
+            "include": [
+              "reasoning.encrypted_content"
+            ]
+          },
+          "xhigh": {
+            "reasoningEffort": "xhigh",
+            "reasoningSummary": "auto",
+            "include": [
+              "reasoning.encrypted_content"
+            ]
+          }
+        }
+      }
+    },
     "grok-build-0.1": {
       "runtime": {
         "client": "openai_compatible",

@@ -86,6 +86,8 @@ _SIMPLE_VERB_MAP = {
 
 def _verb_terminal_manager(args: dict[str, Any]) -> str:
     op = str(args.get('action') or '').strip().lower()
+    if not op and 'command' in args:
+        op = 'run'
     return _TERMINAL_MANAGER_VERBS.get(op, 'Tool')
 
 
@@ -192,6 +194,7 @@ _STATS_HANDLERS: dict[str, Callable[[dict[str, Any]], str | None]] = {
     'analyze_project_structure': _stats_analyze_project,
     'task_tracker': _stats_task_tracker,
     'terminal_manager': _stats_terminal_manager,
+    'terminal': _stats_terminal_manager,
     'debugger': _stats_debugger,
     'lsp': _stats_lsp,
     'lsp_query': _stats_lsp,

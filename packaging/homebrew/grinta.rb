@@ -1,14 +1,14 @@
 # Homebrew formula for Grinta
 #
 # Maintainer note: bump `version` and `sha256` on each release.
-# `brew create --python https://files.pythonhosted.org/.../grinta-ai-X.Y.Z.tar.gz`
+# `brew create --python https://files.pythonhosted.org/.../grinta-X.Y.Z.tar.gz`
 # can scaffold an updated version. Keep this file as the canonical template.
 class Grinta < Formula
   include Language::Python::Virtualenv
 
   desc "Autonomous local-first CLI coding agent"
   homepage "https://github.com/josephsenior/Grinta-Coding-Agent"
-  url "https://files.pythonhosted.org/packages/source/g/grinta-ai/grinta-ai-1.0.0rc1.tar.gz"
+  url "https://files.pythonhosted.org/packages/source/g/grinta/grinta-1.0.0rc1.tar.gz"
   sha256 "e898dbfbe588b60b3375797287b85a709faafd9c8d942ce7371e7a2c9e8f9d30"
   license "MIT"
 

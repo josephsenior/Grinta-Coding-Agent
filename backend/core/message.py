@@ -18,6 +18,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_serializer
 
+
 class ToolCallFunction(BaseModel):
     """Function call details within a tool call.
 

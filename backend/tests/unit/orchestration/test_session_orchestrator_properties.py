@@ -178,13 +178,14 @@ def test_default_operation_pipeline_order_is_stable() -> None:
         'PreExecDiffMiddleware',
         'AutoCheckMiddleware',
         'PostEditDiagnosticsMiddleware',
+        'SymbolIndexInvalidationMiddleware',
         'FileStateMiddleware',
         'LoggingMiddleware',
         'TelemetryMiddleware',
         'ToolResultValidator',
     ]
     assert ctrl._rollback_middleware.__class__.__name__ == 'RollbackMiddleware'
-    assert ctrl._file_state_tracker is middlewares[11].tracker
+    assert ctrl._file_state_tracker is middlewares[12].tracker
 
 
 # ── Service aliasing ────────────────────────────────────────────────

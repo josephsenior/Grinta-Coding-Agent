@@ -220,6 +220,142 @@
         "display_name": "GPT-5.5 Pro (Vercel Gateway)"
       }
     },
+    "openai/gpt-5.6": {
+      "runtime": {
+        "aliases": [
+          "vercel/openai/gpt-5.6"
+        ],
+        "context_window_tokens": 1050000,
+        "max_input_tokens": 917904,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 5.0,
+        "output_price_per_m": 30.0,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_vision": true,
+        "supports_reasoning_effort": true,
+        "strip_temperature": true,
+        "strip_top_p": true,
+        "use_max_completion_tokens": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "reasoning_wire": "vercel_gateway_reasoning",
+        "supports_response_schema": true
+      },
+      "metadata": {
+        "display_name": "GPT-5.6 (Vercel Gateway)"
+      }
+    },
+    "openai/gpt-5.6-sol": {
+      "runtime": {
+        "aliases": [
+          "vercel/openai/gpt-5.6-sol"
+        ],
+        "context_window_tokens": 1050000,
+        "max_input_tokens": 917904,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 5.0,
+        "output_price_per_m": 30.0,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_vision": true,
+        "supports_reasoning_effort": true,
+        "strip_temperature": true,
+        "strip_top_p": true,
+        "use_max_completion_tokens": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "reasoning_wire": "vercel_gateway_reasoning",
+        "supports_response_schema": true
+      },
+      "metadata": {
+        "display_name": "GPT-5.6 Sol (Vercel Gateway)"
+      }
+    },
+    "openai/gpt-5.6-terra": {
+      "runtime": {
+        "aliases": [
+          "vercel/openai/gpt-5.6-terra"
+        ],
+        "context_window_tokens": 1050000,
+        "max_input_tokens": 917904,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 2.5,
+        "output_price_per_m": 15.0,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_vision": true,
+        "supports_reasoning_effort": true,
+        "strip_temperature": true,
+        "strip_top_p": true,
+        "use_max_completion_tokens": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "reasoning_wire": "vercel_gateway_reasoning",
+        "supports_response_schema": true
+      },
+      "metadata": {
+        "display_name": "GPT-5.6 Terra (Vercel Gateway)"
+      }
+    },
+    "openai/gpt-5.6-luna": {
+      "runtime": {
+        "aliases": [
+          "vercel/openai/gpt-5.6-luna"
+        ],
+        "context_window_tokens": 1050000,
+        "max_input_tokens": 917904,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 1.0,
+        "output_price_per_m": 6.0,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_vision": true,
+        "supports_reasoning_effort": true,
+        "strip_temperature": true,
+        "strip_top_p": true,
+        "use_max_completion_tokens": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "reasoning_wire": "vercel_gateway_reasoning",
+        "supports_response_schema": true
+      },
+      "metadata": {
+        "display_name": "GPT-5.6 Luna (Vercel Gateway)"
+      }
+    },
     "openai/gpt-5.1": {
       "runtime": {
         "aliases": [

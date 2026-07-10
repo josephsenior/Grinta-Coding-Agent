@@ -78,7 +78,7 @@ class TestRenderCriticalModeSpecific:
         return _render_critical(
             _fake_render_partial,
             'execute_command',
-            terminal_available=kwargs.get('terminal_available', False),
+            terminal_manager_available=kwargs.get('terminal_available', False),
             tracker_on=kwargs.get('tracker_on', False),
             checkpoints_on=kwargs.get('checkpoints_on', False),
             mode=mode,
@@ -133,7 +133,7 @@ class TestRenderCriticalModeSpecific:
         self._assert_contains_body(body, 'is_background=true')
         self._assert_contains_body(body, 'terminal action=wait')
         self._assert_contains_body(body, 'action=stop')
-        self._assert_contains_body(body, 'action='start'')
+        self._assert_contains_body(body, "action='start'")
         lines = [
             line
             for line in body.split('\n')

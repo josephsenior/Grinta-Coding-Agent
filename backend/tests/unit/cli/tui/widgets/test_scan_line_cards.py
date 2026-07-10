@@ -308,14 +308,14 @@ def test_shell_card_done():
     card = ShellCard(command='cargo test', output='47/47 passed', exit_code=0)
     assert card.state == 'done'
     assert '[#639922]$ Shell[/]' in _line_text(card)
-    assert '[#639922]✓[/]' in card._delta_text()
+    assert '[scan-line-state-done]✓[/]' in card._delta_text()
 
 
 def test_shell_card_failed():
     card = ShellCard(command='npm build', exit_code=1)
     assert card.state == 'failed'
     assert '[#E24B4A]$ Shell[/]' in _line_text(card)
-    assert '[#E24B4A]✗ 1[/]' in card._delta_text()
+    assert '[scan-line-state-failed]✗ 1[/]' in card._delta_text()
 
 
 def test_shell_card_background_detached():
@@ -372,7 +372,7 @@ def test_terminal_card_done():
         exit_code=0,
     )
     assert card.state == 'done'
-    assert '[#639922]✓[/]' in card._delta_text()
+    assert '[scan-line-state-done]✓[/]' in card._delta_text()
 
 
 def test_terminal_card_failed():
@@ -384,7 +384,7 @@ def test_terminal_card_failed():
         exit_code=101,
     )
     assert card.state == 'failed'
-    assert '[#E24B4A]✗ 101[/]' in card._delta_text()
+    assert '[scan-line-state-failed]✗ 101[/]' in card._delta_text()
 
 
 def test_terminal_card_summary():

@@ -288,7 +288,7 @@ class TestOrchestratorPromptManager:
         opm = OrchestratorPromptManager(prompt_dir=str(tmp_path), config=config)
         result = opm.get_system_message()
 
-        assert '`action='start'`' not in result
+        assert "`action='start'`" not in result
         assert 'do not refer to `terminal`' not in result
 
     def test_build_knowledge_base_info(self, tmp_path):
@@ -425,9 +425,7 @@ class TestOrchestratorPromptManager:
         assert 'Function-calling mode' not in result
         assert 'Fallback' not in result
 
-    def test_shell_identity_uses_active_terminal_tool_over_bash_presence(
-        self, tmp_path
-    ):
+    def test_shell_identity_windows_with_bash(self, tmp_path):
         from backend.utils.prompt import OrchestratorPromptManager
 
         mock_config = MagicMock()
@@ -446,6 +444,33 @@ class TestOrchestratorPromptManager:
             patch(
                 'backend.utils.terminal.terminal_contract.is_windows_with_bash',
                 return_value=True,
+            ),
+        ):
+            mock_caps.is_windows = True
+            result = opm.get_system_message()
+
+        assert 'Your terminal is **Git Bash** running on Windows.' in result
+        assert 'Your terminal is **PowerShell** on Windows.' not in result
+
+    def test_shell_identity_windows_with_powershell(self, tmp_path):
+        from backend.utils.prompt import OrchestratorPromptManager
+
+        mock_config = MagicMock()
+        mock_config.autonomy_level = 'balanced'
+        mock_config.enable_checkpoints = False
+        mock_config.enable_permissions = False
+
+        opm = OrchestratorPromptManager(prompt_dir=str(tmp_path), config=mock_config)
+
+        with (
+            patch('backend.utils.prompt.OS_CAPS') as mock_caps,
+            patch(
+                'backend.utils.terminal.terminal_contract.get_terminal_tool_name',
+                return_value='terminal',
+            ),
+            patch(
+                'backend.utils.terminal.terminal_contract.is_windows_with_bash',
+                return_value=False,
             ),
         ):
             mock_caps.is_windows = True

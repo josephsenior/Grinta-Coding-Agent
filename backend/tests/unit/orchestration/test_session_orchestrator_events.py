@@ -4,7 +4,6 @@
 # pylint: disable=protected-access,too-many-lines
 
 import asyncio
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest

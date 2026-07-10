@@ -99,7 +99,7 @@ class TestFeatureFlagToolPresence:
 
     def test_terminal_enabled(self):
         names = _build_toolset(enable_terminal=True)
-        assert {'terminal', 'terminal'} & names
+        assert {'terminal'} & names
         assert 'terminal' in names
         self._assert_dispatch_covered(names)
 
@@ -310,8 +310,6 @@ class TestModeToolVisibility:
             'replace_string',
             'multiedit',
             'terminal',
-            'terminal',
-            'terminal',
             'debugger',
             'call_mcp_tool',
             'browser_tool',
@@ -333,7 +331,7 @@ class TestModeToolVisibility:
             enable_debugger=False,
         )
         assert {'create_file', 'replace_string', 'multiedit'} <= names
-        assert {'terminal', 'terminal'} & names
+        assert {'terminal'} & names
         assert 'ask_user' in names
         assert 'terminal' in names
         assert 'call_mcp_tool' in names
@@ -384,8 +382,6 @@ class TestModeToolVisibility:
             'create_file',
             'replace_string',
             'multiedit',
-            'terminal',
-            'terminal',
             'terminal',
             'call_mcp_tool',
         }.isdisjoint(names)

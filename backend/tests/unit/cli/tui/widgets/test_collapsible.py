@@ -130,5 +130,5 @@ async def test_task_sidebar_retries_after_failed_first_update(
 
         renderer._refresh_tasks_sidebar()
         section = screen.query_one('#sidebar-tasks', CollapsibleSection)
-        assert section._section_title == 'Tasks (1)'
+        assert section._section_title == 'Tasks · 0/1 done'
         assert len(list(section.query(SidebarRow).results())) == 1

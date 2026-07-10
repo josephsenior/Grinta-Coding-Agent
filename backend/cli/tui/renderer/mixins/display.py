@@ -319,7 +319,6 @@ class RendererDisplayMixin:
     def _refresh_lsp_sidebar(self) -> None:
         from textual.widgets import Static
 
-        from backend.cli.tui.widgets.collapsible import CollapsibleSection
 
         if not self._sidebar_lsp_enabled():
             signature = ('disabled',)
@@ -406,7 +405,6 @@ class RendererDisplayMixin:
     def _refresh_dap_sidebar(self) -> None:
         from textual.widgets import Static
 
-        from backend.cli.tui.widgets.collapsible import CollapsibleSection
 
         if not self._sidebar_debugger_enabled():
             signature = ('disabled',)
@@ -485,7 +483,7 @@ class RendererDisplayMixin:
 
     def _refresh_tasks_sidebar(self) -> None:
         """Keep task rows live even while transcript streaming is throttled."""
-        from backend.cli.tui.widgets.collapsible import CollapsibleSection, SidebarRow
+        from backend.cli.tui.widgets.collapsible import SidebarRow
         from backend.core.tasks.task_status import TASK_STATUS_DONE
 
         task_signature = task_panel_signature(self._task_list)
@@ -575,8 +573,6 @@ class RendererDisplayMixin:
 
     def _sync_mcp_sidebar_disabled(self) -> None:
         """Show the same muted ``● Disabled`` empty state as LSP/DAP."""
-        from backend.cli.tui.widgets.collapsible import CollapsibleSection
-
         section = self._get_sidebar_section('#sidebar-mcp')
         if section is None:
             return
@@ -592,7 +588,6 @@ class RendererDisplayMixin:
         *,
         empty_message: str | None = None,
     ) -> bool:
-        from backend.cli.tui.widgets.collapsible import CollapsibleSection
 
         widget = self._get_sidebar_section(widget_id)
         if widget is None:
@@ -607,7 +602,6 @@ class RendererDisplayMixin:
             return False
 
     def _sync_sidebar_feature_switch(self, widget_id: str, enabled: bool) -> None:
-        from backend.cli.tui.widgets.collapsible import CollapsibleSection
 
         section = self._get_sidebar_section(widget_id)
         if section is None:

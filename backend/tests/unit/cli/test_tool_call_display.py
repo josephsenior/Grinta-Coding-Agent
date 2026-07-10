@@ -57,7 +57,7 @@ class TestToolCallDisplay(unittest.TestCase):
             'terminal',
             '{"action": "open", "command": "npm test',
         )
-        self.assertIn('open', h)
+        self.assertIn('start', h)
         h2 = streaming_args_hint(
             'terminal',
             '{"action": "open", "command": "npm test", "cwd": "x"}',
@@ -220,10 +220,10 @@ class TestToolCallDisplay(unittest.TestCase):
     def test_tool_headline_respects_use_icons(self) -> None:
         em, label = tool_headline('terminal', use_icons=True)
         self.assertEqual(em, '')
-        self.assertEqual(label, 'Shell')
+        self.assertEqual(label, 'Terminal')
         em2, label2 = tool_headline('terminal', use_icons=False)
         self.assertEqual(em2, '')
-        self.assertEqual(label2, 'Shell')
+        self.assertEqual(label2, 'Terminal')
 
 
 if __name__ == '__main__':

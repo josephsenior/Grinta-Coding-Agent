@@ -471,7 +471,7 @@ async def drain_events_async(orch: 'RendererEventProcessorMixin') -> None:
             orch._drain_requested_while_active = False
             if orch._pending_events:
                 _force_immediate_drain(orch)
-                return
+                return  # noqa: B012
 
     elapsed_ms = (time.monotonic() - invocation_started) * 1000.0
     pending_depth = 0

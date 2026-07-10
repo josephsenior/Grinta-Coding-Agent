@@ -1,6 +1,6 @@
 """Text extraction from PDF, DOCX, and PPTX files.
 
-Parser libraries ship with the base ``grinta-ai`` install (``pypdf``, ``python-docx``,
+Parser libraries ship with the base ``grinta`` install (``pypdf``, ``python-docx``,
 ``python-pptx``, ``pylatexenc``).
 """
 
@@ -8,7 +8,7 @@ from __future__ import annotations
 
 _MISSING_PARSER_HINT = (
     'Document parser dependency missing. '
-    'Reinstall grinta-ai or run: pip install pypdf python-docx python-pptx pylatexenc'
+    'Reinstall grinta or run: pip install pypdf python-docx python-pptx pylatexenc'
 )
 
 

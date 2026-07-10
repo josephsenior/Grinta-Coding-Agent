@@ -425,6 +425,8 @@ def _summary_checkpoint(args: dict[str, Any]) -> str:
 
 def _summary_terminal(args: dict[str, Any]) -> str:
     op = str(args.get('action') or '').strip().lower()
+    if not op and 'command' in args:
+        op = 'run'
     if op == 'run':
         return _summary_shell(args)
     if op == 'start':

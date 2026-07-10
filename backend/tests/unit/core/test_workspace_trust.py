@@ -41,7 +41,9 @@ async def test_maybe_apply_unfamiliar_workspace_skips_familiar(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from backend.cli.workspace_trust_prompt import maybe_apply_unfamiliar_workspace_hardening
+    from backend.cli.workspace_trust_prompt import (
+        maybe_apply_unfamiliar_workspace_hardening,
+    )
 
     trust_file = tmp_path / 'workspace_trust.json'
     monkeypatch.setattr('backend.core.workspace_trust._TRUST_FILE', trust_file)
@@ -67,7 +69,9 @@ async def test_maybe_apply_unfamiliar_workspace_switches_to_conservative(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from backend.cli.workspace_trust_prompt import maybe_apply_unfamiliar_workspace_hardening
+    from backend.cli.workspace_trust_prompt import (
+        maybe_apply_unfamiliar_workspace_hardening,
+    )
 
     trust_file = tmp_path / 'workspace_trust.json'
     monkeypatch.setattr('backend.core.workspace_trust._TRUST_FILE', trust_file)

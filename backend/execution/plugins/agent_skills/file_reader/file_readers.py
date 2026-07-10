@@ -35,7 +35,7 @@ from backend.execution.plugins.agent_skills.utils.config import (
 
 _MISSING_PARSER_HINT = (
     'Document parser dependency missing. '
-    'Reinstall grinta-ai or run: pip install pypdf python-docx python-pptx pylatexenc'
+    'Reinstall grinta or run: pip install pypdf python-docx python-pptx pylatexenc'
 )
 
 

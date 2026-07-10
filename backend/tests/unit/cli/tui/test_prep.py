@@ -5,7 +5,6 @@ from __future__ import annotations
 from rich.syntax import Syntax
 
 from backend.cli.tui.renderer.prep import (
-    StreamingRenderState,
     _loosen_markdown_spacing,
     prep_markdown,
     prep_streaming_renderable_incremental,

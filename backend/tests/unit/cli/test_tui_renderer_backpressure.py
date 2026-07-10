@@ -11,7 +11,6 @@ from backend.cli.theme import CLR_REASONING_SNAP
 from backend.cli.tui import app as tui_app
 from backend.cli.tui.renderer import drain as _drain_mod
 from backend.cli.tui.renderer.mixins import event_processor as _ep_mod
-from backend.cli.tui.renderer.mixins import live as _live_mod
 from backend.ledger.action import StreamingChunkAction
 
 
@@ -60,7 +59,7 @@ async def test_tui_renderer_latches_drain_request_while_active():
 @pytest.mark.asyncio
 async def test_tui_renderer_history_is_bounded(monkeypatch):
     monkeypatch.setattr(
-        'backend.cli.tui.constants._TUI_HISTORY_RENDER_LIMIT',
+        'backend.cli.tui.app._TUI_HISTORY_RENDER_LIMIT',
         3,
     )
     display = MagicMock()

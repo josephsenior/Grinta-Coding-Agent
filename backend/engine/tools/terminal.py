@@ -1,27 +1,14 @@
 from typing import Any
 
-from backend.core.errors import FunctionCallValidationError
 from backend.core.tools.tool_names import TERMINAL_TOOL_NAME
-from backend.engine.function_calling.helpers import (
-    set_security_risk,
-    validate_security_risk,
-)
-from backend.ledger.action.terminal import (
-    TerminalCloseAction,
-    TerminalInputAction,
-    TerminalListAction,
-    TerminalReadAction,
-    TerminalRunAction,
-    TerminalWaitAction,
+from backend.engine.tools.param_defs import (
+    get_security_risk_param,
+    get_timeout_param,
 )
 from backend.utils.terminal.terminal_contract import (
     get_shell_name,
     is_windows_with_bash,
     uses_powershell_terminal,
-)
-from backend.engine.tools.param_defs import (
-    get_security_risk_param,
-    get_timeout_param,
 )
 
 _DETAILED_TERMINAL_DESCRIPTION = (
@@ -117,7 +104,7 @@ def create_terminal_tool() -> dict[str, Any]:
                     'truncation_strategy': {
                         'type': 'string',
                         'enum': ['tail_heavy', 'head_heavy', 'balanced'],
-                        'description': "For action=run: how to truncate long output.",
+                        'description': 'For action=run: how to truncate long output.',
                     },
                     'rows': {
                         'type': 'integer',

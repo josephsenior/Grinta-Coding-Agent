@@ -1,7 +1,7 @@
 # ============================================
 # GRINTA - Quick Start (pipx / installed CLI)
 # ============================================
-# For users who installed with: pipx install grinta-ai
+# For users who installed with: pipx install grinta
 # Mirrors scripts/launch/start_here.ps1 without uv or source checkout steps.
 
 $ErrorActionPreference = 'Stop'
@@ -36,7 +36,7 @@ Write-Host 'Step 0: Pre-flight checks...' -ForegroundColor Yellow
 $grintaCmd = Get-GrintaCommand
 if (-not $grintaCmd) {
     Write-Host "'grinta' not found on PATH." -ForegroundColor Red
-    Write-Host 'Install with: pipx install grinta-ai' -ForegroundColor Yellow
+    Write-Host 'Install with: pipx install grinta' -ForegroundColor Yellow
     Write-Host 'Then reopen your terminal and run this script again.' -ForegroundColor Yellow
     Read-Host 'Press Enter to exit'
     exit 1
@@ -61,7 +61,7 @@ Write-Host 'machine tools (not Grinta dependencies) that unlock more workflow fe
 Write-Host ''
 
 Write-Host 'Step 1: Skipping dependency sync (managed by pipx).' -ForegroundColor Yellow
-Write-Host '[OK] Using installed grinta-ai package.' -ForegroundColor Green
+Write-Host '[OK] Using installed grinta package.' -ForegroundColor Green
 
 Write-Host 'Step 1.5: Checking local model servers (Ollama/LM Studio/vLLM)...' -ForegroundColor Yellow
 if ($pythonExe) {

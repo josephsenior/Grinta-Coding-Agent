@@ -5,7 +5,7 @@ requires = [
 ]
 
 [project]
-name = "grinta-ai"
+name = "grinta"
 version = "1.0.0rc1"
 description = "Local-first TUI/CLI coding agent"
 readme = "README.md"
@@ -86,9 +86,9 @@ optional-dependencies.rag = [
 urls = { Repository = "https://github.com/josephsenior/Grinta-Coding-Agent", Issues = "https://github.com/josephsenior/Grinta-Coding-Agent/issues", Documentation = "https://github.com/josephsenior/Grinta-Coding-Agent/tree/main/docs" }
 
 # User-installable extras. Base install includes PDF/DOCX/PPTX/LaTeX parsers.
-# pip install "grinta-ai[rag]"     — long-term semantic memory (Chroma + ONNX embeddings)
-# pip install "grinta-ai[browser]" — native browser automation (browser-use)
-# pip install "grinta-ai[all]"     — rag + browser
+# pip install "grinta[rag]"     — long-term semantic memory (Chroma + ONNX embeddings)
+# pip install "grinta[browser]" — native browser automation (browser-use)
+# pip install "grinta[all]"     — rag + browser
 scripts.grinta = "launch.entry:main"
 
 [dependency-groups]

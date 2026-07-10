@@ -527,6 +527,146 @@
         "reasoning_wire": "openai_reasoning_effort"
       },
       "metadata": {}
+    },
+    "gpt-5.6": {
+      "runtime": {
+        "aliases": [
+          "openai/gpt-5.6",
+          "gpt-5.6",
+          "gpt 5.6"
+        ],
+        "context_window_tokens": 1050000,
+        "max_input_tokens": 917904,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 5.0,
+        "cached_input_price_per_m": 0.5,
+        "output_price_per_m": 30.0,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_response_schema": true,
+        "supports_vision": true,
+        "supports_reasoning_effort": true,
+        "strip_temperature": true,
+        "strip_top_p": true,
+        "use_max_completion_tokens": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
+      },
+      "metadata": {}
+    },
+    "gpt-5.6-sol": {
+      "runtime": {
+        "aliases": [
+          "openai/gpt-5.6-sol",
+          "gpt-5.6-sol",
+          "gpt 5.6 sol"
+        ],
+        "context_window_tokens": 1050000,
+        "max_input_tokens": 917904,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 5.0,
+        "cached_input_price_per_m": 0.5,
+        "output_price_per_m": 30.0,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_response_schema": true,
+        "supports_vision": true,
+        "supports_reasoning_effort": true,
+        "strip_temperature": true,
+        "strip_top_p": true,
+        "use_max_completion_tokens": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
+      },
+      "metadata": {}
+    },
+    "gpt-5.6-terra": {
+      "runtime": {
+        "aliases": [
+          "openai/gpt-5.6-terra",
+          "gpt-5.6-terra",
+          "gpt 5.6 terra"
+        ],
+        "context_window_tokens": 1050000,
+        "max_input_tokens": 917904,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 2.5,
+        "cached_input_price_per_m": 0.25,
+        "output_price_per_m": 15.0,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_response_schema": true,
+        "supports_vision": true,
+        "supports_reasoning_effort": true,
+        "strip_temperature": true,
+        "strip_top_p": true,
+        "use_max_completion_tokens": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
+      },
+      "metadata": {}
+    },
+    "gpt-5.6-luna": {
+      "runtime": {
+        "aliases": [
+          "openai/gpt-5.6-luna",
+          "gpt-5.6-luna",
+          "gpt 5.6 luna"
+        ],
+        "context_window_tokens": 1050000,
+        "max_input_tokens": 917904,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 1.0,
+        "cached_input_price_per_m": 0.1,
+        "output_price_per_m": 6.0,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_response_schema": true,
+        "supports_vision": true,
+        "supports_reasoning_effort": true,
+        "strip_temperature": true,
+        "strip_top_p": true,
+        "use_max_completion_tokens": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
+      },
+      "metadata": {}
     }
   }
 }

@@ -238,12 +238,12 @@ class OrchestratorPlanner:
 
     def _add_basic_tools(self, tools: list) -> None:
         """Add terminal, ask_user, and basic file tools."""
-        from backend.engine.tools.terminal import create_terminal_tool
         from backend.engine.tools.meta_cognition import create_ask_user_tool
         from backend.engine.tools.native_file_tools import (
             create_find_symbols_tool,
             create_read_file_tool,
         )
+        from backend.engine.tools.terminal import create_terminal_tool
 
         tools.append(create_terminal_tool())
         tools.append(create_ask_user_tool())

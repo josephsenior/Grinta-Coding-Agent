@@ -25,7 +25,7 @@
 
 | Step | Pass / fail | Notes |
 | --- | --- | --- |
-| Install (`pipx install grinta-ai` or source bootstrap) | | |
+| Install (`pipx install grinta` or source bootstrap) | | |
 | `grinta init` (interactive wizard) | | |
 | `grinta` TUI launch | | |
 | First agent task (`/health` or starter prompt) | | |

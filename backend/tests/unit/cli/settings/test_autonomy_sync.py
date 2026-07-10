@@ -12,7 +12,6 @@ from backend.cli.settings.query import (
 )
 from backend.engine.tools.param_defs import relax_security_risk_in_tools
 
-
 _BALANCED_TOOL = {
     'type': 'function',
     'function': {

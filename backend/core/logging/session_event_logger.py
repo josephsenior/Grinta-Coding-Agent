@@ -93,19 +93,19 @@ class SessionEventLogger:
         *,
         workspace_segment: str | None = None,
     ) -> None:
-        import queue
         import atexit
+        import queue
 
         self.close()
         os.makedirs(log_dir, exist_ok=True)
         path = os.path.join(log_dir, SESSION_LOG_FILENAME)
-        
+
         # Keep a dummy stream to satisfy is_bound checks and global refs
         self._stream = open(os.devnull, 'w', encoding='utf-8')
         self._session_dir = log_dir
         self._session_id = session_id
         self._workspace = workspace_segment
-        
+
         # Set up async queue and background writer thread
         self._queue = queue.Queue()
         self._thread = threading.Thread(
@@ -115,7 +115,7 @@ class SessionEventLogger:
             daemon=True,
         )
         self._thread.start()
-        
+
         # Register atexit shutdown to ensure we drain the queue on clean exit
         atexit.register(self._shutdown)
 
@@ -130,7 +130,7 @@ class SessionEventLogger:
         global _STREAM, _SESSION_DIR, _SESSION_ID, _WORKSPACE_SEGMENT
         # Shutdown background thread first to flush everything
         self._shutdown()
-        
+
         if self._stream is not None:
             try:
                 self._stream.close()
@@ -150,7 +150,7 @@ class SessionEventLogger:
 
     def _writer_loop(self, path: str, q: Any) -> None:
         import queue as q_mod
-        
+
         try:
             with open(path, 'a', encoding='utf-8') as f:
                 fd = f.fileno()
@@ -159,10 +159,10 @@ class SessionEventLogger:
                     if item is self._sentinel:
                         q.task_done()
                         break
-                    
+
                     batch = [item]
                     q.task_done()
-                    
+
                     while not q.empty():
                         try:
                             next_item = q.get_nowait()
@@ -173,7 +173,7 @@ class SessionEventLogger:
                             q.task_done()
                         except q_mod.Empty:
                             break
-                    
+
                     f.write('\n'.join(batch) + '\n')
                     f.flush()
                     try:
@@ -185,16 +185,16 @@ class SessionEventLogger:
 
     def _shutdown(self) -> None:
         import atexit
-        
+
         try:
             atexit.unregister(self._shutdown)
         except Exception:
             pass
-            
+
         if self._queue is not None:
             self._queue.put(self._sentinel)
             self._queue = None
-            
+
         if self._thread is not None:
             self._thread.join(timeout=2.0)
             self._thread = None

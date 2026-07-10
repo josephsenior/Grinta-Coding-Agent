@@ -112,9 +112,12 @@ def test_reasoning_models_declare_catalog_efforts() -> None:
         ('openrouter', 'anthropic/claude-sonnet-4'),
         ('vercel', 'anthropic/claude-opus-4.8'),
         ('vercel', 'openai/gpt-5.5'),
+        ('vercel', 'openai/gpt-5.6'),
         ('vercel', 'google/gemini-3.5-flash'),
         ('opencode', 'gpt-5'),
+        ('opencode', 'gpt-5.6'),
         ('opencode', 'gemini-3-flash'),
+        ('openai', 'gpt-5.6'),
     ],
 )
 def test_canonical_model_ids_resolve(provider: str, model_id: str) -> None:
