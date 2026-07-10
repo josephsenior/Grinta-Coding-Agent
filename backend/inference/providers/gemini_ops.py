@@ -71,22 +71,26 @@ class GeminiClient(DirectLLMClient):
         caching_requested: bool,
         model_name: str,
         system_instruction: str | None,
-        history_messages: list,
+        _history_messages: list,
     ) -> str | None:
-        """Get cache name if caching requested and there is content to cache."""
+        """Get a reusable cache for the stable system instruction only.
+
+        Growing chat history is sent through the normal chat request. Including
+        it in an explicit cache resource would create a new paid resource on
+        every turn instead of producing a cache hit.
+        """
         if not caching_requested:
             return None
         from backend.inference.caching.prompt_cache import get_prompt_cache
 
-        history_to_cache = history_messages if history_messages else []
-        if not history_to_cache and not system_instruction:
+        if not system_instruction:
             return None
         backend = get_prompt_cache('google')
         return backend.get_or_create_cache_handle(
             client=self.client,
             model=model_name,
             system_instruction=system_instruction,
-            messages=history_to_cache,
+            messages=[],
         )
 
     def _extract_gemini_text(self, message: dict[str, Any]) -> str:

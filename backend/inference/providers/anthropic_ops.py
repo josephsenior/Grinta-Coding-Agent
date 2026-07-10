@@ -237,15 +237,13 @@ def _prepare_anthropic_stream_request(
 ) -> tuple[list[dict[str, Any]], Any, dict[str, Any]]:
     from backend.inference.mappers.anthropic import (
         _apply_system_cache_control,
-        _collect_system_messages,
         _normalize_messages,
         _normalize_tools,
+        _split_system_messages,
     )
 
-    system_raw = _collect_system_messages(messages)
-    filtered_messages = _normalize_messages(
-        [message for message in messages if message['role'] != 'system']
-    )
+    system_raw, body_messages = _split_system_messages(messages)
+    filtered_messages = _normalize_messages(body_messages)
     request_kwargs = _apply_required_anthropic_request_defaults(client, kwargs)
     request_kwargs.setdefault('model', client.model_name)
     _normalize_tools(request_kwargs)

@@ -3,6 +3,7 @@
 import json
 from typing import Any
 
+from backend.context.prompt.turn_context import split_stable_system_prefix
 from backend.core.logging.logger import app_logger as logger
 
 
@@ -65,8 +66,8 @@ def prepare_kwargs(
     messages: list[dict[str, Any]], kwargs: dict[str, Any], default_model: str
 ) -> tuple[list, dict[str, Any]]:
     """Extract system message and set model for Anthropic calls."""
-    system_msg = _collect_system_messages(messages)
-    filtered = _normalize_messages([m for m in messages if m['role'] != 'system'])
+    system_msg, body_messages = _split_system_messages(messages)
+    filtered = _normalize_messages(body_messages)
     if 'model' not in kwargs:
         kwargs['model'] = default_model
     if system_msg is not None:
@@ -96,16 +97,24 @@ def _content_to_text(content: Any) -> str:
     return '\n'.join(part for part in parts if part)
 
 
+def _split_system_messages(
+    messages: list[dict[str, Any]],
+) -> tuple[str | None, list[dict[str, Any]]]:
+    """Extract only the stable leading system prefix.
+
+    Anthropic exposes a top-level system field rather than mid-conversation
+    system roles. Late app-owned context is therefore retained as a marked user
+    block in its original turn position instead of being folded into (and
+    invalidating) the cached system prefix.
+    """
+    parts, body = split_stable_system_prefix(messages)
+    return ('\n\n'.join(parts) if parts else None), body
+
+
 def _collect_system_messages(messages: list[dict[str, Any]]) -> str | None:
-    """Combine all system messages for APIs that expose one system field."""
-    parts: list[str] = []
-    for message in messages:
-        if not isinstance(message, dict) or message.get('role') != 'system':
-            continue
-        text = _content_to_text(message.get('content')).strip()
-        if text:
-            parts.append(text)
-    return '\n\n'.join(parts) if parts else None
+    """Return the stable leading system prefix (backward-compatible helper)."""
+    system, _ = _split_system_messages(messages)
+    return system
 
 
 def _parse_tool_arguments(arguments: Any) -> dict[str, Any]:

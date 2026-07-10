@@ -36,6 +36,7 @@ from backend.context.prompt.message_formatting import (
 )
 from backend.context.prompt.prompt_assembly import process_recall_observation
 from backend.context.prompt.prompt_window import event_fingerprint
+from backend.context.prompt.turn_context import wrap_turn_context
 from backend.context.tool_call_tracker import (
     filter_unmatched_tool_calls,
     flush_resolved_tool_calls,
@@ -59,7 +60,7 @@ from backend.ledger.observation.reject import UserRejectObservation
 from backend.ledger.observation.status import StatusObservation
 from backend.utils.prompt import PromptManager
 
-_MAX_SYSTEM_CONTEXT_SUMMARY_CHARS = 2000
+_MAX_TURN_CONTEXT_SUMMARY_CHARS = 2000
 _PROMPT_RENDERER_VERSION = 'context-memory-render-v1'
 _DEFAULT_RENDER_CACHE_MAX = 1024
 
@@ -887,41 +888,35 @@ class ContextMemory:
             messages.insert(0, messages.pop(first_idx))
         return messages
 
-    def _inject_context_summary_into_system(self, messages: list[Message]) -> None:
-        """Append a bounded context summary to the leading system message."""
+    @staticmethod
+    def _insert_before_last_user(messages: list[Message], message: Message) -> None:
+        insert_at = len(messages)
+        for index in range(len(messages) - 1, -1, -1):
+            if messages[index].role == 'user':
+                insert_at = index
+                break
+        messages.insert(insert_at, message)
+
+    def _insert_context_summary_before_last_user(
+        self, messages: list[Message]
+    ) -> None:
+        """Insert a bounded context snapshot beside the current user turn."""
         context_summary = self.get_context_summary()
         if not context_summary or not messages:
             return
-        sys_msg = messages[0]
-        if sys_msg.role != 'system':
-            return
         summary = context_summary
-        if len(summary) > _MAX_SYSTEM_CONTEXT_SUMMARY_CHARS:
+        if len(summary) > _MAX_TURN_CONTEXT_SUMMARY_CHARS:
             logger.warning(
-                'Context summary truncated for system prompt integrity: %d -> %d chars',
+                'Context summary truncated for turn-context integrity: %d -> %d chars',
                 len(summary),
-                _MAX_SYSTEM_CONTEXT_SUMMARY_CHARS,
+                _MAX_TURN_CONTEXT_SUMMARY_CHARS,
             )
             summary = (
-                summary[:_MAX_SYSTEM_CONTEXT_SUMMARY_CHARS].rstrip()
+                summary[:_MAX_TURN_CONTEXT_SUMMARY_CHARS].rstrip()
                 + '\n[Context summary truncated for prompt integrity]'
             )
-        for content in sys_msg.content:
-            if is_text_content(content):
-                content.text += f'\n\n{summary}'
-                break
-
-    @staticmethod
-    def _first_user_message_leading_text(messages: list[Message]) -> str | None:
-        existing = messages[1] if len(messages) > 1 else None
-        if existing is None or existing.role not in ('user', 'system'):
-            return None
-        text_parts = [
-            content.text for content in existing.content if is_text_content(content)
-        ]
-        if not text_parts:
-            return None
-        return text_parts[0].strip()
+        block = wrap_turn_context(summary, kind='session-summary')
+        self._insert_before_last_user(messages, message_with_text('system', block))
 
     def _build_mcp_user_addendum_text(self) -> str | None:
         builder = getattr(self.prompt_manager, 'get_mcp_user_addendum', None)
@@ -940,8 +935,11 @@ class ContextMemory:
             return None
         return addendum or None
 
-    def _ensure_mcp_user_addendum(self, messages: list[Message]) -> None:
-        """Insert the MCP catalogue as a leading user message when configured."""
+    def _insert_mcp_addendum_before_last_user(
+        self,
+        messages: list[Message],
+    ) -> None:
+        """Insert the current MCP catalogue beside the current user turn."""
         if not messages or messages[0].role != 'system':
             return
 
@@ -949,11 +947,8 @@ class ContextMemory:
         if not addendum:
             return
 
-        leading = self._first_user_message_leading_text(messages)
-        if leading == addendum:
-            return
-
-        messages.insert(1, message_with_text('system', addendum))
+        block = wrap_turn_context(addendum, kind='mcp-catalog')
+        self._insert_before_last_user(messages, message_with_text('system', block))
 
     def _dedupe_system_messages(self, messages: list[Message]) -> list[Message]:
         """Return list with leading message plus non-system messages only."""
@@ -962,13 +957,13 @@ class ContextMemory:
         return [messages[0]] + [m for m in messages[1:] if m.role != 'system']
 
     def _normalize_system_messages(self, messages: list[Message]) -> list[Message]:
-        """Ensure a single leading system prompt and drop duplicates."""
+        """Keep behavior static up front and data snapshots near the active turn."""
         if not messages:
             return messages
         self._ensure_leading_system_message(messages)
-        self._inject_context_summary_into_system(messages)
         messages[:] = self._dedupe_system_messages(messages)
-        self._ensure_mcp_user_addendum(messages)
+        self._insert_mcp_addendum_before_last_user(messages)
+        self._insert_context_summary_before_last_user(messages)
         return messages
 
     def _process_action(

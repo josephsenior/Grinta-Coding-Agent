@@ -3,6 +3,8 @@
 import json
 from typing import Any
 
+from backend.context.prompt.turn_context import split_stable_system_prefix
+
 
 def _build_gemini_model_parts(
     text: str, tool_calls: list[dict[str, Any]] | None
@@ -80,12 +82,6 @@ def _resolve_content_text(
     return text, False
 
 
-def _accumulate_system_instruction(current: str | None, text: str) -> str:
-    if current:
-        return current + '\n\n' + text
-    return text
-
-
 def _build_tool_result_message(
     message: dict[str, Any], content: Any, content_text: str
 ) -> dict[str, Any]:
@@ -111,22 +107,22 @@ def convert_messages(
     Returns:
         (system_instruction_or_None, gemini_history_messages, caching_requested)
     """
-    system_instruction: str | None = None
+    system_parts, provider_messages = split_stable_system_prefix(messages)
+    system_instruction = '\n\n'.join(system_parts) if system_parts else None
     gemini_messages: list[dict[str, Any]] = []
     caching_requested = False
 
-    for m in messages:
+    # Cache hints may live on the leading system blocks removed above.
+    for original in messages:
+        _, msg_caching = _resolve_content_text(original.get('content', ''))
+        caching_requested = caching_requested or msg_caching
+
+    for m in provider_messages:
         content = m.get('content', '')
         role_name = m.get('role', 'user')
         content_text, msg_caching = _resolve_content_text(content)
         if msg_caching:
             caching_requested = True
-
-        if role_name == 'system':
-            system_instruction = _accumulate_system_instruction(
-                system_instruction, content_text
-            )
-            continue
 
         if role_name == 'tool':
             gemini_messages.append(_build_tool_result_message(m, content, content_text))

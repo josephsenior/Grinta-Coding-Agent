@@ -393,8 +393,8 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         default=DEFAULT_AGENT_MERGE_CONTROL_SYSTEM_INTO_PRIMARY,
         description=(
             'Append APP control/status text to the first system message instead of '
-            'inserting a second system message (some providers handle a single system '
-            'message better)'
+            'inserting a late turn-context message. This compatibility option reduces '
+            'prompt-cache reuse because the leading prefix changes each turn.'
         ),
     )
     max_consecutive_errors: int = Field(

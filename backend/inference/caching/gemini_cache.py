@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import time
 from typing import TYPE_CHECKING, Any, cast
 
@@ -30,9 +31,24 @@ class GeminiCacheManager:
             cls._instance._caches = {}  # hash -> cache_name
         return cls._instance
 
-    def _get_hash(self, system_instruction: str | None, messages: list[dict]) -> str:
+    def _get_hash(
+        self,
+        system_instruction: str | None,
+        messages: list[dict],
+        *,
+        model: str = '',
+    ) -> str:
         """Create a stable hash of the context to identify existing caches."""
-        content = f'sys:{system_instruction or ""}|msgs:{str(messages)}'
+        content = json.dumps(
+            {
+                'model': model,
+                'system_instruction': system_instruction or '',
+                'messages': messages,
+            },
+            sort_keys=True,
+            separators=(',', ':'),
+            default=str,
+        )
         return hashlib.sha256(content.encode()).hexdigest()
 
     def get_or_create_cache(
@@ -59,7 +75,11 @@ class GeminiCacheManager:
         # We only use it if specifically requested via 'cache_prompt'
         # logic handled in the calling client.
 
-        content_hash = self._get_hash(system_instruction, messages)
+        content_hash = self._get_hash(
+            system_instruction,
+            messages,
+            model=model,
+        )
 
         # Check in-memory index first
         if content_hash in self._caches:
@@ -85,14 +105,19 @@ class GeminiCacheManager:
                     {'role': role, 'parts': [{'text': m.get('content', '')}]}
                 )
 
-            cache = cast(Any, client.caches.create)(
-                model=model,
-                config={
+            create_kwargs: dict[str, Any] = {
+                'model': model,
+                'config': {
                     'display_name': f'app_cache_{int(time.time())}',
                     'system_instruction': system_instruction,
                     'ttl': f'{ttl_minutes * 60}s',
                 },
-                contents=contents,
+            }
+            if contents:
+                create_kwargs['contents'] = contents
+
+            cache = cast(Any, client.caches.create)(
+                **create_kwargs,
             )
 
             logger.info(

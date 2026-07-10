@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from typing import TYPE_CHECKING, Any
 
+from backend.context.prompt.turn_context import (
+    is_turn_context_text,
+    wrap_turn_context,
+)
 from backend.core.constants import (
     DEFAULT_AGENT_DEBUGGER_ENABLED,
     DEFAULT_AGENT_LSP_QUERY_ENABLED,
@@ -53,7 +58,11 @@ _INJECTED_MSG_MARKERS = (
     '<REPOSITORY_INSTRUCTIONS>',
     '<CONVERSATION_INSTRUCTIONS>',
     '<EXTRA_INFO>',
+    '<GRINTA_TURN_CONTEXT',
 )
+
+_TURN_CONTEXT_STATE_KEY = '_prompt_turn_context_v1'
+_MAX_RECORDED_TURN_CONTEXTS = 64
 
 
 def _maybe_log_prompt_metrics(messages: list) -> None:
@@ -121,6 +130,8 @@ def _message_contains(message: dict[str, Any], marker: str) -> bool:
 
 def _is_static_prompt_message(message: dict[str, Any]) -> bool:
     role = message.get('role')
+    if is_turn_context_text(_message_text(message)):
+        return False
     if role == 'system':
         return True
     if role != 'user':
@@ -430,25 +441,238 @@ class OrchestratorPlanner:
                 )
                 break
 
+    @staticmethod
+    def _user_message_fingerprint(message: dict[str, Any]) -> str:
+        return hashlib.sha256(_message_text(message).encode('utf-8')).hexdigest()
+
+    @staticmethod
+    def _turn_context_payload(state: State) -> dict[str, Any]:
+        extra = getattr(state, 'extra_data', None)
+        if not isinstance(extra, dict):
+            return {}
+        payload = extra.get(_TURN_CONTEXT_STATE_KEY)
+        return payload if isinstance(payload, dict) else {}
+
+    @staticmethod
+    def _record_lookup(
+        messages: list,
+    ) -> tuple[dict[int, tuple[str, int]], int | None]:
+        """Map each user-message index to a stable text fingerprint + occurrence."""
+        identities: dict[int, tuple[str, int]] = {}
+        occurrences: dict[str, int] = {}
+        last_user_index: int | None = None
+        for index, message in enumerate(messages):
+            if not isinstance(message, dict) or message.get('role') != 'user':
+                continue
+            fingerprint = OrchestratorPlanner._user_message_fingerprint(message)
+            occurrence = occurrences.get(fingerprint, 0)
+            occurrences[fingerprint] = occurrence + 1
+            identities[index] = (fingerprint, occurrence)
+            last_user_index = index
+        return identities, last_user_index
+
+    def _restore_prior_turn_context(
+        self,
+        messages: list,
+        state: State,
+    ) -> tuple[list, bool]:
+        """Restore app context beside retained historical user turns.
+
+        ContextMemory rebuilds messages from ledger events, while planner-only
+        control blocks are intentionally not ledger events. Keeping a compact,
+        content-addressed snapshot in State makes subsequent provider requests
+        append-only for every retained turn.
+        """
+        payload = self._turn_context_payload(state)
+        pool = payload.get('blocks')
+        turns = payload.get('turns')
+        if not isinstance(pool, dict) or not isinstance(turns, list):
+            return list(messages), False
+
+        records: dict[tuple[str, int], list[str]] = {}
+        for record in turns:
+            if not isinstance(record, dict):
+                continue
+            fingerprint = record.get('user_fingerprint')
+            occurrence = record.get('occurrence')
+            block_ids = record.get('block_ids')
+            if (
+                not isinstance(fingerprint, str)
+                or not isinstance(occurrence, int)
+                or not isinstance(block_ids, list)
+            ):
+                continue
+            blocks = [pool.get(block_id) for block_id in block_ids]
+            records[(fingerprint, occurrence)] = [
+                block
+                for block in blocks
+                if isinstance(block, str) and is_turn_context_text(block)
+            ]
+
+        identities, last_user_index = self._record_lookup(messages)
+        if last_user_index is None:
+            return list(messages), False
+        current_identity = identities[last_user_index]
+        current_turn_restored = current_identity in records
+
+        restored: list = []
+        for index, message in enumerate(messages):
+            identity = identities.get(index)
+            if (
+                identity is not None
+                and identity in records
+            ):
+                # Replace, rather than duplicate, any snapshots supplied by a
+                # future ContextMemory implementation.
+                while (
+                    restored
+                    and isinstance(restored[-1], dict)
+                    and restored[-1].get('role') == 'system'
+                    and is_turn_context_text(_message_text(restored[-1]))
+                ):
+                    restored.pop()
+                restored.extend(
+                    {'role': 'system', 'content': block}
+                    for block in records.get(identity, [])
+                )
+            restored.append(message)
+        return restored, current_turn_restored
+
+    def _record_current_turn_context(self, messages: list, state: State) -> None:
+        identities, last_user_index = self._record_lookup(messages)
+        if last_user_index is None:
+            return
+
+        blocks: list[str] = []
+        index = last_user_index - 1
+        while index >= 0:
+            message = messages[index]
+            if (
+                not isinstance(message, dict)
+                or message.get('role') != 'system'
+                or not is_turn_context_text(_message_text(message))
+            ):
+                break
+            blocks.append(_message_text(message))
+            index -= 1
+        blocks.reverse()
+        if not blocks:
+            return
+
+        identity = identities[last_user_index]
+        payload = self._turn_context_payload(state)
+        raw_pool = payload.get('blocks')
+        raw_turns = payload.get('turns')
+        pool = dict(raw_pool) if isinstance(raw_pool, dict) else {}
+        turns = (
+            [item for item in raw_turns if isinstance(item, dict)]
+            if isinstance(raw_turns, list)
+            else []
+        )
+
+        block_ids: list[str] = []
+        for block in blocks:
+            block_id = hashlib.sha256(block.encode('utf-8')).hexdigest()
+            pool[block_id] = block
+            block_ids.append(block_id)
+
+        fingerprint, occurrence = identity
+        record = {
+            'user_fingerprint': fingerprint,
+            'occurrence': occurrence,
+            'block_ids': block_ids,
+        }
+        turns = [
+            item
+            for item in turns
+            if (
+                item.get('user_fingerprint'),
+                item.get('occurrence'),
+            )
+            != identity
+        ]
+        turns.append(record)
+        turns = turns[-_MAX_RECORDED_TURN_CONTEXTS:]
+        referenced_ids: set[str] = set()
+        for item in turns:
+            saved_ids = item.get('block_ids')
+            if isinstance(saved_ids, list):
+                referenced_ids.update(
+                    block_id for block_id in saved_ids if isinstance(block_id, str)
+                )
+        new_payload = {
+            'blocks': {
+                block_id: text
+                for block_id, text in pool.items()
+                if block_id in referenced_ids and isinstance(text, str)
+            },
+            'turns': turns,
+        }
+
+        extra = getattr(state, 'extra_data', None)
+        if isinstance(extra, dict):
+            extra[_TURN_CONTEXT_STATE_KEY] = new_payload
+        setter = getattr(state, 'set_extra', None)
+        if callable(setter):
+            try:
+                setter(
+                    _TURN_CONTEXT_STATE_KEY,
+                    new_payload,
+                    source='OrchestratorPlanner',
+                )
+            except Exception:
+                logger.debug('Failed to persist turn context snapshots', exc_info=True)
+
+    @staticmethod
+    def _build_prompt_cache_variant(messages: list, tools: object) -> str:
+        """Fingerprint only the stable provider prefix and active tool schemas."""
+        leading_system: list[str] = []
+        for message in messages:
+            if not isinstance(message, dict) or message.get('role') != 'system':
+                break
+            text = _message_text(message)
+            if is_turn_context_text(text):
+                break
+            leading_system.append(text)
+        payload = json.dumps(
+            {
+                'leading_system': leading_system,
+                'tools': tools if isinstance(tools, list) else [],
+            },
+            sort_keys=True,
+            separators=(',', ':'),
+            default=str,
+        )
+        return hashlib.sha256(payload.encode('utf-8')).hexdigest()[:24]
+
     def build_llm_params(
         self,
         messages: list,
         state: State,
         tools: list[ChatCompletionToolParam],
     ) -> dict:
+        messages, continuing_turn = self._restore_prior_turn_context(messages, state)
         tool_choice = self._determine_tool_choice(messages, state)
         mode = self._active_mode_for_state(state)
-        messages = self._inject_turn_status(messages, state)
-        messages = self._inject_coding_preflight(messages, state, mode)
-        messages = self._inject_repo_map(messages, mode)
+        if continuing_turn:
+            messages = self._inject_continuation_directive(messages, state)
+        else:
+            messages = self._inject_turn_status(messages, state)
+            messages = self._inject_coding_preflight(messages, state, mode)
+            messages = self._inject_repo_map(messages, mode)
         tools = self._filter_tools_for_mode(tools, mode)
-        messages = self._inject_mode_instructions(messages, state, mode)
+        if not continuing_turn:
+            messages = self._inject_mode_instructions(messages, state, mode)
         _maybe_log_prompt_metrics(messages)
         self._warn_if_degraded_emergency_prompt(messages)
         self._log_debug_mode_info(messages, state, mode)
 
         params: dict[str, Any] = {'messages': messages, 'stream': True}
         params = self._configure_tool_routing(params, tools, messages, tool_choice)
+        self._record_current_turn_context(params['messages'], state)
+        params['_prompt_cache_variant'] = self._build_prompt_cache_variant(
+            params['messages'], params.get('tools', [])
+        )
         params['extra_body'] = {
             'metadata': state.to_llm_metadata(
                 model_name=(self._llm.config.model or '').strip() or 'unknown',
@@ -489,10 +713,17 @@ class OrchestratorPlanner:
         context_packet_tokens = self._count_messages(
             [msg for msg in messages if _message_contains(msg, '<CONTEXT_PACKET>')]
         )
+        turn_context_tokens = self._count_messages(
+            [msg for msg in messages if is_turn_context_text(_message_text(msg))]
+        )
         tool_schema_tokens = self._count_tool_schema_tokens(tools)
         full_request_tokens = message_tokens + tool_schema_tokens
         dynamic_history_tokens = max(
-            0, message_tokens - static_prompt_tokens - context_packet_tokens
+            0,
+            message_tokens
+            - static_prompt_tokens
+            - context_packet_tokens
+            - turn_context_tokens,
         )
         usable_input = self._usable_input_tokens()
         return {
@@ -500,6 +731,7 @@ class OrchestratorPlanner:
             'tool_schema_tokens': tool_schema_tokens,
             'dynamic_history_tokens': dynamic_history_tokens,
             'context_packet_tokens': context_packet_tokens,
+            'turn_context_tokens': turn_context_tokens,
             'usable_input_tokens': usable_input,
             'full_request_tokens': full_request_tokens,
         }
@@ -617,16 +849,32 @@ class OrchestratorPlanner:
         When set, a single `<APP_DIRECTIVE>` block is inserted before the last
         user message.
         """
-        ts = getattr(state, 'turn_signals', None)
-        planning_directive = getattr(ts, 'planning_directive', None) if ts else None
-        if planning_directive is None:
-            extra_data = getattr(state, 'extra_data', {}) or {}
-            planning_directive = extra_data.get('planning_directive')
-
+        planning_directive = self._planning_directive(state)
         if not planning_directive:
             return messages
         status = f'<APP_DIRECTIVE>\n{planning_directive}\n</APP_DIRECTIVE>'
         return self._apply_control_message(messages, status)
+
+    @staticmethod
+    def _planning_directive(state: State) -> object:
+        ts = getattr(state, 'turn_signals', None)
+        planning_directive = getattr(ts, 'planning_directive', None) if ts else None
+        if planning_directive is None:
+            extra_data = getattr(state, 'extra_data', {}) or {}
+            if isinstance(extra_data, dict):
+                planning_directive = extra_data.get('planning_directive')
+        return planning_directive
+
+    def _inject_continuation_directive(self, messages: list, state: State) -> list:
+        """Append a newly raised directive without rewriting the user-turn prefix."""
+        planning_directive = self._planning_directive(state)
+        if not planning_directive:
+            return messages
+        status = wrap_turn_context(
+            f'<APP_DIRECTIVE>\n{planning_directive}\n</APP_DIRECTIVE>',
+            kind='continuation-control',
+        )
+        return [*messages, {'role': 'system', 'content': status}]
 
     def _inject_coding_preflight(self, messages: list, state: State, mode: str) -> list:
         """Inject a lightweight first-turn coding-task preflight when enabled."""
@@ -671,6 +919,7 @@ class OrchestratorPlanner:
 
     def _apply_control_message(self, messages: list, status: str) -> list:
         """Attach turn control either as a second system message or merged into primary."""
+        status = wrap_turn_context(status, kind='control')
         if getattr(self._config, 'merge_control_system_into_primary', False):
             return self._merge_control_into_primary_system(messages, status)
         return self._insert_control_message(messages, status)

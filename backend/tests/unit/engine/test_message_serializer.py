@@ -61,3 +61,21 @@ def test_serialize_messages_preserves_image_blocks():
         isinstance(part, dict) and part.get('type') == 'image_url'
         for part in out[0]['content']
     )
+
+
+def test_serialize_messages_preserves_prompt_cache_control():
+    msg = Message(
+        role='user',
+        cache_enabled=True,
+        content=[TextContent(text='stable anchor', cache_prompt=True)],
+    )
+
+    out = serialize_messages([msg])
+
+    assert out[0]['content'] == [
+        {
+            'type': 'text',
+            'text': 'stable anchor',
+            'cache_control': {'type': 'ephemeral'},
+        }
+    ]

@@ -236,6 +236,7 @@ class LLM(RetryMixin, DebugMixin):
         ):
             kwargs.pop(param, None)
         prompt_accounting = kwargs.pop('_prompt_accounting', None)
+        prompt_cache_variant = kwargs.pop('_prompt_cache_variant', None)
         self._last_prompt_accounting = (
             prompt_accounting if isinstance(prompt_accounting, dict) else None
         )
@@ -280,6 +281,11 @@ class LLM(RetryMixin, DebugMixin):
             is_stream=is_stream,
             provider=getattr(self.config, 'custom_llm_provider', None),
             caching_prompt=bool(getattr(self.config, 'caching_prompt', True)),
+            prompt_cache_variant=(
+                prompt_cache_variant
+                if isinstance(prompt_cache_variant, str)
+                else None
+            ),
         )
 
         if self.config.seed is not None:
