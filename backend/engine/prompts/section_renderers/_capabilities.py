@@ -280,6 +280,9 @@ def _render_mcp_status_line(config: Any) -> str:
     wired up. Empty state is explicit so the model does not invent
     tool names when the catalogue is empty.
     """
+    if not getattr(config, 'enable_mcp', True):
+        return '- **External MCP tools**: disabled.'
+
     mcp_status: dict[str, Any] = {}
     bootstrap = getattr(config, 'mcp_capability_status', None)
     if isinstance(bootstrap, dict):

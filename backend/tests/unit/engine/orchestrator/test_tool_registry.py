@@ -173,7 +173,7 @@ class TestFeatureFlagToolPresence:
 
     def test_mcp_disabled(self):
         names = _build_toolset(enable_mcp=False)
-        assert 'call_mcp_tool' in names
+        assert 'call_mcp_tool' not in names
 
     def test_ask_user_always_in_toolset(self):
         names = _build_toolset()

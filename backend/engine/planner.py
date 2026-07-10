@@ -380,11 +380,12 @@ class OrchestratorPlanner:
             tools.append(create_undo_last_edit_tool())
 
     def _add_execute_mcp_tool_tool(self, tools: list) -> None:
-        from backend.engine.tools.execute_mcp_tool import (
-            create_execute_mcp_tool_tool,
-        )
+        if getattr(self._config, 'enable_mcp', True):
+            from backend.engine.tools.execute_mcp_tool import (
+                create_execute_mcp_tool_tool,
+            )
 
-        tools.append(create_execute_mcp_tool_tool(self._config))
+            tools.append(create_execute_mcp_tool_tool(self._config))
 
     def _add_memory_and_checkpoint_tools(self, tools: list) -> None:
         if getattr(self._config, 'enable_checkpoints', True):

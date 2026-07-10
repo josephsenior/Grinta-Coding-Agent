@@ -111,31 +111,44 @@ def _callers_lines_via_walk(
 
 def _build_callers_action(symbol: str, scope: str) -> str:
     """Find all files that reference a given symbol (function, class, variable)."""
-    trunc_sym = f'{symbol[:40]}…' if len(symbol) > 40 else symbol
-    out = [f'=== CALLERS OF {trunc_sym} ===']
+    from backend.utils.impact_analysis import analyze_symbol_impact
 
     safe_scope = scope if scope and scope != '.' else '.'
-    rg_lines = _callers_lines_via_rg(symbol, safe_scope)
-    if rg_lines is not None:
-        out.extend(rg_lines)
-        return '\n'.join(out)
-
-    walk_lines, count = _callers_lines_via_walk(
-        symbol=symbol,
-        safe_scope=safe_scope,
-    )
-    out.extend(walk_lines)
-    if count == 0:
-        out.append(
-            _diag(
-                reason=f'no references found for symbol {trunc_sym!r}',
-                command='callers',
-                params={'symbol': symbol, 'path': scope},
-                next_steps=[
-                    'Verify the symbol name is spelled exactly as in source.',
-                    'Try command=semantic_search for AST-aware matching.',
-                    'Broaden the search by passing path=. (workspace root).',
-                ],
-            )
+    report = analyze_symbol_impact(safe_scope, symbol)
+    
+    if report is None or report.total_references == 0:
+        trunc_sym = f'{symbol[:40]}…' if len(symbol) > 40 else symbol
+        return _diag(
+            reason=f'no references found for symbol {trunc_sym!r}',
+            command='callers',
+            params={'symbol': symbol, 'path': scope},
+            next_steps=[
+                'Verify the symbol name is spelled exactly as in source.',
+                'Try command=semantic_search for AST-aware matching.',
+                'Broaden the search by passing path=. (workspace root).',
+            ],
         )
+
+    trunc_sym = f'{symbol[:40]}…' if len(symbol) > 40 else symbol
+    out = [
+        f'=== REFERENCES TO {trunc_sym} ===',
+        f'Engine: {report.engine.upper()}',
+        f'Confidence: {report.confidence}',
+        f'References: {report.total_references} across {report.unique_files} files',
+        f'Production: {report.production_references}',
+        f'Tests: {report.test_references}',
+        f'Outside definition file: {report.external_file_references}',
+        f'Estimated impact: {report.risk.upper()}',
+    ]
+    if report.reasons:
+        out.append('Reasons:')
+        for reason in report.reasons:
+            out.append(f'- {reason}')
+            
+    out.append('\nLocations:')
+    for loc in report.locations:
+        out.append(f'  {loc.file_path}:{loc.line}: {loc.text}')
+    if report.truncated:
+        out.append('  … (truncated)')
+        
     return '\n'.join(out)

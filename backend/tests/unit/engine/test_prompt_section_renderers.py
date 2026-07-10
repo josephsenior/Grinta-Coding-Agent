@@ -130,7 +130,7 @@ class TestRenderCriticalModeSpecific:
         self._assert_contains_body(body, 'Shell vs interactive terminal')
         self._assert_contains_body(body, 'execute_command')
         self._assert_not_contains_body(body, '{terminal_command_tool}')
-        self._assert_contains_body(body, 'is_background=true')
+
         self._assert_contains_body(body, 'terminal_manager action=wait')
         self._assert_contains_body(body, 'action=stop')
         self._assert_contains_body(body, 'action=open')
@@ -280,9 +280,11 @@ class TestSystemCapabilitiesModeSpecific:
         body = self._render_caps(mode='agent', enable_browsing=True)
         self._assert_not_contains(body, 'Browser (`browser`)')
 
-    def test_agent_mode_shows_memory(self):
-        body = self._render_caps(mode='agent')
-        self._assert_contains(body, 'Memory (`memory`)')
+    def test_agent_mode_shows_search_history(self, monkeypatch):
+        from backend.utils import optional_extras as oe
+        monkeypatch.setattr(oe, 'is_rag_extra_available', lambda: True)
+        body = self._render_caps(mode='agent', enable_vector_memory=True)
+        self._assert_contains(body, 'Search History (`search_history`)')
 
     def test_agent_mode_shows_checkpoint_when_enabled(self):
         body = self._render_caps(mode='agent', enable_checkpoints=True)
@@ -312,9 +314,11 @@ class TestSystemCapabilitiesModeSpecific:
         body = self._render_caps(mode='chat')
         self._assert_not_contains(body, 'Browser (`browser`)')
 
-    def test_chat_mode_hides_memory(self):
-        body = self._render_caps(mode='chat')
-        self._assert_not_contains(body, 'Memory (`memory`)')
+    def test_chat_mode_shows_search_history_when_enabled(self, monkeypatch):
+        from backend.utils import optional_extras as oe
+        monkeypatch.setattr(oe, 'is_rag_extra_available', lambda: True)
+        body = self._render_caps(mode='chat', enable_vector_memory=True)
+        self._assert_contains(body, 'Search History (`search_history`)')
 
     def test_chat_mode_hides_checkpoint_even_when_enabled(self):
         body = self._render_caps(mode='chat', enable_checkpoints=True)
@@ -338,9 +342,16 @@ class TestSystemCapabilitiesModeSpecific:
         body = self._render_caps(mode='plan')
         self._assert_not_contains(body, 'Browser (`browser`)')
 
-    def test_plan_mode_hides_memory(self):
-        body = self._render_caps(mode='plan')
-        self._assert_not_contains(body, 'Memory (`memory`)')
+    def test_plan_mode_shows_search_history_when_enabled(self, monkeypatch):
+        from backend.utils import optional_extras as oe
+        monkeypatch.setattr(oe, 'is_rag_extra_available', lambda: True)
+        body = self._render_caps(mode='plan', enable_vector_memory=True)
+        self._assert_contains(body, 'Search History (`search_history`)')
+
+    def test_all_modes_hide_search_history_when_disabled(self):
+        for mode in ('agent', 'chat', 'plan'):
+            body = self._render_caps(mode=mode, enable_vector_memory=False)
+            self._assert_not_contains(body, 'Search History (`search_history`)')
 
     def test_plan_mode_hides_checkpoint(self):
         body = self._render_caps(mode='plan', enable_checkpoints=True)

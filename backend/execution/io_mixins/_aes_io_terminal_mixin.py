@@ -259,9 +259,15 @@ class _AesIoTerminalMixin:
         while waited < timeout:
             await asyncio.sleep(poll_interval)
             waited += poll_interval
-            probe, *_ = self._read_terminal_with_mode(
-                session=session, mode='delta', offset=offset
-            )
+            from functools import partial
+            loop = asyncio.get_running_loop()
+            try:
+                probe, *_ = await asyncio.wait_for(
+                    loop.run_in_executor(None, partial(self._read_terminal_with_mode, session=session, mode='delta', offset=offset)),
+                    timeout=2.0
+                )
+            except asyncio.TimeoutError:
+                probe = ''
             if probe:
                 break
 
@@ -996,7 +1002,14 @@ class _AesIoTerminalMixin:
                 }
                 return obs
 
-            self.session_manager.close_session(session_id)
+            loop = asyncio.get_running_loop()
+            try:
+                await asyncio.wait_for(
+                    loop.run_in_executor(None, self.session_manager.close_session, session_id),
+                    timeout=2.0
+                )
+            except asyncio.TimeoutError:
+                logger.warning('Terminal close timed out for session %s (winpty deadlock). Forced return.', session_id)
             self._clear_terminal_read_cursor(session_id)
             obs = Observation(content=f'Closed terminal session {session_id!r}.')
             obs.tool_result = {
