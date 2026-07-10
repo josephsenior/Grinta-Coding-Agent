@@ -109,4 +109,29 @@ def create_memory_tool(
 # Backward-compatible factory name for imports not yet updated.
 create_memory_manager_tool = create_memory_tool
 
-__all__ = ['create_memory_tool', 'create_memory_manager_tool']
+
+def create_search_history_tool() -> ChatCompletionToolParam:
+    """Create the read-only search_history tool definition."""
+    return create_tool_definition(
+        name='search_history',
+        description=(
+            'Search earlier conversation and tool-event history when required '
+            'information is no longer visible.'
+        ),
+        properties={
+            'query': {
+                'type': 'string',
+                'description': 'Search query or keyword phrase.',
+            },
+            'max_results': {
+                'type': 'integer',
+                'description': 'Maximum number of results to return (default 8).',
+                'minimum': 1,
+                'maximum': 10,
+            },
+        },
+        required=['query'],
+    )
+
+
+__all__ = ['create_memory_tool', 'create_memory_manager_tool', 'create_search_history_tool']

@@ -69,6 +69,7 @@ class MemoryRecallAction(Action):
     """Semantic recall over indexed conversation history."""
 
     query: str = ''
+    max_results: int = 8
 
     action: ClassVar[str] = ActionType.MEMORY_RECALL
     runnable: ClassVar[bool] = True
@@ -77,7 +78,7 @@ class MemoryRecallAction(Action):
 
     @property
     def message(self) -> str:
-        return f'memory recall {self.query!r}'
+        return f'search_history {self.query!r}'
 
 
 @dataclass

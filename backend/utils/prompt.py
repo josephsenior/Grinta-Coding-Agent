@@ -378,8 +378,6 @@ class OrchestratorPromptManager(PromptManager):
 
             block = format_prompt_block(query)
             if not block:
-                block = self._lessons_markdown_block()
-            if not block:
                 return content
             return f'{content}\n\n{block}'
         except Exception:

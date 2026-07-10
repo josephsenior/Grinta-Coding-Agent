@@ -392,7 +392,7 @@ class OrchestratorPlanner:
 
             tools.append(create_checkpoint_tool())
         if getattr(self._config, 'enable_working_memory', True):
-            from backend.engine.tools.memory import create_memory_tool
+            from backend.engine.tools.memory import create_search_history_tool
             from backend.utils.optional_extras import semantic_recall_active
 
             store = None
@@ -401,15 +401,12 @@ class OrchestratorPlanner:
                 cm = getattr(agent, 'conversation_memory', None)
                 if cm is not None:
                     store = cm.vector_store
-            tools.append(
-                create_memory_tool(
-                    include_semantic_recall=semantic_recall_active(
-                        self._config,
-                        vector_store=store,
-                        require_live_store=True,
-                    )
-                )
-            )
+            if semantic_recall_active(
+                self._config,
+                vector_store=store,
+                require_live_store=True,
+            ):
+                tools.append(create_search_history_tool())
 
     def _refresh_checked_tools_cache(
         self, tools: list[ChatCompletionToolParam]

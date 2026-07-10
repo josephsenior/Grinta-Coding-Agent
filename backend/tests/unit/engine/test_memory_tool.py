@@ -84,3 +84,30 @@ def test_memory_persist_execute() -> None:
         )
     assert obs.content == 'stored lesson'
     assert obs.inserted is True
+
+
+def test_create_search_history_tool() -> None:
+    from backend.engine.tools.memory import create_search_history_tool
+
+    tool = create_search_history_tool()
+    assert tool['function']['name'] == 'search_history'
+    props = tool['function']['parameters']['properties']
+    assert 'query' in props
+    assert 'max_results' in props
+
+
+def test_handle_search_history_tool_validation() -> None:
+    from backend.engine.tools._tool_handlers import _handle_search_history_tool
+
+    with pytest.raises(FunctionCallValidationError, match='Missing search query'):
+        _handle_search_history_tool({'query': ''})
+
+
+def test_handle_search_history_tool_mapping() -> None:
+    from backend.engine.tools._tool_handlers import _handle_search_history_tool
+
+    with patch.dict(_semantic_recall_registry, {'fn': lambda q, k: []}, clear=True):
+        action = _handle_search_history_tool({'query': 'test', 'max_results': 5})
+        assert isinstance(action, MemoryRecallAction)
+        assert action.query == 'test'
+        assert action.max_results == 5

@@ -166,24 +166,12 @@ def _routing_memory_tool_placeholders(
     semantic_recall_on: bool = False,
 ) -> dict[str, str]:
     ambiguous_intent_instruction = 'If intent is still ambiguous after inspection, see `<ASK_USER_TOOL>` rather than guessing.'
-    if working_memory_on:
-        recall_line = (
-            '- `memory(action="recall", key=...)`: fuzzy search when prior turns fell out of '
-            'the visible window.\n'
-            if semantic_recall_on
-            else ''
-        )
+    if semantic_recall_on:
         memory_and_context_section = (
             '<MEMORY_AND_CONTEXT>\n'
-            '**memory** tool — actions:\n'
-            '- `memory(action="working", update_type=update, section=..., content=...)`: '
-            'session reasoning (hypothesis, findings, blockers, plan). '
-            'Auto-restored after condensation; do not re-fetch at session start.\n'
-            '- `memory(action="persist", key=..., kind=..., value=...)`: rare workspace facts '
-            '(conventions, commands, architecture, lessons). '
-            'Ranked workspace memory may appear at session start.\n'
-            f'{recall_line}'
-            'Do not store task progress in memory — use `task_tracker`.\n'
+            '**search_history** tool:\n'
+            '- `search_history(query=...)`: search earlier conversation and tool-event history when required '
+            'information is no longer visible.\n'
             '</MEMORY_AND_CONTEXT>'
         )
     else:

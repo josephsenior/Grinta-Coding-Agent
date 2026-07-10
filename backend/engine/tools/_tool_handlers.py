@@ -253,7 +253,7 @@ def execute_memory_recall(action: MemoryRecallAction) -> MemoryRecallObservation
             ),
             query=query,
         )
-    results = recall_fn(query, 5)
+    results = recall_fn(query, getattr(action, 'max_results', 8))
     if not results:
         return MemoryRecallObservation(
             content=f'No indexed memory results found for query: {query!r}',
@@ -326,6 +326,25 @@ def _handle_memory_tool(arguments: Mapping[str, Any]) -> Action:
 
 
 _handle_memory_manager_tool = _handle_memory_tool
+
+
+def _handle_search_history_tool(arguments: Mapping[str, Any]) -> Action:
+    """Handle read-only search_history tool."""
+    query = cast(str, arguments.get('query', '')).strip()
+    if not query:
+        raise FunctionCallValidationError('Missing search query in search_history.')
+    if get_semantic_recall_fn() is None:
+        raise FunctionCallValidationError(
+            'search_history is not available in this session. Install optional '
+            'RAG support with pip install "grinta[rag]" or set '
+            'enable_vector_memory to false in settings.'
+        )
+    try:
+        max_results = int(arguments.get('max_results', 8))
+    except (ValueError, TypeError):
+        max_results = 8
+    max_results = max(1, min(10, max_results))
+    return MemoryRecallAction(query=query, max_results=max_results)
 
 
 def _handle_grep_tool(arguments: Mapping[str, Any]) -> GrepAction:

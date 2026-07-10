@@ -208,17 +208,10 @@ def _render_system_capabilities(
         )
 
     memory_line = ''
-    if bool(getattr(config, 'enable_working_memory', True)) and can_edit:
-        recall_hint = (
-            ', `recall` for semantic search over indexed history'
-            if _semantic_recall_runtime(
-                config, semantic_recall_active=semantic_recall_active
-            )
-            else ''
-        )
+    if _semantic_recall_runtime(config, semantic_recall_active=semantic_recall_active):
         memory_line = (
-            '- **Memory (`memory`)**: `working` for session reasoning, `persist` for rare workspace '
-            f'facts{recall_hint}.'
+            '- **Search History (`search_history`)**: search earlier conversation and tool-event history when required '
+            'information is no longer visible.'
         )
 
     checkpoint_line = ''

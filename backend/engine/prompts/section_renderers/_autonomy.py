@@ -36,14 +36,11 @@ def _build_context_discipline_section(
         'Use the visible conversation, current files, and fresh tool observations as context. '
         'After condensation, follow `<SELF_REGULATION>`.'
     )
-    if working_memory_on:
-        memory_actions = 'working/persist'
-        if semantic_recall_on:
-            memory_actions += '/recall'
+    if semantic_recall_on:
         parts.extend(
             [
                 '',
-                f'**memory** — see `<MEMORY_AND_CONTEXT>` for {memory_actions}.',
+                '**search_history** — see `<MEMORY_AND_CONTEXT>` to search past turns.',
             ]
         )
     if checkpoints_on:
@@ -90,8 +87,8 @@ def _build_when_to_use_context(
     semantic_recall_on: bool = False,
 ) -> str:
     parts = ['<WHEN_TO_USE_CONTEXT>']
-    if working_memory_on:
-        parts.append('- **memory**: See `<MEMORY_AND_CONTEXT>`.')
+    if semantic_recall_on:
+        parts.append('- **search_history**: See `<MEMORY_AND_CONTEXT>`.')
     if checkpoints_on:
         parts.append(
             '- **checkpoint**: before revert or when milestones are stale — see System Capabilities.'

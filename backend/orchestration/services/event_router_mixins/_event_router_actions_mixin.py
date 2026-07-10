@@ -14,6 +14,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from backend.core.interaction_modes import (
+    AGENT_MODE,
     CHAT_MODE,
     PLAN_MODE,
     normalize_interaction_mode,
@@ -238,17 +239,21 @@ class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
                     },
                     source='EventRouterService.final_response',
                 )
+                active_mode = self._active_interaction_mode()
                 self._ctrl.state.extra_data.pop('active_run_mode', None)
-                try:
-                    from backend.engine.tools.session_lessons import (
-                        persist_finish_lessons,
-                    )
+                if active_mode == AGENT_MODE:
+                    try:
+                        from backend.engine.tools.session_lessons import (
+                            persist_finish_lessons,
+                        )
 
-                    persist_finish_lessons(
-                        summary=content,
-                        session_id=self._ctrl.id,
-                    )
-                except Exception:
-                    pass
+                        await persist_finish_lessons(
+                            summary=content,
+                            session_id=self._ctrl.id,
+                            state=self._ctrl.state,
+                            controller=self._ctrl,
+                        )
+                    except Exception:
+                        pass
                 await self._ctrl.set_agent_state_to(AgentState.FINISHED)
                 await self._ctrl.log_task_audit(status='success')

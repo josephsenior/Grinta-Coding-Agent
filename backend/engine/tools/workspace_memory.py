@@ -170,7 +170,7 @@ def persist_entry(
         if same_key or similar:
             entry['seen_count'] = int(entry.get('seen_count', 1)) + 1
             entry['updated'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
-            if similar and not same_key:
+            if same_key or similar:
                 entry['value'] = value
             store['entries'] = entries
             _save_store(store)
@@ -251,28 +251,32 @@ def format_prompt_block(
     char_budget: int = _DEFAULT_PROMPT_CHAR_BUDGET,
 ) -> str:
     """Return a bounded workspace-memory block for system-prompt injection."""
-    ranked = rank_entries(query)
-    if not ranked:
-        return ''
+    try:
+        from backend.context.memory.project_memory import ProjectMemoryService, migrate_legacy_memories
+        
+        # Automatically migrate legacy memories on first run
+        migrate_legacy_memories()
+        
+        service = ProjectMemoryService()
+        ranked = service.retrieve_relevant(query or "", limit=10)
+        if not ranked:
+            return ''
 
-    lines = ['<WORKSPACE_MEMORY>', 'Durable workspace facts (ranked by relevance):']
-    for entry in ranked:
-        kind = entry.get('kind', 'lesson')
-        key = entry.get('key', '')
-        value = str(entry.get('value', '')).replace('\n', ' ').strip()
-        if len(value) > 220:
-            value = value[:217] + '...'
-        line = f'- [{kind}] {key}: {value}'
-        candidate = '\n'.join(lines + [line, '</WORKSPACE_MEMORY>'])
-        if len(candidate) > char_budget:
-            lines.append('... (additional workspace memory truncated)')
-            break
-        lines.append(line)
+        lines = ['<WORKSPACE_MEMORY>', 'Durable workspace facts (ranked by relevance):']
+        for entry in ranked:
+            line = f'- [{entry.kind}] {entry.fact}'
+            candidate = '\n'.join(lines + [line, '</WORKSPACE_MEMORY>'])
+            if len(candidate) > char_budget:
+                lines.append('... (additional workspace memory truncated)')
+                break
+            lines.append(line)
 
-    if len(lines) == 2:
+        if len(lines) == 2:
+            return ''
+        lines.append('</WORKSPACE_MEMORY>')
+        return '\n'.join(lines)
+    except Exception:
         return ''
-    lines.append('</WORKSPACE_MEMORY>')
-    return '\n'.join(lines)
 
 
 __all__ = [

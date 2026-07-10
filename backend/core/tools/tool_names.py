@@ -31,6 +31,7 @@ ACCEPTANCE_CRITERIA_TOOL_NAME = 'acceptance_criteria'
 
 # ── Memory & checkpoints ──────────────────────────────────────────────
 MEMORY_TOOL_NAME = 'memory'
+SEARCH_HISTORY_TOOL_NAME = 'search_history'
 CHECKPOINT_TOOL_NAME = 'checkpoint'
 # Internal-only tool names (not exposed to the LLM tool surface).
 NOTE_TOOL_NAME = 'note'
@@ -63,6 +64,7 @@ __all__ = [
     'GREP_TOOL_NAME',
     'LSP_TOOL_NAME',
     'MEMORY_TOOL_NAME',
+    'SEARCH_HISTORY_TOOL_NAME',
     'MULTIEDIT_TOOL_NAME',
     'NOTE_TOOL_NAME',
     'READ_FILE_TOOL_NAME',
