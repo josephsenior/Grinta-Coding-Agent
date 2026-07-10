@@ -122,14 +122,14 @@ def _configured_windows_shell() -> Literal['bash', 'powershell']:
         from backend.core.config.config_loader import load_app_config
 
         shell = str(
-            getattr(load_app_config().security, 'windows_shell', 'bash')
+            getattr(load_app_config().security, 'windows_shell', 'powershell')
         ).lower()
-        if shell in _WINDOWS_SHELL_POWERSHELL:
-            return 'powershell'
+        if shell in _WINDOWS_SHELL_BASH:
+            return 'bash'
     except Exception:
-        logger.debug('Falling back to default windows_shell=bash', exc_info=True)
+        logger.debug('Falling back to default windows_shell=powershell', exc_info=True)
 
-    return 'bash'
+    return 'powershell'
 
 
 def resolve_windows_powershell_preference(

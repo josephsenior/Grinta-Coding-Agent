@@ -256,7 +256,8 @@ class OrchestratorPlanner:
         )
         from backend.engine.tools.terminal import create_terminal_tool
 
-        tools.append(create_terminal_tool())
+        if getattr(self._config, 'enable_terminal', True):
+            tools.append(create_terminal_tool())
         tools.append(create_ask_user_tool())
         tools.append(create_read_file_tool())
         tools.append(create_find_symbols_tool())

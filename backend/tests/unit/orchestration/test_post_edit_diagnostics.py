@@ -15,7 +15,12 @@ from backend.utils.lsp.lsp_client import LspLocation, LspResult
 
 
 def _ctx(action: object) -> ToolInvocationContext:
-    controller = SimpleNamespace(config=SimpleNamespace(enable_lsp_query=True))
+    controller = SimpleNamespace(
+        config=SimpleNamespace(
+            enable_lsp_query=True,
+            agent=SimpleNamespace(enable_lsp_query=True),
+        )
+    )
     return ToolInvocationContext(
         controller=controller,  # type: ignore[arg-type]
         action=action,  # type: ignore[arg-type]

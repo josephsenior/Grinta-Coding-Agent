@@ -62,7 +62,7 @@ async def test_normal_step_emits_compaction_status_before_condense() -> None:
     orch._reset_step_recovery_counters = MagicMock()  # type: ignore[method-assign]
     action = CondensationAction(pruned_event_ids=[1])
 
-    async def _condense(_state):
+    async def _condense(_state, *args, **kwargs):
         orch.event_stream.add_event.assert_called_once()
         emitted = orch.event_stream.add_event.call_args.args[0]
         assert isinstance(emitted, StatusObservation)
@@ -88,7 +88,7 @@ async def test_normal_step_falls_back_to_post_condense_compaction_status() -> No
     orch._reset_step_recovery_counters = MagicMock()  # type: ignore[method-assign]
     action = CondensationAction(pruned_event_ids=[1])
 
-    async def _condense(_state):
+    async def _condense(_state, *args, **kwargs):
         orch.event_stream.add_event.assert_not_called()
         return SimpleNamespace(pending_action=action, events=[])
 

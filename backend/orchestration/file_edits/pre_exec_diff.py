@@ -129,21 +129,18 @@ class PreExecDiffMiddleware(ToolInvocationMiddleware):
         # Count boundary-aware matches (not naive substring count).
         import re as _re
 
-        boundary_matches = [
-            m
-            for m in _re.finditer(_re.escape(old_match), old_content)
-            if (
-                m.start() == 0
-                or not (
-                    old_content[m.start() - 1].isalnum()
-                    or old_content[m.start() - 1] == '_'
-                )
-            )
-            and (
-                m.end() >= len(old_content)
-                or not (old_content[m.end()].isalnum() or old_content[m.end()] == '_')
-            )
-        ]
+        old_starts_with_id = bool(old_match and (old_match[0].isalnum() or old_match[0] == '_'))
+        old_ends_with_id = bool(old_match and (old_match[-1].isalnum() or old_match[-1] == '_'))
+
+        boundary_matches = []
+        for m in _re.finditer(_re.escape(old_match), old_content):
+            start, end = m.start(), m.end()
+            if old_starts_with_id and start > 0 and (old_content[start - 1].isalnum() or old_content[start - 1] == '_'):
+                continue
+            if old_ends_with_id and end < len(old_content) and (old_content[end].isalnum() or old_content[end] == '_'):
+                continue
+            boundary_matches.append(m)
+
         match_count = len(boundary_matches)
         if match_count == 0 or (match_count > 1 and not replace_all):
             return None

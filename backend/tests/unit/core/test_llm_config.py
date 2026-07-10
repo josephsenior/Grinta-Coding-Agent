@@ -197,6 +197,13 @@ class TestSuppressEnvExport:
 
 
 class TestAPIKeyHandling:
+    @pytest.fixture(autouse=True)
+    def setup_api_key_manager(self):
+        from backend.core.config.llm_config import api_key_manager
+        api_key_manager.provider_api_keys.clear()
+        yield
+        api_key_manager.provider_api_keys.clear()
+
     def test_api_key_loaded_from_env(self, monkeypatch):
         """Test API key loading from environment."""
         monkeypatch.setenv('OPENAI_API_KEY', 'sk-test123456789012345678901234567890')

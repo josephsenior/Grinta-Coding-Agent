@@ -16,7 +16,7 @@
     "enabled": false
   },
   "security": {
-    "windows_shell": "bash",
+    "windows_shell": "powershell",
     "execution_profile": "standard",
     "enforce_security": true,
     "block_high_risk": false,

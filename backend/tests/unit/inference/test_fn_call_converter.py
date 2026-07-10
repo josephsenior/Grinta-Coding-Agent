@@ -414,12 +414,12 @@ class TestExampleStepBuilder:
         assert builder.build_all_steps() == ''
 
     def test_with_terminal(self):
-        builder = ExampleStepBuilder({'terminal'})
+        builder = ExampleStepBuilder({'terminal_command'})
         result = builder.build_all_steps()
-        assert 'terminal' in result
+        assert 'execute_bash' in result
 
     def test_with_tool_steps_ends_in_plain_text(self):
-        builder = ExampleStepBuilder({'terminal'})
+        builder = ExampleStepBuilder({'terminal_command'})
         result = builder.build_all_steps()
         assert '<function=finish>' not in result
         assert 'ASSISTANT:' in result

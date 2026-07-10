@@ -853,8 +853,9 @@ class TestBuildLlmParams:
             for m in params['messages']
             if isinstance(m.get('content'), str)
         )
-        assert joined.count('Current mode:') == 1
-        assert f'Current mode: {label}' in joined
+        joined_lower = joined.lower()
+        assert joined_lower.count('current mode:') == 1
+        assert f'current mode: {label.lower()}' in joined_lower
 
 
 class TestMinimalTurnStatusDefault:

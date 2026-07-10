@@ -55,7 +55,7 @@ class SecurityConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         ),
     )
     windows_shell: Literal['bash', 'powershell'] = Field(
-        default='bash',
+        default='powershell',
         description=(
             'On Windows, which shell contract the agent uses for execute_bash vs '
             'execute_powershell. Ignored on Linux and macOS.'

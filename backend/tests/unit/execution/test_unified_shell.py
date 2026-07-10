@@ -439,9 +439,32 @@ class TestCreateShellSession:
             '-NoProfile',
         ]
 
-    def test_windows_prefers_bash_by_default(self, tmp_path, monkeypatch, request):
+    def test_windows_prefers_powershell_by_default(self, tmp_path, monkeypatch, request):
         _force_os(request, windows=True)
         monkeypatch.delenv('SECURITY_WINDOWS_SHELL', raising=False)
+        _configured_windows_shell.cache_clear()
+        monkeypatch.setitem(
+            sys.modules,
+            'backend.execution.utils.shell.windows_bash',
+            types.SimpleNamespace(WindowsPowershellSession=_DummySession),
+        )
+
+        tools = _DummyTools(
+            has_bash=True,
+            has_tmux=False,
+            has_powershell=True,
+            shell_type='pwsh',
+        )
+        session = create_shell_session(
+            work_dir=str(tmp_path),
+            tools=tools,
+            cancellation_service=MagicMock(),
+        )
+        assert isinstance(session, _DummySession)
+
+    def test_windows_can_prefer_bash_by_config(self, tmp_path, monkeypatch, request):
+        _force_os(request, windows=True)
+        monkeypatch.setenv('SECURITY_WINDOWS_SHELL', 'bash')
         _configured_windows_shell.cache_clear()
         monkeypatch.setitem(
             sys.modules,

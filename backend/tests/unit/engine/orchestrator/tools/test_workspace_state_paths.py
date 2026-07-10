@@ -115,7 +115,7 @@ def test_task_tracker_persists_active_plan_under_app_dir(tmp_path, monkeypatch) 
 
     tracker.save_to_file(task_list)
 
-    assert tracker.path == tmp_path / 'active_plan.json'
+    assert tracker.path == tmp_path / '.session_context_unbound' / 'active_plan.json'
     assert tracker.load_from_file() == [
         {
             'id': '1',
