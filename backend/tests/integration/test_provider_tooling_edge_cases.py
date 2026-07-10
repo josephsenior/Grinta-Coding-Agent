@@ -203,8 +203,9 @@ class TestLSPEdgeCases:
             error='Symbol not found in this context',
         )
 
-        with patch('backend.utils.lsp.lsp_client.LspClient') as LC:
-            LC.return_value.query.return_value = result
+        mock_client = MagicMock()
+        mock_client.query.return_value = result
+        with patch('backend.utils.lsp.lsp_client.get_lsp_client', return_value=mock_client):
             obs = await ex.lsp_query(action)
 
         assert isinstance(obs, LspQueryObservation)
@@ -231,8 +232,9 @@ class TestLSPEdgeCases:
             error='',
         )
 
-        with patch('backend.utils.lsp.lsp_client.LspClient') as LC:
-            LC.return_value.query.return_value = result
+        mock_client = MagicMock()
+        mock_client.query.return_value = result
+        with patch('backend.utils.lsp.lsp_client.get_lsp_client', return_value=mock_client):
             obs = await ex.lsp_query(action)
 
         assert isinstance(obs, LspQueryObservation)

@@ -8,9 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from backend.core.constants import (
-    API_VERSION_V1,
     CONVERSATION_BASE_DIR,
-    CURRENT_API_VERSION,
     DEFAULT_AGENT_AUTONOMY_LEVEL,
     DEFAULT_AGENT_MEMORY_MAX_THREADS,
     DEFAULT_AGENT_MIN_ITERATIONS,
@@ -115,10 +113,6 @@ class TestCoreConstants:
         assert isinstance(DEFAULT_AGENT_MEMORY_MAX_THREADS, int)
         assert isinstance(DEFAULT_AGENT_MIN_ITERATIONS, int)
 
-    def test_api_version(self):
-        assert API_VERSION_V1 == 'v1'
-        assert CURRENT_API_VERSION == API_VERSION_V1
-
     def test_storage(self):
         assert CONVERSATION_BASE_DIR == 'sessions'
         assert DEFAULT_CONVERSATION_MAX_AGE_SECONDS > 0
@@ -169,4 +163,3 @@ class TestEnvVarRegistry:
     def test_known_keys_present(self):
         assert 'LOG_LEVEL' in ENV_VAR_REGISTRY
         assert 'DEBUG' in ENV_VAR_REGISTRY
-        assert 'APP_PERMISSIVE_API' in ENV_VAR_REGISTRY

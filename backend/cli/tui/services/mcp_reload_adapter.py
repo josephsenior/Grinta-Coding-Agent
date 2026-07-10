@@ -1,8 +1,7 @@
 """Adapter that wires the MCP config bus to a running Runtime.
 
-The TUI / controller / REPL each own a single :class:`Runtime` (either
-the in-process :class:`ActionExecutionServer` or the HTTP
-:class:`ActionExecutionClient`). This module is the bridge that:
+The TUI / controller / REPL each own a single in-process :class:`Runtime`.
+This module is the bridge that:
 
 * subscribes to the process-wide :class:`MCPConfigBus`;
 * on every emission, calls :meth:`Runtime.reload_mcp` (when the runtime
@@ -11,10 +10,8 @@ the in-process :class:`ActionExecutionServer` or the HTTP
 * emits a small status :class:`StatusObservation` so the TUI sidebar
   shows the reload.
 
-The same adapter is installed in both the in-process and the
-out-of-process runtime because the :meth:`reload_mcp` and
-:meth:`close_mcp` methods are present on both classes (the client
-exposes them via the same mixin signature).
+The runtime exposes :meth:`reload_mcp` and :meth:`close_mcp` so settings changes
+can reconcile live MCP clients without restarting the session.
 """
 
 from __future__ import annotations

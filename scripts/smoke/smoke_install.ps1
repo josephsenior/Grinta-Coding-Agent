@@ -1,13 +1,13 @@
 # Clean-room install smoke-test for Grinta on Windows / PowerShell.
 #
 # Validates that `pip install grinta` and the optional extras install cleanly
-# on a fresh Python environment. Mirror of `scripts/smoke_install.sh`.
+# on a fresh Python environment. Mirror of `scripts/smoke/smoke_install.sh`.
 #
 # Usage:
-#   .\scripts\smoke_install.ps1                 # base install only
-#   .\scripts\smoke_install.ps1 rag             # base + [rag]
-#   .\scripts\smoke_install.ps1 rag browser     # multiple extras
-#   .\scripts\smoke_install.ps1 all             # everything
+#   .\scripts\smoke\smoke_install.ps1                 # base install only
+#   .\scripts\smoke\smoke_install.ps1 rag             # base + [rag]
+#   .\scripts\smoke\smoke_install.ps1 rag browser     # multiple extras
+#   .\scripts\smoke\smoke_install.ps1 all             # everything
 
 [CmdletBinding()]
 param(

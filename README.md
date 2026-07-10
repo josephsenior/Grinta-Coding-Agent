@@ -36,7 +36,7 @@ Direct link if the video does not load: [`docs/assets/grinta-demo.mp4`](docs/ass
 ## What makes Grinta different
 
 Grinta distinguishes itself by focusing on a completely local-first, provider-agnostic, and deeply integrated terminal workflow. Unlike thin wrappers or cloud-dependent control planes, Grinta:
-- **Operates entirely locally**: Your code, logs, and sessions remain on your machine.
+- **Local-first**: Grinta’s control plane, execution, storage, and session history run locally. Model inference may be local or remote depending on the configured provider.
 - **Provider-agnostic**: Connects seamlessly with OpenAI, Anthropic, Google, OpenRouter, Ollama, or LM Studio using a unified interface.
 - **Deep tooling integration**: Automatically discovers and integrates with local Language Servers (LSP) and Debug Adapters (DAP) on your PATH.
 - **Built-in safety rails**: Classifies actions by risk, implements confirmation gates, and masks secrets in console outputs.

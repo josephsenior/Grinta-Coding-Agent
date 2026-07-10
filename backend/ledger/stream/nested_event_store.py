@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from http import HTTPStatus
 from typing import TYPE_CHECKING
 from urllib.parse import urlencode
 
 import httpx
-from fastapi import status
 
 from backend.ledger.event.event_store_abc import EventStoreABC
 from backend.ledger.serialization.event import event_from_dict
@@ -50,7 +50,7 @@ class NestedEventStore(EventStoreABC):
         search_str = urlencode(search_params)
         url = f'{self.base_url}/events?{search_str}'
         response = httpx.get(url)
-        if response.status_code == status.HTTP_404_NOT_FOUND:
+        if response.status_code == HTTPStatus.NOT_FOUND:
             return None
         return response.json()
 

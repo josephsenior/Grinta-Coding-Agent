@@ -32,11 +32,3 @@ def test_try_compile_user_regex_accepts_and_rejects_patterns() -> None:
     bad, bad_err = aes.try_compile_user_regex('(')
     assert bad is None
     assert bad_err
-
-
-@pytest.mark.integration
-def test_get_uvicorn_json_log_config_is_valid_dict() -> None:
-    cfg = aes.get_uvicorn_json_log_config()
-    assert cfg['version'] == 1
-    assert 'handlers' in cfg and 'loggers' in cfg
-    assert cfg['loggers']['uvicorn']['level'] == 'INFO'

@@ -64,7 +64,7 @@ Post-v1.0 split candidates — use `docs/internals/import-manifest.json` before 
 | Execution runtime pool / factory / orchestrator | `execution/runtime/` (`manager`, `pool`, `factory`, `orchestrator`) |
 | Inference capabilities + prompt caching | `inference/capabilities/` (`ModelCapabilities`, `model_features`, `context_limits`, …), `inference/caching/` |
 | Execution AES helpers | `execution/aes/` (`helpers`, `file_operations`, `structured_edit_errors`, `security_enforcement`) |
-| Execution HTTP server | `execution/server/` (`routes`, `utils`, `file_viewer_server`) |
+| Retired execution HTTP server | `execution/server/` route/file-viewer layer removed |
 | Utils tree-sitter editor + syntax | `utils/treesitter/` (`treesitter_editor`, `syntax_check`, `chunk_localizer`, `_tse_*`) |
 | Utils async bridging + retries | `utils/async_helpers/` (`async_utils`, `retry`, `circuit_breaker`, `tenacity_*`, `subprocess_bridge`) — not `async/` (`async` is a reserved keyword) |
 | Utils LSP client + language aliases | `utils/lsp/` (`lsp_client`, `language_tool_aliases`) |

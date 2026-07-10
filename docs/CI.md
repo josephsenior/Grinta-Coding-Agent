@@ -23,7 +23,7 @@ For release tagging and GA promotion, see [RELEASE_CHECKLIST.md](RELEASE_CHECKLI
 | **Dependency Review** | `dependency-review` | Blocks high-severity dependency risk on pull requests. |
 | **Dependency Audit (pip-audit)** | `pip-audit` | Audits locked runtime dependencies for known CVEs. |
 | **CLI Regression Tests** | (when paths match) | CLI integration smoke and selected orchestration tests; see [`.github/workflows/e2e-tests.yml`](../.github/workflows/e2e-tests.yml). |
-| **Smoke Install** | `smoke-install` | Clean venv wheel install + source onboarding smoke (`scripts/smoke_install.*`, `scripts/smoke_source_onboarding.*`) on Linux and Windows; see [`.github/workflows/smoke-install.yml`](../.github/workflows/smoke-install.yml). |
+| **Smoke Install** | `smoke-install` | Clean venv wheel install + source onboarding smoke (`scripts/smoke/smoke_install.*`, `scripts/smoke/smoke_source_onboarding.*`) on Linux and Windows; see [`.github/workflows/smoke-install.yml`](../.github/workflows/smoke-install.yml). |
 
 ### Advisory (not release-blocking today)
 

@@ -306,7 +306,7 @@ alongside built-in tools.
 - ✅ High performance (ASGI)
 - ⚠️ Middleware ordering is order-sensitive
 
-**Note (current state):** Grinta is terminal-first. FastAPI/uvicorn remain in the dependency tree for MCP proxy and related plumbing, but the supported interactive product surface is the Textual TUI and non-interactive CLI runner — not a browser client.
+**Note (current state):** Grinta is terminal-first. The legacy FastAPI/uvicorn action server and MCP proxy have been retired; the supported interactive product surface is the Textual TUI and non-interactive CLI runner.
 
 ---
 

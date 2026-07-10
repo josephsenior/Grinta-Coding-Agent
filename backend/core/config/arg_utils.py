@@ -3,28 +3,6 @@
 from __future__ import annotations
 
 import argparse
-from argparse import ArgumentParser, _SubParsersAction
-
-
-def get_subparser(parser: ArgumentParser, name: str) -> ArgumentParser:
-    """Get a subparser by name from an argument parser.
-
-    Args:
-        parser: Parent argument parser
-        name: Name of the subparser to retrieve
-
-    Returns:
-        The requested subparser
-
-    Raises:
-        ValueError: If subparser not found
-
-    """
-    for action in parser._actions:
-        if isinstance(action, _SubParsersAction) and name in action.choices:
-            return action.choices[name]
-    msg = f"Subparser '{name}' not found"
-    raise ValueError(msg)
 
 
 def add_common_arguments(parser: argparse.ArgumentParser) -> None:
@@ -103,49 +81,6 @@ def add_headless_specific_arguments(parser: argparse.ArgumentParser) -> None:
         type=str,
         default=None,
     )
-
-
-def get_cli_parser() -> argparse.ArgumentParser:
-    """Create argument parser for Grinta (legacy parser shape)."""
-    description = (
-        'Grinta — local-first coding agent\n\n'
-        'Primary interface: `grinta` or `uv run python -m backend.cli.entry`. '
-        'This parser is retained for compatibility with older automation.'
-    )
-    parser = argparse.ArgumentParser(
-        description=description,
-        prog='grinta',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    subparsers = parser.add_subparsers(
-        dest='command',
-        title='commands',
-        metavar='COMMAND',
-    )
-    subparsers.add_parser(
-        'serve', help='Legacy serve subcommand (optional HTTP tooling)'
-    )
-
-    subparsers.add_parser(
-        'health', help='Run production health checks for critical dependencies'
-    )
-
-    init_parser = subparsers.add_parser(
-        'init', help='Initialize a new Grinta workspace'
-    )
-    init_parser.add_argument(
-        'project_name',
-        nargs='?',
-        help='Name of the project (defaults to current directory)',
-    )
-    init_parser.add_argument(
-        '--template', default='basic', help='Project template to use'
-    )
-
-    parser.add_argument(
-        '--conversation', help='The conversation id to continue', type=str, default=None
-    )
-    return parser
 
 
 def get_headless_parser() -> argparse.ArgumentParser:

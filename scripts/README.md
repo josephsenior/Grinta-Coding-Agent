@@ -19,15 +19,15 @@ For CI gates and layer-boundary checks, see [`backend/scripts/`](../backend/scri
 | [`launch/start_here.ps1`](launch/start_here.ps1) / [`launch/start_here.sh`](launch/start_here.sh) | Source-checkout bootstrap: sync deps, init wizard, doctor (does not launch TUI). |
 | [`launch/start_here_pipx.ps1`](launch/start_here_pipx.ps1) / [`launch/start_here_pipx.sh`](launch/start_here_pipx.sh) | pipx-installed `grinta` flow (no `uv`/bootstrap). |
 | Root [`START_HERE.ps1`](../START_HERE.ps1) / [`start_here.sh`](../start_here.sh) | Unified entry: auto-picks source vs pipx (`-Pipx` / `--pipx` to override). |
-| [`docker/docker_start.ps1`](docker/docker_start.ps1) / [`docker/docker_start.sh`](docker/docker_start.sh) | Optional Docker helper; exits with guidance when no `docker-compose.yml` / `compose.yml` exists in the repo (experimental GHCR image path is documented in [QUICK_START.md](../docs/QUICK_START.md)). Root `DOCKER_START.ps1` / `docker_start.sh` are thin stubs. |
-| [`build.sh`](build.sh) | `uv build -v` wrapper. Root `build.sh` is a thin stub. |
+| [`docker/docker_start.ps1`](docker/docker_start.ps1) / [`docker/docker_start.sh`](docker/docker_start.sh) | Optional Docker helper; exits with guidance when no `docker-compose.yml` / `compose.yml` exists in the repo (experimental GHCR image path is documented in [QUICK_START.md](../docs/QUICK_START.md)). |
+| [`build.sh`](build.sh) | `uv build -v` wrapper. |
 
 ## Release / onboarding smoke
 
 | Script | Purpose |
 | --- | --- |
-| [`smoke/smoke_install.sh`](smoke/smoke_install.sh) / [`.ps1`](smoke/smoke_install.ps1) | Install the built wheel into a clean venv and verify `grinta --help`, optional extras, and `grinta init` non-TTY guard. Root `scripts/smoke_install.*` are thin stubs. |
-| [`smoke/smoke_source_onboarding.sh`](smoke/smoke_source_onboarding.sh) / [`.ps1`](smoke/smoke_source_onboarding.ps1) | Source-checkout smoke: sync `base` profile and run `grinta --help`. Root stubs preserved. |
+| [`smoke/smoke_install.sh`](smoke/smoke_install.sh) / [`.ps1`](smoke/smoke_install.ps1) | Install the built wheel into a clean venv and verify `grinta --help`, optional extras, and `grinta init` non-TTY guard. |
+| [`smoke/smoke_source_onboarding.sh`](smoke/smoke_source_onboarding.sh) / [`.ps1`](smoke/smoke_source_onboarding.ps1) | Source-checkout smoke: sync `base` profile and run `grinta --help`. |
 | [`smoke/Dockerfile.smoke`](smoke/Dockerfile.smoke) | Minimal image for wheel-install smoke in containerized CI. |
 
 ## Evals

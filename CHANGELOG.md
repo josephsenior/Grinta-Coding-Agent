@@ -83,9 +83,9 @@ before the final `1.0.0` cut.
   (`demo_app/calc.py::average` `ZeroDivisionError`) plus an `agg` command
   for converting the cast into a GIF for the README.
 - **Smoke-test scripts** for clean-box install verification:
-  - `scripts/smoke_install.sh` (Linux/macOS, accepts extras as positional
+  - `scripts/smoke/smoke_install.sh` (Linux/macOS, accepts extras as positional
     args; prefers a local wheel from `$WHEEL_DIR=./dist`, falls back to PyPI).
-  - `scripts/smoke_install.ps1` (Windows mirror; reports site-packages MB).
+  - `scripts/smoke/smoke_install.ps1` (Windows mirror; reports site-packages MB).
   - `scripts/Dockerfile.smoke` (Python 3.12-slim base, ripgrep pre-installed,
     `EXTRAS` env var picks the optional extras to test).
   Each script runs `python -c "import backend"`, `--help`, and

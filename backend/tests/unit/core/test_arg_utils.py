@@ -4,45 +4,11 @@ from __future__ import annotations
 
 import argparse
 
-import pytest
-
 from backend.core.config.arg_utils import (
     add_common_arguments,
     add_headless_specific_arguments,
-    get_cli_parser,
     get_headless_parser,
-    get_subparser,
 )
-
-# ── get_subparser ────────────────────────────────────────────────────
-
-
-class TestGetSubparser:
-    def test_found(self):
-        parser = get_cli_parser()
-        sub = get_subparser(parser, 'serve')
-        assert isinstance(sub, argparse.ArgumentParser)
-
-    def test_init_subparser(self):
-        parser = get_cli_parser()
-        sub = get_subparser(parser, 'init')
-        assert isinstance(sub, argparse.ArgumentParser)
-
-    def test_health_subparser(self):
-        parser = get_cli_parser()
-        sub = get_subparser(parser, 'health')
-        assert isinstance(sub, argparse.ArgumentParser)
-
-    def test_not_found_raises(self):
-        parser = get_cli_parser()
-        with pytest.raises(ValueError, match='not found'):
-            get_subparser(parser, 'nonexistent')
-
-    def test_empty_parser(self):
-        parser = argparse.ArgumentParser()
-        with pytest.raises(ValueError, match='not found'):
-            get_subparser(parser, 'anything')
-
 
 # ── add_common_arguments ─────────────────────────────────────────────
 
@@ -135,47 +101,6 @@ class TestAddHeadlessArguments:
         p = self._make_parser()
         args = p.parse_args(['--selected-repo', 'owner/repo'])
         assert args.selected_repo == 'owner/repo'
-
-
-# ── get_cli_parser ───────────────────────────────────────────────────
-
-
-class TestGetCliParser:
-    def test_returns_parser(self):
-        p = get_cli_parser()
-        assert isinstance(p, argparse.ArgumentParser)
-
-    def test_serve_command(self):
-        p = get_cli_parser()
-        args = p.parse_args(['serve'])
-        assert args.command == 'serve'
-
-    def test_init_command(self):
-        p = get_cli_parser()
-        args = p.parse_args(['init', 'myproject'])
-        assert args.command == 'init'
-        assert args.project_name == 'myproject'
-
-    def test_init_default_template(self):
-        p = get_cli_parser()
-        args = p.parse_args(['init'])
-        assert args.template == 'basic'
-        assert args.project_name is None
-
-    def test_init_custom_template(self):
-        p = get_cli_parser()
-        args = p.parse_args(['init', '--template', 'advanced'])
-        assert args.template == 'advanced'
-
-    def test_conversation_arg(self):
-        p = get_cli_parser()
-        args = p.parse_args(['--conversation', 'conv-123'])
-        assert args.conversation == 'conv-123'
-
-    def test_no_command(self):
-        p = get_cli_parser()
-        args = p.parse_args([])
-        assert args.command is None
 
 
 # ── get_headless_parser ──────────────────────────────────────────────

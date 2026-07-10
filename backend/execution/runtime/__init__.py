@@ -1,1 +1,1 @@
-"""Runtime pool, factory, orchestrator, and lifecycle manager."""
+"""Runtime pool, factory, and orchestrator."""

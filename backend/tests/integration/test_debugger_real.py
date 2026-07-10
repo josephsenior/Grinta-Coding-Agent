@@ -19,7 +19,7 @@ import pytest
 debugpy = pytest.importorskip('debugpy', reason='debugpy not installed')
 
 from backend.core.constants import DEBUGGER_START_TIMEOUT_SECONDS
-from backend.execution.server.debugger import DAPDebugManager  # noqa: E402
+from backend.execution.dap import DAPDebugManager  # noqa: E402
 from backend.ledger.action.debugger import DebuggerAction  # noqa: E402
 from backend.ledger.observation import ErrorObservation  # noqa: E402
 from backend.ledger.observation.debugger import DebuggerObservation  # noqa: E402

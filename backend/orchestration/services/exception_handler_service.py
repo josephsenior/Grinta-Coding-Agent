@@ -63,16 +63,35 @@ class ExceptionHandlerService:
         Known LLM exceptions are forwarded verbatim; anything else is
         wrapped in a user-friendly RuntimeError.
         """
-        self._ctrl.log(
-            'error',
-            f'Error while running the agent (session {self._ctrl.id}): {exc}',
-            extra={'exception_type': type(exc).__name__},
+        from backend.orchestration.services.recovery_service import (
+            _QUEUED_RETRY_EXCEPTIONS,
         )
-        logger.error(
-            'Agent step exception traceback (session %s): %s',
-            self._ctrl.id,
-            traceback.format_exc(),
-        )
+
+        is_transient = isinstance(exc, _QUEUED_RETRY_EXCEPTIONS)
+
+        if is_transient:
+            self._ctrl.log(
+                'warning',
+                f'Transient error during agent run (session {self._ctrl.id}): {exc}',
+                extra={'exception_type': type(exc).__name__},
+            )
+            logger.warning(
+                'Agent step transient error (session %s): %s: %s',
+                self._ctrl.id,
+                type(exc).__name__,
+                exc,
+            )
+        else:
+            self._ctrl.log(
+                'error',
+                f'Error while running the agent (session {self._ctrl.id}): {exc}',
+                extra={'exception_type': type(exc).__name__},
+            )
+            logger.error(
+                'Agent step exception traceback (session %s): %s',
+                self._ctrl.id,
+                traceback.format_exc(),
+            )
 
         reported: Exception
         if isinstance(exc, _PASSTHROUGH_EXCEPTIONS):

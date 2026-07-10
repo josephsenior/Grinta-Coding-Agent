@@ -33,12 +33,10 @@ from backend.core.timeouts.timeout_policy import (
     cmd_run_sync_bridge_timeout_seconds,
 )
 from backend.execution.capabilities import detect_capabilities
-from backend.execution.drivers.action_execution.action_execution_client import (
-    ActionExecutionClient,
-)
 from backend.execution.executor_protocol import RuntimeExecutorProtocol
 from backend.execution.plugins import ALL_PLUGINS, Plugin
 from backend.execution.server.action_execution_server import RuntimeExecutor
+from backend.execution.server.base import Runtime
 from backend.ledger.action import (
     CmdRunAction,
     DebuggerAction,
@@ -155,7 +153,7 @@ class _PersistentAsyncLoopRunner:
             self._loop.close()
 
 
-class LocalRuntimeInProcess(ActionExecutionClient):
+class LocalRuntimeInProcess(Runtime):
     """In-process local runtime that runs RuntimeExecutor directly.
 
     This eliminates subprocess and HTTP overhead by running RuntimeExecutor
@@ -209,6 +207,9 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         # runtime — any executor satisfying the protocol works.
         self._executor: RuntimeExecutorProtocol | None = None
         self._browser_loop_runner: _PersistentAsyncLoopRunner | None = None
+        self._mcp_config: Any | None = getattr(config, 'mcp', None)
+        self._mcp_clients: list[Any] | None = None
+        self._mcp_servers_resolved: list[Any] | None = None
 
         # Apply startup env vars
         if self.config.runtime_config.runtime_startup_env_vars:
@@ -267,7 +268,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             user_id=self._user_id,
             enable_browser=self.config.enable_browser,
             tool_registry=self._tool_registry,  # Pass ToolRegistry for cross-platform support
-            mcp_config=getattr(self.config, 'mcp', None),
+            mcp_config=self._mcp_config,
             security_config=self.config.security,
         )
 
@@ -715,18 +716,81 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         return Path(path)  # pylint: disable=redefined-outer-name,reimported
 
     def get_mcp_config(self, extra_servers: list[Any] | None = None) -> Any:
-        """Get MCP configuration."""
+        """Return local MCP configuration, including playbook-provided servers."""
         if self._executor is None:
             raise AgentRuntimeDisconnectedError('Runtime not initialized')
-        # MCP is handled by RuntimeExecutor if available
-        return self.config.mcp if hasattr(self.config, 'mcp') else None
+
+        cfg = getattr(self.config, 'mcp', None) or self._mcp_config
+        if cfg is None:
+            return None
+
+        from backend.core.config.mcp_config import (
+            MCPConfig,
+            _filter_windows_stdio_servers,
+        )
+
+        merged = cfg.model_copy(deep=True) if isinstance(cfg, MCPConfig) else cfg
+        servers = list(getattr(merged, 'servers', []) or [])
+        for server in extra_servers or []:
+            if server not in servers:
+                servers.append(server)
+        merged.servers = _filter_windows_stdio_servers(servers)
+        self._set_mcp_config(merged)
+        return merged
 
     async def call_tool_mcp(self, action: MCPAction) -> Observation:
         """Call MCP tool via RuntimeExecutor."""
         if self._executor is None:
             raise AgentRuntimeDisconnectedError('Runtime not initialized')
-        # RuntimeExecutor handles MCP through run_action
-        return await self._executor.run_action(action)
+        self._sync_mcp_config_to_executor()
+        observation = await self._executor.run_action(action)
+        self._mirror_executor_mcp_state()
+        return observation
+
+    async def reload_mcp(self) -> dict[str, list[str]]:
+        """Reload MCP clients on the RuntimeExecutor that actually serves MCP calls."""
+        if self._executor is None:
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
+        self._sync_mcp_config_to_executor()
+        reload_mcp = getattr(self._executor, 'reload_mcp', None)
+        if not callable(reload_mcp):
+            return {
+                'added': [],
+                'removed': [],
+                'reconnected': [],
+                'unchanged': [],
+                'failed': [],
+            }
+        summary = await reload_mcp()
+        self._mirror_executor_mcp_state()
+        return summary
+
+    async def close_mcp(self) -> None:
+        """Close MCP clients owned by the RuntimeExecutor."""
+        if self._executor is not None:
+            close_mcp = getattr(self._executor, 'close_mcp', None)
+            if callable(close_mcp):
+                await close_mcp()
+        self._mcp_clients = None
+        self._mcp_servers_resolved = None
+
+    def _set_mcp_config(self, cfg: Any) -> None:
+        self._mcp_config = cfg
+        if hasattr(self.config, 'mcp'):
+            self.config.mcp = cfg
+        self._sync_mcp_config_to_executor()
+
+    def _sync_mcp_config_to_executor(self) -> None:
+        if self._executor is not None and hasattr(self._executor, '_mcp_config'):
+            setattr(self._executor, '_mcp_config', self._mcp_config)
+
+    def _mirror_executor_mcp_state(self) -> None:
+        if self._executor is None:
+            return
+        self._mcp_clients = getattr(self._executor, '_mcp_clients', None)
+        self._mcp_servers_resolved = getattr(
+            self._executor, '_mcp_servers_resolved', None
+        )
 
     def close(self) -> None:
         """Clean up runtime resources."""

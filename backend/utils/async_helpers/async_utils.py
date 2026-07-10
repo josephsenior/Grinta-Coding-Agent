@@ -485,7 +485,7 @@ def _run_in_loop(
 # ---------------------------------------------------------------------------
 # Main event loop registry
 # ---------------------------------------------------------------------------
-# The application's main event loop (typically uvicorn's) is registered here
+# The application's main event loop is registered here
 # so that ``run_or_schedule`` can dispatch coroutines to it even when called
 # from background threads (e.g. EventStream's ThreadPoolExecutor dispatch).
 # Without this, ``run_or_schedule`` would create throw-away event loops whose
@@ -503,7 +503,7 @@ _fallback_loop_lock = threading.Lock()
 def set_main_event_loop(loop: asyncio.AbstractEventLoop | None = None) -> None:
     """Register the application's main event loop.
 
-    Call this once from the application startup (e.g. FastAPI lifespan).
+    Call this once from application startup.
     If *loop* is ``None``, the currently running loop is used.
     """
     global _main_event_loop  # noqa: PLW0603

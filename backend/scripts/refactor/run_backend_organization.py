@@ -267,14 +267,12 @@ LEDGER_STREAM_IMPORTS: list[tuple[str, str]] = [
 # --- execution/runtime ---
 
 EXECUTION_RUNTIME_MOVES: dict[str, str] = {
-    'runtime_manager.py': 'runtime/manager.py',
     'runtime_pool.py': 'runtime/pool.py',
     'runtime_factory.py': 'runtime/factory.py',
     'orchestrator.py': 'runtime/orchestrator.py',
 }
 
 EXECUTION_RUNTIME_IMPORTS: list[tuple[str, str]] = [
-    ('backend.execution.runtime_manager', 'backend.execution.runtime.manager'),
     ('backend.execution.runtime_pool', 'backend.execution.runtime.pool'),
     ('backend.execution.runtime_factory', 'backend.execution.runtime.factory'),
     ('backend.execution.orchestrator', 'backend.execution.runtime.orchestrator'),
@@ -345,23 +343,6 @@ EXECUTION_AES_IMPORTS: list[tuple[str, str]] = [
     (
         'backend.execution.security_enforcement',
         'backend.execution.aes.security_enforcement',
-    ),
-]
-
-# --- execution/server (HTTP routes and file viewer) ---
-
-EXECUTION_SERVER_MOVES: dict[str, str] = {
-    'server_routes.py': 'server/routes.py',
-    'server_utils.py': 'server/utils.py',
-    'file_viewer_server.py': 'server/file_viewer_server.py',
-}
-
-EXECUTION_SERVER_IMPORTS: list[tuple[str, str]] = [
-    ('backend.execution.server_routes', 'backend.execution.server.routes'),
-    ('backend.execution.server_utils', 'backend.execution.server.utils'),
-    (
-        'backend.execution.file_viewer_server',
-        'backend.execution.server.file_viewer_server',
     ),
 ]
 
@@ -734,7 +715,6 @@ EXECUTION_UTILS_SHELL_IMPORTS: list[tuple[str, str]] = [
         'backend.execution.utils.shell.pty_session',
     ),
     ('backend.execution.utils.bash', 'backend.execution.utils.shell.bash'),
-    ('backend.execution.utils.command', 'backend.execution.utils.shell.command'),
 ]
 
 ALL_IMPORTS = (
@@ -753,7 +733,6 @@ ALL_IMPORTS = (
     + CAPABILITIES_IMPORTS
     + CACHING_IMPORTS
     + EXECUTION_AES_IMPORTS
-    + EXECUTION_SERVER_IMPORTS
     + UTILS_TREESITTER_IMPORTS
     + UTILS_ASYNC_HELPERS_IMPORTS
     + UTILS_LSP_IMPORTS
@@ -865,9 +844,8 @@ def main() -> None:
     _move_group(BACKEND / 'execution', EXECUTION_AES_MOVES)
     _write_init(
         BACKEND / 'execution' / 'server' / '__init__.py',
-        'Action execution server HTTP routes and file viewer.',
+        'In-process runtime executor and execution support.',
     )
-    _move_group(BACKEND / 'execution', EXECUTION_SERVER_MOVES)
     _write_init(
         BACKEND / 'utils' / 'treesitter' / '__init__.py',
         'Tree-sitter editor, syntax checking, and chunk localization.',

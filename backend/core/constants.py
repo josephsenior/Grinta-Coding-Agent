@@ -265,11 +265,6 @@ MAX_DELEGATION_DEPTH = int(os.getenv('GRINTA_MAX_DELEGATION_DEPTH', '2'))
 IDLE_RECLAIM_SPIKE_THRESHOLD = 3
 EVICTION_SPIKE_THRESHOLD = 1
 
-# ── Runtime Bootstrap ───────────────────────────────────────────────
-# Empty prefix: invoke ``python_executable`` directly. Container images may inject a prefix.
-DEFAULT_PYTHON_PREFIX: list[str] = []
-DEFAULT_MAIN_MODULE = 'backend.execution.server.action_execution_server'
-
 # ── Storage ─────────────────────────────────────────────────────────
 # Relative sub-directory under local_data_root for conversation files.
 CONVERSATION_BASE_DIR = 'sessions'
@@ -465,20 +460,6 @@ DEFAULT_KB_RELEVANCE_THRESHOLD = 0.7
 DEFAULT_KB_AUTO_SEARCH = True
 DEFAULT_KB_SEARCH_STRATEGY = 'hybrid'
 
-# ── API & Server ────────────────────────────────────────────────────
-API_VERSION_V1 = 'v1'
-CURRENT_API_VERSION = API_VERSION_V1
-
-# API versioning is strict by default: unversioned /api/ requests are
-# rejected with a 400 suggesting the correct path.  Existing deployments
-# that rely on unversioned routes can set APP_PERMISSIVE_API=1 to
-# restore the old permissive behavior during migration.
-ENFORCE_API_VERSIONING = os.getenv('APP_PERMISSIVE_API', '').strip().lower() not in (
-    '1',
-    'true',
-    'yes',
-)
-
 # ── Logging & Debug (env-var driven) ────────────────────────────────
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
 DEBUG = _parse_bool_env('DEBUG')
@@ -616,12 +597,6 @@ DEFAULT_SHELL_CONFIRMATION_PATTERNS = [
 ]
 DEFAULT_BROWSER_MAX_PAGES = 10
 
-# ── Runtime Resource Limits ─────────────────────────────────────────
-DEFAULT_RUNTIME_MAX_MEMORY_MB = 2048
-DEFAULT_RUNTIME_MAX_CPU_PERCENT = 80.0
-DEFAULT_RUNTIME_MAX_DISK_GB = 10
-DEFAULT_RUNTIME_MAX_FILE_COUNT = 10000
-DEFAULT_RUNTIME_MAX_NETWORK_REQUESTS_PER_MINUTE = 100
 MAX_FILENAME_LENGTH = 255
 MAX_PATH_LENGTH = 4096  # Maximum path length (POSIX limit)
 MAX_FILE_SIZE_FOR_GIT_DIFF = 1024 * 1024
@@ -746,11 +721,6 @@ ENV_VAR_REGISTRY: dict[str, tuple[str, str]] = {
     'GRINTA_DISABLE_AUTO_LSP_DIAGNOSTICS': (
         '',
         'Set to 1 to disable the post-edit LSP diagnostics middleware',
-    ),
-    # API versioning
-    'APP_PERMISSIVE_API': (
-        '',
-        "Set to '1' to allow unversioned /api/ routes (deprecated)",
     ),
 }
 

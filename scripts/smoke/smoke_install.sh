@@ -5,10 +5,10 @@
 # fresh Python environment. Run inside a Docker container or a throwaway venv.
 #
 # Usage:
-#   ./scripts/smoke_install.sh                 # base install only
-#   ./scripts/smoke_install.sh rag             # base + [rag]
-#   ./scripts/smoke_install.sh rag browser     # base + multiple extras
-#   ./scripts/smoke_install.sh all             # everything
+#   ./scripts/smoke/smoke_install.sh                 # base install only
+#   ./scripts/smoke/smoke_install.sh rag             # base + [rag]
+#   ./scripts/smoke/smoke_install.sh rag browser     # base + multiple extras
+#   ./scripts/smoke/smoke_install.sh all             # everything
 set -euo pipefail
 
 EXTRAS="${*:-}"

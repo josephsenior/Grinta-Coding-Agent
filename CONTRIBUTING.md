@@ -136,8 +136,8 @@ For packaging / onboarding smoke (wheel + source non-interactive checks):
 
 ```bash
 uv build --wheel
-WHEEL_DIR=./dist ./scripts/smoke_install.sh
-./scripts/smoke_source_onboarding.sh
+WHEEL_DIR=./dist ./scripts/smoke/smoke_install.sh
+./scripts/smoke/smoke_source_onboarding.sh
 ```
 
 Maintainers: see [docs/onboarding_reports/](docs/onboarding_reports/) for GA fresh-machine evidence.

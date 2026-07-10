@@ -917,11 +917,11 @@ def detect_lsp_servers() -> dict[str, DetectedTool]:
 def detect_debug_adapters_summary() -> list[dict]:
     """Return the canonical DAP adapter detection list.
 
-    Thin pass-through to :func:`backend.execution.debugger.detect_debug_adapters`
+    Thin pass-through to :func:`backend.execution.dap.detect_debug_adapters`
     so callers don't need to know which module owns the registry.
     """
     try:
-        from backend.execution.server.debugger import detect_debug_adapters
+        from backend.execution.dap import detect_debug_adapters
 
         return detect_debug_adapters()
     except Exception as exc:

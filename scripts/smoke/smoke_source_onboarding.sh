@@ -5,7 +5,7 @@
 # behavior. Interactive init + first task remain manual (see docs/onboarding_reports/).
 #
 # Usage (from repo root):
-#   ./scripts/smoke_source_onboarding.sh
+#   ./scripts/smoke/smoke_source_onboarding.sh
 set -euo pipefail
 
 echo "==> Source onboarding smoke: sync base profile"

@@ -292,11 +292,11 @@ class TestExitCodes:
                         return_value=[],
                     ):
                         with patch(
-                            'backend.cli.onboarding.init_wizard.Prompt.ask',
-                            side_effect=['openai', 'test-model', '', ''],
+                            'rich.prompt.Prompt.ask',
+                            side_effect=['1', '1', 'test-key', ''],
                         ):
                             with patch(
-                                'backend.cli.onboarding.init_wizard.Confirm.ask',
+                                'rich.prompt.Confirm.ask',
                                 return_value=True,
                             ):
                                 with patch(

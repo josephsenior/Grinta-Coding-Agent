@@ -8,13 +8,10 @@ NOTE: this executes inside the local runtime environment.
 from __future__ import annotations
 
 import asyncio
-import os
 import re
 import time
-from collections.abc import Callable, Coroutine
-from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 # Fail fast when invoked as a module script. Keeping this guard before heavy
 # imports prevents startup hangs/timeouts in retired-entrypoint checks.
@@ -24,21 +21,13 @@ if __name__ == '__main__':
         'backend.execution.action_execution_server is retired.'
     )
 
-from fastapi import FastAPI
-from pydantic import BaseModel
-
 from backend.core.logging.logger import app_logger as logger
 from backend.core.os_capabilities import OS_CAPS
-from backend.execution.mcp.proxy import MCPProxyManager
+from backend.execution.dap import DAPDebugManager
 from backend.execution.plugin_loader import init_plugins
 from backend.execution.plugins import Plugin
 from backend.execution.server.action_execution_server_io import (
     RuntimeExecutorIOAndTerminalMixin,
-)
-from backend.execution.server.debugger import DAPDebugManager
-from backend.execution.server.routes import (
-    register_exception_handlers,
-    register_routes,
 )
 from backend.execution.utils.file_editor import FileEditor
 from backend.execution.utils.memory_monitor import MemoryMonitor
@@ -112,12 +101,6 @@ def try_compile_user_regex(
 # Note: Import is deferred to avoid executing windows_bash.py on non-Windows platforms
 if OS_CAPS.is_windows:
     pass
-
-
-class ActionRequest(BaseModel):
-    """Incoming action execution request envelope sent to runtime server."""
-
-    event: dict[str, Any]
 
 
 class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
@@ -516,129 +499,5 @@ class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
             self._native_browser = None
 
 
-# Initialize global variables for client and proxies
+# Initialize global variables for client (retained for backward compatibility/TUI reference)
 client: RuntimeExecutor | None = None
-mcp_proxy_manager: MCPProxyManager | None = None
-initialization_task: asyncio.Task[None] | None = None
-
-
-# Initializers for routes
-def get_client() -> RuntimeExecutor:
-    if client is None:
-        logger.warning('Runtime executor not initialized')
-        raise ReferenceError('Runtime executor not initialized')
-    return client
-
-
-def get_mcp_proxy() -> MCPProxyManager | None:
-    return mcp_proxy_manager
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Manage FastAPI application lifespan."""
-    global initialization_task
-    logger.info('Starting server (prewarm check for local models)...')
-
-    # Run prewarm check synchronously (in a thread) so we fail startup fast if
-    # prebundled model artifacts are missing.
-    try:
-        from backend.utils.model_prewarm import (
-            ensure_models_available,
-            get_default_models_to_prewarm,
-        )
-
-        prebundle_env = os.getenv('PREBUNDLED_MODELS', '')
-        models = get_default_models_to_prewarm()
-        if prebundle_env:
-            models += [m.strip() for m in prebundle_env.split(',') if m.strip()]
-        # snapshot_download is blocking; run it in a thread to avoid blocking the loop.
-        await asyncio.to_thread(ensure_models_available, models, True)
-        logger.info('Prewarm check succeeded: required models available locally')
-    except Exception as e:
-        logger.error('Prewarm model check failed: %s', e, exc_info=True)
-        # Raise to prevent yielding readiness — startup should fail fast when artifacts are missing.
-        raise
-
-    # Start initialization in background task
-    initialize_background = globals().get('_initialize_background')
-    if callable(initialize_background):
-        initialize_background_fn = cast(
-            Callable[[FastAPI], Coroutine[Any, Any, None]], initialize_background
-        )
-    else:
-
-        async def _noop_initialize(_: FastAPI) -> None:
-            return
-
-        initialize_background_fn = _noop_initialize
-    initialization_task = asyncio.create_task(initialize_background_fn(app))
-
-    # Yield after prewarm so server can start accepting requests
-    yield
-
-    # Cleanup on shutdown
-    logger.info('Shutting down...')
-    global mcp_proxy_manager, client
-    if initialization_task and not initialization_task.done():
-        logger.info('Cancelling initialization task...')
-        initialization_task.cancel()
-        try:
-            await initialization_task
-        except asyncio.CancelledError:
-            pass
-
-    logger.info('Shutting down MCP Proxy Manager...')
-    if mcp_proxy_manager:
-        try:
-            # MCP Proxy doesn't have a close/cleanup method?
-            # It handles cleanup via destructors usually or just stops.
-            # Original code just deleted it.
-            # We'll check if it has a cleanup method?
-            pass
-        except Exception:
-            pass
-
-    logger.info('Closing RuntimeExecutor...')
-    if client:
-        try:
-            client.close()
-            logger.info('RuntimeExecutor closed successfully.')
-        except Exception as e:
-            logger.error('Error closing RuntimeExecutor: %s', e, exc_info=True)
-
-    logger.info('Shutdown complete.')
-
-
-app = FastAPI(lifespan=lifespan)
-register_exception_handlers(app)
-register_routes(app, get_client, get_mcp_proxy)
-
-
-def get_uvicorn_json_log_config() -> dict[str, Any]:
-    """Return a minimal uvicorn log configuration."""
-    return {
-        'version': 1,
-        'disable_existing_loggers': False,
-        'formatters': {
-            'default': {
-                'format': '%(levelname)s %(asctime)s %(name)s %(message)s',
-                'use_colors': None,
-            },
-            'access': {
-                'format': '%(levelname)s %(asctime)s %(message)s',
-                'use_colors': None,
-            },
-        },
-        'handlers': {
-            'default': {
-                'class': 'logging.StreamHandler',
-                'formatter': 'default',
-            }
-        },
-        'loggers': {
-            'uvicorn': {'handlers': ['default'], 'level': 'INFO'},
-            'uvicorn.error': {'handlers': ['default'], 'level': 'INFO'},
-            'uvicorn.access': {'handlers': ['default'], 'level': 'INFO'},
-        },
-    }

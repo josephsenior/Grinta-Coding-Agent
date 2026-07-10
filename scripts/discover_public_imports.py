@@ -78,7 +78,6 @@ KNOWN_MONOLITHS: tuple[str, ...] = (
     'backend.cli.repl',
     'backend.inference.clients',
     'backend.inference.fn_call',
-    'backend.execution.server.debugger',
     'backend.cli.theme',
 )
 

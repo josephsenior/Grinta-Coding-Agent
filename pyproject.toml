@@ -30,7 +30,6 @@ dependencies = [
   "binaryornot>=0.4.4,<0.7",
   "chardet>=3.0.2,<8",
   "charset-normalizer>=2,<4",
-  "fastapi>=0.115,<1",
   "fastmcp>=3.2,<4",
   "google-genai>=0.1",
   "httpx>=0.27,<1",
@@ -52,21 +51,18 @@ dependencies = [
   "python-dotenv>=1.2.2,<2",
   "python-frontmatter>=1.1,<2",
   "python-json-logger>=3.2.1,<5",
-  "python-multipart>=0.0.20,<1",
   "python-pptx>=1,<2",
   "pywinpty>=2,<4; sys_platform=='win32'",
   "rapidfuzz>=3.9,<4",
   "requests>=2.32.4,<3",
   "rich>=14,<16",
   "ripgrep==15.1; sys_platform != 'win32'",
-  "starlette>=1.0.1,<2",
   "tenacity>=8.5,<10",
   "termcolor>=3.1,<4",
   "textual>=1,<9",
   "tree-sitter>=0.24,<0.27",
   "tree-sitter-language-pack>=0.7.3,<1.13",
   "urllib3>=2.7,<3",
-  "uvicorn>=0.30,<1",
 ]
 
 optional-dependencies.all = [
@@ -208,7 +204,7 @@ lint.per-file-ignores."backend/tests/**" = [
 ]
 lint.per-file-ignores."backend/tests/unit/cli/**/_shared.py" = [ "F401" ]
 lint.per-file-ignores."packaging/vulture_whitelist.py" = [ "F821" ]
-lint.flake8-bugbear.extend-immutable-calls = [ "Depends", "fastapi.Depends", "fastapi.params.Depends" ]
+lint.flake8-bugbear.extend-immutable-calls = [ "Depends" ]
 lint.flake8-quotes.docstring-quotes = "double"
 lint.flake8-quotes.inline-quotes = "single"
 lint.pydocstyle.convention = "google"

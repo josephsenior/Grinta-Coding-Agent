@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable
 
-from backend.execution.server.debugger import DAPDebugManager
+from backend.execution.dap import DAPDebugManager
 from backend.ledger.action import (
     CmdRunAction,
     DebuggerAction,

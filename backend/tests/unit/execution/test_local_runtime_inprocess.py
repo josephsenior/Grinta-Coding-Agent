@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from backend.core.config.mcp_config import MCPConfig, MCPServerConfig
 from backend.core.constants import (
     CMD_PENDING_ACTION_TIMEOUT_FLOOR,
     TOOL_BRIDGE_TIMEOUT_BUFFER,
@@ -266,6 +268,63 @@ def test_list_files_allows_workspace_grinta_root_playbooks(tmp_path) -> None:
     runtime._executor = executor
 
     assert runtime.list_files(str(playbooks_dir)) == ['starter.md']
+
+
+def test_get_mcp_config_merges_extra_servers_and_updates_executor() -> None:
+    runtime = _make_runtime()
+    base = MCPConfig(
+        enabled=True,
+        servers=[
+            MCPServerConfig(name='base', type='sse', url='http://127.0.0.1:8010/mcp')
+        ],
+    )
+    extra = MCPServerConfig(name='extra', type='stdio', command='node')
+    executor = SimpleNamespace(_mcp_config=None)
+    runtime.config.mcp = base
+    runtime._mcp_config = base
+    runtime._executor = executor  # type: ignore[assignment]
+
+    cfg = runtime.get_mcp_config([extra])
+
+    assert [server.name for server in cfg.servers] == ['base', 'extra']
+    assert runtime._mcp_config is cfg
+    assert executor._mcp_config is cfg
+
+
+@pytest.mark.asyncio
+async def test_reload_mcp_delegates_to_runtime_executor() -> None:
+    runtime = _make_runtime()
+    cfg = MCPConfig(enabled=True, servers=[])
+    summary = {
+        'added': ['tool'],
+        'removed': [],
+        'reconnected': [],
+        'unchanged': [],
+        'failed': [],
+    }
+    executor = SimpleNamespace(
+        _mcp_config=None,
+        _mcp_clients=[],
+        _mcp_servers_resolved=[],
+    )
+
+    async def _reload_mcp() -> dict[str, list[str]]:
+        executor._mcp_clients = ['client']
+        executor._mcp_servers_resolved = ['server']
+        return summary
+
+    executor.reload_mcp = AsyncMock(side_effect=_reload_mcp)
+    runtime.config.mcp = cfg
+    runtime._mcp_config = cfg
+    runtime._executor = executor  # type: ignore[assignment]
+
+    result = await runtime.reload_mcp()
+
+    assert result == summary
+    executor.reload_mcp.assert_awaited_once()
+    assert executor._mcp_config is cfg
+    assert runtime._mcp_clients == ['client']
+    assert runtime._mcp_servers_resolved == ['server']
 
 
 def test_cmd_run_bridge_timeout_aligns_with_default_cmd_floor() -> None:

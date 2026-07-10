@@ -221,8 +221,8 @@ run-cli:
 smoke-onboarding:
 	@echo "$(YELLOW)Running onboarding smoke checks (wheel + source)...$(RESET)"
 	@uv build --wheel
-	@WHEEL_DIR=./dist ./scripts/smoke_install.sh
-	@./scripts/smoke_source_onboarding.sh
+	@WHEEL_DIR=./dist ./scripts/smoke/smoke_install.sh
+	@./scripts/smoke/smoke_source_onboarding.sh
 	@echo "$(GREEN)Onboarding smoke checks completed.$(RESET)"
 
 .PHONY: run

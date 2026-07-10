@@ -298,6 +298,42 @@ class TestExceptionHandlerService(unittest.IsolatedAsyncioTestCase):
         reported_exc = call_args[0]
         self.assertIsInstance(reported_exc, RuntimeError)
 
+    @patch('backend.orchestration.services.exception_handler_service.logger')
+    async def test_handle_step_exception_transient_logging(self, mock_logger):
+        """Test handle_step_exception logs transient exceptions as warnings without tracebacks."""
+        exc = APIConnectionError('Connection timed out')
+
+        await self.service.handle_step_exception(exc)
+
+        # Should log as warning on the controller
+        self.mock_controller.log.assert_called_once_with(
+            'warning',
+            'Transient error during agent run (session test-controller): Connection timed out',
+            extra={'exception_type': 'APIConnectionError'},
+        )
+
+        # Should log warning using logger, and NOT error
+        mock_logger.warning.assert_called_once()
+        mock_logger.error.assert_not_called()
+
+    @patch('backend.orchestration.services.exception_handler_service.logger')
+    async def test_handle_step_exception_non_transient_logging(self, mock_logger):
+        """Test handle_step_exception logs non-transient exceptions as errors with tracebacks."""
+        exc = ValueError('Invalid argument')
+
+        await self.service.handle_step_exception(exc)
+
+        # Should log as error on the controller
+        self.mock_controller.log.assert_called_once_with(
+            'error',
+            'Error while running the agent (session test-controller): Invalid argument',
+            extra={'exception_type': 'ValueError'},
+        )
+
+        # Should log error using logger, and NOT warning
+        mock_logger.error.assert_called()
+        mock_logger.warning.assert_not_called()
+
 
 if __name__ == '__main__':
     unittest.main()

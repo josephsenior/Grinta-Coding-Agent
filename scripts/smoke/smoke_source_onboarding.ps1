@@ -1,7 +1,7 @@
 # Automated smoke for the contributor / source-checkout onboarding path.
 #
 # Usage (from repo root):
-#   .\scripts\smoke_source_onboarding.ps1
+#   .\scripts\smoke\smoke_source_onboarding.ps1
 
 $ErrorActionPreference = 'Stop'
 

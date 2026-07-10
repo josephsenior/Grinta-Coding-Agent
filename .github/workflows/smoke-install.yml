@@ -40,21 +40,21 @@ jobs:
       - name: Run wheel smoke install (Unix)
         if: runner.os != 'Windows'
         run: |
-          chmod +x scripts/smoke_install.sh scripts/smoke_source_onboarding.sh scripts/smoke/*.sh
-          WHEEL_DIR=./dist ./scripts/smoke_install.sh
+          chmod +x scripts/smoke/*.sh
+          WHEEL_DIR=./dist ./scripts/smoke/smoke_install.sh
 
       - name: Run wheel smoke install (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $env:WHEEL_DIR = '.\dist'
-          .\scripts\smoke_install.ps1
+          .\scripts\smoke\smoke_install.ps1
 
       - name: Run source onboarding smoke (Unix)
         if: runner.os != 'Windows'
-        run: ./scripts/smoke_source_onboarding.sh
+        run: ./scripts/smoke/smoke_source_onboarding.sh
 
       - name: Run source onboarding smoke (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: .\scripts\smoke_source_onboarding.ps1
+        run: .\scripts\smoke\smoke_source_onboarding.ps1

@@ -72,8 +72,8 @@ uv run pytest -m integration backend/tests/integration/test_cli_entry_integratio
 
 ```bash
 uv build --wheel
-WHEEL_DIR=./dist ./scripts/smoke_install.sh
-./scripts/smoke_source_onboarding.sh
+WHEEL_DIR=./dist ./scripts/smoke/smoke_install.sh
+./scripts/smoke/smoke_source_onboarding.sh
 ```
 
 ### RC / GA (stronger gates)

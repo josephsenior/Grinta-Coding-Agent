@@ -8,10 +8,7 @@ from backend.core.config.app_config import (
     GitIdentityConfig,
     TrajectoryConfig,
 )
-from backend.core.config.arg_utils import (
-    get_cli_parser,
-    get_headless_parser,
-)
+from backend.core.config.arg_utils import get_headless_parser
 from backend.core.config.cli_config import get_llm_config_arg
 from backend.core.config.config_loader import (
     finalize_config,
@@ -49,7 +46,6 @@ __all__ = [
     'RuntimeConfig',
     'SecurityConfig',
     'finalize_config',
-    'get_cli_parser',
     'get_field_info',
     'get_headless_parser',
     'get_llm_config_arg',

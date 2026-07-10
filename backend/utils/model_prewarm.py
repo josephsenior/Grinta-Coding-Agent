@@ -1,7 +1,7 @@
 """Model prewarm utilities for required Hugging Face repos.
 
 This module ensures required models are available in the local HF cache (snapshot)
-and provides a small helper used by the FastAPI startup lifespan to fail fast when
+and provides a small helper that startup checks can use to fail fast when
 prebundled models are missing.
 
 It intentionally runs huggingface_hub.snapshot_download with local_files_only=True

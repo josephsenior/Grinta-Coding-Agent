@@ -35,7 +35,7 @@
 ## Friction log
 
 - Automated contributor smoke validates source bootstrap and stub agent task; interactive GA still requires fresh VM evidence.
-- Run `.\scripts\smoke_source_onboarding.ps1` from repo root to reproduce.
+- Run `.\scripts\smoke\smoke_source_onboarding.ps1` from repo root to reproduce.
 
 ## Sign-off
 
