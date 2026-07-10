@@ -814,6 +814,7 @@ class TestGetCallKwargs:
             is_stream=True,
             provider=None,
             caching_prompt=True,
+            prompt_cache_variant=None,
         )
         mock_sanitize.assert_called_once_with(
             'google/gemini-2.5-pro', mock_apply_overrides.return_value

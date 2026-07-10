@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from backend.context.prompt.turn_context import wrap_turn_context
 from backend.engine.planner import (
     OrchestratorPlanner,
 )
@@ -473,6 +474,10 @@ class TestBuildLlmParams:
                     'content': '<RUNTIME_INFORMATION>repo</RUNTIME_INFORMATION>',
                 },
                 {'role': 'user', 'content': '<CONTEXT_PACKET>state</CONTEXT_PACKET>'},
+                {
+                    'role': 'system',
+                    'content': wrap_turn_context('Current mode: AGENT', kind='control'),
+                },
                 {'role': 'user', 'content': 'latest user task'},
             ],
             'tools': [
@@ -492,9 +497,151 @@ class TestBuildLlmParams:
         assert accounting['static_prompt_tokens'] > 0
         assert accounting['tool_schema_tokens'] > 0
         assert accounting['context_packet_tokens'] > 0
+        assert accounting['turn_context_tokens'] > 0
         assert accounting['dynamic_history_tokens'] > 0
         assert 100_000 < accounting['usable_input_tokens'] <= 120_000
         assert accounting['full_request_tokens'] > accounting['dynamic_history_tokens']
+
+    def test_prior_turn_context_is_restored_as_an_append_only_prefix(self):
+        p = _make_planner(
+            config=_make_config(enable_coding_preflight=False, enable_repo_map=False)
+        )
+        state = _make_state()
+        state.turn_signals.planning_directive = 'Inspect the auth boundary first.'
+
+        first_messages = [
+            {'role': 'system', 'content': 'stable system'},
+            {
+                'role': 'system',
+                'content': wrap_turn_context('MCP v1', kind='mcp-catalog'),
+            },
+            {'role': 'user', 'content': 'Fix auth'},
+        ]
+        with patch('backend.engine.planner.check_tools', return_value=[]):
+            first = p.build_llm_params(first_messages, state, [])
+
+        state.turn_signals.planning_directive = None
+        second_messages = [
+            {'role': 'system', 'content': 'stable system'},
+            {'role': 'user', 'content': 'Fix auth'},
+            {'role': 'assistant', 'content': 'I inspected it.'},
+            {
+                'role': 'system',
+                'content': wrap_turn_context('MCP v2', kind='mcp-catalog'),
+            },
+            {'role': 'user', 'content': 'Continue'},
+        ]
+        with patch('backend.engine.planner.check_tools', return_value=[]):
+            second = p.build_llm_params(second_messages, state, [])
+
+        first_request = first['messages']
+        second_request = second['messages']
+        assert second_request[: len(first_request)] == first_request
+        assert second_request[-1] == {'role': 'user', 'content': 'Continue'}
+        assert first['_prompt_cache_variant'] == second['_prompt_cache_variant']
+
+    def test_same_turn_retry_does_not_duplicate_context(self):
+        p = _make_planner(
+            config=_make_config(enable_coding_preflight=False, enable_repo_map=False)
+        )
+        state = _make_state()
+        messages = [
+            {'role': 'system', 'content': 'stable system'},
+            {'role': 'user', 'content': 'Retry this'},
+        ]
+
+        with patch('backend.engine.planner.check_tools', return_value=[]):
+            first = p.build_llm_params(messages, state, [])
+            retry = p.build_llm_params(messages, state, [])
+
+        assert retry['messages'] == first['messages']
+        context_blocks = [
+            message
+            for message in retry['messages']
+            if '<GRINTA_TURN_CONTEXT' in str(message.get('content', ''))
+        ]
+        assert len(context_blocks) == 1
+
+    def test_tool_loop_continuation_keeps_original_turn_prefix(self):
+        p = _make_planner(
+            config=_make_config(enable_coding_preflight=False, enable_repo_map=False)
+        )
+        state = _make_state()
+        messages = [
+            {'role': 'system', 'content': 'stable system'},
+            {'role': 'user', 'content': 'Inspect auth'},
+        ]
+
+        with patch('backend.engine.planner.check_tools', return_value=[]):
+            first = p.build_llm_params(messages, state, [])
+
+        continuation = [
+            *messages,
+            {'role': 'assistant', 'content': 'Calling read_file'},
+            {
+                'role': 'tool',
+                'name': 'read_file',
+                'tool_call_id': 'call-1',
+                'content': 'file contents',
+            },
+        ]
+        with patch('backend.engine.planner.check_tools', return_value=[]):
+            second = p.build_llm_params(continuation, state, [])
+
+        assert second['messages'][: len(first['messages'])] == first['messages']
+        assert second['messages'][-1]['role'] == 'tool'
+
+    def test_new_continuation_directive_is_appended_after_tool_history(self):
+        p = _make_planner(
+            config=_make_config(enable_coding_preflight=False, enable_repo_map=False)
+        )
+        state = _make_state()
+        messages = [
+            {'role': 'system', 'content': 'stable system'},
+            {'role': 'user', 'content': 'Inspect auth'},
+        ]
+        with patch('backend.engine.planner.check_tools', return_value=[]):
+            first = p.build_llm_params(messages, state, [])
+
+        state.turn_signals.planning_directive = 'Try a narrower search.'
+        continuation = [
+            *messages,
+            {'role': 'assistant', 'content': 'Calling grep'},
+            {'role': 'tool', 'content': 'no matches'},
+        ]
+        with patch('backend.engine.planner.check_tools', return_value=[]):
+            second = p.build_llm_params(continuation, state, [])
+
+        assert second['messages'][: len(first['messages'])] == first['messages']
+        assert second['messages'][-2]['role'] == 'tool'
+        assert second['messages'][-1]['role'] == 'system'
+        assert 'Try a narrower search.' in second['messages'][-1]['content']
+
+    def test_prompt_cache_variant_tracks_only_stable_prefix_and_tools(self):
+        p = _make_planner()
+        base = [
+            {'role': 'system', 'content': 'stable system'},
+            {
+                'role': 'system',
+                'content': wrap_turn_context('turn one', kind='control'),
+            },
+            {'role': 'user', 'content': 'task'},
+        ]
+        changed_tail = [
+            {'role': 'system', 'content': 'stable system'},
+            {
+                'role': 'system',
+                'content': wrap_turn_context('turn two', kind='control'),
+            },
+            {'role': 'user', 'content': 'different task'},
+        ]
+
+        assert p._build_prompt_cache_variant(base, []) == p._build_prompt_cache_variant(
+            changed_tail, []
+        )
+        assert p._build_prompt_cache_variant(base, []) != p._build_prompt_cache_variant(
+            [{'role': 'system', 'content': 'different system'}], []
+        )
 
     def test_injects_control_message_before_last_user(self):
         p = _make_planner()

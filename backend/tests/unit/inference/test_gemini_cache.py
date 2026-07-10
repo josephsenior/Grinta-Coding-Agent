@@ -47,6 +47,11 @@ class TestGeminiCacheManager(unittest.TestCase):
         h2 = self.manager._get_hash(None, [{'role': 'user', 'content': 'y'}])
         self.assertNotEqual(h1, h2)
 
+    def test_hash_changes_with_model(self):
+        h1 = self.manager._get_hash('sys', [], model='gemini-a')
+        h2 = self.manager._get_hash('sys', [], model='gemini-b')
+        self.assertNotEqual(h1, h2)
+
     def test_hash_none_system(self):
         h = self.manager._get_hash(None, [])
         self.assertIsInstance(h, str)
@@ -180,8 +185,10 @@ class TestGeminiCacheManager(unittest.TestCase):
             system_instruction='test',
             messages=[],
         )
-        h = self.manager._get_hash('test', [])
+        h = self.manager._get_hash('test', [], model='gemini-1.5-pro')
         self.assertEqual(self.manager._caches[h], 'cache/stored')
+        call_kwargs = self.mock_client.caches.create.call_args.kwargs
+        self.assertNotIn('contents', call_kwargs)
 
     @patch('backend.inference.caching.gemini_cache.time')
     def test_default_ttl(self, mock_time):

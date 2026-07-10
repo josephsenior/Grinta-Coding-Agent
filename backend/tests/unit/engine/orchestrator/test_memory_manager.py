@@ -434,8 +434,9 @@ class TestBuildMessages:
         llm_config.model = 'claude-sonnet-4-6'
         llm_config.caching_prompt = True
 
-        m.build_messages([], MagicMock(), llm_config)
+        messages = m.build_messages([], MagicMock(), llm_config)
         assert tc.cache_prompt is True
+        assert messages[0].cache_enabled is True
 
     def test_sets_cache_prompt_on_last_user_message(self):
         from backend.core.message import Message, TextContent
@@ -455,8 +456,9 @@ class TestBuildMessages:
         llm_config.model = 'anthropic/claude-sonnet-4-6'
         llm_config.caching_prompt = True
 
-        m.build_messages([], MagicMock(), llm_config)
+        messages = m.build_messages([], MagicMock(), llm_config)
         assert user_tc.cache_prompt is True
+        assert messages[-1].cache_enabled is True
 
     def test_does_not_set_cache_prompt_for_openai_model(self):
         from backend.core.message import Message, TextContent

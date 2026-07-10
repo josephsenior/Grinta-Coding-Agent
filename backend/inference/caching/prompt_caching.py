@@ -168,7 +168,12 @@ def should_mark_messages_for_prompt_cache(
     return mode in {PROMPT_CACHE_EXPLICIT_HINTS, PROMPT_CACHE_EXPLICIT_RESOURCE}
 
 
-def implicit_prompt_cache_key(entry: ModelEntry) -> str:
+def implicit_prompt_cache_key(
+    entry: ModelEntry,
+    *,
+    variant: str | None = None,
+) -> str:
     """Stable routing key for OpenAI-style implicit prompt caching."""
     model_id = runtime_model_id(entry)
-    return f'grinta:{entry.provider}:{model_id}'
+    base = f'grinta:{entry.provider}:{model_id}'
+    return f'{base}:{variant}' if variant else base

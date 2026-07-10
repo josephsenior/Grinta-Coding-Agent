@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from backend.inference.caching.prompt_caching import (
+    implicit_prompt_cache_key,
     model_supports_explicit_resource_cache,
     model_supports_prompt_cache_hints,
     model_uses_implicit_prompt_cache,
@@ -98,6 +99,24 @@ def test_apply_model_param_overrides_sets_prompt_cache_key_for_implicit() -> Non
         caching_prompt=False,
     )
     assert 'prompt_cache_key' not in disabled
+
+
+def test_implicit_prompt_cache_key_includes_stable_prefix_variant() -> None:
+    entry = lookup('gpt-5')
+    assert entry is not None
+
+    assert implicit_prompt_cache_key(entry, variant='abc123') == (
+        'grinta:openai:gpt-5:abc123'
+    )
+
+    out = apply_model_param_overrides(
+        'gpt-5',
+        {},
+        provider='openai',
+        caching_prompt=True,
+        prompt_cache_variant='abc123',
+    )
+    assert out['prompt_cache_key'] == 'grinta:openai:gpt-5:abc123'
 
 
 def test_strip_prompt_cache_hints_from_messages() -> None:

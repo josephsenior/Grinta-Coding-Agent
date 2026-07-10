@@ -1059,6 +1059,7 @@ def apply_model_param_overrides(
     *,
     provider: str | None = None,
     caching_prompt: bool = True,
+    prompt_cache_variant: str | None = None,
 ) -> dict:
     """Apply data-driven model-specific parameter overrides from the catalog."""
     entry = lookup(model)
@@ -1091,7 +1092,12 @@ def apply_model_param_overrides(
     if entry.supports_parallel_tool_calls and 'parallel_tool_calls' not in call_kwargs:
         call_kwargs['parallel_tool_calls'] = True
 
-    _apply_prompt_cache_call_kwargs(entry, call_kwargs, caching_prompt=caching_prompt)
+    _apply_prompt_cache_call_kwargs(
+        entry,
+        call_kwargs,
+        caching_prompt=caching_prompt,
+        prompt_cache_variant=prompt_cache_variant,
+    )
 
     return call_kwargs
 
@@ -1101,6 +1107,7 @@ def _apply_prompt_cache_call_kwargs(
     call_kwargs: dict,
     *,
     caching_prompt: bool,
+    prompt_cache_variant: str | None = None,
 ) -> None:
     if not caching_prompt or entry.prompt_cache_mode != 'implicit':
         return
@@ -1108,7 +1115,10 @@ def _apply_prompt_cache_call_kwargs(
         return
     from backend.inference.caching.prompt_caching import implicit_prompt_cache_key
 
-    call_kwargs['prompt_cache_key'] = implicit_prompt_cache_key(entry)
+    call_kwargs['prompt_cache_key'] = implicit_prompt_cache_key(
+        entry,
+        variant=prompt_cache_variant,
+    )
 
 
 def _apply_thinking_disabled(call_kwargs: dict, entry: ModelEntry) -> None:

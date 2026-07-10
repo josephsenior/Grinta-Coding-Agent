@@ -19,6 +19,7 @@ from backend.context.prompt.message_formatting import (
     message_with_text,
     remove_duplicate_system_prompt_user,
 )
+from backend.context.prompt.turn_context import is_turn_context_text
 from backend.core.message import Message, TextContent
 from backend.inference.tool_support.tool_result_format import decode_tool_result_payload
 from backend.integrations.mcp.mcp_utils import call_tool_mcp
@@ -126,12 +127,41 @@ class TestMcpUserAddendum:
 
         assert normalized[0].role == 'system'
         assert normalized[1].role == 'system'
-        assert (
-            extract_first_text(normalized[1])
-            == '<MCP_TOOLS>\n`github_search`\n</MCP_TOOLS>'
-        )
+        mcp_text = extract_first_text(normalized[1])
+        assert is_turn_context_text(mcp_text)
+        assert '<MCP_TOOLS>\n`github_search`\n</MCP_TOOLS>' in mcp_text
         assert normalized[2].role == 'user'
         assert extract_first_text(normalized[2]) == 'Implement the fix'
+
+    def test_dynamic_snapshots_do_not_modify_leading_system_prefix(self):
+        mem = _make_memory()
+        prompt_manager = cast(MagicMock, mem.prompt_manager)
+        prompt_manager.get_mcp_user_addendum.return_value = '<MCP_TOOLS>live</MCP_TOOLS>'
+        mem.get_context_summary = MagicMock(  # type: ignore[method-assign]
+            return_value='<SESSION_CONTEXT>now</SESSION_CONTEXT>'
+        )
+
+        normalized = mem._normalize_system_messages(
+            [_text_msg('user', 'Implement the fix')]
+        )
+
+        assert extract_first_text(normalized[0]) == (
+            'You are Grinta, an expert AI coding agent.'
+        )
+        assert [message.role for message in normalized] == [
+            'system',
+            'system',
+            'system',
+            'user',
+        ]
+        assert all(
+            is_turn_context_text(extract_first_text(message))
+            for message in normalized[1:3]
+        )
+        assert '<MCP_TOOLS>live</MCP_TOOLS>' in extract_first_text(normalized[1])
+        assert '<SESSION_CONTEXT>now</SESSION_CONTEXT>' in extract_first_text(
+            normalized[2]
+        )
 
 
 class TestToolResultPropagation:

@@ -349,7 +349,7 @@ class TestAnthropicClientHelpers:
         assert kwargs['system'] == 'Be helpful'
         assert kwargs['model'] == 'claude-3'
 
-    def test_prepare_kwargs_combines_all_system_messages(self):
+    def test_prepare_kwargs_combines_leading_system_messages(self):
         from backend.inference.mappers.anthropic import prepare_kwargs
 
         messages = [
@@ -362,6 +362,48 @@ class TestAnthropicClientHelpers:
 
         assert filtered == [{'role': 'user', 'content': 'What mode are you in?'}]
         assert kwargs['system'] == 'Base system prompt\n\nCurrent mode: PLAN'
+
+    def test_prepare_kwargs_keeps_late_system_context_in_turn_order(self):
+        from backend.inference.mappers.anthropic import prepare_kwargs
+
+        messages = [
+            {'role': 'system', 'content': 'Base system prompt'},
+            {'role': 'user', 'content': 'First task'},
+            {'role': 'assistant', 'content': 'First answer'},
+            {'role': 'system', 'content': 'Current mode: PLAN'},
+            {'role': 'user', 'content': 'Next task'},
+        ]
+
+        filtered, kwargs = prepare_kwargs(messages, {}, default_model='claude-3')
+
+        assert kwargs['system'] == 'Base system prompt'
+        assert [message['role'] for message in filtered] == [
+            'user',
+            'assistant',
+            'user',
+        ]
+        assert '<GRINTA_TURN_CONTEXT' in filtered[2]['content']
+        assert 'Current mode: PLAN' in filtered[2]['content']
+
+    def test_prepare_kwargs_does_not_promote_adjacent_turn_context(self):
+        from backend.context.prompt.turn_context import wrap_turn_context
+        from backend.inference.mappers.anthropic import prepare_kwargs
+
+        messages = [
+            {'role': 'system', 'content': 'Base system prompt'},
+            {
+                'role': 'system',
+                'content': wrap_turn_context('MCP snapshot', kind='mcp-catalog'),
+            },
+            {'role': 'user', 'content': 'First task'},
+        ]
+
+        filtered, kwargs = prepare_kwargs(messages, {}, default_model='claude-3')
+
+        assert kwargs['system'] == 'Base system prompt'
+        assert [message['role'] for message in filtered] == ['user']
+        assert 'MCP snapshot' in filtered[0]['content']
+        assert 'First task' in filtered[0]['content']
 
     def test_prepare_kwargs_converts_openai_tools_to_anthropic_schema(self):
         from backend.inference.mappers.anthropic import prepare_kwargs
@@ -802,6 +844,71 @@ class TestGeminiClientHelpers:
         assert gemini[0]['role'] == 'user'
         assert gemini[1]['role'] == 'model'
 
+    def test_convert_messages_keeps_late_system_context_out_of_instruction(self):
+        from backend.inference.mappers.gemini import convert_messages
+
+        messages = [
+            {'role': 'system', 'content': 'Stable system'},
+            {'role': 'user', 'content': 'First task'},
+            {'role': 'assistant', 'content': 'First answer'},
+            {'role': 'system', 'content': 'Current mode: PLAN'},
+            {'role': 'user', 'content': 'Next task'},
+        ]
+
+        system, gemini, _caching = convert_messages(messages)
+
+        assert system == 'Stable system'
+        assert [message['role'] for message in gemini] == [
+            'user',
+            'model',
+            'user',
+        ]
+        assert '<GRINTA_TURN_CONTEXT' in gemini[2]['parts'][0]['text']
+
+    def test_convert_messages_does_not_promote_adjacent_turn_context(self):
+        from backend.context.prompt.turn_context import wrap_turn_context
+        from backend.inference.mappers.gemini import convert_messages
+
+        messages = [
+            {'role': 'system', 'content': 'Stable system'},
+            {
+                'role': 'system',
+                'content': wrap_turn_context('MCP snapshot', kind='mcp-catalog'),
+            },
+            {'role': 'user', 'content': 'First task'},
+        ]
+
+        system, gemini, _caching = convert_messages(messages)
+
+        assert system == 'Stable system'
+        assert [message['role'] for message in gemini] == ['user']
+        assert 'MCP snapshot' in gemini[0]['parts'][0]['text']
+        assert 'First task' in gemini[0]['parts'][0]['text']
+
+    def test_gemini_explicit_cache_excludes_growing_history(self):
+        from backend.inference.clients import GeminiClient
+
+        client = GeminiClient.__new__(GeminiClient)
+        client.client = MagicMock()
+        cache_backend = MagicMock()
+        cache_backend.get_or_create_cache_handle.return_value = 'caches/stable'
+
+        with patch(
+            'backend.inference.caching.prompt_cache.get_prompt_cache',
+            return_value=cache_backend,
+        ):
+            cache_name = client._get_gemini_cache_name(
+                True,
+                'gemini-2.5-pro',
+                'Stable system',
+                [{'role': 'user', 'parts': [{'text': 'growing history'}]}],
+            )
+
+        assert cache_name == 'caches/stable'
+        assert (
+            cache_backend.get_or_create_cache_handle.call_args.kwargs['messages'] == []
+        )
+
     def test_extract_generation_config(self):
         from backend.inference.mappers.gemini import extract_generation_config
 
@@ -984,4 +1091,3 @@ class TestBoundedLlmHttpTimeout:
         assert isinstance(kwargs['timeout'], httpx.Timeout)
         assert kwargs['timeout'].read <= 30.0
         assert kwargs['timeout'].connect <= 10.0
-

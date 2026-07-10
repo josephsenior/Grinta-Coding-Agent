@@ -24,6 +24,7 @@ def apply_prompt_cache_hints(messages: list[Message], llm_config: object) -> Non
     for item in first_message.content:
         if isinstance(item, TextContent):
             item.cache_prompt = True
+            first_message.cache_enabled = True
             break
 
     # Stable intermediate anchors: mark the 4th and 8th user messages
@@ -39,6 +40,7 @@ def apply_prompt_cache_hints(messages: list[Message], llm_config: object) -> Non
             for item in msg.content:
                 if isinstance(item, TextContent):
                     item.cache_prompt = True
+                    msg.cache_enabled = True
                     break
         user_msg_idx += 1
         if user_msg_idx > max(_STABLE_USER_CACHE_POSITIONS):
@@ -50,5 +52,6 @@ def apply_prompt_cache_hints(messages: list[Message], llm_config: object) -> Non
         for item in message.content:
             if isinstance(item, TextContent):
                 item.cache_prompt = True
+                message.cache_enabled = True
                 break
         break
