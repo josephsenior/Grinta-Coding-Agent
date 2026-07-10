@@ -128,9 +128,9 @@ _SCAN_LINE_ICONS: dict[str, str] = {
     'Compacting': '◈',
     'Compacted': '◇',
     'Defined': '⊡',
-    'Updated': '⊡',
-    'Viewed': '⊡',
-    'Audited': '⊡',
+    'Updated': '⊜',
+    'Viewed': '⊙',
+    'Audited': '⊠',
 }
 
 

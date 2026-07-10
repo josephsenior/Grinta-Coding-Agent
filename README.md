@@ -33,32 +33,24 @@ Direct link if the video does not load: [`docs/assets/grinta-demo.mp4`](docs/ass
 - If you hit friction, please open an issue with the `RC Feedback` template from the issue chooser.
 - GA criteria and release gate details live in [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md).
 
-## Why Grinta vs the rest
+## What makes Grinta different
 
-|                                                                                   | **Grinta**          | Aider   | Claude Code       | Codex CLI      |
-| --------------------------------------------------------------------------------- | ------------------- | ------- | ----------------- | -------------- |
-| Provider-agnostic (OpenAI / Anthropic / Google / Ollama / LM Studio / OpenRouter) | ✅                  | ✅      | ❌ Anthropic only | ❌ OpenAI only |
-| Local-first (works fully offline w/ Ollama)                                       | ✅ auto-detected    | partial | ❌                | ❌             |
-| LSP integration (auto-discovers 40+ language servers on PATH)                     | ✅                  | ❌      | partial           | ❌             |
-| DAP debugger integration                                                          | ✅ auto-discovered  | ❌      | ❌                | ❌             |
-| Cost / token / latency HUD                                                        | ✅ live             | partial | ❌                | partial        |
-| Stuck-loop + cost-acceleration detection                                          | ✅                  | ❌      | partial           | ❌             |
-| Risk-classified actions + audit log                                               | ✅                  | ❌      | partial           | partial        |
-| Session checkpoint / resume / revert                                              | ✅ event-stream     | ✅ git  | partial           | ❌             |
-| Windows-supported workflow (PowerShell)                                           | ✅                  | partial | partial           | partial        |
-| MCP support                                                                       | ✅                  | ❌      | ✅ strong         | partial        |
-
-The pitch in one sentence: **a local-first coding agent with deeper built-in tooling than most terminal peers, without locking you to a single model vendor.**
+Grinta distinguishes itself by focusing on a completely local-first, provider-agnostic, and deeply integrated terminal workflow. Unlike thin wrappers or cloud-dependent control planes, Grinta:
+- **Operates entirely locally**: Your code, logs, and sessions remain on your machine.
+- **Provider-agnostic**: Connects seamlessly with OpenAI, Anthropic, Google, OpenRouter, Ollama, or LM Studio using a unified interface.
+- **Deep tooling integration**: Automatically discovers and integrates with local Language Servers (LSP) and Debug Adapters (DAP) on your PATH.
+- **Built-in safety rails**: Classifies actions by risk, implements confirmation gates, and masks secrets in console outputs.
+- **Durable long sessions**: Built with an event-stream ledger supporting automatic compaction, manual checkpoints, and easy reverts.
 
 ## Install
 
 **Consumer, dev, Windows, WSL2, Linux, macOS:** [docs/QUICK_START.md](docs/QUICK_START.md)
 
 ```bash
-pipx install grinta-ai    # consumer — then cd "<project>" && grinta
+pipx install grinta    # consumer — then cd "<project>" && grinta
 ```
 
-Optional extras: `pipx install "grinta-ai[rag]"` · `"grinta-ai[browser]"` · `"grinta-ai[all]"` — details in [Quick Start](docs/QUICK_START.md).
+Optional extras: `pipx install "grinta[rag]"` · `"grinta[browser]"` · `"grinta[all]"` — details in [Quick Start](docs/QUICK_START.md).
 
 ## What you get
 

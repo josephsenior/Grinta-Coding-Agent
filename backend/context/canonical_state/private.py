@@ -11,7 +11,6 @@ from backend.context.canonical_state.types import (
     _MAX_BLOCKERS,
     _MAX_FAILED_APPROACHES,
     _MAX_OUTPUT_CHARS,
-    _MAX_PRIOR_OBJECTIVES,
     _MAX_RECENT_WORK,
     _MAX_TASK_PLAN_ITEMS,
     _MAX_VERIFICATION_OUTPUT_CHARS,

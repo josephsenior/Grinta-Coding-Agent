@@ -25,7 +25,7 @@
 
 | Step | Pass / fail | Notes |
 | --- | --- | --- |
-| Install (`pipx install grinta-ai` or source bootstrap) | pass | `python scripts/bootstrap_env.py base` |
+| Install (`pipx install grinta` or source bootstrap) | pass | `python scripts/bootstrap_env.py base` |
 | `grinta init` (interactive wizard) | pass | Non-interactive stdin correctly exits 3 without writing settings |
 | `grinta` TUI launch | skip | Automated smoke uses stub CLI task |
 | First agent task (`/health` or starter prompt) | pass | `scripts/smoke/run_stub_cli_task.ps1 -UseUvRun` |

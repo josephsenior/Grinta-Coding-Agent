@@ -1,6 +1,6 @@
 # Clean-room install smoke-test for Grinta on Windows / PowerShell.
 #
-# Validates that `pip install grinta-ai` and the optional extras install cleanly
+# Validates that `pip install grinta` and the optional extras install cleanly
 # on a fresh Python environment. Mirror of `scripts/smoke_install.sh`.
 #
 # Usage:
@@ -27,7 +27,7 @@ if ($wheels.Count -gt 0) {
     $pkgSpec = $wheels[0].FullName
     Write-Host "==> Using local wheel: $pkgSpec"
 } else {
-    $pkgSpec = 'grinta-ai'
+    $pkgSpec = 'grinta'
     Write-Host "==> Using PyPI: $pkgSpec"
 }
 

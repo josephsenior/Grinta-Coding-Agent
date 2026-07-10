@@ -288,7 +288,6 @@ class TUIRenderer(
         self._streaming_active: bool = False
 
         # Unit test compatibility
-        from backend.cli.tui.constants import _TUI_HISTORY_RENDER_LIMIT
 
         self._history: deque[Any] = deque(maxlen=_TUI_HISTORY_RENDER_LIMIT)
         self._history_items_dropped: int = 0

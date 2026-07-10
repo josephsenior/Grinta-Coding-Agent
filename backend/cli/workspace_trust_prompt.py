@@ -40,7 +40,7 @@ async def maybe_apply_unfamiliar_workspace_hardening(
     if workspace is None:
         return normalize_autonomy_level(get_persisted_autonomy_level(agent_name))
 
-    resolved = workspace.expanduser().resolve()
+    resolved = workspace.expanduser().resolve()  # noqa: ASYNC240
     current = normalize_autonomy_level(get_persisted_autonomy_level(agent_name))
 
     if is_familiar_workspace(resolved):

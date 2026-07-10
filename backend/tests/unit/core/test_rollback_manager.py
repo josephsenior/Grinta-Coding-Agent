@@ -9,7 +9,10 @@ import pytest
 
 pytest.importorskip('pygit2')  # skip entire module if pygit2 not installed
 
-from backend.execution.rollback.rollback_manager import Checkpoint, RollbackManager  # noqa: E402
+from backend.execution.rollback.rollback_manager import (  # noqa: E402
+    Checkpoint,
+    RollbackManager,
+)
 from backend.execution.rollback.shadow_repo import ShadowRepoError  # noqa: E402
 
 # ---------------------------------------------------------------------------

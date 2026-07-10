@@ -643,6 +643,7 @@ ollama pull qwen2.5-coder
 
 - `claude-haiku-4-5-20251001` - 2x faster than Sonnet
 - `gpt-4o-mini` - Fast and cheap
+- `gpt-5.6-luna` - Fastest and most cost-effective GPT-5.6 tier
 - `openrouter/x-ai/grok-code-fast-1` - 2x faster, very cheap
 
 **For quality:**
@@ -650,10 +651,12 @@ ollama pull qwen2.5-coder
 - `claude-sonnet-4-5-20250929` - Best for coding
 - `gpt-5-2025-08-07` - Frontier model
 - `gpt-5.5` - Flagship reasoning + tools
+- `gpt-5.6` / `gpt-5.6-sol` - Latest flagship tiered reasoning model (Sol)
 
 **For cost:**
 
 - `gpt-4o-mini` - $0.15/$0.60 per 1M tokens
+- `gpt-5.6-luna` - $1/$6 per 1M tokens
 - `claude-haiku-4-5-20251001` - $1/$5 per 1M tokens
 - `openrouter/x-ai/grok-code-fast-1` - $0.20/$0.50 per 1M tokens
 

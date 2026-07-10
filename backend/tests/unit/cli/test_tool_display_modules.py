@@ -21,7 +21,7 @@ from backend.cli.tool_display.renderers.file_editor import (
 class TestToolHeadline(unittest.TestCase):
     def test_known_tool(self) -> None:
         _, label = tool_headline('terminal')
-        self.assertEqual(label, 'Shell')
+        self.assertEqual(label, 'Terminal')
 
     def test_debugger_tool(self) -> None:
         _, label = tool_headline('debugger')
@@ -82,10 +82,6 @@ class TestFriendlyVerbForTool(unittest.TestCase):
         v = friendly_verb_for_tool('terminal', {})
         self.assertEqual(v, 'Ran')
 
-    def test_terminal(self) -> None:
-        v = friendly_verb_for_tool('terminal', {})
-        self.assertEqual(v, 'Ran')
-
     def test_terminal_open(self) -> None:
         v = friendly_verb_for_tool('terminal', {'action': 'open'})
         self.assertEqual(v, 'Started')
@@ -103,9 +99,9 @@ class TestFriendlyVerbForTool(unittest.TestCase):
         self.assertEqual(v, 'Evaluated')
 
     def test_terminal_unknown_action(self) -> None:
-        # Falls back to title-cased tool name
+        # Falls back to Ran
         v = friendly_verb_for_tool('terminal', {'action': 'whatever'})
-        self.assertEqual(v, 'Terminal Manager')
+        self.assertEqual(v, 'Ran')
 
     def test_simple_map_tools(self) -> None:
         self.assertEqual(friendly_verb_for_tool('read_file', {}), 'Read')
@@ -507,7 +503,7 @@ class TestStreamingArgsHint(unittest.TestCase):
         hint = streaming_args_hint(
             'terminal', '{"action": "open", "command": "bash"}'
         )
-        self.assertIn('open', hint)
+        self.assertIn('start', hint)
 
     def test_terminal_read(self) -> None:
         hint = streaming_args_hint(

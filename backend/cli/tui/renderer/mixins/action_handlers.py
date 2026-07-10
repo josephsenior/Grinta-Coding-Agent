@@ -6,11 +6,11 @@ import time
 from typing import Any
 
 from backend.cli.display.hud import HUDBar
-from backend.cli.tui.constants import _TUI_STREAM_PAINT_INTERVAL_SECONDS
 from backend.cli.event_rendering.text_utils import (
     sanitize_streaming_thinking_text,
     sanitize_visible_transcript_text,
 )
+from backend.cli.tui.constants import _TUI_STREAM_PAINT_INTERVAL_SECONDS
 from backend.core.enums import (
     AgentState,
     EventSource,

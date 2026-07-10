@@ -371,7 +371,7 @@ def _collect_system_prompt_sections(
         is_windows=is_windows,
         terminal_tool_name=terminal_tool_name,
     )
-    shell_is_powershell = resolved_terminal_tool == 'execute_powershell'
+    shell_is_powershell = is_windows and not windows_with_bash
     lsp_available = _lsp_available(config)
 
     identity_line = (

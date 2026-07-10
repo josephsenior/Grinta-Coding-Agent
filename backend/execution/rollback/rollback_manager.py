@@ -18,8 +18,7 @@ from typing import Any
 
 from backend.core.logging.logger import app_logger as logger
 from backend.core.workspace_resolution import workspace_agent_state_dir
-from backend.execution.rollback.shadow_repo import ShadowRepo, ShadowRepoError
-
+from backend.execution.rollback.shadow_repo import ShadowRepo
 
 
 @dataclass

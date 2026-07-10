@@ -132,7 +132,7 @@ def create_app(
     return app
 
 
-def start_file_viewer_server(
+def start_file_viewer_server(  # noqa: D417
     port: int,
     workspace_roots: Sequence[str] | None = None,
     *,

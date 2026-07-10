@@ -203,7 +203,7 @@ class PtyInteractiveShellSession(BaseShellSession):
         workspace_root: str | None = None,
         *,
         shell_argv: list[str] | None = None,
-        dimensions: tuple[int, int] = (24, 120),
+        dimensions: tuple[int, int] = (24, 1000) if IS_WINDOWS else (24, 120),
         buffer_chars: int = DEFAULT_BUFFER_CHARS,
         enable_ps1_metadata: bool | None = None,
     ) -> None:
@@ -234,17 +234,18 @@ class PtyInteractiveShellSession(BaseShellSession):
             'no',
         ):
             return False
+        kind = self.shell_kind
         if self._enable_ps1_param is not None:
             if not self._enable_ps1_param:
                 return False
-            if not _argv_looks_like_bash(self._shell_argv):
+            if kind not in {'bash', 'powershell'}:
                 logger.warning(
-                    'enable_ps1_metadata=True but the PTY command is not bash; '
+                    'enable_ps1_metadata=True but the PTY command is not bash or powershell; '
                     'disabling JSON PS1 tracking.'
                 )
                 return False
             return True
-        return _argv_looks_like_bash(self._shell_argv)
+        return kind in {'bash', 'powershell'}
 
     @property
     def shell_kind(self) -> str:
@@ -293,6 +294,58 @@ class PtyInteractiveShellSession(BaseShellSession):
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning('Failed to install JSON PS1 in PTY bash: %s', exc)
+            self._ps1_ready = False
+
+    def _install_powershell_json_ps1(self) -> None:
+        """Overwrite the powershell `prompt` function so we can parse exit/cwd (powershell only)."""
+        pty = self._pty
+        if pty is None or not self._want_ps1_metadata():
+            return
+        if _argv_shell_kind(self._shell_argv) != 'powershell':
+            return
+        try:
+            from backend.core.constants import CMD_OUTPUT_PS1_BEGIN, CMD_OUTPUT_PS1_END
+            prompt_fn = (
+                "function prompt { "
+                "  $ok = $?; "
+                "  $last_exit = $global:LASTEXITCODE; "
+                "  if ($last_exit -eq $null) { $last_exit = 0 }; "
+                "  if (-not $ok) { if ($last_exit -eq 0) { $last_exit = 1 } }; "
+                "  $pid_val = $PID; "
+                "  $cwd = (Get-Location).Path; "
+                "  $py_exe = (Get-Command python3, python, py -ErrorAction SilentlyContinue | Select-Object -First 1 | Select-Object -ExpandProperty Source); "
+                "  $py_path = if ($py_exe) { $py_exe } else { $null }; "
+                "  $metadata = @{ "
+                "    pid = $pid_val; "
+                "    exit_code = $last_exit; "
+                "    working_dir = $cwd; "
+                "    username = $env:USERNAME; "
+                "    hostname = $env:COMPUTERNAME; "
+                "    py_interpreter_path = $py_path "
+                "  } | ConvertTo-Json -Compress; "
+                f"  return \"`n{CMD_OUTPUT_PS1_BEGIN.strip()}`n\" + $metadata + \"`n{CMD_OUTPUT_PS1_END.strip()}`n\" "
+                "}\r"
+            )
+            pty.write(prompt_fn)
+            time.sleep(0.5)
+            if not pty.wait_for_output(
+                predicate=lambda p: bool(
+                    CmdOutputMetadata.matches_ps1_metadata(_norm_tty_text(p))
+                ),
+                timeout=25.0,
+            ):
+                logger.warning(
+                    'JSON PS1 not detected in PTY powershell output; '
+                    'falling back to best-effort execute().'
+                )
+                self._ps1_ready = False
+                return
+            self._ps1_ready = True
+            logger.info(
+                'Pty powershell session JSON PS1 ready (execute will report exit/cwd).'
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning('Failed to install JSON PS1 in PTY powershell: %s', exc)
             self._ps1_ready = False
 
     def _pwsh_prompt_ready(self, text: str) -> bool:
@@ -353,6 +406,7 @@ class PtyInteractiveShellSession(BaseShellSession):
         self._pty = session
         self._initialized = True
         self._install_bash_json_ps1()
+        self._install_powershell_json_ps1()
         if self._ps1_ready:
             self._shell_ready = True
         else:

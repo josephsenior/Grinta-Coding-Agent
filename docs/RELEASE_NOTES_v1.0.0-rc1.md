@@ -37,7 +37,7 @@ For the current support contract and CI certification depth, see [SUPPORT_MATRIX
 
 - **Supported:** Linux, Windows.
 - **Best effort:** macOS (advisory CI; not yet a required gate).
-- **Preferred install path:** `pipx install grinta-ai`.
+- **Preferred install path:** `pipx install grinta`.
 
 ## Known limitations and candid caveats
 
@@ -60,7 +60,7 @@ Please open issues with the `RC Feedback` template:
 ## Upgrade / install
 
 ```bash
-pipx install grinta-ai
+pipx install grinta
 grinta init
 grinta
 ```

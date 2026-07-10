@@ -1242,7 +1242,7 @@ wheels = [
 ]
 
 [[package]]
-name = "grinta-ai"
+name = "grinta"
 version = "1.0.0rc1"
 source = { editable = "." }
 dependencies = [

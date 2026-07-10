@@ -5,7 +5,7 @@ Features:
 - SQLite FTS5 BM25 lexical backend
 - LRU query cache with TTL
 
-Requires the optional ``[rag]`` extra (``pip install 'grinta-ai[rag]'``).
+Requires the optional ``[rag]`` extra (``pip install 'grinta[rag]'``).
 """
 
 from __future__ import annotations

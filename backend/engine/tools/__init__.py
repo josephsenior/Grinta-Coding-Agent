@@ -48,5 +48,6 @@ __all__ = [
     'create_task_tracker_tool',
     'create_delegate_task_tool',
     'create_terminal_tool',
+    'create_blackboard_tool',
     'note',
 ]

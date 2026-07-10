@@ -17,7 +17,6 @@ from backend.core.schemas import AgentState
 from backend.core.tasks.task_status import ACTIVE_TASK_STATUSES
 from backend.ledger import EventSource
 from backend.ledger.action import (
-    Action,
     ChangeAgentStateAction,
 )
 

@@ -25,6 +25,7 @@ from backend.ledger import (
     EventStreamSubscriber,
 )
 
+
 class RendererLiveMixin:
     """subscribe + live thinking/response streaming."""
 

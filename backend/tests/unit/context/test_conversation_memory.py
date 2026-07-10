@@ -529,6 +529,11 @@ class TestVectorMemoryInit:
             cm, 'EnhancedVectorStore', MagicMock(return_value=fake_store)
         )
 
+        monkeypatch.setattr(
+            'backend.utils.optional_extras.is_rag_extra_available',
+            lambda: True,
+        )
+
         mem = _make_memory(enable_vector_memory=True)
         assert mem.vector_store is fake_store
 

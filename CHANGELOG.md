@@ -199,7 +199,7 @@ HTTP server.
 
 ### Added
 
-- Open-source release on PyPI as `grinta-ai`, with Homebrew and Scoop manifests
+- Open-source release on PyPI as `grinta`, with Homebrew and Scoop manifests
   in `packaging/` for native installs on macOS and Windows.
 - `CHANGELOG.md` following [keepachangelog.com](https://keepachangelog.com)
   format and `SECURITY.md` describing reporting, threat model, and supported

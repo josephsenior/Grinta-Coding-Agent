@@ -2,7 +2,7 @@
 # ============================================
 # GRINTA - Quick Start (pipx / installed CLI)
 # ============================================
-# For users who installed with: pipx install grinta-ai
+# For users who installed with: pipx install grinta
 # Mirrors scripts/launch/start_here.sh without uv or source checkout steps.
 
 set -e
@@ -29,7 +29,7 @@ echo -e "${YELLOW}Step 0: Pre-flight checks...${NC}"
 
 if ! command -v grinta &> /dev/null; then
     echo -e "${RED}'grinta' not found on PATH.${NC}"
-    echo -e "${YELLOW}Install with: pipx install grinta-ai${NC}"
+    echo -e "${YELLOW}Install with: pipx install grinta${NC}"
     exit 1
 fi
 echo -e "${GREEN}grinta found: $(command -v grinta)${NC}"
@@ -53,7 +53,7 @@ echo -e "${DIM}machine tools (not Grinta dependencies) that unlock more workflow
 echo ""
 
 echo -e "${YELLOW}Step 1: Skipping dependency sync (managed by pipx).${NC}"
-echo -e "${GREEN}Using installed grinta-ai package.${NC}"
+echo -e "${GREEN}Using installed grinta package.${NC}"
 
 echo -e "${YELLOW}Step 1.5: Checking local model servers (Ollama/LM Studio/vLLM)...${NC}"
 if [[ -x "$PYTHON" ]]; then

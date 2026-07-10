@@ -365,7 +365,7 @@ class TestCmdCopy:
     def test_copy_ok(self) -> None:
         r = _repl()
         with patch(
-            'backend.cli.repl.slash_command_registry._copy_to_system_clipboard',
+            'backend.cli.repl.slash_registry_clipboard.copy_to_system_clipboard',
             return_value=(True, 'Copied!'),
         ):
             result = r._cmd_copy(_parse('/copy'))
@@ -377,7 +377,7 @@ class TestCmdCopy:
     def test_copy_fail(self) -> None:
         r = _repl()
         with patch(
-            'backend.cli.repl.slash_command_registry._copy_to_system_clipboard',
+            'backend.cli.repl.slash_registry_clipboard.copy_to_system_clipboard',
             return_value=(False, 'Failed!'),
         ):
             result = r._cmd_copy(_parse('/copy'))

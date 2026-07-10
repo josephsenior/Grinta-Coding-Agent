@@ -24,6 +24,7 @@ from backend.core.tasks.task_tracker import TaskTracker
 from backend.core.tools.tool_names import (
     ACCEPTANCE_CRITERIA_TOOL_NAME,
     TASK_TRACKER_TOOL_NAME,
+    TERMINAL_TOOL_NAME,
     UNDO_LAST_EDIT_TOOL_NAME,
 )
 from backend.engine.function_calling.helpers import (
@@ -32,11 +33,14 @@ from backend.engine.function_calling.helpers import (
     set_security_risk,
     validate_security_risk,
 )
+from backend.engine.tools._file_ops import (
+    _relative_display_path,
+    _safe_workspace_path,
+)
 from backend.engine.tools.browser_native import (
     BROWSER_TOOL_NAME,
     build_browser_tool_action,
 )
-from backend.core.tools.tool_names import TERMINAL_TOOL_NAME
 from backend.engine.tools.glob import build_glob_action
 from backend.engine.tools.grep import build_grep_action
 from backend.ledger.action import (
@@ -130,11 +134,8 @@ def _handle_terminal_tool(arguments: Mapping[str, Any]) -> Action:
     """Handle unified Terminal tool call."""
     action_type = require_tool_argument(arguments, 'action', TERMINAL_TOOL_NAME)
     validate_security_risk(arguments, TERMINAL_TOOL_NAME)
-    
+
     if action_type == 'run':
-        from backend.utils.terminal.terminal_contract import (
-            uses_powershell_terminal,
-        )
 
         command = require_tool_argument(arguments, 'command', TERMINAL_TOOL_NAME)
         raw_is_input = arguments.get('is_input', False)
@@ -145,9 +146,9 @@ def _handle_terminal_tool(arguments: Mapping[str, Any]) -> Action:
         # Logic from previous cmd run handler: checking for drive letter missing space
         glue_hint = ''
         if command and len(command) > 2 and command[0].isalpha() and command[1:3] == ':\\':
-            glue_hint = "Windows drive glued in command. Make sure to use spaces."
+            glue_hint = 'Windows drive glued in command. Make sure to use spaces.'
 
-        action = CmdRunAction(
+        action: Action = CmdRunAction(
             command=command,
             is_input=is_input,
             is_background=is_background,
@@ -163,7 +164,7 @@ def _handle_terminal_tool(arguments: Mapping[str, Any]) -> Action:
                 raise FunctionCallValidationError(msg) from e
         set_security_risk(action, arguments)
         return action
-        
+
     elif action_type == 'start':
         command = require_tool_argument(arguments, 'command', TERMINAL_TOOL_NAME)
         action = TerminalRunAction(
@@ -174,7 +175,7 @@ def _handle_terminal_tool(arguments: Mapping[str, Any]) -> Action:
         )
         set_security_risk(action, arguments)
         return action
-        
+
     elif action_type == 'input':
         session_id = require_tool_argument(arguments, 'session_id', TERMINAL_TOOL_NAME)
         action = TerminalInputAction(
@@ -188,7 +189,7 @@ def _handle_terminal_tool(arguments: Mapping[str, Any]) -> Action:
         )
         set_security_risk(action, arguments)
         return action
-        
+
     elif action_type == 'read':
         session_id = require_tool_argument(arguments, 'session_id', TERMINAL_TOOL_NAME)
         action = TerminalReadAction(
@@ -200,7 +201,7 @@ def _handle_terminal_tool(arguments: Mapping[str, Any]) -> Action:
         )
         set_security_risk(action, arguments)
         return action
-        
+
     elif action_type == 'wait':
         session_id = require_tool_argument(arguments, 'session_id', TERMINAL_TOOL_NAME)
         pattern = require_tool_argument(arguments, 'pattern', TERMINAL_TOOL_NAME)
@@ -211,13 +212,13 @@ def _handle_terminal_tool(arguments: Mapping[str, Any]) -> Action:
         )
         set_security_risk(action, arguments)
         return action
-        
+
     elif action_type == 'kill':
         session_id = require_tool_argument(arguments, 'session_id', TERMINAL_TOOL_NAME)
         action = TerminalCloseAction(session_id=session_id)
         set_security_risk(action, arguments)
         return action
-        
+
     raise FunctionCallValidationError(
         f'Unknown terminal action: {action_type!r}. '
         'Valid actions: run, start, input, read, wait, kill.'
@@ -247,7 +248,7 @@ def execute_memory_recall(action: MemoryRecallAction) -> MemoryRecallObservation
         return MemoryRecallObservation(
             content=(
                 'Semantic recall is not available in this session. Install optional RAG '
-                'with pip install "grinta-ai[rag]" (auto-enabled when installed) or set '
+                'with pip install "grinta[rag]" (auto-enabled when installed) or set '
                 'agent.Orchestrator.enable_vector_memory to false to hide recall.'
             ),
             query=query,
@@ -290,7 +291,7 @@ def _handle_memory_tool(arguments: Mapping[str, Any]) -> Action:
         if get_semantic_recall_fn() is None:
             raise FunctionCallValidationError(
                 'memory(recall) is not available in this session. Install optional '
-                'RAG support with pip install "grinta-ai[rag]" or set '
+                'RAG support with pip install "grinta[rag]" or set '
                 'enable_vector_memory to false in settings.'
             )
         return MemoryRecallAction(query=query)
@@ -428,7 +429,9 @@ def _acceptance_criteria_tool_enabled() -> bool:
         agent = _get_active_agent_config(load_app_config(set_logging_levels=False))
         return bool(getattr(agent, 'enable_acceptance_criteria_tool', True))
     except Exception:
-        from backend.core.constants import DEFAULT_AGENT_ACCEPTANCE_CRITERIA_TOOL_ENABLED
+        from backend.core.constants import (
+            DEFAULT_AGENT_ACCEPTANCE_CRITERIA_TOOL_ENABLED,
+        )
 
         return DEFAULT_AGENT_ACCEPTANCE_CRITERIA_TOOL_ENABLED
 

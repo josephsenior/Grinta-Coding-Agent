@@ -51,7 +51,7 @@ from pathlib import Path  # noqa: E402
 
 _DEFAULT_VERSION = '1.0.0rc1'
 __version__ = _DEFAULT_VERSION
-__package_name__ = 'grinta-ai'
+__package_name__ = 'grinta'
 
 
 def get_version() -> str:

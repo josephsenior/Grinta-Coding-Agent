@@ -829,8 +829,8 @@ class TestLoadFromJson:
     def test_update_enable_lsp_query_writes_only_lsp_config(
         self, tmp_path, monkeypatch
     ) -> None:
-        from backend.cli.settings.query import update_enable_lsp_query
         from backend.cli.settings import storage as storage_mod
+        from backend.cli.settings.query import update_enable_lsp_query
         from backend.core.constants import DEFAULT_AGENT_NAME
 
         settings_path = tmp_path / 'settings.json'

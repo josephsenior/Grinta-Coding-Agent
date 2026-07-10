@@ -50,7 +50,7 @@ body:
       label: Steps to reproduce (if applicable)
       description: Include commands, prompts, and sequence of actions.
       placeholder: |
-        1. pipx install grinta-ai
+        1. pipx install grinta
         2. grinta init
         3. grinta
         4. Ask it to ...
@@ -69,7 +69,7 @@ body:
     attributes:
       label: Installation path
       options:
-        - pipx install grinta-ai
+        - pipx install grinta
         - Source (uv run python -m backend.cli.entry)
         - Docker
         - Other

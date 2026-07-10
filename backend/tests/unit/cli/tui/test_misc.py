@@ -308,8 +308,14 @@ async def test_tui_handle_input_does_not_bootstrap_twice_after_background_ready(
     calls = 0
 
     class FakeController:
+        def __init__(self):
+            self.state = MagicMock()
+
         def get_agent_state(self):
             return AgentState.AWAITING_USER_INPUT
+
+        def step(self):
+            pass
 
     async def fake_bootstrap(self, session_id=None):
         nonlocal calls
@@ -329,12 +335,15 @@ async def test_tui_handle_input_does_not_bootstrap_twice_after_background_ready(
         await pilot.pause()
 
         s = _get_screen(app)
-        s._dispatch_to_agent = AsyncMock()  # type: ignore[method-assign]
+        s._event_stream = MagicMock()
+        s._dispatch_action_event = AsyncMock()  # type: ignore[method-assign]
 
         await s._handle_input('hello')
 
         assert calls == 1
-        s._dispatch_to_agent.assert_awaited_once_with('hello', image_urls=[])
+        s._dispatch_action_event.assert_awaited_once()
+        called_action = s._dispatch_action_event.call_args[0][0]
+        assert called_action.content == 'hello'
 
 
 @pytest.mark.asyncio
@@ -380,8 +389,14 @@ async def test_handle_input_releases_lock_during_dispatch(mock_config, monkeypat
     dispatch_continue = asyncio.Event()
 
     class FakeController:
+        def __init__(self):
+            self.state = MagicMock()
+
         def get_agent_state(self):
             return AgentState.RUNNING
+
+        def step(self):
+            pass
 
     class FakeRenderer:
         async def drain_events_async(self) -> None:
@@ -390,7 +405,7 @@ async def test_handle_input_releases_lock_during_dispatch(mock_config, monkeypat
         def flush_live_ui(self, *, terminal: bool = False) -> None:
             return None
 
-    async def slow_dispatch(text: str, *, image_urls=None) -> None:
+    async def slow_dispatch(action: Any) -> None:
         dispatch_started.set()
         await dispatch_continue.wait()
 
@@ -410,10 +425,13 @@ async def test_handle_input_releases_lock_during_dispatch(mock_config, monkeypat
         await pilot.pause()
 
         s = _get_screen(app)
+        s._event_stream = MagicMock()
+        s._memory_stub = MagicMock()
+        s._runtime_stub = MagicMock()
         s._controller = FakeController()
         s._renderer = FakeRenderer()
         s._renderer._event_stream = None
-        s._dispatch_to_agent = slow_dispatch  # type: ignore[method-assign]
+        s._dispatch_action_event = slow_dispatch  # type: ignore[method-assign]
 
         task = asyncio.create_task(s._handle_input('hello'))
         await asyncio.wait_for(dispatch_started.wait(), timeout=10)

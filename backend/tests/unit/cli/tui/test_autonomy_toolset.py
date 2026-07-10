@@ -8,7 +8,6 @@ from unittest.mock import MagicMock
 from backend.cli.tui.screen.settings import ScreenSettingsMixin
 from backend.engine.tools.param_defs import relax_security_risk_in_tools
 
-
 _BALANCED_TOOL = {
     'type': 'function',
     'function': {

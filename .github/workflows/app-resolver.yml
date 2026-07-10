@@ -94,7 +94,7 @@ jobs:
 
       - name: Get latest versions and create requirements.txt
         run: |
-          PKG_NAME="grinta-ai"
+          PKG_NAME="grinta"
           if ! python -m pip index versions "$PKG_NAME" > APP_versions.txt 2>/dev/null; then
             echo "Could not resolve $PKG_NAME; falling back to App-ai"
             PKG_NAME="App-ai"

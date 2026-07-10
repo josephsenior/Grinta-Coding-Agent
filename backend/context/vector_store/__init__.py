@@ -9,7 +9,7 @@ Public API re-exports — implementation is split across:
   TTL) and ``EnhancedVectorStore`` (hybrid semantic + BM25 search that
   combines both backends).
 
-Requires the optional ``[rag]`` extra (``pip install 'grinta-ai[rag]'``).
+Requires the optional ``[rag]`` extra (``pip install 'grinta[rag]'``).
 """
 
 from __future__ import annotations

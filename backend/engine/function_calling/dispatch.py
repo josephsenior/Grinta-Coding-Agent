@@ -23,7 +23,6 @@ import backend.engine.tools.checkpoint as checkpoint_tools
 import backend.engine.tools.debugger as debugger_tools
 import backend.engine.tools.delegate_task as delegate_task_tools
 import backend.engine.tools.lsp_query as lsp_query_tools
-import backend.engine.tools.lsp_query as lsp_query_tools
 from backend.core.errors import FunctionCallNotExistsError, FunctionCallValidationError
 from backend.core.interaction_modes import (
     CHAT_MODE_ALLOWED_TOOLS,
@@ -302,7 +301,6 @@ from backend.engine.tools._tool_handlers import (  # noqa: E402, F401  # noqa: E
     _handle_ask_user_tool,
     _handle_browser_tool,
     _handle_checkpoint_tool,
-    _handle_terminal_tool,
     _handle_docs_query_tool,
     _handle_docs_resolve_tool,
     _handle_execute_mcp_tool_tool,
@@ -312,6 +310,7 @@ from backend.engine.tools._tool_handlers import (  # noqa: E402, F401  # noqa: E
     _handle_memory_manager_tool,
     _handle_memory_tool,
     _handle_task_tracker_tool,
+    _handle_terminal_tool,
     _handle_undo_last_edit_tool,
     _handle_web_fetch_tool,
     _handle_web_search_tool,

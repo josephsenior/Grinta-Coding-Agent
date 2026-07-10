@@ -1,6 +1,6 @@
 FROM python:3.12-slim
 
-# Clean-room Docker container for verifying that `pip install grinta-ai`
+# Clean-room Docker container for verifying that `pip install grinta`
 # (and its optional extras) installs and imports cleanly on a fresh OS.
 #
 # Usage:

@@ -11,7 +11,7 @@ Quote paths with spaces. First `grinta` runs setup — no `grinta init` required
 
 | | **Consumer** | **Dev (source)** |
 | --- | --- | --- |
-| Install | `pipx install grinta-ai` (PyPI) | `bash start_here.sh` or `.\START_HERE.ps1` once (bootstrap only) |
+| Install | `pipx install grinta` (PyPI) | `bash start_here.sh` or `.\START_HERE.ps1` once (bootstrap only) |
 | Settings | `~/.grinta/settings.json` | `Grinta/settings.json` in your clone |
 | Folders | `<project>` only | repo **and** `<project>` (often different) |
 | Daily command | `cd "<project>"` → `grinta` | See **Dev daily use** |
@@ -60,7 +60,7 @@ Native Windows and WSL are **separate installs** (different binaries, different 
 ### Consumer
 
 ```powershell
-pipx install grinta-ai
+pipx install grinta
 cd "<project>"
 grinta
 ```
@@ -114,7 +114,7 @@ Install and run Grinta **inside Ubuntu**, not PowerShell. Windows `pipx` does no
 ```bash
 sudo apt install -y python3.12 python3.12-venv pipx
 pipx ensurepath && source ~/.bashrc
-pipx install grinta-ai
+pipx install grinta
 grinta doctor
 cd "<project>"
 grinta
@@ -148,7 +148,7 @@ grinta
 ### Consumer
 
 ```bash
-pipx install grinta-ai
+pipx install grinta
 cd "<project>"
 grinta
 ```
@@ -178,7 +178,7 @@ grinta
 ### Consumer (pipx)
 
 ```bash
-pipx install grinta-ai
+pipx install grinta
 cd "<project>"
 grinta
 ```
@@ -219,6 +219,6 @@ grinta
 | `grinta init` | Reconfigure without TUI |
 | `grinta doctor` | Install / settings / WSL checks |
 | `grinta -p "<project>"` | Open project without `cd` first |
-| `pipx install "grinta-ai[rag]"` | Vector memory extra |
+| `pipx install "grinta[rag]"` | Vector memory extra |
 
 **Problems:** [TROUBLESHOOTING.md](TROUBLESHOOTING.md)

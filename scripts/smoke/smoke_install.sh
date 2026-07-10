@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Clean-room install smoke-test for Grinta.
 #
-# Validates that `pip install grinta-ai` and the optional extras work on a
+# Validates that `pip install grinta` and the optional extras work on a
 # fresh Python environment. Run inside a Docker container or a throwaway venv.
 #
 # Usage:
@@ -18,7 +18,7 @@ if [ -d "$WHEEL_DIR" ] && ls "$WHEEL_DIR"/*.whl >/dev/null 2>&1; then
     PKG_SPEC="$(ls "$WHEEL_DIR"/grinta_ai-*.whl | head -n1)"
     echo "==> Using local wheel: $PKG_SPEC"
 else
-    PKG_SPEC="grinta-ai"
+    PKG_SPEC="grinta"
     echo "==> Using PyPI: $PKG_SPEC"
 fi
 

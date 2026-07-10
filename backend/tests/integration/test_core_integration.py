@@ -18,18 +18,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from backend.engine.memory_manager import ContextMemoryManager
-from backend.engine.tools.working_memory import (
-    build_working_memory_action,
-    execute_working_memory,
-    get_working_memory_prompt_block,
-    set_current_session_id,
-)
 from backend.ledger.action import ActionSecurityRisk
-from backend.ledger.action.files import FileEditAction
-from backend.ledger.action.message import MessageAction, SystemMessageAction
-from backend.ledger.event import EventSource
-from backend.ledger.observation.error import ErrorObservation
-from backend.ledger.observation.files import FileEditObservation
 from backend.orchestration.agent.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerConfig,

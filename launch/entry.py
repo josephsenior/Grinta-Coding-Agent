@@ -19,7 +19,7 @@ from urllib.parse import unquote, urlparse
 def _editable_project_root() -> Path | None:
     """Resolve editable project root from distribution metadata when available."""
     try:
-        dist = metadata.distribution('grinta-ai')
+        dist = metadata.distribution('grinta')
     except metadata.PackageNotFoundError:
         return None
 
@@ -56,7 +56,7 @@ def _resolve_entry_file() -> Path | None:
             return editable_entry
 
     try:
-        dist = metadata.distribution('grinta-ai')
+        dist = metadata.distribution('grinta')
     except metadata.PackageNotFoundError:
         return None
 
