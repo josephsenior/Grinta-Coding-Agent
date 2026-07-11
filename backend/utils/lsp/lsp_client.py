@@ -196,6 +196,8 @@ class LspResult:
 class LspClient:
     """JSON-RPC client backed by persistent language-server sessions."""
 
+    available: bool = True
+
     _SYMBOL_KIND_MAP: dict[int, str] = {
         1: 'File',
         2: 'Module',

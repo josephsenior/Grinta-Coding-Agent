@@ -10,6 +10,7 @@ from backend.cli.settings.mode_runtime import (
     apply_interaction_mode_to_controller,
     rebuild_agent_toolset,
 )
+from backend.engine.contracts import ChatCompletionToolParam
 from backend.engine.tools.param_defs import relax_security_risk_in_tools
 
 _BALANCED_TOOL = {
@@ -25,8 +26,8 @@ _BALANCED_TOOL = {
 }
 
 
-def _toolset_for_autonomy(level: str) -> list[dict]:
-    return relax_security_risk_in_tools([_BALANCED_TOOL], level)
+def _toolset_for_autonomy(level: str) -> list[ChatCompletionToolParam]:
+    return relax_security_risk_in_tools([_BALANCED_TOOL], level)  # type: ignore[arg-type]
 
 
 def test_rebuild_agent_toolset_refreshes_tools() -> None:

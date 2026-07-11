@@ -190,14 +190,20 @@ class TestFeatureFlagToolPresence:
         assert 'task_tracker' not in names
 
     def test_working_memory_enabled(self):
-        names = _build_toolset(enable_working_memory=True)
-        assert 'memory' in names
+        from unittest.mock import patch
+        with patch('backend.utils.optional_extras.semantic_recall_active', return_value=True):
+            names = _build_toolset(enable_working_memory=True)
+        assert 'search_history' in names
+        assert 'memory' not in names
         assert 'note' not in names
         assert 'recall' not in names
         self._assert_dispatch_covered(names)
 
     def test_working_memory_disabled(self):
-        names = _build_toolset(enable_working_memory=False)
+        from unittest.mock import patch
+        with patch('backend.utils.optional_extras.semantic_recall_active', return_value=True):
+            names = _build_toolset(enable_working_memory=False)
+        assert 'search_history' not in names
         assert 'memory' not in names
         assert 'note' not in names
         assert 'recall' not in names

@@ -1076,9 +1076,9 @@ class TestBuildSystemPromptRenders:
             semantic_recall_active=True,
         )
         assert '<MEMORY_AND_CONTEXT>' in result
-        assert 'memory(action="working", update_type=update' in result
-        assert 'memory(action="persist"' in result
-        assert 'memory(action="recall", key=...)' in result
+        assert 'search_history' in result
+        assert 'search_history(query=...)' in result
+        assert 'memory(action="working"' not in result
 
     def test_working_memory_enabled_omits_recall_when_rag_inactive(self) -> None:
         result = self._assert_renders_cleanly(
@@ -1088,10 +1088,8 @@ class TestBuildSystemPromptRenders:
             function_calling_mode='native',
             semantic_recall_active=False,
         )
-        assert '<MEMORY_AND_CONTEXT>' in result
-        assert 'memory(action="working", update_type=update' in result
-        assert 'memory(action="persist"' in result
-        assert 'memory(action="recall", key=...)' not in result
+        assert '<MEMORY_AND_CONTEXT>' not in result
+        assert 'search_history' not in result
 
     def test_condensation_request_enabled(self) -> None:
         result = self._assert_renders_cleanly(
@@ -1610,42 +1608,13 @@ class TestOrchestratorPromptManagerExtended:
             msg = opm.get_system_message()
             assert 'lessons-injected' in msg
 
-    def test_inject_workspace_memory_falls_back_to_lessons_md(
-        self, prompt_dir, tmp_path
-    ):
-        from backend.utils.prompt import OrchestratorPromptManager
-
-        opm = OrchestratorPromptManager(prompt_dir)
-        lessons = tmp_path / 'lessons.md'
-        lessons.write_text('verified fix for auth', encoding='utf-8')
-        with (
-            patch(
-                'backend.engine.tools.workspace_memory.format_prompt_block',
-                return_value='',
-            ),
-            patch(
-                'backend.core.workspace_resolution.get_effective_workspace_root',
-                return_value=tmp_path,
-            ),
-            patch(
-                'backend.core.workspace_resolution.workspace_agent_state_dir',
-                return_value=tmp_path,
-            ),
-        ):
-            result = opm._inject_workspace_memory('content')
-            assert '<WORKSPACE_MEMORY>' in result
-            assert 'verified fix for auth' in result
-
     def test_inject_workspace_memory_empty(self, prompt_dir):
         from backend.utils.prompt import OrchestratorPromptManager
 
         opm = OrchestratorPromptManager(prompt_dir)
-        with (
-            patch(
-                'backend.engine.tools.workspace_memory.format_prompt_block',
-                return_value='',
-            ),
-            patch.object(opm, '_lessons_markdown_block', return_value=''),
+        with patch(
+            'backend.engine.tools.workspace_memory.format_prompt_block',
+            return_value='',
         ):
             result = opm._inject_workspace_memory('Original content')
             assert result == 'Original content'

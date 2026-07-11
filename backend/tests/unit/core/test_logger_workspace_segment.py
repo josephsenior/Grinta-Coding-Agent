@@ -111,6 +111,7 @@ def test_bind_session_logging_creates_session_jsonl(
     monkeypatch.setattr(logger_mod, '_ACTIVE_SESSION_LOG_DIR', None)
 
     logger_mod.bind_session_logging('my-session-123')
+    logger_mod.close_session_event_logger()
 
     session_dir = ws_root / 'sessions' / 'my-session-123'
     assert session_dir.is_dir()

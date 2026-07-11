@@ -383,36 +383,7 @@ class OrchestratorPromptManager(PromptManager):
         except Exception:
             return content
 
-    def _lessons_markdown_block(self) -> str:
-        """Fallback workspace memory from lessons.md when JSON store is empty."""
-        try:
-            from backend.core.workspace_resolution import (
-                get_effective_workspace_root,
-                workspace_agent_state_dir,
-            )
 
-            root = get_effective_workspace_root()
-            if root is None:
-                return ''
-            lessons_path = workspace_agent_state_dir(root) / 'lessons.md'
-            if not lessons_path.is_file():
-                lessons_path = root / 'memories' / 'repo' / 'lessons.md'
-                if not lessons_path.is_file():
-                    return ''
-
-            lessons = lessons_path.read_text(encoding='utf-8').strip()
-            if not lessons:
-                return ''
-            if len(lessons) > 800:
-                lessons = '... (earlier lessons truncated)\n' + lessons[-800:]
-            return (
-                '<WORKSPACE_MEMORY>\n'
-                'Durable workspace facts (from lessons.md):\n'
-                f'{lessons}\n'
-                '</WORKSPACE_MEMORY>'
-            )
-        except Exception:
-            return ''
 
     def _inject_scratchpad(self, content: str) -> str:
         """Deprecated: session scratchpad injection removed; use workspace memory."""

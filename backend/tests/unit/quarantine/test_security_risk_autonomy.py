@@ -15,9 +15,25 @@ from backend.engine.function_calling.helpers import (
 )
 from backend.engine.prompts.section_renderers._security import _render_security
 from backend.engine.tools._tool_handlers import _handle_cmd_run_tool
-from backend.engine.tools.bash import create_cmd_run_tool
 from backend.engine.tools.param_defs import relax_security_risk_in_tools
 from backend.engine.tools.terminal import create_terminal_tool
+
+
+def create_cmd_run_tool():
+    return {
+        'type': 'function',
+        'function': {
+            'name': 'cmd_run',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'command': {'type': 'string'},
+                    'security_risk': {'type': 'string'},
+                },
+                'required': ['command', 'security_risk'],
+            },
+        },
+    }
 
 
 def test_security_risk_required_for_autonomy_by_level():

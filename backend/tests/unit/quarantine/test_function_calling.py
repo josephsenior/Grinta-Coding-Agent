@@ -450,7 +450,7 @@ class TestTaskTrackerAcceptanceCriteriaOrdering:
         assert isinstance(action, TaskTrackingAction)
 
     def test_update_allowed_when_plan_already_exists(self, monkeypatch):
-        existing_plan = [
+        existing_plan: list[dict[str, Any]] = [
             {
                 'id': 'task-1',
                 'description': 'Existing',
@@ -497,7 +497,21 @@ class TestProcessSingleToolCall:
         return tc
 
     def test_dispatches_cmd_run(self):
-        from backend.engine.tools.bash import create_cmd_run_tool
+        def create_cmd_run_tool():
+            return {
+                'type': 'function',
+                'function': {
+                    'name': 'cmd_run',
+                    'parameters': {
+                        'type': 'object',
+                        'properties': {
+                            'command': {'type': 'string'},
+                            'security_risk': {'type': 'string'},
+                        },
+                        'required': ['command', 'security_risk'],
+                    },
+                },
+            }
 
         tool_name = create_cmd_run_tool()['function']['name']
         tc = self._make_tool_call(tool_name)

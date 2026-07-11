@@ -436,7 +436,7 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         return text[start:next_header].strip()
 
     @staticmethod
-    def _latest_verification_block(pipeline_state: object | None) -> str:
+    def _latest_verification_block(pipeline_state: Any) -> str:
         """Inject authoritative latest verification so summaries do not revive stale blockers."""
         if pipeline_state is None:
             return ''
@@ -449,7 +449,7 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             status = str(verification.status or '').strip().lower()
             if not command or status != 'passed':
                 return ''
-            outcome = str(verification.outcome or '').strip()
+            outcome = str(verification.output or '').strip()
             lines = [
                 '<LATEST VERIFICATION (authoritative)>',
                 f'PASSED: {command}',

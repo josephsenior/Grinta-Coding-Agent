@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from backend.cli.tui.screen.settings import ScreenSettingsMixin
+from backend.engine.contracts import ChatCompletionToolParam
 from backend.engine.tools.param_defs import relax_security_risk_in_tools
 
 _BALANCED_TOOL = {
@@ -21,8 +22,8 @@ _BALANCED_TOOL = {
 }
 
 
-def _toolset_for_autonomy(level: str) -> list[dict]:
-    return relax_security_risk_in_tools([_BALANCED_TOOL], level)
+def _toolset_for_autonomy(level: str) -> list[ChatCompletionToolParam]:
+    return relax_security_risk_in_tools([_BALANCED_TOOL], level)  # type: ignore[arg-type]
 
 
 class _AutonomyScreenStub(ScreenSettingsMixin):

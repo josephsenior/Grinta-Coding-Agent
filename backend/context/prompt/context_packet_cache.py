@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 from backend.context.prompt.prompt_window import event_fingerprint
 from backend.core.logging.logger import app_logger as logger
@@ -116,7 +116,7 @@ def _projected_events_token(events: list[Event]) -> str:
     return ';'.join(event_fingerprint(event) for event in tail)
 
 
-def _json_path_token(path_resolver: object) -> str:
+def _json_path_token(path_resolver: Callable[[], Path]) -> str:
     try:
         path = path_resolver()
         if not isinstance(path, Path):
