@@ -24,6 +24,7 @@
 
 Direct link if the video does not load: [`docs/assets/grinta-demo.mp4`](docs/assets/grinta-demo.mp4).
 
+Created and maintained by [Youssef Mejdi](https://github.com/josephsenior).
 ## Release status
 
 - Latest public build is `v1.0.0-rc1` (release candidate), not final GA.
