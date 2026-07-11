@@ -1,12 +1,17 @@
-# Grinta Autonomous Execution Report
+# Grinta Long-Horizon Execution Report: The Ouroboros
 
-**Run date:** July 9, 2026  
-**Execution mode:** Agent / Full autonomy  
-**Model:** `opencode/mimo-v2.5-free`  
-**Final state:** **FINISHED**
+Run date: July 9, 2026
+Task: The Ouroboros — self-hosting compiler and distributed runtime systems task
+Model: opencode/mimo-v2.5-free
+Reasoning configuration: High
+Execution mode: Agent / Full autonomy
+Runtime final state: FINISHED
 
-> Sanitized execution summary generated from Grinta's internal session audit.
-> Raw prompts, absolute local paths, full tracebacks, and detailed internal module paths are intentionally omitted.
+This report documents Grinta's execution behavior during a 4h33m autonomous systems-engineering run. FINISHED refers to Grinta's runtime session state and must not be interpreted as proof that every task-level correctness requirement passed unless separately documented in the validation results.
+
+The task required a from-scratch compiler and runtime stack spanning Hindley–Milner type inference, linear and effect types, LLVM IR generation, concurrent garbage collection, work-stealing scheduling, Raft consensus, distributed garbage collection, and self-hosting bootstrap convergence.
+
+The complete task specification defined ten binary correctness tests and prohibited claims of full task success unless all ten tests passed, the bootstrap diff was empty, ASAN reported zero errors, and TSAN reported zero scheduler races.
 
 ---
 
