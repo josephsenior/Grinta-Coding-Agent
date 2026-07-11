@@ -18,13 +18,14 @@
 >
 > **Current status:** `v1.0.0-rc1` public release candidate. Linux, Windows, and macOS run required unit and extended CI gates; smoke-install and onboarding validation are in place. Remaining GA work is mostly documentation alignment, contributor-doc honesty, and edge-case hardening after the post-rc1 decomposition wave.
 
+Created and maintained by [Youssef Mejdi](https://github.com/josephsenior).
+
 ### Grinta in action
 
 <video src="docs/assets/grinta-demo.mp4" autoplay loop muted playsinline></video>
 
 Direct link if the video does not load: [`docs/assets/grinta-demo.mp4`](docs/assets/grinta-demo.mp4).
 
-Created and maintained by [Youssef Mejdi](https://github.com/josephsenior).
 ## Release status
 
 - Latest public build is `v1.0.0-rc1` (release candidate), not final GA.
