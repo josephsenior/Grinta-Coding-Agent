@@ -1,17 +1,12 @@
-# Grinta Long-Horizon Execution Report: The Ouroboros
+# Grinta Autonomous Execution Report
 
-Run date: July 9, 2026
-Task: The Ouroboros — self-hosting compiler and distributed runtime systems task
-Model: opencode/mimo-v2.5-free
-Reasoning configuration: High
-Execution mode: Agent / Full autonomy
-Runtime final state: FINISHED
+**Run date:** July 9, 2026  
+**Execution mode:** Agent / Full autonomy  
+**Model:** `opencode/mimo-v2.5-free`  
+**Final state:** **FINISHED**
 
-This report documents Grinta's execution behavior during a 4h33m autonomous systems-engineering run. FINISHED refers to Grinta's runtime session state and must not be interpreted as proof that every task-level correctness requirement passed unless separately documented in the validation results.
-
-The task required a from-scratch compiler and runtime stack spanning Hindley–Milner type inference, linear and effect types, LLVM IR generation, concurrent garbage collection, work-stealing scheduling, Raft consensus, distributed garbage collection, and self-hosting bootstrap convergence.
-
-The complete task specification defined ten binary correctness tests and prohibited claims of full task success unless all ten tests passed, the bootstrap diff was empty, ASAN reported zero errors, and TSAN reported zero scheduler races.
+> Sanitized execution summary generated from Grinta's internal session audit.
+> Raw prompts, absolute local paths, full tracebacks, and detailed internal module paths are intentionally omitted.
 
 ---
 
@@ -43,6 +38,32 @@ Despite inference-provider connection failures, process suspension, malformed mo
 | Retry / recovery mentions | **26** |
 | Initial user turns recorded | **1** |
 | Mid-run user turns recorded | **0** |
+
+---
+
+## Validation Status
+
+The generated Ouroboros repository's implemented test suite passed.
+
+However, **a green repository test suite is not equivalent to full compliance with the original Ouroboros specification**.
+
+The generated project's own README documents material simplifications, including:
+
+- bootstrap convergence is simulated in Python rather than executed through actual OUR-compiled Stage 1, Stage 2, and Stage 3 compiler binaries
+- Raft state is in-memory rather than persisted with the specified fsync-backed state
+- distributed garbage-collection cycle detection is simplified rather than a complete Maheshwari-Liskov implementation
+- the concurrent GC omits part of the specified old-generation write-barrier / remembered-set design
+- green-thread context switching uses `setjmp` / `longjmp` and the runtime does not implement the full specified execution model
+- linear and effect types are checked statically but are not fully enforced at runtime
+
+Accordingly, this report makes two separate claims:
+
+1. **Execution claim:** Grinta sustained the autonomous run and reached its `FINISHED` runtime state after multiple recoverable failures.
+2. **Validation claim:** the generated repository's implemented tests passed.
+
+This report **does not claim full conformance to every requirement in the original Ouroboros task specification**.
+
+The distinction is intentional: the engineering evidence is the agent's long-horizon execution, recovery behavior, generated systems scope, and explicit identification of remaining correctness gaps.
 
 ---
 
