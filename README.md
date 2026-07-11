@@ -96,6 +96,28 @@ Playbook workflows (`/debug`, `/testing`, `/feature`, …) and the full registry
 
 Grinta executes actions on the local host. The default `standard` profile preserves full interactive terminal and debugger support. `hardened_local` adds stricter policy checks but **is not** sandboxing or process isolation; `sandboxed_local` adds process isolation only for non-interactive commands. Read [docs/SECURITY_CHECKLIST.md](docs/SECURITY_CHECKLIST.md) **before pointing Grinta at code you do not trust** — for hostile codebases, run inside a VM or container.
 
+## Execution Evidence
+
+Grinta is evaluated through recorded long-horizon autonomous sessions and forensic event-stream audits.
+
+A recent full-autonomy run:
+
+- executed for **4h 33m**
+- processed **16,393 events**
+- recorded **373 tool outcomes — 368 successful, 5 failed**
+- produced **123 file events**
+- recovered through inference-provider connection failures
+- detected process suspension without misclassifying it as an agent hang
+- rejected malformed model tool payloads at the tool boundary
+- handled context pressure during execution
+- reached the final **FINISHED** state
+
+The audit recorded one initial user turn and no subsequent user turns during execution.
+
+📊 [Read the sanitized autonomous execution report](docs/evidence/2026-07-09-autonomous-run-report.md)
+
+Full forensic session audits are retained privately.
+
 ## Architecture (high level)
 
 ```mermaid
