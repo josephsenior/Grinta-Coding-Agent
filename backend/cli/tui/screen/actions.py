@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 from backend.cli.tui.dialogs import ConfirmWidget
-from backend.cli.tui.widgets.small import Transcript
 from backend.core.autonomy import normalize_autonomy_level
 
 
@@ -35,14 +34,13 @@ class ScreenActionsMixin:
     def action_toggle_sidebar(self) -> None:
         """Toggle sidebar visibility."""
         sidebar = self.query_one('#sidebar')
+        left_col = self.query_one('#left-column')
         if sidebar.has_class('-hidden'):
             sidebar.remove_class('-hidden')
-            transcript = self.query_one('#main-display', Transcript)
-            transcript.styles.width = '78%'
+            left_col.styles.width = '78%'
         else:
             sidebar.add_class('-hidden')
-            transcript = self.query_one('#main-display', Transcript)
-            transcript.styles.width = '100%'
+            left_col.styles.width = '100%'
 
     def action_show_help(self) -> None:
         """Show help information."""

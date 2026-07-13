@@ -531,3 +531,33 @@ async def test_tui_task_sidebar_allows_explicit_empty_update_clear(
 
         tasks_widget = s.query_one('#sidebar-tasks', CollapsibleSection)
         assert tasks_widget._section_title == 'Tasks'
+
+
+@pytest.mark.asyncio
+async def test_tui_toggle_sidebar_adjusts_left_column_width(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        sidebar = s.query_one('#sidebar')
+        left_col = s.query_one('#left-column')
+
+        # Initially, sidebar is visible (doesn't have -hidden class)
+        assert not sidebar.has_class('-hidden')
+
+        # Toggle sidebar off (hide it)
+        s.action_toggle_sidebar()
+        await pilot.pause()
+        assert sidebar.has_class('-hidden')
+        assert str(left_col.styles.width) == '100w'
+
+        # Toggle sidebar back on (show it)
+        s.action_toggle_sidebar()
+        await pilot.pause()
+        assert not sidebar.has_class('-hidden')
+        assert str(left_col.styles.width) == '78w'
+

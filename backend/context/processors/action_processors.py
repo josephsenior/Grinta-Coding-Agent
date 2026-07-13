@@ -21,6 +21,7 @@ from backend.ledger.action import (
     MessageAction,
     SystemHintAction,
     TaskTrackingAction,
+    TaskStateAction,
 )
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.mcp import MCPAction
@@ -93,6 +94,7 @@ def _is_tool_based_action(action: Action) -> bool:
         MCPAction,
         TaskTrackingAction,
         AcceptanceCriteriaAction,
+        TaskStateAction,
         TerminalRunAction,
         TerminalInputAction,
         TerminalReadAction,

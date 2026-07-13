@@ -50,6 +50,7 @@ from backend.ledger.observation.search import (
 from backend.ledger.observation.status import StatusObservation
 from backend.ledger.observation.success import SuccessObservation
 from backend.ledger.observation.task_tracking import TaskTrackingObservation
+from backend.ledger.observation.task_state import TaskStateObservation
 from backend.ledger.observation.terminal import TerminalObservation
 
 observations = (
@@ -70,6 +71,7 @@ observations = (
     FileDownloadObservation,
     TaskTrackingObservation,
     AcceptanceCriteriaObservation,
+    TaskStateObservation,
     StatusObservation,
     LspQueryObservation,
     GrepObservation,

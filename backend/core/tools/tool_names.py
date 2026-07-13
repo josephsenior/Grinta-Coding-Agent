@@ -28,6 +28,7 @@ TERMINAL_TOOL_NAME = 'terminal'
 ASK_USER_TOOL_NAME = 'ask_user'
 TASK_TRACKER_TOOL_NAME = 'task_tracker'
 ACCEPTANCE_CRITERIA_TOOL_NAME = 'acceptance_criteria'
+TASK_STATE_TOOL_NAME = 'task_state'
 
 # ── Memory & checkpoints ──────────────────────────────────────────────
 MEMORY_TOOL_NAME = 'memory'
@@ -72,6 +73,7 @@ __all__ = [
     'REPLACE_STRING_TOOL_NAME',
     'SHARED_TASK_BOARD_TOOL_NAME',
     'ACCEPTANCE_CRITERIA_TOOL_NAME',
+    'TASK_STATE_TOOL_NAME',
     'TASK_TRACKER_TOOL_NAME',
     'TERMINAL_TOOL_NAME',
     'UNDO_LAST_EDIT_TOOL_NAME',

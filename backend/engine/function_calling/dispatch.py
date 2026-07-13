@@ -50,6 +50,7 @@ from backend.core.tools.tool_names import (
     SEARCH_HISTORY_TOOL_NAME,
     SHARED_TASK_BOARD_TOOL_NAME,
     TASK_TRACKER_TOOL_NAME,
+    TASK_STATE_TOOL_NAME,
     TERMINAL_TOOL_NAME,
     UNDO_LAST_EDIT_TOOL_NAME,
     WEB_FETCH_TOOL_NAME,
@@ -110,6 +111,7 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
             str, create_multiedit_tool().get('function', {}).get('name', '')
         ): _handle_multiedit_tool,
         TASK_TRACKER_TOOL_NAME: _handle_task_tracker_tool,
+        TASK_STATE_TOOL_NAME: _handle_task_state_tool,
         ACCEPTANCE_CRITERIA_TOOL_NAME: _handle_acceptance_criteria_tool,
         MEMORY_TOOL_NAME: _handle_memory_tool,
         SEARCH_HISTORY_TOOL_NAME: _handle_search_history_tool,
@@ -313,6 +315,7 @@ from backend.engine.tools._tool_handlers import (  # noqa: E402, F401  # noqa: E
     _handle_memory_tool,
     _handle_search_history_tool,
     _handle_task_tracker_tool,
+    _handle_task_state_tool,
     _handle_terminal_tool,
     _handle_undo_last_edit_tool,
     _handle_web_fetch_tool,

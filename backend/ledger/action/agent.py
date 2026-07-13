@@ -295,6 +295,19 @@ class TaskTrackingAction(Action):
 
 
 @dataclass
+class TaskStateAction(Action):
+    """A command against the canonical task-state aggregate."""
+
+    command: str = 'review'
+    arguments: dict[str, Any] = field(default_factory=dict)
+    action: ClassVar[str] = ActionType.TASK_STATE
+
+    @property
+    def message(self) -> str:
+        return f'Task state: {self.command}.'
+
+
+@dataclass
 class DelegateTaskAction(Action):
     """An action where the orchestrator delegates a subtask to a worker agent.
 

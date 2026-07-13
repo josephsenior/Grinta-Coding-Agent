@@ -266,18 +266,10 @@ class OrchestratorPlanner:
         """Add task_tracker, grep, and glob tools."""
         from backend.engine.tools.glob import create_glob_tool
         from backend.engine.tools.grep import create_grep_tool
-        from backend.engine.tools.task_tracker import (
-            create_task_tracker_tool,
-        )
+        from backend.engine.tools.task_state import create_task_state_tool
 
         if getattr(self._config, 'enable_task_tracker_tool', True):
-            tools.append(create_task_tracker_tool())
-        if getattr(self._config, 'enable_acceptance_criteria_tool', True):
-            from backend.engine.tools.acceptance_criteria import (
-                create_acceptance_criteria_tool,
-            )
-
-            tools.append(create_acceptance_criteria_tool())
+            tools.append(create_task_state_tool())
         tools.append(create_grep_tool())
         tools.append(create_glob_tool())
 

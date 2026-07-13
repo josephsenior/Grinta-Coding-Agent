@@ -6,6 +6,7 @@ from backend.core.enums import ActionConfirmationStatus, ActionSecurityRisk
 from backend.ledger.action.action import Action
 from backend.ledger.action.agent import (
     AcceptanceCriteriaAction,
+    TaskStateAction,
     AgentRejectAction,
     AgentThinkAction,
     BlackboardAction,
@@ -93,6 +94,7 @@ __all__ = [
     'SystemMessageAction',
     'AcceptanceCriteriaAction',
     'TaskTrackingAction',
+    'TaskStateAction',
     'TerminalCloseAction',
     'TerminalInputAction',
     'TerminalListAction',

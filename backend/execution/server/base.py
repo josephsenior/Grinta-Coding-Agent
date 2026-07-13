@@ -39,6 +39,7 @@ from backend.execution.runtime_mixins.command_timeout import CommandTimeoutMixin
 from backend.execution.runtime_mixins.env_manager import EnvManagerMixin
 from backend.execution.runtime_mixins.git_setup import GitSetupMixin
 from backend.execution.task_tracking import TaskTrackingMixin
+from backend.execution.task_state import TaskStateMixin
 from backend.execution.utils.git.git_handler import CommandResult, GitHandler
 from backend.ledger import EventSource, EventStream, EventStreamSubscriber
 from backend.ledger.action import (
@@ -50,6 +51,7 @@ from backend.ledger.action import (
     FileReadAction,
     SystemHintAction,
     TaskTrackingAction,
+    TaskStateAction,
     is_debugger_action,
 )
 from backend.ledger.action.mcp import MCPAction
@@ -160,6 +162,7 @@ class Runtime(
     GitSetupMixin,
     PlaybookLoaderMixin,
     TaskTrackingMixin,
+    TaskStateMixin,
     AcceptanceCriteriaMixin,
     CommandTimeoutMixin,
     SecurityEnforcementMixin,
@@ -794,6 +797,8 @@ class Runtime(
             return self._make_system_hint_observation(action)
         if isinstance(action, TaskTrackingAction):
             return self._handle_task_tracking_action(action)
+        if isinstance(action, TaskStateAction):
+            return self._handle_task_state_action(action)
         if isinstance(action, AcceptanceCriteriaAction):
             return self._handle_acceptance_criteria_action(action)
         if is_debugger_action(action):

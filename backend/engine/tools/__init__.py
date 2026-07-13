@@ -24,6 +24,7 @@ from .native_file_tools import (
     create_undo_last_edit_tool,
 )
 from .task_tracker import create_task_tracker_tool
+from .task_state import create_task_state_tool
 from .terminal import create_terminal_tool
 
 __all__ = [
@@ -46,6 +47,7 @@ __all__ = [
     'create_browser_tool',
     'create_acceptance_criteria_tool',
     'create_task_tracker_tool',
+    'create_task_state_tool',
     'create_delegate_task_tool',
     'create_terminal_tool',
     'create_blackboard_tool',

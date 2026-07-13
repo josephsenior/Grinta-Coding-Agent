@@ -20,6 +20,7 @@ from backend.ledger.action.agent import (
     RecallAction,
     SystemHintAction,
     TaskTrackingAction,
+    TaskStateAction,
 )
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.code_nav import LspQueryAction
@@ -77,6 +78,7 @@ actions = (
     MCPAction,
     AcceptanceCriteriaAction,
     TaskTrackingAction,
+    TaskStateAction,
     DelegateTaskAction,
     BlackboardAction,
     LspQueryAction,

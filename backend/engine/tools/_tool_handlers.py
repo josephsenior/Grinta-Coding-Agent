@@ -24,6 +24,7 @@ from backend.core.tasks.task_tracker import TaskTracker
 from backend.core.tools.tool_names import (
     ACCEPTANCE_CRITERIA_TOOL_NAME,
     TASK_TRACKER_TOOL_NAME,
+    TASK_STATE_TOOL_NAME,
     TERMINAL_TOOL_NAME,
     UNDO_LAST_EDIT_TOOL_NAME,
 )
@@ -54,6 +55,7 @@ from backend.ledger.action import (
     MemoryPersistAction,
     MemoryRecallAction,
     TaskTrackingAction,
+    TaskStateAction,
 )
 from backend.ledger.action.mcp import MCPAction
 from backend.ledger.action.search import GlobAction, GrepAction
@@ -397,6 +399,19 @@ def _handle_analyze_project_structure_tool(
         AnalyzeProjectStructureAction,
         build_analyze_project_structure_action(dict(arguments)),
     )
+
+
+def _handle_task_state_tool(arguments: Mapping[str, Any]) -> TaskStateAction:
+    """Validate a canonical task-state command without coupling tool dispatch to storage."""
+    command = require_tool_argument(arguments, 'action', TASK_STATE_TOOL_NAME)
+    if command not in {'set', 'update_task', 'review', 'audit'}:
+        raise FunctionCallValidationError(f'Unsupported task_state action {command!r}')
+    if command == 'update_task':
+        require_tool_argument(arguments, 'task_id', TASK_STATE_TOOL_NAME)
+        require_tool_argument(arguments, 'status', TASK_STATE_TOOL_NAME)
+    if command == 'audit' and 'evidence' not in arguments:
+        raise FunctionCallValidationError('task_state(audit) requires evidence.')
+    return TaskStateAction(command=command, arguments=dict(arguments))
 
 
 def _normalize_task_tracker_step(s: Mapping[str, Any], idx: int) -> dict[str, Any]:

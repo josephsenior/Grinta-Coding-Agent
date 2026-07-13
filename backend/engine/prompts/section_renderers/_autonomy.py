@@ -204,46 +204,15 @@ def _render_autonomy(
     )
     if tracker_on:
         task_tracker_discipline_block = (
-            '<TASK_TRACKING>\n'
-            '**Purpose:** Coarse execution milestones (3–7 steps) — activities and sequencing, '
-            'not verifiable done-conditions.\n'
-            '**When:** After `acceptance_criteria(update)` scopes outcomes and before editing '
-            'files or running commands.\n'
-            '**Commands:** `view` (read plan), `update` (replace full `task_list`), '
-            '`update_status` (one step by `task_id`).\n'
-            '**Step fields:** `id`, `description`, `status` '
-            '(`todo`|`in_progress`|`done`|`skipped`|`blocked`), optional `result`, '
-            'optional `tags` (list of strings).\n'
-            '**Completion:** Before the final summary, no step stays `todo`/`in_progress` '
-            'unless genuinely `blocked` with a reason.\n'
-            '**Live state:** `<EXECUTION_CONTRACT>` in `<CONTEXT_PACKET>` each turn.\n'
-            f'{_CRITERIA_VS_TASKS_LINE}\n'
-            '</TASK_TRACKING>'
+            '<TASK_STATE>\n'
+            'Use `task_state` for durable multi-step cognition. The contract records WHAT must remain true: objective, explicit requirements, constraints, and verifiable success conditions. The plan records HOW you currently intend to work and may be rewritten when evidence changes.\n'
+            'Commands: `set` (replace only supplied contract/plan fields), `update_task`, `review`, `audit`. Lightweight work may use tasks alone. Never record an implementation hypothesis as a user requirement; never silently weaken a user requirement. Audit contract items with concrete evidence before finishing.\n'
+            '</TASK_STATE>'
         )
     else:
         task_tracker_discipline_block = ''
 
-    if criteria_on:
-        acceptance_criteria_discipline_block = (
-            '<ACCEPTANCE_CRITERIA>\n'
-            '**Purpose:** Flat auditable assertions — what must be true when done, '
-            'not activity steps.\n'
-            '**When:** `update` to scope outcomes before `task_tracker` and implementation; '
-            '`audit(audit_entries=[...])` before the final summary.\n'
-            '**Commands:** `view`, `update` (full list), `append`, '
-            '`refine(criterion_id, new_assertion, reason)`, `audit`.\n'
-            '**Audit evidence:** each `audit_entries` item needs `criterion_id` and '
-            'short `evidence` text — quote the relevant command output, test summary, '
-            'or state an explicit gap (e.g. "GAP: not verified on this platform").\n'
-            '**Item fields:** `assertion`, `source` (`stated`|`inferred`); stable `id` on write.\n'
-            '**Rules:** Fix one assertion with `refine` — never rewrite the full list.\n'
-            '**Live state:** `<EXECUTION_CONTRACT>` in `<CONTEXT_PACKET>` each turn.\n'
-            f'{_CRITERIA_VS_TASKS_LINE}\n'
-            '**Workflow examples:** see `<COMMON_PATTERNS>`.\n'
-            '</ACCEPTANCE_CRITERIA>'
-        )
-    else:
-        acceptance_criteria_discipline_block = ''
+    acceptance_criteria_discipline_block = ''
 
     problem_solving_workflow_body = (
         'Default loop: scope → reproduce → isolate → fix → verify.\n'
