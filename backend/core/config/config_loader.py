@@ -429,6 +429,7 @@ def _apply_json_mcp_servers(cfg: AppConfig, data: dict[str, object]) -> None:
 
     if 'enabled' in mcp_config:
         cfg.mcp.enabled = bool(mcp_config.get('enabled'))
+        cfg._mcp_enabled_set_in_json = True
 
     raw_servers = mcp_config.get('servers') or []
     parsed = [
@@ -661,7 +662,16 @@ def finalize_config(cfg: AppConfig) -> None:
     from backend.core.config.mcp_config import extend_mcp_servers_with_bundled_defaults
 
     _ensure_active_agent_compactor_llm(cfg)
-    cfg.get_agent_config(cfg.default_agent)
+    if getattr(cfg, '_mcp_enabled_set_in_json', False):
+        mcp_enabled = cfg.mcp.enabled
+        for name in list(cfg.agents.keys()):
+            cfg.agents[name] = cfg.agents[name].model_copy(update={'enable_mcp': mcp_enabled})
+            
+        agent_base = cfg.get_agent_config(cfg.default_agent)
+        if agent_base.enable_mcp != mcp_enabled:
+            cfg.agents[cfg.default_agent] = agent_base.model_copy(update={'enable_mcp': mcp_enabled})
+    else:
+        cfg.get_agent_config(cfg.default_agent)
     from backend.utils.optional_extras import browser_tool_enabled
 
     cfg.enable_browser = browser_tool_enabled(cfg)

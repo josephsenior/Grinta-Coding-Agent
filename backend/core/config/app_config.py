@@ -234,6 +234,7 @@ class AppConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     defaults_dict: ClassVar[dict] = {}
     _minimal_mode: bool = PrivateAttr(default=False)
     _accessible_mode: bool = PrivateAttr(default=False)
+    _mcp_enabled_set_in_json: bool = PrivateAttr(default=False)
     model_config = ConfigDict(extra='forbid', arbitrary_types_allowed=True)
 
     def get_llm_config(self, name: str = 'llm') -> LLMConfig:

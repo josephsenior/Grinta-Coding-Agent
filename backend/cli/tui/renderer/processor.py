@@ -342,13 +342,7 @@ def _process_event_commit_response(
     if isinstance(event, (MessageAction, StreamingChunkAction)):
         return
     if orch._live_response_dirty:
-        if is_tool:
-            orch.clear_live_response()
-            orch._step_draft.begin_stream_leg()
-        else:
-            orch._commit_final_response(orch._live_response)
-    elif is_tool:
-        orch._step_draft.begin_stream_leg()
+        orch._commit_final_response(orch._live_response)
     else:
         orch.clear_live_response()
 

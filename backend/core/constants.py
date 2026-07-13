@@ -348,8 +348,8 @@ DEFAULT_AGENT_AUTO_RETRY_ON_ERROR = True
 DEFAULT_AGENT_AUTONOMY_LEVEL = 'balanced'
 # LSP / DAP tools are opt-in: set lsp_config.enabled / dap_config.enabled in settings.json.
 # When enabled, runtime detection still gates availability on installed adapters.
-DEFAULT_AGENT_LSP_QUERY_ENABLED = False
-DEFAULT_AGENT_DEBUGGER_ENABLED = False
+DEFAULT_AGENT_LSP_QUERY_ENABLED = True
+DEFAULT_AGENT_DEBUGGER_ENABLED = True
 
 # Optional LLM-initiated compaction; automatic condensation still runs when needed.
 DEFAULT_AGENT_CONDENSATION_REQUEST_ENABLED = False

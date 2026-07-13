@@ -182,12 +182,12 @@ class TestFeatureFlagToolPresence:
 
     def test_task_tracker_enabled(self):
         names = _build_toolset(enable_task_tracker_tool=True)
-        assert 'task_tracker' in names
+        assert 'task_state' in names
         self._assert_dispatch_covered(names)
 
     def test_task_tracker_disabled(self):
         names = _build_toolset(enable_task_tracker_tool=False)
-        assert 'task_tracker' not in names
+        assert 'task_state' not in names
 
     def test_working_memory_enabled(self):
         from unittest.mock import patch
@@ -308,8 +308,7 @@ class TestModeToolVisibility:
             'docs_resolve',
             'docs_query',
             'ask_user',
-            'task_tracker',
-            'acceptance_criteria',
+            'task_state',
         }
         assert {
             'create_file',
@@ -384,7 +383,7 @@ class TestModeToolVisibility:
             'ask_user',
         }
         assert {
-            'task_tracker',
+            'task_state',
             'create_file',
             'replace_string',
             'multiedit',
