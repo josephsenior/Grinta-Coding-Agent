@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-import os
 import re
 import time
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+
 
 @dataclass
 class ProjectMemoryEntry:
@@ -16,8 +15,8 @@ class ProjectMemoryEntry:
     status: str  # active, stale, superseded, archived
     fact: str
     evidence: list[str] = field(default_factory=list)
-    created: str = ""
-    last_verified: str = ""
+    created: str = ''
+    last_verified: str = ''
     confidence: float = 1.0
     source_sessions: list[str] = field(default_factory=list)
     superseded_by: list[str] = field(default_factory=list)
@@ -37,15 +36,15 @@ def parse_markdown_memory(text: str) -> list[ProjectMemoryEntry]:
         if len(header_parts) < 3:
             continue
         entry_id, kind, status = header_parts[0], header_parts[1], header_parts[2]
-        
-        fact = ""
+
+        fact = ''
         evidence = []
-        created = ""
-        last_verified = ""
+        created = ''
+        last_verified = ''
         confidence = 1.0
         source_sessions = []
         superseded_by = []
-        
+
         in_evidence = False
         for line in lines[1:]:
             line_stripped = line.strip()
@@ -81,7 +80,7 @@ def parse_markdown_memory(text: str) -> list[ProjectMemoryEntry]:
                     evidence.append(line_stripped[2:].strip())
                 else:
                     evidence.append(line_stripped)
-        
+
         entries.append(ProjectMemoryEntry(
             id=entry_id,
             kind=kind,
@@ -99,30 +98,30 @@ def parse_markdown_memory(text: str) -> list[ProjectMemoryEntry]:
 
 def serialize_markdown_memory(entries: list[ProjectMemoryEntry]) -> str:
     """Serialize project memory entries back to standard Markdown format."""
-    lines = ["# Grinta Project Memory", ""]
+    lines = ['# Grinta Project Memory', '']
     for entry in entries:
-        lines.append(f"## {entry.id} · {entry.kind} · {entry.status}")
-        lines.append("")
-        lines.append(f"**Fact:** {entry.fact}")
-        lines.append("")
-        lines.append("**Evidence:**")
+        lines.append(f'## {entry.id} · {entry.kind} · {entry.status}')
+        lines.append('')
+        lines.append(f'**Fact:** {entry.fact}')
+        lines.append('')
+        lines.append('**Evidence:**')
         if entry.evidence:
             for ev in entry.evidence:
-                lines.append(f"- {ev}")
+                lines.append(f'- {ev}')
         else:
-            lines.append("- None")
-        lines.append("")
-        lines.append(f"**Created:** {entry.created}")
-        lines.append(f"**Last verified:** {entry.last_verified}")
-        lines.append(f"**Confidence:** {entry.confidence:.2f}")
+            lines.append('- None')
+        lines.append('')
+        lines.append(f'**Created:** {entry.created}')
+        lines.append(f'**Last verified:** {entry.last_verified}')
+        lines.append(f'**Confidence:** {entry.confidence:.2f}')
         if entry.source_sessions:
             lines.append(f"**Source sessions:** {', '.join(entry.source_sessions)}")
         if entry.superseded_by:
             lines.append(f"**Superseded by:** {', '.join(entry.superseded_by)}")
-        lines.append("")
-        lines.append("---")
-        lines.append("")
-    return "\n".join(lines).strip() + "\n"
+        lines.append('')
+        lines.append('---')
+        lines.append('')
+    return '\n'.join(lines).strip() + '\n'
 
 
 def _facts_are_similar(fact1: str, fact2: str) -> bool:
@@ -146,7 +145,7 @@ class ProjectMemoryService:
             from backend.core.workspace_resolution import get_effective_workspace_root
             workspace_root = get_effective_workspace_root()
         self.workspace_root = workspace_root
-        
+
     def _memory_file_path(self) -> Path:
         if self.workspace_root is not None:
             p = self.workspace_root / '.grinta' / 'project_memory.md'
@@ -154,7 +153,7 @@ class ProjectMemoryService:
             return p
         from backend.core.workspace_resolution import workspace_agent_state_dir
         return workspace_agent_state_dir() / 'project_memory.md'
-        
+
     def load(self) -> list[ProjectMemoryEntry]:
         p = self._memory_file_path()
         if not p.is_file():
@@ -163,7 +162,7 @@ class ProjectMemoryService:
             return parse_markdown_memory(p.read_text(encoding='utf-8'))
         except Exception:
             return []
-            
+
     def save(self, entries: list[ProjectMemoryEntry]) -> None:
         p = self._memory_file_path()
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -181,14 +180,14 @@ class ProjectMemoryService:
         entries = self.load()
         now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
         evidence = evidence or []
-        
+
         # Find existing active entry with similar fact
         existing = None
         for entry in entries:
             if entry.status == 'active' and _facts_are_similar(entry.fact, fact):
                 existing = entry
                 break
-                
+
         if existing:
             existing.last_verified = now
             for ev in evidence:
@@ -205,8 +204,8 @@ class ProjectMemoryService:
                 match = re.match(r'mem-(\d+)', entry.id)
                 if match:
                     max_num = max(max_num, int(match.group(1)))
-            next_id = f"mem-{max_num + 1:03d}"
-            
+            next_id = f'mem-{max_num + 1:03d}'
+
             new_entry = ProjectMemoryEntry(
                 id=next_id,
                 kind=kind,
@@ -265,36 +264,36 @@ class ProjectMemoryService:
         entries = [e for e in self.load() if e.status == 'active']
         if not query:
             return entries[:limit]
-        
+
         def get_words(text: str):
             return set(re.findall(r'[a-z0-9]+', text.lower()))
-        
+
         query_words = get_words(query)
         if not query_words:
             return entries[:limit]
-            
+
         scored = []
         for entry in entries:
             entry_words = get_words(entry.fact) | get_words(entry.kind)
             overlap = len(query_words & entry_words)
             scored.append((overlap, entry))
-            
+
         scored.sort(key=lambda x: x[0], reverse=True)
         return [item[1] for item in scored[:limit]]
 
 
 def migrate_legacy_memories(workspace_root: Path | None = None) -> None:
     """Migrate legacy workspace_memory.json and lessons.md to project_memory.md."""
-    from backend.engine.tools.workspace_memory import list_entries
     from backend.core.workspace_resolution import workspace_agent_state_dir
-    
+    from backend.engine.tools.workspace_memory import list_entries
+
     service = ProjectMemoryService(workspace_root)
     pm_file = service._memory_file_path()
     if pm_file.is_file():
         return
-        
+
     migrated_facts = []
-    
+
     try:
         json_entries = list_entries()
         for je in json_entries:
@@ -303,15 +302,15 @@ def migrate_legacy_memories(workspace_root: Path | None = None) -> None:
             value = je.get('value', '')
             if key == 'session_summary' or kind == 'preference':
                 continue
-            fact = f"{key}: {value}" if key else value
+            fact = f'{key}: {value}' if key else value
             migrated_facts.append((kind, fact, je.get('created', ''), je.get('seen_count', 1)))
     except Exception:
         pass
-        
+
     if workspace_root is None:
         from backend.core.workspace_resolution import get_effective_workspace_root
         workspace_root = get_effective_workspace_root()
-        
+
     if workspace_root:
         paths = [
             workspace_agent_state_dir(workspace_root) / 'lessons.md',
@@ -332,11 +331,11 @@ def migrate_legacy_memories(workspace_root: Path | None = None) -> None:
                                 migrated_facts.append(('lesson', line, '', 1))
                 except Exception:
                     pass
-                    
+
     for kind, fact, created, seen_count in migrated_facts:
         service.upsert_candidate(
             kind=kind,
             fact=fact,
             confidence=0.9,
-            evidence=[f"Migrated from legacy store (seen {seen_count} times)."]
+            evidence=[f'Migrated from legacy store (seen {seen_count} times).']
         )

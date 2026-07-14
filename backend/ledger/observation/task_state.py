@@ -1,8 +1,10 @@
 """Observation emitted by the canonical task-state service."""
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
+
 from backend.core.schemas import ObservationType
 from backend.ledger.observation.observation import Observation
+
 
 @dataclass
 class TaskStateObservation(Observation):

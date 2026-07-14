@@ -666,7 +666,7 @@ def finalize_config(cfg: AppConfig) -> None:
         mcp_enabled = cfg.mcp.enabled
         for name in list(cfg.agents.keys()):
             cfg.agents[name] = cfg.agents[name].model_copy(update={'enable_mcp': mcp_enabled})
-            
+
         agent_base = cfg.get_agent_config(cfg.default_agent)
         if agent_base.enable_mcp != mcp_enabled:
             cfg.agents[cfg.default_agent] = agent_base.model_copy(update={'enable_mcp': mcp_enabled})

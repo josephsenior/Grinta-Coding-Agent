@@ -156,7 +156,7 @@ class TestObservationType:
         assert ObservationType.BROWSER_SCREENSHOT.value == 'browser_screenshot'
 
     def test_count(self):
-        assert len(ObservationType) == 36
+        assert len(ObservationType) == 37
 
 
 class TestExitReason:

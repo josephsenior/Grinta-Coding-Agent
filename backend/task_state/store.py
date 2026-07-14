@@ -39,5 +39,6 @@ class TaskStateStore:
         with tempfile.NamedTemporaryFile(prefix=f'.{self.path.name}.', dir=self.path.parent, delete=False, mode='w', encoding='utf-8') as handle:
             tmp = Path(handle.name)
             json.dump(state.to_dict(), handle, indent=2, ensure_ascii=False)
-            handle.flush(); os.fsync(handle.fileno())
+            handle.flush()
+            os.fsync(handle.fileno())
         replace_file_with_retry(tmp, self.path)

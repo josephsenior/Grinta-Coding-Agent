@@ -13,8 +13,8 @@ from backend.core.tools.tool_names import (
     GREP_TOOL_NAME,
     LSP_TOOL_NAME,
     READ_FILE_TOOL_NAME,
-    TASK_TRACKER_TOOL_NAME,
     TASK_STATE_TOOL_NAME,
+    TASK_TRACKER_TOOL_NAME,
     WEB_FETCH_TOOL_NAME,
     WEB_SEARCH_TOOL_NAME,
 )
@@ -65,8 +65,8 @@ def action_blocked_for_interaction_mode(action: object, mode: object) -> str | N
         AcceptanceCriteriaAction,
         BlackboardAction,
         DelegateTaskAction,
-        TaskTrackingAction,
         TaskStateAction,
+        TaskTrackingAction,
     )
     from backend.ledger.action.browse import BrowseInteractiveAction
     from backend.ledger.action.browser_tool import BrowserToolAction

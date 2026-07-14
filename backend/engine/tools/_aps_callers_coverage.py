@@ -115,7 +115,7 @@ def _build_callers_action(symbol: str, scope: str) -> str:
 
     safe_scope = scope if scope and scope != '.' else '.'
     report = analyze_symbol_impact(safe_scope, symbol)
-    
+
     if report is None or report.total_references == 0:
         trunc_sym = f'{symbol[:40]}…' if len(symbol) > 40 else symbol
         return _diag(
@@ -144,11 +144,11 @@ def _build_callers_action(symbol: str, scope: str) -> str:
         out.append('Reasons:')
         for reason in report.reasons:
             out.append(f'- {reason}')
-            
+
     out.append('\nLocations:')
     for loc in report.locations:
         out.append(f'  {loc.file_path}:{loc.line}: {loc.text}')
     if report.truncated:
         out.append('  … (truncated)')
-        
+
     return '\n'.join(out)

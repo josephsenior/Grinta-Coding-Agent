@@ -969,12 +969,10 @@ class TestBuildSystemPromptRenders:
             function_calling_mode='native',
         )
         assert '<COMMON_PATTERNS>' in result
-        assert '<ACCEPTANCE_CRITERIA>' in result
-        assert '**Purpose:**' in result
-        assert '**Live state:**' in result
-        assert 'audit_entries' in result
-        assert 'evidence' in result
-        assert 'audit(audit_entries)' in result
+        assert '<TASK_STATE>' in result
+        assert 'Use `task_state` for durable multi-step cognition.' in result
+        assert 'contract records WHAT must remain true' in result
+        assert 'Audit contract items with concrete evidence' in result
 
     def test_ask_user_in_system_prompt(self) -> None:
         result = self._assert_renders_cleanly(

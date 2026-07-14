@@ -1,8 +1,10 @@
 """Single model-facing tool for durable contract and plan state."""
 from typing import Any
+
 from backend.core.tools.tool_names import TASK_STATE_TOOL_NAME
 from backend.engine.contracts import ChatCompletionToolParam
 from backend.engine.tools.param_defs import create_tool_definition, get_command_param
+
 
 def create_task_state_tool() -> ChatCompletionToolParam:
     item: dict[str, Any] = {'type':'object','properties':{'id':{'type':'string'},'text':{'type':'string'},'source':{'type':'string','enum':['user','repository','system','agent']},'status':{'type':'string','enum':['unknown','satisfied','gap','not_applicable']}},'required':['text'],'additionalProperties':False}

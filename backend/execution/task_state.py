@@ -1,7 +1,9 @@
 """Runtime integration for canonical task-state commands."""
 from __future__ import annotations
+
 from backend.ledger.observation import ErrorObservation, Observation
 from backend.ledger.observation.task_state import TaskStateObservation
+
 
 class TaskStateMixin:
     def _handle_task_state_action(self, action) -> Observation:

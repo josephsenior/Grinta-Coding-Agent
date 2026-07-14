@@ -706,7 +706,7 @@ def compact_metadata_for_log(metadata: dict[str, Any] | None) -> dict[str, Any] 
 
 
 def _compact_capabilities_for_log(capabilities: dict[str, Any]) -> dict[str, Any]:
-    compact = {
+    compact: dict[str, Any] = {
         key: capabilities[key]
         for key in ('temperature', 'reasoning', 'attachment', 'toolcall', 'interleaved')
         if key in capabilities

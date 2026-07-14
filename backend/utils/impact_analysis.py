@@ -12,7 +12,7 @@ import shutil
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal, Any
+from typing import Literal
 
 from backend.core.logging.logger import app_logger as logger
 from backend.utils.lsp.lsp_client import get_lsp_client
@@ -40,8 +40,8 @@ class ReferenceLocation:
 class ImpactReport:
     symbol: str
     definition_file: str
-    engine: Literal["lsp", "ripgrep", "ast", "unknown"]
-    confidence: Literal["high", "medium", "low"]
+    engine: Literal['lsp', 'ripgrep', 'ast', 'unknown']
+    confidence: Literal['high', 'medium', 'low']
 
     total_references: int
     unique_files: int
@@ -52,7 +52,7 @@ class ImpactReport:
     locations: list[ReferenceLocation] = field(default_factory=list)
     truncated: bool = False
 
-    risk: Literal["low", "medium", "high"] = "low"
+    risk: Literal['low', 'medium', 'high'] = 'low'
     reasons: list[str] = field(default_factory=list)
 
 
@@ -60,16 +60,16 @@ def _is_test_file(file_path: str) -> bool:
     """Classify if a file is a test file based on its name and path parts."""
     parts = Path(file_path).parts
     name = Path(file_path).name.lower()
-    
+
     # Check if name contains test_ or _test
     if 'test_' in name or '_test' in name:
         return True
-        
+
     # Check if any path segment matches test, tests, spec, or specs
     test_dirs = {'test', 'tests', 'spec', 'specs'}
     if any(p.lower() in test_dirs for p in parts):
         return True
-        
+
     return False
 
 
@@ -82,7 +82,7 @@ def _grep_fallback_locations(
     """Find references using ripgrep or grep walking when LSP is unavailable."""
     locations: list[ReferenceLocation] = []
     rg = shutil.which('rg')
-    
+
     if rg:
         cmd = [
             rg,
@@ -93,7 +93,7 @@ def _grep_fallback_locations(
             symbol_name,
             search_root,
         ]
-        
+
         try:
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
             for line in proc.stdout.splitlines():
@@ -105,19 +105,19 @@ def _grep_fallback_locations(
                         line_num = int(line_str)
                     except ValueError:
                         continue
-                    
+
                     # Normalize file path relative to search root / PROJECT_ROOT
                     rel_path = os.path.relpath(file_path, search_root).replace(os.sep, '/')
-                    
+
                     # Exclude the definition line itself
                     if os.path.abspath(file_path) == os.path.abspath(definition_file) and line_num == definition_line:
                         continue
-                        
+
                     # Skip comment lines
                     stripped = text.strip()
                     if stripped.startswith('#') or stripped.startswith('//') or stripped.startswith('/*'):
                         continue
-                        
+
                     locations.append(
                         ReferenceLocation(
                             file_path=rel_path,
@@ -131,23 +131,27 @@ def _grep_fallback_locations(
             logger.debug('Ripgrep fallback failed: %s', exc)
     else:
         # Walk directories as secondary fallback
-        from backend.engine.tools.ignore_filter import get_ignore_spec, prune_ignored_dirs, is_ignored_file
-        
+        from backend.engine.tools.ignore_filter import (
+            get_ignore_spec,
+            is_ignored_file,
+            prune_ignored_dirs,
+        )
+
         spec = get_ignore_spec(search_root)
         sym_re = re.compile(r'\b' + re.escape(symbol_name) + r'\b', re.IGNORECASE)
         for root_dir, dirs, files in os.walk(search_root):
             prune_ignored_dirs(search_root, root_dir, dirs, spec)
-            
+
             for file in files:
                 if is_ignored_file(search_root, root_dir, file, spec):
                     continue
                 if Path(file).suffix.lower() in _COMMON_EXTENSIONS:
                     fpath = os.path.join(root_dir, file)
                     rel_path = os.path.relpath(fpath, search_root).replace(os.sep, '/')
-                    
+
                     # Exclude definition file on definition line
                     is_def_file = os.path.abspath(fpath) == os.path.abspath(definition_file)
-                    
+
                     try:
                         with open(fpath, encoding='utf-8', errors='ignore') as fl:
                             for idx, line in enumerate(fl, 1):
@@ -168,7 +172,7 @@ def _grep_fallback_locations(
                                     )
                     except Exception:
                         pass
-                        
+
     return locations
 
 
@@ -176,7 +180,7 @@ def _find_defining_file(symbol_name: str, search_root: str) -> str | None:
     """Find a file in the workspace that defines symbol_name (with def or class)."""
     rg = shutil.which('rg')
     pattern = rf'\b(def|class)\s+{re.escape(symbol_name)}\b'
-    
+
     if rg:
         cmd = [
             rg,
@@ -192,8 +196,12 @@ def _find_defining_file(symbol_name: str, search_root: str) -> str | None:
                 return os.path.abspath(lines[0])
         except Exception:
             pass
-            
-    from backend.engine.tools.ignore_filter import get_ignore_spec, prune_ignored_dirs, is_ignored_file
+
+    from backend.engine.tools.ignore_filter import (
+        get_ignore_spec,
+        is_ignored_file,
+        prune_ignored_dirs,
+    )
     spec = get_ignore_spec(search_root)
     sym_re = re.compile(pattern)
     for root_dir, dirs, files in os.walk(search_root):
@@ -228,7 +236,7 @@ def analyze_symbol_impact(
         editor = TreeSitterEditor()
         search_root = os.environ.get('PROJECT_ROOT') or os.getcwd()
         resolved_file = None
-        
+
         # Determine if file_path is a directory or None
         if not file_path or file_path == '.' or os.path.isdir(file_path):
             resolved_file = _find_defining_file(symbol_name, search_root)
@@ -236,16 +244,16 @@ def analyze_symbol_impact(
             resolved_file = os.path.abspath(file_path)
 
         locations: list[ReferenceLocation] = []
-        engine: Literal["lsp", "ripgrep", "ast", "unknown"] = "unknown"
-        confidence: Literal["high", "medium", "low"] = "low"
-        def_file_rel = ""
+        engine: Literal['lsp', 'ripgrep', 'ast', 'unknown'] = 'unknown'
+        confidence: Literal['high', 'medium', 'low'] = 'low'
+        def_file_rel = ''
 
         if resolved_file and os.path.exists(resolved_file):
             loc = editor.find_symbol(resolved_file, symbol_name)
             if not loc:
                 logger.debug('Symbol %s not found in file %s', symbol_name, resolved_file)
-                engine = "ripgrep"
-                confidence = "low"
+                engine = 'ripgrep'
+                confidence = 'low'
                 def_file_rel = os.path.relpath(resolved_file, search_root).replace(os.sep, '/')
                 locations = _grep_fallback_locations(symbol_name, resolved_file, 0, search_root)
             else:
@@ -266,15 +274,15 @@ def analyze_symbol_impact(
                         )
                     except Exception as e:
                         logger.debug('LSP query failed: %s', e)
-                        
+
                 if lsp_result and lsp_result.locations:
-                    engine = "lsp"
-                    confidence = "high"
+                    engine = 'lsp'
+                    confidence = 'high'
                     for ref in lsp_result.locations:
                         # Exclude the definition itself
                         if os.path.abspath(ref.file) == def_file and ref.line == def_line:
                             continue
-                        
+
                         # Fetch text content for the reference line if possible
                         text_content = ''
                         try:
@@ -285,7 +293,7 @@ def analyze_symbol_impact(
                                     text_content = lines[ref.line - 1].rstrip()
                         except Exception:
                             pass
-                        
+
                         rel_path = os.path.relpath(ref.file, search_root).replace(os.sep, '/')
                         locations.append(
                             ReferenceLocation(
@@ -298,14 +306,14 @@ def analyze_symbol_impact(
                         )
                 else:
                     # 2. Fallback to Ripgrep/Grep
-                    engine = "ripgrep"
-                    confidence = "medium"
+                    engine = 'ripgrep'
+                    confidence = 'medium'
                     locations = _grep_fallback_locations(symbol_name, def_file, def_line, search_root)
         else:
             # No definition file found, run pure fallback
-            engine = "ripgrep"
-            confidence = "low"
-            locations = _grep_fallback_locations(symbol_name, "", 0, search_root)
+            engine = 'ripgrep'
+            confidence = 'low'
+            locations = _grep_fallback_locations(symbol_name, '', 0, search_root)
 
         # Deduplicate locations by (file_path, line)
         seen = set()
@@ -319,28 +327,28 @@ def analyze_symbol_impact(
 
         # Calculate counts
         unique_files = len({loc_obj.file_path for loc_obj in locations})
-        
+
         external_file_refs = 0
         production_refs = 0
         test_refs = 0
-        
+
         for loc_obj in locations:
             if def_file_rel and loc_obj.file_path != def_file_rel:
                 external_file_refs += 1
             elif not def_file_rel:
                 external_file_refs += 1
-                
+
             if loc_obj.is_test:
                 test_refs += 1
             else:
                 production_refs += 1
-                
+
         total_references = len(locations)
-        
+
         # Risk assessment and reasoning
         reasons: list[str] = []
-        risk: Literal["low", "medium", "high"] = "low"
-        
+        risk: Literal['low', 'medium', 'high'] = 'low'
+
         # Determine package crossing
         crosses_package = False
         if resolved_file and os.path.exists(resolved_file):
@@ -354,40 +362,40 @@ def analyze_symbol_impact(
             # If no definition file, any reference crosses package
             if total_references > 0:
                 crosses_package = True
-        
+
         # Scoring risk rules:
         # High risk: refs > 15 OR unique files > 3 OR crosses package
         # Medium risk: refs > 5 OR unique files > 1 (cross-file)
         if total_references > 15 or unique_files > 3 or crosses_package:
-            risk = "high"
+            risk = 'high'
         elif total_references > 5 or unique_files > 1:
-            risk = "medium"
+            risk = 'medium'
         else:
-            risk = "low"
+            risk = 'low'
 
         if total_references > 15:
-            reasons.append(f"High number of references ({total_references})")
+            reasons.append(f'High number of references ({total_references})')
         if unique_files > 3:
-            reasons.append(f"Referenced across {unique_files} unique files")
+            reasons.append(f'Referenced across {unique_files} unique files')
         if crosses_package:
-            reasons.append("Referenced outside its defining package")
-            
-        if risk != "high":
+            reasons.append('Referenced outside its defining package')
+
+        if risk != 'high':
             if total_references > 5:
-                reasons.append(f"Moderate number of references ({total_references})")
+                reasons.append(f'Moderate number of references ({total_references})')
             elif unique_files > 1:
-                reasons.append(f"Referenced across {unique_files} files")
-                
+                reasons.append(f'Referenced across {unique_files} files')
+
         if total_references == 0:
-            risk = "low"
-            reasons.append("No references found outside the definition itself")
+            risk = 'low'
+            reasons.append('No references found outside the definition itself')
         else:
             if test_refs > 0 and production_refs > 0:
-                reasons.append("Referenced by both production and test code")
+                reasons.append('Referenced by both production and test code')
             elif production_refs > 0:
-                reasons.append("Referenced by production code")
+                reasons.append('Referenced by production code')
             elif test_refs > 0:
-                reasons.append("Referenced by test code only")
+                reasons.append('Referenced by test code only')
 
         # Exclude definition directory crossing if it's only in test files
         # Truncate locations if too large (e.g. > 50)

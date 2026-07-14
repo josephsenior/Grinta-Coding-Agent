@@ -363,7 +363,10 @@ def _process_event_commit_response(
     if orch._live_response_dirty:
         orch._commit_final_response(orch._live_response)
     else:
-        orch.clear_live_response()
+        if orch._live_response_dirty:
+            orch._commit_final_response(orch._live_response)
+        else:
+            orch.clear_live_response()
 
 
 def _process_event(orch: 'RendererEventProcessorMixin', event: Any) -> None:

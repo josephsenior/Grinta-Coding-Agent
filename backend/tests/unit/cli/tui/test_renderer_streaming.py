@@ -254,6 +254,7 @@ async def test_tui_streamed_response_clears_before_tool_action(mock_config):
 
         s = _get_screen(app)
         from backend.cli.tui.app import TUIRenderer
+        from backend.cli.tui.widgets.activity_card import AgentMessage
 
         renderer = TUIRenderer(
             console=console,
@@ -277,7 +278,8 @@ async def test_tui_streamed_response_clears_before_tool_action(mock_config):
 
         assert renderer._last_final_response_text == ''
         assert renderer._live_response == ''
-        assert len(renderer._history) == 0
+        assert len(renderer._history) == 1
+        assert isinstance(renderer._history[0], AgentMessage)
 
 
 @pytest.mark.asyncio

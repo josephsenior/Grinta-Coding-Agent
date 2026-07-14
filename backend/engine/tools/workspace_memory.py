@@ -252,13 +252,16 @@ def format_prompt_block(
 ) -> str:
     """Return a bounded workspace-memory block for system-prompt injection."""
     try:
-        from backend.context.memory.project_memory import ProjectMemoryService, migrate_legacy_memories
-        
+        from backend.context.memory.project_memory import (
+            ProjectMemoryService,
+            migrate_legacy_memories,
+        )
+
         # Automatically migrate legacy memories on first run
         migrate_legacy_memories()
-        
+
         service = ProjectMemoryService()
-        ranked = service.retrieve_relevant(query or "", limit=10)
+        ranked = service.retrieve_relevant(query or '', limit=10)
         if not ranked:
             return ''
 

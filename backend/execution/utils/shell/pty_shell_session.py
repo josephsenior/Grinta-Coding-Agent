@@ -306,25 +306,25 @@ class PtyInteractiveShellSession(BaseShellSession):
         try:
             from backend.core.constants import CMD_OUTPUT_PS1_BEGIN, CMD_OUTPUT_PS1_END
             prompt_fn = (
-                "function prompt { "
-                "  $ok = $?; "
-                "  $last_exit = $global:LASTEXITCODE; "
-                "  if ($last_exit -eq $null) { $last_exit = 0 }; "
-                "  if (-not $ok) { if ($last_exit -eq 0) { $last_exit = 1 } }; "
-                "  $pid_val = $PID; "
-                "  $cwd = (Get-Location).Path; "
-                "  $py_exe = (Get-Command python3, python, py -ErrorAction SilentlyContinue | Select-Object -First 1 | Select-Object -ExpandProperty Source); "
-                "  $py_path = if ($py_exe) { $py_exe } else { $null }; "
-                "  $metadata = @{ "
-                "    pid = $pid_val; "
-                "    exit_code = $last_exit; "
-                "    working_dir = $cwd; "
-                "    username = $env:USERNAME; "
-                "    hostname = $env:COMPUTERNAME; "
-                "    py_interpreter_path = $py_path "
-                "  } | ConvertTo-Json -Compress; "
-                f"  return \"`n{CMD_OUTPUT_PS1_BEGIN.strip()}`n\" + $metadata + \"`n{CMD_OUTPUT_PS1_END.strip()}`n\" "
-                "}\r"
+                'function prompt { '
+                '  $ok = $?; '
+                '  $last_exit = $global:LASTEXITCODE; '
+                '  if ($last_exit -eq $null) { $last_exit = 0 }; '
+                '  if (-not $ok) { if ($last_exit -eq 0) { $last_exit = 1 } }; '
+                '  $pid_val = $PID; '
+                '  $cwd = (Get-Location).Path; '
+                '  $py_exe = (Get-Command python3, python, py -ErrorAction SilentlyContinue | Select-Object -First 1 | Select-Object -ExpandProperty Source); '
+                '  $py_path = if ($py_exe) { $py_exe } else { $null }; '
+                '  $metadata = @{ '
+                '    pid = $pid_val; '
+                '    exit_code = $last_exit; '
+                '    working_dir = $cwd; '
+                '    username = $env:USERNAME; '
+                '    hostname = $env:COMPUTERNAME; '
+                '    py_interpreter_path = $py_path '
+                '  } | ConvertTo-Json -Compress; '
+                f'  return "`n{CMD_OUTPUT_PS1_BEGIN.strip()}`n" + $metadata + "`n{CMD_OUTPUT_PS1_END.strip()}`n" '
+                '}\r'
             )
             pty.write(prompt_fn)
             time.sleep(0.5)

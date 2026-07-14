@@ -3,19 +3,17 @@
 from __future__ import annotations
 
 import json
-import logging
-import re
-import time
 from typing import Any
 
+from backend.context.memory.project_memory import ProjectMemoryService
 from backend.core.logging.logger import app_logger as logger
 from backend.ledger import EventSource
-from backend.context.memory.project_memory import ProjectMemoryService
+
 
 def _has_unresolved_tasks(state: Any) -> bool:
     if not getattr(state, 'plan', None):
         return False
-    
+
     def _is_unresolved(step: Any) -> bool:
         if getattr(step, 'status', 'todo') in {'todo', 'in_progress'}:
             return True
@@ -23,7 +21,7 @@ def _has_unresolved_tasks(state: Any) -> bool:
             if _is_unresolved(sub):
                 return True
         return False
-        
+
     for step in getattr(state.plan, 'steps', []):
         if _is_unresolved(step):
             return True
@@ -33,7 +31,7 @@ def _has_unresolved_tasks(state: Any) -> bool:
 def detect_reflection_signals(history: list[Any]) -> list[str]:
     """Scan history for signals of durable memory candidates."""
     signals = []
-    
+
     # 1. Check for file mutations (Create/Edit/Write)
     mutated = False
     for event in history:
@@ -42,19 +40,19 @@ def detect_reflection_signals(history: list[Any]) -> list[str]:
             mutated = True
             break
     if mutated:
-        signals.append("mutation")
-        
+        signals.append('mutation')
+
     # 2. Check for user corrections
     user_correction = False
     for event in history:
         if getattr(event, 'source', None) == EventSource.USER and hasattr(event, 'content'):
             content = str(event.content).lower()
-            if any(word in content for word in ["wrong", "mistake", "error", "no, actually", "incorrect", "fix it"]):
+            if any(word in content for word in ['wrong', 'mistake', 'error', 'no, actually', 'incorrect', 'fix it']):
                 user_correction = True
                 break
     if user_correction:
-        signals.append("user_correction")
-        
+        signals.append('user_correction')
+
     # 3. Check for command failure recovery
     has_failure = False
     recovered = False
@@ -67,19 +65,19 @@ def detect_reflection_signals(history: list[Any]) -> list[str]:
             elif isinstance(exit_code, int) and exit_code == 0 and has_failure:
                 recovered = True
     if recovered:
-        signals.append("command_recovery")
-        
+        signals.append('command_recovery')
+
     # 4. Check for platform/quirk keywords in logs
     has_quirk = False
     for event in history:
         if hasattr(event, 'content'):
             content = str(event.content).lower()
-            if any(word in content for word in ["windows", "unix", "permission", "workaround", "quirk"]):
+            if any(word in content for word in ['windows', 'unix', 'permission', 'workaround', 'quirk']):
                 has_quirk = True
                 break
     if has_quirk:
-        signals.append("platform_quirk")
-        
+        signals.append('platform_quirk')
+
     return signals
 
 
@@ -97,7 +95,7 @@ def format_history_for_reflection(history: list[Any]) -> str:
             exit_code = getattr(event, 'exit_code', 0)
             output = getattr(event, 'content', '')
             output_snippet = output[:300] + '...' if len(output) > 300 else output
-            summary_lines.append(f"[Command Result] Exit Code: {exit_code}\nOutput: {output_snippet}")
+            summary_lines.append(f'[Command Result] Exit Code: {exit_code}\nOutput: {output_snippet}')
         elif class_name in {'FileEditAction', 'CreateFileAction', 'WriteFileAction'}:
             summary_lines.append(f"[File Mutate] {class_name} on {getattr(event, 'path', '')}")
         elif class_name in {'ErrorObservation', 'RecallFailureObservation'}:
@@ -118,28 +116,28 @@ async def persist_finish_lessons(
 
     # Check unresolved tasks
     if _has_unresolved_tasks(state):
-        logger.info("Unresolved tasks exist. Skipping memory reflection.")
+        logger.info('Unresolved tasks exist. Skipping memory reflection.')
         return
 
     history = getattr(state, 'history', [])
     signals = detect_reflection_signals(history)
     if not signals:
-        logger.info("No reflection signals detected. Skipping memory reflection.")
+        logger.info('No reflection signals detected. Skipping memory reflection.')
         return
 
-    logger.info("Memory reflection signals detected: %s. Starting targeted reflection.", signals)
+    logger.info('Memory reflection signals detected: %s. Starting targeted reflection.', signals)
 
     agent = getattr(controller, 'agent', None)
     llm = getattr(agent, 'llm', None)
     if not llm:
-        logger.info("No LLM configured on agent. Skipping memory reflection.")
+        logger.info('No LLM configured on agent. Skipping memory reflection.')
         return
 
     history_summary = format_history_for_reflection(history)
     prompt_messages = [
         {
-            "role": "system",
-            "content": (
+            'role': 'system',
+            'content': (
                 "You are Grinta's memory reflection service.\n"
                 "Analyze the session event history and extract durable, high-confidence project-scoped memories/lessons.\n\n"
                 "durable facts include:\n"
@@ -174,10 +172,10 @@ async def persist_finish_lessons(
             )
         },
         {
-            "role": "user",
-            "content": (
-                f"Session Final Summary:\n{summary}\n\n"
-                f"Session Event History:\n{history_summary}\n"
+            'role': 'user',
+            'content': (
+                f'Session Final Summary:\n{summary}\n\n'
+                f'Session Event History:\n{history_summary}\n'
             )
         }
     ]
@@ -190,7 +188,7 @@ async def persist_finish_lessons(
             end = raw_content.rfind('}')
             if start != -1 and end != -1:
                 raw_content = raw_content[start:end+1]
-        
+
         data = json.loads(raw_content)
         candidates = data.get('candidates', [])
         if not candidates:
@@ -207,13 +205,13 @@ async def persist_finish_lessons(
                     confidence=confidence,
                     source_session=session_id
                 )
-                logger.info("Upserted project memory candidate: %s -> %s", cand.get('fact', ''), entry_id)
+                logger.info('Upserted project memory candidate: %s -> %s', cand.get('fact', ''), entry_id)
                 # handle supersession
                 for superseded_id in cand.get('superseded_ids', []):
                     if service.supersede_entry(superseded_id, entry_id):
-                        logger.info("Project memory %s superseded by %s", superseded_id, entry_id)
+                        logger.info('Project memory %s superseded by %s', superseded_id, entry_id)
     except Exception as exc:
-        logger.warning("Failed to run post-session reflection candidate extraction: %s", exc, exc_info=True)
+        logger.warning('Failed to run post-session reflection candidate extraction: %s', exc, exc_info=True)
 
 
 __all__ = ['persist_finish_lessons']
