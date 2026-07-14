@@ -4134,6 +4134,8 @@
         "supports_function_calling": true,
         "supports_parallel_tool_calls": true,
         "supports_vision": false,
+        "supports_prompt_cache": true,
+        "prompt_cache_mode": "implicit",
         "inference_endpoint": "/chat/completions",
         "supports_stop_words": true,
         "supports_reasoning_effort": true,

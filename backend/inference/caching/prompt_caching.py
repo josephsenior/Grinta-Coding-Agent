@@ -85,9 +85,6 @@ def resolve_prompt_cache_mode_from_runtime(
     if provider_l == 'google' or client_l == 'google_native':
         return PROMPT_CACHE_EXPLICIT_RESOURCE
 
-    if runtime.get('supports_prompt_cache') is True:
-        return PROMPT_CACHE_EXPLICIT_HINTS
-
     if provider_l == 'anthropic' or client_l in {
         'anthropic_native',
         'anthropic_compatible',
@@ -97,6 +94,19 @@ def resolve_prompt_cache_mode_from_runtime(
     if name_l.startswith('anthropic/') or 'claude' in name_l:
         if provider_l in _GATEWAY_PROVIDERS or client_l == 'anthropic_compatible':
             return PROMPT_CACHE_EXPLICIT_HINTS
+
+    # A generic capability flag means "caching exists", not that the wire
+    # protocol accepts Anthropic cache_control markers. Non-Anthropic models
+    # use provider-managed prefix caching and, where supported, a stable
+    # prompt_cache_key routing hint.
+    if runtime.get('supports_prompt_cache') is True:
+        return PROMPT_CACHE_IMPLICIT
+
+    # OpenCode Zen exposes OpenAI-compatible implicit prefix caching for its
+    # model gateway, including zero-priced models whose cached-input price
+    # cannot be used as a capability signal (for example hy3-free).
+    if provider_l == 'opencode':
+        return PROMPT_CACHE_IMPLICIT
 
     if has_cached_pricing:
         return PROMPT_CACHE_IMPLICIT

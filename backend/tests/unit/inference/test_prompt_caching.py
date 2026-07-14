@@ -8,6 +8,7 @@ from backend.inference.caching.prompt_caching import (
     model_supports_prompt_cache_hints,
     model_uses_implicit_prompt_cache,
     prompt_cache_mode_for_model,
+    resolve_prompt_cache_mode_from_runtime,
 )
 from backend.inference.catalog.catalog_loader import apply_model_param_overrides, lookup
 from backend.inference.mappers.openai import strip_prompt_cache_hints_from_messages
@@ -72,6 +73,53 @@ def test_openai_gpt5_uses_implicit_cache_not_hints() -> None:
     assert not model_supports_prompt_cache_hints('openai/gpt-5')
     assert model_uses_implicit_prompt_cache('gpt-5', provider='openai')
     assert prompt_cache_mode_for_model('gpt-5', provider='openai') == 'implicit'
+
+
+def test_opencode_hy3_uses_implicit_prefix_cache() -> None:
+    assert not model_supports_prompt_cache_hints('opencode/hy3-free')
+    assert model_uses_implicit_prompt_cache('opencode/hy3-free')
+    assert prompt_cache_mode_for_model('opencode/hy3-free') == 'implicit'
+
+    out = apply_model_param_overrides(
+        'opencode/hy3-free',
+        {},
+        provider='opencode',
+        caching_prompt=True,
+        prompt_cache_variant='stable-prefix',
+    )
+    assert out['prompt_cache_key'] == (
+        'grinta:opencode:hy3-free:stable-prefix'
+    )
+
+
+def test_generic_cache_capability_uses_implicit_mode_for_openai_wire() -> None:
+    mode = resolve_prompt_cache_mode_from_runtime(
+        provider='example',
+        name='example-model',
+        runtime={'supports_prompt_cache': True},
+        client='openai_compatible',
+    )
+    assert mode == 'implicit'
+
+
+def test_opencode_zero_price_model_still_uses_implicit_cache() -> None:
+    mode = resolve_prompt_cache_mode_from_runtime(
+        provider='opencode',
+        name='free-model',
+        runtime={'cached_input_price_per_m': 0},
+        client='openai_compatible',
+    )
+    assert mode == 'implicit'
+
+
+def test_anthropic_cache_capability_keeps_explicit_hints() -> None:
+    mode = resolve_prompt_cache_mode_from_runtime(
+        provider='example',
+        name='claude-example',
+        runtime={'supports_prompt_cache': True},
+        client='anthropic_compatible',
+    )
+    assert mode == 'explicit_hints'
 
 
 def test_model_supports_hints_empty() -> None:
