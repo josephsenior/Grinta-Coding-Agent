@@ -481,6 +481,63 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         *,
         char_limit: int = 48000,
     ) -> str:
+        """Give the agent model chronological evidence for its own continuity.
+
+        No runtime classifier decides which tools, languages, errors, or facts
+        are semantically important.  The same model that performs the task sees
+        the ordered evidence and produces a reconciled working memory.
+        """
+        previous_summary = summary_event.message or '(no previous working memory)'
+        evidence: list[str] = []
+        for event in pruned_events:
+            evidence.append(
+                '\n'.join(
+                    (
+                        '<EVENT '
+                        f'id="{getattr(event, "id", -1)}" '
+                        f'type="{type(event).__name__}" '
+                        f'cause="{getattr(event, "cause", None)}">',
+                        str(event),
+                        '</EVENT>',
+                    )
+                )
+            )
+
+        return (
+            'You are the same agent model that is performing this task. Create '
+            'the working memory you will need after older events are removed. '
+            'This is continuity of your own reasoning, not a generic transcript '
+            'summary.\n\n'
+            'Use the chronological evidence directly. The previous working memory '
+            'is useful context but may be stale or mistaken; later direct evidence '
+            'wins. Internally reconstruct the timeline, reconcile contradictions, '
+            'and audit the draft for unsupported claims, lost user intent, stale '
+            'test status, and confusion between attempted, implemented, and '
+            'verified work. Output only the final reconciled working memory.\n\n'
+            'Preserve what is semantically useful for continuing this particular '
+            "task: the user's current intent and constraints, verified facts and "
+            'their evidence, current implementation state, unresolved uncertainty, '
+            'important decisions, failed approaches worth avoiding, and concrete '
+            'next work. Choose the organization that best fits the task. Do not '
+            'invent completion, rationale, or future actions. Clearly distinguish '
+            'observation from inference. Keep exact identifiers, paths, commands, '
+            'errors, and event references when their precision matters.\n\n'
+            f'The final working memory must not exceed {char_limit} characters.\n\n'
+            '<PREVIOUS_WORKING_MEMORY>\n'
+            f'{previous_summary}\n'
+            '</PREVIOUS_WORKING_MEMORY>\n\n'
+            '<CHRONOLOGICAL_EVIDENCE>\n'
+            + '\n'.join(evidence)
+            + '\n</CHRONOLOGICAL_EVIDENCE>\n'
+        )
+
+    def _build_legacy_condensation_prompt(
+        self,
+        summary_event: AgentCondensationObservation,
+        pruned_events: list,
+        *,
+        char_limit: int = 48000,
+    ) -> str:
         """Build the prompt for LLM condensation.
 
         Events are pre-digested into a compact type-grouped summary to reduce

@@ -51,17 +51,21 @@ def _update_or_write_delegate_card(
     resolved_task: str,
     success: bool,
     preview: str | None,
+    action_id: int | None,
 ) -> None:
     from backend.cli.tui.widgets.scan_line import DelegateCard
 
-    pending = orch._pending_delegate_card
+    pending = orch._take_tool_card(action_id, expected_kind='delegate')
+    if pending is None and (action_id is None or action_id < 0):
+        pending = orch._pending_delegate_card
     if isinstance(pending, DelegateCard):
         pending.complete(
             result=preview or '',
             success=success,
             worker=card.detail if hasattr(card, 'detail') else '',
         )
-        orch._pending_delegate_card = None
+        if orch._pending_delegate_card is pending:
+            orch._pending_delegate_card = None
         return
     orch._append_scan_line_card(
         DelegateCard(
@@ -87,6 +91,7 @@ def _handle_delegate_task_action(
     widget = DelegateCard(task, worker=worker)
     orch._append_scan_line_card(widget)
     orch._pending_delegate_card = widget
+    orch._register_tool_card(getattr(event, 'id', -1), widget, kind='delegate')
 
 
 def _handle_delegate_task_observation(
@@ -107,4 +112,11 @@ def _handle_delegate_task_observation(
         success=success,
     )
     preview = build_delegate_preview(detail)
-    _update_or_write_delegate_card(orch, card, resolved_task, success, preview)
+    _update_or_write_delegate_card(
+        orch,
+        card,
+        resolved_task,
+        success,
+        preview,
+        getattr(event, 'cause', None),
+    )

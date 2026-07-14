@@ -29,7 +29,11 @@ from backend.ledger.action.mcp import MCPAction
 from backend.ledger.action.search import GlobAction
 from backend.ledger.event import EventSource
 from backend.ledger.infra.tool import ToolCallMetadata, build_tool_call_metadata
-from backend.ledger.observation import AgentThinkObservation, ErrorObservation
+from backend.ledger.observation import (
+    AgentCondensationObservation,
+    AgentThinkObservation,
+    ErrorObservation,
+)
 from backend.ledger.observation.commands import CmdOutputObservation
 from backend.ledger.observation.files import FileEditObservation
 from backend.ledger.observation.mcp import MCPObservation
@@ -136,7 +140,9 @@ class TestMcpUserAddendum:
     def test_dynamic_snapshots_do_not_modify_leading_system_prefix(self):
         mem = _make_memory()
         prompt_manager = cast(MagicMock, mem.prompt_manager)
-        prompt_manager.get_mcp_user_addendum.return_value = '<MCP_TOOLS>live</MCP_TOOLS>'
+        prompt_manager.get_mcp_user_addendum.return_value = (
+            '<MCP_TOOLS>live</MCP_TOOLS>'
+        )
         mem.get_context_summary = MagicMock(  # type: ignore[method-assign]
             return_value='<SESSION_CONTEXT>now</SESSION_CONTEXT>'
         )
@@ -701,6 +707,26 @@ class TestUserMessageFormatting:
 
 
 class TestNormalizeSystemMessages:
+    def test_process_events_keeps_stable_prompt_and_current_context_packet(self):
+        mem = _make_memory()
+        user = MessageAction(content='Continue the task')
+        user.source = EventSource.USER
+        user.id = 1
+        packet = AgentCondensationObservation(
+            content='<CONTEXT_PACKET>current state</CONTEXT_PACKET>',
+            is_working_set=True,
+        )
+        packet.id = 2
+
+        result = mem.process_events([packet, user], user)
+        system_texts = [
+            message.content[0].text for message in result if message.role == 'system'
+        ]
+
+        assert system_texts[0] == 'You are Grinta, an expert AI coding agent.'
+        assert system_texts[1] == '<CONTEXT_PACKET>current state</CONTEXT_PACKET>'
+        assert len(system_texts) == 2
+
     def test_adds_system_if_missing(self):
         mem = _make_memory()
         msgs = [_text_msg('user', 'hi')]
@@ -716,7 +742,7 @@ class TestNormalizeSystemMessages:
         result = mem._normalize_system_messages(msgs)
         assert result[0].role == 'system'
 
-    def test_deduplicates_system_messages(self):
+    def test_preserves_distinct_system_messages(self):
         mem = _make_memory()
         msgs = [
             _text_msg('system', 'prompt'),
@@ -725,7 +751,8 @@ class TestNormalizeSystemMessages:
         ]
         result = mem._normalize_system_messages(msgs)
         system_count = sum(1 for m in result if m.role == 'system')
-        assert system_count == 1
+        assert system_count == 2
+        assert [m.content[0].text for m in result[:2]] == ['prompt', 'duplicate']
 
     def test_empty_messages(self):
         mem = _make_memory()

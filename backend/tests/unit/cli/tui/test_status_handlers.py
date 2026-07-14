@@ -93,3 +93,19 @@ class TestNotifyUiOnlyError:
 
         tui.add_error_panel.assert_not_called()
         assert tui.notify_warning.call_count == 1
+
+    def test_correlated_tool_error_updates_card_without_new_panel(self) -> None:
+        tui = SimpleNamespace(add_error_panel=MagicMock(), add_warning=MagicMock())
+        orch = SimpleNamespace(
+            _tui=tui,
+            _fail_tool_scan_card=MagicMock(return_value=True),
+        )
+        event = ErrorObservation(content='Pending action timed out')
+        event.cause = 91
+
+        _handle_error_observation(orch, event)
+
+        orch._fail_tool_scan_card.assert_called_once_with(
+            91, 'Pending action timed out'
+        )
+        tui.add_error_panel.assert_not_called()
