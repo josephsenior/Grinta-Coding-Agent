@@ -77,6 +77,40 @@ def _is_streaming_only_batch(events: list[Any]) -> bool:
     )
 
 
+def _is_tool_step_preamble(event: Any) -> bool:
+    """Return whether *event* must paint before the following tool card.
+
+    A model response with both prose and a tool call becomes a transcript-only
+    ``MessageAction`` followed by its executable action.  Keeping both in one
+    drain pass makes Textual paint them together, leaving the last partial
+    stream preview on screen until the tool card appears.  Yielding after the
+    complete preamble gives the user one rendered frame with the full message.
+    """
+    from backend.ledger.action.message import MessageAction
+
+    return bool(
+        isinstance(event, MessageAction)
+        and getattr(event, 'transcript_only', False)
+        and str(getattr(event, 'content', '') or '').strip()
+    )
+
+
+def _streaming_channel_key(event: Any) -> tuple[str, str]:
+    """Return the UI channel represented by a streaming snapshot.
+
+    Assistant prose and streamed tool arguments both use
+    ``StreamingChunkAction``.  They must never replace one another while the
+    pending queue is coalesced: tool-argument snapshots are intentionally not
+    rendered by the transcript, so allowing one to replace prose leaves the
+    last visible sentence fragment frozen until the whole tool call ends.
+    """
+    if bool(getattr(event, 'is_tool_call', False)):
+        return ('tool', str(getattr(event, 'tool_call_name', '') or ''))
+    if str(getattr(event, 'tool_call_name', '') or '') == 'compaction':
+        return ('compaction', '')
+    return ('assistant', '')
+
+
 def _collapse_streaming_chunks(events: list[Any]) -> list[Any]:
     """Keep only the latest snapshot from each run of streaming chunk events."""
     from backend.ledger.action.message import StreamingChunkAction
@@ -89,8 +123,13 @@ def _collapse_streaming_chunks(events: list[Any]) -> list[Any]:
     while idx < len(events):
         event = events[idx]
         if isinstance(event, StreamingChunkAction):
+            channel = _streaming_channel_key(event)
             end = idx + 1
-            while end < len(events) and isinstance(events[end], StreamingChunkAction):
+            while (
+                end < len(events)
+                and isinstance(events[end], StreamingChunkAction)
+                and _streaming_channel_key(events[end]) == channel
+            ):
                 end += 1
             collapsed.append(events[end - 1])
             idx = end
@@ -108,6 +147,8 @@ def _try_coalesce_streaming_enqueue(pending: Any, event: Any) -> bool:
         return False
     last = pending[-1]
     if not isinstance(last, StreamingChunkAction):
+        return False
+    if _streaming_channel_key(last) != _streaming_channel_key(event):
         return False
     if last.is_final:
         return False
@@ -150,10 +191,11 @@ def _coalesce_pending_backlog(pending: Any) -> int:
         if isinstance(prev, StreamingChunkAction) and isinstance(
             cur, StreamingChunkAction
         ):
-            pending[idx - 1] = cur
-            del pending[idx]
-            reclaimed += 1
-            continue
+            if _streaming_channel_key(prev) == _streaming_channel_key(cur):
+                pending[idx - 1] = cur
+                del pending[idx]
+                reclaimed += 1
+                continue
         if isinstance(prev, TerminalObservation) and isinstance(
             cur, TerminalObservation
         ):
@@ -237,6 +279,35 @@ def _force_immediate_drain(orch: 'RendererEventProcessorMixin') -> None:
             pass
         orch._drain_debounce_handle = None
     _post_drain_message(orch)
+
+
+def _resume_after_tool_preamble_paint(
+    orch: 'RendererEventProcessorMixin',
+) -> None:
+    """Resume event draining only after Textual paints the full preamble."""
+    orch._tool_preamble_refresh_scheduled = False
+    orch._tool_preamble_paint_pending = False
+    with orch._pending_lock:
+        has_pending = bool(orch._pending_events)
+    if has_pending:
+        _force_immediate_drain(orch)
+
+
+def _schedule_resume_after_tool_preamble_paint(
+    orch: 'RendererEventProcessorMixin',
+) -> None:
+    """Install one refresh barrier between assistant prose and its tool card."""
+    if getattr(orch, '_tool_preamble_refresh_scheduled', False) is True:
+        return
+    orch._tool_preamble_refresh_scheduled = True
+    call_after_refresh = getattr(orch._tui, 'call_after_refresh', None)
+    if callable(call_after_refresh):
+        try:
+            call_after_refresh(partial(_resume_after_tool_preamble_paint, orch))
+            return
+        except Exception:
+            pass
+    _resume_after_tool_preamble_paint(orch)
 
 
 def drain_events(orch: 'RendererEventProcessorMixin') -> None:
@@ -385,6 +456,12 @@ async def _process_events_with_frame_budget(
         await _preprocess_event_async(orch, event)
         orch._process_event(event)
         processed += 1
+        if _is_tool_step_preamble(event):
+            # The caller requeues the remaining events and returns to the
+            # Textual loop, allowing the complete preamble to paint before
+            # its next tool card is mounted.
+            orch._tool_preamble_paint_pending = True
+            break
         if (time.monotonic() - started) >= _TUI_DRAIN_FRAME_BUDGET_SECONDS:
             break
     return processed
@@ -406,6 +483,9 @@ async def drain_events_async(orch: 'RendererEventProcessorMixin') -> None:
     Processes multiple micro-batches per invocation up to a wall-clock cap so
     backlog drains faster without monopolizing the Textual event loop.
     """
+    if getattr(orch, '_tool_preamble_paint_pending', False) is True:
+        _schedule_resume_after_tool_preamble_paint(orch)
+        return
     if getattr(orch, '_async_drain_active', False):
         orch._drain_requested_while_active = True
         return
@@ -455,6 +535,13 @@ async def drain_events_async(orch: 'RendererEventProcessorMixin') -> None:
             if callable(flush_commits):
                 await flush_commits()
 
+            if getattr(orch, '_tool_preamble_paint_pending', False) is True:
+                # ``call_after_refresh`` is the actual paint boundary.  A bare
+                # event-loop yield is insufficient because Textual can process
+                # another drain message before composing the next frame.
+                _schedule_resume_after_tool_preamble_paint(orch)
+                break
+
             if not has_pending:
                 break
 
@@ -467,11 +554,16 @@ async def drain_events_async(orch: 'RendererEventProcessorMixin') -> None:
     finally:
         orch._async_drain_active = False
         _set_display_backpressure(orch, False)
+        has_pending_after_drain = False
         with orch._pending_lock:
             orch._drain_requested_while_active = False
-            if orch._pending_events:
-                _force_immediate_drain(orch)
+            has_pending_after_drain = bool(orch._pending_events)
+        if has_pending_after_drain:
+            if getattr(orch, '_tool_preamble_paint_pending', False) is True:
+                _schedule_resume_after_tool_preamble_paint(orch)
                 return  # noqa: B012
+            _force_immediate_drain(orch)
+            return  # noqa: B012
 
     elapsed_ms = (time.monotonic() - invocation_started) * 1000.0
     pending_depth = 0
@@ -713,6 +805,9 @@ def _signal_activity(
 ) -> None:
     orch._state_event.set()
     if not should_schedule_drain:
+        return
+    if getattr(orch, '_tool_preamble_paint_pending', False) is True:
+        _schedule_resume_after_tool_preamble_paint(orch)
         return
     if getattr(orch, '_drain_debounce_handle', None) is not None:
         return

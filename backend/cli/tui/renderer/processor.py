@@ -93,6 +93,10 @@ from backend.cli.tui.renderer.handlers.status import (
     _handle_success_observation,
     maybe_restore_running_hud_after_backoff,
 )
+from backend.cli.tui.renderer.handlers.task_state import (
+    _handle_task_state_action,
+    _handle_task_state_observation,
+)
 from backend.cli.tui.renderer.handlers.task_tracking import (
     _handle_task_tracking_action,
     _handle_task_tracking_observation,
@@ -135,6 +139,7 @@ from backend.ledger.action import (
     RecallAction,
     StreamingChunkAction,
     SystemHintAction,
+    TaskStateAction,
     TaskTrackingAction,
     TerminalCloseAction,
     TerminalInputAction,
@@ -175,6 +180,7 @@ from backend.ledger.observation import (
     ServerReadyObservation,
     StatusObservation,
     SuccessObservation,
+    TaskStateObservation,
     TaskTrackingObservation,
     TerminalObservation,
     UserRejectObservation,
@@ -243,6 +249,7 @@ _TOOL_EXECUTION_TYPES = (
     TerminalCloseAction,
     RecallAction,
     DelegateTaskAction,
+    TaskStateAction,
 )
 
 _ORIENT_EVENT_TYPES = (
@@ -340,6 +347,18 @@ def _process_event_commit_response(
     orch: 'RendererEventProcessorMixin', event: Any, is_tool: bool
 ) -> None:
     if isinstance(event, (MessageAction, StreamingChunkAction)):
+        return
+    if is_tool:
+        # A tool can arrive while a streamed preamble is still only a partial
+        # preview.  Never promote that fragment into the transcript: the
+        # following transcript-only MessageAction carries the complete
+        # canonical preamble and is deliberately painted before this card.
+        orch._streaming_active = False
+        sync_mount_mode = getattr(orch, '_sync_streaming_mount_mode', None)
+        if callable(sync_mount_mode):
+            sync_mount_mode()
+        orch._step_draft.begin_stream_leg()
+        orch.clear_live_response()
         return
     if orch._live_response_dirty:
         orch._commit_final_response(orch._live_response)
@@ -443,6 +462,8 @@ _EVENT_HANDLERS: dict[type, Any] = {
     DelegateTaskObservation: _handle_delegate_task_observation,
     TaskTrackingObservation: _handle_task_tracking_observation,
     TaskTrackingAction: _handle_task_tracking_action,
+    TaskStateAction: _handle_task_state_action,
+    TaskStateObservation: _handle_task_state_observation,
     AcceptanceCriteriaObservation: _handle_acceptance_criteria_observation,
     AcceptanceCriteriaAction: _handle_acceptance_criteria_action,
     CheckpointAction: _handle_checkpoint_action,

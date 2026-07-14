@@ -623,3 +623,82 @@ async def test_tui_acceptance_criteria_renders_scan_line_card(mock_config):
         assert 'Build succeeds' in joined
         assert 'Tests pass' in joined
         assert '●' in joined
+
+
+@pytest.mark.asyncio
+async def test_tui_task_state_refreshes_tasks_sidebar_without_transcript_card(mock_config):
+    from backend.ledger.action import TaskStateAction
+    from backend.ledger.observation import TaskStateObservation
+
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+        s = _get_screen(app)
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        renderer._tui._write_log = MagicMock()
+        state = {
+            'revision': 3,
+            'contract': {'objective': 'Ship task-state cards'},
+            'plan': {
+                'tasks': [
+                    {'id': '1', 'description': 'Add the card', 'status': 'done'},
+                    {'id': '2', 'description': 'Test the card', 'status': 'todo'},
+                ]
+            },
+        }
+
+        renderer._process_event(TaskStateAction(command='set'))
+        renderer._process_event(
+            TaskStateObservation(
+                command='set',
+                revision=3,
+                state=state,
+                content='TASK STATE (revision 3)\n\nPLAN\n[done] 1 Add the card',
+            )
+        )
+        await pilot.pause()
+
+        renderer._tui._write_log.assert_not_called()
+        from backend.cli.tui.widgets.collapsible import CollapsibleSection, SidebarRow
+
+        tasks = s.query_one('#sidebar-tasks', CollapsibleSection)
+        assert tasks._section_title == 'Tasks · 1/2 done'
+        rows = list(tasks.query(SidebarRow).results())
+        assert len(rows) == 2
+
+
+@pytest.mark.asyncio
+async def test_tui_task_state_error_does_not_create_transcript_card(mock_config):
+    from backend.ledger.action import TaskStateAction
+    from backend.ledger.observation import ErrorObservation
+
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+        s = _get_screen(app)
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        renderer._process_event(TaskStateAction(command='update_task'))
+        renderer._process_event(
+            ErrorObservation("Task state error: Task '99' not found.")
+        )
+        await pilot.pause()
+
+        assert not renderer._task_list

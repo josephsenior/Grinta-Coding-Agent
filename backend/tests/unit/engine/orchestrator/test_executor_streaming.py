@@ -141,7 +141,7 @@ def test_emit_malformed_tool_call_observation_adds_error_event() -> None:
     assert source == EventSource.ENVIRONMENT
 
 
-def test_final_stream_event_with_tool_call_suppresses_draft_reply():
+def test_final_stream_event_with_tool_call_keeps_visible_draft_reply():
     from backend.engine.executor import OrchestratorExecutor
 
     executor = OrchestratorExecutor(
@@ -167,8 +167,48 @@ def test_final_stream_event_with_tool_call_suppresses_draft_reply():
 
     emitted = event_stream.add_event.call_args.args[0]
     assert emitted.is_final is True
-    assert emitted.accumulated == ''
+    assert emitted.accumulated == 'I will inspect the workspace.'
     assert emitted.suppress_live_response is True
+
+
+@pytest.mark.asyncio
+async def test_tool_stream_boundary_force_flushes_complete_text_preamble():
+    from backend.engine.executor import OrchestratorExecutor
+    from backend.engine.executor_mixins._executor_types import _AsyncStreamingState
+    from backend.ledger.action import StreamingChunkAction
+
+    executor = OrchestratorExecutor(
+        llm=MagicMock(),
+        safety_manager=MagicMock(),
+        planner=MagicMock(),
+        mcp_tools_provider=lambda: {},
+    )
+    event_stream = _event_stream('test-tool-boundary-text-flush')
+    state = _AsyncStreamingState(
+        content_accumulate='Now let me build the compiler.',
+        last_text_emit_len=len('Now let me'),
+        last_text_emit_at=1.0,
+    )
+    delta = {
+        'tool_calls': [
+            {
+                'index': 0,
+                'id': 'call_1',
+                'function': {
+                    'name': 'create_file',
+                    'arguments': '{"path":',
+                },
+            }
+        ]
+    }
+
+    await executor._process_stream_tool_calls(delta, state, event_stream)
+
+    emitted = [call.args[0] for call in event_stream.add_event.call_args_list]
+    assert isinstance(emitted[0], StreamingChunkAction)
+    assert emitted[0].is_tool_call is False
+    assert emitted[0].accumulated == 'Now let me build the compiler.'
+    assert emitted[1].is_tool_call is True
 
 
 def test_executor_emits_streaming_chunk_actions(monkeypatch):
@@ -1719,4 +1759,3 @@ def test_ensure_stream_response_id_generates_stable_synthetic_id() -> None:
     second = executor._ensure_stream_response_id(state)
     assert first == second
     assert first.startswith('grinta-synthetic-')
-

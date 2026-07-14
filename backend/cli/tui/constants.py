@@ -58,7 +58,7 @@ _TUI_DRAIN_INVOCATION_BUDGET_SECONDS = float(
 )
 _TUI_STREAM_PAINT_INTERVAL_SECONDS = _bounded_float_env(
     'GRINTA_TUI_STREAM_PAINT_INTERVAL',
-    default=0.066,
+    default=0.033,
     minimum=0.008,
 )
 _TUI_SCROLL_PAINT_INTERVAL_SECONDS = _bounded_float_env(

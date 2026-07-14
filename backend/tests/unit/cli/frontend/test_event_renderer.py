@@ -60,6 +60,36 @@ async def test_event_renderer_updates_metrics_and_streaming_preview() -> None:
 
 
 @pytest.mark.asyncio
+async def test_event_renderer_tool_step_final_replaces_partial_preview() -> None:
+    console = _make_console()
+    renderer = CLIEventRenderer(
+        console,
+        HUDBar(),
+        ReasoningDisplay(),
+        loop=asyncio.get_running_loop(),
+    )
+
+    partial = StreamingChunkAction(
+        accumulated='Now let me',
+        is_final=False,
+    )
+    partial.source = EventSource.AGENT
+    await renderer.handle_event(partial)
+    final = StreamingChunkAction(
+        accumulated='Now let me create the elementwise operators.',
+        is_final=True,
+        suppress_live_response=True,
+    )
+    final.source = EventSource.AGENT
+    await renderer.handle_event(final)
+
+    assert (
+        renderer.streaming_preview
+        == 'Now let me create the elementwise operators.'
+    )
+
+
+@pytest.mark.asyncio
 async def test_event_renderer_emits_each_duplicate_command_line() -> None:
     """Each CmdRunAction produces a Ran row; command is shown when observation or next action arrives."""
     console = _make_console()

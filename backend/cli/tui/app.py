@@ -277,6 +277,8 @@ class TUIRenderer(
         self._drain_debounce_handle: Any | None = None
         self._last_scroll_paint_at: float = 0.0
         self._pending_events_dropped = 0
+        self._tool_preamble_paint_pending: bool = False
+        self._tool_preamble_refresh_scheduled: bool = False
 
         # History & Live state
         self._live_thinking_widget: Any | None = None

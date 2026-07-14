@@ -625,6 +625,50 @@ async def test_drain_respects_frame_budget(mock_config, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_drain_yields_after_tool_step_preamble(mock_config, monkeypatch):
+    from collections import deque
+    from threading import Lock
+
+    from backend.cli.tui.renderer import drain as drain_mod
+    from backend.ledger.action import CmdRunAction, MessageAction
+
+    preamble = MessageAction(
+        content='I will inspect the workspace.',
+        transcript_only=True,
+    )
+    tool = CmdRunAction(command='Get-Location')
+    orch = MagicMock()
+    orch._async_drain_active = False
+    orch._pending_events = deque([preamble, tool])
+    orch._pending_lock = Lock()
+    orch._drain_scheduled = True
+    orch._pending_events_dropped = 0
+    orch._history = []
+    orch._loop = MagicMock()
+    orch._tui = MagicMock()
+    orch._render_prep_cache = {}
+    orch._process_event = MagicMock()
+    orch.flush_live_ui = MagicMock()
+    orch.flush_pending_final_commits = AsyncMock(return_value=None)
+    orch._refresh_display = MagicMock()
+
+    monkeypatch.setattr(
+        drain_mod, '_preprocess_event_async', AsyncMock(return_value=None)
+    )
+    reschedule = MagicMock()
+    monkeypatch.setattr(drain_mod, '_force_immediate_drain', reschedule)
+
+    await drain_mod.drain_events_async(orch)
+
+    orch._process_event.assert_called_once_with(preamble)
+    assert list(orch._pending_events) == [tool]
+    assert orch._tui.call_after_refresh.called
+    resume = orch._tui.call_after_refresh.call_args.args[0]
+    resume()
+    assert reschedule.called
+
+
+@pytest.mark.asyncio
 async def test_viewport_keeps_bounded_child_count(mock_config):
     from backend.cli.tui.constants import _TUI_VIEWPORT_MAX_MOUNTED
 

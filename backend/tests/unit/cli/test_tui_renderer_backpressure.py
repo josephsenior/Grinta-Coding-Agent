@@ -279,6 +279,52 @@ def test_collapse_streaming_chunks_keeps_latest_snapshot_per_run():
     assert collapsed[2].is_final is True
 
 
+def test_streaming_coalescing_keeps_prose_separate_from_tool_arguments():
+    prose = StreamingChunkAction(
+        chunk='full preamble',
+        accumulated='Now let me build the compiler.',
+        is_final=False,
+    )
+    tool_args = StreamingChunkAction(
+        chunk='{"path":',
+        accumulated='{"path":',
+        is_final=False,
+        is_tool_call=True,
+        tool_call_name='create_file',
+    )
+
+    collapsed = _drain_mod._collapse_streaming_chunks([prose, tool_args])
+
+    assert collapsed == [prose, tool_args]
+
+
+@pytest.mark.asyncio
+async def test_tui_renderer_does_not_replace_pending_prose_with_tool_arguments():
+    renderer = tui_app.TUIRenderer(
+        console=SimpleNamespace(width=100),
+        hud=SimpleNamespace(
+            state=SimpleNamespace(mcp_servers=0), bundled_skill_count=0
+        ),
+        reasoning=SimpleNamespace(),
+        tui=SimpleNamespace(),
+        loop=MagicMock(),
+    )
+    prose = StreamingChunkAction(
+        accumulated='Now let me build the compiler.', is_final=False
+    )
+    tool_args = StreamingChunkAction(
+        accumulated='{"path":"compiler.py"}',
+        is_final=False,
+        is_tool_call=True,
+        tool_call_name='create_file',
+    )
+
+    renderer._on_event(prose)
+    renderer._on_event(tool_args)
+
+    assert list(renderer._pending_events) == [prose, tool_args]
+
+
 @pytest.mark.asyncio
 async def test_tui_renderer_schedules_single_drain_message_per_backlog():
     fake_tui = SimpleNamespace(post_message=MagicMock())

@@ -71,7 +71,12 @@ class StreamingMixin(CLIEventRenderer if TYPE_CHECKING else object):
             return
 
         if bool(getattr(action, 'suppress_live_response', False)):
-            self._streaming_accumulated = ''
+            # Tool-step finals still carry the completed visible preamble.
+            # Keep it in the live panel until the canonical MessageAction
+            # prints the permanent transcript line; clearing it here leaves
+            # users stuck on the last throttled partial chunk.
+            if raw.strip():
+                self._streaming_accumulated = _sanitize_visible_transcript_text(raw)
             self._streaming_final = action.is_final
             if action.is_final:
                 self._hud.state.llm_calls += 1

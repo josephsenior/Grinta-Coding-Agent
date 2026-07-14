@@ -212,6 +212,38 @@ async def test_tui_final_stream_suppresses_live_response_for_tool_call(mock_conf
 
 
 @pytest.mark.asyncio
+async def test_tui_tool_step_final_replaces_partial_preview(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+        s = _get_screen(app)
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        s._renderer = renderer
+
+        renderer._process_event(
+            StreamingChunkAction(accumulated='Now let me', is_final=False)
+        )
+        renderer._process_event(
+            StreamingChunkAction(
+                accumulated='Now let me create the elementwise operators.',
+                is_final=True,
+                suppress_live_response=True,
+            )
+        )
+
+        assert renderer._live_response == 'Now let me create the elementwise operators.'
+        assert renderer._last_final_response_text == ''
+
+@pytest.mark.asyncio
 async def test_tui_streamed_response_clears_before_tool_action(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()

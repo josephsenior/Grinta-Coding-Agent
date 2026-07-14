@@ -392,7 +392,12 @@ class _ExecutorStreamingMixin:
         from backend.ledger.action.message import StreamingChunkAction
         from backend.ledger.event import EventSource
 
-        draft_reply_accum = '' if has_tools else visible_accum
+        # The TUI coalesces consecutive streaming snapshots by keeping the
+        # final one.  Preserve the visible prose even for tool steps so that
+        # the final event cannot replace a complete preamble with an empty
+        # payload.  ``suppress_live_response`` still prevents this preview
+        # from becoming a permanent transcript row; MessageAction does that.
+        draft_reply_accum = visible_accum
         from backend.cli.event_rendering.text_utils import (
             sanitize_streaming_thinking_text,
         )
@@ -1036,6 +1041,24 @@ class _ExecutorStreamingMixin:
         tool_call_chunks = delta.get('tool_calls')
         if not tool_call_chunks:
             return
+
+        # A provider commonly emits a short prose preamble and then spends
+        # seconds streaming a large tool-argument payload.  The normal text
+        # throttle may still have an unpainted trailing snapshot at that
+        # boundary.  Flush it now so the user sees the complete prose while
+        # the tool call is still being produced, rather than only when the
+        # entire LLM stream finishes.
+        if (
+            event_stream is not None
+            and state.content_accumulate
+            and state.last_text_emit_len < len(state.content_accumulate)
+        ):
+            await self._emit_stream_text_piece(
+                state,
+                '',
+                event_stream,
+                force=True,
+            )
 
         for tool_call_chunk in tool_call_chunks:
             await self._ingest_stream_tool_call_chunk(

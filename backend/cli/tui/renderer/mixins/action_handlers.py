@@ -291,7 +291,12 @@ class RendererActionHandlersMixin:
             self._finalize_live_thinking()
 
         if action.is_final:
-            if content and not bool(getattr(action, 'suppress_live_response', False)):
+            if content:
+                # Tool-step finals carry the complete visible preamble so a
+                # coalesced final event can replace any partial live preview.
+                # ``suppress_live_response`` only controls permanent commit;
+                # the following transcript-only MessageAction remains the
+                # sole writer of the finalized transcript row.
                 self._step_draft.set_preview_content(content)
                 self.update_live_response(content)
             self._finalize_streaming_response(action, content)

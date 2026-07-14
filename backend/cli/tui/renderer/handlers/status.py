@@ -166,7 +166,6 @@ def _handle_error_observation(
         clear_pending_exploration_cards,
     )
     from backend.cli.tui.renderer.handlers.memory import clear_pending_memory_lines
-
     orch._compaction_transcript_active = False
     clear_pending_exploration_cards(orch)
     clear_pending_memory_lines(orch)
