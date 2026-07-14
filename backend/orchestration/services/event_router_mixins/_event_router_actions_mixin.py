@@ -225,11 +225,6 @@ class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
             ) or self._is_plain_terminal_agent_message(action)
             if is_final_response:
                 action.final_response = True
-                # Optional LLM-judge quality check; emits a warning on
-                # failure but never blocks the transition.
-                await self._ctrl.task_validation_service.validate_completion_quality(
-                    action
-                )
                 content = str(getattr(action, 'content', '') or '').strip()
                 self._ctrl.state.set_outputs(
                     {
@@ -241,6 +236,18 @@ class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
                 )
                 active_mode = self._active_interaction_mode()
                 self._ctrl.state.extra_data.pop('active_run_mode', None)
+
+                # The final response is the user-visible completion boundary.
+                # Publish FINISHED before optional validation, reflection, and
+                # audit work so the TUI becomes ready as soon as the response
+                # ends instead of remaining in RUNNING during housekeeping.
+                await self._ctrl.set_agent_state_to(AgentState.FINISHED)
+
+                # Optional LLM-judge quality check; emits a warning on
+                # failure but never blocks or delays the state transition.
+                await self._ctrl.task_validation_service.validate_completion_quality(
+                    action
+                )
                 if active_mode == AGENT_MODE:
                     try:
                         from backend.engine.tools.session_lessons import (
@@ -255,5 +262,4 @@ class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
                         )
                     except Exception:
                         pass
-                await self._ctrl.set_agent_state_to(AgentState.FINISHED)
                 await self._ctrl.log_task_audit(status='success')

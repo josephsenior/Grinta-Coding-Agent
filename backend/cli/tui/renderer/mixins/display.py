@@ -279,8 +279,14 @@ class RendererDisplayMixin:
         import asyncio
         import os
 
-        disable_lsp = os.getenv('GRINTA_DISABLE_LSP_DETECTION') == '1'
-        disable_dap = os.getenv('GRINTA_DISABLE_DEBUGGER_DETECTION') == '1'
+        disable_lsp = (
+            os.getenv('GRINTA_DISABLE_LSP_DETECTION') == '1'
+            or not self._sidebar_lsp_enabled()
+        )
+        disable_dap = (
+            os.getenv('GRINTA_DISABLE_DEBUGGER_DETECTION') == '1'
+            or not self._sidebar_debugger_enabled()
+        )
         if disable_lsp:
             self._lsp_servers_cache = {}
         if disable_dap:

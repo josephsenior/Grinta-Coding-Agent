@@ -21,7 +21,13 @@
         "supports_parallel_tool_calls": true,
         "supports_vision": false,
         "inference_endpoint": "/chat/completions",
-        "supports_stop_words": true
+        "supports_stop_words": true,
+        "supports_reasoning_effort": true,
+        "reasoning_efforts": [
+          "low",
+          "high"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
       },
       "metadata": {
         "source": "user_provided_opencode_internal_config",

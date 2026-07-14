@@ -595,7 +595,17 @@ class ScreenInputMixin:
 
         if agent_text is None:
             if slash_followup is not None:
-                await slash_followup
+                # Textual requires ``push_screen_wait`` to run from a worker.
+                # Slash follow-ups execute after the input lock is released and
+                # may open settings/session dialogs, so give all of them the
+                # worker context expected by the modal API.
+                worker = self.run_worker(
+                    slash_followup,
+                    name='slash-followup',
+                    group='slash-followup',
+                    exclusive=True,
+                )
+                await worker.wait()
             return
 
         await self._handle_input_dispatch(agent_text, image_urls=image_urls)
