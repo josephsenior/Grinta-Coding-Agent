@@ -181,7 +181,11 @@ async def persist_finish_lessons(
     ]
 
     try:
-        response = await llm.completion(messages=prompt_messages, temperature=0.1)
+        # Reflection runs after the interactive turn has already finished.  It
+        # must use the asynchronous transport: ``completion`` is deliberately
+        # synchronous and would block the TUI event loop until the provider
+        # responds, delaying the visible RUNNING -> READY transition.
+        response = await llm.acompletion(messages=prompt_messages, temperature=0.1)
         raw_content = response.content.strip()
         if raw_content.startswith('```'):
             start = raw_content.find('{')

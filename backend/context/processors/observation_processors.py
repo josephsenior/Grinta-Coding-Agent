@@ -676,7 +676,10 @@ def _handle_error_observation(
     content = _get_observation_content(obs)
     text = truncate_content(content, max_message_chars)
 
-    parts: list[str] = [f'[ERROR type={error_id}]']
+    structured_tool_error = isinstance(getattr(obs, 'tool_result', None), dict)
+    parts: list[str] = []
+    if not structured_tool_error:
+        parts.append(f'[ERROR type={error_id}]')
     parts.append(text)
 
     # Add fallback hint from structured field (set by CircuitBreakerMiddleware)
@@ -684,7 +687,8 @@ def _handle_error_observation(
     if fallback:
         parts.append(f'\n[SUGGESTION] Consider using `{fallback}` instead.')
 
-    parts.append('\n[Error occurred in processing last action]')
+    if not structured_tool_error:
+        parts.append('\n[Error occurred in processing last action]')
 
     return Message(role='user', content=[TextContent(text='\n'.join(parts))])
 

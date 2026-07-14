@@ -27,6 +27,7 @@ from backend.context.processors.observation_processors import (
 )
 from backend.context.prompt.message_formatting import (
     apply_user_message_formatting,
+    extract_first_text,
     is_action_event,
     is_instance_of,
     is_observation_event,
@@ -62,26 +63,33 @@ from backend.utils.prompt import PromptManager
 _MAX_TURN_CONTEXT_SUMMARY_CHARS = 2000
 _PROMPT_RENDERER_VERSION = 'context-memory-render-v1'
 _DEFAULT_RENDER_CACHE_MAX = 1024
+_MEMORY_DYNAMIC_CONTEXT_PREFIXES = (
+    '<GRINTA_TURN_CONTEXT kind="mcp-catalog">',
+    '<GRINTA_TURN_CONTEXT kind="session-summary">',
+)
 
 
 def _tool_ok_for_observation(obs: Observation) -> bool | None:
     """Structured tool outcome for serialized role=tool messages.
 
-    Prefer canonical ``tool_result`` metadata when present. ``None`` means the
-    observation does not carry a stable machine-readable success/failure signal.
+    Command exit status and error observation type are authoritative; otherwise
+    prefer canonical ``tool_result`` metadata. ``None`` means no stable outcome.
     """
-    tool_result = getattr(obs, 'tool_result', None)
-    if isinstance(tool_result, dict) and 'ok' in tool_result:
-        raw_ok = tool_result.get('ok')
-        if isinstance(raw_ok, bool):
-            return raw_ok
     if isinstance(obs, (ErrorObservation, UserRejectObservation)):
         return False
     if isinstance(obs, CmdOutputObservation):
         ec = getattr(obs, 'exit_code', None)
         if ec is None:
-            return None
-        return ec == 0
+            pass
+        else:
+            return ec == 0
+    tool_result = getattr(obs, 'tool_result', None)
+    if isinstance(tool_result, dict) and 'ok' in tool_result:
+        raw_ok = tool_result.get('ok')
+        if isinstance(raw_ok, bool):
+            return raw_ok
+    if isinstance(obs, CmdOutputObservation):
+        return None
     return True
 
 
@@ -955,12 +963,32 @@ class ContextMemory:
         """
         return messages
 
+    @staticmethod
+    def _remove_previous_dynamic_snapshots(messages: list[Message]) -> list[Message]:
+        """Remove snapshots that ContextMemory will rebuild for this request.
+
+        ``process_events_appending`` starts from an already-normalized prefix.
+        Without removing these two application-owned messages first, every
+        incremental render appends another session summary and MCP catalogue.
+        Conversation messages and tool results are deliberately left untouched.
+        """
+        return [
+            message
+            for message in messages
+            if not (
+                message.role == 'system'
+                and (text := extract_first_text(message)) is not None
+                and text.lstrip().startswith(_MEMORY_DYNAMIC_CONTEXT_PREFIXES)
+            )
+        ]
+
     def _normalize_system_messages(self, messages: list[Message]) -> list[Message]:
         """Keep behavior static up front and data snapshots near the active turn."""
         if not messages:
             return messages
         self._ensure_leading_system_message(messages)
         messages[:] = self._dedupe_system_messages(messages)
+        messages[:] = self._remove_previous_dynamic_snapshots(messages)
         self._insert_mcp_addendum_before_last_user(messages)
         self._insert_context_summary_before_last_user(messages)
         return messages
@@ -1061,13 +1089,19 @@ class ContextMemory:
                     encode_tool_result_payload,
                 )
 
-                payload = encode_tool_result_payload(
-                    tool_name,
-                    {
+                if isinstance(obs, ErrorObservation):
+                    # Emit one canonical error object.  Nesting the structured
+                    # result beside a second rendered message made agents see
+                    # the same failure twice and wasted context.
+                    error_payload = dict(tool_result)
+                    error_payload['message'] = _json_safe_tool_message_content(message)
+                    payload_content: object = error_payload
+                else:
+                    payload_content = {
                         'message': _json_safe_tool_message_content(message),
                         'tool_result': tool_result,
-                    },
-                )
+                    }
+                payload = encode_tool_result_payload(tool_name, payload_content)
                 encoded_content = [TextContent(text=payload)]
             else:
                 encoded_content = message.content

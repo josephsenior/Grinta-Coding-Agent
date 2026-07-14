@@ -82,7 +82,7 @@ def _raise_multi_edit_syntax_failure(
     )
 
     _multi_edit_raise(
-        'multi_edit failed: syntax validation failed.',
+        'multi_edit syntax validation failed.',
         error_code='SYNTAX_VALIDATION_FAILED',
         path=rel_path,
         operation='multi_edit',

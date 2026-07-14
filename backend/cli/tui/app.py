@@ -186,6 +186,7 @@ class GrintaScreen(
         self._event_stream: Any | None = None
         self._controller: Any | None = None
         self._agent_task: asyncio.Task[Any] | None = None
+        self._interrupt_task: asyncio.Task[Any] | None = None
         self._runtime_stub: Any = None
         self._memory_stub: Any = None
         self._agent_running = True

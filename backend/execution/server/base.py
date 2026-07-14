@@ -57,6 +57,7 @@ from backend.ledger.action import (
 from backend.ledger.action.mcp import MCPAction
 from backend.ledger.observation import (
     AgentThinkObservation,
+    CmdOutputObservation,
     ErrorObservation,
     NullObservation,
     Observation,
@@ -603,11 +604,17 @@ class Runtime(
         existing_tool_result = (
             observation.tool_result if isinstance(observation.tool_result, dict) else {}
         )
+        default_ok = not isinstance(observation, ErrorObservation)
+        if isinstance(observation, CmdOutputObservation) and exit_code is not None:
+            default_ok = exit_code == 0
+        result_ok = existing_tool_result.get('ok', default_ok)
+        if isinstance(observation, CmdOutputObservation) and exit_code is not None:
+            # The process exit status is authoritative even if an earlier layer
+            # only recorded that command invocation itself succeeded.
+            result_ok = bool(result_ok) and exit_code == 0
         observation.tool_result = {
             **existing_tool_result,
-            'ok': existing_tool_result.get(
-                'ok', not isinstance(observation, ErrorObservation)
-            ),
+            'ok': result_ok,
             'retryable': existing_tool_result.get(
                 'retryable', isinstance(observation, ErrorObservation)
             ),

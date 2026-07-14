@@ -68,6 +68,14 @@ def test_compact_syntax_detail_strips_content_context() -> None:
     assert compact_syntax_detail(raw) == 'SyntaxError: invalid syntax at line 42'
 
 
+def test_compact_syntax_detail_hides_transaction_temp_path() -> None:
+    raw = (
+        r'Python syntax error at C:\Users\me\AppData\Local\Temp\grinta-multi-edit-123'
+        r'\src\app.py: line 137:20'
+    )
+    assert compact_syntax_detail(raw) == 'Python syntax error (column 20).'
+
+
 def test_multi_edit_raise_builds_structured_tool_execution_error() -> None:
     with pytest.raises(ToolExecutionError) as exc_info:
         multi_edit_raise(
@@ -83,7 +91,7 @@ def test_multi_edit_raise_builds_structured_tool_execution_error() -> None:
     exc = exc_info.value
     assert 'replace_string failed: old_string not found exactly.' in str(exc)
     assert 'File: src/config.py' in str(exc)
-    assert 'Op index: 1 (2/3)' in str(exc)
+    assert 'Operation: 2/3' in str(exc)
     assert exc.context['error_code'] == 'OLD_STRING_NOT_FOUND'
     assert exc.context['failed_path'] == 'src/config.py'
     assert 'payload' not in exc.context
@@ -153,8 +161,10 @@ def test_normalize_edit_exception_from_validation_error() -> None:
     }
     message, tool_result = normalize_edit_exception(exc, payload, command='multi_edit')
     assert 'item 2' in message
+    assert message.count("multiedit validation failed: item 2 missing required field 'path'.") == 1
     assert tool_result['error_code'] == 'VALIDATION_ERROR'
     assert tool_result['failed_op_index'] == 2
+    assert 'detail' not in tool_result
     assert 'payload' not in tool_result
 
 
@@ -282,5 +292,5 @@ def test_format_agent_edit_error_message_includes_rollback() -> None:
         },
         fallback='multi_edit transaction rolled back.',
     )
-    assert 'Transaction rolled back' in message
-    assert 'No files were modified' in message
+    assert 'Batch rolled back' in message
+    assert 'no files changed' in message

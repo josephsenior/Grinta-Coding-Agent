@@ -350,34 +350,48 @@ class ScreenMessagesMixin:
         """Cancel the running agent and clean up."""
         _tui_logger.info('User requested agent interrupt')
 
-        if self._agent_task and not self._agent_task.done():
-            self._agent_task.cancel()
+        active_interrupt = getattr(self, '_interrupt_task', None)
+        if active_interrupt is not None and not active_interrupt.done():
+            return
 
         # Update the TUI immediately; cleanup may take seconds on WSL / slow disks.
         self.finalize_thinking()
         with contextlib.suppress(Exception):
             spinner = self.query_one('#spinner', Static)
             spinner.add_class('-hidden')
-            self.query_one('#input-bar', InputBar).remove_class('processing')
         if getattr(self, '_hud', None) is not None:
             self._finalize_turn_duration()
-            self._hud.update_agent_state('Ready')
+            self._hud.update_agent_state('Stopping')
             with contextlib.suppress(Exception):
                 self._render_hud_bar()
 
         async def _do_interrupt() -> None:
-            if self._controller is not None:
-                mark = getattr(self._controller, 'mark_user_interrupt_stop', None)
+            controller = self._controller
+            agent_task = self._agent_task
+            if controller is not None:
+                mark = getattr(controller, 'mark_user_interrupt_stop', None)
                 if callable(mark):
-                    mark()
-                with contextlib.suppress(Exception):
-                    await self._controller.stop()
-
-            if self._agent_task and not self._agent_task.done():
+                    with contextlib.suppress(Exception):
+                        mark()
                 try:
-                    await asyncio.wait_for(self._agent_task, timeout=5.0)
-                except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
+                    await asyncio.wait_for(controller.stop(), timeout=10.0)
+                except Exception:
+                    _tui_logger.exception('Controller stop failed during user interrupt')
+
+            # The poller should observe STOPPED and return.  Only cancel it after
+            # backend shutdown has been requested; cancelling it first can leave
+            # the in-flight LLM step detached and still writing session events.
+            if agent_task and not agent_task.done():
+                try:
+                    await asyncio.wait_for(asyncio.shield(agent_task), timeout=2.0)
+                except asyncio.TimeoutError:
+                    agent_task.cancel()
+                    with contextlib.suppress(asyncio.CancelledError, Exception):
+                        await agent_task
+                except asyncio.CancelledError:
                     pass
+                except Exception:
+                    _tui_logger.exception('Agent poller failed while stopping')
 
             with contextlib.suppress(Exception):
                 from backend.execution.server.action_execution_server import (
@@ -387,12 +401,37 @@ class ScreenMessagesMixin:
                 if runtime_client is not None:
                     await runtime_client.hard_kill()
 
+            if controller is not None:
+                with contextlib.suppress(Exception):
+                    if controller.get_agent_state() != AgentState.STOPPED:
+                        await controller.set_agent_state_to(AgentState.STOPPED)
+
             with contextlib.suppress(Exception):
                 from backend.core.logging.logger import finalize_session_logging_audit
 
                 finalize_session_logging_audit()
 
-        asyncio.create_task(_do_interrupt())
+            if getattr(self, '_hud', None) is not None:
+                self._hud.update_agent_state('Ready')
+                with contextlib.suppress(Exception):
+                    self._render_hud_bar()
+            with contextlib.suppress(Exception):
+                self.query_one('#input-bar', InputBar).remove_class('processing')
+
+        self._interrupt_task = asyncio.create_task(
+            _do_interrupt(), name='grinta-tui-interrupt'
+        )
+
+        def _interrupt_done(task: asyncio.Task[Any]) -> None:
+            if getattr(self, '_interrupt_task', None) is task:
+                self._interrupt_task = None
+            if task.cancelled():
+                _tui_logger.warning('User interrupt cleanup task was cancelled')
+                return
+            if exc := task.exception():
+                _tui_logger.error('User interrupt cleanup failed: %s', exc)
+
+        self._interrupt_task.add_done_callback(_interrupt_done)
 
     def _transcript_has_real_content(self) -> bool:
         """True when transcript has non-welcome, non-badge visible content."""

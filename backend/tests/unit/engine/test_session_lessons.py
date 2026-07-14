@@ -67,7 +67,7 @@ async def test_persist_finish_lessons_with_signals_and_reflection(tmp_path, monk
         TerminalRunObservation(exit_code=0, content='test output'),
     ]
 
-    # Mock LLM completion response
+    # Mock the asynchronous LLM response used by background reflection.
     mock_response = MagicMock()
     mock_response.content = json.dumps({
         'candidates': [
@@ -82,12 +82,15 @@ async def test_persist_finish_lessons_with_signals_and_reflection(tmp_path, monk
     })
 
     llm = AsyncMock()
-    llm.completion.return_value = mock_response
+    llm.acompletion.return_value = mock_response
 
     controller = MagicMock()
     controller.agent.llm = llm
 
     await persist_finish_lessons(summary='Done task', session_id='sess-123', state=state, controller=controller)
+
+    llm.acompletion.assert_awaited_once()
+    llm.completion.assert_not_called()
 
     # Verify ProjectMemoryService wrote the file
     service = ProjectMemoryService(workspace_root=tmp_path)

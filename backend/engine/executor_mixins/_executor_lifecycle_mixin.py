@@ -73,6 +73,21 @@ class _ExecutorLifecycleMixin:
         return guarded
 
     def _resolve_total_limit(self, input_limit: int, output_limit: int | None) -> int:
+        # Prefer the catalog/configured shared context window.  ``input_limit``
+        # is often already derived from that window by reserving output space;
+        # adding max output to it reconstructs a fictitious, oversized limit.
+        runtime_limits = getattr(
+            getattr(self._llm, 'runtime_profile', None), 'context_limits', None
+        )
+        config = getattr(self._llm, 'config', None)
+        for value in (
+            getattr(runtime_limits, 'context_window_tokens', None),
+            getattr(config, 'context_window_tokens', None),
+        ):
+            total_limit = self._positive_int(value) or 0
+            if total_limit > 0:
+                return total_limit
+
         total_limit = 0
         context_window = getattr(self._llm, 'context_window', None)
         if callable(context_window):

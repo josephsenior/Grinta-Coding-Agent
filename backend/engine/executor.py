@@ -192,9 +192,6 @@ class OrchestratorExecutor(
         response = None
         loop = asyncio.get_running_loop()
         state = _AsyncStreamingState()
-        stream_iter: Any | None = None
-        consume_task: asyncio.Task[Any] | None = None
-
         try:
             response = await self._execute_stream(
                 call_params, event_stream, state, loop
@@ -205,8 +202,6 @@ class OrchestratorExecutor(
             raise
         except Exception as exc:
             self._handle_stream_error(exc, error_message)
-        finally:
-            self._cleanup_stream_refs(consume_task, stream_iter)
 
         if response is None:
             raise ModelProviderError('LLM returned no response')
@@ -289,7 +284,10 @@ class OrchestratorExecutor(
         )
         self._active_stream_iter = stream_iter
         self._active_stream_task = consume_task
-        await consume_task
+        try:
+            await consume_task
+        finally:
+            self._cleanup_stream_refs(consume_task, stream_iter)
         if self._step_cancelled:
             raise asyncio.CancelledError()
         await self._flush_stream_paint_events(state, event_stream)

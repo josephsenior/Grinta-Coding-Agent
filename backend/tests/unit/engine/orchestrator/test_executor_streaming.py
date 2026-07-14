@@ -756,6 +756,33 @@ def test_async_execute_raises_preflight_context_error_before_provider_call(
     llm.astream.assert_not_called()
 
 
+def test_preflight_uses_configured_shared_context_window() -> None:
+    from backend.engine.executor import OrchestratorExecutor
+
+    llm = MagicMock()
+    llm.config = SimpleNamespace(
+        model='test-model',
+        context_window_tokens=200_000,
+        max_input_tokens=145_904,
+        max_output_tokens=128_000,
+    )
+    llm.features = SimpleNamespace(
+        max_input_tokens=145_904,
+        max_output_tokens=128_000,
+    )
+    llm.runtime_profile = SimpleNamespace(
+        context_limits=SimpleNamespace(context_window_tokens=200_000)
+    )
+    executor = OrchestratorExecutor(
+        llm=llm,
+        safety_manager=cast(NoopSafetyManager, _Safety()),
+        planner=MagicMock(),
+        mcp_tools_provider=lambda: {},
+    )
+
+    assert executor._resolve_total_limit(145_904, 128_000) == 200_000
+
+
 def test_async_execute_does_not_timeout_active_reasoning_stream(monkeypatch, tmp_path):
     """Active reasoning streams are governed by per-chunk stall timeouts."""
     import backend.engine.function_calling.dispatch as fc
@@ -818,6 +845,49 @@ def test_async_execute_does_not_timeout_active_reasoning_stream(monkeypatch, tmp
     assert result.response is not None
     assert result.response.content == 'done'
     assert result.response.reasoning_content == 'still thinking'
+
+
+def test_first_chunk_and_fallback_timeout_propagates_llm_timeout(
+    monkeypatch, tmp_path
+):
+    """A double timeout must enter recovery, never become an empty null action."""
+    import backend.engine.function_calling.dispatch as fc
+    from backend.engine.executor import OrchestratorExecutor
+    from backend.inference.exceptions import Timeout as LLMTimeout
+
+    sys.modules.setdefault('app.engine.function_calling', fc)
+    monkeypatch.setenv('APP_DATA_DIR', str(tmp_path))
+    monkeypatch.setenv('APP_LLM_FIRST_CHUNK_TIMEOUT_SECONDS', '0.01')
+    monkeypatch.setenv('APP_LLM_FALLBACK_TIMEOUT_SECONDS', '0.01')
+
+    async def stalled_stream(**kwargs):
+        await asyncio.sleep(1)
+        yield {'choices': []}
+
+    async def stalled_fallback(**kwargs):
+        await asyncio.sleep(1)
+
+    llm = MagicMock()
+    llm.astream = stalled_stream
+    llm.acompletion = stalled_fallback
+
+    executor = OrchestratorExecutor(
+        llm=llm,
+        safety_manager=cast(NoopSafetyManager, _Safety()),
+        planner=MagicMock(),
+        mcp_tools_provider=lambda: {},
+    )
+
+    with pytest.raises(LLMTimeout):
+        asyncio.run(
+            executor.async_execute(
+                {'messages': []},
+                _event_stream('test-double-timeout'),
+            )
+        )
+
+    assert executor._active_stream_task is None
+    assert executor._active_stream_iter is None
 
 
 def test_cancel_step_cancels_active_stream_and_discards_checkpoint(

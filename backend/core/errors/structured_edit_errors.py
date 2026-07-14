@@ -7,7 +7,7 @@ from typing import Any, NoReturn
 
 from backend.core.errors import FunctionCallValidationError, ToolExecutionError
 
-_FILES_UNMODIFIED = 'No files were modified. Re-read the file and retry.'
+_FILES_UNMODIFIED = 'No files changed. Re-read the file and retry.'
 
 _SYMBOL_AMBIGUITY_HINT = (
     'Retry with path + qualified_name + symbol_kind, or use symbol_id.'
@@ -57,6 +57,13 @@ def compact_syntax_detail(message: str) -> str:
         text = text.split('Content context:', 1)[0].strip()
     text = text.replace('File has syntax errors.', '')
     text = text.replace('INTRODUCED_SYNTAX_ERROR:', '').strip()
+    location = re.match(
+        r'(?is)^Python syntax error at .+?:\s*line\s+\d+(?::(?P<column>\d+))?',
+        text,
+    )
+    if location:
+        column = location.group('column')
+        return f'Python syntax error (column {column}).' if column else 'Python syntax error.'
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     for line in lines:
         if line.startswith(('SyntaxError:', 'IndentationError:', 'TabError:')):
@@ -119,18 +126,20 @@ def format_agent_edit_error_message(
         else fallback
     ]
     path = context.get('failed_path') or context.get('path')
+    line = context.get('line')
     if path:
-        lines.append(f'File: {path}')
+        location = f'{path}:{line}' if line is not None else str(path)
+        lines.append(f'File: {location}')
     op_index = context.get('failed_op_index')
     total_ops = context.get('total_ops')
     if op_index is not None:
         if total_ops is not None:
-            lines.append(f'Op index: {op_index} ({op_index + 1}/{total_ops})')
+            lines.append(f'Operation: {op_index + 1}/{total_ops}')
         else:
-            lines.append(f'Op index: {op_index}')
+            lines.append(f'Operation index: {op_index}')
     if symbol := context.get('symbol'):
         lines.append(f'Symbol: {symbol}')
-    if line := context.get('line'):
+    if line and not path:
         lines.append(f'Line: {line}')
     if detail := context.get('detail'):
         lines.append(f'Detail: {detail}')
@@ -143,7 +152,7 @@ def format_agent_edit_error_message(
         context.get('transaction_rolled_back') or context.get('files_modified', 0) == 0
     ):
         if context.get('transaction_rolled_back'):
-            lines.append(f'Transaction rolled back. {_FILES_UNMODIFIED}')
+            lines.append('Batch rolled back; no files changed. Fix the edit and retry.')
         else:
             lines.append(_FILES_UNMODIFIED)
     return '\n'.join(line for line in lines if line)
@@ -202,7 +211,6 @@ def parse_validation_error(
         'retryable': True,
         'files_modified': 0,
         'operation': 'multi_edit',
-        'detail': text,
     }
     if item_index is not None:
         context['failed_op_index'] = item_index

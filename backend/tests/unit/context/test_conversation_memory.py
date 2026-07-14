@@ -169,6 +169,61 @@ class TestMcpUserAddendum:
             normalized[2]
         )
 
+    def test_repeated_normalization_replaces_memory_snapshots(self):
+        mem = _make_memory()
+        prompt_manager = cast(MagicMock, mem.prompt_manager)
+        prompt_manager.get_mcp_user_addendum.return_value = '<MCP_TOOLS>v1</MCP_TOOLS>'
+        mem.get_context_summary = MagicMock(  # type: ignore[method-assign]
+            return_value='<SESSION_CONTEXT>v1</SESSION_CONTEXT>'
+        )
+        messages = mem._normalize_system_messages([_text_msg('user', 'Continue')])
+
+        prompt_manager.get_mcp_user_addendum.return_value = '<MCP_TOOLS>v2</MCP_TOOLS>'
+        mem.get_context_summary.return_value = (  # type: ignore[attr-defined]
+            '<SESSION_CONTEXT>v2</SESSION_CONTEXT>'
+        )
+        normalized = mem._normalize_system_messages(messages)
+        rendered = '\n'.join(
+            extract_first_text(message) or '' for message in normalized
+        )
+
+        assert rendered.count('kind="mcp-catalog"') == 1
+        assert rendered.count('kind="session-summary"') == 1
+        assert '<MCP_TOOLS>v1</MCP_TOOLS>' not in rendered
+        assert '<SESSION_CONTEXT>v1</SESSION_CONTEXT>' not in rendered
+        assert '<MCP_TOOLS>v2</MCP_TOOLS>' in rendered
+        assert '<SESSION_CONTEXT>v2</SESSION_CONTEXT>' in rendered
+        assert normalized[-1].role == 'user'
+        assert extract_first_text(normalized[-1]) == 'Continue'
+
+    def test_snapshot_replacement_does_not_change_tool_results(self):
+        mem = _make_memory()
+        mem.get_context_summary = MagicMock(  # type: ignore[method-assign]
+            return_value='<SESSION_CONTEXT>current</SESSION_CONTEXT>'
+        )
+        tool_result = Message(
+            role='tool',
+            content=[TextContent(text='complete unmodified tool output')],
+            tool_call_id='call-1',
+            name='read_file',
+        )
+        messages = [
+            _text_msg('system', 'stable'),
+            _text_msg(
+                'system',
+                '<GRINTA_TURN_CONTEXT kind="session-summary">\nold\n'
+                '</GRINTA_TURN_CONTEXT>',
+            ),
+            tool_result,
+            _text_msg('user', 'Continue'),
+        ]
+
+        normalized = mem._normalize_system_messages(messages)
+
+        retained = next(message for message in normalized if message.role == 'tool')
+        assert retained is tool_result
+        assert extract_first_text(retained) == 'complete unmodified tool output'
+
 
 class TestToolResultPropagation:
     def test_tool_result_ok_is_propagated_to_tool_ok(self):
@@ -299,6 +354,44 @@ class TestToolResultPropagation:
         assert isinstance(payload[1], dict)
         assert payload[1]['tool_result'] == obs.tool_result
         assert json.loads(payload[1]['message']) == obs.tool_result
+
+    def test_structured_tool_error_is_emitted_as_one_canonical_object(self):
+        mem = _make_memory()
+        obs = ErrorObservation(content='multi_edit syntax validation failed.')
+        obs.error_id = 'SYNTAX_VALIDATION_FAILED'
+        obs.tool_result = {
+            'tool': 'file_edit',
+            'ok': False,
+            'error_code': 'SYNTAX_VALIDATION_FAILED',
+            'path': 'src/app.py',
+            'line': 12,
+        }
+        obs.tool_call_metadata = ToolCallMetadata(
+            function_name='multiedit',
+            tool_call_id='call_error',
+            model_response={'id': 'resp_error'},
+            total_calls_in_response=1,
+        )
+        tool_messages: dict[str, Message] = {}
+
+        out = mem._process_observation(
+            obs,
+            tool_call_id_to_message=tool_messages,
+            max_message_chars=None,
+        )
+
+        assert not out
+        message_text = extract_first_text(tool_messages['call_error'])
+        assert message_text is not None
+        payload = decode_tool_result_payload(message_text)
+        assert payload is not None
+        assert payload[0] == 'multiedit'
+        content = payload[1]
+        assert isinstance(content, dict)
+        assert content['error_code'] == 'SYNTAX_VALIDATION_FAILED'
+        assert content['message'] == 'multi_edit syntax validation failed.'
+        assert 'tool_result' not in content
+        assert '[Error occurred in processing last action]' not in message_text
 
 
 class TestToolPairingMessageShape:

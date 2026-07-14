@@ -902,13 +902,13 @@ class _ExecutorStreamingMixin:
         state: _AsyncStreamingState,
         first_chunk_timeout: float,
     ) -> bool:
-        try:
-            await self._handle_first_chunk_timeout_fallback(
-                call_params, event_stream, state, first_chunk_timeout
-            )
-            return True
-        except Exception:
-            return False
+        # A failed fallback is still an LLM failure.  Do not turn it into an
+        # empty response: that is interpreted as a null action and causes the
+        # orchestrator to resend the same prompt without recovery or backoff.
+        await self._handle_first_chunk_timeout_fallback(
+            call_params, event_stream, state, first_chunk_timeout
+        )
+        return True
 
     async def _ingest_stream_tool_call_chunk(
         self,
