@@ -9,29 +9,24 @@ from backend.context.context_pipeline.types import (
     _JUST_COMPACTED_KEY,
     _LAST_LLM_STEP_KEY,
 )
-from backend.context.prompt.context_packet import CONTEXT_PACKET_MARKER
 from backend.ledger.action.agent import CondensationAction
 from backend.ledger.event import Event
+from backend.ledger.observation.agent import AgentCondensationObservation
 
 if TYPE_CHECKING:
     from backend.orchestration.state.state import State
 
 
 def _drop_stale_prompt_state_artifacts(events: list[Event]) -> list[Event]:
-    """Remove old prompt-only state blocks before injecting the fresh packet."""
-    markers = (
-        CONTEXT_PACKET_MARKER,
-        '<COMPACT_SNAPSHOT>',
-        '<POST_COMPACT_RESTORE>',
-        '<RESTORED_CONTEXT>',
-    )
-    filtered: list[Event] = []
-    for event in events:
-        content = getattr(event, 'content', None)
-        if isinstance(content, str) and any(marker in content for marker in markers):
-            continue
-        filtered.append(event)
-    return filtered
+    """Remove superseded prompt packets by event type, never content matching."""
+    return [
+        event
+        for event in events
+        if not (
+            isinstance(event, AgentCondensationObservation)
+            and getattr(event, 'is_working_set', False)
+        )
+    ]
 
 
 def clear_compact_guard_after_llm_step(state: State) -> None:

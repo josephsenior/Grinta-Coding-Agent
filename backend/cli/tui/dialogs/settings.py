@@ -98,19 +98,35 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
 
         return build_model_entries_by_provider(provider=provider)
 
-    def _apply_model_list_to_ui(self, provider: str) -> None:
+    def _apply_model_list_to_ui(
+        self,
+        provider: str,
+        *,
+        preferred_model: str | None = None,
+        preferred_custom_model: str | None = None,
+    ) -> None:
         model_select = self.query_one('#settings-model', Select)
         options = self._model_options(provider)
         values = {value for _label, value in options}
-        model = self._current_model_for_provider(provider)
+        model = preferred_model or self._current_model_for_provider(provider)
         if model not in values:
-            model = options[0][1] if options else '__custom__'
+            # A user-selected custom value is intentionally not in the catalog.
+            # Keep it while an asynchronous catalog refresh is being applied.
+            if preferred_model == '__custom__':
+                model = '__custom__'
+            else:
+                model = options[0][1] if options else '__custom__'
         model_select.set_options(options)
         model_select.value = model
         self._selected_model_value = model
+        custom_model = (
+            preferred_custom_model
+            if preferred_custom_model is not None
+            else self._current_custom_model_for_provider(provider)
+        )
         self.query_one(
             '#settings-custom-model', Input
-        ).value = self._current_custom_model_for_provider(provider)
+        ).value = custom_model if model == '__custom__' else ''
         self._sync_custom_model_visibility()
         self._sync_reasoning_options(provider, model)
         self._sync_model_metadata()
@@ -136,7 +152,20 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         if request_id != self._model_list_request_id or not self.is_mounted:
             return
         self._entries_by_provider.update(merged)
-        self._apply_model_list_to_ui(selected)
+        # Catalog loading is asynchronous. Preserve a selection made while it
+        # was in flight instead of rebuilding the controls from the old config.
+        preferred_model = None
+        preferred_custom_model = None
+        if self._selected_provider() == selected:
+            preferred_model = self._selected_model_value
+            preferred_custom_model = self.query_one(
+                '#settings-custom-model', Input
+            ).value
+        self._apply_model_list_to_ui(
+            selected,
+            preferred_model=preferred_model,
+            preferred_custom_model=preferred_custom_model,
+        )
         self._set_feedback('')
 
     def _load_catalog_entries_for_provider(self, provider: str) -> None:
@@ -363,10 +392,10 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
 
     def _selected_model(self) -> str:
         value = self.query_one('#settings-model', Select).value
-        if isinstance(value, str) and value:
-            return value
         if self._selected_model_value:
             return self._selected_model_value
+        if isinstance(value, str) and value:
+            return value
         return self._current_model_for_provider(self._selected_provider())
 
     def _selected_entry(self, provider: str | None, model: str | None):
@@ -490,9 +519,9 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         model_select = self.query_one('#settings-model', Select)
         selected = ''
         for candidate in (
+            self._selected_model_value,
             model_select.value,
             getattr(model_select, 'selection', None),
-            self._selected_model_value,
         ):
             if isinstance(candidate, str) and candidate:
                 selected = candidate

@@ -191,6 +191,21 @@ class TestInitialize:
         bound_config = mock_from_config.call_args.args[0]
         assert bound_config.llm_config is llm_config
 
+    def test_pipeline_compaction_always_uses_agent_model_config(self):
+        from backend.core.config.compactor_config import ContextPipelineConfig
+        from backend.core.config.llm_config import LLMConfig
+
+        agent_llm = LLMConfig.model_validate({'model': 'openai/agent-model'})
+        other_llm = LLMConfig.model_validate({'model': 'openai/other-model'})
+        config = MagicMock()
+        config.compactor_config = ContextPipelineConfig(llm_config=other_llm)
+        config.get_llm_config.return_value = agent_llm
+        manager = ContextMemoryManager(config=config, llm_registry=MagicMock())
+
+        normalized = manager._normalized_pipeline_config()
+
+        assert normalized.llm_config is agent_llm
+
 
 # ---------------------------------------------------------------------------
 # condense_history

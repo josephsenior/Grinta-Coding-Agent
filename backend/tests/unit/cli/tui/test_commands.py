@@ -64,6 +64,8 @@ async def test_tui_help_shows(mock_config):
 @pytest.mark.asyncio
 async def test_tui_settings_command_dispatches(mock_config):
     """Verify /settings dispatches to the real TUI settings handler."""
+    from textual.worker import get_current_worker
+
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -72,10 +74,11 @@ async def test_tui_settings_command_dispatches(mock_config):
         await pilot.pause()
 
         s = _get_screen(app)
-        called = {'value': False}
+        called = {'value': False, 'worker': False}
 
         async def _fake_settings() -> None:
             called['value'] = True
+            called['worker'] = get_current_worker() is not None
 
         s._open_settings_tui = _fake_settings  # type: ignore[method-assign]
 
@@ -85,6 +88,36 @@ async def test_tui_settings_command_dispatches(mock_config):
         await pilot.pause()
 
         assert called['value'] is True
+        assert called['worker'] is True
+
+
+@pytest.mark.asyncio
+async def test_tui_settings_command_can_wait_for_real_modal(mock_config, monkeypatch):
+    """Regression: push_screen_wait must run inside a Textual worker."""
+    from backend.cli.tui.dialogs.settings import GrintaSettingsDialog
+
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+    monkeypatch.setattr(
+        'backend.core.config.load_app_config', lambda *args, **kwargs: mock_config
+    )
+    monkeypatch.setattr(
+        GrintaSettingsDialog, '_schedule_model_refresh', lambda self, provider=None: None
+    )
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+
+        s = _get_screen(app)
+        ta = s.query_one('#input', TextArea)
+        ta.text = '/settings'
+        await pilot.press('enter')
+        await pilot.pause()
+
+        assert isinstance(app.screen, GrintaSettingsDialog)
+        await pilot.press('escape')
+        await pilot.pause()
 
 
 @pytest.mark.asyncio

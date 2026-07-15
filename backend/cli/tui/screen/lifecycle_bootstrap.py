@@ -197,7 +197,10 @@ class ScreenLifecycleBootstrapMixin:
         """Connect MCP servers and detect local language/debug runtimes."""
         probes: list[Any] = [self._bootstrap_mcp_warmup(agent, runtime, memory)]
         renderer = self._renderer
-        if renderer is not None:
+        if renderer is not None and (
+            renderer._sidebar_lsp_enabled()
+            or renderer._sidebar_debugger_enabled()
+        ):
             probes.append(renderer._detect_lsp_servers_async())
         await asyncio.gather(*probes)
 

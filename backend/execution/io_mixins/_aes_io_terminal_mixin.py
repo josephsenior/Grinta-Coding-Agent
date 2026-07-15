@@ -260,11 +260,20 @@ class _AesIoTerminalMixin:
             await asyncio.sleep(poll_interval)
             waited += poll_interval
             from functools import partial
+
             loop = asyncio.get_running_loop()
             try:
                 probe, *_ = await asyncio.wait_for(
-                    loop.run_in_executor(None, partial(self._read_terminal_with_mode, session=session, mode='delta', offset=offset)),
-                    timeout=2.0
+                    loop.run_in_executor(
+                        None,
+                        partial(
+                            self._read_terminal_with_mode,
+                            session=session,
+                            mode='delta',
+                            offset=offset,
+                        ),
+                    ),
+                    timeout=2.0,
                 )
             except asyncio.TimeoutError:
                 probe = ''
@@ -752,7 +761,9 @@ class _AesIoTerminalMixin:
                             f'produced no new output for {streak} consecutive '
                             'terminal_read calls and was closed to prevent a ghost '
                             'session loop. Open a new terminal session or use '
-                            'action=''run'' for one-shot commands.'
+                            'action='
+                            'run'
+                            ' for one-shot commands.'
                         ),
                         error_id='TERMINAL_EMPTY_READ_STREAK',
                     )
@@ -970,7 +981,9 @@ class _AesIoTerminalMixin:
             logger.error('Error listing terminal sessions: %s', exc)
             return ErrorObservation(f'Failed to list terminal sessions: {exc}')
 
-    async def terminal_close(self, action: TerminalCloseAction) -> Observation:
+    async def terminal_close(
+        self, action: TerminalCloseAction
+    ) -> TerminalObservation | ErrorObservation:
         """Explicitly close an interactive terminal session.
 
         Sessions are otherwise garbage-collected by the runtime (timeout /
@@ -981,14 +994,16 @@ class _AesIoTerminalMixin:
         """
         session_id = action.session_id
         try:
-            session = self.session_manager.get_session(session_id)
-            if session is None:
+            close_requested = self.session_manager.request_close_session(session_id)
+            if not close_requested:
                 self._clear_terminal_read_cursor(session_id)
-                obs = Observation(
+                obs = TerminalObservation(
+                    session_id=session_id,
                     content=(
                         f'Terminal session {session_id!r} was not active; '
                         'close is a no-op.'
-                    )
+                    ),
+                    state='SESSION_NOT_FOUND',
                 )
                 obs.tool_result = {
                     'tool': 'terminal',
@@ -1002,16 +1017,12 @@ class _AesIoTerminalMixin:
                 }
                 return obs
 
-            loop = asyncio.get_running_loop()
-            try:
-                await asyncio.wait_for(
-                    loop.run_in_executor(None, self.session_manager.close_session, session_id),
-                    timeout=2.0
-                )
-            except asyncio.TimeoutError:
-                logger.warning('Terminal close timed out for session %s (winpty deadlock). Forced return.', session_id)
             self._clear_terminal_read_cursor(session_id)
-            obs = Observation(content=f'Closed terminal session {session_id!r}.')
+            obs = TerminalObservation(
+                session_id=session_id,
+                content=f'Closed terminal session {session_id!r}.',
+                state='SESSION_CLOSED',
+            )
             obs.tool_result = {
                 'tool': 'terminal',
                 'ok': True,
@@ -1019,11 +1030,10 @@ class _AesIoTerminalMixin:
                 'retryable': False,
                 'state': 'SESSION_CLOSED',
                 'next_actions': ['open'],
-                'payload': {'session_id': session_id},
+                'payload': {'session_id': session_id, 'teardown_async': True},
                 'progress': False,
             }
             return obs
         except Exception as exc:
             logger.error('Error closing terminal %s: %s', action.session_id, exc)
             return ErrorObservation(f'Failed to close terminal: {exc}')
-

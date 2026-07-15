@@ -13,12 +13,14 @@ from backend.context.canonical_state import (
 )
 from backend.context.compactor.pre_condensation_snapshot import extract_snapshot
 from backend.context.context_pipeline import ContextPipeline
+from backend.context.context_pipeline.helpers import _drop_stale_prompt_state_artifacts
 from backend.core.config.compactor_config import ContextPipelineConfig
 from backend.core.constants import DEFAULT_EMERGENCY_PROMPT_MIN_EVENTS
 from backend.ledger.action.agent import AgentThinkAction
 from backend.ledger.action.commands import CmdRunAction
 from backend.ledger.action.message import MessageAction
 from backend.ledger.event import EventSource
+from backend.ledger.observation.agent import AgentCondensationObservation
 from backend.ledger.observation.commands import CmdOutputObservation
 from backend.ledger.observation.error import ErrorObservation
 
@@ -85,6 +87,18 @@ def test_soak_replay_excerpt_recoverable_tool_error_is_not_durable() -> None:
     assert snapshot['decisions'] == []
     assert snapshot['recent_errors'] == []
     assert snapshot['attempted_approaches'] == []
+
+
+def test_stale_packet_removal_uses_event_identity_not_message_text() -> None:
+    user = _user('Explain the literal tag <CONTEXT_PACKET>', 1)
+    stale_packet = AgentCondensationObservation(
+        content='<CONTEXT_PACKET>old</CONTEXT_PACKET>', is_working_set=True
+    )
+    stale_packet.id = 2
+
+    result = _drop_stale_prompt_state_artifacts([user, stale_packet])
+
+    assert result == [user]
 
 
 def test_recent_work_ledger_renders_once_for_latest_verification() -> None:

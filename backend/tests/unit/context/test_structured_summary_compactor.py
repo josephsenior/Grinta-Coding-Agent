@@ -329,17 +329,15 @@ class TestGetCompaction:
 
         async def _astream(messages):
             yield {
-                'choices': [
-                    {'delta': {'content': good_prose}, 'finish_reason': None}
-                ]
+                'choices': [{'delta': {'content': good_prose}, 'finish_reason': None}]
             }
             yield {'choices': [{'delta': {}, 'finish_reason': 'stop'}]}
 
         llm.astream = _astream
         llm.acompletion = AsyncMock()
         emitted: list[str] = []
-        condenser.streaming_emitter = lambda _chunk, accumulated, _final: emitted.append(
-            accumulated
+        condenser.streaming_emitter = (
+            lambda _chunk, accumulated, _final: emitted.append(accumulated)
         )
 
         with patch.object(condenser, '_add_response_metadata'):
@@ -372,16 +370,14 @@ class TestGetCompaction:
                 ]
             }
             yield {
-                'choices': [
-                    {'delta': {'content': good_prose}, 'finish_reason': None}
-                ]
+                'choices': [{'delta': {'content': good_prose}, 'finish_reason': None}]
             }
 
         llm.astream = _astream
         llm.acompletion = AsyncMock()
         emitted: list[str] = []
-        condenser.streaming_emitter = lambda _chunk, accumulated, _final: emitted.append(
-            accumulated
+        condenser.streaming_emitter = (
+            lambda _chunk, accumulated, _final: emitted.append(accumulated)
         )
 
         with patch.object(condenser, '_add_response_metadata'):
@@ -460,61 +456,57 @@ class TestBuildCondensationPrompt:
 
     def test_prompt_contains_previous_summary_section(self):
         prompt = self._build_prompt()
-        assert '<PREVIOUS SUMMARY>' in prompt
-        assert '</PREVIOUS SUMMARY>' in prompt
+        assert '<PREVIOUS_WORKING_MEMORY>' in prompt
+        assert '</PREVIOUS_WORKING_MEMORY>' in prompt
 
     def test_prompt_includes_previous_summary_content(self):
         prompt = self._build_prompt(summary_text='Built X from scratch')
         assert 'Built X from scratch' in prompt
 
-    def test_prompt_instructs_preserve_previous_narrative(self):
+    def test_prompt_treats_previous_memory_as_revisable(self):
         prompt = self._build_prompt()
-        assert 'preserve its narrative arc' in prompt.lower()
+        assert 'may be stale or mistaken' in prompt.lower()
+        assert 'later direct evidence wins' in prompt.lower()
 
-    def test_prompt_instructs_from_scratch_preservation(self):
+    def test_prompt_frames_compaction_as_agent_continuity(self):
         prompt = self._build_prompt()
-        assert 'narrative arc' in prompt.lower()
-        assert 'previous summary' in prompt.lower()
+        assert 'same agent model' in prompt.lower()
+        assert 'continuity of your own reasoning' in prompt.lower()
 
-    def test_prompt_includes_event_digest_section(self):
+    def test_prompt_includes_chronological_evidence_section(self):
         prompt = self.condenser._build_condensation_prompt(
             _summary_event(0), [_event(1)]
         )
-        assert '<EVENT DIGEST>' in prompt
-        assert '</EVENT DIGEST>' in prompt
+        assert '<CHRONOLOGICAL_EVIDENCE>' in prompt
+        assert '</CHRONOLOGICAL_EVIDENCE>' in prompt
 
-    def test_prompt_includes_recent_raw_events_section(self):
+    def test_prompt_includes_raw_event_identity(self):
         prompt = self.condenser._build_condensation_prompt(
             _summary_event(0), [_event(1)]
         )
-        assert '<RECENT RAW EVENTS' in prompt
+        assert '<EVENT id="1"' in prompt
 
-    def test_prompt_only_includes_last_5_raw_events(self):
+    def test_prompt_includes_full_ordered_evidence_not_a_heuristic_tail(self):
         events = [_event(i, content=f'event {i}') for i in range(20)]
         prompt = self.condenser._build_condensation_prompt(_summary_event(0), events)
-        raw_section = prompt[prompt.index('<RECENT RAW EVENTS') :]
-        assert 'event 19' in raw_section
-        assert 'event 15' in raw_section
-        assert 'event 14' not in raw_section
+        evidence = prompt[prompt.index('<CHRONOLOGICAL_EVIDENCE>') :]
+        assert 'event 0' in evidence
+        assert 'event 19' in evidence
+        assert evidence.index('event 0') < evidence.index('event 19')
 
     def test_prompt_includes_pruned_events(self):
         event = _event(42, content='Created autograd/tensor.py')
         prompt = self.condenser._build_condensation_prompt(_summary_event(0), [event])
         assert 'Created autograd/tensor.py' in prompt
 
-    def test_prompt_has_priority_ordered_sections(self):
+    def test_prompt_leaves_task_specific_organization_to_model(self):
         prompt = self._build_prompt()
-        assert 'UNRESOLVED & BLOCKING' in prompt
-        assert 'NEXT STEPS' in prompt
-        assert 'FAILED APPROACHES' in prompt
-        assert 'ACCOMPLISHED & ARCHITECTURE' in prompt
-        assert 'DECISIONS & RATIONALE' in prompt
+        assert 'Choose the organization that best fits the task' in prompt
 
     def test_prompt_has_budget_constraint(self):
         prompt = self.condenser._build_condensation_prompt(
             _summary_event(0), [], char_limit=48000
         )
-        assert 'BUDGET CONSTRAINT' in prompt
         assert '48000 characters' in prompt
 
     def test_prompt_budget_reflects_char_limit(self):
@@ -523,28 +515,23 @@ class TestBuildCondensationPrompt:
         )
         assert '12000 characters' in prompt
 
-    def test_prompt_instructs_synthesized_user_goal_not_verbatim_quotes(self):
+    def test_prompt_preserves_precise_task_evidence_without_fixed_categories(self):
         prompt = self._build_prompt()
-        assert 'GOAL CONTEXT' in prompt or 'goal context' in prompt.lower()
-        assert 'Do NOT quote' in prompt or 'Never include' in prompt
-        assert 'exact file paths' in prompt
-        assert 'test names' in prompt
-        assert 'exact error messages' in prompt
-        assert 'User messages (verbatim)' not in prompt
+        assert "user's current intent and constraints" in prompt
+        assert 'exact identifiers, paths, commands' in prompt
+        assert 'errors, and event references' in prompt
 
-    def test_prompt_instructs_failed_approaches(self):
+    def test_prompt_instructs_failed_approaches_when_useful(self):
         prompt = self._build_prompt()
-        assert 'FAILED APPROACHES' in prompt
-        assert 'not tool-level' in prompt.lower()
+        assert 'failed approaches worth avoiding' in prompt.lower()
 
-    def test_prompt_instructs_dense_markdown_not_filler(self):
+    def test_prompt_requests_only_final_reconciled_memory(self):
         prompt = self._build_prompt()
-        assert 'hyper-dense Markdown' in prompt
-        assert 'conversational filler' in prompt.lower()
+        assert 'Output only the final reconciled working memory' in prompt
 
-    def test_prompt_instructs_unverified_flag(self):
+    def test_prompt_distinguishes_observation_from_inference(self):
         prompt = self._build_prompt()
-        assert '[UNVERIFIED]' in prompt
+        assert 'distinguish observation from inference' in prompt
 
 
 # ---------------------------------------------------------------------------
@@ -695,7 +682,7 @@ class TestUserGoalSection:
     def test_prompt_includes_previous_goal_when_present(self):
         prev = _summary_event(0, '## USER GOAL\nBuild a compiler\n## OTHER\nstuff')
         prompt = self.condenser._build_condensation_prompt(prev, [], char_limit=48000)
-        assert 'PREVIOUS GOAL SYNTHESIS' in prompt
+        assert '<PREVIOUS_WORKING_MEMORY>' in prompt
         assert 'Build a compiler' in prompt
 
     def test_prompt_omits_previous_goal_when_absent(self):
@@ -718,7 +705,7 @@ class TestUserGoalSection:
         prompt = self.condenser._build_condensation_prompt(
             summary_event, [], char_limit=48000
         )
-        assert 'PREVIOUS GOAL SYNTHESIS' in prompt
+        assert '<PREVIOUS_WORKING_MEMORY>' in prompt
         assert 'Build a compiler with X constraints' in prompt
 
     def test_previous_goal_synthesis_omitted_when_no_prior_goal(self):
@@ -728,12 +715,11 @@ class TestUserGoalSection:
         )
         assert 'PREVIOUS GOAL SYNTHESIS' not in prompt
 
-    def test_prompt_includes_goal_section_instruction(self):
+    def test_prompt_includes_user_intent_instruction(self):
         prompt = self.condenser._build_condensation_prompt(
             _summary_event(0), [], char_limit=48000
         )
-        assert '## USER GOAL' in prompt
-        assert 'Highest Priority' in prompt
+        assert "user's current intent and constraints" in prompt
 
 
 # ---------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 """Tests for EventRouterService."""
 
+import asyncio
 import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -621,10 +622,38 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         self.mock_controller.set_agent_state_to.assert_called_once_with(
             AgentState.FINISHED
         )
+        await asyncio.sleep(0)
         self.mock_controller.task_validation_service.validate_completion_quality.assert_awaited_once_with(
             finish_action
         )
         self.assertNotIn('active_run_mode', self.mock_controller.state.extra_data)
+
+    async def test_final_response_does_not_wait_for_housekeeping(self):
+        housekeeping_started = asyncio.Event()
+        release_housekeeping = asyncio.Event()
+
+        async def _slow_validation(_action):
+            housekeeping_started.set()
+            await release_housekeeping.wait()
+
+        self.mock_controller.task_validation_service.validate_completion_quality.side_effect = (
+            _slow_validation
+        )
+        self.mock_controller.state.extra_data['active_run_mode'] = 'plan'
+        finish_action = MessageAction(content='Done.', final_response=True)
+        finish_action.source = EventSource.AGENT
+
+        await asyncio.wait_for(
+            self.service._handle_message_action(finish_action),
+            timeout=0.25,
+        )
+
+        self.mock_controller.set_agent_state_to.assert_awaited_once_with(
+            AgentState.FINISHED
+        )
+        await asyncio.wait_for(housekeeping_started.wait(), timeout=0.25)
+        release_housekeeping.set()
+        await asyncio.sleep(0)
 
     async def test_handle_task_tracking_action_uses_canonical_plan_payloads(self):
         """Live plan updates should keep the canonical task payload shape intact."""
