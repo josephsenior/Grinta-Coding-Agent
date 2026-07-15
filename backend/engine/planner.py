@@ -130,13 +130,13 @@ def _message_contains(message: dict[str, Any], marker: str) -> bool:
 
 def _is_static_prompt_message(message: dict[str, Any]) -> bool:
     role = message.get('role')
-    if is_turn_context_text(_message_text(message)):
+    text = _message_text(message)
+    if is_turn_context_text(text) or '<CONTEXT_PACKET>' in text:
         return False
     if role == 'system':
         return True
     if role != 'user':
         return False
-    text = _message_text(message)
     return any(marker in text for marker in _INJECTED_MSG_MARKERS)
 
 
@@ -509,10 +509,7 @@ class OrchestratorPlanner:
         restored: list = []
         for index, message in enumerate(messages):
             identity = identities.get(index)
-            if (
-                identity is not None
-                and identity in records
-            ):
+            if identity is not None and identity in records:
                 # Replace, rather than duplicate, any snapshots supplied by a
                 # future ContextMemory implementation.
                 while (
@@ -642,7 +639,11 @@ class OrchestratorPlanner:
         state: State,
         tools: list[ChatCompletionToolParam],
     ) -> dict:
-        messages, continuing_turn = self._restore_prior_turn_context(messages, state)
+        # Dynamic application context is rebuilt once for the active request.
+        # Historical control blocks are not conversation and must not be
+        # restored beside every retained user message.
+        messages = list(messages)
+        continuing_turn = False
         tool_choice = self._determine_tool_choice(messages, state)
         mode = self._active_mode_for_state(state)
         if continuing_turn:
@@ -660,7 +661,6 @@ class OrchestratorPlanner:
 
         params: dict[str, Any] = {'messages': messages, 'stream': True}
         params = self._configure_tool_routing(params, tools, messages, tool_choice)
-        self._record_current_turn_context(params['messages'], state)
         params['_prompt_cache_variant'] = self._build_prompt_cache_variant(
             params['messages'], params.get('tools', [])
         )

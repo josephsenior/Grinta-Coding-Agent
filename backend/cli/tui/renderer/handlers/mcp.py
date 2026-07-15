@@ -32,6 +32,7 @@ def _handle_mcp_action(orch: 'RendererEventProcessorMixin', event: MCPAction) ->
     widget = MCPCard(event.name, arguments=event.arguments)
     orch._append_scan_line_card(widget)
     orch._pending_mcp_card = widget
+    orch._register_tool_card(getattr(event, 'id', -1), widget, kind='mcp')
     orch._pending_exploration_meta = None
 
 
@@ -60,7 +61,10 @@ def _handle_mcp_observation(
         error=content if is_error else None,
     )
     meta = list(card.meta_lines) if card.meta_lines else None
-    pending = orch._pending_mcp_card
+    action_id = getattr(event, 'cause', None)
+    pending = orch._take_tool_card(action_id, expected_kind='mcp')
+    if pending is None and (action_id is None or action_id < 0):
+        pending = orch._pending_mcp_card
     from backend.cli.tui.widgets.scan_line import MCPCard
 
     if isinstance(pending, MCPCard):
@@ -69,7 +73,8 @@ def _handle_mcp_observation(
             success=not is_error,
             meta_lines=meta,
         )
-        orch._pending_mcp_card = None
+        if orch._pending_mcp_card is pending:
+            orch._pending_mcp_card = None
         orch._pending_exploration_meta = None
         return
 
@@ -82,5 +87,6 @@ def _handle_mcp_observation(
             meta_lines=meta,
         )
     )
-    orch._pending_mcp_card = None
+    if action_id is None or action_id < 0:
+        orch._pending_mcp_card = None
     orch._pending_exploration_meta = None

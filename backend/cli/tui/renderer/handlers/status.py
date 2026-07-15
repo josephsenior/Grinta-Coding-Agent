@@ -166,6 +166,7 @@ def _handle_error_observation(
         clear_pending_exploration_cards,
     )
     from backend.cli.tui.renderer.handlers.memory import clear_pending_memory_lines
+
     orch._compaction_transcript_active = False
     clear_pending_exploration_cards(orch)
     clear_pending_memory_lines(orch)
@@ -181,6 +182,10 @@ def _handle_error_observation(
         return
     if getattr(event, 'notify_ui_only', False):
         _notify_ui_only_error(orch, content, error_category, error_id=error_id or None)
+        return
+
+    fail_card = getattr(orch, '_fail_tool_scan_card', None)
+    if callable(fail_card) and fail_card(getattr(event, 'cause', None), content):
         return
 
     _show_dap_install_hint_if_needed(orch, event)
@@ -239,7 +244,9 @@ def _show_dap_install_hint_if_needed(
 
 
 def _backoff_hud_label_active(hud: Any) -> bool:
-    label = (getattr(getattr(hud, 'state', None), 'agent_state_label', '') or '').strip()
+    label = (
+        getattr(getattr(hud, 'state', None), 'agent_state_label', '') or ''
+    ).strip()
     return label.startswith(('Backoff', 'Retrying'))
 
 

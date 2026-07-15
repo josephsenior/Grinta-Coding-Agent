@@ -91,7 +91,9 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
                     )
                     yield CollapsibleSection(
                         title='LSP Servers',
-                        content=LOADING_LSP,
+                        content=(
+                            LOADING_LSP if self._sidebar_lsp_enabled() else 'Disabled'
+                        ),
                         collapsed=False,
                         accent_color=NAVY_FOCUS_ACCENT,
                         section_icon='◈',
@@ -100,7 +102,11 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
                     )
                     yield CollapsibleSection(
                         title='Debug Adapters',
-                        content=LOADING_DAP,
+                        content=(
+                            LOADING_DAP
+                            if self._sidebar_debugger_enabled()
+                            else 'Disabled'
+                        ),
                         collapsed=False,
                         accent_color=NAVY_RUNNING,
                         section_icon='◆',

@@ -91,14 +91,16 @@ class ContextMemoryManager:
         if compactor_config is None:
             pipeline_config = ContextPipelineConfig(llm_config=agent_llm)
         elif isinstance(compactor_config, ContextPipelineConfig):
-            pipeline_config = compactor_config
+            pipeline_config = compactor_config.model_copy(
+                update={'llm_config': agent_llm}
+            )
         else:
             logger.info(
                 'Agent compactor type %r maps to context_pipeline',
                 getattr(compactor_config, 'type', type(compactor_config).__name__),
             )
             pipeline_config = ContextPipelineConfig(llm_config=agent_llm)
-        if pipeline_config.llm_config is None and agent_llm is not None:
+        if agent_llm is not None and pipeline_config.llm_config != agent_llm:
             pipeline_config = pipeline_config.model_copy(
                 update={'llm_config': agent_llm}
             )

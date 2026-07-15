@@ -315,6 +315,8 @@ class TUIRenderer(
         self._debugger_cards_by_session: dict[str, Any] = {}
         self._pending_debugger_card: Any | None = None
         self._pending_shell_cards_by_command: dict[str, deque[Any]] = defaultdict(deque)
+        self._tool_cards_by_action_id: dict[int, Any] = {}
+        self._tool_kinds_by_action_id: dict[int, str] = {}
         RendererTerminalMixin._init_terminal_state(self)
         self._streaming_render_cache: dict[str, Any] = {}
         self._streaming_render_state: Any | None = None

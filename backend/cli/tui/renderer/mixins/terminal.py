@@ -18,6 +18,8 @@ class RendererTerminalMixin:
         instance._terminal_scrollback_by_session: dict[str, list[str]] = {}
         instance._pending_terminal_scan_cards: dict[str, Any] = {}
         instance._pending_terminal_scan_card: Any | None = None
+        instance._tool_cards_by_action_id: dict[int, Any] = {}
+        instance._tool_kinds_by_action_id: dict[int, str] = {}
         if not hasattr(instance, '_pending_shell_cards_by_command'):
             instance._pending_shell_cards_by_command: dict[str, deque[Any]] = {}
         instance._pending_compaction_scan_card: Any | None = None
@@ -109,7 +111,11 @@ class RendererTerminalMixin:
     # ── scan-line shell card ──────────────────────────────────────────
 
     def _create_shell_scan_card(
-        self, command_key: str, *, command: str | None = None
+        self,
+        command_key: str,
+        *,
+        command: str | None = None,
+        action_id: int | None = None,
     ) -> Any:
         from backend.cli.tui.widgets.scan_line import ShellCard
 
@@ -117,7 +123,10 @@ class RendererTerminalMixin:
         display_command = command if command is not None else command_key
         card = ShellCard(command=display_command)
         card.set_state('running')
-        self._pending_shell_cards_by_command[command_key].append(card)
+        if action_id is not None and action_id >= 0:
+            self._register_tool_card(action_id, card, kind='shell')
+        else:
+            self._pending_shell_cards_by_command[command_key].append(card)
         self._append_scan_line_card(card)
         return card
 
@@ -130,12 +139,15 @@ class RendererTerminalMixin:
         exit_code: int | None,
         cwd: str | None = None,
         is_background: bool = False,
+        action_id: int | None = None,
     ) -> None:
         display_command = command if command is not None else command_key
-        queue = self._pending_shell_cards_by_command.get(command_key)
-        card = queue.popleft() if queue else None
-        if queue is not None and not queue:
-            self._pending_shell_cards_by_command.pop(command_key, None)
+        card = self._take_tool_card(action_id, expected_kind='shell')
+        if card is None and (action_id is None or action_id < 0):
+            queue = self._pending_shell_cards_by_command.get(command_key)
+            card = queue.popleft() if queue else None
+            if queue is not None and not queue:
+                self._pending_shell_cards_by_command.pop(command_key, None)
 
         if card is None:
             from backend.cli.tui.widgets.scan_line import ShellCard
@@ -172,6 +184,8 @@ class RendererTerminalMixin:
         session_label: str,
         cwd: str,
         command: str,
+        action_id: int | None = None,
+        action_kind: str = 'terminal',
     ) -> Any:
         from backend.cli.tui.widgets.scan_line import TerminalCard
 
@@ -186,6 +200,8 @@ class RendererTerminalMixin:
         )
         card.set_state('running')
         self._pending_terminal_scan_card = card
+        if action_id is not None and action_id >= 0:
+            self._register_tool_card(action_id, card, kind=action_kind)
         if session_id:
             self._pending_terminal_scan_cards[session_id] = card
         self._append_scan_line_card(card)
@@ -201,6 +217,7 @@ class RendererTerminalMixin:
         command: str = '',
         scrollback: str = '',
         exit_code: int | None = None,
+        state: str | None = None,
     ) -> None:
         if card is None:
             return
@@ -210,13 +227,84 @@ class RendererTerminalMixin:
         card.command = command or card.command
         card.scrollback = scrollback or card.scrollback
         card.exit_code = exit_code
-        if exit_code == 0:
+        if state is not None:
+            card.set_state(state)
+        elif exit_code == 0:
             card.set_state('done')
         elif exit_code is not None:
             card.set_state('failed')
         else:
             card.set_state('running')
         card._refresh_line()
+
+    def _register_tool_card(self, action_id: int, card: Any, *, kind: str) -> None:
+        """Correlate a rendered card with the immutable ledger action id."""
+        if action_id < 0:
+            return
+        self._tool_cards_by_action_id[action_id] = card
+        self._tool_kinds_by_action_id[action_id] = kind
+
+    def _take_tool_card(
+        self, action_id: int | None, *, expected_kind: str | None = None
+    ) -> Any | None:
+        if action_id is None or action_id < 0:
+            return None
+        kind = self._tool_kinds_by_action_id.get(action_id)
+        if expected_kind is not None and kind != expected_kind:
+            return None
+        self._tool_kinds_by_action_id.pop(action_id, None)
+        return self._tool_cards_by_action_id.pop(action_id, None)
+
+    def _tool_card_kind(self, action_id: int | None) -> str | None:
+        if action_id is None or action_id < 0:
+            return None
+        return self._tool_kinds_by_action_id.get(action_id)
+
+    def _begin_terminal_close_card(self, action_id: int, session_id: str) -> Any:
+        """Reuse the session's card for close instead of appending a duplicate."""
+        card = self._pending_terminal_scan_cards.get(session_id)
+        if card is None:
+            card = getattr(self, '_terminal_cards_by_session', {}).get(session_id)
+        if card is None:
+            card = self._create_terminal_scan_card(
+                session_id=session_id,
+                session_label=self._terminal_session_label(session_id) or session_id,
+                cwd='',
+                command='close',
+                action_id=action_id,
+                action_kind='terminal_close',
+            )
+            return card
+        card.set_state('running')
+        card._refresh_line()
+        self._register_tool_card(action_id, card, kind='terminal_close')
+        return card
+
+    def _fail_tool_scan_card(self, action_id: int | None, content: str) -> bool:
+        """Fail a correlated card in place; return whether one was resolved."""
+        kind = self._tool_card_kind(action_id)
+        card = self._take_tool_card(action_id, expected_kind=kind)
+        if card is None:
+            return False
+        if hasattr(card, 'output'):
+            card.output = content
+        if hasattr(card, 'scrollback'):
+            existing = str(getattr(card, 'scrollback', '') or '')
+            card.scrollback = '\n'.join(part for part in (existing, content) if part)
+        for attr in ('result', 'error', 'status_message'):
+            if hasattr(card, attr):
+                setattr(card, attr, content)
+        for pending_attr in (
+            '_pending_mcp_card',
+            '_pending_delegate_card',
+            '_pending_acceptance_criteria_card',
+            '_last_browser_action_card',
+        ):
+            if getattr(self, pending_attr, None) is card:
+                setattr(self, pending_attr, None)
+        card.set_state('failed')
+        card._refresh_line()
+        return True
 
     # ── scrollback buffer ────────────────────────────────────────────
 
@@ -255,6 +343,8 @@ class RendererTerminalMixin:
         action: str = '',
         domain: str = '',
         full_url: str = '',
+        extracted: str = '',
+        action_id: int | None = None,
     ) -> Any:
         from backend.cli.tui.widgets.scan_line import BrowserCard
 
@@ -263,7 +353,10 @@ class RendererTerminalMixin:
             domain=domain,
             action=action,
             full_url=full_url,
+            extracted=extracted,
         )
-        card.set_state('running')
+        card.set_state('done' if extracted else 'running')
+        if action_id is not None and action_id >= 0:
+            self._register_tool_card(action_id, card, kind='browser')
         self._append_scan_line_card(card)
         return card
