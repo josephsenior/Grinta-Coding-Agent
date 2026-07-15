@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import threading
 import time
 from unittest.mock import MagicMock
 
@@ -362,6 +363,24 @@ class TestSessionManagerInteractiveFlag:
         manager.create_session(session_id='default', cwd=str(tmp_path))
         assert captured.get('interactive') is False
 
+    def test_request_close_detaches_before_physical_teardown_finishes(
+        self, tmp_path
+    ) -> None:
+        from backend.execution.utils.shell.session_manager import SessionManager
+
+        manager = SessionManager(
+            work_dir=str(tmp_path), username='test', tool_registry=MagicMock()
+        )
+        release = threading.Event()
+        session = MagicMock()
+        session.close.side_effect = lambda: release.wait(timeout=2)
+        manager.sessions['terminal_1'] = session
+
+        assert manager.request_close_session('terminal_1') is True
+        assert 'terminal_1' not in manager.sessions
+        assert manager.request_close_session('terminal_1') is False
+        release.set()
+
 
 # ---------------------------------------------------------------------------
 # Live integration tests (spawn real shell via PTY primitive)
@@ -487,22 +506,20 @@ class TestLiveBashPs1Execute:
 class TestPowerShellPs1Execute:
     def test_want_ps1_metadata_with_powershell(self) -> None:
         session = PtyInteractiveShellSession(
-            work_dir='.',
-            shell_argv=['powershell.exe', '-NoProfile']
+            work_dir='.', shell_argv=['powershell.exe', '-NoProfile']
         )
         assert session._want_ps1_metadata() is True
 
         session = PtyInteractiveShellSession(
             work_dir='.',
             shell_argv=['powershell.exe', '-NoProfile'],
-            enable_ps1_metadata=False
+            enable_ps1_metadata=False,
         )
         assert session._want_ps1_metadata() is False
 
     def test_install_powershell_ps1(self) -> None:
         session = PtyInteractiveShellSession(
-            work_dir='.',
-            shell_argv=['powershell.exe', '-NoProfile']
+            work_dir='.', shell_argv=['powershell.exe', '-NoProfile']
         )
         fake_pty = MagicMock()
         fake_pty.is_alive.return_value = True
@@ -512,4 +529,3 @@ class TestPowerShellPs1Execute:
         session._install_powershell_json_ps1()
         assert session._ps1_ready is True
         fake_pty.write.assert_called()
-

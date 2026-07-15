@@ -54,6 +54,8 @@ def _handle_terminal_run_action(
         session_label=label,
         cwd=cwd,
         command=cmd,
+        action_id=getattr(event, 'id', None),
+        action_kind='terminal_run',
     )
 
 
@@ -68,6 +70,8 @@ def _handle_terminal_input_action(
         session_label=label,
         cwd='',
         command=submitted,
+        action_id=getattr(event, 'id', None),
+        action_kind='terminal_input',
     )
 
 
@@ -97,9 +101,9 @@ def _handle_terminal_list_action(
 def _handle_terminal_close_action(
     orch: 'RendererEventProcessorMixin', event: TerminalCloseAction
 ) -> None:
-    # Close is a lightweight bookkeeping action — no new card, no scrollback
-    # update. The observation will carry the actual state transition.
-    pass
+    orch._begin_terminal_close_card(
+        getattr(event, 'id', -1), getattr(event, 'session_id', '') or ''
+    )
 
 
 def _handle_terminal_observation(
@@ -110,3 +114,29 @@ def _handle_terminal_observation(
     content = sanitize_terminal_observation_content(content)
 
     orch._accumulate_terminal_scrollback(session_id, content)
+    action_id = getattr(event, 'cause', None)
+    kind = orch._tool_card_kind(action_id)
+    if kind is None:
+        return
+    card = orch._take_tool_card(action_id, expected_kind=kind)
+    if card is None:
+        return
+
+    tool_result = getattr(event, 'tool_result', None)
+    ok = tool_result.get('ok', True) if isinstance(tool_result, dict) else True
+    if session_id:
+        orch._pending_terminal_scan_cards[session_id] = card
+        if hasattr(orch, '_terminal_cards_by_session'):
+            orch._terminal_cards_by_session[session_id] = card
+
+    if kind == 'terminal_run' and ok:
+        final_state = 'background'
+    else:
+        final_state = 'done' if ok else 'failed'
+    orch._complete_terminal_scan_card(
+        card,
+        session_id=session_id,
+        session_label=orch._terminal_session_label(session_id) or session_id,
+        scrollback='\n'.join(orch._terminal_scrollback_by_session.get(session_id, [])),
+        state=final_state,
+    )

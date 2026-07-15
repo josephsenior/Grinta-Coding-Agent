@@ -26,6 +26,7 @@ def _handle_browser_tool_action(
         action=action_name,
         domain=domain,
         full_url=url,
+        action_id=getattr(event, 'id', None),
     )
     orch._last_browser_action_card = None
     orch._last_browser_cmd = action_name
@@ -42,6 +43,7 @@ def _handle_browse_interactive_action(
         action=detail or 'browse',
         domain=domain,
         full_url=url,
+        action_id=getattr(event, 'id', None),
     )
     orch._last_browser_action_card = None
     orch._last_browser_cmd = 'browse'
@@ -52,8 +54,17 @@ def _handle_browser_screenshot_observation(
 ) -> None:
     content = (event.content or '').strip()
     domain = orch._extract_browser_domain(content)
+    card = orch._take_tool_card(getattr(event, 'cause', None), expected_kind='browser')
+    if card is not None:
+        card.extracted = content
+        if domain:
+            card.domain = domain
+        card.set_state('done')
+        card._refresh_line()
+        return
     orch._create_browser_scan_card(
         action=content or 'screenshot captured',
         domain=domain,
         full_url='',
+        extracted=content or 'screenshot captured',
     )

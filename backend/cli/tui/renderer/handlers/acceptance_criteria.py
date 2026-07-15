@@ -48,14 +48,18 @@ def _handle_acceptance_criteria_observation(
     success = _criteria_success(event)
     command = str(getattr(event, 'command', '') or 'view').strip().lower()
 
-    pending = getattr(orch, '_pending_acceptance_criteria_card', None)
+    action_id = getattr(event, 'cause', None)
+    pending = orch._take_tool_card(action_id, expected_kind='acceptance_criteria')
+    if pending is None and (action_id is None or action_id < 0):
+        pending = getattr(orch, '_pending_acceptance_criteria_card', None)
     if isinstance(pending, AcceptanceCriteriaCard):
         pending.complete(
             criteria_list=criteria_list,
             status_message=status_message,
             success=success,
         )
-        orch._pending_acceptance_criteria_card = None
+        if orch._pending_acceptance_criteria_card is pending:
+            orch._pending_acceptance_criteria_card = None
         return
 
     orch._append_scan_line_card(
@@ -78,3 +82,4 @@ def _handle_acceptance_criteria_action(
     card = AcceptanceCriteriaCard(command, criteria_list=criteria_list)
     orch._append_scan_line_card(card)
     orch._pending_acceptance_criteria_card = card
+    orch._register_tool_card(getattr(event, 'id', -1), card, kind='acceptance_criteria')

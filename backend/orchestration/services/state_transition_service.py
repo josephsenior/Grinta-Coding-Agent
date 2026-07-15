@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING
 
 from backend.core.logging.logger import app_logger as logger
@@ -170,7 +171,7 @@ class StateTransitionService:
     def _refresh_session_log_audit(
         old_state: AgentState, new_state: AgentState
     ) -> None:
-        """Refresh ``app.stripped.log`` / ``app.audit.txt`` when a run ends."""
+        """Refresh session audit artifacts off the latency-sensitive state path."""
         if old_state != AgentState.RUNNING:
             return
         if new_state not in (
@@ -183,10 +184,14 @@ class StateTransitionService:
             return
         try:
             from backend.core.logging.logger import finalize_session_logging_audit
+            from backend.utils.async_helpers.async_utils import create_tracked_task
 
-            finalize_session_logging_audit()
+            create_tracked_task(
+                asyncio.to_thread(finalize_session_logging_audit),
+                name='session-log-audit-refresh',
+            )
         except Exception:
-            logger.debug('Session log audit refresh failed', exc_info=True)
+            logger.debug('Session log audit refresh scheduling failed', exc_info=True)
 
     def _handle_watchdog_lifecycle(
         self, old_state: AgentState, new_state: AgentState
