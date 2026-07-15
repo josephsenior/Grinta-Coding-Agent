@@ -210,6 +210,45 @@ class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
         self._ctrl.state.set_outputs(action.outputs, source='EventRouterService.reject')
         await self._ctrl.set_agent_state_to(AgentState.REJECTED)
 
+    def _schedule_final_response_housekeeping(
+        self,
+        action: MessageAction,
+        *,
+        content: str,
+        active_mode: str,
+    ) -> None:
+        """Run completion validation, reflection, and auditing off the router lane."""
+        from backend.utils.async_helpers.async_utils import create_tracked_task
+
+        async def _run() -> None:
+            # Optional LLM-judge quality check. A warning may arrive after the
+            # run becomes ready, but this work must never delay that transition.
+            await self._ctrl.task_validation_service.validate_completion_quality(
+                action
+            )
+            if active_mode == AGENT_MODE:
+                try:
+                    from backend.engine.tools.session_lessons import (
+                        persist_finish_lessons,
+                    )
+
+                    await persist_finish_lessons(
+                        summary=content,
+                        session_id=self._ctrl.id,
+                        state=self._ctrl.state,
+                        controller=self._ctrl,
+                    )
+                except Exception:
+                    logger.debug(
+                        'Final-response lesson reflection failed', exc_info=True
+                    )
+            await self._ctrl.log_task_audit(status='success')
+
+        create_tracked_task(
+            _run(),
+            name='final-response-housekeeping',
+        )
+
     async def _handle_message_action(self, action: MessageAction) -> None:
         """Handle message actions from users or agents."""
         if action.source == EventSource.USER:
@@ -225,11 +264,6 @@ class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
             ) or self._is_plain_terminal_agent_message(action)
             if is_final_response:
                 action.final_response = True
-                # Optional LLM-judge quality check; emits a warning on
-                # failure but never blocks the transition.
-                await self._ctrl.task_validation_service.validate_completion_quality(
-                    action
-                )
                 content = str(getattr(action, 'content', '') or '').strip()
                 self._ctrl.state.set_outputs(
                     {
@@ -241,19 +275,14 @@ class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
                 )
                 active_mode = self._active_interaction_mode()
                 self._ctrl.state.extra_data.pop('active_run_mode', None)
-                if active_mode == AGENT_MODE:
-                    try:
-                        from backend.engine.tools.session_lessons import (
-                            persist_finish_lessons,
-                        )
 
-                        await persist_finish_lessons(
-                            summary=content,
-                            session_id=self._ctrl.id,
-                            state=self._ctrl.state,
-                            controller=self._ctrl,
-                        )
-                    except Exception:
-                        pass
+                # The final response is the user-visible completion boundary.
+                # Publish FINISHED before optional validation, reflection, and
+                # audit work so the TUI becomes ready as soon as the response
+                # ends instead of remaining in RUNNING during housekeeping.
                 await self._ctrl.set_agent_state_to(AgentState.FINISHED)
-                await self._ctrl.log_task_audit(status='success')
+                self._schedule_final_response_housekeeping(
+                    action,
+                    content=content,
+                    active_mode=active_mode,
+                )

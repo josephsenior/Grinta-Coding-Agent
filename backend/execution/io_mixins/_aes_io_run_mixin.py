@@ -8,7 +8,6 @@ method bodies are byte-identical to the pre-split version.
 from __future__ import annotations
 
 import asyncio
-import re
 import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -51,9 +50,6 @@ class _AesIoRunMixin:
     ) -> CmdOutputObservation | ErrorObservation | TerminalObservation:
         """Execute bash/shell command."""
         try:
-            if self._should_rewrite_python3_to_python() and action.command:
-                action.command = re.sub(r'\bpython3\b', 'python', action.command)
-
             default_session = self.session_manager.get_session('default')
             base_cwd = default_session.cwd if default_session else self._initial_cwd
             cwd_error = self._validate_workspace_scoped_cwd(
@@ -266,11 +262,13 @@ class _AesIoRunMixin:
             detached_pane,
         )
 
-        if registered_bg_id is not None and isinstance(observation, CmdOutputObservation):
+        if registered_bg_id is not None and isinstance(
+            observation, CmdOutputObservation
+        ):
             observation.content = (
-                f"Command exceeded timeout. Process detached and running in background "
+                f'Command exceeded timeout. Process detached and running in background '
                 f"as session_id: {registered_bg_id}. Use action='read' or action='wait' to interact.\n\n"
-                f"Partial output before detach:\n{observation.content}"
+                f'Partial output before detach:\n{observation.content}'
             )
 
         return observation

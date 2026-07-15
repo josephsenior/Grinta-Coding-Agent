@@ -17,6 +17,7 @@ from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.commands import CmdRunAction
 from backend.ledger.action.debugger import DebuggerAction
 from backend.ledger.action.files import FileEditAction
+from backend.ledger.action.terminal import TerminalCloseAction
 from backend.orchestration.services.pending_action_service import PendingActionService
 
 
@@ -342,6 +343,13 @@ class TestPendingActionService(unittest.TestCase):
         )
         timeout = self.service._effective_timeout_seconds(20.0, action)
         self.assertGreaterEqual(timeout, float(DEBUGGER_PENDING_ACTION_TIMEOUT_FLOOR))
+
+    def test_terminal_close_uses_acknowledgement_timeout(self):
+        action = TerminalCloseAction(session_id='terminal_1')
+
+        timeout = self.service._effective_timeout_seconds(120.0, action)
+
+        self.assertEqual(timeout, 15.0)
 
     @patch('time.time')
     def test_debugger_pending_timeout_closes_debug_sessions(self, mock_time):

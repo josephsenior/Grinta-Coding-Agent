@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock
 
 from backend.cli.tui.widgets.activity_card import OrientLine
+from backend.ledger.action import TerminalCloseAction
 from backend.tests.unit.cli.tui._shared import (
     BrowserScreenshotObservation,
     BrowserToolAction,
@@ -169,6 +170,127 @@ async def test_tui_shell_command_reuses_single_card(mock_config):
 
 
 @pytest.mark.asyncio
+async def test_tui_shell_card_correlates_by_action_id_when_command_changes(mock_config):
+    """The observation may report an effective command without creating a new card."""
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+        from backend.cli.tui.widgets.scan_line import ShellCard
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        action = CmdRunAction(command='python3.12 --version')
+        action.id = 101
+        result = CmdOutputObservation(
+            'Python 3.12', command='python.12 --version', exit_code=0
+        )
+        result.cause = 101
+
+        renderer._process_event(action)
+        renderer._process_event(result)
+        await pilot.pause()
+
+        cards = list(s.query(ShellCard).results())
+        assert len(cards) == 1
+        assert cards[0].command == 'python3.12 --version'
+        assert cards[0].state == 'done'
+
+
+@pytest.mark.asyncio
+async def test_tui_identical_shell_commands_complete_out_of_order_by_action_id(
+    mock_config,
+):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+        from backend.cli.tui.widgets.scan_line import ShellCard
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        first = CmdRunAction(command='pytest -q')
+        second = CmdRunAction(command='pytest -q')
+        first.id, second.id = 201, 202
+        second_result = CmdOutputObservation('second', command='pytest -q', exit_code=0)
+        first_result = CmdOutputObservation('first', command='pytest -q', exit_code=0)
+        second_result.cause, first_result.cause = 202, 201
+
+        for event in (first, second, second_result, first_result):
+            renderer._process_event(event)
+        await pilot.pause()
+
+        cards = list(s.query(ShellCard).results())
+        assert len(cards) == 2
+        assert [card.output for card in cards] == ['first', 'second']
+        assert all(card.state == 'done' for card in cards)
+
+
+@pytest.mark.asyncio
+async def test_tui_terminal_close_updates_existing_session_card(mock_config):
+    console = RichConsole()
+    loop = asyncio.get_running_loop()
+    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
+
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+        s = _get_screen(app)
+        from backend.cli.tui.app import TUIRenderer
+        from backend.cli.tui.widgets.scan_line import TerminalCard
+
+        renderer = TUIRenderer(
+            console=console,
+            hud=HUDBar(),
+            reasoning=ReasoningDisplay(),
+            tui=s,
+            loop=loop,
+        )
+        start = TerminalRunAction(command='npm run dev')
+        start.id = 401
+        started = TerminalObservation(
+            session_id='terminal_1', content='ready', state='SESSION_OPENED'
+        )
+        started.cause = 401
+        started.tool_result = {'ok': True}
+        close = TerminalCloseAction(session_id='terminal_1')
+        close.id = 402
+        closed = TerminalObservation(
+            session_id='terminal_1',
+            content='Closed terminal session.',
+            state='SESSION_CLOSED',
+        )
+        closed.cause = 402
+        closed.tool_result = {'ok': True}
+
+        for event in (start, started, close, closed):
+            renderer._process_event(event)
+        await pilot.pause()
+
+        cards = list(s.query(TerminalCard).results())
+        assert len(cards) == 1
+        assert cards[0].state == 'done'
+        assert 'Closed terminal session.' in cards[0].scrollback
+
+
+@pytest.mark.asyncio
 async def test_tui_shell_command_reuses_card_with_mixed_case_flags(mock_config):
     """CmdRun and CmdOutput must use the same command key (no .lower() on complete)."""
     console = RichConsole()
@@ -312,16 +434,16 @@ async def test_tui_mcp_call_merges_action_and_observation_into_single_card(
 
         from backend.cli.tui.widgets.scan_line import MCPCard
 
-        renderer._process_event(
-            MCPAction(name='search_docs', arguments={'q': 'ranking'})
+        action = MCPAction(name='search_docs', arguments={'q': 'ranking'})
+        action.id = 501
+        observation = MCPObservation(
+            name='search_docs',
+            arguments={'q': 'ranking'},
+            content='Result snippet for ranking.',
         )
-        renderer._process_event(
-            MCPObservation(
-                name='search_docs',
-                arguments={'q': 'ranking'},
-                content='Result snippet for ranking.',
-            )
-        )
+        observation.cause = 501
+        renderer._process_event(action)
+        renderer._process_event(observation)
         await pilot.pause()
 
         mcp_cards = list(s.query(MCPCard).results())
@@ -450,17 +572,17 @@ async def test_tui_delegate_task_merges_action_and_observation_into_single_card(
 
         from backend.cli.tui.widgets.scan_line import DelegateCard
 
-        renderer._process_event(
-            DelegateTaskAction(
-                task_description='Investigate flaky test',
-            )
+        action = DelegateTaskAction(
+            task_description='Investigate flaky test',
         )
-        renderer._process_event(
-            DelegateTaskObservation(
-                content='Worker finished successfully.',
-                success=True,
-            )
+        action.id = 601
+        observation = DelegateTaskObservation(
+            content='Worker finished successfully.',
+            success=True,
         )
+        observation.cause = 601
+        renderer._process_event(action)
+        renderer._process_event(observation)
         await pilot.pause()
 
         delegate_cards = list(s.query(DelegateCard).results())
@@ -536,21 +658,22 @@ async def test_tui_browser_screenshot_merges_with_action_card(mock_config):
 
         from backend.cli.tui.widgets.scan_line import BrowserCard
 
-        renderer._process_event(
-            BrowserToolAction(
-                command='navigate',
-                params={'url': 'https://example.com'},
-            )
+        action = BrowserToolAction(
+            command='navigate',
+            params={'url': 'https://example.com'},
         )
-        renderer._process_event(
-            BrowserScreenshotObservation(
-                content='page captured',
-            )
+        action.id = 701
+        observation = BrowserScreenshotObservation(
+            content='page captured',
         )
+        observation.cause = 701
+        renderer._process_event(action)
+        renderer._process_event(observation)
         await pilot.pause()
 
         cards = list(s.query(BrowserCard).results())
-        assert len(cards) >= 1, f'Expected >=1 BrowserCard, got {len(cards)}'
+        assert len(cards) == 1, f'Expected 1 BrowserCard, got {len(cards)}'
+        assert cards[0].state == 'done'
         assert any(
             'navigate' in str(c._line_text())
             or 'captured' in str(c._line_text())
@@ -583,25 +706,25 @@ async def test_tui_acceptance_criteria_renders_scan_line_card(mock_config):
         )
         renderer._tui._write_log = MagicMock()
 
-        renderer._process_event(
-            AcceptanceCriteriaAction(
-                command='update',
-                criteria_list=[
-                    {'assertion': 'Build succeeds', 'source': 'stated'},
-                    {'assertion': 'Tests pass', 'source': 'stated'},
-                ],
-            )
+        action = AcceptanceCriteriaAction(
+            command='update',
+            criteria_list=[
+                {'assertion': 'Build succeeds', 'source': 'stated'},
+                {'assertion': 'Tests pass', 'source': 'stated'},
+            ],
         )
-        renderer._process_event(
-            AcceptanceCriteriaObservation(
-                command='update',
-                criteria_list=[
-                    {'assertion': 'Build succeeds', 'source': 'stated'},
-                    {'assertion': 'Tests pass', 'source': 'stated'},
-                ],
-                content='✅ Acceptance criteria defined (2 items).',
-            )
+        action.id = 801
+        observation = AcceptanceCriteriaObservation(
+            command='update',
+            criteria_list=[
+                {'assertion': 'Build succeeds', 'source': 'stated'},
+                {'assertion': 'Tests pass', 'source': 'stated'},
+            ],
+            content='✅ Acceptance criteria defined (2 items).',
         )
+        observation.cause = 801
+        renderer._process_event(action)
+        renderer._process_event(observation)
         await pilot.pause()
 
         renderer._tui._write_log.assert_not_called()
@@ -626,7 +749,9 @@ async def test_tui_acceptance_criteria_renders_scan_line_card(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_tui_task_state_refreshes_tasks_sidebar_without_transcript_card(mock_config):
+async def test_tui_task_state_refreshes_tasks_sidebar_without_transcript_card(
+    mock_config,
+):
     from backend.ledger.action import TaskStateAction
     from backend.ledger.observation import TaskStateObservation
 

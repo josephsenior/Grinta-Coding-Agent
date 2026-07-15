@@ -32,7 +32,6 @@ from backend.context.prompt.message_formatting import (
     is_observation_event,
     is_text_content,
     message_with_text,
-    remove_duplicate_system_prompt_user,
 )
 from backend.context.prompt.prompt_assembly import process_recall_observation
 from backend.context.prompt.prompt_window import event_fingerprint
@@ -313,7 +312,6 @@ class ContextMemory:
             messages += messages_to_add
         messages = list(filter_unmatched_tool_calls(messages))
         messages = self._normalize_system_messages(messages)
-        messages = remove_duplicate_system_prompt_user(messages)
         return apply_user_message_formatting(messages)
 
     def process_events_appending(
@@ -350,7 +348,6 @@ class ContextMemory:
             messages += messages_to_add
         messages = list(filter_unmatched_tool_calls(messages))
         messages = self._normalize_system_messages(messages)
-        messages = remove_duplicate_system_prompt_user(messages)
         return apply_user_message_formatting(messages)
 
     def release_post_compaction_render_cache(self) -> int:
@@ -897,9 +894,7 @@ class ContextMemory:
                 break
         messages.insert(insert_at, message)
 
-    def _insert_context_summary_before_last_user(
-        self, messages: list[Message]
-    ) -> None:
+    def _insert_context_summary_before_last_user(self, messages: list[Message]) -> None:
         """Insert a bounded context snapshot beside the current user turn."""
         context_summary = self.get_context_summary()
         if not context_summary or not messages:
@@ -951,10 +946,14 @@ class ContextMemory:
         self._insert_before_last_user(messages, message_with_text('system', block))
 
     def _dedupe_system_messages(self, messages: list[Message]) -> list[Message]:
-        """Return list with leading message plus non-system messages only."""
-        if not messages:
-            return messages
-        return [messages[0]] + [m for m in messages[1:] if m.role != 'system']
+        """Preserve distinct system messages assembled from distinct events.
+
+        Semantic system data (for example the current context packet) is not a
+        duplicate of the stable instruction merely because both use the system
+        role. Event identity is handled before message conversion; text-based
+        or role-based semantic deduplication does not belong here.
+        """
+        return messages
 
     def _normalize_system_messages(self, messages: list[Message]) -> list[Message]:
         """Keep behavior static up front and data snapshots near the active turn."""
@@ -1157,32 +1156,30 @@ class ContextMemory:
             return
 
         system_message = SystemMessageAction(content=system_prompt)
-        has_system_message = False
-
+        system_indices: list[int] = []
         for i, event in enumerate(events):
             # Primary fast-path: direct isinstance or duck-typed equivalent
             if is_instance_of(event, SystemMessageAction):
-                has_system_message = True
-                events[i] = system_message
-                break
+                system_indices.append(i)
+                continue
             # Class name match fallback (handles duplicate class loading / re-import edge cases)
             if (
                 type(event).__name__ == 'SystemMessageAction'
             ):  # pragma: no cover - defensive
-                has_system_message = True
-                events[i] = system_message
-                break
+                system_indices.append(i)
+                continue
             # Duck-typed detection: an event with action == ActionType.SYSTEM is treated as system
             if getattr(event, 'action', None) == ActionType.SYSTEM:
-                has_system_message = True
-                events[i] = system_message
-                break
+                system_indices.append(i)
 
-        if not has_system_message:
+        for index in reversed(system_indices):
+            events.pop(index)
+        events.insert(0, system_message)
+
+        if not system_indices:
             logger.debug(
                 '[ContextMemory] No SystemMessageAction found in events. Adding one.',
             )
-            events.insert(0, system_message)
             logger.info('[ContextMemory] Added SystemMessageAction')
 
     def _ensure_initial_user_message(

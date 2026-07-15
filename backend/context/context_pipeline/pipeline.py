@@ -191,7 +191,10 @@ class ContextPipeline:
             else:
                 clear_prewarm_signals(turn_signals)
                 action = prewarmed.action
-                if isinstance(action, CondensationAction) and (action.summary or '').strip():
+                if (
+                    isinstance(action, CondensationAction)
+                    and (action.summary or '').strip()
+                ):
                     budget = ContextBudget.from_events(
                         post_boundary,
                         llm_config=llm_config,
@@ -289,14 +292,19 @@ class ContextPipeline:
         finalize_compaction_artifacts(state=state)
         mark_just_compacted(state)
         record_boundary_compact(
-            state, history, action, llm_config=llm_config,
+            state,
+            history,
+            action,
+            llm_config=llm_config,
             post_events=self._projected_post_boundary(history, action, state),
         )
         from backend.context.canonical_state.ops import (
             merge_compaction_summary_into_canonical,
         )
 
-        merge_compaction_summary_into_canonical(state=state, summary=action.summary or '')
+        merge_compaction_summary_into_canonical(
+            state=state, summary=action.summary or ''
+        )
         logger.info(
             'ContextPipeline committed compaction (pruned=%d elapsed=%.3fs)',
             len(action.pruned),
@@ -561,47 +569,33 @@ class ContextPipeline:
             logger.debug('Memory pressure record_condensation failed', exc_info=True)
 
     def _get_structured_compactor(self, state: State) -> Any:
-        """Lazily create and cache a StructuredSummaryCompactor."""
-        llm_config = getattr(self._config, 'llm_config', None) or self._llm_config(
-            state
-        )
-        if llm_config is None:
+        """Lazily bind compaction to the actual active agent LLM instance."""
+        try:
+            agent_llm = self._llm_registry.get_active_llm()
+        except (AttributeError, RuntimeError):
+            agent_llm = getattr(getattr(state, 'agent', None), 'llm', None)
+        if agent_llm is None:
             return None
-        from backend.core.config.llm_config import LLMConfig
-
-        if isinstance(llm_config, LLMConfig):
-            llm_cfg = llm_config
-        elif isinstance(llm_config, str):
-            llm_cfg = self._llm_registry.config.get_llm_config(llm_config)
-        else:
-            return None
+        llm_cfg = getattr(agent_llm, 'config', None)
         model_key = str(getattr(llm_cfg, 'model', '') or '')
         if (
             self._structured_compactor is not None
             and self._structured_compactor_model_key == model_key
+            and getattr(self._structured_compactor, 'llm', None) is agent_llm
         ):
             return self._structured_compactor
         from backend.context.compactor.strategies.structured_summary_compactor import (
             StructuredSummaryCompactor,
         )
-        from backend.core.config.compactor_config import (
-            StructuredSummaryCompactorConfig,
-        )
 
-        cfg = StructuredSummaryCompactorConfig(
-            llm_config=llm_cfg,
+        compactor = StructuredSummaryCompactor(
+            llm=agent_llm,
             max_size=102,
             keep_first=0,
         )
-        try:
-            compactor = StructuredSummaryCompactor.from_config(cfg, self._llm_registry)
-        except ValueError as exc:
-            logger.warning('ContextPipeline: structured compactor unavailable: %s', exc)
-            return None
         self._structured_compactor = compactor
         self._structured_compactor_model_key = model_key
         if compactor.token_budget is None:
-            agent_llm = getattr(getattr(state, 'agent', None), 'llm', None)
             max_input = getattr(
                 getattr(agent_llm, 'config', None), 'max_input_tokens', None
             )

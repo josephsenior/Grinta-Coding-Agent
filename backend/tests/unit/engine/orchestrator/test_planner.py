@@ -502,7 +502,7 @@ class TestBuildLlmParams:
         assert 100_000 < accounting['usable_input_tokens'] <= 120_000
         assert accounting['full_request_tokens'] > accounting['dynamic_history_tokens']
 
-    def test_prior_turn_context_is_restored_as_an_append_only_prefix(self):
+    def test_prior_turn_context_is_not_copied_into_later_turns(self):
         p = _make_planner(
             config=_make_config(enable_coding_preflight=False, enable_repo_map=False)
         )
@@ -534,10 +534,16 @@ class TestBuildLlmParams:
         with patch('backend.engine.planner.check_tools', return_value=[]):
             second = p.build_llm_params(second_messages, state, [])
 
-        first_request = first['messages']
         second_request = second['messages']
-        assert second_request[: len(first_request)] == first_request
-        assert second_request[-1] == {'role': 'user', 'content': 'Continue'}
+        assert all('MCP v1' not in str(message) for message in second_request)
+        assert sum('MCP v2' in str(message) for message in second_request) == 1
+        assert (
+            sum(
+                message == {'role': 'user', 'content': 'Continue'}
+                for message in second_request
+            )
+            == 1
+        )
         assert first['_prompt_cache_variant'] == second['_prompt_cache_variant']
 
     def test_same_turn_retry_does_not_duplicate_context(self):
@@ -591,7 +597,7 @@ class TestBuildLlmParams:
         assert second['messages'][: len(first['messages'])] == first['messages']
         assert second['messages'][-1]['role'] == 'tool'
 
-    def test_new_continuation_directive_is_appended_after_tool_history(self):
+    def test_new_directive_is_present_once_without_restored_control_blocks(self):
         p = _make_planner(
             config=_make_config(enable_coding_preflight=False, enable_repo_map=False)
         )
@@ -612,10 +618,10 @@ class TestBuildLlmParams:
         with patch('backend.engine.planner.check_tools', return_value=[]):
             second = p.build_llm_params(continuation, state, [])
 
-        assert second['messages'][: len(first['messages'])] == first['messages']
-        assert second['messages'][-2]['role'] == 'tool'
-        assert second['messages'][-1]['role'] == 'system'
-        assert 'Try a narrower search.' in second['messages'][-1]['content']
+        rendered = '\n'.join(str(message) for message in second['messages'])
+        assert rendered.count('Try a narrower search.') == 1
+        assert sum(message.get('role') == 'tool' for message in second['messages']) == 1
+        assert rendered.count('Current mode: AGENT') == 1
 
     def test_prompt_cache_variant_tracks_only_stable_prefix_and_tools(self):
         p = _make_planner()

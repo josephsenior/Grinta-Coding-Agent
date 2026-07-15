@@ -52,6 +52,11 @@ def _terminal_wait_pending_timeout(base: float, action: Action) -> float:
     return max(float(base), wait_seconds + 5.0)
 
 
+def _terminal_close_pending_timeout(_base: float, _action: Action) -> float:
+    """Close is an acknowledgement operation, not a process-lifetime wait."""
+    return 15.0
+
+
 def _debugger_pending_timeout(base: float, action: Action) -> float:
     """Honour an explicit action ``timeout`` and apply the debugger floor.
 
@@ -126,7 +131,7 @@ _TIMEOUT_POLICY_BY_ACTION_NAME = {
     'TerminalReadAction': _terminal_io_pending_timeout,
     'TerminalWaitAction': _terminal_wait_pending_timeout,
     'TerminalListAction': _terminal_io_pending_timeout,
-    'TerminalCloseAction': _terminal_io_pending_timeout,
+    'TerminalCloseAction': _terminal_close_pending_timeout,
     'DebuggerAction': _debugger_pending_timeout,
 }
 

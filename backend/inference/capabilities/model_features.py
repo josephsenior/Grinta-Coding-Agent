@@ -63,6 +63,7 @@ FUNCTION_CALLING_PATTERNS: list[str] = [
     'claude-sonnet-4*',
     'claude-haiku-4*',
     'claude-4*',
+    'claude-sonnet-5*',
     'gpt-4o*',
     'gpt-4.1*',
     'gpt-4*',
@@ -96,6 +97,7 @@ PROMPT_CACHE_PATTERNS: list[str] = [
     'claude-sonnet-4*',
     'claude-haiku-4*',
     'claude-4*',
+    'claude-sonnet-5*',
     'deepseek*',
     # Google Gemini explicit context cache (see GeminiClient + gemini_cache)
     'google/gemini-2.5-*',
@@ -127,6 +129,7 @@ RESPONSE_SCHEMA_PATTERNS: list[str] = [
     'claude-sonnet-4*',
     'claude-haiku-4*',
     'claude-4*',
+    'claude-sonnet-5*',
     'claude-fable*',
     'anthropic-claude*',
     # Google Gemini

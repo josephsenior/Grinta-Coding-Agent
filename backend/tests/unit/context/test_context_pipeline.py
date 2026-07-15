@@ -197,7 +197,6 @@ async def test_prepare_step_accepts_prewarmed_compaction_despite_continuity_issu
     assert len(result.events) < len(events)
 
 
-
 def test_structured_compactor_preserves_50_raw_events():
     """With max_size=102, compaction keeps ~50 raw tail events."""
     compactor = SimpleNamespace(max_size=102, keep_first=0)
@@ -305,6 +304,22 @@ def test_build_prompt_events_injects_context_packet(pipeline):
         isinstance(event, MessageAction) and event.content == 'implement feature X'
         for event in prompt_events
     )
+
+
+def test_structured_compactor_uses_the_active_agent_llm_instance():
+    active_llm = MagicMock()
+    active_llm.config.model = 'openai/agent-model'
+    active_llm.config.max_input_tokens = 100_000
+    registry = MagicMock()
+    registry.get_active_llm.return_value = active_llm
+    pipeline = ContextPipeline(
+        llm_registry=registry,
+        config=ContextPipelineConfig(),
+    )
+
+    compactor = pipeline._get_structured_compactor(_make_state([]))
+
+    assert compactor.llm is active_llm
 
 
 def test_build_prompt_events_injects_context_packet_on_fresh_session(
@@ -545,25 +560,34 @@ def test_skip_compaction_when_boundary_at_or_below_snapshot(pipeline):
         return_value=50_000,
     ):
         record_boundary_compact(
-            state, events, action, llm_config=llm_config,
-        )
-        assert should_skip_compaction(
             state,
-            events=events,
+            events,
+            action,
             llm_config=llm_config,
-            history=history + [action],
-        ) is True
+        )
+        assert (
+            should_skip_compaction(
+                state,
+                events=events,
+                llm_config=llm_config,
+                history=history + [action],
+            )
+            is True
+        )
 
     with patch(
         'backend.context.context_pipeline.compaction.estimate_boundary_event_tokens',
         return_value=55_000,
     ):
-        assert should_skip_compaction(
-            state,
-            events=events,
-            llm_config=llm_config,
-            history=history + [action],
-        ) is False
+        assert (
+            should_skip_compaction(
+                state,
+                events=events,
+                llm_config=llm_config,
+                history=history + [action],
+            )
+            is False
+        )
 
 
 def test_skip_compaction_when_snapshot_set_but_boundary_not_in_history(pipeline):
@@ -581,15 +605,21 @@ def test_skip_compaction_when_snapshot_set_but_boundary_not_in_history(pipeline)
         return_value=50_000,
     ):
         record_boundary_compact(
-            state, events, action, llm_config=llm_config,
+            state,
+            events,
+            action,
+            llm_config=llm_config,
         )
     assert find_last_condensation_action(state.history) is None
-    assert should_skip_compaction(
-        state,
-        events=events,
-        llm_config=llm_config,
-        history=list(state.history),
-    ) is True
+    assert (
+        should_skip_compaction(
+            state,
+            events=events,
+            llm_config=llm_config,
+            history=list(state.history),
+        )
+        is True
+    )
 
 
 def test_dismissed_explicit_request_does_not_retrigger_compaction():
@@ -624,4 +654,3 @@ def test_dismissed_explicit_request_does_not_retrigger_compaction():
         llm_config=llm_config,
         explicit=False,
     )
-

@@ -132,7 +132,11 @@ class RendererDisplayMixin:
         self._terminal_commands_by_session = {}
         self._pending_terminal_command = None
         self._pending_terminal_card = None
+        self._pending_terminal_scan_cards = {}
+        self._pending_terminal_scan_card = None
         self._pending_shell_cards_by_command = defaultdict(deque)
+        self._tool_cards_by_action_id = {}
+        self._tool_kinds_by_action_id = {}
         self._pending_file_read_cards_by_path = defaultdict(deque)
         self._pending_checkpoint_line = None
         self._pending_acceptance_criteria_card = None
@@ -275,8 +279,14 @@ class RendererDisplayMixin:
         import asyncio
         import os
 
-        disable_lsp = os.getenv('GRINTA_DISABLE_LSP_DETECTION') == '1'
-        disable_dap = os.getenv('GRINTA_DISABLE_DEBUGGER_DETECTION') == '1'
+        disable_lsp = (
+            os.getenv('GRINTA_DISABLE_LSP_DETECTION') == '1'
+            or not self._sidebar_lsp_enabled()
+        )
+        disable_dap = (
+            os.getenv('GRINTA_DISABLE_DEBUGGER_DETECTION') == '1'
+            or not self._sidebar_debugger_enabled()
+        )
         if disable_lsp:
             self._lsp_servers_cache = {}
         if disable_dap:
@@ -318,7 +328,6 @@ class RendererDisplayMixin:
 
     def _refresh_lsp_sidebar(self) -> None:
         from textual.widgets import Static
-
 
         if not self._sidebar_lsp_enabled():
             signature = ('disabled',)
@@ -404,7 +413,6 @@ class RendererDisplayMixin:
 
     def _refresh_dap_sidebar(self) -> None:
         from textual.widgets import Static
-
 
         if not self._sidebar_debugger_enabled():
             signature = ('disabled',)
@@ -588,7 +596,6 @@ class RendererDisplayMixin:
         *,
         empty_message: str | None = None,
     ) -> bool:
-
         widget = self._get_sidebar_section(widget_id)
         if widget is None:
             return False
@@ -602,7 +609,6 @@ class RendererDisplayMixin:
             return False
 
     def _sync_sidebar_feature_switch(self, widget_id: str, enabled: bool) -> None:
-
         section = self._get_sidebar_section(widget_id)
         if section is None:
             return
