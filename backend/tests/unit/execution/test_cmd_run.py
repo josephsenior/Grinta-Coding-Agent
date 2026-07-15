@@ -176,10 +176,10 @@ async def test_cmd_run_background_spawns_session(mock_executor):
 
 
 @pytest.mark.asyncio
-async def test_windows_prefers_powershell_rewrites_python3_when_both_available(
+async def test_windows_prefers_powershell_preserves_python3_when_both_available(
     mock_executor, monkeypatch
 ):
-    """When both shells exist on Windows, PowerShell-first contract rewrites python3."""
+    """Shell selection must not rewrite the agent's requested command."""
     for key in ('MSYSTEM', 'MINGW_PREFIX', 'MSYSTEM_CHOST', 'SHELL'):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv('SECURITY_WINDOWS_SHELL', 'powershell')
@@ -203,14 +203,14 @@ async def test_windows_prefers_powershell_rewrites_python3_when_both_available(
     with override_os_capabilities(replace(OS_CAPS, is_windows=True)):
         await mock_executor.run(action)
 
-    assert action.command == 'python --version'
+    assert action.command == 'python3 --version'
 
 
 @pytest.mark.asyncio
-async def test_windows_powershell_default_rewrites_python3_when_both_available(
+async def test_windows_powershell_default_preserves_python3_when_both_available(
     mock_executor, monkeypatch
 ):
-    """Default windows_shell should be powershell, rewriting python3 to python."""
+    """The default PowerShell contract preserves execution intent."""
     monkeypatch.delenv('SECURITY_WINDOWS_SHELL', raising=False)
     from backend.execution.utils.tool_registry import _configured_windows_shell
 
@@ -232,7 +232,7 @@ async def test_windows_powershell_default_rewrites_python3_when_both_available(
     with override_os_capabilities(replace(OS_CAPS, is_windows=True)):
         await mock_executor.run(action)
 
-    assert action.command == 'python --version'
+    assert action.command == 'python3 --version'
 
 
 @pytest.mark.asyncio
@@ -265,8 +265,8 @@ async def test_windows_bash_preference_keeps_python3_when_both_available(
 
 
 @pytest.mark.asyncio
-async def test_windows_powershell_rewrites_python3(mock_executor):
-    """When bash is unavailable on Windows, rewrite python3 to python."""
+async def test_windows_powershell_preserves_python3(mock_executor):
+    """The runtime never guesses a Python executable from the outer shell."""
     mock_session = MagicMock(spec=BaseShellSession)
     mock_obs = CmdOutputObservation(
         content='ok',
@@ -284,7 +284,24 @@ async def test_windows_powershell_rewrites_python3(mock_executor):
     with override_os_capabilities(replace(OS_CAPS, is_windows=True)):
         await mock_executor.run(action)
 
-    assert action.command == 'python --version'
+    assert action.command == 'python3 --version'
+
+
+@pytest.mark.asyncio
+async def test_windows_powershell_preserves_nested_wsl_python_command(mock_executor):
+    mock_session = MagicMock(spec=BaseShellSession)
+    requested = 'wsl bash -lc "python3.12 --version && /usr/bin/python3 -V"'
+    mock_session.execute.return_value = CmdOutputObservation(
+        content='ok', command=requested, metadata={'exit_code': 0}
+    )
+    mock_executor.session_manager.get_session.return_value = mock_session
+
+    action = CmdRunAction(command=requested)
+    with override_os_capabilities(replace(OS_CAPS, is_windows=True)):
+        await mock_executor.run(action)
+
+    assert action.command == requested
+    mock_session.execute.assert_called_once()
 
 
 def test_init_shell_commands_uses_powershell_helpers_on_windows(mock_executor):
@@ -1146,14 +1163,16 @@ async def test_terminal_run_returns_error_when_execution_cap_exceeded(
 
 @pytest.mark.asyncio
 async def test_terminal_close_releases_session_and_clears_cursor(mock_executor):
-    mock_executor.session_manager.get_session.return_value = MagicMock()
+    mock_executor.session_manager.request_close_session.return_value = True
     mock_executor._terminal_read_cursor = {'terminal_99': 42}
 
     obs = await mock_executor.terminal_close(
         TerminalCloseAction(session_id='terminal_99')
     )
 
-    mock_executor.session_manager.close_session.assert_called_once_with('terminal_99')
+    mock_executor.session_manager.request_close_session.assert_called_once_with(
+        'terminal_99'
+    )
     assert 'terminal_99' not in mock_executor._terminal_read_cursor
     assert obs.tool_result['state'] == 'SESSION_CLOSED'
     assert obs.tool_result['ok'] is True
@@ -1162,7 +1181,7 @@ async def test_terminal_close_releases_session_and_clears_cursor(mock_executor):
 
 @pytest.mark.asyncio
 async def test_terminal_close_is_idempotent_for_unknown_session(mock_executor):
-    mock_executor.session_manager.get_session.return_value = None
+    mock_executor.session_manager.request_close_session.return_value = False
     mock_executor._terminal_read_cursor = {'terminal_99': 7}
 
     obs = await mock_executor.terminal_close(
@@ -1175,4 +1194,6 @@ async def test_terminal_close_is_idempotent_for_unknown_session(mock_executor):
     assert obs.tool_result['state'] == 'SESSION_NOT_FOUND'
     # Cursor is still cleared to avoid leaking stale read positions.
     assert 'terminal_99' not in mock_executor._terminal_read_cursor
-    mock_executor.session_manager.close_session.assert_not_called()
+    mock_executor.session_manager.request_close_session.assert_called_once_with(
+        'terminal_99'
+    )

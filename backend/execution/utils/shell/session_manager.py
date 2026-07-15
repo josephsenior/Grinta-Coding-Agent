@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 import uuid
 from typing import TYPE_CHECKING, Any, cast
 
@@ -126,10 +127,33 @@ class SessionManager:
         """Close and remove a specific session."""
         session = self.sessions.pop(session_id, None)
         if session:
-            try:
-                session.close()
-            except Exception as e:
-                logger.error('Error closing session %s: %s', session_id, e)
+            self._close_detached_session(session_id, session)
+
+    def request_close_session(self, session_id: str) -> bool:
+        """Detach a session immediately and close it outside the caller's path.
+
+        The managed-session state transition is synchronous and idempotent.  A
+        platform PTY or child process is allowed to take longer to tear down,
+        but it cannot delay delivery of the close acknowledgement to the agent.
+        """
+        session = self.sessions.pop(session_id, None)
+        if session is None:
+            return False
+        worker = threading.Thread(
+            target=self._close_detached_session,
+            args=(session_id, session),
+            name=f'terminal-close-{session_id}',
+            daemon=True,
+        )
+        worker.start()
+        return True
+
+    @staticmethod
+    def _close_detached_session(session_id: str, session: UnifiedShellSession) -> None:
+        try:
+            session.close()
+        except Exception as e:
+            logger.error('Error closing session %s: %s', session_id, e)
 
     def close_all(self) -> None:
         """Close all active sessions."""
