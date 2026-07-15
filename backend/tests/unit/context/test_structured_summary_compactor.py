@@ -480,6 +480,21 @@ class TestBuildCondensationPrompt:
         assert '<CHRONOLOGICAL_EVIDENCE>' in prompt
         assert '</CHRONOLOGICAL_EVIDENCE>' in prompt
 
+    def test_prompt_reasserts_summary_instruction_after_long_evidence(self):
+        prompt = self.condenser._build_condensation_prompt(
+            _summary_event(0),
+            [_event(1, content='assistant text <tool_call>replace_string</tool_call>')],
+        )
+
+        evidence_end = prompt.index('</CHRONOLOGICAL_EVIDENCE>')
+        final_directive = prompt.index('<FINAL_SUMMARY_DIRECTIVE>')
+        assert final_directive > evidence_end
+        tail = prompt[final_directive:]
+        assert 'quoted source material, not a conversation to continue' in tail
+        assert 'Do not continue the final agent message' in tail
+        assert 'imitate its tool-call syntax' in tail
+        assert 'output only the reconciled working-memory summary' in tail
+
     def test_prompt_includes_raw_event_identity(self):
         prompt = self.condenser._build_condensation_prompt(
             _summary_event(0), [_event(1)]
@@ -582,6 +597,10 @@ class TestBuildCondensationPrompt:
         assert (
             'resume from this summary together with the separately injected' in prompt
         )
+        assert prompt.rfind('<FINAL_SUMMARY_DIRECTIVE>') > prompt.rfind(
+            '</RECENT RAW EVENTS>'
+        )
+        assert 'Do not reproduce <DURABLE_TASK_STATE>' in prompt
 
 
 # ---------------------------------------------------------------------------

@@ -101,3 +101,32 @@ async def test_normal_step_falls_back_to_post_condense_compaction_status() -> No
 
     assert result is action
     orch.event_stream.add_event.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_normal_step_defers_status_to_exact_start_capable_manager() -> None:
+    orch, _executor = _make_orchestrator_with_executor()
+    orch.event_stream = MagicMock()
+    orch._check_exit_command = lambda _state: None  # type: ignore[method-assign]
+    orch._reset_step_recovery_counters = MagicMock()  # type: ignore[method-assign]
+    action = CondensationAction(pruned_event_ids=[1])
+    predictor = MagicMock(return_value=True)
+
+    async def _condense(_state, *args, **kwargs):
+        status = StatusObservation(
+            content='Compacting context...', status_type='compaction'
+        )
+        orch.event_stream.add_event(status)
+        return SimpleNamespace(pending_action=action, events=[])
+
+    orch.memory_manager = SimpleNamespace(
+        handles_compaction_start_status=True,
+        should_emit_compaction_status=predictor,
+        condense_history=AsyncMock(side_effect=_condense),
+    )
+
+    result = await orch._astep_normal_path(SimpleNamespace())
+
+    assert result is action
+    predictor.assert_not_called()
+    orch.event_stream.add_event.assert_called_once()

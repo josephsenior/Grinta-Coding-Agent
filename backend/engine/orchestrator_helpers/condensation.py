@@ -34,6 +34,11 @@ def _emit_compaction_status(orch: Orchestrator) -> None:
 
 def _emit_compaction_status_if_needed(orch: Orchestrator, state: State) -> bool:
     """Emit compaction status before a foreground condensation blocks."""
+    if bool(getattr(orch.memory_manager, 'handles_compaction_start_status', False)):
+        # The built-in memory manager emits from the exact branch that actually
+        # starts compaction.  Avoid both the stale preflight estimate and a
+        # duplicate late status after condensation returns.
+        return True
     predictor = getattr(
         orch.memory_manager,
         'should_emit_compaction_status',

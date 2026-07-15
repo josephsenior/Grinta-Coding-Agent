@@ -129,7 +129,11 @@ class ContextPipeline:
     # ------------------------------------------------------------------ #
 
     async def prepare_step(
-        self, state: State, *, streaming_emitter: Any | None = None
+        self,
+        state: State,
+        *,
+        streaming_emitter: Any | None = None,
+        compaction_start_emitter: Any | None = None,
     ) -> CondensedHistory:
         """Run compaction layers; always commit a boundary when over threshold.
 
@@ -160,6 +164,7 @@ class ContextPipeline:
                 history,
                 llm_config,
                 started,
+                compaction_start_emitter,
             )
         finally:
             if compactor_owner is not None:
@@ -171,6 +176,7 @@ class ContextPipeline:
         history: list,
         llm_config: Any,
         started: float,
+        compaction_start_emitter: Any | None,
     ) -> CondensedHistory:
         self._extract_pre_condensation_snapshot(state, history)
         reduce_events_into_state(history, state=state, source='context_pipeline')
@@ -216,6 +222,7 @@ class ContextPipeline:
                         state, history, post_boundary, action, budget, llm_config
                     )
                     if resolved_action is not None:
+                        await self._notify_compaction_started(compaction_start_emitter)
                         action = resolved_action
                         action.summary = strip_verbatim_user_echo(
                             action.summary or '', state=state
@@ -265,6 +272,7 @@ class ContextPipeline:
             delete_staging_snapshot(state=state)
             return CondensedHistory(history, None)
 
+        await self._notify_compaction_started(compaction_start_emitter)
         action = await self._compaction_engine.run(
             state,
             history,
@@ -315,6 +323,18 @@ class ContextPipeline:
             time.perf_counter() - started,
         )
         return CondensedHistory([], action)
+
+    @staticmethod
+    async def _notify_compaction_started(emitter: Any | None) -> None:
+        """Emit the UI lifecycle signal at the exact committed start point."""
+        if emitter is None:
+            return
+        try:
+            result = emitter()
+            if hasattr(result, '__await__'):
+                await result
+        except Exception:
+            logger.debug('Compaction start emitter failed', exc_info=True)
 
     def build_prompt_events(
         self,

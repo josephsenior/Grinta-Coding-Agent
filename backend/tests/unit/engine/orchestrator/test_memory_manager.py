@@ -245,6 +245,30 @@ class TestCondenseHistory:
         pipeline.prepare_step.assert_awaited_once()
         assert result is expected
 
+    async def test_exact_compaction_start_emitter_adds_status_event(self):
+        from backend.ledger.event import EventSource
+        from backend.ledger.observation import StatusObservation
+
+        m = _make_manager()
+        expected = CondensedHistory(events=[], pending_action=None)
+        pipeline = MagicMock(prepare_step=AsyncMock(return_value=expected))
+        m._pipeline = pipeline
+        state = self._make_state_with_history()
+        event_stream = MagicMock()
+
+        await m.condense_history(state, event_stream=event_stream)
+
+        kwargs = pipeline.prepare_step.await_args.kwargs
+        start_emitter = kwargs['compaction_start_emitter']
+        assert callable(start_emitter)
+        start_emitter()
+        event_stream.add_event.assert_called_once()
+        event, source = event_stream.add_event.call_args.args
+        assert isinstance(event, StatusObservation)
+        assert event.status_type == 'compaction'
+        assert event.content == 'Compacting context...'
+        assert source == EventSource.AGENT
+
 
 # ---------------------------------------------------------------------------
 # get_initial_user_message

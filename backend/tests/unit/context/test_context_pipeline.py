@@ -96,6 +96,7 @@ def _isolate_snapshot_paths(tmp_path, monkeypatch):
 async def test_prepare_step_skips_compaction_under_threshold(pipeline):
     events = [_user('fix tests', 1), _cmd_output('ok', 2)]
     state = _make_state(events)
+    on_start = MagicMock()
     with patch('backend.context.context_pipeline.ContextBudget') as mock_budget:
         mock_budget.from_events.return_value = SimpleNamespace(
             should_autocompact=False,
@@ -105,9 +106,10 @@ async def test_prepare_step_skips_compaction_under_threshold(pipeline):
             fixed_prompt_reserve_tokens=500,
             reserved_summary_tokens=100,
         )
-        result = await pipeline.prepare_step(state)
+        result = await pipeline.prepare_step(state, compaction_start_emitter=on_start)
     assert result.pending_action is None
     assert result.events == events
+    on_start.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -123,6 +125,7 @@ async def test_prepare_step_commits_llm_compaction_when_over_threshold(pipeline)
         summary='LLM compaction summary ' * 50,
         summary_offset=0,
     )
+    on_start = MagicMock()
     with (
         patch(
             'backend.context.context_pipeline.session_memory_exists',
@@ -138,11 +141,12 @@ async def test_prepare_step_commits_llm_compaction_when_over_threshold(pipeline)
             new=AsyncMock(return_value=llm_action),
         ),
     ):
-        result = await pipeline.prepare_step(state)
+        result = await pipeline.prepare_step(state, compaction_start_emitter=on_start)
     assert result.pending_action is not None
     assert isinstance(result.pending_action, CondensationAction)
     assert result.pending_action.summary
     assert result.events == []
+    on_start.assert_called_once_with()
 
 
 @pytest.mark.asyncio

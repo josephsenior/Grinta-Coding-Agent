@@ -40,6 +40,8 @@ class _BuildMessagesCache:
 class ContextMemoryManager:
     """Owns context memory and condensation."""
 
+    handles_compaction_start_status = True
+
     def __init__(
         self,
         config: AgentConfig,
@@ -131,6 +133,7 @@ class ContextMemoryManager:
         self, state: State, *, event_stream: Any | None = None
     ) -> CondensedHistory:
         emitter = self._build_streaming_emitter(event_stream)
+        start_emitter = self._build_compaction_start_emitter(event_stream)
         if self._pipeline is None:
             history = list(getattr(state, 'history', []))
             logger.debug(
@@ -138,7 +141,31 @@ class ContextMemoryManager:
                 len(history),
             )
             return CondensedHistory(history, None)
-        return await self._pipeline.prepare_step(state, streaming_emitter=emitter)
+        return await self._pipeline.prepare_step(
+            state,
+            streaming_emitter=emitter,
+            compaction_start_emitter=start_emitter,
+        )
+
+    @staticmethod
+    def _build_compaction_start_emitter(event_stream: Any | None) -> Any | None:
+        """Build the exact-start lifecycle event used by the TUI card."""
+        if event_stream is None:
+            return None
+        try:
+            from backend.ledger.event import EventSource
+            from backend.ledger.observation import StatusObservation
+        except Exception:
+            return None
+
+        def _emit() -> None:
+            status = StatusObservation(
+                content='Compacting context...',
+                status_type='compaction',
+            )
+            event_stream.add_event(status, EventSource.AGENT)
+
+        return _emit
 
     @staticmethod
     def _build_streaming_emitter(event_stream: Any | None) -> Any | None:
