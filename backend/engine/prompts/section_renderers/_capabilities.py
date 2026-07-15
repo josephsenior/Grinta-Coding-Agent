@@ -155,18 +155,11 @@ def _render_system_capabilities(
         )
         else 'working / episodic'
     )
-    criteria_on = bool(getattr(config, 'enable_acceptance_criteria_tool', True))
     tracker_on = bool(getattr(config, 'enable_task_tracker_tool', True))
-    persisted_surfaces: list[str] = []
-    if criteria_on:
-        persisted_surfaces.append('acceptance criteria')
     if tracker_on:
-        persisted_surfaces.append('task plans')
-    if persisted_surfaces:
         survival_list = (
-            'verified facts, '
-            + ', '.join(persisted_surfaces)
-            + ', and the immediate task surface'
+            'verified facts, the durable overall objective, contract conditions, '
+            'task plan, and the immediate task surface'
         )
     else:
         survival_list = 'verified facts and the immediate task surface'

@@ -66,12 +66,12 @@ def test_render_acceptance_gates_includes_assertions_and_ids():
 def test_render_task_plan_empty_state():
     lines = render_task_plan([], show_empty=True)
     joined = '\n'.join(lines)
-    assert 'no tasks configured yet' in joined
-    assert 'task_tracker' in joined
+    assert 'no durable tasks recorded' in joined
+    assert 'task_state' in joined
 
 
 def test_render_acceptance_gates_empty_state():
     lines = render_acceptance_gates([], show_empty=True)
     joined = '\n'.join(lines)
-    assert 'no acceptance criteria defined yet' in joined
-    assert 'acceptance_criteria' in joined
+    assert 'no durable contract conditions recorded' in joined
+    assert 'task_state' in joined

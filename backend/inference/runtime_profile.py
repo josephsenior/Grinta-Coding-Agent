@@ -69,12 +69,16 @@ def _resolve_context_limits(
         getattr(llm_config, 'context_window_tokens', None)
     )
     configured_output = _positive_int(getattr(llm_config, 'max_output_tokens', None))
+    budget_output = (
+        _positive_int(getattr(llm_config, '_native_max_output_tokens_for_budget', None))
+        or configured_output
+    )
     configured_input = _positive_int(getattr(llm_config, 'max_input_tokens', None))
 
     if configured_context is not None:
         usable = derive_usable_input_tokens(
             context_window_tokens=configured_context,
-            max_output_tokens=configured_output,
+            max_output_tokens=budget_output,
             fallback_input_tokens=configured_input,
         )
         return ModelContextLimits(
@@ -90,9 +94,10 @@ def _resolve_context_limits(
         or catalog.usable_input_tokens is not None
     ):
         max_output = configured_output or catalog.max_output_tokens
+        reservation_output = budget_output or catalog.max_output_tokens
         usable = derive_usable_input_tokens(
             context_window_tokens=catalog.context_window_tokens,
-            max_output_tokens=max_output,
+            max_output_tokens=reservation_output,
             fallback_input_tokens=configured_input or catalog.usable_input_tokens,
         )
         return ModelContextLimits(
@@ -103,7 +108,7 @@ def _resolve_context_limits(
         )
 
     if configured_input is not None:
-        context = configured_input + (configured_output or 0)
+        context = configured_input + (budget_output or 0)
         return ModelContextLimits(
             context,
             configured_output,
@@ -113,20 +118,22 @@ def _resolve_context_limits(
 
     entry = lookup(model)
     if entry is not None and entry.context_window_tokens:
+        max_output = configured_output or entry.max_output_tokens
+        reservation_output = budget_output or entry.max_output_tokens
         usable = derive_usable_input_tokens(
             context_window_tokens=entry.context_window_tokens,
-            max_output_tokens=configured_output or entry.max_output_tokens,
+            max_output_tokens=reservation_output,
         )
         return ModelContextLimits(
             entry.context_window_tokens,
-            configured_output or entry.max_output_tokens,
+            max_output,
             usable,
             'catalog',
         )
 
     usable = derive_usable_input_tokens(
         context_window_tokens=DEFAULT_UNKNOWN_CONTEXT_WINDOW_TOKENS,
-        max_output_tokens=configured_output,
+        max_output_tokens=budget_output,
     )
     return ModelContextLimits(
         DEFAULT_UNKNOWN_CONTEXT_WINDOW_TOKENS,

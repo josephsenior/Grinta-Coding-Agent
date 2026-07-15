@@ -6,12 +6,8 @@ from typing import Any
 
 _DONE_STATUSES = frozenset({'done', 'completed', 'cancelled'})
 
-EMPTY_TASK_PLAN_HINT = (
-    '(no tasks configured yet — use task_tracker(update) to create a plan)'
-)
-EMPTY_ACCEPTANCE_GATES_HINT = (
-    '(no acceptance criteria defined yet — use acceptance_criteria(update) to scope outcomes)'
-)
+EMPTY_TASK_PLAN_HINT = '(no durable tasks recorded — use task_state(set, tasks=[...]) for substantial multi-step work)'
+EMPTY_ACCEPTANCE_GATES_HINT = '(no durable contract conditions recorded — use task_state(set) when explicit outcomes must persist)'
 
 
 def cap_line(text: str, limit: int) -> str:
@@ -80,9 +76,7 @@ def render_task_plan(
             continue
         task_id = str(task.get('id', '') or '').strip()
         id_part = f' (id={task_id})' if task_id else ''
-        lines.append(
-            f'  - [{status or "?"}]{id_part} {cap_line(desc, desc_limit)}'
-        )
+        lines.append(f'  - [{status or "?"}]{id_part} {cap_line(desc, desc_limit)}')
     if len(lines) > 1:
         return lines
     if show_empty:
@@ -130,12 +124,12 @@ def render_acceptance_gates(
         if not assertion:
             continue
         evidence = str(item.get('evidence', '') or '').strip()
-        suffix = f' (evidence: {cap_line(evidence, evidence_limit)})' if evidence else ''
+        suffix = (
+            f' (evidence: {cap_line(evidence, evidence_limit)})' if evidence else ''
+        )
         criterion_id = str(item.get('id', '') or '').strip()
         label = f'[{criterion_id}] ' if criterion_id else ''
-        lines.append(
-            f'  - {label}{cap_line(assertion, assertion_limit)}{suffix}'
-        )
+        lines.append(f'  - {label}{cap_line(assertion, assertion_limit)}{suffix}')
     return lines if len(lines) > 1 else []
 
 

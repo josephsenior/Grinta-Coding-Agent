@@ -836,6 +836,21 @@ class TestGetCallKwargs:
 
         assert result['max_tokens'] == 321
 
+    def test_generation_output_is_capped_at_32k(self):
+        llm = self._make_llm_stub('gpt-4o')
+        llm.config.max_output_tokens = 128_000
+
+        result = llm._get_call_kwargs(is_stream=True)
+
+        assert result['max_tokens'] == 32_000
+
+    def test_explicit_generation_output_above_32k_is_capped(self):
+        llm = self._make_llm_stub('gpt-4o')
+
+        result = llm._get_call_kwargs(is_stream=True, max_tokens=64_000)
+
+        assert result['max_tokens'] == 32_000
+
 
 class TestInbandDisconnectDetection:
     """astream() must detect in-band provider disconnect messages and raise APIConnectionError.

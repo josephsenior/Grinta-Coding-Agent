@@ -452,11 +452,17 @@ def estimate_event_tokens(event: Event, model: str | None = None) -> int:
     content = getattr(event, 'content', None)
     if isinstance(content, str) and content.strip() == _MASKED_PLACEHOLDER:
         return 4
-    fp = event_fingerprint(event)
+    payload = _event_payload_text(event)
+    fp = _event_token_cache_key(
+        event,
+        model=model,
+        rendering='payload',
+        payload=payload,
+    )
     cached = _event_token_cache_get(fp)
     if cached is not None:
         return cached
-    tokens = _tokenize_text(_event_payload_text(event), model=model)
+    tokens = _tokenize_text(payload, model=model)
     _cache_token(fp, tokens)
     return tokens
 
@@ -473,11 +479,29 @@ def estimate_events_tokens(events: Iterable[Event], model: str | None = None) ->
 
 
 def estimate_prompt_event_tokens(event: Event, model: str | None = None) -> int:
-    """Estimate tokens for the model-visible rendering of one event."""
+    """Estimate tokens for the model-visible rendering of one event.
+
+    Prompt selection runs on every agent step.  Events already retained from
+    the previous step are immutable, so tokenizing their rendered payloads
+    again makes prompt preparation grow linearly with the full conversation.
+    Cache this distinct rendering separately from the durable event payload.
+    """
     content = getattr(event, 'content', None)
     if isinstance(content, str) and content.strip() == _MASKED_PLACEHOLDER:
         return 4
-    return _tokenize_text(_event_prompt_payload_text(event), model=model)
+    payload = _event_prompt_payload_text(event)
+    fp = _event_token_cache_key(
+        event,
+        model=model,
+        rendering='prompt',
+        payload=payload,
+    )
+    cached = _event_token_cache_get(fp)
+    if cached is not None:
+        return cached
+    tokens = _tokenize_text(payload, model=model)
+    _cache_token(fp, tokens)
+    return tokens
 
 
 def estimate_prompt_events_tokens(
@@ -518,6 +542,25 @@ def event_fingerprint(event: Event) -> str:
     ).hexdigest()[:16]
     event_id = getattr(event, 'id', None)
     return f'{type(event).__name__}:{event_id}:{digest}'
+
+
+def _event_token_cache_key(
+    event: Event,
+    *,
+    model: str | None,
+    rendering: str,
+    payload: str,
+) -> str:
+    """Return a tokenizer- and rendering-specific event cache key."""
+    effective_model = model if model is not None else _CURRENT_MODEL.get()
+    digest = hashlib.sha1(
+        payload.encode('utf-8', 'ignore'), usedforsecurity=False
+    ).hexdigest()[:16]
+    event_id = getattr(event, 'id', None)
+    return (
+        f'{rendering}:{effective_model or "default"}:'
+        f'{type(event).__name__}:{event_id}:{digest}'
+    )
 
 
 def _history_token_budget(
@@ -1210,11 +1253,7 @@ def _result(
     windowed: bool,
     reason: str,
 ) -> PromptWindowResult:
-    fingerprint_payload = '|'.join(event_fingerprint(event) for event in events)
-    cache_fingerprint = hashlib.sha1(
-        fingerprint_payload.encode('utf-8', 'ignore'),
-        usedforsecurity=False,
-    ).hexdigest()[:16]
+    cache_fingerprint = prompt_events_fingerprint(events)
     return PromptWindowResult(
         events=events,
         original_events=original_events,
@@ -1228,6 +1267,24 @@ def _result(
         reason=reason,
         cache_fingerprint=cache_fingerprint,
     )
+
+
+def prompt_events_fingerprint(events: Iterable[Event]) -> str:
+    """Return the stable fingerprint shared by prompt-window consumers."""
+    fingerprints: list[str] = []
+    for event in events:
+        payload = _event_prompt_payload_text(event)
+        digest = hashlib.sha1(
+            payload.encode('utf-8', 'ignore'), usedforsecurity=False
+        ).hexdigest()[:16]
+        fingerprints.append(
+            f'{type(event).__name__}:{getattr(event, "id", None)}:{digest}'
+        )
+    fingerprint_payload = '|'.join(fingerprints)
+    return hashlib.sha1(
+        fingerprint_payload.encode('utf-8', 'ignore'),
+        usedforsecurity=False,
+    ).hexdigest()[:16]
 
 
 def _parse_non_negative_int(value, default):
@@ -1330,6 +1387,7 @@ __all__ = [
     'estimate_events_tokens',
     'estimate_prompt_event_tokens',
     'estimate_prompt_events_tokens',
+    'prompt_events_fingerprint',
     'event_fingerprint',
     'select_prompt_events',
 ]

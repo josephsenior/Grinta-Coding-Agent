@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from collections import OrderedDict
 from typing import TYPE_CHECKING, Any
 
 from backend.context.prompt.turn_context import (
@@ -63,6 +64,7 @@ _INJECTED_MSG_MARKERS = (
 
 _TURN_CONTEXT_STATE_KEY = '_prompt_turn_context_v1'
 _MAX_RECORDED_TURN_CONTEXTS = 64
+_PROMPT_TOKEN_COUNT_CACHE_MAX = 128
 
 
 def _maybe_log_prompt_metrics(messages: list) -> None:
@@ -157,6 +159,7 @@ class OrchestratorPlanner:
         # Lazy cache for check_tools output (model-scoped)
         self._checked_tools_cache: list[ChatCompletionToolParam] | None = None
         self._checked_tools_model: str | None = None
+        self._prompt_token_count_cache: OrderedDict[str, int] = OrderedDict()
 
     # ------------------------------------------------------------------ #
     # Tool assembly
@@ -697,15 +700,28 @@ class OrchestratorPlanner:
         if not isinstance(tools, list):
             tools = []
 
+        static_messages: list[dict[str, Any]] = []
+        context_packet_messages: list[dict[str, Any]] = []
+        turn_context_messages: list[dict[str, Any]] = []
+        for msg in messages:
+            if not isinstance(msg, dict):
+                continue
+            if _is_static_prompt_message(msg):
+                static_messages.append(msg)
+            if _message_contains(msg, '<CONTEXT_PACKET>'):
+                context_packet_messages.append(msg)
+            if is_turn_context_text(_message_text(msg)):
+                turn_context_messages.append(msg)
+
+        # The complete request changes on every tool turn and is counted once.
+        # Stable/subset categories are cached by their exact serialized content.
         message_tokens = self._count_messages(messages)
-        static_prompt_tokens = self._count_messages(
-            [msg for msg in messages if _is_static_prompt_message(msg)]
+        static_prompt_tokens = self._count_messages_cached('static', static_messages)
+        context_packet_tokens = self._count_messages_cached(
+            'context_packet', context_packet_messages
         )
-        context_packet_tokens = self._count_messages(
-            [msg for msg in messages if _message_contains(msg, '<CONTEXT_PACKET>')]
-        )
-        turn_context_tokens = self._count_messages(
-            [msg for msg in messages if is_turn_context_text(_message_text(msg))]
+        turn_context_tokens = self._count_messages_cached(
+            'turn_context', turn_context_messages
         )
         tool_schema_tokens = self._count_tool_schema_tokens(tools)
         full_request_tokens = message_tokens + tool_schema_tokens
@@ -739,6 +755,38 @@ class OrchestratorPlanner:
         except Exception:
             return max(1, len(str(messages)) // 4)
 
+    def _count_messages_cached(
+        self,
+        category: str,
+        messages: list[dict[str, Any]],
+    ) -> int:
+        if not messages:
+            return 0
+        try:
+            payload = json.dumps(
+                messages,
+                sort_keys=True,
+                separators=(',', ':'),
+                ensure_ascii=False,
+                default=str,
+            )
+        except Exception:
+            payload = str(messages)
+        model = (self._llm.config.model or '').strip() or 'gpt-4o'
+        tokenizer = getattr(self._llm.config, 'custom_tokenizer', None)
+        digest = hashlib.sha256(payload.encode('utf-8')).hexdigest()
+        key = f'{category}:{model}:{id(tokenizer)}:{digest}'
+        cached = self._prompt_token_count_cache.get(key)
+        if cached is not None:
+            self._prompt_token_count_cache.move_to_end(key)
+            return cached
+        tokens = self._count_messages(messages)
+        self._prompt_token_count_cache[key] = tokens
+        self._prompt_token_count_cache.move_to_end(key)
+        while len(self._prompt_token_count_cache) > _PROMPT_TOKEN_COUNT_CACHE_MAX:
+            self._prompt_token_count_cache.popitem(last=False)
+        return tokens
+
     def _count_tool_schema_tokens(self, tools: list[dict[str, Any]]) -> int:
         if not tools:
             return 0
@@ -746,7 +794,9 @@ class OrchestratorPlanner:
             payload = json.dumps(tools, sort_keys=True, default=str)
         except Exception:
             payload = str(tools)
-        return self._count_messages([{'role': 'system', 'content': payload}])
+        return self._count_messages_cached(
+            'tool_schema', [{'role': 'system', 'content': payload}]
+        )
 
     def _usable_input_tokens(self) -> int:
         try:

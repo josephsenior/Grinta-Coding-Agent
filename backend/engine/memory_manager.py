@@ -33,7 +33,6 @@ if TYPE_CHECKING:
 @dataclass
 class _BuildMessagesCache:
     event_ids: tuple[int | str, ...]
-    event_fingerprints: tuple[str, ...]
     messages: list[Message]
     llm_config_key: str
 
@@ -302,10 +301,8 @@ class ContextMemoryManager:
         event_ids = tuple(
             self._prompt_event_cache_key(event) for event in events_for_prompt
         )
-        fingerprints = tuple(event_fingerprint(event) for event in events_for_prompt)
         self._build_messages_cache = _BuildMessagesCache(
             event_ids=event_ids,
-            event_fingerprints=fingerprints,
             messages=copy.deepcopy(messages),
             llm_config_key=config_key,
         )
@@ -320,15 +317,34 @@ class ContextMemoryManager:
         full_history = (
             list(getattr(state, 'history', [])) if state is not None else condensed_list
         )
+        from backend.context.prompt.prompt_window import (
+            PromptWindowResult,
+            estimate_prompt_events_tokens,
+        )
+
+        build_window = getattr(self._pipeline, 'build_prompt_window', None)
+        prompt_window = None
+        if callable(build_window):
+            candidate = build_window(
+                condensed_list,
+                state=state,
+                llm_config=llm_config,
+                full_history=full_history,
+            )
+            if isinstance(candidate, PromptWindowResult):
+                prompt_window = candidate
+
+        if prompt_window is not None:
+            return prompt_window.events, prompt_window
+
+        # Compatibility path for lightweight/custom pipeline implementations.
+        # The built-in ContextPipeline returns PromptWindowResult directly and
+        # therefore avoids these two full-history accounting passes.
         events_for_prompt = self._pipeline.build_prompt_events(
             condensed_list,
             state=state,
             llm_config=llm_config,
             full_history=full_history,
-        )
-        from backend.context.prompt.prompt_window import (
-            PromptWindowResult,
-            estimate_prompt_events_tokens,
         )
 
         prompt_window = PromptWindowResult(
@@ -353,7 +369,6 @@ class ContextMemoryManager:
         event_ids = tuple(
             self._prompt_event_cache_key(event) for event in events_for_prompt
         )
-        tuple(event_fingerprint(event) for event in events_for_prompt)
         cache = self._build_messages_cache
         incremental = self._is_incremental(cache, config_key, event_ids, prompt_window)
         max_message_chars = getattr(llm_config, 'max_message_chars', None)

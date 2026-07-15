@@ -8,6 +8,7 @@ import pytest
 
 from backend.context.prompt.prompt_window import (
     estimate_events_tokens,
+    estimate_prompt_event_tokens,
     estimate_prompt_events_tokens,
     select_prompt_events,
 )
@@ -328,3 +329,25 @@ def test_prompt_token_estimator_ignores_internal_llm_metrics() -> None:
 
     assert full_serialized_tokens > prompt_tokens * 100
     assert prompt_tokens < 50
+
+
+def test_prompt_event_token_estimate_is_cached_per_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from backend.context.prompt import prompt_window
+
+    event = _user_message('unique cached prompt payload', 98_765)
+    calls: list[str | None] = []
+
+    def _count(text: str, model: str | None = None) -> int:
+        calls.append(model)
+        return len(text)
+
+    monkeypatch.setattr(prompt_window, '_tokenize_text', _count)
+
+    first = estimate_prompt_event_tokens(event, model='cache-model-a')
+    second = estimate_prompt_event_tokens(event, model='cache-model-a')
+    other_model = estimate_prompt_event_tokens(event, model='cache-model-b')
+
+    assert first == second == other_model
+    assert calls == ['cache-model-a', 'cache-model-b']

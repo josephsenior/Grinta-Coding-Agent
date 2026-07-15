@@ -18,12 +18,11 @@ def _build_agent_execution_block(
     terminal_manager_rule: str,
 ) -> tuple[str, str, str, str]:
     """Build execution block for agent mode (can_edit=True)."""
+    _ = criteria_on
     edit_context_antipattern = '- **Editing existing content without current context.** Before mutating an existing file/symbol, inspect the relevant file, range, symbol, or anchor in this session. New file creation is exempt. New symbol creation requires reading the target file/anchor first. **Same bar for tests:** if you authored implementation earlier in the turn, **re-read it** before writing tests — memory drifts from the file on disk.\n'
     planning_parts: list[str] = []
-    if criteria_on:
-        planning_parts.append('`acceptance_criteria`')
     if tracker_on:
-        planning_parts.append('`task_tracker`')
+        planning_parts.append('`task_state`')
     planning_parts.append(f'`{terminal_command_tool}`')
     planning_parts.append('the public file API tools')
     if len(planning_parts) == 2:
@@ -51,8 +50,9 @@ def _build_agent_execution_block(
     rules += [
         '**Verify before final summary** — run the narrowest relevant proof: reproducer, tests, lint, or typecheck'
         + (
-            '; then `acceptance_criteria(audit, audit_entries=[...])` with `evidence` on every criterion'
-            if criteria_on
+            '; for substantial tracked work, use `task_state(audit)` to record evidence '
+            'and reconcile the overall objective before deciding to finish'
+            if tracker_on
             else ''
         )
         + '. If verification cannot run, state the concrete blocker: no test/build harness exists, missing dependency or credential, environment cannot install/build/run, verification would be unsafe/destructive, or the task has no meaningful runnable check. Do not use vague excuses like "not applicable."\n'
@@ -84,13 +84,13 @@ def _build_chat_plan_execution_block(
     is_plan: bool,
 ) -> tuple[str, str, str, str]:
     """Build execution block for chat/plan mode (can_edit=False)."""
+    _ = criteria_on
     edit_context_antipattern = ''
     planning_tool_list = ', '.join(
         filter(
             None,
             [
-                '`acceptance_criteria`' if criteria_on and is_plan else None,
-                '`task_tracker`' if tracker_on and is_plan else None,
+                '`task_state`' if tracker_on and is_plan else None,
                 '`read_file`',
                 '`grep`',
                 '`glob`',
@@ -152,23 +152,13 @@ def _render_critical(
     )
 
     task_tracker_antipattern = (
-        '- **Calling `task_tracker(update)` before `acceptance_criteria(update)` scopes outcomes.** '
-        'Criteria define done; milestones come second — see `<COMMON_PATTERNS>`.\n'
-        '- **Writing the final summary with `task_tracker` items still `todo` or `in_progress`.** Sync the tracker first.'
-        if tracker_on and criteria_on and can_edit
-        else (
-            '- **Writing the final summary with `task_tracker` items still `todo` or `in_progress`.** Sync the tracker first.'
-            if tracker_on and can_edit
-            else ''
-        )
-    )
-    acceptance_criteria_antipattern = (
-        '- **Writing the final summary when criteria exist but `acceptance_criteria(audit, audit_entries=[...])` was not done.** '
-        'Record brief `evidence` per criterion from verification output or state an explicit gap.\n'
-        '- **Rewriting the full criteria list to fix one assertion.** Use `refine(criterion_id, new_assertion, reason)` instead.'
-        if criteria_on and can_edit
+        '- **Treating a completed `task_state` milestone as completion of a broader '
+        'user objective.** Reconcile the recorded overall objective, contract '
+        'conditions, and remaining tasks before deciding to write the final summary.'
+        if tracker_on and can_edit
         else ''
     )
+    acceptance_criteria_antipattern = ''
     destructive_ops_antipattern = (
         '- **Running `rm`, `Remove-Item`, force pushes, or other destructive ops without explicit confirmation from the user.**'
         if can_edit

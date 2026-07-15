@@ -269,9 +269,7 @@ class TestOrchestratorPromptManager:
         assert '→ `lsp`' not in result
         assert 'definitions/references, `lsp`' not in result
 
-    def test_get_system_message_omits_terminal_when_terminal_disabled(
-        self, tmp_path
-    ):
+    def test_get_system_message_omits_terminal_when_terminal_disabled(self, tmp_path):
         from backend.utils.prompt import OrchestratorPromptManager
 
         config = SimpleNamespace(
@@ -956,7 +954,9 @@ class TestBuildSystemPromptRenders:
             config=_base_config(enable_task_tracker_tool=True),
             function_calling_mode='native',
         )
-        assert 'task_tracker' in result
+        assert 'task_state' in result
+        assert 'task_tracker' not in result
+        assert 'acceptance_criteria' not in result
 
     def test_acceptance_criteria_workflow_examples(self) -> None:
         result = self._assert_renders_cleanly(
@@ -972,7 +972,24 @@ class TestBuildSystemPromptRenders:
         assert '<TASK_STATE>' in result
         assert 'Use `task_state` for durable multi-step cognition.' in result
         assert 'contract records WHAT must remain true' in result
-        assert 'Audit contract items with concrete evidence' in result
+        assert 'record verification evidence with `audit`' in result
+        assert 'milestone as completion of a broader objective' in result
+
+    def test_completion_boundary_is_overall_user_objective(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(enable_task_tracker_tool=True),
+            function_calling_mode='native',
+        )
+        assert (
+            'debugging subproblem or implementation milestone is not a new request boundary'
+            in result
+        )
+        assert 'continue other safe in-scope work' in result
+        assert (
+            'Do not turn unfinished requested work into optional next steps' in result
+        )
 
     def test_ask_user_in_system_prompt(self) -> None:
         result = self._assert_renders_cleanly(
@@ -1784,4 +1801,3 @@ def test_build_python_exec_command_matches_active_registry_git_bash_on_windows()
     finally:
         prompt_mod.set_active_tool_registry(None)
         prompt_mod._get_global_tool_registry.cache_clear()
-

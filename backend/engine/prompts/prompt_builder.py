@@ -391,10 +391,11 @@ def _collect_system_prompt_sections(
             '- Write production-quality code by default.\n'
             '- State your approach before implementing.\n'
             '- Calibrate confidence to evidence . Be decisive when tool observations are sufficient; state uncertainty when something is unverified.\n'
-            '- Keep scope anchored to the latest user request. You may act on adjacent issues that are clearly required for the requested change to be correct (for example, a bug in a helper you touched, or a broken call site your edit created).\n'
-            '- Stop at the request boundary for pure style, refactors, or unrelated investigations — note them in the final summary instead of acting on them.\n'
-            '- When the requested change is implemented and verification appropriate to the change is done, stop and give the final summary. If verification cannot run, state exactly why and stop.\n'
-            '- Before final, silently check: latest request answered, no required work remains, verification status is clear, and no stale todo/in_progress task is left behind.\n'
+            '- Keep scope anchored to the latest explicit user objective. You may act on adjacent issues that are clearly required for the requested change to be correct (for example, a bug in a helper you touched, or a broken call site your edit created).\n'
+            '- A debugging subproblem or implementation milestone is not a new request boundary. Completing it does not narrow a broader objective unless the user changed scope.\n'
+            '- Stop at the user objective boundary for pure style, refactors, or unrelated investigations — note them in the final summary instead of acting on them.\n'
+            '- When the overall requested change is implemented and appropriately verified, stop and give the final summary. If one required check is blocked, continue other safe in-scope work; report the blocker and stop only when no meaningful required work can proceed.\n'
+            '- Before final, silently check: latest objective answered, no actionable required work remains, verification status is clear, and recorded task state matches reality. Do not turn unfinished requested work into optional next steps.\n'
             '</OPERATING_CONTRACT>',
         ),
     ]
@@ -419,20 +420,11 @@ def _collect_system_prompt_sections(
     )
     if is_plan_mode(mode):
         plan_tools_line = (
-            'Scope with `acceptance_criteria(update)` first, then `task_tracker(update)` — see `<ACCEPTANCE_CRITERIA>` and `<COMMON_PATTERNS>`. '
-            'Do not audit in Plan mode (no executable evidence yet).\n'
-            if bool(getattr(config, 'enable_acceptance_criteria_tool', True))
-            and bool(getattr(config, 'enable_task_tracker_tool', True))
-            else (
-                'Scope with `acceptance_criteria` — see `<ACCEPTANCE_CRITERIA>`. '
-                'Do not audit in Plan mode.\n'
-                if bool(getattr(config, 'enable_acceptance_criteria_tool', True))
-                else (
-                    'Use `task_tracker` for a coarse plan — see `<TASK_TRACKING>`.\n'
-                    if bool(getattr(config, 'enable_task_tracker_tool', True))
-                    else ''
-                )
-            )
+            'For substantial plans, use `task_state(set)` to record the overall '
+            'objective, contract conditions, and tasks — see `<TASK_STATE>`. Do not '
+            'audit in Plan mode because executable evidence does not exist yet.\n'
+            if bool(getattr(config, 'enable_task_tracker_tool', True))
+            else ''
         )
         sections.append(
             (
@@ -468,7 +460,7 @@ def _collect_system_prompt_sections(
                 '- What changed\n'
                 '- Verification run and result, or the concrete blocker if verification could not run\n'
                 '- Any important notes or caveats for the user\n'
-                '- Next steps for the user\n\n'
+                '- Follow-up options only when they are outside the requested objective or the remaining work is concretely blocked\n\n'
                 'Writing that summary ends the run. You do not need to call any special tool to signal completion. Your final response IS the completion.',
             )
         )

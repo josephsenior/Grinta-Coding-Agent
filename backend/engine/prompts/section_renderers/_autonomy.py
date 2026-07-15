@@ -17,10 +17,6 @@ from backend.engine.prompts.section_renderers._env_hints import (
     _path_uncertainty_hint,
 )
 
-_CRITERIA_VS_TASKS_LINE = (
-    '**Separation:** tasks = execution milestones (how); criteria = verifiable outcomes (what must be true).'
-)
-
 
 def _build_context_discipline_section(
     *,
@@ -31,6 +27,7 @@ def _build_context_discipline_section(
     condensation_on: bool,
     semantic_recall_on: bool = False,
 ) -> str:
+    _ = (working_memory_on, criteria_on)
     parts = ['<CONTEXT_DISCIPLINE>']
     parts.append(
         'Use the visible conversation, current files, and fresh tool observations as context. '
@@ -48,30 +45,18 @@ def _build_context_discipline_section(
             '**checkpoint** — see System Capabilities and `<EDITOR_AND_FILE_OPERATIONS>`.'
         )
 
-    if criteria_on:
-        parts.extend(
-            [
-                '',
-                '**acceptance_criteria** — outcomes only; see `<ACCEPTANCE_CRITERIA>`.',
-            ]
-        )
-        if condensation_on:
-            parts.append(
-                'Post-condensation: live ids are in `<EXECUTION_CONTRACT>`; '
-                'call `acceptance_criteria(view)` only if you need the full list.'
-            )
-
     if tracker_on:
         parts.extend(
             [
                 '',
-                '**task_tracker** — milestones only; see `<TASK_TRACKING>`.',
+                '**task_state** — durable overall objective, contract conditions, and plan; see `<TASK_STATE>`.',
             ]
         )
         if condensation_on:
             parts.append(
-                'Post-condensation: live ids/status are in `<EXECUTION_CONTRACT>`; '
-                'call `task_tracker(view)` only if you need the full markdown plan.'
+                'Post-condensation: the live recorded objective, status, contract '
+                'conditions, and task ids are in `<EXECUTION_CONTRACT>`; call '
+                '`task_state(review)` only when you need the full state.'
             )
 
     parts.append('</CONTEXT_DISCIPLINE>')
@@ -86,6 +71,7 @@ def _build_when_to_use_context(
     checkpoints_on: bool,
     semantic_recall_on: bool = False,
 ) -> str:
+    _ = (working_memory_on, criteria_on)
     parts = ['<WHEN_TO_USE_CONTEXT>']
     if semantic_recall_on:
         parts.append('- **search_history**: See `<MEMORY_AND_CONTEXT>`.')
@@ -93,11 +79,9 @@ def _build_when_to_use_context(
         parts.append(
             '- **checkpoint**: before revert or when milestones are stale — see System Capabilities.'
         )
-    if criteria_on:
-        parts.append('- **acceptance_criteria**: See `<ACCEPTANCE_CRITERIA>`.')
     if tracker_on:
-        parts.append('- **task_tracker**: See `<TASK_TRACKING>`.')
-    if not tracker_on and not criteria_on:
+        parts.append('- **task_state**: See `<TASK_STATE>`.')
+    if not tracker_on:
         parts.append(
             '- Use fresh reads/searches and recent observations to stay grounded.'
         )
@@ -127,6 +111,9 @@ def _build_autonomy_block(_mode: str) -> str:
         'for discussion or planning work, keep the response aligned with the active protocol. '
         'During implementation, continue work through tool calls. Plain text without tool calls ends the run — '
         'see the active mode protocol for when to write it. '
+        'The completion boundary is the latest user objective, not the most recent '
+        'debugging subproblem or implementation milestone. Completing a milestone '
+        'does not narrow or complete a broader objective unless the user changed scope. '
         'If the user changes or contradicts the task mid-run, treat the latest user directive as authoritative. '
         'Preserve completed work that still applies, drop work that no longer applies, and continue from the new instruction. '
         'The runtime may interrupt a tool call to surface a user decision; treat that decision as '
@@ -136,22 +123,17 @@ def _build_autonomy_block(_mode: str) -> str:
 
 
 def _build_task_sync_instruction(*, tracker_on: bool, criteria_on: bool) -> str:
-    if not tracker_on and not criteria_on:
+    _ = criteria_on
+    if not tracker_on:
         return '**Plan synchronization:** Keep your final response aligned with what was actually completed.'
-    steps: list[str] = []
-    if tracker_on:
-        steps.append(
-            'sync `task_tracker` (no open `todo`/`in_progress` unless truly blocked)'
-        )
-    steps.append('run the narrowest verification')
-    if criteria_on:
-        steps.append(
-            '`acceptance_criteria(audit, audit_entries=[...])` with brief `evidence` '
-            'per criterion (command output, test summary, or explicit gap)'
-        )
-    steps.append('write the final summary')
-    ordered = '; '.join(f'{index}. {step}' for index, step in enumerate(steps, 1))
-    return f'**Completion ritual:** Before the final summary: {ordered}.'
+    return (
+        '**Completion ritual for substantial multi-step work:** review and reconcile '
+        '`task_state` against the latest user objective, record verification evidence '
+        'with `audit`, and decide whether the overall objective is complete or no '
+        'meaningful in-scope work remains because of a concrete blocker. Do not treat '
+        'a completed milestone as completion of a broader objective. Lightweight work '
+        'does not require task state.'
+    )
 
 
 def _render_autonomy(
@@ -205,8 +187,17 @@ def _render_autonomy(
     if tracker_on:
         task_tracker_discipline_block = (
             '<TASK_STATE>\n'
-            'Use `task_state` for durable multi-step cognition. The contract records WHAT must remain true: objective, explicit requirements, constraints, and verifiable success conditions. The plan records HOW you currently intend to work and may be rewritten when evidence changes.\n'
-            'Commands: `set` (replace only supplied contract/plan fields), `update_task`, `review`, `audit`. Lightweight work may use tasks alone. Never record an implementation hypothesis as a user requirement; never silently weaken a user requirement. Audit contract items with concrete evidence before finishing.\n'
+            'Use `task_state` for durable multi-step cognition. The contract records '
+            'WHAT must remain true: the overall objective, explicit requirements, '
+            'constraints, and verifiable success conditions. Tasks record HOW you '
+            'currently intend to work and may be replaced when evidence changes.\n'
+            'Commands: `set`, `update_task`, `review`, `audit`. For `set`, pass '
+            '`objective`, `requirements`, `constraints`, `success_conditions`, and '
+            '`tasks` directly as structured top-level arguments—never JSON strings or '
+            '`contract`/`plan` wrappers. Lightweight work need not create task state. '
+            'Never record an implementation hypothesis as a user requirement; never '
+            'silently weaken a user requirement. `task_state` reports evidence for '
+            'your judgment; it does not decide whether to finish.\n'
             '</TASK_STATE>'
         )
     else:
@@ -220,7 +211,8 @@ def _render_autonomy(
     )
     if tracker_on:
         problem_solving_workflow_body += (
-            '\n\nSync the `task_tracker` plan after verify when milestone status changed.'
+            '\n\nFor substantial multi-step work, sync `task_state` after verification '
+            'when a milestone or contract condition changed.'
         )
 
     task_sync_instruction = _build_task_sync_instruction(

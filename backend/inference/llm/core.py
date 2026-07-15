@@ -193,8 +193,23 @@ class LLM(RetryMixin, DebugMixin):
                 self.config.context_window_tokens = features.context_window_tokens
             if self.config.max_input_tokens is None:
                 self.config.max_input_tokens = features.max_input_tokens
-            if self.config.max_output_tokens is None:
-                self.config.max_output_tokens = features.max_output_tokens
+            native_output = self.config.max_output_tokens
+            if native_output is None:
+                native_output = features.max_output_tokens
+            from backend.inference.capabilities.context_limits import (
+                cap_generation_output_tokens,
+            )
+
+            # Keep the native value solely for the existing context-reservation
+            # policy, then expose/use the effective application request cap.
+            # This makes config/session telemetry truthful (32K) without moving
+            # the compaction boundary that was derived from model capacity.
+            object.__setattr__(
+                self.config,
+                '_native_max_output_tokens_for_budget',
+                native_output,
+            )
+            self.config.max_output_tokens = cap_generation_output_tokens(native_output)
         except (KeyError, ValueError, AttributeError) as exc:
             logger.warning(
                 'Could not initialize token limits for model %s: %s  '
@@ -282,9 +297,7 @@ class LLM(RetryMixin, DebugMixin):
             provider=getattr(self.config, 'custom_llm_provider', None),
             caching_prompt=bool(getattr(self.config, 'caching_prompt', True)),
             prompt_cache_variant=(
-                prompt_cache_variant
-                if isinstance(prompt_cache_variant, str)
-                else None
+                prompt_cache_variant if isinstance(prompt_cache_variant, str) else None
             ),
         )
 
@@ -292,6 +305,20 @@ class LLM(RetryMixin, DebugMixin):
             call_kwargs['seed'] = self.config.seed
 
         call_kwargs = sanitize_call_kwargs_for_provider(model, call_kwargs)
+
+        from backend.inference.capabilities.context_limits import (
+            cap_generation_output_tokens,
+        )
+
+        # Catalog limits describe model capacity; Grinta intentionally requests
+        # no more than 32K output tokens.  Apply this after provider overrides so
+        # no mapper can restore a larger request value.
+        for field in ('max_tokens', 'max_completion_tokens', 'max_output_tokens'):
+            if field not in call_kwargs:
+                continue
+            capped = cap_generation_output_tokens(call_kwargs.get(field))
+            if capped is not None:
+                call_kwargs[field] = capped
 
         # Drop explicit None values to avoid sending JSON nulls.
         # Keep falsy values like 0/False.

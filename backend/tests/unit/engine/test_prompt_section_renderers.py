@@ -107,9 +107,9 @@ class TestRenderCriticalModeSpecific:
         # Should NOT have chat-specific rules
         self._assert_not_contains_body(body, 'Non-tool responses end the turn')
 
-    def test_agent_mode_verify_rule_mentions_audit_entries(self):
-        body = self._render_critical(mode='agent', criteria_on=True)
-        self._assert_contains_body(body, 'audit_entries')
+    def test_agent_mode_verify_rule_mentions_task_state_audit(self):
+        body = self._render_critical(mode='agent', criteria_on=True, tracker_on=True)
+        self._assert_contains_body(body, 'task_state(audit)')
         self._assert_contains_body(body, 'evidence')
 
     def test_agent_mode_contains_exactly_10_rules(self):
@@ -282,6 +282,7 @@ class TestSystemCapabilitiesModeSpecific:
 
     def test_agent_mode_shows_search_history(self, monkeypatch):
         from backend.utils import optional_extras as oe
+
         monkeypatch.setattr(oe, 'is_rag_extra_available', lambda: True)
         body = self._render_caps(mode='agent', enable_vector_memory=True)
         self._assert_contains(body, 'Search History (`search_history`)')
@@ -316,6 +317,7 @@ class TestSystemCapabilitiesModeSpecific:
 
     def test_chat_mode_shows_search_history_when_enabled(self, monkeypatch):
         from backend.utils import optional_extras as oe
+
         monkeypatch.setattr(oe, 'is_rag_extra_available', lambda: True)
         body = self._render_caps(mode='chat', enable_vector_memory=True)
         self._assert_contains(body, 'Search History (`search_history`)')
@@ -344,6 +346,7 @@ class TestSystemCapabilitiesModeSpecific:
 
     def test_plan_mode_shows_search_history_when_enabled(self, monkeypatch):
         from backend.utils import optional_extras as oe
+
         monkeypatch.setattr(oe, 'is_rag_extra_available', lambda: True)
         body = self._render_caps(mode='plan', enable_vector_memory=True)
         self._assert_contains(body, 'Search History (`search_history`)')
@@ -466,10 +469,10 @@ class TestRenderCriticalFullRender:
 
     def test_agent_tracker_antipattern_appears_when_tracker_on(self):
         result = self._render(mode='agent', tracker_on=True)
-        assert 'task_tracker' in result
-        assert 'Sync the tracker first' in result
+        assert 'task_state' in result
+        assert 'completed `task_state` milestone' in result
+        assert 'broader user objective' in result
 
     def test_chat_tracker_antipattern_not_present(self):
         result = self._render(mode='chat', tracker_on=True)
         assert 'Sync the tracker first' not in result
-

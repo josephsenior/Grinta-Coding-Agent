@@ -502,6 +502,30 @@ class TestBuildLlmParams:
         assert 100_000 < accounting['usable_input_tokens'] <= 120_000
         assert accounting['full_request_tokens'] > accounting['dynamic_history_tokens']
 
+    def test_prompt_accounting_caches_stable_categories(self):
+        p = _make_planner()
+        p._llm.config.custom_tokenizer = None
+        params = {
+            'messages': [
+                {'role': 'system', 'content': 'stable system'},
+                {'role': 'user', 'content': 'dynamic history'},
+            ],
+            'tools': [
+                {
+                    'type': 'function',
+                    'function': {'name': 'read_file', 'parameters': {}},
+                }
+            ],
+        }
+
+        with patch('backend.engine.planner.get_token_count', return_value=10) as count:
+            p._build_prompt_accounting(params)
+            first_calls = count.call_count
+            p._build_prompt_accounting(params)
+
+        assert first_calls == 3  # full request, static subset, tool schema
+        assert count.call_count == first_calls + 1  # only the full request changed path
+
     def test_prior_turn_context_is_not_copied_into_later_turns(self):
         p = _make_planner(
             config=_make_config(enable_coding_preflight=False, enable_repo_map=False)

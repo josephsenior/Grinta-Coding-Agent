@@ -533,6 +533,13 @@ class TestBuildCondensationPrompt:
         prompt = self._build_prompt()
         assert 'distinguish observation from inference' in prompt
 
+    def test_prompt_preserves_user_completion_boundary_across_milestones(self):
+        prompt = self._build_prompt()
+        assert 'completion boundary exactly' in prompt
+        assert 'completed subproblems as milestones' in prompt
+        assert 'cannot fit in one session' in prompt
+        assert 'preserve the next actionable step' in prompt
+
 
 # ---------------------------------------------------------------------------
 # _digest_events — event pre-digestion

@@ -783,6 +783,33 @@ def test_preflight_uses_configured_shared_context_window() -> None:
     assert executor._resolve_total_limit(145_904, 128_000) == 200_000
 
 
+def test_preflight_reuses_planner_message_accounting(monkeypatch) -> None:
+    from backend.engine.executor_mixins._executor_lifecycle_mixin import (
+        _ExecutorLifecycleMixin,
+    )
+
+    lifecycle = _ExecutorLifecycleMixin()
+    lifecycle._llm = SimpleNamespace(config=SimpleNamespace(model='test-model'))
+
+    def _unexpected_count(*args, **kwargs):
+        raise AssertionError('messages were tokenized twice')
+
+    monkeypatch.setattr(
+        'backend.inference.llm.utils.get_token_count', _unexpected_count
+    )
+    estimated = lifecycle._estimate_request_tokens(
+        {
+            'messages': [{'role': 'user', 'content': 'hello'}],
+            '_prompt_accounting': {
+                'full_request_tokens': 125,
+                'tool_schema_tokens': 25,
+            },
+        }
+    )
+
+    assert estimated == 100
+
+
 def test_async_execute_does_not_timeout_active_reasoning_stream(monkeypatch, tmp_path):
     """Active reasoning streams are governed by per-chunk stall timeouts."""
     import backend.engine.function_calling.dispatch as fc
@@ -847,9 +874,7 @@ def test_async_execute_does_not_timeout_active_reasoning_stream(monkeypatch, tmp
     assert result.response.reasoning_content == 'still thinking'
 
 
-def test_first_chunk_and_fallback_timeout_propagates_llm_timeout(
-    monkeypatch, tmp_path
-):
+def test_first_chunk_and_fallback_timeout_propagates_llm_timeout(monkeypatch, tmp_path):
     """A double timeout must enter recovery, never become an empty null action."""
     import backend.engine.function_calling.dispatch as fc
     from backend.engine.executor import OrchestratorExecutor

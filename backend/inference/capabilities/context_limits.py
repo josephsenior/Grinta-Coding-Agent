@@ -11,6 +11,7 @@ from typing import Any
 
 DEFAULT_CONTEXT_OVERHEAD_TOKENS = 4_096
 DEFAULT_UNKNOWN_CONTEXT_WINDOW_TOKENS = 200_000
+MAX_GENERATION_OUTPUT_TOKENS = 32_000
 
 # Cap the output reservation at 25% of the context window so that oversized
 # max_output_tokens (e.g. 128K on a 200K window) don't starve the prompt
@@ -50,6 +51,18 @@ def derive_usable_input_tokens(
         reserve = max(0, capped_output) + max(0, overhead_tokens)
         return max(1, context - reserve)
     return fallback
+
+
+def cap_generation_output_tokens(value: Any) -> int | None:
+    """Return Grinta's effective generation cap without altering model capacity.
+
+    Context budgeting continues to use the provider/catalog limit so changing
+    this application-level request cap cannot silently move compaction.
+    """
+    parsed = _positive_int(value)
+    if parsed is None:
+        return None
+    return min(parsed, MAX_GENERATION_OUTPUT_TOKENS)
 
 
 def limits_from_catalog(model: str | None) -> ModelContextLimits:
@@ -172,7 +185,9 @@ def _positive_int(value: Any) -> int | None:
 __all__ = [
     'DEFAULT_CONTEXT_OVERHEAD_TOKENS',
     'DEFAULT_UNKNOWN_CONTEXT_WINDOW_TOKENS',
+    'MAX_GENERATION_OUTPUT_TOKENS',
     'ModelContextLimits',
+    'cap_generation_output_tokens',
     'derive_usable_input_tokens',
     'limits_from_catalog',
     'limits_from_config',

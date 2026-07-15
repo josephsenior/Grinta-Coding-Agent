@@ -32,14 +32,8 @@ def _build_search_tools(*, lsp_available: bool) -> str:
 
 
 def _build_structured_work_prefix(*, criteria_on: bool, tracker_on: bool) -> str:
-    tags: list[str] = []
-    if criteria_on:
-        tags.append('<ACCEPTANCE_CRITERIA>')
-    if tracker_on:
-        tags.append('<TASK_TRACKING>')
-    if not tags:
-        return ''
-    return 'See ' + ' + '.join(tags) + ' → '
+    _ = criteria_on
+    return 'See <TASK_STATE> → ' if tracker_on else ''
 
 
 def _build_bug_fix_pattern(
@@ -50,20 +44,11 @@ def _build_bug_fix_pattern(
     prefix = _build_structured_work_prefix(
         criteria_on=criteria_on, tracker_on=tracker_on
     )
-    if criteria_on and tracker_on:
-        return (
-            prefix + 'criteria(update) → tracker(update) → discover → edit → verify → '
-            'tracker(sync) → audit(audit_entries) → final summary.'
-        )
-    if criteria_on:
-        return (
-            prefix + 'criteria(update) → discover → edit → verify → '
-            'audit(audit_entries) → final summary.'
-        )
     if tracker_on:
         return (
-            prefix
-            + 'tracker(update) → discover → edit → verify → tracker(sync) → final summary.'
+            prefix + 'task_state(set for substantial work) → discover → edit → '
+            'verify → task_state(update/audit/review) → decide whether the overall '
+            'objective is complete or blocked → final summary.'
         )
     return 'Discover → edit → verify → final summary.'
 
@@ -76,21 +61,11 @@ def _build_feature_pattern(
     prefix = _build_structured_work_prefix(
         criteria_on=criteria_on, tracker_on=tracker_on
     )
-    if criteria_on and tracker_on:
-        return (
-            prefix
-            + 'criteria(update) → tracker(update) → analyze → edit → test/lint → '
-            'tracker(sync) → audit(audit_entries) → final summary.'
-        )
-    if criteria_on:
-        return (
-            prefix + 'criteria(update) → analyze → edit → test/lint → '
-            'audit(audit_entries) → final summary.'
-        )
     if tracker_on:
         return (
-            'See <TASK_TRACKING> → tracker(update) → analyze → edit → test/lint → '
-            'tracker(sync) → final summary.'
+            prefix + 'task_state(set for substantial work) → analyze → edit → '
+            'test/lint → task_state(update/audit/review) → decide whether the '
+            'overall objective is complete or blocked → final summary.'
         )
     return 'Scope → analyze → edit → test/lint → final summary.'
 

@@ -184,7 +184,18 @@ class _ExecutorLifecycleMixin:
 
         model = self._llm_model_name(self._llm) or 'gpt-4o'
         messages = call_params.get('messages') or []
-        prompt_tokens = get_token_count(messages, model=model)
+        prompt_tokens: int | None = None
+        accounting = call_params.get('_prompt_accounting')
+        if isinstance(accounting, dict):
+            full_request = self._positive_int(accounting.get('full_request_tokens'))
+            tool_schema = self._positive_int(accounting.get('tool_schema_tokens')) or 0
+            if full_request is not None and full_request >= tool_schema:
+                # Planner counted these exact messages moments ago.  Reuse that
+                # result while leaving tool/metadata preflight accounting below
+                # unchanged.
+                prompt_tokens = full_request - tool_schema
+        if prompt_tokens is None:
+            prompt_tokens = get_token_count(messages, model=model)
 
         extra_lines: list[str] = []
         for key in sorted(call_params.keys()):
@@ -312,15 +323,21 @@ class _ExecutorLifecycleMixin:
         return None
 
     def _llm_output_token_limit(self) -> int | None:
+        from backend.inference.capabilities.context_limits import (
+            cap_generation_output_tokens,
+        )
+
         llm = self._llm
         features = getattr(llm, 'features', None)
         config = getattr(llm, 'config', None)
 
         max_out = self._positive_int(getattr(features, 'max_output_tokens', None))
         if max_out is not None:
-            return max_out
+            return cap_generation_output_tokens(max_out)
 
-        return self._positive_int(getattr(config, 'max_output_tokens', None))
+        return cap_generation_output_tokens(
+            self._positive_int(getattr(config, 'max_output_tokens', None))
+        )
 
     @staticmethod
     def _minimum_viable_completion_tokens() -> int:

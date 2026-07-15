@@ -47,7 +47,11 @@ from backend.context.context_pipeline.types import _JUST_COMPACTED_KEY
 from backend.context.memory.session_context import bind_session_context
 from backend.context.memory.session_memory import maybe_update
 from backend.context.prompt.context_packet import build_context_packet_observation
-from backend.context.prompt.prompt_window import select_prompt_events
+from backend.context.prompt.prompt_window import (
+    PromptWindowResult,
+    prompt_events_fingerprint,
+    select_prompt_events,
+)
 from backend.context.tool_result_storage import (
     apply_frozen_tool_replacements,
     apply_tool_result_budget,
@@ -321,6 +325,22 @@ class ContextPipeline:
         full_history: list[Event] | None = None,
     ) -> list[Event]:
         """Assemble LLM-facing events through layers 1–7."""
+        return self.build_prompt_window(
+            condensed_history,
+            state=state,
+            llm_config=llm_config,
+            full_history=full_history,
+        ).events
+
+    def build_prompt_window(
+        self,
+        condensed_history: list[Event],
+        *,
+        state: State | None = None,
+        llm_config: object | None = None,
+        full_history: list[Event] | None = None,
+    ) -> PromptWindowResult:
+        """Assemble and return the already-accounted LLM prompt window."""
         history = full_history if full_history is not None else list(condensed_history)
         events = self._project_layers_1_to_3(
             history, state or _EmptyState(), apply_tool_budget=True
@@ -375,8 +395,20 @@ class ContextPipeline:
                     logger.debug(
                         'Failed to mark emergency memory pressure', exc_info=True
                     )
-            return events
-        return window.events
+            return PromptWindowResult(
+                events=events,
+                original_events=window.original_events,
+                selected_events=len(events),
+                dropped_events=max(0, window.original_events - len(events)),
+                estimated_tokens=window.estimated_tokens,
+                selected_estimated_tokens=window.estimated_tokens,
+                token_budget=window.token_budget,
+                protected_events=0,
+                windowed=False,
+                reason='emergency_window_rejected',
+                cache_fingerprint=prompt_events_fingerprint(events),
+            )
+        return window
 
     async def prewarm_compaction(self, state: State) -> Compaction | None:
         """Run LLM compaction off the hot path for foreground reuse."""

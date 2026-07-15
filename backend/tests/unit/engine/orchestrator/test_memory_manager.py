@@ -381,6 +381,34 @@ class TestBuildMessages:
         with pytest.raises(RuntimeError, match='not initialized'):
             m.build_messages([], MagicMock(), MagicMock())
 
+    def test_reuses_pipeline_prompt_window_accounting(self):
+        from backend.context.prompt.prompt_window import PromptWindowResult
+
+        m = _make_manager()
+        event = MagicMock()
+        window = PromptWindowResult(
+            events=[event],
+            original_events=1,
+            selected_events=1,
+            dropped_events=0,
+            estimated_tokens=17,
+            selected_estimated_tokens=17,
+            token_budget=100,
+            protected_events=0,
+            windowed=False,
+            reason='within_budget',
+            cache_fingerprint='abc',
+        )
+        pipeline = MagicMock()
+        pipeline.build_prompt_window.return_value = window
+        m._pipeline = pipeline
+
+        events, resolved = m._resolve_prompt_events([], None, MagicMock())
+
+        assert events == [event]
+        assert resolved is window
+        pipeline.build_prompt_events.assert_not_called()
+
     def test_returns_empty_list_when_process_events_returns_empty(self):
         m = _make_manager()
         self._attach_pipeline(m)

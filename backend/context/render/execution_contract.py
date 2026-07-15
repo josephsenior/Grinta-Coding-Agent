@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from backend.context.render.task_context import (
+    cap_line,
     render_acceptance_gates,
     render_goal_header,
     render_task_plan,
@@ -55,11 +56,29 @@ def build_execution_contract_lines(
     if snapshot is None and state is not None:
         snapshot = _load_snapshot_safe(state)
 
+    task_state = _load_task_state_safe()
+    has_task_state = bool(
+        task_state is not None
+        and (
+            getattr(task_state, 'contract', None) is not None
+            or getattr(task_state, 'plan', None) is not None
+        )
+    )
+
     lines: list[str] = []
     if include_goal_header:
         lines.extend(render_goal_header(canonical))
 
-    task_plan = _resolve_task_plan(snapshot)
+    if has_task_state:
+        contract = getattr(task_state, 'contract', None)
+        objective = str(getattr(contract, 'objective', '') or '').strip()
+        if objective:
+            lines.append(f'- Recorded overall objective: {cap_line(objective, 320)}')
+        lines.append(_task_state_status_line(task_state))
+
+    task_plan = (
+        _task_state_plan(task_state) if has_task_state else _resolve_task_plan(snapshot)
+    )
     header = '- Task plan:' if not only_open_tasks else '- Active scope:'
     if task_plan is not None:
         lines.extend(
@@ -79,11 +98,89 @@ def build_execution_contract_lines(
             )
         )
 
-    lines.extend(_acceptance_criteria_lines(show_empty=show_empty_states))
+    if has_task_state:
+        lines.extend(
+            render_acceptance_gates(
+                _task_state_criteria(task_state),
+                header='- Contract conditions:',
+                show_empty=show_empty_states,
+            )
+        )
+    else:
+        lines.extend(_acceptance_criteria_lines(show_empty=show_empty_states))
     return lines
 
 
-def _resolve_task_plan(snapshot: dict[str, Any] | None) -> dict[str, Any] | list[Any] | None:
+def _load_task_state_safe() -> object | None:
+    try:
+        from backend.task_state import TaskStateStore
+
+        return TaskStateStore().load()
+    except Exception:
+        logger.debug('Execution contract task_state load failed', exc_info=True)
+        return None
+
+
+def _task_state_plan(task_state: object | None) -> dict[str, Any] | None:
+    plan = getattr(task_state, 'plan', None)
+    tasks = getattr(plan, 'tasks', None)
+    if not isinstance(tasks, list):
+        return None
+    return {
+        'tasks': [
+            {
+                'id': str(getattr(task, 'id', '') or ''),
+                'description': str(getattr(task, 'description', '') or ''),
+                'status': str(getattr(task, 'status', '') or ''),
+                'result': str(getattr(task, 'result', '') or ''),
+            }
+            for task in tasks
+        ]
+    }
+
+
+def _task_state_criteria(task_state: object | None) -> list[dict[str, Any]]:
+    contract = getattr(task_state, 'contract', None)
+    if contract is None:
+        return []
+    result: list[dict[str, Any]] = []
+    for field in ('requirements', 'constraints', 'success_conditions'):
+        for item in getattr(contract, field, []) or []:
+            evidence = getattr(item, 'evidence', None) or []
+            latest = evidence[-1] if evidence else None
+            result.append(
+                {
+                    'id': str(getattr(item, 'id', '') or ''),
+                    'assertion': (
+                        f'[{str(getattr(item, "status", "unknown") or "unknown")}] '
+                        f'{str(getattr(item, "text", "") or "")}'
+                    ),
+                    'evidence': str(getattr(latest, 'summary', '') or ''),
+                }
+            )
+    return result
+
+
+def _task_state_status_line(task_state: object) -> str:
+    from backend.task_state import TaskStateService
+
+    status, unresolved, actionable, blocked = TaskStateService.recorded_status(
+        task_state  # type: ignore[arg-type]
+    )
+    details: list[str] = []
+    if unresolved:
+        details.append('unresolved contract: ' + ', '.join(unresolved))
+    if actionable:
+        details.append('open tasks: ' + ', '.join(actionable))
+    if blocked:
+        details.append('blocked tasks: ' + ', '.join(blocked))
+    suffix = f' — {"; ".join(details)}' if details else ''
+    return f'- Recorded overall status: {status.upper()}{suffix}'
+
+
+def _resolve_task_plan(
+    snapshot: dict[str, Any] | None,
+) -> dict[str, Any] | list[Any] | None:
     if isinstance(snapshot, dict):
         raw_plan = snapshot.get('task_plan')
         if isinstance(raw_plan, dict) and raw_plan.get('tasks'):

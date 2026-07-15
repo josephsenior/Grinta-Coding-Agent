@@ -165,6 +165,7 @@ def _routing_memory_tool_placeholders(
     criteria_on: bool = True,
     semantic_recall_on: bool = False,
 ) -> dict[str, str]:
+    _ = (working_memory_on, criteria_on)
     ambiguous_intent_instruction = 'If intent is still ambiguous after inspection, see `<ASK_USER_TOOL>` rather than guessing.'
     if semantic_recall_on:
         memory_and_context_section = (
@@ -176,52 +177,29 @@ def _routing_memory_tool_placeholders(
         )
     else:
         memory_and_context_section = ''
-    if criteria_on and tracker_on:
+    if tracker_on:
         post_condensation_retrieval = (
             'Resume from the summary and `<EXECUTION_CONTRACT>`; '
-            'call `view` on either tool only when you need the full markdown list.'
-        )
-    elif criteria_on:
-        post_condensation_retrieval = (
-            'Resume from the summary and `<EXECUTION_CONTRACT>`; '
-            'call `acceptance_criteria(view)` only when you need the full list.'
-        )
-    elif tracker_on:
-        post_condensation_retrieval = (
-            'Resume from the summary and `<EXECUTION_CONTRACT>`; '
-            'call `task_tracker(view)` only when you need the full markdown plan.'
+            'call `task_state(review)` only when you need the full durable state.'
         )
     else:
         post_condensation_retrieval = (
             'Resume from the summary and your most recent verified observations.'
         )
-    if criteria_on or tracker_on:
-        persisted: list[str] = []
-        if criteria_on:
-            persisted.append('acceptance criteria')
-        if tracker_on:
-            persisted.append('task plans')
+    if tracker_on:
         surviving_state_facts = (
-            f'Persisted {" and ".join(persisted)} survive condensation and are '
+            'The persisted task-state objective, contract conditions, and plan survive '
+            'condensation and are '
             're-injected automatically; the visible conversation, current files, and fresh '
             'tool observations remain your live grounding.'
         )
     else:
         surviving_state_facts = 'Only the visible conversation, current files, and tool observations are available.'
-    if criteria_on and tracker_on:
+    if tracker_on:
         remaining_work_source_of_truth = (
-            '`<EXECUTION_CONTRACT>` shows live task ids/status and criterion ids each turn; '
-            'criteria define done, tasks define remaining milestones.'
-        )
-    elif criteria_on:
-        remaining_work_source_of_truth = (
-            '`<EXECUTION_CONTRACT>` shows live criterion ids each turn — '
-            'trust those for what must be true when done.'
-        )
-    elif tracker_on:
-        remaining_work_source_of_truth = (
-            '`<EXECUTION_CONTRACT>` shows live task ids/status each turn — '
-            'trust those for what milestones remain.'
+            '`<EXECUTION_CONTRACT>` shows the recorded overall objective, status, '
+            'contract conditions, and live task ids each turn. Use it as durable '
+            'evidence without treating a milestone as a replacement objective.'
         )
     else:
         remaining_work_source_of_truth = (
