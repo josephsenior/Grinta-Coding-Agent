@@ -540,6 +540,49 @@ class TestBuildCondensationPrompt:
         assert 'cannot fit in one session' in prompt
         assert 'preserve the next actionable step' in prompt
 
+    def test_durable_task_state_is_read_only_input_not_summary_content(self):
+        prompt = self.condenser._build_condensation_prompt(
+            _summary_event(0, '## USER GOAL\nStale duplicate objective'),
+            [],
+            durable_task_state_context=(
+                '- Recorded overall objective: Build the complete compiler\n'
+                '- Recorded overall status: ACTIVE'
+            ),
+        )
+
+        assert '<DURABLE_TASK_STATE>' in prompt
+        assert 'Build the complete compiler' in prompt
+        assert 'freshly injected into every subsequent agent prompt' in prompt
+        assert 'Do not restate, summarize, revise' in prompt
+        assert 'omit the duplicate from the new memory' in prompt
+        assert 'without reproducing the durable task plan' in prompt
+
+    def test_missing_durable_task_state_keeps_goal_as_fallback(self):
+        prompt = self.condenser._build_condensation_prompt(
+            _summary_event(0), [], durable_task_state_context=''
+        )
+
+        assert '<DURABLE_TASK_STATE>' not in prompt
+        assert 'No durable task state is available' in prompt
+        assert 'Preserve the user objective' in prompt
+
+    def test_legacy_prompt_omits_goal_output_when_task_state_is_durable(self):
+        with patch.object(
+            self.condenser,
+            '_durable_task_state_context',
+            return_value='- Recorded overall objective: Build everything',
+        ):
+            prompt = self.condenser._build_legacy_condensation_prompt(
+                _summary_event(0, '## USER GOAL\nOld duplicate'), []
+            )
+
+        assert '<DURABLE_TASK_STATE>' in prompt
+        assert 'Do not emit a ## USER GOAL section' in prompt
+        assert 'PREVIOUS GOAL SYNTHESIS' not in prompt
+        assert (
+            'resume from this summary together with the separately injected' in prompt
+        )
+
 
 # ---------------------------------------------------------------------------
 # _digest_events — event pre-digestion

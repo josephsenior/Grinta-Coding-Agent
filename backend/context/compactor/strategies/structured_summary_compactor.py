@@ -35,12 +35,15 @@ DEFAULT_SUMMARY_BUDGET_TOKENS = 12_000
 # Nudge appended on a retry when the previous output was too short.
 _REPAIR_NUDGE = (
     '\n\nYour previous summary was too short to preserve the session context. '
-    'Produce a complete, detailed compaction covering the full arc: a synthesized '
-    'USER GOAL (from goal context, task tracker, and acceptance criteria — never '
-    'verbatim user quotes), what was accomplished, decisions and their rationale, '
-    'current blockers, remaining work, and failed '
+    'Produce a complete, detailed compaction covering the full operational arc: '
+    'what was accomplished, decisions and their rationale, current blockers, '
+    'remaining work, and failed '
     'approaches to avoid. Each required section must contain multiple substantive '
-    'bullets — not stubs or placeholders. Be precise, exhaustive, and complete.'
+    'bullets — not stubs or placeholders. When <DURABLE_TASK_STATE> is present, '
+    'treat it as external authoritative context and do not copy its objective, plan, '
+    'conditions, or statuses into the summary. When it is absent, preserve a compact '
+    'USER GOAL fallback without verbatim user quotes. Be precise, exhaustive, and '
+    'complete.'
 )
 
 
@@ -119,12 +122,16 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         if not pruned_events:
             return self._create_compaction_result(pruned_events, '')
 
+        durable_task_state_context = self._durable_task_state_context()
         previous_goal = ''
-        if summary_event and summary_event.message:
+        if not durable_task_state_context and summary_event and summary_event.message:
             previous_goal = self._extract_section(summary_event.message, '## USER GOAL')
 
         prompt = self._build_condensation_prompt(
-            summary_event, pruned_events, char_limit=self._get_summary_char_limit()
+            summary_event,
+            pruned_events,
+            char_limit=self._get_summary_char_limit(),
+            durable_task_state_context=durable_task_state_context,
         )
 
         prose = await self._get_llm_prose_summary(prompt)
@@ -148,8 +155,41 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             raise RuntimeError('LLM compaction returned empty summary')
 
         summary_text = self._sanitize_summary_prose(prose)
-        self._check_goal_regression(summary_text, previous_goal)
+        if not durable_task_state_context:
+            self._check_goal_regression(summary_text, previous_goal)
         return self._create_compaction_result(pruned_events, summary_text)
+
+    def _durable_task_state_context(self) -> str:
+        """Render authoritative task state for compaction input, never output.
+
+        Prompt assembly independently reloads this state after compaction.  The
+        compactor only needs a read-only view so it can interpret operational
+        evidence without creating a second, potentially stale copy of the task
+        contract in its prose summary.
+        """
+        pipeline_state = getattr(self, '_pipeline_state', None)
+        if pipeline_state is None:
+            return ''
+        try:
+            from backend.context.render.execution_contract import (
+                build_execution_contract,
+            )
+            from backend.task_state import TaskStateStore
+
+            task_state = TaskStateStore().load()
+            if task_state.contract is None and task_state.plan is None:
+                return ''
+            return build_execution_contract(
+                state=pipeline_state,
+                only_open_tasks=False,
+                include_goal_header=False,
+                show_empty_states=True,
+            ).strip()
+        except Exception:
+            logger.debug(
+                'Failed to load durable task state for compaction', exc_info=True
+            )
+            return ''
 
     def _sanitize_summary_prose(self, prose: str) -> str:
         """Strip verbatim user echoes from USER GOAL as a post-LLM safety net."""
@@ -480,6 +520,7 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         pruned_events: list,
         *,
         char_limit: int = 48000,
+        durable_task_state_context: str | None = None,
     ) -> str:
         """Give the agent model chronological evidence for its own continuity.
 
@@ -488,6 +529,54 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         the ordered evidence and produces a reconciled working memory.
         """
         previous_summary = summary_event.message or '(no previous working memory)'
+        if durable_task_state_context is None:
+            durable_task_state_context = self._durable_task_state_context()
+        durable_task_state_context = durable_task_state_context.strip()
+        if durable_task_state_context:
+            task_state_block = (
+                '<DURABLE_TASK_STATE>\n'
+                f'{durable_task_state_context}\n'
+                '</DURABLE_TASK_STATE>\n\n'
+            )
+            task_state_policy = (
+                '<DURABLE_TASK_STATE> is the authoritative task contract. It '
+                'survives compaction and is freshly injected into every subsequent '
+                'agent prompt. Use it only to interpret which operational evidence '
+                'matters. Do not restate, summarize, revise, or infer replacements '
+                'for its objective, plan, conditions, or statuses in the final '
+                'working memory. If the previous working memory duplicates that '
+                'state, omit the duplicate from the new memory. A completed '
+                'subproblem remains a milestone; it never replaces the durable '
+                'objective.\n\n'
+            )
+            intent_policy = (
+                'Preserve operational user directives and constraints that are not '
+                'already represented in <DURABLE_TASK_STATE>, verified facts and '
+            )
+            completion_policy = (
+                'Do not infer permission to stop, narrow scope, or hand unfinished '
+                'requested work back to the user from elapsed iterations, context '
+                'size, session duration, perceived difficulty, or statements such '
+                'as "this cannot fit in one session." Preserve the concrete next '
+                'operational step without reproducing the durable task plan.\n\n'
+            )
+        else:
+            task_state_block = ''
+            task_state_policy = (
+                'No durable task state is available. Preserve the user objective, '
+                'acceptance conditions, and constraints in this working memory as a '
+                'fallback source of continuity. Record completed subproblems as '
+                'milestones, never as replacement objectives.\n\n'
+            )
+            intent_policy = "Preserve the user's current intent and constraints, verified facts and "
+            completion_policy = (
+                'Preserve the completion boundary exactly. Do not infer permission '
+                'to stop, narrow scope, or hand unfinished requested work back to '
+                'the user from elapsed iterations, context size, session duration, '
+                'perceived difficulty, or statements such as "this cannot fit in '
+                'one session." If work remains, describe it as remaining work and '
+                'preserve the next actionable step.\n\n'
+            )
         evidence: list[str] = []
         for event in pruned_events:
             evidence.append(
@@ -508,6 +597,8 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             'the working memory you will need after older events are removed. '
             'This is continuity of your own reasoning, not a generic transcript '
             'summary.\n\n'
+            f'{task_state_block}'
+            f'{task_state_policy}'
             'Use the chronological evidence directly. The previous working memory '
             'is useful context but may be stale or mistaken; later direct evidence '
             'wins. Internally reconstruct the timeline, reconcile contradictions, '
@@ -515,21 +606,14 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             'test status, and confusion between attempted, implemented, and '
             'verified work. Output only the final reconciled working memory.\n\n'
             'Preserve what is semantically useful for continuing this particular '
-            "task: the user's current intent and constraints, verified facts and "
+            f'task: {intent_policy}'
             'their evidence, current implementation state, unresolved uncertainty, '
             'important decisions, failed approaches worth avoiding, and concrete '
             'next work. Choose the organization that best fits the task. Do not '
             'invent completion, rationale, or future actions. Clearly distinguish '
             'observation from inference. Keep exact identifiers, paths, commands, '
             'errors, and event references when their precision matters.\n\n'
-            'Preserve the completion boundary exactly: an explicit user objective '
-            'and its acceptance conditions remain binding until the user changes '
-            'them. Record completed subproblems as milestones, never as replacement '
-            'objectives. Do not infer permission to stop, narrow scope, or hand '
-            'unfinished requested work back to the user from elapsed iterations, '
-            'context size, session duration, perceived difficulty, or statements '
-            'such as "this cannot fit in one session." If work remains, describe it '
-            'as remaining work and preserve the next actionable step.\n\n'
+            f'{completion_policy}'
             f'The final working memory must not exceed {char_limit} characters.\n\n'
             '<PREVIOUS_WORKING_MEMORY>\n'
             f'{previous_summary}\n'
@@ -553,19 +637,20 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         for detailed context. The prompt enforces a priority-ordered structure
         with a hard character budget.
 
-        The previous ``## USER GOAL`` section from the prior summary is injected
-        so the LLM can refine it based on the new event digest rather than
-        re-deriving from scratch.
+        Durable task state is supplied as read-only input and deliberately kept
+        out of the output.  A ``## USER GOAL`` summary section is required only
+        when that independent state is unavailable.
         """
+        durable_task_state_context = self._durable_task_state_context()
         previous_goal_section = ''
-        if summary_event and summary_event.message:
+        if not durable_task_state_context and summary_event and summary_event.message:
             prev_goal = self._extract_section(summary_event.message, '## USER GOAL')
             if prev_goal:
                 previous_goal_section = f'### PREVIOUS GOAL SYNTHESIS\n{prev_goal}\n\n'
 
         goal_context_block = ''
         pipeline_state = getattr(self, '_pipeline_state', None)
-        if pipeline_state is not None:
+        if not durable_task_state_context and pipeline_state is not None:
             try:
                 from backend.context.context_pipeline.goal_context import (
                     build_goal_context_for_compaction,
@@ -581,6 +666,63 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
                     'Failed to build goal context for 5b prompt', exc_info=True
                 )
 
+        if durable_task_state_context:
+            durable_task_state_block = (
+                '<DURABLE_TASK_STATE>\n'
+                f'{durable_task_state_context}\n'
+                '</DURABLE_TASK_STATE>\n\n'
+            )
+            task_state_source_description = (
+                '- <DURABLE_TASK_STATE>: authoritative task state that survives '
+                'compaction and will be freshly injected into later agent prompts; '
+                'use it to interpret evidence, but do not reproduce it in the summary\n'
+            )
+            goal_output_instruction = (
+                'Do not emit a ## USER GOAL section or otherwise restate the '
+                'durable objective, plan, conditions, or statuses. If the previous '
+                'summary contains such a section, omit it from the new summary.\n\n'
+            )
+            completion_instruction = (
+                '- Treat <DURABLE_TASK_STATE> as binding and do not reinterpret it. '
+                'A completed subproblem is a milestone, not a replacement objective. '
+                'Never infer permission to stop or narrow scope from elapsed '
+                'iterations, context size, session duration, perceived difficulty, '
+                'or whether the remaining work seems too large for one session.\n\n'
+            )
+            verbatim_instruction = (
+                '- Do not copy technical constraints or other task-state fields into '
+                'the summary; preserve only operational details absent from the '
+                'durable state.\n'
+            )
+        else:
+            durable_task_state_block = ''
+            task_state_source_description = (
+                '- <GOAL CONTEXT> (when present): synthesized objective, active '
+                'scope, and acceptance gates — use it as the fallback source of '
+                'truth for USER GOAL\n'
+            )
+            goal_output_instruction = (
+                '0. ## USER GOAL (Highest Priority — Never Drop)\n'
+                'Reference <GOAL CONTEXT> as the source of truth. Write a compact '
+                'synthesis (objective, active scope, acceptance gates, constraints, '
+                'pivots) without re-enumerating every task or criterion already '
+                'listed there. Do NOT quote or paste user messages.\n'
+                f'Hard cap: entire ## USER GOAL section must stay under '
+                f'{DEFAULT_USER_GOAL_SECTION_MAX_CHARS} characters. Compress pivots '
+                'first.\n\n'
+            )
+            completion_instruction = (
+                '- Preserve the user-defined completion boundary. A completed '
+                'subproblem is a milestone, not a replacement objective. Never infer '
+                'permission to stop or narrow scope from elapsed iterations, context '
+                'size, session duration, perceived difficulty, or whether the '
+                'remaining work seems too large for one session.\n\n'
+            )
+            verbatim_instruction = (
+                '- Technical constraints (paths, thresholds, must-not-touch files) '
+                'may be stated verbatim in USER GOAL; never quote full user messages.\n'
+            )
+
         verification_block = self._latest_verification_block(pipeline_state)
 
         base_prompt = (
@@ -588,12 +730,12 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             'agent. This summary is critical: it lets the agent resume work '
             'WITHOUT re-reading the full conversation history once it has been '
             'compacted for length.\n\n'
+            f'{durable_task_state_block}'
             f'{goal_context_block}'
             f'{verification_block}'
             f'{previous_goal_section}'
             'You will be given:\n'
-            '- <GOAL CONTEXT> (when present): synthesized objective, active scope, '
-            'and acceptance gates — use this as the source of truth for USER GOAL\n'
+            f'{task_state_source_description}'
             '- <PREVIOUS SUMMARY>: the prior compaction summary (preserve its '
             'narrative arc)\n'
             '- <EVENT DIGEST>: a compact grouped breakdown of what happened '
@@ -618,13 +760,7 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             '### PRIORITY ORDER & STRUCTURE\n'
             'Format your response using the following headers in this exact '
             'order. If budget runs tight, compress from the bottom up:\n\n'
-            '0. ## USER GOAL (Highest Priority — Never Drop)\n'
-            'Reference <GOAL CONTEXT> as the source of truth. Write a compact '
-            'synthesis (objective, active scope, acceptance gates, constraints, '
-            'pivots) without re-enumerating every task or criterion already listed '
-            'there. Do NOT quote or paste user messages.\n'
-            f'Hard cap: entire ## USER GOAL section must stay under '
-            f'{DEFAULT_USER_GOAL_SECTION_MAX_CHARS} characters. Compress pivots first.\n\n'
+            f'{goal_output_instruction}'
         )
 
         base_prompt += (
@@ -656,8 +792,7 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             '### ADHERENCE TO DETAIL\n'
             '- Preserve VERBATIM only for: exact file paths, test names, exact error '
             'messages, function signatures, key variable/data values.\n'
-            '- Technical constraints (paths, thresholds, must-not-touch files) may be '
-            'stated verbatim in USER GOAL; never quote full user messages.\n'
+            f'{verbatim_instruction}'
             '- Never mark a test as passing if it only checks file existence '
             'or symbol presence in a header. A test passes only if it '
             'executes the actual behavior the spec requires and produces a '
@@ -665,13 +800,10 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             '- If a previous summary exists, you MUST preserve its key '
             'narrative. Do not replace the full arc with only recent bug '
             'fixes or incremental work.\n'
-            '- Preserve the user-defined completion boundary. A completed '
-            'subproblem is a milestone, not a replacement objective. Never infer '
-            'permission to stop or narrow scope from elapsed iterations, context '
-            'size, session duration, perceived difficulty, or whether the remaining '
-            'work seems too large for one session.\n\n'
+            f'{completion_instruction}'
             'Summarize the session now, ensuring a fresh agent can seamlessly '
-            'resume work using only this state.\n'
+            'resume from this summary together with the separately injected durable '
+            'task state when present.\n'
         )
 
         # Add previous summary
