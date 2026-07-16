@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+from subprocess import Popen
 from typing import TYPE_CHECKING
 
 from backend.core.logging.logger import app_logger as logger
@@ -187,7 +188,7 @@ class SimpleBashSession(BaseShellSession):
             if process is not None and process.pid:
                 self._cancellation.unregister_process(process.pid)
 
-    def _start_subprocess(self, command: str) -> subprocess.Popen:
+    def _start_subprocess(self, command: str) -> Popen:
         """Initialize and register the subprocess.
 
         Note: stdout/stderr are kept in **binary** mode here so that
@@ -205,7 +206,7 @@ class SimpleBashSession(BaseShellSession):
         )
 
         argv = self._wrap_subprocess_argv([bash_exe, '-c', command], cwd=self._cwd)
-        process = subprocess.Popen(
+        process = Popen(
             argv,
             cwd=self._cwd,
             stdout=subprocess.PIPE,

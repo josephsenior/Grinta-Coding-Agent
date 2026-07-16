@@ -67,7 +67,7 @@ class TestSimpleBashSession:
         assert 'Interactive input not supported' in result.content
 
     @patch('backend.execution.utils.shell.simple_bash.bounded_communicate')
-    @patch('subprocess.Popen')
+    @patch('backend.execution.utils.shell.simple_bash.Popen')
     def test_execute_command_success(
         self, mock_popen: MagicMock, mock_bc: MagicMock, session: SimpleBashSession
     ) -> None:
@@ -90,7 +90,7 @@ class TestSimpleBashSession:
         assert result.content == 'stdout_val'
 
     @patch('backend.execution.utils.shell.simple_bash.bounded_communicate')
-    @patch('subprocess.Popen')
+    @patch('backend.execution.utils.shell.simple_bash.Popen')
     def test_execute_command_with_cd(
         self, mock_popen: MagicMock, mock_bc: MagicMock, session: SimpleBashSession
     ) -> None:
@@ -115,7 +115,7 @@ class TestSimpleBashSession:
         assert mock_popen.call_count >= 1
 
     @patch('backend.execution.utils.shell.simple_bash.bounded_communicate')
-    @patch('subprocess.Popen')
+    @patch('backend.execution.utils.shell.simple_bash.Popen')
     def test_execute_background_failure_fallback(
         self, mock_popen: MagicMock, mock_bc: MagicMock, session: SimpleBashSession
     ) -> None:
@@ -148,7 +148,7 @@ class TestSimpleBashSession:
         assert result.content == 'stdout'
 
     @patch('backend.execution.utils.shell.simple_bash.bounded_communicate')
-    @patch('subprocess.Popen')
+    @patch('backend.execution.utils.shell.simple_bash.Popen')
     def test_execute_background_registration_exception(
         self, mock_popen: MagicMock, mock_bc: MagicMock, session: SimpleBashSession
     ) -> None:
@@ -183,7 +183,7 @@ class TestSimpleBashSession:
             session._run_command('ls')
 
     @patch('backend.execution.utils.shell.simple_bash.bounded_communicate')
-    @patch('subprocess.Popen')
+    @patch('backend.execution.utils.shell.simple_bash.Popen')
     def test_handle_subprocess_timeout(
         self, mock_popen: MagicMock, mock_bc: MagicMock, session: SimpleBashSession
     ) -> None:
