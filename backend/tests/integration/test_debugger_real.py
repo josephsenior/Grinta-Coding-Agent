@@ -10,6 +10,7 @@ in `logs/workspaces/.../app.log` (PENDING_ACTION_TIMEOUT_CLEARED at 600 s).
 
 from __future__ import annotations
 
+import os
 import sys
 import textwrap
 import time
@@ -26,6 +27,10 @@ from backend.ledger.observation.debugger import DebuggerObservation  # noqa: E40
 
 
 @pytest.mark.integration
+@pytest.mark.skipif(
+    os.getenv('GITHUB_ACTIONS') == 'true',
+    reason='debugpy cold start is flaky/restricted in GitHub Actions CI environment',
+)
 def test_real_debugpy_cold_start_and_stop(tmp_path, monkeypatch) -> None:
     from backend.core import constants
 
