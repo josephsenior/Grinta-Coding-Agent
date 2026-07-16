@@ -160,7 +160,7 @@ def test_watchdog_detects_blocked_loop(capture_app_log):
         deadline_seen = time.monotonic() + 3.0
         while not wd._seen_tick and time.monotonic() < deadline_seen:
             time.sleep(0.01)
-        assert wd._seen_tick, "heartbeat was never recorded by the loop"
+        assert wd._seen_tick, 'heartbeat was never recorded by the loop'
         # Block the loop thread for ~2.0s with a synchronous sleep.
         loop.call_soon_threadsafe(lambda: time.sleep(2.0))
         # Within the block window, a stall must be reported.

@@ -34,6 +34,7 @@ from backend.integrations.mcp.config_bus import (
 @pytest.fixture(autouse=True)
 def _reset() -> Any:
     from backend.cli.tui.services import settings_watcher as sw
+
     with sw._self_write_lock:
         sw._last_self_write = 0.0
     reset_mcp_config_bus()
