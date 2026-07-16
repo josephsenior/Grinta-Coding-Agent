@@ -20,7 +20,7 @@ $wheelDir = if ($env:WHEEL_DIR) { $env:WHEEL_DIR } else { '.\dist' }
 
 $wheels = @()
 if (Test-Path $wheelDir) {
-    $wheels = Get-ChildItem -Path $wheelDir -Filter 'grinta_ai-*.whl' -ErrorAction SilentlyContinue
+    $wheels = Get-ChildItem -Path $wheelDir -Filter 'grinta-*.whl' -ErrorAction SilentlyContinue
 }
 
 if ($wheels.Count -gt 0) {

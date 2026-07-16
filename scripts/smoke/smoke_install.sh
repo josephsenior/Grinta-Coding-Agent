@@ -15,7 +15,7 @@ EXTRAS="${*:-}"
 WHEEL_DIR="${WHEEL_DIR:-./dist}"
 
 if [ -d "$WHEEL_DIR" ] && ls "$WHEEL_DIR"/*.whl >/dev/null 2>&1; then
-    PKG_SPEC="$(ls "$WHEEL_DIR"/grinta_ai-*.whl | head -n1)"
+    PKG_SPEC="$(ls "$WHEEL_DIR"/grinta-*.whl | head -n1)"
     echo "==> Using local wheel: $PKG_SPEC"
 else
     PKG_SPEC="grinta"
