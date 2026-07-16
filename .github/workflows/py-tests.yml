@@ -188,7 +188,7 @@ jobs:
           mapfile -t tests < <(find backend/tests/unit/execution -name 'test_*.py' | sort)
           half=$((${#tests[@]} / 2))
           for attempt in 1 2 3; do
-            if PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q \
+            if PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -v \
               --cov=backend --cov-fail-under=0 \
               "${tests[@]:$half}"; then
               exit 0
