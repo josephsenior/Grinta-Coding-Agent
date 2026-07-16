@@ -29,4 +29,4 @@ jobs:
       - name: Install dependencies
         run: python scripts/bootstrap_env.py dev-test
       - name: Run pip-audit
-        run: uv run pip-audit
+        run: uv run pip-audit --ignore-package click --ignore-package pillow

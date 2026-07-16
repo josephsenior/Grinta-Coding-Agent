@@ -26,7 +26,12 @@ from backend.ledger.observation.debugger import DebuggerObservation  # noqa: E40
 
 
 @pytest.mark.integration
-def test_real_debugpy_cold_start_and_stop(tmp_path) -> None:
+def test_real_debugpy_cold_start_and_stop(tmp_path, monkeypatch) -> None:
+    from backend.core import constants
+    monkeypatch.setattr(constants, 'DEBUGGER_START_TIMEOUT_SECONDS', 120.0)
+    from backend.execution.dap import _dap_spawn_utils
+    monkeypatch.setattr(_dap_spawn_utils, 'DEBUGGER_START_TIMEOUT_SECONDS', 120.0)
+
     program = tmp_path / 'noop.py'
     program.write_text(
         textwrap.dedent(

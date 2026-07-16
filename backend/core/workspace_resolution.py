@@ -280,7 +280,7 @@ def infer_workspace_from_uv_style_launch(install_root: Path) -> Path | None:
     """
     if sys.platform.startswith('linux'):
         return _infer_workspace_from_uv_style_launch_linux(install_root)
-    return None
+    return None  # type: ignore[unreachable]
 
 
 def _infer_workspace_from_uv_style_launch_linux(install_root: Path) -> Path | None:

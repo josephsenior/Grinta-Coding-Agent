@@ -156,11 +156,15 @@ def test_watchdog_detects_blocked_loop(capture_app_log):
     wd = lw._LoopWatchdog(interval=0.05, stall_seconds=0.2, suspend_seconds=1000.0)
     try:
         wd.start(loop)
-        time.sleep(0.2)  # let the first heartbeat confirm the loop is live
-        # Block the loop thread for ~0.9s with a synchronous sleep.
-        loop.call_soon_threadsafe(lambda: time.sleep(0.9))
+        # Wait for the first heartbeat to confirm the loop is live
+        deadline_seen = time.monotonic() + 3.0
+        while not wd._seen_tick and time.monotonic() < deadline_seen:
+            time.sleep(0.01)
+        assert wd._seen_tick, "heartbeat was never recorded by the loop"
+        # Block the loop thread for ~2.0s with a synchronous sleep.
+        loop.call_soon_threadsafe(lambda: time.sleep(2.0))
         # Within the block window, a stall must be reported.
-        deadline = time.monotonic() + 1.5
+        deadline = time.monotonic() + 3.5
         while time.monotonic() < deadline:
             if 'EVENT_LOOP_STALL' in capture_app_log.msg_types():
                 break

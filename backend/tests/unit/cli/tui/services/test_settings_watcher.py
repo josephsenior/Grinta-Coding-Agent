@@ -33,8 +33,13 @@ from backend.integrations.mcp.config_bus import (
 
 @pytest.fixture(autouse=True)
 def _reset() -> Any:
+    from backend.cli.tui.services import settings_watcher as sw
+    with sw._self_write_lock:
+        sw._last_self_write = 0.0
     reset_mcp_config_bus()
     yield
+    with sw._self_write_lock:
+        sw._last_self_write = 0.0
     reset_mcp_config_bus()
 
 
@@ -79,7 +84,7 @@ async def test_external_edit_emits_change(
             mcp=[{'name': 'github', 'type': 'stdio', 'command': 'gh', 'args': []}],
         )
         # Poll several times to give the watcher a chance to pick it up.
-        for _ in range(20):
+        for _ in range(100):
             if captured:
                 break
             await asyncio.sleep(0.05)

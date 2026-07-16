@@ -56,7 +56,12 @@ jobs:
           uv run pytest
           backend/tests/unit/cli/frontend/
           backend/tests/unit/cli/tui/
-          backend/tests/unit/orchestration/test_session_orchestrator.py
+          backend/tests/unit/orchestration/test_session_orchestrator_blocked.py
+          backend/tests/unit/orchestration/test_session_orchestrator_events.py
+          backend/tests/unit/orchestration/test_session_orchestrator_misc.py
+          backend/tests/unit/orchestration/test_session_orchestrator_properties.py
+          backend/tests/unit/orchestration/test_session_orchestrator_state.py
+          backend/tests/unit/orchestration/test_session_orchestrator_steps.py
           backend/tests/unit/orchestration/services/test_action_execution_service.py
           -k "wait_for_agent_idle or step_from_threadpool_uses_main_loop or parallel_batch_failure_requeues_failed_actions_for_serial_retry or preserves_recovery_round_after_real_action or recovers_first_round_then_pauses"
           -q --tb=short
