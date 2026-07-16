@@ -22,8 +22,9 @@ from backend.execution.utils.tool_registry import (
 def _clear_windows_shell_cache() -> None:
     _configured_windows_shell.cache_clear()
 
-
-    def test_defaults_to_powershell_from_settings(self, monkeypatch: pytest.MonkeyPatch):
+    def test_defaults_to_powershell_from_settings(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
         from backend.core.os_capabilities import OS_CAPS, override_os_capabilities
 
         _clear_windows_shell_cache()
@@ -33,9 +34,7 @@ def _clear_windows_shell_cache() -> None:
                 has_bash=True, has_powershell=True
             )
 
-    def test_bash_via_settings_env_override(
-        self, monkeypatch: pytest.MonkeyPatch
-    ):
+    def test_bash_via_settings_env_override(self, monkeypatch: pytest.MonkeyPatch):
         from backend.core.os_capabilities import OS_CAPS, override_os_capabilities
 
         _clear_windows_shell_cache()

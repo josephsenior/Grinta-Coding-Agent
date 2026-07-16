@@ -138,7 +138,6 @@ def _handle_terminal_tool(arguments: Mapping[str, Any]) -> Action:
     validate_security_risk(arguments, TERMINAL_TOOL_NAME)
 
     if action_type == 'run':
-
         command = require_tool_argument(arguments, 'command', TERMINAL_TOOL_NAME)
         raw_is_input = arguments.get('is_input', False)
         is_input = parse_bool_argument(raw_is_input)
@@ -147,7 +146,12 @@ def _handle_terminal_tool(arguments: Mapping[str, Any]) -> Action:
 
         # Logic from previous cmd run handler: checking for drive letter missing space
         glue_hint = ''
-        if command and len(command) > 2 and command[0].isalpha() and command[1:3] == ':\\':
+        if (
+            command
+            and len(command) > 2
+            and command[0].isalpha()
+            and command[1:3] == ':\\'
+        ):
             glue_hint = 'Windows drive glued in command. Make sure to use spaces.'
 
         action: Action = CmdRunAction(

@@ -280,7 +280,7 @@ def test_multiedit_commits_no_changes_when_one_operation_fails(monkeypatch, tmp_
     exc = exc_info.value
     assert 'replace_string failed: old_string not found exactly.' in str(exc)
     assert 'File: b.py' in str(exc)
-    assert 'Op index: 1 (2/2)' in str(exc)
+    assert 'Operation: 2/2' in str(exc)
     assert exc.context['error_code'] == 'OLD_STRING_NOT_FOUND'
     assert 'missing' not in str(exc)
 

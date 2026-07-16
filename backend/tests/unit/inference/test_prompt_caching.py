@@ -87,9 +87,7 @@ def test_opencode_hy3_uses_implicit_prefix_cache() -> None:
         caching_prompt=True,
         prompt_cache_variant='stable-prefix',
     )
-    assert out['prompt_cache_key'] == (
-        'grinta:opencode:hy3-free:stable-prefix'
-    )
+    assert out['prompt_cache_key'] == ('grinta:opencode:hy3-free:stable-prefix')
 
 
 def test_generic_cache_capability_uses_implicit_mode_for_openai_wire() -> None:

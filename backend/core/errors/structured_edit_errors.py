@@ -63,7 +63,11 @@ def compact_syntax_detail(message: str) -> str:
     )
     if location:
         column = location.group('column')
-        return f'Python syntax error (column {column}).' if column else 'Python syntax error.'
+        return (
+            f'Python syntax error (column {column}).'
+            if column
+            else 'Python syntax error.'
+        )
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     for line in lines:
         if line.startswith(('SyntaxError:', 'IndentationError:', 'TabError:')):

@@ -60,7 +60,6 @@ def test_try_compile_user_regex_valid_and_invalid() -> None:
     assert isinstance(bad_err, str)
 
 
-
 @pytest.mark.asyncio
 async def test_runtime_executor_hard_kill(tmp_path: Path) -> None:
     ex = aes.RuntimeExecutor([], str(tmp_path), 'u', 1, False)

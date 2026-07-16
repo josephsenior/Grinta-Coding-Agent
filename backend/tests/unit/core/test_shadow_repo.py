@@ -308,7 +308,9 @@ class TestRestore:
         (ws / 'lib' / 'utils.py').unlink()
 
         repo.restore(sha)
-        assert (ws / 'lib' / 'utils.py').read_text(encoding='utf-8') == 'def util(): pass'
+        assert (ws / 'lib' / 'utils.py').read_text(
+            encoding='utf-8'
+        ) == 'def util(): pass'
 
     def test_restore_invalidates_stat_cache(self, tmp_path):
         ws = _make_workspace(tmp_path)

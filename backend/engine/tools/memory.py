@@ -134,4 +134,8 @@ def create_search_history_tool() -> ChatCompletionToolParam:
     )
 
 
-__all__ = ['create_memory_tool', 'create_memory_manager_tool', 'create_search_history_tool']
+__all__ = [
+    'create_memory_tool',
+    'create_memory_manager_tool',
+    'create_search_history_tool',
+]

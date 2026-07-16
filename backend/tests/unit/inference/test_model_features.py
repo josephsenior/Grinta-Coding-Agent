@@ -136,7 +136,13 @@ class TestPatternSanity:
 
     @pytest.mark.parametrize(
         'model',
-        ['gpt-5.5', 'gpt-5.6-terra', 'gemini-3.1-pro-preview', 'gemini-2.5-pro', 'deepseek-chat'],
+        [
+            'gpt-5.5',
+            'gpt-5.6-terra',
+            'gemini-3.1-pro-preview',
+            'gemini-2.5-pro',
+            'deepseek-chat',
+        ],
     )
     def test_reasoning_effort_models(self, model):
         assert model_matches(model, REASONING_EFFORT_PATTERNS)

@@ -64,7 +64,11 @@ def render_terminal_output(text: str, *, language: str = 'text') -> Any:
 
     from backend.cli.theme.syntax_theme import grinta_syntax_kwargs
 
-    lexer = language if language and language != 'text' else _guess_terminal_output_lexer(body)
+    lexer = (
+        language
+        if language and language != 'text'
+        else _guess_terminal_output_lexer(body)
+    )
     return Syntax(
         body,
         lexer,

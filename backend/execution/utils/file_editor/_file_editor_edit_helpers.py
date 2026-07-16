@@ -126,9 +126,17 @@ def _replace_all_with_boundary_check(content: str, old: str, new: str) -> str:
 
         # Guard: skip matches that are substrings of an identifier.
         # An "identifier continuation" character is alnum or '_'.
-        if old_starts_with_id and start > 0 and (content[start - 1].isalnum() or content[start - 1] == '_'):
+        if (
+            old_starts_with_id
+            and start > 0
+            and (content[start - 1].isalnum() or content[start - 1] == '_')
+        ):
             continue
-        if old_ends_with_id and end < len(content) and (content[end].isalnum() or content[end] == '_'):
+        if (
+            old_ends_with_id
+            and end < len(content)
+            and (content[end].isalnum() or content[end] == '_')
+        ):
             continue
 
         result_parts.append(content[last_end:start])

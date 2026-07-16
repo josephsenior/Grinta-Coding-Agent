@@ -20,7 +20,9 @@ def test_workspace_trust_key_is_stable(tmp_path: Path) -> None:
     assert workspace_trust_key(workspace) == workspace_trust_key(workspace)
 
 
-def test_record_and_query_workspace_visit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_record_and_query_workspace_visit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     trust_file = tmp_path / 'workspace_trust.json'
     monkeypatch.setattr('backend.core.workspace_trust._TRUST_FILE', trust_file)
 

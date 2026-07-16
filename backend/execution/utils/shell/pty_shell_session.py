@@ -305,6 +305,7 @@ class PtyInteractiveShellSession(BaseShellSession):
             return
         try:
             from backend.core.constants import CMD_OUTPUT_PS1_BEGIN, CMD_OUTPUT_PS1_END
+
             prompt_fn = (
                 'function prompt { '
                 '  $ok = $?; '

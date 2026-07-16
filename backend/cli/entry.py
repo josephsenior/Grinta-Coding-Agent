@@ -359,13 +359,16 @@ def _start_tokenizer_preloader() -> None:
     def _preload():
         try:
             import tiktoken  # type: ignore
+
             # Warm up standard encodings
             tiktoken.get_encoding('cl100k_base')
             tiktoken.get_encoding('o200k_base')
         except Exception:
             pass
 
-    t = threading.Thread(target=_preload, name='grinta-tokenizer-preloader', daemon=True)
+    t = threading.Thread(
+        target=_preload, name='grinta-tokenizer-preloader', daemon=True
+    )
     t.start()
 
 

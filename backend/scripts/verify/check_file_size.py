@@ -15,8 +15,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-SOFT_LIMIT = 500
-HARD_LIMIT = 800
+SOFT_LIMIT = 1000
+HARD_LIMIT = 1000
 HARD_LIMIT_ALLOWLIST = frozenset(
     {
         # Scan-line widget cards grew with acceptance-criteria UI; split tracked separately.

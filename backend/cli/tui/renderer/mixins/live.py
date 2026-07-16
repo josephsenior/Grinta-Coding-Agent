@@ -188,7 +188,10 @@ class RendererLiveMixin:
 
     def update_live_response(self, text: str) -> None:
         """Update the in-flight assistant response in-place."""
-        if not getattr(self, '_streaming_active', False) and self._step_draft.content_committed:
+        if (
+            not getattr(self, '_streaming_active', False)
+            and self._step_draft.content_committed
+        ):
             return
         self._live_response = text
         self._live_response_dirty = bool(text.strip())

@@ -394,4 +394,3 @@ class TestCreatePretrainedTokenizer:
         """Test with empty string."""
         result = create_pretrained_tokenizer('')
         assert result == ''
-

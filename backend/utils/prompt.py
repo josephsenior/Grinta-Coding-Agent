@@ -383,8 +383,6 @@ class OrchestratorPromptManager(PromptManager):
         except Exception:
             return content
 
-
-
     def _inject_scratchpad(self, content: str) -> str:
         """Deprecated: session scratchpad injection removed; use workspace memory."""
         return self._inject_workspace_memory(content)

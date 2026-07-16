@@ -636,9 +636,7 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
             housekeeping_started.set()
             await release_housekeeping.wait()
 
-        self.mock_controller.task_validation_service.validate_completion_quality.side_effect = (
-            _slow_validation
-        )
+        self.mock_controller.task_validation_service.validate_completion_quality.side_effect = _slow_validation
         self.mock_controller.state.extra_data['active_run_mode'] = 'plan'
         finish_action = MessageAction(content='Done.', final_response=True)
         finish_action.source = EventSource.AGENT

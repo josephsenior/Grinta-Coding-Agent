@@ -252,6 +252,7 @@ class TestRollbackManager:
 
     def test_shadow_repo_unavailable_raises(self, workspace, monkeypatch):
         """RollbackManager raises when ShadowRepo cannot be initialised (hard dep)."""
+
         def failing_init(*args, **kwargs):
             raise ImportError('pygit2 not available')
 

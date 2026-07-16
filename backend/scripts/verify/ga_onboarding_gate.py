@@ -139,11 +139,20 @@ def _format_status_table(
     )
     notes = {
         ('pipx', 'linux'): 'CI wheel smoke only until interactive reports land',
-        ('pipx', 'windows'): 'Partial interactive evidence acceptable while collecting 3×',
-        ('pipx', 'wsl2'): 'Run `scripts/smoke/smoke_wsl_layout.sh` inside Ubuntu; manual GA',
+        (
+            'pipx',
+            'windows',
+        ): 'Partial interactive evidence acceptable while collecting 3×',
+        (
+            'pipx',
+            'wsl2',
+        ): 'Run `scripts/smoke/smoke_wsl_layout.sh` inside Ubuntu; manual GA',
         ('source', 'linux'): 'CI only until interactive reports land',
         ('source', 'windows'): 'Contributor smoke + interactive reports',
-        ('source', 'wsl2'): 'clone on Linux home, project on `/mnt/c`; `grinta doctor` + interrupt test',
+        (
+            'source',
+            'wsl2',
+        ): 'clone on Linux home, project on `/mnt/c`; `grinta doctor` + interrupt test',
     }
     for path, os_name in _PATH_OS_ROWS:
         label = f'{path} {os_name.upper() if os_name == "wsl2" else os_name.title()}'
@@ -175,7 +184,9 @@ def _print_summary(
         i_count = interactive.get((path, os_name), 0)
         c_count = ci_smoke.get((path, os_name), 0)
         status = 'OK' if i_count >= _REQUIRED_INTERACTIVE else 'NEEDS MORE'
-        print(f'  {path:6} {os_name:7} interactive={i_count} ci-smoke={c_count} [{status}]')
+        print(
+            f'  {path:6} {os_name:7} interactive={i_count} ci-smoke={c_count} [{status}]'
+        )
     print('Gate ready:', 'yes' if _gate_ready(interactive) else 'no')
 
 

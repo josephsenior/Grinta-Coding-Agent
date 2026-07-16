@@ -11,7 +11,9 @@ from pathlib import Path
 @dataclass
 class ProjectMemoryEntry:
     id: str  # e.g. mem-001
-    kind: str  # convention, command, architecture, lesson, strategy, heuristic, decision
+    kind: (
+        str  # convention, command, architecture, lesson, strategy, heuristic, decision
+    )
     status: str  # active, stale, superseded, archived
     fact: str
     evidence: list[str] = field(default_factory=list)
@@ -68,10 +70,14 @@ def parse_markdown_memory(text: str) -> list[ProjectMemoryEntry]:
                     confidence = 1.0
                 in_evidence = False
             elif line_stripped.startswith('**Source sessions:**'):
-                source_sessions = [s.strip() for s in line_stripped[20:].split(',') if s.strip()]
+                source_sessions = [
+                    s.strip() for s in line_stripped[20:].split(',') if s.strip()
+                ]
                 in_evidence = False
             elif line_stripped.startswith('**Superseded by:**'):
-                superseded_by = [s.strip() for s in line_stripped[18:].split(',') if s.strip()]
+                superseded_by = [
+                    s.strip() for s in line_stripped[18:].split(',') if s.strip()
+                ]
                 in_evidence = False
             elif in_evidence:
                 if line_stripped.startswith('---'):
@@ -81,18 +87,20 @@ def parse_markdown_memory(text: str) -> list[ProjectMemoryEntry]:
                 else:
                     evidence.append(line_stripped)
 
-        entries.append(ProjectMemoryEntry(
-            id=entry_id,
-            kind=kind,
-            status=status,
-            fact=fact,
-            evidence=evidence,
-            created=created,
-            last_verified=last_verified,
-            confidence=confidence,
-            source_sessions=source_sessions,
-            superseded_by=superseded_by
-        ))
+        entries.append(
+            ProjectMemoryEntry(
+                id=entry_id,
+                kind=kind,
+                status=status,
+                fact=fact,
+                evidence=evidence,
+                created=created,
+                last_verified=last_verified,
+                confidence=confidence,
+                source_sessions=source_sessions,
+                superseded_by=superseded_by,
+            )
+        )
     return entries
 
 
@@ -115,9 +123,9 @@ def serialize_markdown_memory(entries: list[ProjectMemoryEntry]) -> str:
         lines.append(f'**Last verified:** {entry.last_verified}')
         lines.append(f'**Confidence:** {entry.confidence:.2f}')
         if entry.source_sessions:
-            lines.append(f"**Source sessions:** {', '.join(entry.source_sessions)}")
+            lines.append(f'**Source sessions:** {", ".join(entry.source_sessions)}')
         if entry.superseded_by:
-            lines.append(f"**Superseded by:** {', '.join(entry.superseded_by)}")
+            lines.append(f'**Superseded by:** {", ".join(entry.superseded_by)}')
         lines.append('')
         lines.append('---')
         lines.append('')
@@ -126,8 +134,10 @@ def serialize_markdown_memory(entries: list[ProjectMemoryEntry]) -> str:
 
 def _facts_are_similar(fact1: str, fact2: str) -> bool:
     """Determine Jaccard word-overlap similarity between two facts."""
+
     def get_words(text: str):
         return set(re.findall(r'[a-z0-9]+', text.lower()))
+
     w1 = get_words(fact1)
     w2 = get_words(fact2)
     if not w1 or not w2:
@@ -143,6 +153,7 @@ class ProjectMemoryService:
     def __init__(self, workspace_root: Path | None = None) -> None:
         if workspace_root is None:
             from backend.core.workspace_resolution import get_effective_workspace_root
+
             workspace_root = get_effective_workspace_root()
         self.workspace_root = workspace_root
 
@@ -152,6 +163,7 @@ class ProjectMemoryService:
             p.parent.mkdir(parents=True, exist_ok=True)
             return p
         from backend.core.workspace_resolution import workspace_agent_state_dir
+
         return workspace_agent_state_dir() / 'project_memory.md'
 
     def load(self) -> list[ProjectMemoryEntry]:
@@ -174,7 +186,7 @@ class ProjectMemoryService:
         fact: str,
         evidence: list[str] | None = None,
         confidence: float = 1.0,
-        source_session: str | None = None
+        source_session: str | None = None,
     ) -> str:
         """Upsert a new memory candidate, merging with existing active entries if similar."""
         entries = self.load()
@@ -215,7 +227,7 @@ class ProjectMemoryService:
                 created=now,
                 last_verified=now,
                 confidence=confidence,
-                source_sessions=[source_session] if source_session else []
+                source_sessions=[source_session] if source_session else [],
             )
             entries.append(new_entry)
             self.save(entries)
@@ -303,18 +315,21 @@ def migrate_legacy_memories(workspace_root: Path | None = None) -> None:
             if key == 'session_summary' or kind == 'preference':
                 continue
             fact = f'{key}: {value}' if key else value
-            migrated_facts.append((kind, fact, je.get('created', ''), je.get('seen_count', 1)))
+            migrated_facts.append(
+                (kind, fact, je.get('created', ''), je.get('seen_count', 1))
+            )
     except Exception:
         pass
 
     if workspace_root is None:
         from backend.core.workspace_resolution import get_effective_workspace_root
+
         workspace_root = get_effective_workspace_root()
 
     if workspace_root:
         paths = [
             workspace_agent_state_dir(workspace_root) / 'lessons.md',
-            workspace_root / 'memories' / 'repo' / 'lessons.md'
+            workspace_root / 'memories' / 'repo' / 'lessons.md',
         ]
         for path in paths:
             if path.is_file():
@@ -326,7 +341,11 @@ def migrate_legacy_memories(workspace_root: Path | None = None) -> None:
                             fact = line[2:].strip()
                             if fact and not any(f[1] == fact for f in migrated_facts):
                                 migrated_facts.append(('lesson', fact, '', 1))
-                        elif line and not line.startswith('#') and not line.startswith('---'):
+                        elif (
+                            line
+                            and not line.startswith('#')
+                            and not line.startswith('---')
+                        ):
                             if not any(f[1] == line for f in migrated_facts):
                                 migrated_facts.append(('lesson', line, '', 1))
                 except Exception:
@@ -337,5 +356,5 @@ def migrate_legacy_memories(workspace_root: Path | None = None) -> None:
             kind=kind,
             fact=fact,
             confidence=0.9,
-            evidence=[f'Migrated from legacy store (seen {seen_count} times).']
+            evidence=[f'Migrated from legacy store (seen {seen_count} times).'],
         )

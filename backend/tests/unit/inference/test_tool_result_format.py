@@ -32,4 +32,3 @@ def test_decode_tolerates_outer_spacing() -> None:
 def test_decode_rejects_malformed_payload() -> None:
     text = '<app_tool_result_json>{"tool_name":"my_tool","content":}</app_tool_result_json>'
     assert decode_tool_result_payload(text) is None
-

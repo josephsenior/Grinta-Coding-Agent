@@ -35,6 +35,7 @@ def _save_lock_for(path: Path) -> threading.Lock:
 def _resolve_session_id() -> str | None:
     """Resolve session ID using working memory or bound session logger without context imports."""
     import sys
+
     try:
         if 'backend.engine.tools.working_memory' in sys.modules:
             wm = sys.modules['backend.engine.tools.working_memory']
@@ -45,6 +46,7 @@ def _resolve_session_id() -> str | None:
         pass
     try:
         from backend.core.logging.session_event_logger import get_bound_session_id
+
         return get_bound_session_id()
     except Exception:
         pass

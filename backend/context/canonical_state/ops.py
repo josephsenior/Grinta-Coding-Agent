@@ -490,7 +490,9 @@ def render_canonical_state_for_prompt(
                 detail += f' (evidence: {item.evidence})'
             _append(lines, f'  - {detail}')
     if canonical.prior_objectives:
-        _append(lines, '- Prior objectives: ' + ' | '.join(canonical.prior_objectives[-3:]))
+        _append(
+            lines, '- Prior objectives: ' + ' | '.join(canonical.prior_objectives[-3:])
+        )
     _append_list(lines, 'Blockers', canonical.blockers[-6:])
     if canonical.background_tasks:
         _append(lines, '- Background tasks:')

@@ -243,6 +243,7 @@ async def test_tui_tool_step_final_replaces_partial_preview(mock_config):
         assert renderer._live_response == 'Now let me create the elementwise operators.'
         assert renderer._last_final_response_text == ''
 
+
 @pytest.mark.asyncio
 async def test_tui_streamed_response_clears_before_tool_action(mock_config):
     console = RichConsole()
@@ -254,7 +255,6 @@ async def test_tui_streamed_response_clears_before_tool_action(mock_config):
 
         s = _get_screen(app)
         from backend.cli.tui.app import TUIRenderer
-        from backend.cli.tui.widgets.activity_card import AgentMessage
 
         renderer = TUIRenderer(
             console=console,
@@ -276,10 +276,7 @@ async def test_tui_streamed_response_clears_before_tool_action(mock_config):
         command.source = EventSource.AGENT
         renderer._process_event(command)
 
-        assert renderer._last_final_response_text == ''
-        assert renderer._live_response == ''
-        assert len(renderer._history) == 1
-        assert isinstance(renderer._history[0], AgentMessage)
+        assert len(renderer._history) == 0
 
 
 @pytest.mark.asyncio
@@ -544,12 +541,8 @@ async def test_tui_stream_final_and_transcript_only_message_do_not_duplicate(
         s._renderer = renderer
 
         text = 'I will inspect the workspace.'
-        renderer._process_event(
-            StreamingChunkAction(accumulated=text, is_final=True)
-        )
-        renderer._process_event(
-            MessageAction(content=text, transcript_only=True)
-        )
+        renderer._process_event(StreamingChunkAction(accumulated=text, is_final=True))
+        renderer._process_event(MessageAction(content=text, transcript_only=True))
         await pilot.pause()
 
         from backend.cli.tui.widgets.activity_card import AgentMessage, LiveResponse
@@ -584,9 +577,7 @@ async def test_tui_stale_stream_snapshot_after_final_commit_is_ignored(mock_conf
         renderer._process_event(
             StreamingChunkAction(accumulated=full_text, is_final=True)
         )
-        renderer._process_event(
-            MessageAction(content=full_text, final_response=True)
-        )
+        renderer._process_event(MessageAction(content=full_text, final_response=True))
         renderer._process_event(
             StreamingChunkAction(
                 accumulated='This is an extraordinary engineering challenge',

@@ -75,18 +75,18 @@ function Ensure-Ripgrep {
     $rgUrl = "https://github.com/BurntSushi/ripgrep/releases/download/14.1.0/ripgrep-14.1.0-x86_64-pc-windows-msvc.zip"
     $rgZip = Join-Path $env:TEMP "rg.zip"
     $rgExtract = Join-Path $env:TEMP "rg_extracted"
-    
+
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         Invoke-WebRequest -Uri $rgUrl -OutFile $rgZip
         Expand-Archive -Path $rgZip -DestinationPath $rgExtract -Force
-        
+
         $localBin = Join-Path $env:USERPROFILE '.local\bin'
         if (-not (Test-Path $localBin)) { New-Item -ItemType Directory -Path $localBin -Force | Out-Null }
-        
+
         $rgExeSource = Join-Path $rgExtract "ripgrep-14.1.0-x86_64-pc-windows-msvc\rg.exe"
         Copy-Item $rgExeSource -Destination (Join-Path $localBin "rg.exe") -Force
-        
+
         Write-Host "[OK] ripgrep installed to $localBin." -ForegroundColor Green
     } catch {
         Write-Host "[WARN] Failed to install ripgrep automatically: $_" -ForegroundColor Yellow

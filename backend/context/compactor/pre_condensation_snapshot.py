@@ -188,7 +188,8 @@ def snapshot_user_objective(snapshot: dict[str, Any]) -> tuple[str, str]:
         texts = [
             str(m.get('text', '')).strip()
             for m in messages
-            if isinstance(m, dict) and _is_substantive_user_directive(str(m.get('text', '')))
+            if isinstance(m, dict)
+            and _is_substantive_user_directive(str(m.get('text', '')))
         ]
         if texts:
             return texts[0], texts[-1]
@@ -421,11 +422,27 @@ def _extract_acceptance_criteria(event: Event, snapshot: dict) -> None:
         state = getattr(event, 'state', {})
         contract = state.get('contract', {}) if isinstance(state, dict) else {}
         groups = ('requirements', 'constraints', 'success_conditions')
-        setattr(event, 'criteria_list', [
-            {'id': item.get('id', ''), 'assertion': item.get('text', ''), 'source': item.get('source', 'agent'),
-             'evidence': '; '.join(str(e.get('summary', '')) for e in item.get('evidence', []) if isinstance(e, dict))}
-            for group in groups for item in (contract.get(group, []) if isinstance(contract, dict) else []) if isinstance(item, dict)
-        ])
+        setattr(
+            event,
+            'criteria_list',
+            [
+                {
+                    'id': item.get('id', ''),
+                    'assertion': item.get('text', ''),
+                    'source': item.get('source', 'agent'),
+                    'evidence': '; '.join(
+                        str(e.get('summary', ''))
+                        for e in item.get('evidence', [])
+                        if isinstance(e, dict)
+                    ),
+                }
+                for group in groups
+                for item in (
+                    contract.get(group, []) if isinstance(contract, dict) else []
+                )
+                if isinstance(item, dict)
+            ],
+        )
     elif cls_name not in ('AcceptanceCriteriaAction', 'AcceptanceCriteriaObservation'):
         return
     criteria_list = getattr(event, 'criteria_list', None)

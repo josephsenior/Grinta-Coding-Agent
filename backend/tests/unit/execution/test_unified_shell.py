@@ -439,7 +439,9 @@ class TestCreateShellSession:
             '-NoProfile',
         ]
 
-    def test_windows_prefers_powershell_by_default(self, tmp_path, monkeypatch, request):
+    def test_windows_prefers_powershell_by_default(
+        self, tmp_path, monkeypatch, request
+    ):
         _force_os(request, windows=True)
         monkeypatch.delenv('SECURITY_WINDOWS_SHELL', raising=False)
         _configured_windows_shell.cache_clear()

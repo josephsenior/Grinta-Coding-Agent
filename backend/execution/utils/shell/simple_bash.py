@@ -195,9 +195,14 @@ class SimpleBashSession(BaseShellSession):
         UTF-8 (with ``errors='replace'``) happens in the bounded reader.
         """
         from backend.execution.utils.tool_registry import ToolRegistry
+
         reg = ToolRegistry()
         bash_info = reg.get_tool_info('bash')
-        bash_exe = bash_info.path if (bash_info and bash_info.available and bash_info.path) else 'bash'
+        bash_exe = (
+            bash_info.path
+            if (bash_info and bash_info.available and bash_info.path)
+            else 'bash'
+        )
 
         argv = self._wrap_subprocess_argv([bash_exe, '-c', command], cwd=self._cwd)
         process = subprocess.Popen(
@@ -217,9 +222,14 @@ class SimpleBashSession(BaseShellSession):
     def _update_cwd_if_needed(self) -> None:
         """Update current working directory by querying the shell."""
         from backend.execution.utils.tool_registry import ToolRegistry
+
         reg = ToolRegistry()
         bash_info = reg.get_tool_info('bash')
-        bash_exe = bash_info.path if (bash_info and bash_info.available and bash_info.path) else 'bash'
+        bash_exe = (
+            bash_info.path
+            if (bash_info and bash_info.available and bash_info.path)
+            else 'bash'
+        )
 
         self._update_cwd_from_output([bash_exe, '-c', 'pwd'])
 

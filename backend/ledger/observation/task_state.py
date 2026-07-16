@@ -1,4 +1,5 @@
 """Observation emitted by the canonical task-state service."""
+
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
 

@@ -83,10 +83,7 @@ async def test_event_renderer_tool_step_final_replaces_partial_preview() -> None
     final.source = EventSource.AGENT
     await renderer.handle_event(final)
 
-    assert (
-        renderer.streaming_preview
-        == 'Now let me create the elementwise operators.'
-    )
+    assert renderer.streaming_preview == 'Now let me create the elementwise operators.'
 
 
 @pytest.mark.asyncio

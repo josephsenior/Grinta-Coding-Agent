@@ -213,6 +213,7 @@ def _adapt_example_commands_to_terminal(
 ) -> str:
     """Rewrite shell snippets in examples to match the active terminal contract."""
     from backend.utils.terminal.terminal_contract import uses_powershell_terminal
+
     if uses_powershell_terminal():
         substitutions = (
             ('pwd && ls', 'Get-Location; Get-ChildItem'),

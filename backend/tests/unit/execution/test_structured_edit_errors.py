@@ -161,7 +161,12 @@ def test_normalize_edit_exception_from_validation_error() -> None:
     }
     message, tool_result = normalize_edit_exception(exc, payload, command='multi_edit')
     assert 'item 2' in message
-    assert message.count("multiedit validation failed: item 2 missing required field 'path'.") == 1
+    assert (
+        message.count(
+            "multiedit validation failed: item 2 missing required field 'path'."
+        )
+        == 1
+    )
     assert tool_result['error_code'] == 'VALIDATION_ERROR'
     assert tool_result['failed_op_index'] == 2
     assert 'detail' not in tool_result

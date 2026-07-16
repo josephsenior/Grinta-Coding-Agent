@@ -104,7 +104,9 @@ class TaskTrackingMixin:
             task_list=action.task_list,
         )
 
-    def _load_task_list_for_view(self, action: TaskTrackingAction) -> list[dict[str, Any]]:
+    def _load_task_list_for_view(
+        self, action: TaskTrackingAction
+    ) -> list[dict[str, Any]]:
         """Load structured task plan from JSON store, falling back to hydrated action."""
         try:
             from backend.core.task_tracker import TaskTracker
@@ -120,7 +122,9 @@ class TaskTrackingMixin:
         self, task_list: list[dict[str, Any]], *, suffix: str = ''
     ) -> str:
         if not task_list:
-            return 'No task list found. Use the "update" command to create one.' + suffix
+            return (
+                'No task list found. Use the "update" command to create one.' + suffix
+            )
         try:
             content = self._generate_task_list_content(task_list)
         except ValueError as e:

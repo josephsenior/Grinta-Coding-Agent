@@ -560,4 +560,3 @@ async def test_tui_toggle_sidebar_adjusts_left_column_width(mock_config):
         await pilot.pause()
         assert not sidebar.has_class('-hidden')
         assert str(left_col.styles.width) == '78w'
-

@@ -223,9 +223,7 @@ class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
         async def _run() -> None:
             # Optional LLM-judge quality check. A warning may arrive after the
             # run becomes ready, but this work must never delay that transition.
-            await self._ctrl.task_validation_service.validate_completion_quality(
-                action
-            )
+            await self._ctrl.task_validation_service.validate_completion_quality(action)
             if active_mode == AGENT_MODE:
                 try:
                     from backend.engine.tools.session_lessons import (

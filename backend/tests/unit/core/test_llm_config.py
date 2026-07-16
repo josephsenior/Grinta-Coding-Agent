@@ -200,6 +200,7 @@ class TestAPIKeyHandling:
     @pytest.fixture(autouse=True)
     def setup_api_key_manager(self):
         from backend.core.config.llm_config import api_key_manager
+
         api_key_manager.provider_api_keys.clear()
         api_key_manager.suppress_env_export = False
         yield

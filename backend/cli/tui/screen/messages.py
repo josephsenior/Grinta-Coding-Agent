@@ -376,7 +376,9 @@ class ScreenMessagesMixin:
                 try:
                     await asyncio.wait_for(controller.stop(), timeout=10.0)
                 except Exception:
-                    _tui_logger.exception('Controller stop failed during user interrupt')
+                    _tui_logger.exception(
+                        'Controller stop failed during user interrupt'
+                    )
 
             # The poller should observe STOPPED and return.  Only cancel it after
             # backend shutdown has been requested; cancelling it first can leave

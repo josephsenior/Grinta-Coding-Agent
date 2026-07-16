@@ -105,4 +105,3 @@ def test_get_persisted_autonomy_rejects_supervised(tmp_path, monkeypatch) -> Non
 
     # Settings should be treated as invalid; no silent migration.
     assert level == ''
-

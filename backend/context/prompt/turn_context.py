@@ -28,9 +28,7 @@ def wrap_turn_context(text: object, *, kind: str) -> str:
         return value
     safe_kind = _KIND_PATTERN.sub('-', kind.strip().lower()).strip('-') or 'context'
     return (
-        f'<GRINTA_TURN_CONTEXT kind="{safe_kind}">\n'
-        f'{value.strip()}\n'
-        f'{TURN_CONTEXT_END}'
+        f'<GRINTA_TURN_CONTEXT kind="{safe_kind}">\n{value.strip()}\n{TURN_CONTEXT_END}'
     )
 
 
@@ -87,9 +85,7 @@ def split_stable_system_prefix(
         leading = False
         if role == 'system':
             if text:
-                pending_context.append(
-                    wrap_turn_context(text, kind='provider-system')
-                )
+                pending_context.append(wrap_turn_context(text, kind='provider-system'))
             continue
 
         if pending_context:

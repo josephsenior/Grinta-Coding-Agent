@@ -321,4 +321,3 @@ class TestConvertActionToMessagesProc:
         action.tool_call_metadata = None
         msgs = convert_action_to_messages(action, {})
         assert msgs == []
-

@@ -152,7 +152,9 @@ class ShadowRepo:
 
         """
         with self._lock:
-            logger.debug('ShadowRepo.prune: %d SHAs marked for retention', len(keep_shas))
+            logger.debug(
+                'ShadowRepo.prune: %d SHAs marked for retention', len(keep_shas)
+            )
 
     # ------------------------------------------------------------------
     # Snapshot internals
@@ -180,14 +182,18 @@ class ShadowRepo:
             if cached is not None and cached == (mtime_ns, size):
                 blob_oid = self._blob_cache.get(rel_posix)
                 if blob_oid is not None:
-                    entry = pygit2.IndexEntry(rel_posix, blob_oid, pygit2.GIT_FILEMODE_BLOB)
+                    entry = pygit2.IndexEntry(
+                        rel_posix, blob_oid, pygit2.GIT_FILEMODE_BLOB
+                    )
                     index.add(entry)
                     continue
 
             try:
                 blob_oid = repo.create_blob_fromdisk(abs_path_str)
             except (pygit2.GitError, OSError) as exc:
-                logger.warning('Skipping file %s in shadow snapshot: %s', rel_posix, exc)
+                logger.warning(
+                    'Skipping file %s in shadow snapshot: %s', rel_posix, exc
+                )
                 continue
 
             entry = pygit2.IndexEntry(rel_posix, blob_oid, pygit2.GIT_FILEMODE_BLOB)
@@ -247,7 +253,9 @@ class ShadowRepo:
         try:
             commit = repo.get(commit_sha)
         except Exception as exc:  # noqa: BLE001
-            raise ShadowRepoError(f'Cannot resolve commit {commit_sha!r}: {exc}') from exc
+            raise ShadowRepoError(
+                f'Cannot resolve commit {commit_sha!r}: {exc}'
+            ) from exc
 
         if commit is None:
             raise ShadowRepoError(f'Commit not found in shadow repo: {commit_sha!r}')

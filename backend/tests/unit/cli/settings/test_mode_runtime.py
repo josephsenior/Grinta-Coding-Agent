@@ -100,4 +100,3 @@ def test_apply_autonomy_to_controller_syncs_from_ac_when_config_stale() -> None:
     assert agent.config.autonomy_level == 'full'
     required = agent.tools[0]['function']['parameters'].get('required', [])
     assert 'security_risk' not in required
-

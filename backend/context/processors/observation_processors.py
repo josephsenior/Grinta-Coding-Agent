@@ -413,10 +413,7 @@ def _handle_condensation_observation(
     banner = _CONDENSATION_BANNER if not getattr(obs, 'is_prewarmed', False) else ''
 
     text = truncate_content(
-        banner
-        + summary
-        + working_memory
-        + _POST_CONDENSATION_RECOVERY,
+        banner + summary + working_memory + _POST_CONDENSATION_RECOVERY,
         max_message_chars,
     )
     return Message(role='system', content=[TextContent(text=text)])

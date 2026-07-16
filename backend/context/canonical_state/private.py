@@ -542,7 +542,9 @@ def _update_vcs_status(
             output = str(command_info.get('output', ''))[:_MAX_OUTPUT_CHARS]
             _set_field(canonical, 'vcs_status', output or command, event_id, source)
             return
-        if lowered.startswith('git log -1') or lowered.startswith('git log --oneline -1'):
+        if lowered.startswith('git log -1') or lowered.startswith(
+            'git log --oneline -1'
+        ):
             output = str(command_info.get('output', ''))[:_MAX_OUTPUT_CHARS]
             if output:
                 _set_field(canonical, 'vcs_status', output, event_id, source)

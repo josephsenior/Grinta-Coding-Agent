@@ -59,7 +59,6 @@ class TestRecentEventsConfig:
             RecentEventsCompactorConfig(keep_first=-1)
 
 
-
 class TestCompactorPipelineConfig:
     def test_empty_pipeline(self):
         c = CompactorPipelineConfig()
@@ -105,9 +104,7 @@ class TestCreateCompactorConfig:
 
     def test_amortized_type_raises(self):
         with pytest.raises(ValueError, match='Unknown compactor type'):
-            create_compactor_config(
-                'amortized', {'type': 'amortized', 'max_size': 50}
-            )
+            create_compactor_config('amortized', {'type': 'amortized', 'max_size': 50})
 
     def test_observation_masking(self):
         cfg = create_compactor_config(

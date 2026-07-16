@@ -254,11 +254,7 @@ class TestParseFunctionCallFromText:
         assert _parse_function_call_from_text(content) is None
 
     def test_named_function_tag_still_parses(self):
-        content = (
-            '<function=terminal>\n'
-            '<parameter=command>pwd</parameter>\n'
-            '</function>'
-        )
+        content = '<function=terminal>\n<parameter=command>pwd</parameter>\n</function>'
         parsed = _parse_function_call_from_text(content)
         assert parsed is not None
         assert parsed['fn_name'] == 'terminal'
@@ -820,9 +816,7 @@ class TestXmlParserRegression:
         '<parameter=name>' inside string content as XML tags.
         """
         tools = [self._make_sample_tool()]
-        content = (
-            '<function=terminal>\n<parameter=command>pwd</parameter>\n</function>'
-        )
+        content = '<function=terminal>\n<parameter=command>pwd</parameter>\n</function>'
         result = self._parse_payload(content, tools)
         assert result is not None
         assert len(result) == 1
@@ -866,4 +860,3 @@ class TestXmlParserRegression:
         assert result is not None
         assert len(result) == 1
         assert result[0]['arguments']['command'] == 'pwd'
-

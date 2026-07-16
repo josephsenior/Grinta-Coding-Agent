@@ -124,9 +124,9 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
             if preferred_custom_model is not None
             else self._current_custom_model_for_provider(provider)
         )
-        self.query_one(
-            '#settings-custom-model', Input
-        ).value = custom_model if model == '__custom__' else ''
+        self.query_one('#settings-custom-model', Input).value = (
+            custom_model if model == '__custom__' else ''
+        )
         self._sync_custom_model_visibility()
         self._sync_reasoning_options(provider, model)
         self._sync_model_metadata()

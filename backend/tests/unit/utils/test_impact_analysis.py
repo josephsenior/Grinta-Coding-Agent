@@ -20,7 +20,9 @@ class TestImpactAnalysis:
     @patch('backend.utils.impact_analysis.os.path.exists', return_value=True)
     @patch('backend.utils.impact_analysis.get_lsp_client')
     @patch('backend.utils.impact_analysis.TreeSitterEditor.find_symbol')
-    def test_analyze_symbol_impact_lsp(self, mock_find_symbol, mock_get_lsp_client, mock_exists) -> None:
+    def test_analyze_symbol_impact_lsp(
+        self, mock_find_symbol, mock_get_lsp_client, mock_exists
+    ) -> None:
         mock_client = MagicMock()
         mock_client.available = True
         mock_get_lsp_client.return_value = mock_client
@@ -29,8 +31,16 @@ class TestImpactAnalysis:
         # Mock 10 references (5 production, 5 tests)
         mock_locations = []
         for i in range(5):
-            mock_locations.append(MagicMock(file=f'src/prod_{i}.py', line=10, column=5, message=f'use_{i}'))
-            mock_locations.append(MagicMock(file=f'tests/test_{i}.py', line=15, column=5, message=f'test_{i}'))
+            mock_locations.append(
+                MagicMock(
+                    file=f'src/prod_{i}.py', line=10, column=5, message=f'use_{i}'
+                )
+            )
+            mock_locations.append(
+                MagicMock(
+                    file=f'tests/test_{i}.py', line=15, column=5, message=f'test_{i}'
+                )
+            )
 
         mock_result.locations = mock_locations
         mock_client.query.return_value = mock_result
@@ -56,7 +66,12 @@ class TestImpactAnalysis:
     @patch('backend.utils.impact_analysis.get_lsp_client')
     @patch('backend.utils.impact_analysis.TreeSitterEditor.find_symbol')
     def test_analyze_symbol_impact_ripgrep_fallback(
-        self, mock_find_symbol, mock_get_lsp_client, mock_shutil_which, mock_run, mock_exists
+        self,
+        mock_find_symbol,
+        mock_get_lsp_client,
+        mock_shutil_which,
+        mock_run,
+        mock_exists,
     ) -> None:
         mock_client = MagicMock()
         mock_client.available = False

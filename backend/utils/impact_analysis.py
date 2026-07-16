@@ -20,10 +20,39 @@ from backend.utils.treesitter.treesitter_editor import TreeSitterEditor
 
 # Common code/text file extensions to walk as fallback.
 _COMMON_EXTENSIONS = {
-    '.py', '.js', '.ts', '.tsx', '.jsx', '.go', '.rs', '.java', '.c', '.cpp',
-    '.h', '.hpp', '.cs', '.rb', '.php', '.swift', '.kt', '.scala', '.sh',
-    '.bat', '.ps1', '.sql', '.yaml', '.yml', '.json', '.md', '.txt', '.xml',
-    '.html', '.css', '.toml', '.ini', '.cfg'
+    '.py',
+    '.js',
+    '.ts',
+    '.tsx',
+    '.jsx',
+    '.go',
+    '.rs',
+    '.java',
+    '.c',
+    '.cpp',
+    '.h',
+    '.hpp',
+    '.cs',
+    '.rb',
+    '.php',
+    '.swift',
+    '.kt',
+    '.scala',
+    '.sh',
+    '.bat',
+    '.ps1',
+    '.sql',
+    '.yaml',
+    '.yml',
+    '.json',
+    '.md',
+    '.txt',
+    '.xml',
+    '.html',
+    '.css',
+    '.toml',
+    '.ini',
+    '.cfg',
 }
 
 
@@ -107,15 +136,24 @@ def _grep_fallback_locations(
                         continue
 
                     # Normalize file path relative to search root / PROJECT_ROOT
-                    rel_path = os.path.relpath(file_path, search_root).replace(os.sep, '/')
+                    rel_path = os.path.relpath(file_path, search_root).replace(
+                        os.sep, '/'
+                    )
 
                     # Exclude the definition line itself
-                    if os.path.abspath(file_path) == os.path.abspath(definition_file) and line_num == definition_line:
+                    if (
+                        os.path.abspath(file_path) == os.path.abspath(definition_file)
+                        and line_num == definition_line
+                    ):
                         continue
 
                     # Skip comment lines
                     stripped = text.strip()
-                    if stripped.startswith('#') or stripped.startswith('//') or stripped.startswith('/*'):
+                    if (
+                        stripped.startswith('#')
+                        or stripped.startswith('//')
+                        or stripped.startswith('/*')
+                    ):
                         continue
 
                     locations.append(
@@ -150,7 +188,9 @@ def _grep_fallback_locations(
                     rel_path = os.path.relpath(fpath, search_root).replace(os.sep, '/')
 
                     # Exclude definition file on definition line
-                    is_def_file = os.path.abspath(fpath) == os.path.abspath(definition_file)
+                    is_def_file = os.path.abspath(fpath) == os.path.abspath(
+                        definition_file
+                    )
 
                     try:
                         with open(fpath, encoding='utf-8', errors='ignore') as fl:
@@ -159,7 +199,11 @@ def _grep_fallback_locations(
                                     continue
                                 if sym_re.search(line):
                                     stripped = line.strip()
-                                    if stripped.startswith('#') or stripped.startswith('//') or stripped.startswith('/*'):
+                                    if (
+                                        stripped.startswith('#')
+                                        or stripped.startswith('//')
+                                        or stripped.startswith('/*')
+                                    ):
                                         continue
                                     locations.append(
                                         ReferenceLocation(
@@ -202,6 +246,7 @@ def _find_defining_file(symbol_name: str, search_root: str) -> str | None:
         is_ignored_file,
         prune_ignored_dirs,
     )
+
     spec = get_ignore_spec(search_root)
     sym_re = re.compile(pattern)
     for root_dir, dirs, files in os.walk(search_root):
@@ -251,15 +296,23 @@ def analyze_symbol_impact(
         if resolved_file and os.path.exists(resolved_file):
             loc = editor.find_symbol(resolved_file, symbol_name)
             if not loc:
-                logger.debug('Symbol %s not found in file %s', symbol_name, resolved_file)
+                logger.debug(
+                    'Symbol %s not found in file %s', symbol_name, resolved_file
+                )
                 engine = 'ripgrep'
                 confidence = 'low'
-                def_file_rel = os.path.relpath(resolved_file, search_root).replace(os.sep, '/')
-                locations = _grep_fallback_locations(symbol_name, resolved_file, 0, search_root)
+                def_file_rel = os.path.relpath(resolved_file, search_root).replace(
+                    os.sep, '/'
+                )
+                locations = _grep_fallback_locations(
+                    symbol_name, resolved_file, 0, search_root
+                )
             else:
                 def_file = os.path.abspath(resolved_file)
                 def_line = loc.line_start
-                def_file_rel = os.path.relpath(def_file, search_root).replace(os.sep, '/')
+                def_file_rel = os.path.relpath(def_file, search_root).replace(
+                    os.sep, '/'
+                )
 
                 # 1. Try LSP
                 lsp = get_lsp_client()
@@ -280,21 +333,28 @@ def analyze_symbol_impact(
                     confidence = 'high'
                     for ref in lsp_result.locations:
                         # Exclude the definition itself
-                        if os.path.abspath(ref.file) == def_file and ref.line == def_line:
+                        if (
+                            os.path.abspath(ref.file) == def_file
+                            and ref.line == def_line
+                        ):
                             continue
 
                         # Fetch text content for the reference line if possible
                         text_content = ''
                         try:
                             ref_abs_path = os.path.abspath(ref.file)
-                            with open(ref_abs_path, encoding='utf-8', errors='ignore') as f:
+                            with open(
+                                ref_abs_path, encoding='utf-8', errors='ignore'
+                            ) as f:
                                 lines = f.readlines()
                                 if 1 <= ref.line <= len(lines):
                                     text_content = lines[ref.line - 1].rstrip()
                         except Exception:
                             pass
 
-                        rel_path = os.path.relpath(ref.file, search_root).replace(os.sep, '/')
+                        rel_path = os.path.relpath(ref.file, search_root).replace(
+                            os.sep, '/'
+                        )
                         locations.append(
                             ReferenceLocation(
                                 file_path=rel_path,
@@ -308,7 +368,9 @@ def analyze_symbol_impact(
                     # 2. Fallback to Ripgrep/Grep
                     engine = 'ripgrep'
                     confidence = 'medium'
-                    locations = _grep_fallback_locations(symbol_name, def_file, def_line, search_root)
+                    locations = _grep_fallback_locations(
+                        symbol_name, def_file, def_line, search_root
+                    )
         else:
             # No definition file found, run pure fallback
             engine = 'ripgrep'
@@ -420,5 +482,7 @@ def analyze_symbol_impact(
             reasons=reasons,
         )
     except Exception as e:
-        logger.error('Impact analysis failed for symbol %s: %s', symbol_name, e, exc_info=True)
+        logger.error(
+            'Impact analysis failed for symbol %s: %s', symbol_name, e, exc_info=True
+        )
         return None

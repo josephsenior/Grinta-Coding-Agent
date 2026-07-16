@@ -9,6 +9,7 @@ import pytest
 from backend.engine.orchestrator import Orchestrator
 from backend.ledger.action import AgentThinkAction
 from backend.ledger.action.agent import CondensationAction
+from backend.ledger.event import EventSource
 from backend.ledger.observation import StatusObservation
 
 
@@ -116,7 +117,7 @@ async def test_normal_step_defers_status_to_exact_start_capable_manager() -> Non
         status = StatusObservation(
             content='Compacting context...', status_type='compaction'
         )
-        orch.event_stream.add_event(status)
+        orch.event_stream.add_event(status, EventSource.AGENT)
         return SimpleNamespace(pending_action=action, events=[])
 
     orch.memory_manager = SimpleNamespace(

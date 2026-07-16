@@ -37,11 +37,7 @@ def _read_session_lines(path: Path) -> list[str]:
     p = path / 'session.jsonl'
     if not p.is_file():
         return []
-    return [
-        line
-        for line in p.read_text(encoding='utf-8').splitlines()
-        if line.strip()
-    ]
+    return [line for line in p.read_text(encoding='utf-8').splitlines() if line.strip()]
 
 
 def test_is_noise_message_filters_streaming_chunks() -> None:
@@ -74,10 +70,7 @@ def test_wire_events_respect_grinta_log_wire(
     ):
         emit_session_event('WIRE_PROMPT', {'messages': []})
     emit_session_event('PROMPT_SHAPE', {'roles': {'user': 1}})
-    events = [
-        json.loads(line)['event']
-        for line in _read_session_lines(tmp_path)
-    ]
+    events = [json.loads(line)['event'] for line in _read_session_lines(tmp_path)]
     assert 'WIRE_PROMPT' not in events
     assert 'PROMPT_SHAPE' in events
 
@@ -87,10 +80,7 @@ def test_bind_emits_session_start(
 ) -> None:
     monkeypatch.setattr('backend.core.logging.session_event_logger.LOG_TO_FILE', True)
     bind_session_event_logger('abc', str(tmp_path), workspace_segment='ws')
-    events = [
-        json.loads(line)['event']
-        for line in _read_session_lines(tmp_path)
-    ]
+    events = [json.loads(line)['event'] for line in _read_session_lines(tmp_path)]
     assert events[0] == 'SESSION_START'
 
 
@@ -105,10 +95,7 @@ def test_bind_suppresses_empty_session_context(
     monkeypatch.setattr('backend.core.logging.session_event_logger.LOG_TO_FILE', True)
     # No register_runtime_context() call — snapshot is all None.
     bind_session_event_logger('sess-2', str(tmp_path))
-    events = [
-        json.loads(line)['event']
-        for line in _read_session_lines(tmp_path)
-    ]
+    events = [json.loads(line)['event'] for line in _read_session_lines(tmp_path)]
     assert events == ['SESSION_START']
     assert 'SESSION_CONTEXT' not in events
 
@@ -146,10 +133,7 @@ def test_bind_emits_session_context_when_runtime_resolved(
 
     register_runtime_context(controller=controller, llm_config=llm_config)
     bind_session_event_logger('sess-3', str(tmp_path))
-    events = [
-        json.loads(line)['event']
-        for line in _read_session_lines(tmp_path)
-    ]
+    events = [json.loads(line)['event'] for line in _read_session_lines(tmp_path)]
     assert events[0] == 'SESSION_START'
     assert 'SESSION_CONTEXT' in events
 
@@ -203,10 +187,7 @@ def test_emit_merges_caller_ctx_with_snapshot(
         {'tool': 'replace_string', 'ok': True},
         ctx={'astep_id': 'ast-42'},
     )
-    lines = [
-        json.loads(line)
-        for line in _read_session_lines(tmp_path)
-    ]
+    lines = [json.loads(line) for line in _read_session_lines(tmp_path)]
     tool_result = [r for r in lines if r['event'] == 'TOOL_RESULT'][0]
     assert tool_result['ctx']['model'] == 'test/model'
     assert tool_result['ctx']['provider'] == 'openai'
@@ -252,10 +233,7 @@ def test_emit_caller_ctx_can_override_snapshot_fields(
         {'tool': 'x', 'ok': True},
         ctx={'model': 'debug/override'},
     )
-    lines = [
-        json.loads(line)
-        for line in _read_session_lines(tmp_path)
-    ]
+    lines = [json.loads(line) for line in _read_session_lines(tmp_path)]
     tool_result = [r for r in lines if r['event'] == 'TOOL_RESULT'][0]
     assert tool_result['ctx']['model'] == 'debug/override'
     # Other snapshot fields still preserved.

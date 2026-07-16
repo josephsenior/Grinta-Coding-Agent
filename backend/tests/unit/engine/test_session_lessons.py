@@ -36,7 +36,7 @@ class TerminalRunObservation:
 async def test_persist_finish_lessons_no_signals(tmp_path, monkeypatch):
     monkeypatch.setattr(
         'backend.context.memory.project_memory.ProjectMemoryService._memory_file_path',
-        lambda self: tmp_path / 'project_memory.md'
+        lambda self: tmp_path / 'project_memory.md',
     )
 
     state = MagicMock()
@@ -48,15 +48,19 @@ async def test_persist_finish_lessons_no_signals(tmp_path, monkeypatch):
     controller = MagicMock()
 
     # Run: no signals -> should return immediately without triggering LLM
-    await persist_finish_lessons(summary='Done', session_id='sess-123', state=state, controller=controller)
+    await persist_finish_lessons(
+        summary='Done', session_id='sess-123', state=state, controller=controller
+    )
     assert not (tmp_path / 'project_memory.md').is_file()
 
 
 @pytest.mark.asyncio
-async def test_persist_finish_lessons_with_signals_and_reflection(tmp_path, monkeypatch):
+async def test_persist_finish_lessons_with_signals_and_reflection(
+    tmp_path, monkeypatch
+):
     monkeypatch.setattr(
         'backend.context.memory.project_memory.ProjectMemoryService._memory_file_path',
-        lambda self: tmp_path / 'project_memory.md'
+        lambda self: tmp_path / 'project_memory.md',
     )
 
     state = MagicMock()
@@ -69,17 +73,19 @@ async def test_persist_finish_lessons_with_signals_and_reflection(tmp_path, monk
 
     # Mock the asynchronous LLM response used by background reflection.
     mock_response = MagicMock()
-    mock_response.content = json.dumps({
-        'candidates': [
-            {
-                'kind': 'command',
-                'fact': 'Run integration tests with uv run pytest.',
-                'evidence': ['pytest passed'],
-                'confidence': 0.95,
-                'superseded_ids': []
-            }
-        ]
-    })
+    mock_response.content = json.dumps(
+        {
+            'candidates': [
+                {
+                    'kind': 'command',
+                    'fact': 'Run integration tests with uv run pytest.',
+                    'evidence': ['pytest passed'],
+                    'confidence': 0.95,
+                    'superseded_ids': [],
+                }
+            ]
+        }
+    )
 
     llm = AsyncMock()
     llm.acompletion.return_value = mock_response
@@ -87,7 +93,9 @@ async def test_persist_finish_lessons_with_signals_and_reflection(tmp_path, monk
     controller = MagicMock()
     controller.agent.llm = llm
 
-    await persist_finish_lessons(summary='Done task', session_id='sess-123', state=state, controller=controller)
+    await persist_finish_lessons(
+        summary='Done task', session_id='sess-123', state=state, controller=controller
+    )
 
     llm.acompletion.assert_awaited_once()
     llm.completion.assert_not_called()

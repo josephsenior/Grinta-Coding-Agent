@@ -415,7 +415,9 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
             ):
                 ready.set()
 
-    async def _maybe_harden_unfamiliar_workspace(self, controller: object, config: object) -> None:
+    async def _maybe_harden_unfamiliar_workspace(
+        self, controller: object, config: object
+    ) -> None:
         from backend.cli.workspace_trust_prompt import (
             maybe_apply_unfamiliar_workspace_hardening,
         )

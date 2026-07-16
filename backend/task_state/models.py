@@ -64,14 +64,26 @@ class TaskState:
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> 'TaskState':
         def items(value: Any) -> list[ContractItem]:
-            return [
-                ContractItem(
-                    id=str(row.get('id', '')).strip(), text=str(row.get('text', '')).strip(),
-                    source=str(row.get('source', 'agent')).strip(), status=str(row.get('status', 'unknown')).strip(),
-                    evidence=[Evidence(**e) for e in row.get('evidence', []) if isinstance(e, dict)],
-                )
-                for row in value if isinstance(row, dict)
-            ] if isinstance(value, list) else []
+            return (
+                [
+                    ContractItem(
+                        id=str(row.get('id', '')).strip(),
+                        text=str(row.get('text', '')).strip(),
+                        source=str(row.get('source', 'agent')).strip(),
+                        status=str(row.get('status', 'unknown')).strip(),
+                        evidence=[
+                            Evidence(**e)
+                            for e in row.get('evidence', [])
+                            if isinstance(e, dict)
+                        ],
+                    )
+                    for row in value
+                    if isinstance(row, dict)
+                ]
+                if isinstance(value, list)
+                else []
+            )
+
         contract_raw = raw.get('contract')
         contract = None
         if isinstance(contract_raw, dict):
@@ -84,9 +96,23 @@ class TaskState:
         plan_raw = raw.get('plan')
         plan = None
         if isinstance(plan_raw, dict):
-            plan = TaskPlan([
-                TrackedTask(**{k: str(row.get(k, '')) for k in ('id', 'description', 'status', 'result')})
-                for row in plan_raw.get('tasks', []) if isinstance(row, dict)
-            ])
-        return cls(version=int(raw.get('version', 1)), revision=int(raw.get('revision', 0)), contract=contract, plan=plan,
-                   created_at=str(raw.get('created_at') or _now()), updated_at=str(raw.get('updated_at') or _now()))
+            plan = TaskPlan(
+                [
+                    TrackedTask(
+                        **{
+                            k: str(row.get(k, ''))
+                            for k in ('id', 'description', 'status', 'result')
+                        }
+                    )
+                    for row in plan_raw.get('tasks', [])
+                    if isinstance(row, dict)
+                ]
+            )
+        return cls(
+            version=int(raw.get('version', 1)),
+            revision=int(raw.get('revision', 0)),
+            contract=contract,
+            plan=plan,
+            created_at=str(raw.get('created_at') or _now()),
+            updated_at=str(raw.get('updated_at') or _now()),
+        )

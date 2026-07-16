@@ -98,6 +98,7 @@ EXEMPTIONS: dict[str, str] = {
     'backend.execution.aes.helpers': 'Execution imports engine.function_calling for multi-edit handler',
     'backend.execution.utils.shell.unified_shell': 'Execution imports engine.tools.prompt for tool registry',
     'backend.execution.rollback.workspace_checkpoint': 'Rollback checkpoint walk reuses engine ignore_filter until moved to utils',
+    'backend.execution.rollback.shadow_repo': 'Rollback shadow repo reuses engine ignore_filter until moved to utils',
     'backend.inference.fn_call': 'Inference imports engine.tools.prompt for tool registry',
 }
 

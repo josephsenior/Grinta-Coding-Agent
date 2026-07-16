@@ -49,15 +49,21 @@ def test_parse_and_serialize_markdown_memory():
 
 
 def test_facts_are_similar():
-    assert _facts_are_similar(
-        'Run integration tests with uv run pytest backend/tests/integration -q.',
-        'Run integration tests with uv run pytest backend/tests/integration'
-    ) is True
+    assert (
+        _facts_are_similar(
+            'Run integration tests with uv run pytest backend/tests/integration -q.',
+            'Run integration tests with uv run pytest backend/tests/integration',
+        )
+        is True
+    )
 
-    assert _facts_are_similar(
-        'Run integration tests with uv run pytest backend/tests/integration -q.',
-        'Create a new file in app/main.py'
-    ) is False
+    assert (
+        _facts_are_similar(
+            'Run integration tests with uv run pytest backend/tests/integration -q.',
+            'Create a new file in app/main.py',
+        )
+        is False
+    )
 
 
 def test_project_memory_service_upsert(tmp_path):
@@ -69,7 +75,7 @@ def test_project_memory_service_upsert(tmp_path):
         fact='uv run pytest backend/tests/unit -q',
         evidence=['passed'],
         confidence=0.9,
-        source_session='session-a'
+        source_session='session-a',
     )
     assert id1 == 'mem-001'
 
@@ -83,7 +89,7 @@ def test_project_memory_service_upsert(tmp_path):
         fact='uv run pytest backend/tests/unit',
         evidence=['passed again'],
         confidence=0.95,
-        source_session='session-b'
+        source_session='session-b',
     )
     assert id2 == 'mem-001'
 
@@ -98,6 +104,6 @@ def test_project_memory_service_upsert(tmp_path):
         fact='Use absolute imports in python files',
         evidence=['convention checklist'],
         confidence=0.88,
-        source_session='session-c'
+        source_session='session-c',
     )
     assert id3 == 'mem-002'

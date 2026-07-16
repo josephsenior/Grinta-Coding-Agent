@@ -18,7 +18,9 @@ def test_detect_sudo_password_prompt_in_output() -> None:
 
 
 def test_detect_dpkg_lock_in_output() -> None:
-    content = 'E: Could not get lock /var/lib/dpkg/lock-frontend. It is held by process 1234'
+    content = (
+        'E: Could not get lock /var/lib/dpkg/lock-frontend. It is held by process 1234'
+    )
     hint = detect_shell_stall_reason(content, 'sudo rm -f /var/lib/dpkg/lock-frontend')
     assert hint is not None
     assert 'lock' in hint.lower()

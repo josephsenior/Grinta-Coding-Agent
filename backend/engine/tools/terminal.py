@@ -23,9 +23,10 @@ _DETAILED_TERMINAL_DESCRIPTION = (
     '* `kill` — release/stop a session immediately.\n\n'
 )
 
+
 def create_terminal_tool() -> dict[str, Any]:
     shell = get_shell_name()
-    description = _DETAILED_TERMINAL_DESCRIPTION.format(shell=shell)
+    description = _DETAILED_TERMINAL_DESCRIPTION.format(shell=shell)  # nosec B604
 
     if uses_powershell_terminal():
         description += (

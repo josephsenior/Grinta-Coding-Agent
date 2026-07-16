@@ -190,9 +190,9 @@ def test_file_facts_capped_to_compact_snapshot_limit():
     assert len(file_facts) == MAX_FILES_IN_COMPACT_SNAPSHOT
 
     snapshot = extract_snapshot(events)
-    assert active_file_paths_from_files_touched(
-        snapshot.get('files_touched', {})
-    ) == [fact.expected_text for fact in file_facts]
+    assert active_file_paths_from_files_touched(snapshot.get('files_touched', {})) == [
+        fact.expected_text for fact in file_facts
+    ]
 
 
 def test_snapshot_in_restored_context_improves_file_continuity_score():

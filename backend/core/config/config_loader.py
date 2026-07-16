@@ -454,7 +454,9 @@ def _apply_agent_enable_flag(
     cfg.agents[agent_name] = AgentConfig(**merged)
 
 
-def _apply_json_tool_integration_config(cfg: AppConfig, data: dict[str, object]) -> None:
+def _apply_json_tool_integration_config(
+    cfg: AppConfig, data: dict[str, object]
+) -> None:
     """Map top-level ``lsp_config`` / ``dap_config`` onto the default agent."""
     from backend.core.constants import DEFAULT_AGENT_NAME
 
@@ -553,9 +555,7 @@ def _apply_json_security_config(
         cfg.security = SecurityConfig.model_validate(merged)
     except Exception as exc:
         detail = str(exc).strip() or repr(exc)
-        logger.app_logger.warning(
-            'Skipping invalid security config overrides: %s', exc
-        )
+        logger.app_logger.warning('Skipping invalid security config overrides: %s', exc)
         if summary is not None:
             summary.record('security', 'invalid', detail)
 
@@ -665,11 +665,15 @@ def finalize_config(cfg: AppConfig) -> None:
     if getattr(cfg, '_mcp_enabled_set_in_json', False):
         mcp_enabled = cfg.mcp.enabled
         for name in list(cfg.agents.keys()):
-            cfg.agents[name] = cfg.agents[name].model_copy(update={'enable_mcp': mcp_enabled})
+            cfg.agents[name] = cfg.agents[name].model_copy(
+                update={'enable_mcp': mcp_enabled}
+            )
 
         agent_base = cfg.get_agent_config(cfg.default_agent)
         if agent_base.enable_mcp != mcp_enabled:
-            cfg.agents[cfg.default_agent] = agent_base.model_copy(update={'enable_mcp': mcp_enabled})
+            cfg.agents[cfg.default_agent] = agent_base.model_copy(
+                update={'enable_mcp': mcp_enabled}
+            )
     else:
         cfg.get_agent_config(cfg.default_agent)
     from backend.utils.optional_extras import browser_tool_enabled

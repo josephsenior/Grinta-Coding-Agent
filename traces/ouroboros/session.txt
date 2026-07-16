@@ -1068,7 +1068,7 @@ Now let me continue building the remaining compiler pipeline components: ANF, Cl
 [thinking]
 The system is warning about JSON escape sequences in file content. Let me continue building the remaining compiler components and then move on to the runtime. I need to create:
 - ANF transform (anf.py)
-- Closure conversion (closure.py) 
+- Closure conversion (closure.py)
 - LLVM IR emission (emit.py)
 - Linker (link.py)
 - C Runtime files
@@ -2725,7 +2725,7 @@ I need to add `type_annotation` to `FuncDecl`. Let me check how FuncDecl is cons
 2026-07-05T22:04:34.086509+00:00 | AGENT step
 --------------------------------------------------------------------------------
 [thinking]
-The FuncDecl is constructed with positional args: `FuncDecl(name, type_params, param_types, return_type, effects, value, [], tok.span)`. The span is `span` attribute from `Decl` base class. 
+The FuncDecl is constructed with positional args: `FuncDecl(name, type_params, param_types, return_type, effects, value, [], tok.span)`. The span is `span` attribute from `Decl` base class.
 
 The `type_annotation` field is not in the dataclass fields, so it doesn't exist. Let me check if `Expr` has `type_annotation`:
 
@@ -3298,7 +3298,7 @@ The error is a built-in Python `TypeError("unhashable type: 'list'")` being caug
 [thinking]
 The error `"unhashable type: 'list'"` is a Python built-in `TypeError` being caught by the `except TypeError` in the infer.py code (since it shadows the built-in `TypeError` with the compiler's `TypeError`). Wait, actually - in Python, `except TypeError` will catch the built-in `TypeError`. But the import `from .types import TypeError` replaces the name `TypeError` in the module namespace. So `except TypeError` in infer.py should catch the compiler's `TypeError`, not the built-in one.
 
-But wait - the message says `"unhashable type: 'list'"` which is a Python built-in TypeError. So somehow the built-in TypeError is being caught by the except clause. 
+But wait - the message says `"unhashable type: 'list'"` which is a Python built-in TypeError. So somehow the built-in TypeError is being caught by the except clause.
 
 Actually, looking again - in Python, when you do `from .types import TypeError`, the name `TypeError` in infer.py refers to the compiler's TypeError class. The `except TypeError as e:` will catch the compiler's TypeError, NOT the built-in TypeError.
 
@@ -3574,7 +3574,7 @@ FuncDecl(name, type_params, param_types, return_type, effects, value, [], tok.sp
 ```
 
 This would map as:
-- name → span- type_params → name  
+- name → span- type_params → name
 - etc.
 
 Wait, that's wrong too! Unless... the Decl was defined differently before. Let me check if `Decl` is a dataclass with `span`.
@@ -4525,7 +4525,7 @@ Let me trace the actual let-polymorphism issue:
 [thinking]
 The let-polymorphism test has: `let a = id 5` followed by `let b = id true`. The issue is that `id 5` instantiates `id` at type `Int -> Int`, but then `a` gets type `Int`, and `id true` tries to instantiate `id` again at `Bool -> Bool`. But if `id` wasn't generalized after `let a`, then the second usage would fail.
 
-Actually, let me look at the infer_program more carefully. The issue is that `a` and `b` are separate `FuncDecl`s. Each is handled independently. The function `id` is defined, then `a = id 5`, then `b = id true`. 
+Actually, let me look at the infer_program more carefully. The issue is that `a` and `b` are separate `FuncDecl`s. Each is handled independently. The function `id` is defined, then `a = id 5`, then `b = id true`.
 
 Wait, but `let a = id 5` is parsed as a FuncDecl. Since there's no annotation, it should generalize. But the error says "Cannot unify Int with a2 -> a3". Let me think about what's happening:
 
@@ -4814,7 +4814,7 @@ Hmm wait, after step 3 for `let a`, the substitution has a2 = Int. So when looki
 
 But wait, the fresh var counter doesn't reset between decls. After inferring `id`, we used a1. After inferring `a`, we used a2 and a3. Now for `b`, we should use a4 and a5.
 
-The error says "Cannot unify Int with a2 → a3" and "Cannot unify Bool with a4 → a5". 
+The error says "Cannot unify Int with a2 → a3" and "Cannot unify Bool with a4 → a5".
 
 Wait, a2 → a3 is the fresh instantiation from `id`'s scheme. But `id`'s scheme is `∀a1. a1 → a1`, so when instantiated, it should be `a_new → a_new` (same variable for both positions). But a2 and a3 are different variables!
 
@@ -7814,7 +7814,7 @@ The issue is probably that the file listing is happening inside the timeout but 
 
 Actually the hang is happening when we iterate over files and try to parse them. But the effect_safety test doesn't use files - it uses inline sources. So the hang is from something else.
 
-Let me re-check: the `test_effect_checker_processes_all` test just loops over `ILLEGAL_EFFECTS + LEGAL_EFFECTS` and calls `check_effects(source)` on each. This should be fast. But somehow it hangs when run through pytest. 
+Let me re-check: the `test_effect_checker_processes_all` test just loops over `ILLEGAL_EFFECTS + LEGAL_EFFECTS` and calls `check_effects(source)` on each. This should be fast. But somehow it hangs when run through pytest.
 
 Could there be a circular import? Let me check if there's a conftest that might cause issues.
 
@@ -10230,7 +10230,7 @@ In `_parse_type()`, when we encounter `(`, `_parse_atomic_type()` is called:
 - Advances past `(`
 - Calls `_parse_type()`
 - `_parse_type()` calls `_parse_atomic_type()`
-- `_parse_atomic_type()` sees RPAREN `)` 
+- `_parse_atomic_type()` sees RPAREN `)`
 - It's not LINEAR, LPAREN, IDENT, INT_TYPE, FLOAT_TYPE, BOOL_TYPE, STRING_TYPE, UNIT_TYPE, or uppercase IDENT
 - It raises ParseError
 
@@ -10239,7 +10239,7 @@ Wait, but then it should error, not hang. Let me re-check...
 Actually, wait. The token after `->` is `(` followed by `)`. Let me check what `_parse_type` does when it encounters `(`.
 
 In `_parse_atomic_type`:
-- It sees `(` (LPAREN) 
+- It sees `(` (LPAREN)
 - Advances
 - Calls `_parse_type()`
 - `_parse_type()` calls `_parse_atomic_type()`
@@ -10737,7 +10737,7 @@ If parsing `()` fails with a ParseError, the exception propagates up. Unless the
 
 Hmm, let me think again. When parsing `()`:
 1. `_parse_atomic_type()` sees LPAREN, advances
-2. Calls `_parse_type()` → `_parse_atomic_type()` 
+2. Calls `_parse_type()` → `_parse_atomic_type()`
 3. `_parse_atomic_type()` sees RPAREN
 4. RPAREN doesn't match any condition → raises ParseError
 
@@ -10766,7 +10766,7 @@ The tokens inside the braces are: `IDENT('print')`, `COLON`, `STRING_TYPE('Strin
 After parsing `String ->`:
 - `_parse_type()` is called for return type
 - `_parse_atomic_type()` sees `(` → advances past `(`, calls `_parse_type()`
-- `_parse_type()` calls `_parse_atomic_type()` → sees `)` 
+- `_parse_type()` calls `_parse_atomic_type()` → sees `)`
 - `)` doesn't match... but wait, maybe it falls through to the error at line 198?
 
 Actually, RPAREN is not in the check. Let me look at `_parse_atomic_type` again:
@@ -10967,7 +10967,7 @@ Now the token is EOF. The while loop in `parse()` checks `self._current().kind !
 
 Wait, but the alarm is showing the parser hangs at line 727. Let me re-check...
 
-Actually, the issue might be subtler. When `_parse_effect_decl` calls `_parse_type()` which calls `_parse_atomic_type()` which sees `(` and advances past it, then calls `_parse_type()` again, which calls `_parse_atomic_type()` which sees `)`. Since `)` doesn't match any of the type cases, it raises `ParseError`. 
+Actually, the issue might be subtler. When `_parse_effect_decl` calls `_parse_type()` which calls `_parse_atomic_type()` which sees `(` and advances past it, then calls `_parse_type()` again, which calls `_parse_atomic_type()` which sees `)`. Since `)` doesn't match any of the type cases, it raises `ParseError`.
 
 BUT — the `_parse_atomic_type` has this check at line 159:
 ```python

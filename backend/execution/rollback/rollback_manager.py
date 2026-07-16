@@ -111,7 +111,9 @@ class RollbackManager:
         self.max_checkpoints = max_checkpoints
         self.auto_cleanup = auto_cleanup
         # Retained for API compat -- has no effect with the shadow-repo backend.
-        self.allow_destructive_git_rollback = bool(allow_destructive_git_rollback or False)
+        self.allow_destructive_git_rollback = bool(
+            allow_destructive_git_rollback or False
+        )
 
         # Create checkpoints directory
         self.checkpoints_dir.mkdir(parents=True, exist_ok=True)

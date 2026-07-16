@@ -83,7 +83,9 @@ async def test_long_session_compaction_preserves_recent_boundary(tmp_path) -> No
     )
     with (
         patch(monkeypatch_paths[0], lambda state=None: tmp_path / 'snapshot.json'),
-        patch(monkeypatch_paths[1], lambda state=None: tmp_path / 'snapshot.staging.json'),
+        patch(
+            monkeypatch_paths[1], lambda state=None: tmp_path / 'snapshot.staging.json'
+        ),
         patch(monkeypatch_paths[2], lambda state=None: tmp_path / 'session_memory.md'),
         patch('backend.context.context_pipeline.finalize_compaction_artifacts'),
         patch('backend.context.context_pipeline.delete_staging_snapshot'),

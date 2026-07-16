@@ -37,4 +37,3 @@ def test_append_markdown_lesson_skips_duplicate_sections(tmp_path) -> None:
     assert stored.count('## ') == 1
     assert 'Terminal run' in stored
     assert 'Terminal rerun' not in stored
-

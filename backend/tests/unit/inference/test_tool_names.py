@@ -106,4 +106,3 @@ class TestToolNames(TestCase):
         """Canonical tool name strings must not collide."""
         canonical = [getattr(tool_names, name) for name in EXPECTED_EXPORTS]
         self.assertEqual(len(canonical), len(set(canonical)))
-

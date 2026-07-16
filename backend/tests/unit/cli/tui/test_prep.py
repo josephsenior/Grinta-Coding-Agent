@@ -48,7 +48,5 @@ def test_incremental_streaming_freezes_complete_fences() -> None:
 
     _renderable, state = prep_streaming_renderable_incremental(second, state)
     assert state.committed_upto >= first_upto
-    frozen_syntax = [
-        part for part in state.committed_parts if isinstance(part, Syntax)
-    ]
+    frozen_syntax = [part for part in state.committed_parts if isinstance(part, Syntax)]
     assert len(frozen_syntax) == 2

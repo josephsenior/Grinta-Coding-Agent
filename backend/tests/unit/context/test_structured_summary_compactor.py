@@ -336,8 +336,8 @@ class TestGetCompaction:
         llm.astream = _astream
         llm.acompletion = AsyncMock()
         emitted: list[str] = []
-        condenser.streaming_emitter = (
-            lambda _chunk, accumulated, _final: emitted.append(accumulated)
+        condenser.streaming_emitter = lambda _chunk, accumulated, _final: (
+            emitted.append(accumulated)
         )
 
         with patch.object(condenser, '_add_response_metadata'):
@@ -376,8 +376,8 @@ class TestGetCompaction:
         llm.astream = _astream
         llm.acompletion = AsyncMock()
         emitted: list[str] = []
-        condenser.streaming_emitter = (
-            lambda _chunk, accumulated, _final: emitted.append(accumulated)
+        condenser.streaming_emitter = lambda _chunk, accumulated, _final: (
+            emitted.append(accumulated)
         )
 
         with patch.object(condenser, '_add_response_metadata'):

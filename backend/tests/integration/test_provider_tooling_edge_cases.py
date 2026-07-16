@@ -205,7 +205,9 @@ class TestLSPEdgeCases:
 
         mock_client = MagicMock()
         mock_client.query.return_value = result
-        with patch('backend.utils.lsp.lsp_client.get_lsp_client', return_value=mock_client):
+        with patch(
+            'backend.utils.lsp.lsp_client.get_lsp_client', return_value=mock_client
+        ):
             obs = await ex.lsp_query(action)
 
         assert isinstance(obs, LspQueryObservation)
@@ -234,7 +236,9 @@ class TestLSPEdgeCases:
 
         mock_client = MagicMock()
         mock_client.query.return_value = result
-        with patch('backend.utils.lsp.lsp_client.get_lsp_client', return_value=mock_client):
+        with patch(
+            'backend.utils.lsp.lsp_client.get_lsp_client', return_value=mock_client
+        ):
             obs = await ex.lsp_query(action)
 
         assert isinstance(obs, LspQueryObservation)

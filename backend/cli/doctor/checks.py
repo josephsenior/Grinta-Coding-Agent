@@ -185,11 +185,15 @@ def check_security_settings_values() -> DoctorCheck:
 
     security = raw.get('security')
     if not isinstance(security, dict):
-        return DoctorCheck('security_values', True, 'no security section', critical=False)
+        return DoctorCheck(
+            'security_values', True, 'no security section', critical=False
+        )
 
     profile = security.get('execution_profile')
     if profile is None:
-        return DoctorCheck('security_values', True, 'execution_profile=default', critical=False)
+        return DoctorCheck(
+            'security_values', True, 'execution_profile=default', critical=False
+        )
 
     allowed = {'standard', 'hardened_local', 'sandboxed_local'}
     text = str(profile).strip()
@@ -200,7 +204,9 @@ def check_security_settings_values() -> DoctorCheck:
             f"invalid execution_profile '{text}'; use one of {sorted(allowed)}",
             critical=False,
         )
-    return DoctorCheck('security_values', True, f'execution_profile={text}', critical=False)
+    return DoctorCheck(
+        'security_values', True, f'execution_profile={text}', critical=False
+    )
 
 
 def check_execution_profile() -> DoctorCheck:
@@ -247,9 +253,6 @@ def check_binary(name: str, *, critical: bool = True) -> DoctorCheck:
     if path:
         return DoctorCheck(name, True, path, critical=critical)
     return DoctorCheck(name, False, 'not found on PATH', critical=critical)
-
-
-
 
 
 def check_optional_imports() -> DoctorCheck:

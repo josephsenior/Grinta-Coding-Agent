@@ -96,4 +96,3 @@ def test_render_security_prompt_background_server_followup():
     assert 'is_background=true' in text
     assert 'terminal' in text
     assert '`wait`' in text
-

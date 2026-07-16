@@ -279,4 +279,3 @@ class TestEventToTrajectory:
         extras = result.get('extras', {})
         assert 'screenshot' not in extras
         assert 'set_of_marks' not in extras
-

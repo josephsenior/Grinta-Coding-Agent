@@ -128,7 +128,10 @@ def test_explicit_pivot_records_superseding_directive() -> None:
     rendered = render_canonical_state_for_prompt(canonical, char_budget=2000)
 
     # Pivot updates the active objective and archives the prior one.
-    assert canonical.objective == 'actually, forget the refactor, just fix the failing test'
+    assert (
+        canonical.objective
+        == 'actually, forget the refactor, just fix the failing test'
+    )
     assert any('Refactor the parser' in item for item in canonical.prior_objectives)
     assert (
         canonical.superseding_directive

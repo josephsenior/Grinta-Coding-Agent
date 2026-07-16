@@ -119,4 +119,3 @@ class TestToolCallMetadataSchema:
             total_calls_in_response=5,
         )
         assert m.total_calls_in_response == 5
-

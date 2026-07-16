@@ -738,9 +738,7 @@ class TestLoadFromJson:
         )
         cfg = AppConfig()
         cfg.mcp.enabled = True
-        cfg.mcp.servers = [
-            MCPServerConfig(name='github', type='stdio', command='npx')
-        ]
+        cfg.mcp.servers = [MCPServerConfig(name='github', type='stdio', command='npx')]
 
         load_from_json(cfg, str(json_file))
 

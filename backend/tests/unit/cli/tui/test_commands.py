@@ -103,7 +103,9 @@ async def test_tui_settings_command_can_wait_for_real_modal(mock_config, monkeyp
         'backend.core.config.load_app_config', lambda *args, **kwargs: mock_config
     )
     monkeypatch.setattr(
-        GrintaSettingsDialog, '_schedule_model_refresh', lambda self, provider=None: None
+        GrintaSettingsDialog,
+        '_schedule_model_refresh',
+        lambda self, provider=None: None,
     )
 
     async with app.run_test(size=(120, 36)) as pilot:
@@ -366,7 +368,9 @@ async def test_tui_slash_command_works_while_turn_in_flight(mock_config, monkeyp
 
 
 @pytest.mark.asyncio
-async def test_tui_compact_slash_dispatches_condensation_action(mock_config, monkeypatch):
+async def test_tui_compact_slash_dispatches_condensation_action(
+    mock_config, monkeypatch
+):
     """`/compact` must queue a condensation request in the TUI."""
     from backend.ledger.action.agent import CondensationRequestAction
 

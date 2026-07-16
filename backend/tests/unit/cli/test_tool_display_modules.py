@@ -465,9 +465,7 @@ class TestParseToolArgumentsJson(unittest.TestCase):
 
 class TestFormatToolActivityRows(unittest.TestCase):
     def test_bash(self) -> None:
-        verb, detail, stats = format_tool_activity_rows(
-            'terminal', {'command': 'ls'}
-        )
+        verb, detail, stats = format_tool_activity_rows('terminal', {'command': 'ls'})
         self.assertEqual(verb, 'Ran')
         self.assertIn('ls', detail)
 
@@ -500,9 +498,7 @@ class TestStreamingArgsHint(unittest.TestCase):
         self.assertEqual(streaming_args_hint('terminal', ''), '')
 
     def test_terminal_open(self) -> None:
-        hint = streaming_args_hint(
-            'terminal', '{"action": "open", "command": "bash"}'
-        )
+        hint = streaming_args_hint('terminal', '{"action": "open", "command": "bash"}')
         self.assertIn('start', hint)
 
     def test_terminal_read(self) -> None:
@@ -512,9 +508,7 @@ class TestStreamingArgsHint(unittest.TestCase):
         self.assertIn('read', hint)
 
     def test_terminal_input_ctrl(self) -> None:
-        hint = streaming_args_hint(
-            'terminal', '{"action": "input", "control": "C"}'
-        )
+        hint = streaming_args_hint('terminal', '{"action": "input", "control": "C"}')
         self.assertIn('ctrl', hint)
 
 
@@ -562,7 +556,9 @@ class TestStripProtocolEchoBlocks(unittest.TestCase):
         self.assertEqual(strip_protocol_echo_blocks(text), text)
 
     def test_strips_tool_result_block(self) -> None:
-        text = 'Done.\n\n[Tool result from terminal]\n[CMD_OUTPUT exit=0]\nfiles\n\nNext.'
+        text = (
+            'Done.\n\n[Tool result from terminal]\n[CMD_OUTPUT exit=0]\nfiles\n\nNext.'
+        )
         result = strip_protocol_echo_blocks(text)
         self.assertIn('Done.', result)
         self.assertNotIn('[Tool result from', result)
@@ -820,4 +816,3 @@ class TestMcpErrorSummary(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-
