@@ -138,7 +138,7 @@ class TestCancelAll:
     def test_cancels_processes_via_tree_kill_then_wait(self):
         svc = TaskCancellationService()
         proc = MagicMock(spec=subprocess.Popen)
-        proc.pid = 10
+        proc.pid = 99910
         svc.register_process(proc)
         svc.cancel_all()
         proc.wait.assert_called_once()
@@ -147,7 +147,7 @@ class TestCancelAll:
     def test_kills_on_timeout(self):
         svc = TaskCancellationService()
         proc = MagicMock(spec=subprocess.Popen)
-        proc.pid = 20
+        proc.pid = 99920
         proc.wait.side_effect = subprocess.TimeoutExpired(cmd='cmd', timeout=1.0)
         svc.register_process(proc)
         svc.cancel_all()
@@ -189,9 +189,9 @@ class TestCancelAll:
     def test_clears_everything(self):
         svc = TaskCancellationService()
         proc = MagicMock(spec=subprocess.Popen)
-        proc.pid = 1
+        proc.pid = 99901
         svc.register_process(proc)
-        svc.register_pid(2)
+        svc.register_pid(99902)
         svc.register_kill_callback('x', MagicMock())
         svc.cancel_all()
         assert not svc._active_pids
