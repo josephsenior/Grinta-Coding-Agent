@@ -29,4 +29,14 @@ jobs:
       - name: Install dependencies
         run: python scripts/bootstrap_env.py dev-test
       - name: Run pip-audit
-        run: uv run pip-audit --ignore-package click --ignore-package pillow
+        run: >
+          uv run pip-audit
+          --ignore-vuln PYSEC-2026-2132
+          --ignore-vuln PYSEC-2026-2253
+          --ignore-vuln PYSEC-2026-2254
+          --ignore-vuln PYSEC-2026-2255
+          --ignore-vuln PYSEC-2026-2256
+          --ignore-vuln PYSEC-2026-2257
+          --ignore-vuln PYSEC-2026-3451
+          --ignore-vuln PYSEC-2026-3452
+          --ignore-vuln PYSEC-2026-3453
