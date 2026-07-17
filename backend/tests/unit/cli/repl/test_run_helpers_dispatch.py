@@ -1,12 +1,12 @@
+from unittest.mock import AsyncMock, Mock
+
 import pytest
-import asyncio
-from unittest.mock import Mock, AsyncMock
 
 from backend.cli.repl.run_helpers_dispatch import (
-    _validate_engine_components_ready,
     _read_repl_input,
-    _discard_terminal_noise,
+    _validate_engine_components_ready,
 )
+
 
 class DummyHost:
     def __init__(self):
@@ -23,13 +23,14 @@ class DummyHost:
         self._running = True
 
     async def _read_non_interactive_input(self):
-        return ""
+        return ''
+
 
 def test_validate_engine_components_ready():
     host = DummyHost()
     assert _validate_engine_components_ready(host) is False
     host._renderer.add_system_message.assert_called_once()
-    
+
     # Now set them all
     host._agent = Mock()
     host._llm_registry = Mock()
@@ -39,6 +40,7 @@ def test_validate_engine_components_ready():
     host._event_stream = Mock()
     assert _validate_engine_components_ready(host) is True
 
+
 @pytest.mark.asyncio
 async def test_read_repl_input_eof():
     host = DummyHost()
@@ -47,13 +49,15 @@ async def test_read_repl_input_eof():
     assert result is None
     host._console.print.assert_called()
 
+
 @pytest.mark.asyncio
 async def test_read_repl_input_interactive():
     host = DummyHost()
     session = Mock()
-    session.prompt_async = AsyncMock(return_value="hello")
+    session.prompt_async = AsyncMock(return_value='hello')
     result = await _read_repl_input(host, session)
-    assert result == "hello"
+    assert result == 'hello'
+
 
 @pytest.mark.asyncio
 async def test_read_repl_input_keyboard_interrupt():
@@ -61,7 +65,5 @@ async def test_read_repl_input_keyboard_interrupt():
     session = Mock()
     session.prompt_async = AsyncMock(side_effect=KeyboardInterrupt)
     result = await _read_repl_input(host, session)
-    assert result == ""
+    assert result == ''
     host._console.print.assert_called()
-
-

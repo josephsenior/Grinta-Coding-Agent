@@ -298,6 +298,7 @@ jobs:
       - gates-on-linux-coverage-d
       - gates-on-linux-coverage-g
       - gates-on-linux-coverage-e
+      - gates-on-linux-extended
     strategy:
       matrix:
         python-version: ['3.12']
@@ -325,7 +326,8 @@ jobs:
           cp coverage-shards/coverage-linux-d/coverage-shard-d.dat .coverage.d
           cp coverage-shards/coverage-linux-g/coverage-shard-g.dat .coverage.g
           cp coverage-shards/coverage-linux-e/coverage-shard-e.dat .coverage.e
-          uv run coverage combine .coverage.a .coverage.b .coverage.c .coverage.d .coverage.g .coverage.e
+          cp coverage-shards/coverage-linux-extended/coverage-shard-extended.dat .coverage.extended
+          uv run coverage combine .coverage.a .coverage.b .coverage.c .coverage.d .coverage.g .coverage.e .coverage.extended
           uv run coverage report --fail-under=75
           uv run coverage xml -o coverage.xml
       - name: Upload coverage to Codecov
@@ -343,7 +345,6 @@ jobs:
     name: Python Gates on Linux (extended)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    needs: gates-on-linux-coverage-report
     strategy:
       matrix:
         python-version: ['3.12']
@@ -366,7 +367,18 @@ jobs:
       - name: Compile backend (syntax gate)
         run: uv run python -m compileall backend
       - name: Run integration, e2e, and stress tests
-        run: PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q -n 2 backend/tests/integration backend/tests/e2e backend/tests/stress
+        run: >-
+          PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q -n 2
+          --cov=backend --cov-fail-under=0
+          backend/tests/integration backend/tests/e2e backend/tests/stress
+      - name: Stage coverage data
+        run: cp .coverage coverage-shard-extended.dat
+      - name: Upload coverage data
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: coverage-linux-extended
+          path: coverage-shard-extended.dat
+          if-no-files-found: error
 
   gates-on-linux-py313:
     name: Python Gates on Linux (3.13 unit)
