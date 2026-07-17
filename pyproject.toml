@@ -298,5 +298,6 @@ constraint-dependencies = [
 ]
 override-dependencies = [
   "aiohttp>=3.14.1",
+  "mcp>=1.28.1,<2",
   "pypdf>=6.12.0",
 ]
