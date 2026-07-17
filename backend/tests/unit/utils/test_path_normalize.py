@@ -50,7 +50,10 @@ def test_msys_to_windows_path() -> None:
 
 def test_to_native_path() -> None:
     # Test on Windows mode
-    with patch('backend.utils.path_normalize.os.name', 'nt'):
+    with (
+        patch('backend.utils.path_normalize.os.name', 'nt'),
+        patch('backend.utils.path_normalize.os.sep', '\\'),
+    ):
         assert to_native_path('/c/Users/foo') == 'C:\\Users\\foo'
         assert to_native_path('C:\\Users\\foo') == 'C:\\Users\\foo'
 
@@ -63,7 +66,8 @@ def test_normalize_path_env_edge_cases() -> None:
     # None or empty variables
     assert normalize_path_env(None) == ''
     assert normalize_path_env('') == ''
-    assert normalize_path_env('   ') == ''
+    with patch('backend.utils.path_normalize.os.name', 'nt'):
+        assert normalize_path_env('   ') == ''
 
 
 def test_normalize_path_env_posix() -> None:
@@ -75,7 +79,10 @@ def test_normalize_path_env_posix() -> None:
 
 def test_normalize_path_env_windows() -> None:
     # On Windows it splits, normalizes to native path, removes duplicates, and rejoins with ";"
-    with patch('backend.utils.path_normalize.os.name', 'nt'):
+    with (
+        patch('backend.utils.path_normalize.os.name', 'nt'),
+        patch('backend.utils.path_normalize.os.sep', '\\'),
+    ):
         # Separated by ":" (colon splitting occurs only if semicolon is absent)
         res = normalize_path_env('/c/bin:/d/bin')
         assert res == 'C:\\bin;D:\\bin'
@@ -95,7 +102,10 @@ def test_normalize_path_env_windows() -> None:
 def test_get_native_path_env() -> None:
     mock_env = {'PATH': '/c/bin:/d/bin'}
     with patch.dict(os.environ, mock_env):
-        with patch('backend.utils.path_normalize.os.name', 'nt'):
+        with (
+            patch('backend.utils.path_normalize.os.name', 'nt'),
+            patch('backend.utils.path_normalize.os.sep', '\\'),
+        ):
             assert get_native_path_env() == 'C:\\bin;D:\\bin'
 
 
@@ -103,7 +113,10 @@ def test_which_normalized() -> None:
     mock_env = {'PATH': '/c/bin:/d/bin'}
 
     with patch.dict(os.environ, mock_env):
-        with patch('backend.utils.path_normalize.os.name', 'nt'):
+        with (
+            patch('backend.utils.path_normalize.os.name', 'nt'),
+            patch('backend.utils.path_normalize.os.sep', '\\'),
+        ):
             with patch('shutil.which') as mock_which:
                 mock_which.return_value = '/c/bin/git'
 

@@ -35,10 +35,10 @@ def test_active_tool_registry_context() -> None:
 
 
 def test_runtime_prefers_powershell() -> None:
+    from types import SimpleNamespace
+
     # 1. Active registry
-    mock_reg = MagicMock()
-    mock_reg.has_bash = True
-    mock_reg.has_powershell = False
+    mock_reg = SimpleNamespace(has_bash=True, has_powershell=False)
 
     set_active_tool_registry(mock_reg)
     assert _runtime_prefers_powershell() is False
@@ -49,9 +49,7 @@ def test_runtime_prefers_powershell() -> None:
 
     # 2. Fallback to global registry
     set_active_tool_registry(None)
-    mock_global = MagicMock()
-    mock_global.has_bash = True
-    mock_global.has_powershell = False
+    mock_global = SimpleNamespace(has_bash=True, has_powershell=False)
     with patch(
         'backend.utils.terminal.terminal_contract._get_global_tool_registry',
         return_value=mock_global,
