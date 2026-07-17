@@ -1,14 +1,14 @@
-# Grinta v1.0.0-rc1 Release Notes
+# Proposed Grinta v1.0.0-rc1 Release Notes
 
-`v1.0.0-rc1` is the public release candidate for Grinta's 1.0 line.
-This build is intended for real usage and focused feedback before final GA.
+These notes are prepared for a future `v1.0.0-rc1` release. That tag and its package artifacts have not been published yet.
+The current `main` branch is intended for evaluation and focused feedback before the release candidate is cut.
 
-Historical note: these release notes capture the support stance at rc1 publication.
+These notes capture the intended support stance for RC publication.
 For the current support contract and CI certification depth, see [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md).
 
 ## What this release is
 
-- Public RC for the CLI-first open-source product surface.
+- Proposed RC for the CLI-first open-source product surface.
 - Intended for everyday coding workflows on Linux and Windows while we collect final RC feedback.
 - Feedback-driven final polish phase before cutting `1.0.0`.
 
@@ -33,11 +33,11 @@ For the current support contract and CI certification depth, see [SUPPORT_MATRIX
 - Added clean-box smoke install scripts for Linux/macOS/Windows and Docker.
 - Clarified autonomy language to `conservative` / `balanced` / `full`.
 
-## Platform and support stance at rc1 publication
+## Intended platform and support stance at RC publication
 
 - **Supported:** Linux, Windows.
 - **Best effort:** macOS (advisory CI; not yet a required gate).
-- **Preferred install path:** `pipx install grinta`.
+- **Current install path:** editable installation from the source checkout.
 
 ## Known limitations and candid caveats
 
@@ -60,7 +60,9 @@ Please open issues with the `RC Feedback` template:
 ## Upgrade / install
 
 ```bash
-pipx install grinta
+git clone https://github.com/josephsenior/Grinta-Coding-Agent.git Grinta
+cd Grinta
+pipx install -e .
 grinta init
 grinta
 ```

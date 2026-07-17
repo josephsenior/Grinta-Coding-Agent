@@ -10,7 +10,7 @@ version = "1.0.0rc1"
 description = "Local-first TUI/CLI coding agent"
 readme = "README.md"
 license = "MIT"
-authors = [ { name = "Joseph Senior" } ]
+authors = [ { name = "Youssef Mejdi" } ]
 requires-python = ">=3.12,<3.14"
 classifiers = [
   "Development Status :: 4 - Beta",

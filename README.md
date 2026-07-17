@@ -4,19 +4,19 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.12–3.13](https://img.shields.io/badge/Python-3.12--3.13-3776AB?logo=python&logoColor=white)](https://python.org)
-[![Install: pipx](https://img.shields.io/badge/install-pipx-brightgreen)](docs/QUICK_START.md)
+[![Install: source](https://img.shields.io/badge/install-from%20source-brightgreen)](docs/QUICK_START.md)
 [![mypy: checked](https://img.shields.io/badge/mypy-checked-2A6DB2.svg)](https://mypy-lang.org/)
 [![code style: Ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://github.com/astral-sh/ruff)
 [![Tests](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/py-tests.yml/badge.svg)](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/py-tests.yml)
 [![Lint](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/lint.yml/badge.svg)](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/lint.yml)
 [![CLI Regression](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/e2e-tests.yml/badge.svg)](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/e2e-tests.yml)
-[![Release Stage: RC](https://img.shields.io/badge/release_stage-RC-orange)](https://github.com/josephsenior/Grinta-Coding-Agent/releases/tag/v1.0.0-rc1)
+[![Status: beta](https://img.shields.io/badge/status-beta-orange)](docs/RELEASE_CHECKLIST.md)
 
 > **Local-first. Provider-agnostic. Ships with real LSP + DAP. Optional extras stay opt-in.**
 >
 > A terminal coding agent that plans, executes, validates, and finishes — without a cloud control plane, without lock-in to one model vendor, and without the old heavyweight install footprint.
 >
-> **Current status:** `v1.0.0-rc1` public release candidate. Linux, Windows, and macOS run required unit and extended CI gates; smoke-install and onboarding validation are in place. Remaining GA work is mostly documentation alignment, contributor-doc honesty, and edge-case hardening after the post-rc1 decomposition wave.
+> **Current status:** active beta development toward the 1.0 release candidate. No GitHub release or PyPI package has been published yet; install from source using the tested paths below. Linux, Windows, and macOS run required unit and extended CI gates.
 
 Created and maintained by [Youssef Mejdi](https://github.com/josephsenior).
 
@@ -28,7 +28,8 @@ Direct link if the video does not load: [`docs/assets/grinta-demo.mp4`](docs/ass
 
 ## Release status
 
-- Latest public build is `v1.0.0-rc1` (release candidate), not final GA.
+- `main` currently identifies as `1.0.0rc1`, but no public release tag or PyPI package has been published yet.
+- Install from source until a signed release and its package artifacts are available.
 - Required CI covers sharded Linux unit coverage (75%), cross-platform unit gates, and integration/e2e/stress on Linux, Windows, and macOS; smoke-install and onboarding validation are in place for the current release line.
 - We are actively collecting feedback on UX clarity and edge-case reliability before the GA call.
 - Linux, Windows, and macOS are supported release targets, but certification depth differs by platform; see [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md).
@@ -49,10 +50,12 @@ Grinta distinguishes itself by focusing on a completely local-first, provider-ag
 **Consumer, dev, Windows, WSL2, Linux, macOS:** [docs/QUICK_START.md](docs/QUICK_START.md)
 
 ```bash
-pipx install grinta    # consumer — then cd "<project>" && grinta
+git clone https://github.com/josephsenior/Grinta-Coding-Agent.git Grinta
+cd Grinta
+pipx install -e .
 ```
 
-Optional extras: `pipx install "grinta[rag]"` · `"grinta[browser]"` · `"grinta[all]"` — details in [Quick Start](docs/QUICK_START.md).
+Then run `grinta` from the project you want it to work on. Optional extras use the same source checkout: `pipx install -e ".[rag]"`, `pipx install -e ".[browser]"`, or `pipx install -e ".[all]"`. See the [Quick Start](docs/QUICK_START.md) for platform-specific bootstrap instructions.
 
 ## What you get
 
