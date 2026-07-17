@@ -35,7 +35,7 @@ dependencies = [
   "httpx>=0.27,<1",
   "json-repair>=0.48,<1",
   "libtmux>=0.37,<0.63",
-  "mcp>=1.10,<2",
+  "mcp>=1.28.1,<2",
   "openai>=1.40,<3",
   "orjson>=3.10,<4",
   "pathspec>=0.12,<2",
@@ -298,5 +298,6 @@ constraint-dependencies = [
 ]
 override-dependencies = [
   "aiohttp>=3.14.1",
+  "mcp>=1.28.1",
   "pypdf>=6.12.0",
 ]
