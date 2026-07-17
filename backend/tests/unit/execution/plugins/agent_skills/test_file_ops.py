@@ -13,11 +13,17 @@ def test_output_error():
     assert _output_error('msg') == 'ERROR: msg'
 
 
+from backend.core.os_capabilities import OS_CAPS
+
+
 def test_is_valid_filename():
     assert _is_valid_filename('test.txt') is True
     assert _is_valid_filename('') is False
     assert _is_valid_filename(None) is False
-    assert _is_valid_filename('invalid<char>.txt') is False
+    if OS_CAPS.is_windows:
+        assert _is_valid_filename('invalid<char>.txt') is False
+    else:
+        assert _is_valid_filename('invalid\x00char.txt') is False
 
 
 def test_is_valid_path():

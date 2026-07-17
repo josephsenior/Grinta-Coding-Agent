@@ -14,7 +14,16 @@ You should care only if you care about one of these problems:
 This book is not a founder success story.
 It is a systems diary of trade-offs, and an admission of limits.
 
-I am publishing this now for one very simple, slightly embarrassing reason: to avoid breaking down. Not everything in this repository works perfectly. Some parts of the vision are still broken, experimental, or bleeding at the edges. But I realized that shipping a flawed, honest system today is infinitely better than burning out in isolation trying to make it perfect tomorrow. I need help to carry the rest of this vision.
+I first published this for one very simple, slightly embarrassing reason: I was
+close to breaking down. Not everything in the repository worked perfectly. Some
+parts of the vision were broken, experimental, or bleeding at the edges. I had
+treated endurance as if it could compensate for scope, and it could not.
+
+The lesson is not that isolation or 3 AM work is heroic. Fatigue is a technical
+risk: it narrows judgment, makes deletion feel like failure, and encourages one
+person to become the only map of the system. Shipping the imperfect version,
+documenting its limits, and asking other people to review it were part of making
+the engineering healthier as well as more useful.
 
 Most AI writing in public is optimized for momentum:
 

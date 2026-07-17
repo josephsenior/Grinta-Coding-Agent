@@ -1,5 +1,12 @@
 # 39. The Semantic Memory That Survived
 
+> **Later update, July 2026:** The implementation moved from
+> `backend/context/vector_store.py` to the `backend/context/vector_store/`
+> package. Vector memory is gated by the optional `[rag]` extra, project memory
+> now has an orchestrator-owned path, and durable task state—not an
+> `active_plan.json` summary—is the stronger completion contract. The retrieval
+> design below remains the history of what survived the larger graph system.
+
 There is a specific kind of embarrassment in engineering: the gap between what you built and what you actually needed.
 
 Earlier versions of Grinta had a memory subsystem that was genuinely impressive. A graph-based knowledge store with typed nodes for files, classes, functions, and concepts, connected by edges for imports, calls, definitions, and inheritance. A vector store that combined ANN search with BM25 lexical retrieval and cross-encoder re-ranking using full PyTorch models. A hierarchical context manager with three tiers — short-term, working, and long-term — plus explicit decision tracking and context anchors that should never be dropped.
@@ -40,7 +47,8 @@ What remained after the deletions was not the ambitious system I originally desi
 
 ### The Dual-Backend Architecture
 
-The current vector store (`backend/context/vector_store.py`) has two backends that run in parallel:
+The vector store at this snapshot (now the `backend/context/vector_store/`
+package) has two backends that run in parallel:
 
 **ChromaDB with FastEmbed ONNX** — The semantic backend uses ChromaDB's persistent client with FastEmbed's `BAAI/bge-small-en-v1.5` model. This is an ONNX-based embedding function, not PyTorch. It produces 384-dimensional vectors, loads in the background without blocking startup, and persists to `~/.grinta/workspaces/<id>/storage/memory/chroma/`. The model is configurable via the `EMBEDDING_MODEL` environment variable.
 
@@ -79,7 +87,9 @@ Every operation has an async wrapper: `async_add`, `async_add_batch`, `async_sea
 
 ## The Integration Story
 
-The vector store is not a standalone feature. It is wired into the conversation memory layer (`backend/context/conversation_memory.py`) and serves three purposes:
+The vector store is not a standalone feature. It is wired into the conversation
+memory layer (later moved under `backend/context/memory/`) and serves three
+purposes:
 
 ### 1. Semantic Event Indexing
 
@@ -93,7 +103,12 @@ The agent can explicitly query its own memory through `RecallObservation` events
 
 ### 3. Condensation Anchoring
 
-The compaction system reads the task tracker (`active_plan.json`) to identify which steps are still in progress. Those steps are marked as essential events that survive compaction. The vector store reinforces this by providing semantic recall for events that are semantically related to the active task, even if they are not directly anchored by the tracker.
+At this snapshot, the compaction system read the task tracker
+(`active_plan.json`) to identify active steps and anchor their events. That was
+later replaced by the separate durable task-state subsystem described in
+[The Continuity Contract](48-the-continuity-contract.md). The retrieval layer
+still provides semantic recall, but it is no longer asked to be the authority on
+what remains unfinished.
 
 ---
 
@@ -127,7 +142,9 @@ What it does have is:
 - Optional flashrank re-ranking for higher accuracy
 - Async-first design that keeps the event loop responsive
 - Background model warmup that does not block startup
-- Zero mandatory dependencies beyond ChromaDB and SQLite
+- No mandatory RAG dependency in the base install; the optional `[rag]` extra
+  provides ChromaDB, FastEmbed, and FlashRank, while SQLite supplies the lexical
+  backend
 
 That is not the system I wanted to build. It is the system the project could actually ship. And in engineering, that distinction is the one that matters.
 

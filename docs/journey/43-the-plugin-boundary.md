@@ -1,5 +1,11 @@
 # 43. The Plugin Boundary
 
+> **Historical capability inventory:** The native-vs-plugin boundary remains,
+> but the file-tool and MCP lists below are snapshots. The current public file API is
+> `read_file`, `find_symbols`, `create_file`, `replace_string`, `multiedit`, and
+> `undo_last_edit`. MCP is off by default in `settings.template.json`; its
+> disabled starter entries are currently shadcn, GitHub, and Rigour.
+
 MCP — the Model Context Protocol — is one of the most promising ideas in the agent ecosystem. A standardized way for agents to discover and invoke external tools. No more hard-coding every API. No more per-provider tool adapters.
 
 It is also one of the most dangerous ideas, if treated as infinite tool soup.
@@ -12,7 +18,8 @@ Grinta has MCP support. But the philosophy behind it is deliberately constrained
 
 ## The Selection
 
-Grinta does not add random MCP servers. The current set is small and curated:
+Grinta did not add random MCP servers. At this snapshot, the selected set was
+small and curated:
 
 - **Web search** — real-time information retrieval when the agent needs current data.
 - **Web fetch** — retrieve content from URLs for context gathering.

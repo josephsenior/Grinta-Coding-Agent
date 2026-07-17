@@ -123,7 +123,16 @@ That phase of the project was important because it taught me a critical lesson:
 
 **memory systems are not just about storing less. They are about storing the right shape of reality for the model to keep acting competently.**
 
-The count got fuzzy because some of what I was building were pure strategies, some were meta-strategies, and some were composition layers. Earlier snapshots of the live repo shipped 9 compactor implementations and a selector helper that made the subsystem feel like 10 moving parts. The current tree has 11 strategy modules under `backend/context/compactor/strategies/`, including selectors and composition pipelines. At the experimental peak, before trimming and consolidation, the working set felt more like 12 or 13. I do not want to erase that ambiguity, because it reflects how the subsystem actually evolved.
+The count got fuzzy because some of what I was building were pure strategies,
+some were meta-strategies, and some were composition layers. Earlier snapshots
+of the live repo shipped 9 compactor implementations and a selector helper that
+made the subsystem feel like 10 moving parts. A later snapshot had 11 strategy
+modules under `backend/context/compactor/strategies/`, including selectors and
+composition pipelines. At the experimental peak, before trimming and
+consolidation, the working set felt more like 12 or 13. As of 17 July 2026, that
+directory contains eight implementation modules after another composition pass.
+I do not want to erase the earlier ambiguity, because it reflects how the
+subsystem actually evolved.
 
 The earlier codebase still has the full 12-condenser set, and tracing the lineage tells the real story of what survived and what did not:
 
@@ -150,7 +159,7 @@ That messiness is valuable to me. I do not want this chapter to read like I calm
 
 ---
 
-## What Survived in the Current Architecture
+## What Survived Into the Later Architecture
 
 The current Grinta architecture retains a more disciplined set of compactor strategies. The surviving system includes several important approaches, each solving a different memory problem.
 

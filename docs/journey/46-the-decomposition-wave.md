@@ -1,5 +1,12 @@
 # 46. The Decomposition Wave
 
+> **Later update:** The seven-tool file API described during this wave changed
+> again when `read_symbol` was removed. July also added public long-run evidence,
+> orchestrator-owned project memory, durable task state, capability-driven prompt
+> caching, a PowerShell-first native-Windows default, and broader CI gates. See
+> [chapters 47](47-the-long-runs-and-their-receipts.md) and
+> [48](48-the-continuity-contract.md).
+
 Chapter 45 described the moment Grinta stopped feeling like an engine with a prompt
 and started feeling like a tool someone could actually sit inside.
 
@@ -283,4 +290,4 @@ an engine and a project worth collaborating on.
 
 ---
 
-← [The Product Surface Became Real](45-the-product-surface-became-real.md) | [The Book of Grinta](README.md) | [The Road Ahead](07-the-road-ahead.md) →
+← [The Product Surface Became Real](45-the-product-surface-became-real.md) | [The Book of Grinta](README.md) | [The Long Runs and Their Receipts](47-the-long-runs-and-their-receipts.md) →

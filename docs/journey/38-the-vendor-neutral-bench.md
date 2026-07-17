@@ -1,5 +1,10 @@
 # 34. The Vendor-Neutral Bench
 
+> **Evidence status:** The pack and scorer are inspectable, but the cross-agent
+> runs described here are not published. They can guide internal regression work;
+> they cannot substantiate a public claim that Grinta outperforms another agent.
+> See [EVIDENCE.md](EVIDENCE.md).
+
 I have a complicated relationship with benchmarks.
 
 Most of the public ones — SWE-bench, HumanEval, the various agent leaderboards — answer the question *“which model resolves more issues from this canned set?”* That is a useful question if you are a model vendor. It is the wrong question if you are building an agent, because by the time the benchmark runs the agent and the model are intertwined: the harness shapes the prompts, the harness controls the tool surface, the harness retries on failure, the harness decides when “done” means done. You are scoring the harness as much as the model, and the score does not transfer to your own harness.

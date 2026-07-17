@@ -1,5 +1,11 @@
 # 44. The Empty Folder Trials
 
+> **Evidence boundary added July 2026:** The current checkout does not contain a
+> self-contained public archive of these two March runs. The account below is a
+> dated lab note, not a reproducible benchmark. Later July runs with public
+> evidence are documented in
+> [The Long Runs and Their Receipts](47-the-long-runs-and-their-receipts.md).
+
 This chapter is not marketing. It is a lab note.
 
 There is a class of agent capability that cannot be measured by benchmarks or demonstrated by cherry-picked examples. It is the ability to start from nothing — an empty directory, a natural-language task description — and produce a working system.
@@ -50,9 +56,15 @@ These are real limitations. They are also the kind of limitations that separate 
 
 ## What the Run Proved
 
-1. **Grinta can build nontrivial distributed systems from scratch.** A Raft implementation is not a toy. It requires understanding a complex protocol, translating it into correct async Python, and handling failure modes that are not in the training data. The agent did all of that.
+1. **Grinta produced a nontrivial distributed-systems prototype from an empty
+   directory.** A Raft-style implementation requires translating a complex
+   protocol into async Python and testing several failure paths. The runs are a
+   capability signal, but the unpublished artifacts and human guidance prevent a
+   stronger reproducibility claim.
 
-2. **The architecture supports multi-hour autonomous sessions.** The Raft task took sustained execution across dozens of tool calls, file edits, test runs, and fix iterations. The event stream, checkpoint, and replay mechanisms kept the session coherent across the full duration.
+2. **The architecture supported sustained autonomous sessions.** The Raft task
+   took dozens of tool calls, file edits, test runs, and fix iterations. The
+   later public runs in chapter 47 provide stronger duration evidence.
 
 3. **The agent can recover from its own mistakes.** When tests failed, it read the output, diagnosed the issue, and fixed the code. It did not loop on the same broken approach. It adapted.
 
@@ -74,11 +86,17 @@ These are real limitations. They are also the kind of limitations that separate 
 
 ## The Honest Receipt
 
-Grinta succeeded on the Raft/RFT consensus task twice. That is a real capability signal. It means the agent can hold a complex system model in context, produce coherent code across multiple files, test and fix its own output, and recover from failures without human intervention.
+Grinta reached a working prototype on the Raft/RFT consensus task twice. That is
+a capability signal: the agent held a multi-file system model in context, tested
+its output, and recovered from several failures. It was not intervention-free;
+the consistency edge case above required explicit prompt guidance.
 
 But the gap between "succeeded twice on a well-specified task" and "reliable autonomous engineering" is still large. The first proves something about the architecture. The second would prove something about the field.
 
-I am publishing this lab note because evidence matters more than claims. The receipts are in the code. The limitations are in this chapter.
+I am keeping this lab note because the event belongs in the journey. The current
+repository does not expose enough of the two original runs to let a stranger
+reproduce the result, so the receipt is incomplete. That limitation belongs next
+to the claim, not in a footnote.
 
 If you want to try the same task: start with an empty directory, give the prompt, and see what happens. Then compare receipts honestly.
 

@@ -1,5 +1,12 @@
 # 06. The System Design Playbook
 
+> **Historical snapshot:** This chapter preserves the server stack, prompt
+> architecture, file API, task tracker, and CLI as they existed during this
+> design phase. FastAPI/Socket.IO later left the core; the interactive interface
+> became Textual; durable task state replaced `active_plan.json` as the stronger
+> continuity contract; and the public file API later settled at six tools. See
+> [The Continuity Contract](48-the-continuity-contract.md).
+
 A lot of people hear "coding agent" and assume the hard part is the model.
 
 That is only part of the story.

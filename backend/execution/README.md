@@ -73,6 +73,12 @@ The Local Runtime is the primary and only supported runtime in this architecture
 
 Grinta also supports a `hardened_local` execution profile. This adds stricter local policy enforcement for workspace-scoped commands, file access, sensitive paths, network-capable commands, package installs, background processes, and interactive terminal behavior. It improves local safety, but it is still not sandboxing or host isolation.
 
+The optional `sandboxed_local` profile reuses those policy gates and adds
+OS-native process isolation for supported **non-interactive** subprocess
+commands. It uses `bwrap` on Linux, AppContainer on Windows, and `sandbox-exec`
+on macOS when the platform backend is available. Interactive PTY sessions remain
+outside that boundary, so this profile is not complete host isolation.
+
 ## Related Components
 
 - The runtime interacts closely with the ledger defined in `backend.ledger`.

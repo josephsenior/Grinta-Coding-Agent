@@ -27,7 +27,9 @@ Install paths: [QUICK_START.md](QUICK_START.md).
 
 ## Windows
 
-- **PowerShell instead of bash:** `"security": { "windows_shell": "bash" }` in settings (default is bash)
+- **Git Bash instead of the PowerShell default:** set
+  `"security": { "windows_shell": "bash" }` in settings. Native-Windows
+  onboarding defaults to `powershell`; Git Bash remains supported.
 - **Long paths:** enable Windows long paths (registry `LongPathsEnabled=1`)
 
 ## WSL2

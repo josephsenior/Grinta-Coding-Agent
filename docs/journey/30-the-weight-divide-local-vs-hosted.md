@@ -58,4 +58,4 @@ The weight divide is not a problem to solve. It is a spectrum to design for. And
 
 ---
 
-← [The Observability, Cost, and Latency Triad](27-the-observability-black-hole.md) | [The Book of Grinta](README.md) | [The Myth of the Committee](31-the-myth-of-the-committee.md) →
+← [The Observability, Cost, and Latency Triad](27-the-observability-black-hole.md) | [The Book of Grinta](README.md) | [The Two Lives of the Terminal](32-the-two-lives-of-the-terminal.md) →

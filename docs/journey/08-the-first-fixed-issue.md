@@ -1,5 +1,10 @@
 # 08. The First Fixed Issue
 
+> **Evidence boundary:** This is a memoir of the first successful end-to-end
+> task, not a published benchmark artifact. Later long runs with inspectable
+> reports and raw traces are documented in
+> [The Long Runs and Their Receipts](47-the-long-runs-and-their-receipts.md).
+
 There is a specific kind of silence when something you built actually works.
 
 Not "runs without crashing" works. Not "the tests pass" works. The kind of works where you type a natural language instruction into a terminal, walk away, come back, and the problem is solved. The code is changed. The tests pass. The diff is clean. The agent wrote a message explaining what it did and why.
@@ -73,7 +78,13 @@ Each one of those heuristics came from watching a real failure. Not a theoretica
 
 The stuck detection integrates with the circuit breaker through the step guard service. When the stuck detector fires, it does not immediately kill the session. Instead, it records the detection and emits a warning with a planning directive — a message injected into the agent's observation stream that essentially says "you appear to be stuck in pattern X, change your strategy." The step guard tracks how many times this warning has fired for the same action-reason combination. Only after hitting a configurable threshold does it escalate to a hard stop.
 
-This graduated response was essential. Early versions of the stuck detector were too aggressive — a threshold of three consecutive errors would trip the circuit breaker during what was actually a normal multi-step debugging process. The current threshold of six provides enough runway for genuine retries while catching real loops. The circuit breaker also adapts its thresholds based on task complexity and iteration budget, so a long complex task gets more runway than a simple one.
+This graduated response was essential. Early versions of the stuck detector
+were too aggressive — a threshold of three consecutive errors would trip the
+circuit breaker during what was actually a normal multi-step debugging process.
+At the phase described here, a threshold of six provided more runway for genuine
+retries. The later architecture narrowed the hard control path further: exact
+repeats and monologue loops can stop execution, while softer heuristics feed a
+repetition score and telemetry instead of directly declaring the agent stuck.
 
 ---
 

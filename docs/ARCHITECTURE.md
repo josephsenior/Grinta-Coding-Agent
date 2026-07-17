@@ -19,6 +19,13 @@ Grinta executes on the local host.
 - Default runtime is in-process local execution.
 - `hardened_local` applies stricter policy checks.
 - `hardened_local` is not sandboxing or host isolation.
+- `sandboxed_local` reuses the hardened policy and adds OS-native,
+  process-scoped isolation for supported **non-interactive** subprocess
+  commands (`bwrap` on Linux, AppContainer on Windows, `sandbox-exec` on
+  macOS).
+- Interactive PTY sessions remain outside the `sandboxed_local` process
+  boundary. The profile is not a VM, container boundary, or complete host
+  isolation.
 
 Use Grinta in trusted environments.
 

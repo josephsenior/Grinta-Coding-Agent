@@ -1,5 +1,10 @@
 # 45. The Product Surface Became Real
 
+> **Historical file API:** The interface and launch story in this chapter still
+> describes the productization event. The `create`/`edit_symbol` tool inventory
+> later changed; see [The Continuity Contract](48-the-continuity-contract.md) for
+> the six-tool July 2026 surface.
+
 There is a quiet phase in a serious project where the hardest work is no longer
 inventing the engine.
 

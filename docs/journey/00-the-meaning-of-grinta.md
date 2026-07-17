@@ -1,10 +1,16 @@
 # 00. The Meaning of Grinta
 
+> **Historical snapshot:** The counts and surviving components in this opening
+> describe the architecture at the time it was written. Later chapters record
+> the return of the Textual interface, further decomposition, long-run evidence,
+> and the separation of task state from conversational memory. See
+> [chapters 46–48](46-the-decomposition-wave.md).
+
 If you spend ten months building, deleting, and rebuilding an autonomous system alone in the dark, the name you give it stops being a branding decision and becomes a reflection of what the project required out of you.
 
 I named this engine **Grinta**.
 
-In Tunisian culture — borrowed from its Italian origins — *grinta* means raw determination. It means grit. Not the polished determination of someone with a plan and a team of engineers backing them up. The rougher kind. The kind where you keep working because stopping feels worse than failing. It is the tenacity to keep pushing when the initial burst of enthusiasm has burned off and you are staring at a completely broken system at 3 AM, wondering if the event store deadlock you are debugging is a sign that your entire architectural direction is profoundly flawed.
+In Tunisian culture — borrowed from its Italian origins — *grinta* means raw determination. It means grit. For this project, the name came to describe continuing after the initial enthusiasm had burned off and the architecture had to be questioned rather than defended. Some of those decisions happened at 3 AM. In retrospect, the useful part was the willingness to change direction, not the hour or the exhaustion.
 
 In Italian football, *grinta* describes players who are not elegant but still win. They make up for what they lack with relentlessness. That description fit this solo project more closely than I understood at the beginning.
 
@@ -24,7 +30,7 @@ It fails fast. It iterates faster. It possesses the exact mechanical equivalent 
 
 This book is the documentation of how I found that architecture, the features I had to kill (or postpone for later open-source contributors) to acquire it, and the brutal lessons that no corporate AI whitepaper will ever teach you.
 
-It is also an honest account of what solo engineering really feels like. Not the heroic narrative. The messy one. The one where you hit the painful limits of your own stamina, where you realize you're on the verge of breaking down and simply ship the version of your project that *works*, inviting people to help build the missing pieces. The one where you delete three weeks of work because you built something for your ego instead of your user. The breakthrough is rarely a flash of insight; it is a slow, grinding recognition that the simple approach was right all along, and asking for help makes it better.
+It is also an account of what solo engineering felt like: hitting the limits of my stamina, shipping an imperfect version, inviting people to help with the missing pieces, and deleting work that served my ego more than the user. The breakthrough was not exhaustion. It was recognizing that the simpler approach was often right and that asking for help made the system better.
 
 ---
 

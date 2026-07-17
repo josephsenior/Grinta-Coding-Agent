@@ -1,5 +1,11 @@
 # 40. The Facade Pattern and the Smaller File API
 
+> **Historical file API:** This chapter documents the six-tool facade that used
+> `read`, `create`, and `edit_symbol`. A later wave renamed and reduced it. As of
+> 17 July 2026 the six tools are `read_file`, `find_symbols`, `create_file`,
+> `replace_string`, `multiedit`, and `undo_last_edit`. The old schema is kept
+> below because its failure taught the lesson in this chapter.
+
 There is a moment in systems engineering where you realize the complexity is no longer in the code itself, but in the interface you are forcing the user to navigate.
 
 For Grinta, the user is the model.

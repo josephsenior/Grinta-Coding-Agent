@@ -1,207 +1,212 @@
 # The Book of Grinta
 
-> **QUARANTINED — historical narrative only.** Chapters in this folder describe past pivots, deleted systems, and development memoir. They are **not** the current product specification. For install, settings, security, and CLI behavior use [USER_GUIDE.md](../USER_GUIDE.md), [SETTINGS.md](../SETTINGS.md), [ARCHITECTURE.md](../ARCHITECTURE.md), and [SECURITY_CHECKLIST.md](../SECURITY_CHECKLIST.md). Do not configure Grinta from journey chapters.
-
-> **Not a product spec.** This memoir is historical narrative. For current install, settings, modes, and CLI behavior use [USER_GUIDE.md](../USER_GUIDE.md), [SETTINGS.md](../SETTINGS.md), and [ARCHITECTURE.md](../ARCHITECTURE.md). Do not configure Grinta from journey chapters.
-
-**A 10-month journey from multi-tenant SaaS to a coherent local-first coding agent.**
+**A development memoir about building, deleting, and rebuilding a local-first coding agent.**
 
 By Youssef Mejdi, AI Engineering Student, 4th Year
 
-**Inventory note:** Chapter-specific counts (services, tools, heuristics, compactors, and similar) and file paths are snapshots unless a chapter says otherwise. Chapters through **[45](45-the-product-surface-became-real.md)** track the productization arc around **[v1.0.0-rc1](../RELEASE_NOTES_v1.0.0-rc1.md)**; **[46](46-the-decomposition-wave.md)** and later updates track the 8.1 → 9.0 decomposition wave. Post-rc1 work renamed the model-facing file API (`read` → `read_file`, `create` → `create_file`, `edit_symbol` removed in favor of `replace_string`, new `read_symbol` and `undo_last_edit` tools) and folded document parsers into the base install — chapters written before that wave still use the earlier names. For current behavior, prefer **[Architecture](../ARCHITECTURE.md)**, **[REFACTOR_BASELINE](../REFACTOR_BASELINE.md)**, the **[CHANGELOG](../../CHANGELOG.md)**, and the source under `backend/`.
+> **Reading contract — history, not configuration.** These chapters preserve what
+> I believed, built, measured, removed, and later corrected. An older chapter can
+> be historically accurate and technically outdated at the same time. I keep the
+> old event and add a dated correction instead of rewriting the past. For current
+> installation, settings, architecture, and security behavior, use
+> [USER_GUIDE.md](../USER_GUIDE.md), [SETTINGS.md](../SETTINGS.md),
+> [ARCHITECTURE.md](../ARCHITECTURE.md), and
+> [SECURITY_CHECKLIST.md](../SECURITY_CHECKLIST.md).
 
----
+> **Evidence contract.** Exact counts are snapshots, not permanent product
+> properties. Claims with durable repository evidence are indexed in
+> [EVIDENCE.md](EVIDENCE.md). Memoir-only claims are identified as such rather
+> than being presented as reproducible benchmarks.
 
-## Why This Exists
+## Start Here
 
-Posting a GitHub repository is not enough.
+Grinta began in September 2025 as an attempt to build far more than a coding
+agent: a multi-tenant SaaS platform with a web interface, container orchestration,
+specialized agents, self-improving prompts, and several layers of cloud
+infrastructure. Much of that code worked. Much of it also made the product more
+expensive, harder to reason about, or less useful to the person sitting in front
+of a repository.
 
-A repo shows the *result*. It doesn't show the 3 AM debugging sessions where the Write-Ahead Log deadlocked and the entire event system collapsed. It doesn't show the moment I deleted a fully working Kubernetes infrastructure because I couldn't afford to market it. It doesn't show the week I spent building a multi-agent software engineering team — Product Manager, Architect, QA, DevOps, Security, UI Designer, Engineer — only to watch it burn through $40 of tokens on a single task that a capable solo agent could finish for $2.
+The project changed direction. The cloud platform was removed from the core. The
+multi-agent committee was removed. Prompt optimization, heavy container pools,
+and several retrieval experiments were removed or rehomed. What remained was a
+local execution loop surrounded by deterministic systems for tool use, recovery,
+context pressure, task validation, and observable failure.
 
-This documentation is my proof of work. Not the polished, corporate kind. The real kind — where I explain every decision, every removal, every heartbreak, and every lesson that turned a university student's side project into a deeply decomposed agent system with durable recovery, model-agnostic inference, strict validation, and an operation pipeline built to survive long real-world sessions.
+The most useful parts of this story are not the feature counts. They are the
+decisions:
 
-If you want a perfect tool with a $100M marketing budget, go buy a subscription. If you want to understand what it actually takes to build an autonomous coding agent from scratch — the architecture, the failures, and the trade-offs that no whitepaper will ever tell you — keep reading.
+1. **Subtraction can be architecture.** A working subsystem can still be the
+   wrong subsystem for the product.
+2. **Agent reliability is largely runtime engineering.** Streaming mergers,
+   state transitions, pending actions, file grounding, and completion gates can
+   make a model look better or worse without changing the model.
+3. **A local-first product has a different threat model.** Policy gates and
+   optional process isolation reduce risk, but they do not turn the host into a
+   disposable VM.
+4. **Long context is not durable task state.** Summaries help a model continue a
+   conversation; they should not be the authoritative record of acceptance
+   criteria and unfinished work.
+5. **Evidence must travel with the claim.** A finished runtime state, a passing
+   generated test suite, and full compliance with an original specification are
+   three different claims.
 
----
+This is also a personal record. I built parts of Grinta while studying, made bad
+decisions while exhausted, and sometimes treated persistence as a substitute for
+scope control. The lesson is not that 3 AM work is admirable. It is that fatigue
+damages judgment, and that shipping, asking for review, and making the system
+legible to other people are engineering decisions too.
 
-## The Philosophy
+## The Short Version
 
-**Reliability over scope creep.**
+If you have less than an hour, read these chapters:
 
-Every feature in Grinta earned its place by surviving a simple test: *Does this make the agent finish tasks more reliably, or does it just look impressive?*
+1. [The SaaS Fortress](01-the-saas-fortress.md) — the original product and the
+   pivot away from it.
+2. [The Killed Darlings](02-the-killed-darlings.md) — what was removed and why.
+3. [The Context War](04-the-context-war.md) — why long sessions became a systems
+   problem.
+4. [The Verification Tax](14-the-verification-tax.md) — why “done” needs
+   independent signals.
+5. [The Small Async Wars](33-the-small-async-wars.md) — five concrete runtime
+   failures that looked like model failures.
+6. [The Decomposition Wave](46-the-decomposition-wave.md) — making the product
+   maintainable after it became usable.
+7. [The Long Runs and Their Receipts](47-the-long-runs-and-their-receipts.md) —
+   what two public July runs prove and do not prove.
+8. [The Continuity Contract](48-the-continuity-contract.md) — the later split
+   between conversational memory and durable task state.
+9. [The Road Ahead](07-the-road-ahead.md) — the unfinished parts.
 
-The multi-agent swarm looked impressive. It died.
-The self-improving prompt system looked impressive. It died.
-The cloud runtime with Docker containers looked impressive. It died.
+## Timeline
 
-What survived was the engine: a single, focused agent that plans, implements, tests, validates, and self-corrects — on any LLM, on any OS, with zero cloud dependency. That's Grinta.
+The filenames preserve repository history, so their numbers are not a clean book
+sequence. The order below is the intended reading order.
 
----
+### Identity, ambition, and subtraction
 
-## The Arc
+- [Preface — Why This Story Matters](preface-why-this-story-matters.md)
+- [00 — The Meaning of Grinta](00-the-meaning-of-grinta.md)
+- [01 — The SaaS Fortress](01-the-saas-fortress.md)
+- [02 — The Killed Darlings](02-the-killed-darlings.md)
 
-Ten months. Several distinct phases. One principle.
+### Architecture under pressure
 
-**Month 1 (September 2025):** Research. I spent the entire first month not writing code. I studied tech stacks, architectures, agent behaviors, terminal multiplexing, event sourcing patterns, and the design decisions of every major coding agent I could find — Claude Code, OpenHands, SWE-Agent, Devin, Aider, LangChain. I mapped out what they did well, where they cut corners, and where the gaps were. I learned how OpenHands treats sessions as durable event streams. I analyzed how SWE-Agent makes tool design the center of agent behavior. This month produced no code, but it produced the design convictions that survived every pivot.
+- [03 — The Architectural Gauntlet](03-the-architectural-gauntlet.md)
+- [04 — The Context War](04-the-context-war.md)
+- [05 — The Giants' Playbook](05-the-giants-playbook.md)
+- [06 — The System Design Playbook](06-the-system-design-playbook.md)
+- [08 — The First Fixed Issue](08-the-first-fixed-issue.md)
+- [09 — The 3 AM Decisions](09-the-3am-decisions.md)
+- [10 — The Model-Agnostic Reckoning](10-model-agnostic-reckoning.md)
+- [11 — The Console Wars](11-the-console-wars.md)
+- [12 — Open Source Was the Better Product Strategy](12-open-source-was-the-better-business.md)
 
-**Months 2–3 (October–November 2025):** The Core. I built the agent loop, the reasoning engine via function-calling dispatch, the tool system with 30+ tools, and the LLM abstraction layer with three native client families plus a compatibility fallback. I designed the event stream with pub/sub, the event store with append-only persistence, and the state machine with 12 explicit states and validated transitions. This was the foundation — the behavior, the state machine, the event stream. The hardest, most intellectually demanding phase. Everything that came after was built on top of what I got right (and wrong) during these two months.
+### Hidden systems and reliability
 
-**Months 4–5 (December 2025–January 2026):** The Infrastructure. Kubernetes. Multi-tenancy. Docker runtime execution. Redis caching. PostgreSQL with asyncpg. A full React frontend with Socket.IO real-time updates. Security hardening. The SaaS dream.
+- [13 — The Hidden Playbooks](13-the-hidden-playbooks.md)
+- [14 — The Verification Tax](14-the-verification-tax.md)
+- [15 — Prompts Are Programs](15-prompts-are-programs.md)
+- [16 — The Pragmatic Stack](17-the-pragmatic-stack.md)
+- [17 — The Mind of the Agent](18-the-mind-of-the-agent.md)
+- [18 — Surviving the Crash](19-surviving-the-crash.md)
+- [19 — Circuit Breakers and Hallucinations](20-circuit-breakers-and-hallucinations.md)
+- [20 — The Safety Sandbox Is Not Optional](21-the-safety-sandbox-is-not-optional.md)
+- [21 — Who Grades the Agent](22-who-grades-the-agent.md)
+- [22 — The Middleware Contract](23-the-middleware-contract.md)
+- [23A — The Identity and Execution Crisis](24-the-identity-and-execution-crisis.md)
+- [24 — The Parallelization Trap](25-the-parallelization-trap.md)
+- [25 — The Observability, Cost, and Latency Triad](27-the-observability-black-hole.md)
+- [26 — The Weight Divide](30-the-weight-divide-local-vs-hosted.md)
 
-**Month 6 (February 2026):** The Pivot. I deleted the cloud. I removed Redis from the core runtime. I moved the async database driver into an optional dependency group. I removed the Textual TUI. I removed the cloud runtime providers. I stripped Grinta down to its engine — 43 required packages, zero cloud dependencies — and shipped the foundation release.
+The former “Myth of the Committee” chapter was merged into
+[The Killed Darlings](02-the-killed-darlings.md). There is intentionally no
+link to the removed file.
 
-**Month 7 (March–April 2026):** The Refinement. Decomposing monoliths into focused modules, pushing orchestration responsibilities into clearer service boundaries, and consolidating the context subsystem after a wave of exploratory variants. Hardening the local security profile. Building the CLI with tab completion, fuzzy command matching, slash commands, and an animated ASCII splash screen. Writing this document. Alongside that work, the terminal story grew a deliberate second layer: a native, OS-agnostic PTY path for **opt-in** interactive shells (no Docker required), sitting next to the original batch/tmux model instead of replacing it — because growing means adding truth, not erasing the chapter you already wrote about the console wars.
+### Productization and later corrections
 
-**Current Phase (May–July 2026):** Productization, legibility at scale, and then the cleanup wave that sharpened everything the decomposition left behind. The architecture was always serious; the interface caught up first (mode split — Chat, Plan, Agent; autonomy as one honest knob; Textual TUI as operational cockpit; piped stdin on a non-interactive path; curated MCP; launch hardening against namespace collisions; Raft/RFT empty-folder receipts). Then the **decomposition wave** landed: CLI/TUI monoliths split into `event_rendering/`, `tui/renderer/handlers/`, `settings/`, `session/`, `display/`, and mirrored tests; backend facades for context, ledger, inference, execution, and orchestration; file-size advisory and phase-based reliability gates; vocabulary locked in ADR-016 before the next rename sweep; MCP tool catalogs moved to per-turn addenda for prompt-cache hygiene; `sandboxed_local` as a third execution profile beside `standard` and `hardened_local`; stuck detection narrowed to provable hard signals while soft heuristics feed telemetry only. In parallel, the context layer gained a dedicated `ContextBudget` estimator for precise post-compaction token pressure and autocompact thresholds; the terminal path matured with a full native PTY session manager supporting interactive shells, debugger mixins, and exploration handlers; task tracking gained workspace-state path validation and tighter integration with the ledger; and rendering became fully mixin-driven for terminal, live display, and event observation. After the decomposition settled, a **file-API cleanup wave** simplified the model-facing editing surface: `read` became `read_file`, `create` became `create_file`, `edit_symbol` was removed entirely (the model was not using it confidently — `replace_string` covers the same ground with a simpler schema), a new `read_symbol` tool restored targeted symbol reads, and `undo_last_edit` completed the rollback story — bringing the public file API to seven tools: `read_file`, `read_symbol`, `find_symbols`, `create_file`, `replace_string`, `multiedit`, `undo_last_edit`. Alongside that, PDF/DOCX/PPTX/LaTeX parsers moved from the `[documents]` optional extra into the base install (44 required packages now), `debugpy` was unbundled from the base wheel to match how other DAP adapters work, the `supervised` autonomy spelling was retired in favor of `conservative`, ADR-017 codified a non-code document edit protocol, CI gates expanded to run the full unit test corpus on both Linux and Windows, and OSS governance docs landed (`GOVERNANCE.md`, `MAINTAINERS.md`, `SUPPORT_MATRIX.md`, `THIRD_PARTY_NOTICES.md`). These refinements deepen the product surface without erasing any prior chapter. The project is not finished, but it is no longer just an engine — it is a coherent product strangers can navigate.
+- [28 — The Two Lives of the Terminal](32-the-two-lives-of-the-terminal.md)
+- [29 — The Small Async Wars](33-the-small-async-wars.md)
+- [30 — The Fuzzy Match Heresy](34-the-fuzzy-match-heresy.md)
+- [31 — The Self-Knowing Agent](35-the-self-knowing-agent.md)
+- [32 — The Required Risk](36-the-required-risk.md)
+- [33 — The Verbose Status](37-the-verbose-status.md)
+- [34 — The Vendor-Neutral Bench](38-the-vendor-neutral-bench.md)
+- [39 — The Semantic Memory That Survived](39-the-semantic-memory-that-survived.md)
+- [40 — The Facade Pattern and the Smaller File API](40-the-facade-pattern-and-the-smaller-file-api.md)
+- [41 — The Mode Split](41-the-mode-split.md)
+- [42 — The Interface Returned](42-the-interface-returned.md)
+- [43 — The Plugin Boundary](43-the-plugin-boundary.md)
+- [44 — The Empty Folder Trials](44-the-empty-folder-trials.md)
+- [45 — The Product Surface Became Real](45-the-product-surface-became-real.md)
+- [46 — The Decomposition Wave](46-the-decomposition-wave.md)
+- [47 — The Long Runs and Their Receipts](47-the-long-runs-and-their-receipts.md)
+- [48 — The Continuity Contract](48-the-continuity-contract.md)
+- [Epilogue — The Road Ahead](07-the-road-ahead.md)
 
----
+## Historical Changes That Commonly Confuse Readers
 
-## The Chapters
+### File tools
 
-Each chapter is both a story and a technical deep-dive. Read them in order for the full journey, or jump to the one that matters to you.
+Several chapters accurately describe an earlier six-tool API built around
+`read`, `create`, and `edit_symbol`. A later cleanup renamed tools, removed
+`edit_symbol`, briefly introduced `read_symbol`, and then removed that dedicated
+read tool as the compaction and file-reading surfaces converged.
 
-### Recommended Reading Order
+As of **17 July 2026**, the model-facing file API in
+`backend/engine/tools/native_file_tools.py` contains six tools:
 
-The file names stay stable for repository sanity, but the strongest reading arc is grouped into acts:
+- `read_file`
+- `find_symbols`
+- `create_file`
+- `replace_string`
+- `multiedit`
+- `undo_last_edit`
 
-- **Preface — Start Here If We Have Never Met:** [Preface](preface-why-this-story-matters.md)
-- **Act I — Identity and Scale:** [00](00-the-meaning-of-grinta.md), [01](01-the-saas-fortress.md)
-- **Act II — The Things I Had to Kill:** [02](02-the-killed-darlings.md)
-- **Act III — Architecture Under Pressure:** [03](03-the-architectural-gauntlet.md), [04](04-the-context-war.md), [05](05-the-giants-playbook.md), [06](06-the-system-design-playbook.md)
-- **Act IV — Proof, Cost, and Consequence:** [08](08-the-first-fixed-issue.md), [09](09-the-3am-decisions.md), [10](10-model-agnostic-reckoning.md), [11](11-the-console-wars.md), [12](12-open-source-was-the-better-business.md)
-- **Act V — Hidden Systems:** [13](13-the-hidden-playbooks.md), [14](14-the-verification-tax.md), [15](15-prompts-are-programs.md), [16](17-the-pragmatic-stack.md), [17](18-the-mind-of-the-agent.md)
-- **Act VI — Reliability Under Fire:** [18](19-surviving-the-crash.md), [19](20-circuit-breakers-and-hallucinations.md), [20](21-the-safety-sandbox-is-not-optional.md), [21](22-who-grades-the-agent.md), [22](23-the-middleware-contract.md), [23](24-the-identity-and-execution-crisis.md)
-- **Act VII — Incident Addenda and Prompt Discipline:** [24](25-the-parallelization-trap.md)
-- **Act VIII — Operational Reality & Production:** [25](27-the-observability-black-hole.md), [26](30-the-weight-divide-local-vs-hosted.md), [27](31-the-myth-of-the-committee.md) *(merged)*
-- **Act IX — Addendum (The Terminal, Revisited):** [28](32-the-two-lives-of-the-terminal.md)
-- **Act X — Reliability Receipts and Editor Honesty:** [29](33-the-small-async-wars.md), [30](34-the-fuzzy-match-heresy.md), [31](35-the-self-knowing-agent.md), [32](36-the-required-risk.md), [33](37-the-verbose-status.md), [34](38-the-vendor-neutral-bench.md)
-- **Act XI — Memory and Retrieval Honesty:** [39](39-the-semantic-memory-that-survived.md)
-- **Act XII — The Interface and Transport Physics:** [40](40-the-facade-pattern-and-the-smaller-file-api.md)
-- **Act XIII — Mode as Product Architecture:** [41](41-the-mode-split.md)
-- **Act XIV — The Interface Returned:** [42](42-the-interface-returned.md)
-- **Act XV — The Plugin Boundary:** [43](43-the-plugin-boundary.md)
-- **Act XVI — The Empty Folder Trials:** [44](44-the-empty-folder-trials.md)
-- **Act XVII — The Product Surface Became Real:** [45](45-the-product-surface-became-real.md)
-- **Act XVIII — Legibility at Scale:** [46](46-the-decomposition-wave.md)
-- **Epilogue:** [07](07-the-road-ahead.md)
+Older names remain in their original chapters because those chapters explain the
+decision at that time. Dated notes point forward to this final shape.
 
-Chapter 07 was written earlier in the repo's life, but it now reads best as the closing chapter after the rest of the system has been laid bare.
+### Interface
 
-| # | Chapter | What You'll Learn |
-| --- | --- | --- |
-| [Preface](preface-why-this-story-matters.md) | **Why This Story Matters** | Why a stranger should care, what makes this journey different from AI marketing narratives, and how to read the book for maximum value. |
-| [00](00-the-meaning-of-grinta.md) | **The Meaning of Grinta** | Why the name matters, what survived the deletions, and what kind of engineering character this project was built to express. |
-| [01](01-the-saas-fortress.md) | **The SaaS Fortress** | How I built a full multi-tenant cloud platform — Kubernetes, Docker, React, Redis, PostgreSQL — and why I burned it all down. |
-| [02](02-the-killed-darlings.md) | **The Killed Darlings** | The features I loved and deleted: a multi-agent software engineering team, a self-improving context framework, an auto-tuning prompt system, and a containerized runtime. Each one taught me something the industry doesn't talk about. |
-| [03](03-the-architectural-gauntlet.md) | **The Architectural Gauntlet** | How a monolithic agent loop became 21 isolated services around a session orchestrator. Why I obsess over cyclomatic complexity. The 3 AM story of event sourcing deadlocks. How OpenHands inspired my persistence layer and what I did differently. |
-| [04](04-the-context-war.md) | **The Context War** | Why 2 compaction strategies weren't enough. How the subsystem expanded to 12 or 13 moving parts, why 9 remain, and what each survivor taught me. |
-| [05](05-the-giants-playbook.md) | **The Giants' Playbook** | A deeper comparative breakdown of how Claude Code, OpenHands, SWE-Agent, Devin, Aider, Cursor, Windsurf, and LangChain expose autonomy, persistence, context, verification, and developer ergonomics — and where Grinta agrees, diverges, or refuses to imitate. |
-| [06](06-the-system-design-playbook.md) | **The System Design Playbook** | The non-agentic engineering: the server stack, database choices, structural editing, the config cascade, security hardening, and why model-agnostic isn't just a feature — it's a philosophy. |
-| [08](08-the-first-fixed-issue.md) | **The First Fixed Issue** | The day the agent completed a real task autonomously. The validation service that blocks false finishes, the 6-layer stuck detection, and why working once changes everything. |
-| [09](09-the-3am-decisions.md) | **The 3 AM Decisions** | The psychological cost of solo engineering. Event sourcing deadlocks, deleting a week's work in one night, and the uncompromising clarity of deciding alone. |
-| [10](10-model-agnostic-reckoning.md) | **The Model-Agnostic Reckoning** | Why vendor lock-in is fatal. The three-client architecture, catalog-driven overrides, and standardizing disparate tool calling formats without `if` statements. |
-| [11](11-the-console-wars.md) | **The Console Wars** | The reality of cross-platform terminal execution. `tmux` vs PowerShell, Windows file locking, path escaping, and the semantic execution layer. |
-| [12](12-open-source-was-the-better-business.md) | **Open Source Was the Better Business** | Why deleting the SaaS platform was the smartest architectural choice. The economics of autonomy, the privacy barrier, and the power of local honesty. |
-| [13](13-the-hidden-playbooks.md) | **The Hidden Playbooks** | Why the right knowledge should arrive at the right moment, how playbooks evolved out of earlier micro-agent ideas, and why runtime expertise beats prompt bloat. |
-| [14](14-the-verification-tax.md) | **The Verification Tax** | Why autonomous agents cannot be allowed to grade their own homework, how validators, replay, and auditability make false finishes harder, and why testing the infrastructure matters more than congratulating the model. |
-| [15](15-prompts-are-programs.md) | **Prompts Are Programs and the Perfect Prompt Illusion** | Why prompt engineering became a software-design problem, how Python replaced Jinja, how scannable structure halts regressions, and the bias of model self-critique. |
-| [16](17-the-pragmatic-stack.md) | **The Pragmatic Stack** | Why Grinta chose practical defaults over trend-chasing: `uv`, JSON-first config, and Python with strict architectural discipline. |
-| [17](18-the-mind-of-the-agent.md) | **The Mind of the Agent** | The cognitive architecture behind tool use and memory: what was removed, what stayed optional, and what made autonomous behavior more reliable. |
-| [18](19-surviving-the-crash.md) | **Surviving the Crash** | How event streams, WAL markers, backpressure policy, and replay semantics make long agent sessions recoverable after real failures. |
-| [19](20-circuit-breakers-and-hallucinations.md) | **Circuit Breakers and Hallucinations** | How stuck detection grew into layered heuristics, how adaptive breaker thresholds work, and how Grinta limits runaway loops — with a 2026 addendum on the control/telemetry split. |
-| [20](21-the-safety-sandbox-is-not-optional.md) | **The Safety Sandbox Is Not Optional** | Why command-risk analysis and policy-driven validation are foundational in local-first agents, not optional polish. |
-| [21](22-who-grades-the-agent.md) | **Who Grades the Agent** | Why finish became a gated contract in that phase of the system, how task validation fought false completion, and why autonomous systems must not grade their own homework. |
-| [22](23-the-middleware-contract.md) | **The Middleware Contract** | Why middleware order is execution governance, how rollback became first-class in the pipeline, and why timing is architecture in autonomous systems. |
-| [23](24-the-identity-and-execution-crisis.md) | **The Identity and Execution Crisis** | A postmortem of four reliability failures: prompt over-caution loops, silent startup crashes, shell-identity mismatch on Windows, and brittle patch fallback execution. |
-| [24](25-the-parallelization-trap.md) | **The Parallelization Trap** | Why aggressive parallelization breaks autonomous agents, how global states decouple, and why safe-subset scheduling won out over unlimited throughput. |
-| [25](27-the-observability-black-hole.md) | **The Observability, Cost, and Latency Triad** | Tracing tool calls, token cost economics, budget middleware guards, real-time HUD displays, context compaction, and human-in-the-loop confirmation systems. |
-| [26](30-the-weight-divide-local-vs-hosted.md) | **The Weight Divide: Local vs Hosted** | The operational realities of deploying heavy local weights vs. depending on frontier AI API latency. |
-| [27](31-the-myth-of-the-committee.md) | **The Myth of the Committee** | *(merged into 02-the-killed-darlings.md)* — historical snapshot only. |
-| [28](32-the-two-lives-of-the-terminal.md) | **The Two Lives of the Terminal** | Native PTY for opt-in interactive shells without Docker; why the default session stayed “batch first”; and how that decision sits on top of the Console Wars chapter instead of deleting it. |
-| [29](33-the-small-async-wars.md) | **The Small Async Wars** | Five reliability fights from the async / state-machine layer: the `NULL_ACTION_LOOP` cap, the `StepGuardService` grounding gate, overlap-aware streamed tool-call merging, the `_step_inner` tail-call race, and routing checkpoint handoffs through planning directives instead of error panels. With an honest note on what `sandboxed_local` does (and does not) claim on Windows. |
-| [30](34-the-fuzzy-match-heresy.md) | **The Fuzzy Match Heresy and the Death of Unified Diffs** | Why exact-match purity was a lie on real files, the three match modes (`exact` / `normalize_ws` / `fuzzy_safe`), the tree-sitter syntax check that is the receipt, and the lines I refuse to cross. |
-| [31](35-the-self-knowing-agent.md) | **The Self-Knowing Agent** | The runtime-truth capability block, default-on read parallelism, atomic `multiedit`, and getting `parallel_tool_calls` to actually reach the SDK so the prompt's claims have receipts. |
-| [32](36-the-required-risk.md) | **The Required Risk** | Why optional security parameters are not security parameters, the autonomy-mode collapse to a single honest knob, and the per-session “always allow” memory that turned a confirmation gate from noise back into signal. |
-| [33](37-the-verbose-status.md) | **The Verbose Status** | `/status verbose` diagnostics, `DO_NOT_TRACK` and `GRINTA_DISABLE_METRICS` as honest opt-outs, and the in-band disconnect probe that catches provider proxies pretending to be the model. |
-| [34](38-the-vendor-neutral-bench.md) | **The Vendor-Neutral Bench** | The internal eval pack: why the scorer refuses to drive other agents, how the five 0–5 metrics compose, why failure caps the score at 49, and what vendor-neutral honestly does (and does not) mean. |
-| [39](39-the-semantic-memory-that-survived.md) | **The Semantic Memory That Survived** | The RAG stack that survived deletion: ChromaDB + FastEmbed ONNX, SQLite FTS5 BM25, parent-child chunking, LRU cache, optional flashrank reranking, and why the 15,000-line graph memory had to die. |
-| [40](40-the-facade-pattern-and-the-smaller-file-api.md) | **The Facade Pattern and the Smaller File API** | How separating backend complexity from prompt cognitive load, and removing transport-format thinking from the model's job entirely, created a smaller and more honest editing API. |
-| [41](41-the-mode-split.md) | **The Mode Split** | Why autonomy is not one setting but a state machine with different conversational contracts, and how Chat / Plan / Agent mode replaced prompt-wrangling with product architecture. |
-| [42](42-the-interface-returned.md) | **The Interface Returned** | Why the Textual TUI was removed as product theater and brought back as operational UI — HUD bar, mode switch, cost observability, and the difference between pretty and useful. |
-| [43](43-the-plugin-boundary.md) | **The Plugin Boundary** | Why MCP is dangerous as infinite tool soup, and how Grinta treats selected MCP servers as deliberate capability extensions rather than identity replacements. |
-| [44](44-the-empty-folder-trials.md) | **The Empty Folder Trials** | Lab notes from the Raft/RFT consensus stress test: what Grinta built from an empty directory, where it struggled, and what the receipts actually prove. |
-| [45](45-the-product-surface-became-real.md) | **The Product Surface Became Real** | Why the current repo is no longer just an engine with a prompt, how Textual became the primary TTY surface, why non-interactive runs got their own path, and what launch hardening taught me about packaging trust. |
-| [46](46-the-decomposition-wave.md) | **The Decomposition Wave** | The 8.1 → 9.0 refactor: CLI/TUI and backend package splits, facades, file-size discipline, reliability gates, vocabulary contract, MCP cache hygiene, graduated security profiles, and the stuck-detection control/telemetry split. |
-| [07](07-the-road-ahead.md) | **The Road Ahead** | What is still experimental, what deserves improvement, and why the most honest ending for this project is still unfinished. |
+The original Textual interface was removed during the local-first pivot. A later,
+operational Textual TUI returned as the primary interactive surface. Piped input
+uses a separate non-interactive path. Both events are true.
 
-### Short reading paths
+### Server transport
 
-If you will not read linearly, five curated arcs:
+FastAPI and Socket.IO belonged to the hosted/server phase and survived for part
+of the transition. They are not part of the current core architecture. The
+current product routes TTY input to the Textual app and piped input to the
+non-interactive runner.
 
-- **Reliability and proof:** [18 · Surviving the Crash](19-surviving-the-crash.md) → [19 · Circuit Breakers](20-circuit-breakers-and-hallucinations.md) → [20 · Safety Sandbox](21-the-safety-sandbox-is-not-optional.md) → [21 · Who Grades the Agent](22-who-grades-the-agent.md) → [22 · Middleware Contract](23-the-middleware-contract.md).
-- **Pivot and subtraction:** [02 · Killed Darlings](02-the-killed-darlings.md) → [12 · Open Source Was the Better Business](12-open-source-was-the-better-business.md) (the multi-agent committee material now lives inside chapter 02).
-- **Terminal and execution:** [11 · Console Wars](11-the-console-wars.md) → [28 · Two Lives of the Terminal](32-the-two-lives-of-the-terminal.md) → [29 · Small Async Wars](33-the-small-async-wars.md) → [30 · Fuzzy Match Heresy](34-the-fuzzy-match-heresy.md).
-- **Memory and retrieval:** [04 · Context War](04-the-context-war.md) → [17 · Mind of the Agent](18-the-mind-of-the-agent.md) → [39 · Semantic Memory That Survived](39-the-semantic-memory-that-survived.md).
-- **Productization and maintainability:** [45 · Product Surface](45-the-product-surface-became-real.md) → [46 · Decomposition Wave](46-the-decomposition-wave.md) → [07 · Road Ahead](07-the-road-ahead.md).
+### Security profiles
 
-> **Tool-name note for chapters 05, 06, 34, 35, 40, 43, and 45:** These chapters reference the earlier file-API surface (`read`, `create`, `edit_symbol`, six tools). The post-rc1 cleanup renamed `read` → `read_file`, `create` → `create_file`, removed `edit_symbol`, and added `read_symbol` and `undo_last_edit` — bringing the public API to seven tools. The chapters remain historically accurate; the [CHANGELOG](../../CHANGELOG.md) tracks the current names.
+`standard`, `hardened_local`, and `sandboxed_local` describe different promises.
+The sandboxed profile adds OS-native, process-scoped isolation for supported
+non-interactive commands; interactive terminal sessions remain outside that
+boundary. None of the profiles should be described as a VM or complete host
+isolation.
 
-### Reference companion
+### Windows shell
 
-Use these when a chapter names a subsystem and you want current behavior in prose:
+Earlier chapters describe Git Bash as the practical Windows default. On
+**10 July 2026**, onboarding and the template changed to prefer PowerShell on
+native Windows. The semantic shell contract and Git Bash support remain.
 
-| Topic | Doc |
-| --- | --- |
-| Orchestration, ledger, pipeline, inference | [Architecture](../ARCHITECTURE.md); implementation under `backend/inference/` |
-| CLI usage, flags, UX | [User Guide](../USER_GUIDE.md), [Quick Start](../QUICK_START.md) |
-| Repo layout, tests, contribution | [Developer Guide](../DEVELOPER.md), [CI](../CI.md) |
-| Terms and symbols | [Vocabulary](../VOCABULARY.md) |
-| Security posture | [Security checklist](../SECURITY_CHECKLIST.md), [Reliability](../RELIABILITY.md) |
-| Memory and RAG stack | [39 · Semantic Memory That Survived](39-the-semantic-memory-that-survived.md); implementation under `backend/context/` |
-| Tool design and the editing facade | [40 · The Facade Pattern and the Smaller File API](40-the-facade-pattern-and-the-smaller-file-api.md) (historical names); current API in [CHANGELOG](../../CHANGELOG.md); implementation under `backend/engine/tools/` |
-| CLI/TUI module layout and size budget | [CLI Module Map](../CLI_MODULE_MAP.md), [46 · Decomposition Wave](46-the-decomposition-wave.md) |
-| Refactor metrics and phase receipts | [Refactor Baseline](../REFACTOR_BASELINE.md) |
-| Canonical terminology | [Vocabulary](../VOCABULARY.md), [ADR-016](../ADR.md#adr-016-grinta-vocabulary-contract) |
-| Non-code document edits | [ADR-017](../ADR.md#adr-017-non-code-document-edit-protocol) |
-| Security execution profiles | [36 · Required Risk](36-the-required-risk.md), [33 · Small Async Wars](33-the-small-async-wars.md) (`sandboxed_local`), [Security checklist](../SECURITY_CHECKLIST.md) |
+## Evidence and Current References
 
----
+- [Journey evidence index](EVIDENCE.md)
+- [Current architecture](../ARCHITECTURE.md)
+- [Current settings](../SETTINGS.md)
+- [Reliability and trust model](../RELIABILITY.md)
+- [Security checklist](../SECURITY_CHECKLIST.md)
+- [Support matrix](../SUPPORT_MATRIX.md)
+- [Vocabulary](../VOCABULARY.md)
+- [Refactor baseline](../REFACTOR_BASELINE.md)
+- [Changelog](../../CHANGELOG.md)
 
-## Who This Is For
+The project is not finished. The point of this book is not to make it look
+finished. It is to preserve the sequence of decisions clearly enough that the
+next person can distinguish an old truth, a current truth, and an unverified
+claim.
 
-- **Hiring managers at AI labs:** This is my portfolio. Not a resume — a systems architecture document that proves I can build, break, and rebuild autonomous systems at scale.
-- **Open-source contributors:** This is the map. Every dead end is marked. Every design constraint is explained. You won't waste weeks rediscovering what I already tried.
-- **Developers learning agentic design:** This is the course nobody teaches. Not "how to call an API" — how to build the infrastructure that makes an AI agent actually finish work.
-
-## Learning First, Business Second
-
-The business experiment was important, but my primary goal through these ten months was learning.
-
-I wanted to learn how to build reliable autonomous systems end-to-end: architecture, validation, tool design, cross-platform execution, cost discipline, and recovery after failure.
-
-What I learned is that reliability wins over hype, deletion is part of progress, and consistent execution over months matters more than short bursts of intensity.
-
-If you are a student and want to follow a similar path:
-
-1. commit to one serious project for at least one semester
-2. document decisions and failed experiments like a research log
-3. prioritize correctness and verification before adding new features
-4. test with real tasks early and often
-5. build in public and ask for feedback before you feel ready
-6. protect your health and schedule; burnout destroys technical judgment
-
----
-
-## A Note on Honesty
-
-I was inspired by OpenHands' event sourcing. I looked at how SWE-Agent designs tools. I'm not hiding that.
-
-What I built on top of those inspirations — the service decomposition, the multi-strategy compaction system, the stuck detector, the model-agnostic inference layer, the security hardening — that's mine. And the things I tried and failed at — the multi-agent swarm, the self-improvement framework, the prompt optimizer — those are mine too.
-
-The earlier codebase still exists as archaeological evidence — two full versions of it, in fact. If any of the claims in these chapters sound too specific to be real, the receipts are there: tens of thousands of lines of server code, a 20,000-line planning orchestrator with conflict prediction and patch scoring, over 10,000 lines of prompt optimization infrastructure, nearly 20,000 lines of container runtime management, a full multi-agent hub, an automated issue resolver, 12 condenser implementations, a browsing agent, a self-improvement framework, a knowledge graph with hybrid search, a multi-backend storage layer, and all the SaaS infrastructure you would expect — billing, authentication, rate limiting, a React frontend with end-to-end tests. All of that was built, tested, and then deliberately removed or reshaped into what Grinta is now.
-
-The code lives at [github.com/josephsenior/Grinta-Coding-Agent](https://github.com/josephsenior/Grinta-Coding-Agent). The knowledge I transferred from the killed multi-agent planning system lives at [github.com/josephsenior/Metasop](https://github.com/josephsenior/Metasop). For specific details about the ACE framework implementation and other deep architectural questions, you can reach me on [LinkedIn](https://linkedin.com/in/youssef-mejdi).
-
----
-
-> "Grinta is an agent built in the trenches. It doesn't have a $100M marketing budget or a perfect state machine. It has Grit. It fails fast, it iterates faster, and it shows you exactly where the gears are grinding."

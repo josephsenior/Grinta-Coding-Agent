@@ -4,13 +4,19 @@ This document describes the reliability primitives that ship with Grinta and
 is **deliberately honest** about what is and is not guaranteed. Read it before
 deploying Grinta against a production codebase.
 
-## Trust model (no automatic sandbox)
+## Trust model (no automatic sandbox by default)
 
-Grinta is a **single-user local CLI agent**. It runs as the same OS user that
-launched it and inherits that user's filesystem and network permissions. There
-is no per-command sandbox, no firejail, and no Docker isolation by default.
-This is a deliberate UX trade-off: a sandbox would give up "feels native" speed
-and break common workflows (asdf, pyenv, npm scripts, native debuggers).
+Grinta is a **single-user local CLI agent**. In the default `standard` profile,
+and in the policy-only `hardened_local` profile, commands run as the OS user that
+launched Grinta and inherit that user's filesystem and network permissions.
+There is no Docker or VM isolation by default. This keeps common local workflows
+(asdf, pyenv, npm scripts, native debuggers) available, but it means policy
+checks are not a host boundary.
+
+The optional `sandboxed_local` profile adds OS-native, process-scoped isolation
+for supported **non-interactive** subprocess commands. It requires the platform
+backend described in [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md). Interactive PTY
+sessions remain unsandboxed, and the profile is not complete host isolation.
 
 What protects you instead:
 
@@ -24,9 +30,13 @@ What protects you instead:
   observations before they reach the model or the persisted event stream.
 * **Risk-aware blast radius warnings.** Edits across many files trigger an
   inline warning that the model surfaces in its observation.
+* **Optional process isolation.** `sandboxed_local` combines the hardened policy
+  with `bwrap`, AppContainer, or `sandbox-exec` for supported non-interactive
+  commands.
 
-If you need stronger isolation, run Grinta inside a container or VM you
-manage. The CLI itself is not a sandbox.
+If you need a complete disposable-host boundary, run Grinta inside a container
+or VM you manage. `sandboxed_local` reduces process capability; it does not make
+the whole CLI a sandbox.
 
 ## Circuit breaker & recovery
 

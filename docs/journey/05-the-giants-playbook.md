@@ -1,5 +1,11 @@
 # 05. The Giants' Playbook
 
+> **Historical comparison:** Product capabilities in this chapter are snapshots
+> of a fast-moving field, not current competitive claims. The file-tool names are
+> also historical. As of 17 July 2026, Grinta exposes `read_file`,
+> `find_symbols`, `create_file`, `replace_string`, `multiedit`, and
+> `undo_last_edit`.
+
 No serious engineer builds in a vacuum.
 
 I did not build Grinta by pretending the rest of the agent world did not exist. I studied it constantly.
@@ -268,9 +274,18 @@ It also sharpened Grinta's own identity.
 
 The difference is the one-line pitch that has defined this project for a while:
 
-**Aider edits files. Grinta finishes tasks.**
+At the time, I reduced the distinction to a deliberately sharp internal line:
 
-That is not an insult. It is a product distinction.
+**“Aider edits files. Grinta finishes tasks.”**
+
+That sentence was useful for forcing a product decision, but it is too broad as a
+comparative claim. Aider can participate in much longer workflows, and Grinta
+does not finish every task. The more accurate distinction is that Grinta was
+designed to own more of the plan–execute–verify–finish loop, with the additional
+runtime weight and failure modes that choice creates.
+
+That was not intended as an insult. It was product shorthand, and it needs the
+qualification above when read as public technical writing.
 
 Grinta wanted the full loop:
 

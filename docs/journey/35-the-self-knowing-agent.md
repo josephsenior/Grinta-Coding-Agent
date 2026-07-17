@@ -1,5 +1,11 @@
 # 31. The Self-Knowing Agent
 
+> **Historical file API:** At this snapshot, `multiedit` accepted
+> `edit_symbol` and `replace_string`. It now accepts `replace_string` operations
+> only, and the public API no longer exposes `edit_symbol` or `read_symbol`.
+> The capability principle in this chapter remains current even though the
+> capability set changed.
+
 Most of what looks like model misbehavior is actually the model lying to *itself* about what tools it has.
 
 That sentence took me an embarrassing number of debug sessions to internalize. The model would shell out `Get-Command pylsp` to see if a language server existed, when the language server was already wired in and detectable through a single function call. It would call `read` six times in series when it could have batched safe read-only calls. It would describe condensation as “lossy summarization I should warn the user about,” when condensation in this codebase is automatic, middleware-driven, and free in turns and tool calls. It would say things like “let me check if I support multi-file edits” *to itself*, and then never check.

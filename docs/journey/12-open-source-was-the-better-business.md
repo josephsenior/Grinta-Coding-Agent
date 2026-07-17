@@ -1,4 +1,4 @@
-# 12. Open Source Was the Better Business
+# 12. Open Source Was the Better Product Strategy
 
 Giving up on a business model was one of the most liberating decisions I made on this project.
 
@@ -6,7 +6,10 @@ I spent the first four months of this project building a SaaS. A multi-tenant, K
 
 And then I deleted it.
 
-This chapter is about why making Grinta a local, open-source, CLI-first tool was not a failure of commercial ambition. It was the only way the tool could actually become what it was meant to be.
+This chapter is about why making Grinta a local, open-source, CLI-first tool was
+not a failure of commercial ambition. It was the strategy that fit my resources,
+the product's privacy model, and the kind of tool I wanted to use. It did not, by
+itself, prove a better business outcome.
 
 ---
 
@@ -86,7 +89,9 @@ All of that infrastructure exists because "local" is not simpler than "cloud." I
 
 That is the lesson that took me four months and 20,000 deleted lines to learn.
 
-Open source was not the fallback plan. It was the only architecture that let Grinta stay uncompromising.
+Open source was not the fallback plan. It was the product and distribution
+strategy that let Grinta keep its local-first constraints without requiring me
+to operate a hosted platform.
 
 ---
 

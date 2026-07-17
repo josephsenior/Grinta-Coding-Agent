@@ -9,11 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **`read_symbol` tool removed after a brief trial.** Targeted discovery remains
+  in `find_symbols`; file content is read through `read_file`. Removing the
+  dedicated tool keeps the final public file surface at six tools.
+
 - **`edit_symbol` tool removed.** The model was not using it; the schema
   was complex (six optional disambiguation fields plus `new_content`),
   and `replace_string` covers the same ground with a simpler schema the
-  model already uses confidently. Symbol discovery stays in
-  `find_symbols` and `read_symbol`.
+  model already uses confidently. Symbol discovery stays in `find_symbols`;
+  content reads stay in `read_file`.
 - **`create(type="symbol")` mode removed.** `create` is now file-only.
   Insert new symbols via `replace_string` with an anchor line.
 - **`multiedit` `edit_symbol` command removed.** `multiedit` now
@@ -32,9 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   environment (`pip install debugpy`), consistent with other DAP adapters and
   LSP servers. Contributor dev deps still include `debugpy`.
 - **Model-facing file API:** `read` renamed to `read_file`, `create` renamed
-  to `create_file`, new `read_symbol` tool replaces the old `read(type="symbols")`
-  mode. Public tools: `read_file`, `read_symbol`, `find_symbols`, `create_file`,
-  `replace_string`, `multiedit`, `undo_last_edit`.
+  to `create_file`, and the old `read(type="symbols")` mode was retired. A
+  dedicated `read_symbol` tool was tried and later removed. Final public tools:
+  `read_file`, `find_symbols`, `create_file`, `replace_string`, `multiedit`,
+  `undo_last_edit`.
 - **CI:** `py-tests` required jobs on Linux and Windows run the full
   `backend/tests/unit` corpus (fast PR gates), not a fixed nine-file slice.
   [docs/CI.md](docs/CI.md) documents the tiers.

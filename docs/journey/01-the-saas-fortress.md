@@ -1,5 +1,10 @@
 # 01. The SaaS Fortress
 
+> **Historical snapshot:** FastAPI, Socket.IO, the server routes, and the service
+> counts below describe the hosted phase and part of the transition. They are no
+> longer the current core product surface. The current terminal path is Textual
+> for TTY input and a separate non-interactive runner for piped input.
+
 I did not start Grinta as a CLI.
 I started it as a business.
 
@@ -85,9 +90,14 @@ That naturally pushes you toward real-time transport. A static request/response 
 
 ### Realtime Transport
 
-That is one of the reasons Grinta still carries **FastAPI + Socket.IO** in its architecture today.
+That is one of the reasons Grinta carried **FastAPI + Socket.IO** through the
+first part of its local-first transition.
 
-Even after the major pivot, the system still reflects the needs of a live agent interface. Socket.IO was not chosen randomly. It came from the real requirement to surface evolving agent state, not just final output.
+Even after the major pivot, the system still reflected the needs of a live agent
+interface. Socket.IO was not chosen randomly. It came from the requirement to
+surface evolving agent state, not just final output. The transport was later
+removed from the core while the event-driven interface requirement survived in
+the terminal UI.
 
 The `EventStream` class that powers all of this today is not a simple message queue. It is a pub/sub backbone with typed subscriber roles, backpressure management so fast producers cannot overwhelm slow consumers, event coalescing for rapid bursts, and secret masking that precompiles patterns from all known secret values before any event leaves the system. That level of transport engineering came directly from the SaaS phase, when multiple concurrent users meant you could not afford sloppy event delivery.
 
@@ -115,8 +125,8 @@ The container runtime infrastructure was its own world: nearly **20,000 lines** 
 Some of that DNA is still visible in the repo today:
 
 - Docker startup scripts still exist
-- HTTP backend entry points still exist (FastAPI + uvicorn serving the Socket.IO app)
-- Socket.IO support still exists, with a full event routing layer
+- HTTP backend entry points and Socket.IO still existed at this snapshot
+- the event-routing lessons survived after those server transports left the core
 - orchestration and persistence layers are far more serious than what a simple local CLI usually needs — the persistence system has multiple tiers with Write-Ahead Logging, batched flushing in a dedicated background thread, and synchronous atomic writes for critical events
 - the conversation abstraction with metadata tracking exists because it was designed for multi-tenant session management
 
@@ -256,7 +266,7 @@ What survived includes:
 
 - a serious orchestration layer — 21 services with explicit dependency injection, wired in dependency order
 - event-sourced persistence and recovery — append-only event streams, Write-Ahead Logging, crash recovery that replays every event to reconstruct state
-- real-time capable backend interfaces — Socket.IO transport still used for streaming agent progress
+- real-time interface thinking — later expressed through the TUI rather than the Socket.IO transport
 - strong security thinking — a security analyzer with multi-tier pattern matching across dozens of threat patterns, chaining escalation, and encoded payload detection
 - containerization where it still makes sense for target apps
 - a design mindset shaped by production-style constraints — atomic writes for crash safety, retry logic for Windows lock contention, the kind of paranoia you only develop when you have watched real systems fail

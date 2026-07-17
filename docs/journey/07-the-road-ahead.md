@@ -1,5 +1,11 @@
 # 07. The Road Ahead
 
+> **Epilogue update, July 2026:** Chapters
+> [47](47-the-long-runs-and-their-receipts.md) and
+> [48](48-the-continuity-contract.md) now document the long-run evidence and
+> continuity work that landed after the original roadmap. The open problems
+> below remain a direction, not a release promise.
+
 This project is not finished.
 
 That is not an apology. It is a fact.

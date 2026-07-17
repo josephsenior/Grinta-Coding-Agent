@@ -67,7 +67,7 @@ See `backend/core/config/agent_config.py` for the full schema.
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `windows_shell` | `bash` | On Windows: `bash` (Git Bash) or `powershell` for the agent shell tool |
+| `windows_shell` | `powershell` | On Windows: `powershell` (native default since 10 July 2026) or `bash` (Git Bash) for the agent shell tool |
 | `execution_profile` | `standard` | `standard`, `hardened_local`, or `sandboxed_local` |
 | `enforce_security` | `true` | Enable security analyzer enforcement |
 | `block_high_risk` | `false` | Block HIGH-risk actions outright |

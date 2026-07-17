@@ -1,5 +1,10 @@
 # 30. The Fuzzy Match Heresy and the Death of Unified Diffs
 
+> **Historical file API:** The `edit_symbol`-first facade below was later
+> removed. The current write path uses `create_file`, `replace_string`, and
+> atomic `multiedit`; `find_symbols` remains discovery-only. The match ladder is
+> still part of the history that led to the smaller API.
+
 There is a sentence I had to argue myself out of for months:
 
 > *“If the agent cannot match an exact string, it is the agent's problem.”*
