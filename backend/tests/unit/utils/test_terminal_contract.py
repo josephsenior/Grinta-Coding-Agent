@@ -37,24 +37,28 @@ def test_active_tool_registry_context() -> None:
 def test_runtime_prefers_powershell() -> None:
     from types import SimpleNamespace
 
-    # 1. Active registry
-    mock_reg = SimpleNamespace(has_bash=True, has_powershell=False)
+    # Mock tool_registry.OS_CAPS to think we are on Windows so resolve_windows_powershell_preference executes Windows logic
+    with patch('backend.execution.utils.tool_registry.OS_CAPS') as mock_caps:
+        mock_caps.is_windows = True
 
-    set_active_tool_registry(mock_reg)
-    assert _runtime_prefers_powershell() is False
+        # 1. Active registry
+        mock_reg = SimpleNamespace(has_bash=True, has_powershell=False)
 
-    mock_reg.has_bash = False
-    mock_reg.has_powershell = True
-    assert _runtime_prefers_powershell() is True
-
-    # 2. Fallback to global registry
-    set_active_tool_registry(None)
-    mock_global = SimpleNamespace(has_bash=True, has_powershell=False)
-    with patch(
-        'backend.utils.terminal.terminal_contract._get_global_tool_registry',
-        return_value=mock_global,
-    ):
+        set_active_tool_registry(mock_reg)
         assert _runtime_prefers_powershell() is False
+
+        mock_reg.has_bash = False
+        mock_reg.has_powershell = True
+        assert _runtime_prefers_powershell() is True
+
+        # 2. Fallback to global registry
+        set_active_tool_registry(None)
+        mock_global = SimpleNamespace(has_bash=True, has_powershell=False)
+        with patch(
+            'backend.utils.terminal.terminal_contract._get_global_tool_registry',
+            return_value=mock_global,
+        ):
+            assert _runtime_prefers_powershell() is False
 
 
 def test_uses_powershell_terminal() -> None:
