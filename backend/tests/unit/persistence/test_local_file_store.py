@@ -189,3 +189,110 @@ class TestGetFullPath:
     def test_strips_leading_slash(self, store):
         full = store.get_full_path('/leading.txt')
         assert store.root in full
+
+
+class TestLocalFileStoreCoverageGaps:
+    def test_get_full_path_empty_after_strip(self, store):
+        # Empty or single slash should resolve to storage root
+        assert store.get_full_path('/') == store.root
+        assert store.get_full_path('') == store.root
+
+    def test_get_full_path_import_error(self, store):
+        import builtins
+        original_import = builtins.__import__
+
+        def mock_import(name, *args, **kwargs):
+            if name == "backend.core.type_safety.path_validation":
+                raise ImportError("mocked import error")
+            return original_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=mock_import):
+            with pytest.raises(RuntimeError) as exc:
+                store.get_full_path("test.txt")
+            assert "Path validation module unavailable" in str(exc.value)
+
+    def test_write_replace_error_cleans_up_tmp(self, store):
+        # Mock replace_file_with_retry to raise an exception
+        with patch("backend.persistence.file_store.local_file_store.replace_file_with_retry", side_effect=ValueError("replace fail")):
+            # Get list of files in storage before write
+            initial_files = os.listdir(store.root)
+            with pytest.raises(ValueError):
+                store.write("fail.txt", "some content")
+            # Verify no temporary files left behind
+            assert os.listdir(store.root) == initial_files
+
+    def test_fsync_directory_non_windows(self):
+        # Mock the imported OS_CAPS in local_file_store module
+        with patch("backend.persistence.file_store.local_file_store.OS_CAPS") as mock_os_caps:
+            mock_os_caps.is_windows = False
+            # Mock open, fsync, close
+            mock_fd = 999
+            with patch("os.open", return_value=mock_fd) as mock_open, \
+                 patch("os.fsync") as mock_fsync, \
+                 patch("os.close") as mock_close:
+                
+                LocalFileStore._fsync_directory("/some/dir")
+                
+                mock_open.assert_called_once_with("/some/dir", os.O_RDONLY)
+                mock_fsync.assert_called_once_with(mock_fd)
+                mock_close.assert_called_once_with(mock_fd)
+
+    def test_delete_file_permission_error_retries_and_succeeds(self, store):
+        store.write("retry_del.txt", "data")
+        full_path = store.get_full_path("retry_del.txt")
+        
+        real_remove = os.remove
+        calls = 0
+        
+        def mock_remove(path):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise PermissionError("Access denied (mocked)")
+            real_remove(path)
+            
+        with patch("os.remove", side_effect=mock_remove):
+            store.delete("retry_del.txt")
+            assert calls == 2
+            assert not os.path.exists(full_path)
+
+    def test_delete_file_os_error_exhausted(self, store):
+        store.write("always_fail.txt", "data")
+        with patch("os.remove", side_effect=OSError("always failing remove")):
+            with pytest.raises(OSError) as exc:
+                store._delete_file_with_retry(store.get_full_path("always_fail.txt"))
+            assert "always failing remove" in str(exc.value)
+
+    def test_delete_dir_os_error_exhausted(self, store):
+        os.makedirs(store.get_full_path("fail_dir"))
+        with patch("shutil.rmtree", side_effect=OSError("always failing rmtree")):
+            with pytest.raises(OSError) as exc:
+                store._delete_dir_with_retry(store.get_full_path("fail_dir"))
+            assert "always failing rmtree" in str(exc.value)
+
+    def test_make_writable_os_error(self):
+        with patch("os.chmod", side_effect=OSError("chmod failed")):
+            # Should catch exception and not raise
+            LocalFileStore._make_writable("/nonexistent")
+
+    def test_make_tree_writable_file(self, tmp_path):
+        test_file = tmp_path / "file.txt"
+        test_file.write_text("hello")
+        
+        # When path is a file, should call _make_writable
+        with patch.object(LocalFileStore, "_make_writable") as mock_make_writable:
+            LocalFileStore._make_tree_writable(str(test_file))
+            mock_make_writable.assert_called_once_with(str(test_file))
+
+    def test_make_tree_writable_dir(self, tmp_path):
+        test_dir = tmp_path / "dir"
+        test_dir.mkdir()
+        sub_dir = test_dir / "subdir"
+        sub_dir.mkdir()
+        test_file = sub_dir / "file.txt"
+        test_file.write_text("hello")
+        
+        # Test full tree walk chmod
+        LocalFileStore._make_tree_writable(str(test_dir))
+        # No errors should be raised
+

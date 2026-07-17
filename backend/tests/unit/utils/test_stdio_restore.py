@@ -58,3 +58,25 @@ def test_real_stdio_when_dunder_stdout_also_lacks_encoding() -> None:
     finally:
         sys.stdout = saved_stdout
         sys.__stdout__ = saved_dunder
+
+
+def test_stdio_encoding_proxy_delegation() -> None:
+    from backend.utils.stdio_restore import _StdioEncodingProxy
+    from unittest.mock import MagicMock
+
+    mock_inner = MagicMock()
+    proxy = _StdioEncodingProxy(mock_inner)
+
+    # 1. Test write
+    proxy.write("data")
+    mock_inner.write.assert_called_once_with("data")
+
+    # 2. Test flush
+    proxy.flush()
+    mock_inner.flush.assert_called_once()
+
+    # 3. Test getattr
+    mock_inner.isatty.return_value = True
+    assert proxy.isatty() is True
+    mock_inner.isatty.assert_called_once()
+

@@ -676,3 +676,59 @@ class TestCoverageGaps:
         node = editor._find_function_node(tree, file_bytes, 'greet', 'unknown')  # type: ignore
         assert node is not None
         assert node.type == 'function_definition'
+
+    def test_get_name_node_returns_none(self, editor: TreeSitterEditor) -> None:
+        """Test get_name_node returns None when no children are name identifiers."""
+        from backend.utils.treesitter._tse_query import get_name_node
+        from unittest.mock import MagicMock
+
+        mock_child = MagicMock()
+        mock_child.type = "unrelated_type"
+        mock_node = MagicMock()
+        mock_node.children = [mock_child]
+
+        assert get_name_node(mock_node) is None
+
+    def test_find_symbol_ambiguous_error(
+        self, editor: TreeSitterEditor, tmp_path: Path
+    ) -> None:
+        """Test finding a symbol raises AmbiguousSymbolError when duplicates exist."""
+        from backend.utils.treesitter._tse_types import AmbiguousSymbolError
+        
+        content = 'def duplicate(): pass\n\ndef duplicate(): pass\n'
+        f = tmp_path / 'dup.py'
+        f.write_text(content, encoding='utf-8')
+        
+        with pytest.raises(AmbiguousSymbolError) as exc:
+            editor.find_symbol(str(f), 'duplicate')
+        assert exc.value.symbol_name == 'duplicate'
+        assert len(exc.value.matches) == 2
+
+    def test_has_syntax_errors_edge_cases(self, editor: TreeSitterEditor) -> None:
+        """Test has_syntax_errors with ERROR nodes and missing nodes."""
+        from backend.utils.treesitter._tse_query import has_syntax_errors
+        from unittest.mock import MagicMock
+
+        # 1. Node type is ERROR
+        node_err = MagicMock()
+        node_err.type = 'ERROR'
+        node_err.is_missing = False
+        assert has_syntax_errors(node_err) is True
+
+        # 2. Node is missing
+        node_missing = MagicMock()
+        node_missing.type = 'parameter'
+        node_missing.is_missing = True
+        assert has_syntax_errors(node_missing) is True
+
+        # 3. Child has syntax error
+        child_err = MagicMock()
+        child_err.type = 'ERROR'
+        child_err.is_missing = False
+        
+        parent = MagicMock()
+        parent.type = 'function_definition'
+        parent.is_missing = False
+        parent.children = [child_err]
+        assert has_syntax_errors(parent) is True
+

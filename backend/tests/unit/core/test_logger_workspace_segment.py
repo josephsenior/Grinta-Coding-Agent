@@ -104,7 +104,11 @@ def test_bind_session_logging_creates_session_jsonl(
     install_root = tmp_path / 'install'
     ws_root = install_root / 'logs' / 'workspaces' / 'sample_ws'
     ws_root.mkdir(parents=True)
+    
+    import backend.core.logging.session_event_logger as sel_mod
     monkeypatch.setattr(logger_mod, 'LOG_TO_FILE', True)
+    monkeypatch.setattr(sel_mod, 'LOG_TO_FILE', True)
+    
     monkeypatch.setattr(logger_mod, '_workspace_logs_dir', lambda: str(ws_root))
     monkeypatch.setattr(logger_mod, '_workspace_logs_segment', lambda: 'sample_ws')
     monkeypatch.setattr(logger_mod, '_LOG_SESSION_ID', None)

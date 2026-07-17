@@ -675,3 +675,171 @@ class TestErrorHandling:
         repaired = store.read_event(0)
         assert repaired is not None
         assert repaired['args']['n'] == 1
+
+
+class TestSqliteEventStoreExtendedCoverage:
+    """Targeted coverage tests for edge cases, large payloads, and integrity errors."""
+
+    def test_destructive_delete_single_event_enabled(self, store: SQLiteEventStore) -> None:
+        """Test delete_event works when GRINTA_SQLITE_LEDGER_ALLOW_DESTRUCTIVE_DELETE is true."""
+        import os
+        from unittest.mock import patch
+
+        store.write_event(0, {'id': 0, 'action': 'first'})
+        store.write_event(1, {'id': 1, 'action': 'second'})
+        assert store.count() == 2
+
+        with patch.dict(os.environ, {'GRINTA_SQLITE_LEDGER_ALLOW_DESTRUCTIVE_DELETE': 'true'}):
+            store.delete_event(0)
+
+        assert store.count() == 1
+        assert store.read_event(0) is None
+        assert store.read_event(1) is not None
+
+    def test_destructive_delete_event_exception_rolls_back(self, store: SQLiteEventStore) -> None:
+        """Test exception in delete_event rolls back transaction."""
+        import os
+        from unittest.mock import patch, MagicMock
+
+        store.write_event(0, {'id': 0, 'action': 'first'})
+
+        with patch.dict(os.environ, {'GRINTA_SQLITE_LEDGER_ALLOW_DESTRUCTIVE_DELETE': 'true'}):
+            # Mock the connection's execute to raise sqlite3.Error
+            mock_conn = MagicMock()
+            mock_conn.execute.side_effect = sqlite3.Error("simulated delete error")
+            with patch.object(store, '_get_conn', return_value=mock_conn):
+                with pytest.raises(sqlite3.Error):
+                    store.delete_event(0)
+                assert mock_conn.rollback.called
+
+    def test_destructive_delete_from_enabled(self, store: SQLiteEventStore) -> None:
+        """Test delete_from works when GRINTA_SQLITE_LEDGER_ALLOW_DESTRUCTIVE_DELETE is true."""
+        import os
+        from unittest.mock import patch
+
+        for i in range(5):
+            store.write_event(i, {'id': i, 'action': f'event_{i}'})
+        assert store.count() == 5
+
+        with patch.dict(os.environ, {'GRINTA_SQLITE_LEDGER_ALLOW_DESTRUCTIVE_DELETE': 'true'}):
+            deleted = store.delete_from(3)
+            assert deleted == 2
+
+        assert store.count() == 3
+        assert store.read_event(2) is not None
+        assert store.read_event(3) is None
+
+    def test_destructive_delete_from_exception_rolls_back(self, store: SQLiteEventStore) -> None:
+        """Test exception in delete_from rolls back transaction."""
+        import os
+        from unittest.mock import patch, MagicMock
+
+        store.write_event(0, {'id': 0, 'action': 'first'})
+
+        with patch.dict(os.environ, {'GRINTA_SQLITE_LEDGER_ALLOW_DESTRUCTIVE_DELETE': 'true'}):
+            mock_conn = MagicMock()
+            mock_conn.execute.side_effect = sqlite3.Error("simulated delete_from error")
+            with patch.object(store, '_get_conn', return_value=mock_conn):
+                with pytest.raises(sqlite3.Error):
+                    store.delete_from(0)
+                assert mock_conn.rollback.called
+
+    def test_read_event_payload_too_large(self, store: SQLiteEventStore) -> None:
+        """Test value error is raised when payload is too large."""
+        from unittest.mock import patch
+
+        store.write_event(0, {'id': 0, 'action': 'test', 'data': 'large_text_here'})
+        
+        # Mock _max_payload_bytes to return 5 bytes (smaller than the payload size)
+        with patch.object(store, '_max_payload_bytes', return_value=5):
+            with pytest.raises(ValueError) as exc:
+                store.read_event(0)
+            assert "too large" in str(exc.value)
+
+    def test_read_event_payload_id_mismatch(self, store: SQLiteEventStore) -> None:
+        """Test value error is raised on payload ID mismatch."""
+        import json
+        
+        # Write clean event
+        store.write_event(0, {'id': 0, 'action': 'test'})
+        
+        # Bypass API and modify payload ID using raw SQLite
+        conn = sqlite3.connect(str(store._db_path))
+        payload_data = {'id': 999, 'action': 'test'}
+        conn.execute('UPDATE events SET payload = ? WHERE id = 0', (json.dumps(payload_data),))
+        conn.commit()
+        conn.close()
+
+        with pytest.raises(ValueError) as exc:
+            store.read_event(0)
+        assert "payload id mismatch" in str(exc.value)
+
+    def test_check_integrity_success(self, store: SQLiteEventStore) -> None:
+        """Test check_integrity returns True on valid db."""
+        store.write_event(0, {'id': 0, 'action': 'test'})
+        assert store.check_integrity() is True
+
+    def test_check_integrity_sqlite_error(self, store: SQLiteEventStore) -> None:
+        """Test check_integrity handles SQLite integrity failure and exceptions."""
+        from unittest.mock import patch, MagicMock
+
+        # 1. PRAGMA integrity_check returns non-ok
+        mock_conn = MagicMock()
+        mock_conn.execute().fetchall.return_value = [("corrupt page",)]
+        with patch.object(store, '_get_read_conn', return_value=mock_conn):
+            assert store.check_integrity() is False
+
+        # 2. SQLite error raises exception
+        mock_conn_exc = MagicMock()
+        mock_conn_exc.execute.side_effect = sqlite3.Error("DB error")
+        with patch.object(store, '_get_read_conn', return_value=mock_conn_exc):
+            assert store.check_integrity() is False
+
+    def test_check_application_integrity_order_violation(self, store: SQLiteEventStore) -> None:
+        """Test check_application_integrity detects ID ordering violations."""
+        from unittest.mock import patch, MagicMock
+        
+        mock_conn = MagicMock()
+        mock_conn.execute().fetchall.return_value = [
+            {'id': 10, 'payload': '{"id": 10}'},
+            {'id': 5, 'payload': '{"id": 5}'}
+        ]
+        with patch.object(store, '_get_read_conn', return_value=mock_conn):
+            assert store.check_application_integrity() is False
+
+    def test_check_application_integrity_id_mismatch(self, store: SQLiteEventStore) -> None:
+        """Test check_application_integrity detects row ID vs payload ID mismatch."""
+        import json
+        import time
+        
+        conn = sqlite3.connect(str(store._db_path))
+        conn.execute('INSERT INTO events (id, event_type, payload, timestamp) VALUES (?, ?, ?, ?)',
+                     (1, 'test', json.dumps({'id': 999, 'action': 'test'}), time.time()))
+        conn.commit()
+        conn.close()
+
+        assert store.check_application_integrity() is False
+
+    def test_check_application_integrity_checksum_mismatch(self, store: SQLiteEventStore) -> None:
+        """Test check_application_integrity detects checksum mismatch."""
+        import json
+        import time
+        
+        # Mismatched checksum
+        conn = sqlite3.connect(str(store._db_path))
+        conn.execute('INSERT INTO events (id, event_type, payload, timestamp) VALUES (?, ?, ?, ?)',
+                     (0, 'test', json.dumps({'id': 0, 'action': 'test', '_grinta_checksum': 'wrong_checksum'}), time.time()))
+        conn.commit()
+        conn.close()
+
+        assert store.check_application_integrity(verify_checksums=True) is False
+
+    def test_check_application_integrity_exception(self, store: SQLiteEventStore) -> None:
+        """Test check_application_integrity returns False if DB exception occurs."""
+        from unittest.mock import patch, MagicMock
+
+        mock_conn = MagicMock()
+        mock_conn.execute.side_effect = sqlite3.Error("Integrity check query failed")
+        with patch.object(store, '_get_read_conn', return_value=mock_conn):
+            assert store.check_application_integrity() is False
+

@@ -237,3 +237,188 @@ class TestPathConsistency:
         event_file = get_conversation_event_filename(sid, id=1)
 
         assert event_file.startswith(events_dir)
+
+
+class TestLocationsExtendedCoverage:
+    """Targeted coverage tests for locations storage, migrations, and local_data_root normalizations."""
+
+    def test_maybe_migrate_legacy_project_storage_success(self, tmp_path):
+        from backend.persistence.locations import _maybe_migrate_legacy_project_storage
+        
+        workspace = tmp_path / "workspace"
+        legacy_dir = workspace / ".grinta" / "storage"
+        legacy_dir.mkdir(parents=True)
+        (legacy_dir / "data.txt").write_text("legacy data")
+        
+        dest_storage = tmp_path / "dest" / "storage"
+        
+        _maybe_migrate_legacy_project_storage(workspace, dest_storage)
+        
+        # Verify moved successfully
+        assert dest_storage.exists()
+        assert (dest_storage / "data.txt").read_text() == "legacy data"
+        assert not legacy_dir.exists()
+
+    def test_maybe_migrate_legacy_project_storage_aborted(self, tmp_path):
+        from backend.persistence.locations import _maybe_migrate_legacy_project_storage
+        
+        workspace = tmp_path / "workspace"
+        legacy_dir = workspace / ".grinta" / "storage"
+        legacy_dir.mkdir(parents=True)
+        
+        dest_storage = tmp_path / "dest" / "storage"
+        dest_storage.mkdir(parents=True)  # Already exists!
+        
+        _maybe_migrate_legacy_project_storage(workspace, dest_storage)
+        # Should not delete legacy if dest exists
+        assert legacy_dir.exists()
+
+    def test_maybe_migrate_legacy_project_storage_oserror(self, tmp_path):
+        from backend.persistence.locations import _maybe_migrate_legacy_project_storage
+        import shutil
+        from unittest.mock import patch
+        
+        workspace = tmp_path / "workspace"
+        legacy_dir = workspace / ".grinta" / "storage"
+        legacy_dir.mkdir(parents=True)
+        
+        dest_storage = tmp_path / "dest" / "storage"
+        
+        with patch("shutil.move", side_effect=OSError("Permission denied")):
+            _maybe_migrate_legacy_project_storage(workspace, dest_storage)
+            # Should survive log warning and not raise exception
+            assert legacy_dir.exists()
+
+    def test_maybe_migrate_legacy_downloads_success(self, tmp_path):
+        from backend.persistence.locations import _maybe_migrate_legacy_downloads
+        
+        workspace = tmp_path / "workspace"
+        legacy_dir = workspace / ".grinta" / "downloads"
+        legacy_dir.mkdir(parents=True)
+        (legacy_dir / "dl.txt").write_text("downloaded")
+        
+        dest_downloads = tmp_path / "dest" / "downloads"
+        
+        _maybe_migrate_legacy_downloads(workspace, dest_downloads)
+        
+        assert dest_downloads.exists()
+        assert (dest_downloads / "dl.txt").read_text() == "downloaded"
+
+    def test_maybe_migrate_legacy_downloads_oserror(self, tmp_path):
+        from backend.persistence.locations import _maybe_migrate_legacy_downloads
+        from unittest.mock import patch
+        
+        workspace = tmp_path / "workspace"
+        legacy_dir = workspace / ".grinta" / "downloads"
+        legacy_dir.mkdir(parents=True)
+        
+        dest_downloads = tmp_path / "dest" / "downloads"
+        
+        with patch("shutil.move", side_effect=OSError("Permission denied")):
+            _maybe_migrate_legacy_downloads(workspace, dest_downloads)
+            assert legacy_dir.exists()
+
+    def test_get_project_local_data_root(self, tmp_path):
+        from backend.persistence.locations import get_project_local_data_root
+        
+        # Resolve grinta root under ~/.grinta/workspaces/<hash>/storage
+        root = get_project_local_data_root(tmp_path)
+        assert "workspaces" in root
+        assert "storage" in root
+
+    def test_get_workspace_downloads_dir(self, tmp_path):
+        from backend.persistence.locations import get_workspace_downloads_dir
+        from pathlib import Path
+        
+        dl_dir = get_workspace_downloads_dir(tmp_path)
+        assert "workspaces" in dl_dir
+        assert "downloads" in dl_dir
+        assert Path(dl_dir).exists()
+
+    def test_config_str(self):
+        from backend.persistence.locations import _config_str
+        from unittest.mock import MagicMock
+        
+        cfg = MagicMock()
+        cfg.local_data_root = "   /path/to/data   "
+        assert _config_str(cfg, 'local_data_root') == "/path/to/data"
+        
+        # Non-string config returns empty string
+        cfg.local_data_root = 123
+        assert _config_str(cfg, 'local_data_root') == ""
+
+    def test_is_same_or_subpath(self, tmp_path):
+        from backend.persistence.locations import _is_same_or_subpath
+        from pathlib import Path
+        
+        parent = tmp_path / "parent"
+        child = parent / "child"
+        unrelated = tmp_path / "other"
+        
+        parent.mkdir()
+        child.mkdir()
+        unrelated.mkdir()
+        
+        assert _is_same_or_subpath(parent, parent) is True
+        assert _is_same_or_subpath(child, parent) is True
+        assert _is_same_or_subpath(unrelated, parent) is False
+        
+        # OSError/ValueError handling
+        from unittest.mock import patch
+        with patch.object(Path, "resolve", side_effect=ValueError("invalid path")):
+            assert _is_same_or_subpath(child, parent) is False
+
+    def test_get_local_data_root_normalization(self, tmp_path):
+        from backend.persistence.locations import get_local_data_root
+        from unittest.mock import MagicMock, patch
+        from pathlib import Path
+        
+        # Configuration mock
+        cfg = MagicMock()
+        cfg.local_data_root = ""
+        cfg.project_root = str(tmp_path)
+        
+        # When raw is empty, fallback to default_local_data_root
+        root = get_local_data_root(cfg)
+        assert "workspaces" in root
+        assert "storage" in root
+
+        # When local_data_root points to unrelated dir outside the workspace (non-subpath of tmp_path)
+        outside_path = Path("/some/unrelated/directory/outside/workspace").resolve()
+        cfg.local_data_root = str(outside_path)
+        root2 = get_local_data_root(cfg)
+        # Should be resolved to the outside directory itself
+        assert root2 == str(outside_path)
+
+        # When CWD matches reserved user app data dir
+        actual_cwd = Path.cwd().resolve()
+        with patch("backend.persistence.locations._current_working_directory", return_value=actual_cwd):
+            with patch("backend.core.workspace_resolution.is_reserved_user_app_data_dir", return_value=True):
+                cfg.local_data_root = "./local_data"
+                cfg.project_root = None
+                root3 = get_local_data_root(cfg)
+                assert root3 == str((actual_cwd / "local_data").resolve())
+
+        # When resolve_cli_workspace_directory is None and CWD is not reserved
+        with patch("backend.persistence.locations._current_working_directory", return_value=actual_cwd):
+            with patch("backend.core.workspace_resolution.is_reserved_user_app_data_dir", return_value=False):
+                cfg.local_data_root = "./sessions"
+                cfg.project_root = None
+                root4 = get_local_data_root(cfg)
+                # It should redirect sessions relative to CWD to the CWD workspace-keyed storage
+                assert "workspaces" in root4
+                assert "storage" in root4
+
+    def test_get_active_local_data_root(self):
+        from backend.persistence.locations import get_active_local_data_root
+        from unittest.mock import patch
+        
+        # Normal active load
+        root = get_active_local_data_root()
+        assert root is not None
+        
+        # Handle exceptions gracefully and return default local data root
+        with patch("backend.core.config.load_app_config", side_effect=Exception("Failed to load")):
+            root_fallback = get_active_local_data_root()
+            assert "grinta" in root_fallback
+

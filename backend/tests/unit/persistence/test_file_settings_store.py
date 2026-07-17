@@ -209,3 +209,69 @@ class TestFileSettingsStoreGetInstance:
         ):
             instance = await FileSettingsStore.get_instance(mock_config, 'user-1')
             assert isinstance(instance, FileSettingsStore)
+
+
+class TestFileSettingsStoreCoverageGaps:
+    async def test_load_double_checked_cache_concurrency(self):
+        import asyncio
+        fs = MagicMock()
+        store = FileSettingsStore(file_store=fs)
+        data = json.dumps({'language': 'python'})
+        
+        calls = 0
+        async def slow_read(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            await asyncio.sleep(0.05)
+            return data
+
+        with patch(
+            'backend.persistence.settings.file_settings_store.call_sync_from_async',
+            side_effect=slow_read,
+        ):
+            # Run both concurrently
+            t1 = asyncio.create_task(store.load())
+            t2 = asyncio.create_task(store.load())
+            r1, r2 = await asyncio.gather(t1, t2)
+            
+            # The first one should have read from file, the second should have hit the double check
+            assert calls == 1
+            assert r1 is not None
+            assert r1.language == r2.language
+
+    async def test_store_plain_string_api_key_and_mcp_config(self, tmp_path):
+        fs = MagicMock()
+        store = FileSettingsStore(file_store=fs)
+        mock_settings = MagicMock()
+        mock_settings.model_dump.return_value = {
+            'llm_model': 'openai/gpt-4.1',
+            'llm_api_key': '   plain-string-secret   ',  # standard string (requires strip)
+            'llm_base_url': None,
+            'mcp_config': {'server': 'http://mcp'},      # non-None mcp_config
+        }
+
+        with (
+            patch(
+                'backend.persistence.settings.file_settings_store.persist_llm_api_key_to_dotenv',
+            ) as mock_persist,
+            patch(
+                'backend.persistence.settings.file_settings_store.get_app_settings_root',
+                return_value=str(tmp_path),
+            ),
+            patch(
+                'backend.persistence.settings.file_settings_store.call_sync_from_async',
+                new_callable=AsyncMock,
+            ) as mock_write,
+        ):
+            await store.store(mock_settings)
+
+        # Verified plain string was stripped and persisted
+        mock_persist.assert_called_once_with(
+            'plain-string-secret',
+            settings_json_path=tmp_path / store.path,
+        )
+        written = mock_write.call_args[0][2]
+        data = json.loads(written)
+        assert data['llm_api_key'] == LLM_API_KEY_SETTINGS_PLACEHOLDER
+        assert data['mcp_config'] == {'server': 'http://mcp'}
+

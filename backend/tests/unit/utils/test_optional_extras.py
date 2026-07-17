@@ -51,3 +51,42 @@ def test_semantic_recall_active_requires_live_store(monkeypatch) -> None:
     assert oe.semantic_recall_active(
         cfg, vector_store=object(), require_live_store=True
     )
+
+
+def test_semantic_recall_active_when_disabled(monkeypatch) -> None:
+    cfg = SimpleNamespace(
+        default_agent='Orchestrator',
+        get_agent_config=lambda _name: SimpleNamespace(enable_vector_memory=False),
+    )
+    monkeypatch.setattr(oe, 'is_rag_extra_available', lambda: True)
+    assert oe.semantic_recall_active(cfg, require_live_store=False) is False
+
+
+def test_semantic_recall_active_no_live_store_needed(monkeypatch) -> None:
+    cfg = SimpleNamespace(
+        default_agent='Orchestrator',
+        get_agent_config=lambda _name: SimpleNamespace(enable_vector_memory=True),
+    )
+    monkeypatch.setattr(oe, 'is_rag_extra_available', lambda: True)
+    assert oe.semantic_recall_active(cfg, require_live_store=False) is True
+
+
+def test_resolve_semantic_recall_for_prompt(monkeypatch) -> None:
+    cfg = SimpleNamespace(
+        default_agent='Orchestrator',
+        get_agent_config=lambda _name: SimpleNamespace(enable_vector_memory=True),
+    )
+    monkeypatch.setattr(oe, 'is_rag_extra_available', lambda: True)
+
+    assert oe.resolve_semantic_recall_for_prompt(cfg, semantic_recall_active=True) is True
+    assert oe.resolve_semantic_recall_for_prompt(cfg, semantic_recall_active=False) is False
+    assert oe.resolve_semantic_recall_for_prompt(cfg, semantic_recall_active=None) is True
+
+
+def test_optional_extra_installed_importerrors() -> None:
+    from unittest.mock import patch
+    import importlib.util
+
+    with patch("importlib.util.find_spec", side_effect=ValueError):
+        assert oe._optional_extra_installed("dummy") is False
+

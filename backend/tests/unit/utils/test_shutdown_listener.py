@@ -225,3 +225,14 @@ class TestShutdownListenerEdgeCases:
             with patch('time.time', side_effect=[10.0, 10.0, 11.5, 12.5]):
                 await async_sleep_if_should_continue(2.0)
             mock_sleep.assert_any_call(1)
+
+    def test_lifecycle_generation(self):
+        from backend.utils.shutdown_listener import get_lifecycle_generation, reset_shutdown_state
+        
+        gen1 = get_lifecycle_generation()
+        assert isinstance(gen1, int)
+        
+        # Reset should increment lifecycle generation
+        reset_shutdown_state()
+        gen2 = get_lifecycle_generation()
+        assert gen2 == gen1 + 1

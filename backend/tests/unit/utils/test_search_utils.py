@@ -80,6 +80,12 @@ class TestPageIdToOffset:
         result = page_id_to_offset(page_id)
         assert result == -10
 
+    def test_decoded_empty_string(self):
+        """Test decoding page ID that decodes to empty string."""
+        page_id = base64.b64encode(b'').decode()
+        result = page_id_to_offset(page_id)
+        assert result == 0
+
 
 class TestRoundTrip:
     def test_roundtrip_with_next(self):
