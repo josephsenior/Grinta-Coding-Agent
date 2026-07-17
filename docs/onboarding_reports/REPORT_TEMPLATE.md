@@ -5,10 +5,10 @@
 | Field | Value |
 | --- | --- |
 | Date | YYYY-MM-DD |
-| Install path | pipx / source uv / docker |
+| Install path | editable source / source uv / docker |
 | OS | Linux / Windows / macOS / WSL2 Ubuntu + version |
 | Python version | |
-| Grinta version | `grinta --version` or PyPI tag |
+| Grinta version | `grinta --version` or commit SHA |
 | Machine | Fresh VM / hardware (no prior `~/.grinta`) |
 | Evidence type | `interactive-fresh-machine` or `ci-smoke-only` |
 | TTY for `grinta init` | yes / no (CI stubs = no) |
@@ -25,7 +25,7 @@
 
 | Step | Pass / fail | Notes |
 | --- | --- | --- |
-| Install (`pipx install grinta` or source bootstrap) | | |
+| Install (`pipx install -e .` or source bootstrap) | | |
 | `grinta init` (interactive wizard) | | |
 | `grinta` TUI launch | | |
 | First agent task (`/health` or starter prompt) | | |
