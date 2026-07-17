@@ -219,6 +219,13 @@ omit = [
   "*/__pycache__/*",
 ]
 
+[tool.coverage.paths]
+source = [
+  "backend",
+  "/home/runner/work/Grinta-Coding-Agent/Grinta-Coding-Agent/backend",
+  "D:\\a\\Grinta-Coding-Agent\\Grinta-Coding-Agent\\backend",
+]
+
 [tool.coverage.report]
 exclude_lines = [
   "pragma: no cover",
