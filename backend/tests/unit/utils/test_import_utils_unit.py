@@ -101,48 +101,64 @@ class TestImportUtilsExtended:
 
     def test_get_impl_reimported_base_success(self):
         from unittest.mock import patch
-        with patch("backend.utils.import_utils._matches_reimported_base", return_value=True):
+
+        with patch(
+            'backend.utils.import_utils._matches_reimported_base', return_value=True
+        ):
             # TypeError is not subclass of ValueError, but mock matches_reimported_base returning True allows it
-            assert get_impl(ValueError, "builtins.TypeError") is TypeError
+            assert get_impl(ValueError, 'builtins.TypeError') is TypeError
 
     def test_matches_reimported_base_no_module_or_name(self):
-        from backend.utils.import_utils import _matches_reimported_base
         from unittest.mock import MagicMock
-        
+
+        from backend.utils.import_utils import _matches_reimported_base
+
         mock_cls = MagicMock()
         mock_cls.__module__ = None
         mock_cls.__name__ = None
         assert _matches_reimported_base(mock_cls, TypeError) is False
 
     def test_matches_reimported_base_failure(self):
-        from backend.utils.import_utils import _matches_reimported_base
         from unittest.mock import patch
-        
-        with patch("backend.utils.import_utils._reimport_base_class", return_value=None):
+
+        from backend.utils.import_utils import _matches_reimported_base
+
+        with patch(
+            'backend.utils.import_utils._reimport_base_class', return_value=None
+        ):
             assert _matches_reimported_base(ValueError, TypeError) is False
 
     def test_matches_reimported_base_success(self):
-        from backend.utils.import_utils import _matches_reimported_base
         from unittest.mock import patch
-        
-        with patch("backend.utils.import_utils._reimport_base_class", return_value=ValueError):
+
+        from backend.utils.import_utils import _matches_reimported_base
+
+        with patch(
+            'backend.utils.import_utils._reimport_base_class', return_value=ValueError
+        ):
+
             class DummyError(ValueError):
                 pass
+
             assert _matches_reimported_base(ValueError, DummyError) is True
 
     def test_reimport_base_class_exception(self):
-        from backend.utils.import_utils import _reimport_base_class
         from unittest.mock import patch
-        
+
+        from backend.utils.import_utils import _reimport_base_class
+
         # Trigger Exception in import_from inside _reimport_base_class
-        with patch("backend.utils.import_utils.import_from", side_effect=RuntimeError("import failed")):
-            assert _reimport_base_class("builtins", "ValueError") is None
+        with patch(
+            'backend.utils.import_utils.import_from',
+            side_effect=RuntimeError('import failed'),
+        ):
+            assert _reimport_base_class('builtins', 'ValueError') is None
 
     def test_reimport_base_class_non_type(self):
-        from backend.utils.import_utils import _reimport_base_class
         from unittest.mock import patch
-        
-        # import_from returns a function (not a type)
-        with patch("backend.utils.import_utils.import_from", return_value=lambda x: x):
-            assert _reimport_base_class("builtins", "abs") is None
 
+        from backend.utils.import_utils import _reimport_base_class
+
+        # import_from returns a function (not a type)
+        with patch('backend.utils.import_utils.import_from', return_value=lambda x: x):
+            assert _reimport_base_class('builtins', 'abs') is None

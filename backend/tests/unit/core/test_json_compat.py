@@ -24,13 +24,17 @@ def mock_orjson_state(request: pytest.FixtureRequest) -> Any:
 
     def dummy_dumps(obj: Any, default: Any = None, option: int = 0) -> bytes:
         # Dummy serialized bytes for check
-        return stdlib_json.dumps(obj, sort_keys=bool(option & 2), indent=2 if (option & 4) else None).encode('utf-8')
+        return stdlib_json.dumps(
+            obj, sort_keys=bool(option & 2), indent=2 if (option & 4) else None
+        ).encode('utf-8')
 
     mock_orjson.dumps.side_effect = dummy_dumps
     mock_orjson.loads.side_effect = stdlib_json.loads
 
-    with patch.object(json_compat, '_ORJSON_AVAILABLE', state), \
-         patch.object(json_compat, '_orjson', mock_orjson):
+    with (
+        patch.object(json_compat, '_ORJSON_AVAILABLE', state),
+        patch.object(json_compat, '_orjson', mock_orjson),
+    ):
         yield state, mock_orjson
 
 
@@ -111,20 +115,28 @@ def test_dumps_behavior(mock_orjson_state: tuple[bool, MagicMock]) -> None:
     if orjson_available:
         assert mock_orjson.dumps.called
         # Check option passes OPT_NON_STR_KEYS by default
-        mock_orjson.dumps.assert_called_with(data, default=None, option=mock_orjson.OPT_NON_STR_KEYS)
+        mock_orjson.dumps.assert_called_with(
+            data, default=None, option=mock_orjson.OPT_NON_STR_KEYS
+        )
     else:
         assert not mock_orjson.dumps.called
         assert 'z' in res_no_ascii
 
 
-def test_dumps_with_sort_keys_and_indent(mock_orjson_state: tuple[bool, MagicMock]) -> None:
+def test_dumps_with_sort_keys_and_indent(
+    mock_orjson_state: tuple[bool, MagicMock],
+) -> None:
     orjson_available, mock_orjson = mock_orjson_state
     data = {'z': 26, 'a': 1}
 
     # Pass ensure_ascii=False to allow orjson
     json_compat.dumps(data, ensure_ascii=False, sort_keys=True, indent=2)
     if orjson_available:
-        expected_option = mock_orjson.OPT_NON_STR_KEYS | mock_orjson.OPT_SORT_KEYS | mock_orjson.OPT_INDENT_2
+        expected_option = (
+            mock_orjson.OPT_NON_STR_KEYS
+            | mock_orjson.OPT_SORT_KEYS
+            | mock_orjson.OPT_INDENT_2
+        )
         mock_orjson.dumps.assert_called_with(data, default=None, option=expected_option)
     else:
         assert not mock_orjson.dumps.called

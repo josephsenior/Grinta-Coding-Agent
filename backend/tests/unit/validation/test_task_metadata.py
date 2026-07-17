@@ -89,8 +89,8 @@ VALIDATION
 
 
 def test_parse_task_empty_message() -> None:
-    body, meta = parse_task_from_user_message("")
-    assert body == ""
+    body, meta = parse_task_from_user_message('')
+    assert body == ''
     assert meta == {}
 
 
@@ -99,12 +99,12 @@ def test_parse_task_single_line_no_newline() -> None:
     body, meta = parse_task_from_user_message(raw)
     # No newline, falls back to full content for description, but JSON is successfully parsed!
     assert body == raw
-    assert meta == {"expected_output_files": ["a.txt"]}
+    assert meta == {'expected_output_files': ['a.txt']}
 
     # Empty JSON string on prefix line
     raw_empty = f'{APP_TASK_JSON_PREFIX}   \nRest'
     body2, meta2 = parse_task_from_user_message(raw_empty)
-    assert body2 == "Rest"
+    assert body2 == 'Rest'
     assert meta2 == {}
 
 
@@ -133,7 +133,7 @@ VALIDATION
     # case-insensitive duplicates should be removed
     _, acceptance = extract_task_rubric(description)
     assert len(acceptance) == 1
-    assert acceptance[0] == "Run pytest"
+    assert acceptance[0] == 'Run pytest'
 
 
 def test_extract_bullets_after_marker_formatting() -> None:
@@ -148,9 +148,9 @@ Plain text breaking the list
 - Third item (should not be collected)
 """
     _, acceptance = extract_task_rubric(description)
-    assert "First item" in acceptance
-    assert "Second item" in acceptance
-    assert "Third item" not in acceptance
+    assert 'First item' in acceptance
+    assert 'Second item' in acceptance
+    assert 'Third item' not in acceptance
 
     # Bullet markers not found
     desc_no_marker = """
@@ -173,22 +173,26 @@ Final report must include:
 2. Chart B
 """
     _, acceptance = extract_task_rubric(description)
-    assert "Chart A" in acceptance
-    assert "Chart B" in acceptance
+    assert 'Chart A' in acceptance
+    assert 'Chart B' in acceptance
 
 
 def test_merge_task_fields_comprehensive() -> None:
     # Test string list extraction and metadata merging
     meta = {
-        "requirements": [123, "   valid requirement   ", ""],  # empty string should be ignored
-        "acceptance_criteria": "not-a-list",
-        "expected_output_files": ["out.txt", 456]  # invalid types mixed in
+        'requirements': [
+            123,
+            '   valid requirement   ',
+            '',
+        ],  # empty string should be ignored
+        'acceptance_criteria': 'not-a-list',
+        'expected_output_files': ['out.txt', 456],  # invalid types mixed in
     }
-    
-    desc = "Regular description"
+
+    desc = 'Regular description'
     desc_res, reqs, acc, files = merge_task_fields(desc, meta)
-    
+
     assert desc_res == desc
-    assert reqs == ["123", "valid requirement"]  # Coerced and stripped
+    assert reqs == ['123', 'valid requirement']  # Coerced and stripped
     assert acc == []  # Not a list, defaults to rubric (empty)
     assert files is None  # Mixed non-string type (456) causes it to be discarded

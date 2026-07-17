@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from backend.core.autonomy import (
     AutonomyLevel,
     autonomy_runtime_notice,
@@ -38,7 +36,9 @@ def test_normalize_autonomy_level_edge_cases() -> None:
 
     # Invalid values are returned normalized, not matched to BALANCED
     assert normalize_autonomy_level('invalid_level') == 'invalid_level'
-    assert normalize_autonomy_level('') == 'balanced'  # None / empty string resolves to BALANCED
+    assert (
+        normalize_autonomy_level('') == 'balanced'
+    )  # None / empty string resolves to BALANCED
     assert normalize_autonomy_level(None) == 'balanced'
 
 
@@ -68,7 +68,10 @@ def test_autonomy_runtime_notice() -> None:
     # Conservative
     conservative_notice = autonomy_runtime_notice(AutonomyLevel.CONSERVATIVE)
     assert 'conservative' in conservative_notice
-    assert 'confirmation before shell, edits, terminal, browser, MCP, and delegation' in conservative_notice
+    assert (
+        'confirmation before shell, edits, terminal, browser, MCP, and delegation'
+        in conservative_notice
+    )
     assert 'security_risk is required' in conservative_notice
 
     # Balanced

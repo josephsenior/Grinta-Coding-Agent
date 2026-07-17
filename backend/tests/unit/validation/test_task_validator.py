@@ -451,108 +451,129 @@ class TestTaskValidatorExtendedCoverage:
 
     def test_looks_like_question_question_mark(self):
         from backend.validation.task_validator import _looks_like_question
-        assert _looks_like_question("Where is the database config?") is True
-        assert _looks_like_question("How does the server initialize") is True  # starts with question word
-        assert _looks_like_question("Perform the refactoring work") is False
+
+        assert _looks_like_question('Where is the database config?') is True
+        assert (
+            _looks_like_question('How does the server initialize') is True
+        )  # starts with question word
+        assert _looks_like_question('Perform the refactoring work') is False
 
     def test_task_requires_repository_changes_with_expected_files(self):
-        from backend.validation.task_validator import _task_requires_repository_changes, Task
-        task = Task(description="read config", expected_output_files=["config.json"])
+        from backend.validation.task_validator import (
+            Task,
+            _task_requires_repository_changes,
+        )
+
+        task = Task(description='read config', expected_output_files=['config.json'])
         assert _task_requires_repository_changes(task) is True
 
     @pytest.mark.asyncio
     async def test_diff_validator_read_only_task(self):
         from backend.validation.task_validator import DiffValidator, Task
+
         # Read-only task
-        task = Task(description="What is the port number?")
+        task = Task(description='What is the port number?')
         state = MagicMock()
-        
+
         validator = DiffValidator()
         result = await validator.validate_completion(task, state)
         assert result.passed is True
-        assert "does not require repository changes" in result.reason
+        assert 'does not require repository changes' in result.reason
 
     @pytest.mark.asyncio
     async def test_diff_validator_no_changes(self):
         from backend.validation.task_validator import DiffValidator, Task
-        task = Task(description="Modify settings.json")
+
+        task = Task(description='Modify settings.json')
         state = MagicMock()
         # Mock _get_diff_output and _changed_paths_in_history to return empty
         validator = DiffValidator()
-        with patch.object(validator, "_get_diff_output", return_value=""), \
-             patch.object(validator, "_changed_paths_in_history", return_value=[]):
-            
+        with (
+            patch.object(validator, '_get_diff_output', return_value=''),
+            patch.object(validator, '_changed_paths_in_history', return_value=[]),
+        ):
             result = await validator.validate_completion(task, state)
             assert result.passed is False
-            assert "No repository changes detected" in result.reason
+            assert 'No repository changes detected' in result.reason
 
     @pytest.mark.asyncio
     async def test_diff_validator_typed_file_changes_only(self):
         from backend.validation.task_validator import DiffValidator, Task
-        task = Task(description="Modify settings.json")
+
+        task = Task(description='Modify settings.json')
         state = MagicMock()
         validator = DiffValidator()
-        with patch.object(validator, "_get_diff_output", return_value=""), \
-             patch.object(validator, "_changed_paths_in_history", return_value=["settings.json"]):
-            
+        with (
+            patch.object(validator, '_get_diff_output', return_value=''),
+            patch.object(
+                validator, '_changed_paths_in_history', return_value=['settings.json']
+            ),
+        ):
             result = await validator.validate_completion(task, state)
             assert result.passed is True
-            assert "Typed file changes detected" in result.reason
+            assert 'Typed file changes detected' in result.reason
 
     @pytest.mark.asyncio
     async def test_diff_validator_meaningful_changes_no_history_events(self):
         from backend.validation.task_validator import DiffValidator, Task
-        task = Task(description="Modify settings.json")
+
+        task = Task(description='Modify settings.json')
         state = MagicMock()
         validator = DiffValidator()
         # A git diff with only comments has 0 meaningful changes
-        git_diff = "+# comment line here\n"
-        with patch.object(validator, "_get_diff_output", return_value=git_diff), \
-             patch.object(validator, "_changed_paths_in_history", return_value=[]):
-            
+        git_diff = '+# comment line here\n'
+        with (
+            patch.object(validator, '_get_diff_output', return_value=git_diff),
+            patch.object(validator, '_changed_paths_in_history', return_value=[]),
+        ):
             result = await validator.validate_completion(task, state)
             assert result.passed is False
-            assert "meaningful changes but no typed file edits" in result.reason
+            assert 'meaningful changes but no typed file edits' in result.reason
 
     @pytest.mark.asyncio
     async def test_file_exists_validator_strips_workspace_prefix(self):
         from backend.validation.task_validator import FileExistsValidator, Task
-        task = Task(description="Create file")
-        
+
+        task = Task(description='Create file')
+
         # Create a mock file edit event in history
         mock_event = MagicMock(spec=FileEditAction)
-        mock_event.path = "workspace/subfolder/output.txt"
+        mock_event.path = 'workspace/subfolder/output.txt'
         state = MagicMock()
         state.history = [mock_event]
-        
+
         # Expected file starts with 'workspace/'
-        validator = FileExistsValidator(expected_files=["workspace/subfolder/output.txt"])
+        validator = FileExistsValidator(
+            expected_files=['workspace/subfolder/output.txt']
+        )
         result = await validator.validate_completion(task, state)
         assert result.passed is True
 
     @pytest.mark.asyncio
     async def test_llm_evaluator_empty_choices(self):
         from backend.validation.task_validator import LLMTaskEvaluator, Task
-        task = Task(description="Verify something")
+
+        task = Task(description='Verify something')
         state = MagicMock()
-        
+
         # Mock LLM client response to return empty choices
         mock_response = MagicMock()
         mock_response.choices = []
         mock_llm = MagicMock()
         mock_llm.completion = AsyncMock(return_value=mock_response)
-        
+
         validator = LLMTaskEvaluator(llm=mock_llm)
         result = await validator.validate_completion(task, state)
         assert result.passed is False
-        assert "no choices" in result.reason.lower()
+        assert 'no choices' in result.reason.lower()
 
     @pytest.mark.asyncio
     async def test_llm_evaluator_none_content(self):
         from backend.validation.task_validator import LLMTaskEvaluator, Task
-        task = Task(description="Verify something")
+
+        task = Task(description='Verify something')
         state = MagicMock()
-        
+
         # Mock LLM choice message to return None content
         mock_choice = MagicMock()
         mock_choice.message.content = None
@@ -560,27 +581,31 @@ class TestTaskValidatorExtendedCoverage:
         mock_response.choices = [mock_choice]
         mock_llm = MagicMock()
         mock_llm.completion = AsyncMock(return_value=mock_response)
-        
+
         validator = LLMTaskEvaluator(llm=mock_llm)
         result = await validator.validate_completion(task, state)
         assert result.passed is False
-        assert "no content" in result.reason.lower()
+        assert 'no content' in result.reason.lower()
 
     @pytest.mark.asyncio
     async def test_composite_validator_fail_closed_on_empty(self):
         from backend.validation.task_validator import CompositeValidator, Task
-        task = Task(description="Complete task")
+
+        task = Task(description='Complete task')
         state = MagicMock()
-        
+
         # A validator that is not applicable
         mock_skipped = MagicMock(spec=TaskValidator)
         mock_skipped.validate_completion = AsyncMock(
-            return_value=ValidationResult(passed=True, reason="skipped", applicable=False)
+            return_value=ValidationResult(
+                passed=True, reason='skipped', applicable=False
+            )
         )
-        
+
         # Composite with fail_open_on_empty=False
-        composite = CompositeValidator(validators=[mock_skipped], fail_open_on_empty=False)
+        composite = CompositeValidator(
+            validators=[mock_skipped], fail_open_on_empty=False
+        )
         result = await composite.validate_completion(task, state)
         assert result.passed is False
-        assert "No applicable validators" in result.reason
-
+        assert 'No applicable validators' in result.reason

@@ -679,11 +679,12 @@ class TestCoverageGaps:
 
     def test_get_name_node_returns_none(self, editor: TreeSitterEditor) -> None:
         """Test get_name_node returns None when no children are name identifiers."""
-        from backend.utils.treesitter._tse_query import get_name_node
         from unittest.mock import MagicMock
 
+        from backend.utils.treesitter._tse_query import get_name_node
+
         mock_child = MagicMock()
-        mock_child.type = "unrelated_type"
+        mock_child.type = 'unrelated_type'
         mock_node = MagicMock()
         mock_node.children = [mock_child]
 
@@ -694,11 +695,11 @@ class TestCoverageGaps:
     ) -> None:
         """Test finding a symbol raises AmbiguousSymbolError when duplicates exist."""
         from backend.utils.treesitter._tse_types import AmbiguousSymbolError
-        
+
         content = 'def duplicate(): pass\n\ndef duplicate(): pass\n'
         f = tmp_path / 'dup.py'
         f.write_text(content, encoding='utf-8')
-        
+
         with pytest.raises(AmbiguousSymbolError) as exc:
             editor.find_symbol(str(f), 'duplicate')
         assert exc.value.symbol_name == 'duplicate'
@@ -706,8 +707,9 @@ class TestCoverageGaps:
 
     def test_has_syntax_errors_edge_cases(self, editor: TreeSitterEditor) -> None:
         """Test has_syntax_errors with ERROR nodes and missing nodes."""
-        from backend.utils.treesitter._tse_query import has_syntax_errors
         from unittest.mock import MagicMock
+
+        from backend.utils.treesitter._tse_query import has_syntax_errors
 
         # 1. Node type is ERROR
         node_err = MagicMock()
@@ -725,10 +727,9 @@ class TestCoverageGaps:
         child_err = MagicMock()
         child_err.type = 'ERROR'
         child_err.is_missing = False
-        
+
         parent = MagicMock()
         parent.type = 'function_definition'
         parent.is_missing = False
         parent.children = [child_err]
         assert has_syntax_errors(parent) is True
-

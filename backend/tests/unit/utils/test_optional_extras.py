@@ -78,15 +78,20 @@ def test_resolve_semantic_recall_for_prompt(monkeypatch) -> None:
     )
     monkeypatch.setattr(oe, 'is_rag_extra_available', lambda: True)
 
-    assert oe.resolve_semantic_recall_for_prompt(cfg, semantic_recall_active=True) is True
-    assert oe.resolve_semantic_recall_for_prompt(cfg, semantic_recall_active=False) is False
-    assert oe.resolve_semantic_recall_for_prompt(cfg, semantic_recall_active=None) is True
+    assert (
+        oe.resolve_semantic_recall_for_prompt(cfg, semantic_recall_active=True) is True
+    )
+    assert (
+        oe.resolve_semantic_recall_for_prompt(cfg, semantic_recall_active=False)
+        is False
+    )
+    assert (
+        oe.resolve_semantic_recall_for_prompt(cfg, semantic_recall_active=None) is True
+    )
 
 
 def test_optional_extra_installed_importerrors() -> None:
     from unittest.mock import patch
-    import importlib.util
 
-    with patch("importlib.util.find_spec", side_effect=ValueError):
-        assert oe._optional_extra_installed("dummy") is False
-
+    with patch('importlib.util.find_spec', side_effect=ValueError):
+        assert oe._optional_extra_installed('dummy') is False

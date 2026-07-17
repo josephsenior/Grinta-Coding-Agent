@@ -41,7 +41,7 @@ class TestCLISessionsE2E:
     def test_sessions_list_empty(self, tmp_path: Path) -> None:
         """Verify sessions list runs and is empty for a fresh home directory."""
         env = _get_base_env(tmp_path)
-        
+
         result = subprocess.run(
             [
                 sys.executable,
@@ -57,13 +57,13 @@ class TestCLISessionsE2E:
             env=env,
         )
         assert result.returncode == 0
-        assert 'session' in result.stdout.lower() or result.stdout.strip() == ""
+        assert 'session' in result.stdout.lower() or result.stdout.strip() == ''
 
     @pytest.mark.e2e
     def test_sessions_show_nonexistent(self, tmp_path: Path) -> None:
         """Verify showing a nonexistent session exits with error."""
         env = _get_base_env(tmp_path)
-        
+
         result = subprocess.run(
             [
                 sys.executable,
@@ -81,14 +81,14 @@ class TestCLISessionsE2E:
         )
         # Should exit with non-zero code or print error
         assert result.returncode != 0
-        combined = f"{result.stdout}\n{result.stderr}".lower()
+        combined = f'{result.stdout}\n{result.stderr}'.lower()
         assert 'no session matches' in combined or 'not found' in combined
 
     @pytest.mark.e2e
     def test_sessions_delete_nonexistent(self, tmp_path: Path) -> None:
         """Verify deleting a nonexistent session exits with error."""
         env = _get_base_env(tmp_path)
-        
+
         result = subprocess.run(
             [
                 sys.executable,
@@ -107,14 +107,14 @@ class TestCLISessionsE2E:
         )
         # Should exit with non-zero code or print error
         assert result.returncode != 0
-        combined = f"{result.stdout}\n{result.stderr}".lower()
+        combined = f'{result.stdout}\n{result.stderr}'.lower()
         assert 'no session matches' in combined or 'not found' in combined
 
     @pytest.mark.e2e
     def test_sessions_export_nonexistent(self, tmp_path: Path) -> None:
         """Verify exporting a nonexistent session exits with error."""
         env = _get_base_env(tmp_path)
-        
+
         result = subprocess.run(
             [
                 sys.executable,
@@ -133,14 +133,14 @@ class TestCLISessionsE2E:
         )
         # Should exit with non-zero code or print error
         assert result.returncode != 0
-        combined = f"{result.stdout}\n{result.stderr}".lower()
+        combined = f'{result.stdout}\n{result.stderr}'.lower()
         assert 'no session matches' in combined or 'not found' in combined
 
     @pytest.mark.e2e
     def test_sessions_prune_runs(self, tmp_path: Path) -> None:
         """Verify session pruning executes without errors."""
         env = _get_base_env(tmp_path)
-        
+
         result = subprocess.run(
             [
                 sys.executable,
@@ -159,4 +159,6 @@ class TestCLISessionsE2E:
             env=env,
         )
         assert result.returncode == 0
-        assert 'no sessions' in result.stdout.lower() or 'pruned' in result.stdout.lower()
+        assert (
+            'no sessions' in result.stdout.lower() or 'pruned' in result.stdout.lower()
+        )

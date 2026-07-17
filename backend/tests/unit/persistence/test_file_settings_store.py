@@ -214,11 +214,13 @@ class TestFileSettingsStoreGetInstance:
 class TestFileSettingsStoreCoverageGaps:
     async def test_load_double_checked_cache_concurrency(self):
         import asyncio
+
         fs = MagicMock()
         store = FileSettingsStore(file_store=fs)
         data = json.dumps({'language': 'python'})
-        
+
         calls = 0
+
         async def slow_read(*args, **kwargs):
             nonlocal calls
             calls += 1
@@ -233,7 +235,7 @@ class TestFileSettingsStoreCoverageGaps:
             t1 = asyncio.create_task(store.load())
             t2 = asyncio.create_task(store.load())
             r1, r2 = await asyncio.gather(t1, t2)
-            
+
             # The first one should have read from file, the second should have hit the double check
             assert calls == 1
             assert r1 is not None
@@ -247,7 +249,7 @@ class TestFileSettingsStoreCoverageGaps:
             'llm_model': 'openai/gpt-4.1',
             'llm_api_key': '   plain-string-secret   ',  # standard string (requires strip)
             'llm_base_url': None,
-            'mcp_config': {'server': 'http://mcp'},      # non-None mcp_config
+            'mcp_config': {'server': 'http://mcp'},  # non-None mcp_config
         }
 
         with (
@@ -274,4 +276,3 @@ class TestFileSettingsStoreCoverageGaps:
         data = json.loads(written)
         assert data['llm_api_key'] == LLM_API_KEY_SETTINGS_PLACEHOLDER
         assert data['mcp_config'] == {'server': 'http://mcp'}
-

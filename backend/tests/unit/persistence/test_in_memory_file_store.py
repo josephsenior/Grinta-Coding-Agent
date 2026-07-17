@@ -130,10 +130,7 @@ class TestIntegration:
 
 class TestInMemoryFileStoreCoverageGaps:
     def test_list_without_trailing_slash(self):
-        store = InMemoryFileStore({
-            'dir/a.txt': 'hello',
-            'dir': 'world'
-        })
+        store = InMemoryFileStore({'dir/a.txt': 'hello', 'dir': 'world'})
         # 1. 'dir/a.txt' with path='dir' -> suffix='/a.txt' -> parts=['', 'a.txt'] -> pops first empty -> ['a.txt']
         # 2. 'dir' with path='dir' -> suffix='' -> parts=[''] -> pops -> [] -> triggers 'if not parts: continue'
         result = store.list('dir')
@@ -141,11 +138,11 @@ class TestInMemoryFileStoreCoverageGaps:
 
     def test_delete_exception_caught(self):
         from unittest.mock import MagicMock
+
         store = InMemoryFileStore()
         # Mock files dictionary to raise exception on iteration
         store.files = MagicMock()
-        store.files.__iter__.side_effect = RuntimeError("mocked delete error")
-        
-        # Should not raise exception
-        store.delete("path")
+        store.files.__iter__.side_effect = RuntimeError('mocked delete error')
 
+        # Should not raise exception
+        store.delete('path')

@@ -70,7 +70,7 @@ def test_is_test_run_command_varieties():
     assert is_test_run_command('python -m unittest') is True
     assert is_test_run_command('python3 -m unittest test_suite') is True
     assert is_test_run_command('-m unittest') is True
-    
+
     # native and package managers
     assert is_test_run_command('cargo test') is True
     assert is_test_run_command('go test ./...') is True
@@ -95,7 +95,7 @@ def test_classify_non_test_shell_intents():
     assert classify_shell_intent('type file.txt') == 'inspect_filesystem'
     assert classify_shell_intent('get-content file.log') == 'inspect_filesystem'
     assert classify_shell_intent('get-childitem') == 'inspect_filesystem'
-    
+
     # fetch code
     assert classify_shell_intent('git clone https://some-url') == 'fetch_code'
     assert classify_shell_intent('git pull origin main') == 'fetch_code'
@@ -124,9 +124,9 @@ def test_find_cmd_output_no_event_id_fallback():
     # When CmdRunAction has no event ID, fall back to matching command string
     run = CmdRunAction(command='pytest -q')
     run.id = None  # No event ID
-    
+
     obs = CmdOutputObservation(content='ok', command='pytest -q', exit_code=0)
-    
+
     # Paired by matching command
     hist = [run, obs]
     paired = find_cmd_output_for_run(run, hist, 0)
@@ -136,11 +136,10 @@ def test_find_cmd_output_no_event_id_fallback():
 def test_find_cmd_output_no_event_id_fallback_mismatch():
     run = CmdRunAction(command='pytest -q')
     run.id = None
-    
+
     # Mismatch command
     obs = CmdOutputObservation(content='ok', command='other-command', exit_code=0)
-    
+
     hist = [run, obs]
     paired = find_cmd_output_for_run(run, hist, 0)
     assert paired is None
-
