@@ -83,6 +83,10 @@ If you have less than an hour, read these chapters:
 The filenames preserve repository history, so their numbers are not a clean book
 sequence. The order below is the intended reading order.
 
+The visible gaps—such as the jump from 34 to 39—are preserved artifacts of
+merges and earlier naming decisions. This directory does not hide separate
+current chapters behind those numbers.
+
 ### Identity, ambition, and subtraction
 
 - [Preface — Why This Story Matters](preface-why-this-story-matters.md)
@@ -209,4 +213,3 @@ The project is not finished. The point of this book is not to make it look
 finished. It is to preserve the sequence of decisions clearly enough that the
 next person can distinguish an old truth, a current truth, and an unverified
 claim.
-

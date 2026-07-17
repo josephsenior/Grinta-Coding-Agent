@@ -7,6 +7,11 @@
 > [chapters 47](47-the-long-runs-and-their-receipts.md) and
 > [48](48-the-continuity-contract.md).
 
+> **Version-label note:** “8.1 → 9.0” was the internal improvement-plan
+> sequence used during this refactor. It was not a claim that the distributed
+> package had reached semantic version 9.0. The package still reports
+> `1.0.0rc1` as of 17 July 2026.
+
 Chapter 45 described the moment Grinta stopped feeling like an engine with a prompt
 and started feeling like a tool someone could actually sit inside.
 

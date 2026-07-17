@@ -6,9 +6,11 @@ This folder contains the components responsible for executing actions and managi
 
 ## Main Components
 
-### 1. base.py
+### 1. server/base.py
 
-The `base.py` file defines the `Runtime` class, which serves as the primary [interface](./base.py) for agent interactions with the external environment. It handles various operations including:
+The `server/base.py` file defines the `Runtime` class, which serves as the
+primary [interface](./server/base.py) for agent interactions with the external
+environment. It handles various operations including:
 
 - Bash execution
 - Browser interactions
@@ -22,9 +24,10 @@ The `local_runtime_inprocess.py` module defines `LocalRuntime` (aliased as `Loca
 
 This implementation runs the runtime executor (`RuntimeExecutor`) in the same process as the CLI/orchestrator, avoiding subprocess or HTTP hops to the executor. It is the default path for local development and installed CLI use.
 
-### 3. action_execution_server.py
+### 3. server/action_execution_server.py
 
-The `action_execution_server.py` file contains the runtime executor class (`RuntimeExecutor`), which is responsible for executing actions directly.
+The `server/action_execution_server.py` file contains the runtime executor class
+(`RuntimeExecutor`), which is responsible for executing actions directly.
 
 Key features of the runtime executor:
 

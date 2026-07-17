@@ -1,5 +1,10 @@
 # 09. The 3 AM Decisions
 
+> **Retrospective note:** This chapter records an unhealthy period of solo work,
+> not a recommended operating model. The useful lesson was learning to reduce
+> scope and expose the system to other reviewers. Sleep deprivation made the
+> decisions harder; it was not the source of their quality.
+
 Solo engineering has a loneliness you do not read about in startup blogs. It is not the loneliness of working alone in a room. It is the loneliness of consequence.
 
 Once a system has enough moving parts, you eventually hit the moment when a foundational architectural decision turns out to be wrong.
@@ -90,11 +95,16 @@ You make those 3 AM decisions because you have to.
 
 But there is a payoff.
 
-When you are the only one making the cuts, the resulting system reflects a single, coherent vision. Grinta does not have design-by-committee compromises. It does not have two features that do the same thing because two different teams couldn't agree.
+When you are the only one making the cuts, the resulting system can reflect a
+single, coherent vision. It can also preserve one person's blind spots for far
+too long. Grinta avoided some design-by-committee compromises, but later
+decomposition, documentation, CI, and requests for outside review were necessary
+because coherence without challenge is not the same thing as correctness.
 
 It has scars. It has clear boundaries. It has an architecture shaped by the painful realization of what happens when you let complexity win.
 
-The loneliness of solo engineering is real. So is the uncompromising clarity that comes out the other side.
+The loneliness of solo engineering was real. The clarity came from making the
+trade-offs explicit and reviewable, not from staying alone.
 
 ---
 
