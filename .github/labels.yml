@@ -216,6 +216,14 @@
   color: "fbca04"
   description: "Performance improvements."
 
+- name: evaluation
+  color: "5319e7"
+  description: "Reproducible agent tasks, benchmarks, and evidence reports."
+
+- name: ux
+  color: "d4c5f9"
+  description: "User experience and interaction design."
+
 - name: feature
   color: "a2eeef"
   description: "Net-new user-facing capability."

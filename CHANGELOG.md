@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Repository launch surface:** a compact README hero, animated recovery
+  preview, capability table, contributor call, and direct links to the
+  strongest autonomous-run evidence.
+- **Public showcase:** standardized case studies for the 4h 33m autonomous
+  session, failure recovery, issue-tracker build, and Raft key-value store.
+- **Shareable media:** a 1280 × 640 social-preview asset and a compressed,
+  looping WebP excerpt that links to the full demo.
+
+### Changed
+
+- **Package discovery metadata:** expanded the package description, keywords,
+  classifiers, and project URLs for package-index searchability.
+- **Citation metadata:** credits maintainer Youssef Mejdi and records the
+  public repository URL.
+
 ### Removed
 
 - **`read_symbol` tool removed after a brief trial.** Targeted discovery remains
