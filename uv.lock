@@ -13,7 +13,7 @@ constraints = [
 ]
 overrides = [
     { name = "aiohttp", specifier = ">=3.14.1" },
-    { name = "mcp", specifier = ">=1.28.1" },
+    { name = "mcp", specifier = ">=1.28.1,<2" },
     { name = "pypdf", specifier = ">=6.12.0" },
 ]
 

@@ -1,224 +1,113 @@
 # Quick Start
 
-Install guide for all platforms (consumer, dev, Windows, WSL2, Linux, macOS).
+Grinta is currently distributed from source. A public GitHub release and PyPI package have not been published yet.
 
-**Paths:** only `<project>` is yours — the folder you want the agent to work in.  
-Clone the repo into a folder named `Grinta` (e.g. `~/Grinta` on WSL).
+The Grinta checkout and the project you want the agent to work on are different folders:
 
-Quote paths with spaces. First `grinta` runs setup — no `grinta init` required.
+- `Grinta` is this repository and contains the runtime and settings.
+- `<project>` is the repository or folder you want Grinta to modify.
 
-## Consumer vs dev
+Quote paths that contain spaces. Native Windows and WSL use separate installations and settings.
 
-| | **Consumer** | **Dev (source)** |
-| --- | --- | --- |
-| Install | `pipx install grinta` (PyPI) | `bash start_here.sh` or `.\START_HERE.ps1` once (bootstrap only) |
-| Settings | `~/.grinta/settings.json` | `Grinta/settings.json` in your clone |
-| Folders | `<project>` only | repo **and** `<project>` (often different) |
-| Daily command | `cd "<project>"` → `grinta` | See **Dev daily use** |
+## Fastest supported install
 
-`-p` — only when `<project>` is not your current directory.
+### Windows PowerShell
 
----
+```powershell
+git clone https://github.com/josephsenior/Grinta-Coding-Agent.git Grinta
+cd Grinta
+.\START_HERE.ps1
+```
 
-## Dev daily use (after bootstrap)
+The bootstrap installs the supported Python toolchain, synchronizes dependencies, runs the setup wizard and health checks, and installs the `grinta` command from the checkout.
 
-From inside your clone (`cd ~/Grinta` or `cd Grinta`):
+Then open the project you want Grinta to work on:
 
-### A. `grinta` on PATH (recommended)
-
-```bash
-pipx install -e .              # once, from repo root
+```powershell
 cd "<project>"
 grinta
 ```
 
-After big dependency changes: `pipx reinstall -e .` (from repo root).
+### Linux, macOS, or WSL
 
-### B. `uv run` (no global install)
+```bash
+git clone https://github.com/josephsenior/Grinta-Coding-Agent.git ~/Grinta
+cd ~/Grinta
+bash start_here.sh
+pipx install -e .
+```
 
-`uv run --directory` changes cwd to the Grinta clone — pass your project explicitly:
+Then:
+
+```bash
+cd "<project>"
+grinta
+```
+
+If you prefer not to install a global command, run from any project with:
+
+```bash
+cd "<project>"
+uv run --directory ~/Grinta grinta -p "$(pwd)"
+```
+
+## WSL notes
+
+Install and run Grinta inside Ubuntu, not PowerShell. Keep the Grinta checkout on the Linux filesystem for best performance:
+
+```bash
+git clone https://github.com/josephsenior/Grinta-Coding-Agent.git ~/Grinta
+```
+
+Your target project may remain under `/mnt/c`, although filesystem operations will be slower. A Windows path such as `C:\foo\bar` becomes `/mnt/c/foo/bar` in WSL.
+
+If required, install the basic WSL prerequisites first:
+
+```bash
+sudo apt update
+sudo apt install -y git pipx tmux
+pipx ensurepath
+```
+
+## Run directly from the checkout
+
+After bootstrap, you can avoid a global installation:
 
 ```bash
 cd "<project>"
 uv run --directory /path/to/Grinta grinta -p "$(pwd)"
 ```
 
-On WSL/Linux, Grinta also infers the project from your shell when you `cd` first (no `-p` needed in most cases).
-
-### C. Open `<project>` without `cd`
+Or provide the target explicitly:
 
 ```bash
 uv run --directory /path/to/Grinta grinta -p "<project>"
 ```
 
----
-
-## Windows (PowerShell)
-
-Native Windows and WSL are **separate installs** (different binaries, different `~/.grinta/`).
-
-### Consumer
+On Windows PowerShell:
 
 ```powershell
-pipx install grinta
-cd "<project>"
-grinta
+uv run --directory C:\path\to\Grinta grinta -p "C:\path\to\project"
 ```
 
-### Dev — bootstrap once
+## Optional features
 
-```powershell
-git clone https://github.com/josephsenior/Grinta-Coding-Agent.git Grinta
-cd Grinta
-.\START_HERE.ps1
-# START_HERE.ps1 will automatically install `grinta` globally via `uv tool install -e .`
-```
-
-Bootstrap does **not** open the TUI. Then:
-
-### Dev — every day
-
-```powershell
-cd "<project>"
-grinta
-# or: uv run --directory C:\path\to\Grinta grinta
-```
-
-### Shell tool (native Windows only)
-
-Default: Git Bash. For PowerShell in `settings.json`:
-
-```json
-"security": { "windows_shell": "powershell" }
-```
-
----
-
-## WSL (Ubuntu)
-
-Install and run Grinta **inside Ubuntu**, not PowerShell. Windows `pipx` does not apply.
-
-| Terminal | Install where |
-| --- | --- |
-| PowerShell / cmd / Git Bash | Windows (section above) |
-| Ubuntu / WSL | Inside WSL |
-
-**Dev layout:** clone to `~/Grinta`, not `/mnt/c`. `<project>` may be on `/mnt/c/...` (slower but OK).
-
-**Path conversion:** `C:\foo\bar` → `/mnt/c/foo/bar` (quote if spaces).
-
-**Preflight:** `grinta doctor` or `/health` in the TUI.
-
-### Consumer
+Install optional dependencies from the same checkout:
 
 ```bash
-sudo apt install -y python3.12 python3.12-venv pipx
-pipx ensurepath && source ~/.bashrc
-pipx install grinta
-grinta doctor
-cd "<project>"
-grinta
+pipx install -e ".[rag]"       # vector-memory support
+pipx install -e ".[browser]"   # browser tools
+pipx install -e ".[all]"       # all optional integrations
 ```
 
-### Dev — bootstrap once
+## Useful commands
 
-```bash
-git clone https://github.com/josephsenior/Grinta-Coding-Agent.git ~/Grinta
-cd ~/Grinta
-bash start_here.sh
-pipx install -e .    # optional
-```
+| Command | Purpose |
+|---|---|
+| `grinta init` | Create or update configuration |
+| `grinta doctor` | Check installation, settings, and WSL layout |
+| `grinta -p "<project>"` | Open a target without changing directory |
+| `grinta --help` | List CLI options |
+| `grinta --version` | Show the current source version |
 
-(Already have a copy on `/mnt/c`? `git clone /mnt/c/path/to/Grinta ~/Grinta` — then use the `~/` copy.)
-
-Bootstrap does **not** open the TUI. Then:
-
-### Dev — every day
-
-```bash
-cd "<project>"
-grinta
-# or: uv run --directory ~/Grinta grinta
-```
-
----
-
-## Linux
-
-### Consumer
-
-```bash
-pipx install grinta
-cd "<project>"
-grinta
-```
-
-### Dev — bootstrap once
-
-```bash
-git clone https://github.com/josephsenior/Grinta-Coding-Agent.git Grinta
-cd Grinta
-bash start_here.sh
-pipx install -e .
-```
-
-Bootstrap does **not** open the TUI. Then:
-
-### Dev — every day
-
-```bash
-cd "<project>"
-grinta
-```
-
----
-
-## macOS
-
-### Consumer (pipx)
-
-```bash
-pipx install grinta
-cd "<project>"
-grinta
-```
-
-### Consumer (Homebrew)
-
-```bash
-brew tap josephsenior/grinta https://github.com/josephsenior/Grinta-Coding-Agent
-brew install grinta
-cd "<project>"
-grinta
-```
-
-### Dev — bootstrap once
-
-```bash
-git clone https://github.com/josephsenior/Grinta-Coding-Agent.git Grinta
-cd Grinta
-bash start_here.sh
-pipx install -e .
-```
-
-Bootstrap does **not** open the TUI. Then:
-
-### Dev — every day
-
-```bash
-cd "<project>"
-grinta
-```
-
----
-
-## Optional
-
-| Command | When |
-| --- | --- |
-| `grinta init` | Reconfigure without TUI |
-| `grinta doctor` | Install / settings / WSL checks |
-| `grinta -p "<project>"` | Open project without `cd` first |
-| `pipx install "grinta[rag]"` | Vector memory extra |
-
-**Problems:** [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+For installation or startup problems, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
