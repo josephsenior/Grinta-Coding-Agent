@@ -52,6 +52,11 @@ jobs:
         run: python scripts/bootstrap_env.py base
       - name: Build package
         run: uv build
+      - name: Generate SHA256 checksums
+        shell: bash
+        run: |
+          cd dist
+          sha256sum *.whl *.tar.gz > SHA256SUMS
       - name: Smoke test built wheel
         shell: bash
         run: |
@@ -80,5 +85,14 @@ jobs:
             GRINTA_NO_SPLASH=1 \
             LOG_TO_FILE=false \
             grinta --project .package-smoke-workspace --no-splash
+      - name: Upload release distributions and checksums
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: grinta-distributions
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+            dist/SHA256SUMS
+          if-no-files-found: error
       - name: Publish to PyPI (Trusted Publishing)
         uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b

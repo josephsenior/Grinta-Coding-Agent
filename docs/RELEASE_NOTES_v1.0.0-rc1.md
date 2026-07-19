@@ -16,9 +16,19 @@ For the current support contract and CI certification depth, see [SUPPORT_MATRIX
 
 - **CLI-first, local-first architecture** with no managed cloud control plane.
 - **Provider-agnostic model routing** across OpenAI, Anthropic, Google, OpenRouter, Ollama, and LM Studio.
+- **Textual terminal UI** with Chat, Plan, and Agent workflows.
+- **LSP and DAP integrations** discovered from the local development environment.
 - **Built-in reliability controls** including stuck-loop detection, recovery prompts, and task validation before finish.
 - **Execution safety rails** via risk-classified actions, secret masking, and the `hardened_local` policy profile.
 - **Session durability** through event-stream storage with checkpoint/resume/revert workflows.
+- **Public execution evidence** including a 4h 33m autonomous session with 16,393 events and 373 tool outcomes.
+
+## Evidence and demos
+
+- [Showcase index](../SHOWCASE.md)
+- [4h 33m autonomous execution report](evidence/2026-07-09-autonomous-run-report.md)
+- [Raft key-value store demo](assets/grinta-demo.mp4)
+- [Animated recovery preview](assets/grinta-demo-preview.webp)
 
 ## Notable release-candidate improvements
 

@@ -7,7 +7,7 @@ requires = [
 [project]
 name = "grinta"
 version = "1.0.0rc1"
-description = "Local-first TUI/CLI coding agent"
+description = "Local-first autonomous coding agent with provider-agnostic inference, LSP, debugging, durable sessions, and a terminal UI"
 readme = "README.md"
 license = "MIT"
 authors = [ { name = "Youssef Mejdi" } ]
@@ -21,6 +21,21 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Software Development :: Build Tools",
+  "Topic :: Software Development :: Debuggers",
+  "Topic :: Software Development :: Testing",
+  "Topic :: Utilities",
+]
+keywords = [
+  "ai-agent",
+  "coding-agent",
+  "autonomous-agent",
+  "developer-tools",
+  "llm",
+  "lsp",
+  "debugger",
+  "terminal",
+  "local-ai",
 ]
 dependencies = [
   "aiohttp>=3.14.1",
@@ -79,7 +94,7 @@ optional-dependencies.rag = [
   "fastembed>=0.2,<1",
   "flashrank>=0.2,<1",
 ]
-urls = { Repository = "https://github.com/josephsenior/Grinta-Coding-Agent", Issues = "https://github.com/josephsenior/Grinta-Coding-Agent/issues", Documentation = "https://github.com/josephsenior/Grinta-Coding-Agent/tree/main/docs" }
+urls = { Homepage = "https://github.com/josephsenior/Grinta-Coding-Agent", Repository = "https://github.com/josephsenior/Grinta-Coding-Agent", Documentation = "https://github.com/josephsenior/Grinta-Coding-Agent/tree/main/docs", Changelog = "https://github.com/josephsenior/Grinta-Coding-Agent/blob/main/CHANGELOG.md", Issues = "https://github.com/josephsenior/Grinta-Coding-Agent/issues", Discussions = "https://github.com/josephsenior/Grinta-Coding-Agent/discussions" }
 
 # User-installable extras. Base install includes PDF/DOCX/PPTX/LaTeX parsers.
 # pip install "grinta[rag]"     — long-term semantic memory (Chroma + ONNX embeddings)
@@ -131,11 +146,14 @@ include = [
   "/packaging",
   "/scripts",
   "/README.md",
+  "/SHOWCASE.md",
   "/CHANGELOG.md",
+  "/CITATION.cff",
   "/LICENSE",
   "/SECURITY.md",
   "/CONTRIBUTING.md",
   "/CODE_OF_CONDUCT.md",
+  "/GOVERNANCE.md",
   "/SUPPORT.md",
   "/MANIFEST.in",
   "/pyproject.toml",
