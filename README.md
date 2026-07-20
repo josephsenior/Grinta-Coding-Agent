@@ -1,7 +1,7 @@
 # Grinta
 
 <p align="center">
-  <img src="docs/assets/logo.svg" alt="Grinta logo" width="180">
+  <img src="docs/assets/logo.svg" alt="Grinta logo" width="280">
 </p>
 
 ### A local-first autonomous coding agent built to finish long, failure-prone software tasks.
@@ -10,9 +10,15 @@
 [![Lint](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/lint.yml/badge.svg)](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/lint.yml)
 [![Python 3.12–3.13](https://img.shields.io/badge/Python-3.12--3.13-3776AB?logo=python&logoColor=white)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Status: release candidate](https://img.shields.io/badge/status-release%20candidate-CC1836)](docs/RELEASE_CHECKLIST.md)
+[![Status: stable](https://img.shields.io/badge/status-stable-2EA44F)](https://github.com/josephsenior/Grinta-Coding-Agent/releases/tag/v1.0.0)
 
-**Demo recording:** published with the corresponding GitHub Release rather than stored in the source repository.
+<p align="center">
+  <a href="https://github.com/josephsenior/Grinta-Coding-Agent/releases/download/v1.0.0/grinta_raft.mp4">
+    <img src="https://github.com/josephsenior/Grinta-Coding-Agent/releases/download/v1.0.0/grinta-demo-preview.webp" alt="Grinta autonomous coding demo" width="900">
+  </a>
+</p>
+
+<p align="center"><strong>Grinta in action</strong> — click the preview to watch the full demo.</p>
 
 Grinta plans, edits, runs commands, debugs failures, validates the result, and continues until the task is finished. Its control plane and session state stay local; inference can use a major hosted provider or a local model.
 
