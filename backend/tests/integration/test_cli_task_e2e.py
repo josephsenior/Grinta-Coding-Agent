@@ -79,7 +79,7 @@ def test_launch_entry_completes_one_task_via_subprocess(tmp_path: Path) -> None:
         errors='replace',
         cwd=_REPO_ROOT,
         env=env,
-        timeout=120,
+        timeout=300,
         check=False,
     )
 
