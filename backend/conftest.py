@@ -23,7 +23,6 @@ from collections.abc import Iterator  # noqa: E402
 
 import pytest  # noqa: E402
 
-
 _TEST_HOME: pathlib.Path | None = None
 
 

@@ -9,6 +9,17 @@ name = "grinta"
 version = "1.0.0rc1"
 description = "Local-first autonomous coding agent with provider-agnostic inference, LSP, debugging, durable sessions, and a terminal UI"
 readme = "README.md"
+keywords = [
+  "ai-agent",
+  "autonomous-agent",
+  "coding-agent",
+  "debugger",
+  "developer-tools",
+  "llm",
+  "local-ai",
+  "lsp",
+  "terminal",
+]
 license = "MIT"
 authors = [ { name = "Youssef Mejdi" } ]
 requires-python = ">=3.12,<3.14"
@@ -20,22 +31,11 @@ classifiers = [
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
-  "Topic :: Software Development :: Libraries :: Python Modules",
   "Topic :: Software Development :: Build Tools",
   "Topic :: Software Development :: Debuggers",
+  "Topic :: Software Development :: Libraries :: Python Modules",
   "Topic :: Software Development :: Testing",
   "Topic :: Utilities",
-]
-keywords = [
-  "ai-agent",
-  "coding-agent",
-  "autonomous-agent",
-  "developer-tools",
-  "llm",
-  "lsp",
-  "debugger",
-  "terminal",
-  "local-ai",
 ]
 dependencies = [
   "aiohttp>=3.14.1",
