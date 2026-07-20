@@ -212,7 +212,10 @@ class TestHomeDirCrossPlatform:
         """Verify home directory contains user-specific path."""
         home = Path.home()
         username = os.environ.get('USERNAME') or os.environ.get('USER') or 'user'
-        assert username in str(home) or home.name == username
+        if 'GRINTA_TEST_HOME' in os.environ:
+            assert str(home) == os.environ['GRINTA_TEST_HOME']
+        else:
+            assert username in str(home) or home.name == username
 
 
 class TestTempDirCrossPlatform:
