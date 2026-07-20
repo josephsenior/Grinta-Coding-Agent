@@ -19,7 +19,9 @@ def main() -> int:
     parser.add_argument('--require-stable', action='store_true')
     args = parser.parse_args()
 
-    pyproject = tomllib.loads((REPO_ROOT / 'pyproject.toml').read_text(encoding='utf-8'))
+    pyproject = tomllib.loads(
+        (REPO_ROOT / 'pyproject.toml').read_text(encoding='utf-8')
+    )
     version = pyproject['project']['version']
     expected_tag = f'v{version}'
     errors: list[str] = []

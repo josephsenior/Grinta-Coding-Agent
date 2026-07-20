@@ -24,10 +24,16 @@ class Member:
 def members(path: Path) -> list[Member]:
     if path.suffix == '.whl':
         with zipfile.ZipFile(path) as archive:
-            return [Member(info.filename, info.file_size) for info in archive.infolist()]
+            return [
+                Member(info.filename, info.file_size) for info in archive.infolist()
+            ]
     if path.name.endswith('.tar.gz'):
         with tarfile.open(path, 'r:gz') as archive:
-            return [Member(info.name, info.size) for info in archive.getmembers() if info.isfile()]
+            return [
+                Member(info.name, info.size)
+                for info in archive.getmembers()
+                if info.isfile()
+            ]
     raise ValueError(f'Unsupported distribution: {path}')
 
 
@@ -54,12 +60,16 @@ def violations(path: Path) -> list[str]:
         lowered = tuple(part.lower() for part in parts)
         suffix = PurePosixPath(member.name).suffix.lower()
         if '.grinta' in lowered:
-            errors.append(f'{path.name}: generated .grinta state included: {member.name}')
+            errors.append(
+                f'{path.name}: generated .grinta state included: {member.name}'
+            )
         if lowered[-1:] == ('conftest.py',) and 'backend' in lowered:
             errors.append(f'{path.name}: test conftest included: {member.name}')
         joined = '/'.join(lowered)
         if '/backend/scripts/refactor/' in f'/{joined}/':
-            errors.append(f'{path.name}: internal refactor utility included: {member.name}')
+            errors.append(
+                f'{path.name}: internal refactor utility included: {member.name}'
+            )
         if 'backend/tests/' in joined:
             errors.append(f'{path.name}: backend tests included: {member.name}')
         if suffix in BANNED_SUFFIXES:
