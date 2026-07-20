@@ -315,6 +315,9 @@ def test_init_shell_commands_uses_powershell_helpers_on_windows(mock_executor):
     with patch(
         'backend.execution.utils.tool_registry.resolve_windows_powershell_preference',
         return_value=True,
+    ), patch(
+        'pathlib.Path.exists',
+        return_value=True,
     ):
         mock_executor._init_shell_commands()
 
@@ -346,6 +349,9 @@ def test_init_shell_commands_keeps_bash_helpers_when_not_powershell(mock_executo
     with patch(
         'backend.execution.utils.tool_registry.resolve_windows_powershell_preference',
         return_value=False,
+    ), patch(
+        'pathlib.Path.exists',
+        return_value=True,
     ):
         mock_executor._init_shell_commands()
 
