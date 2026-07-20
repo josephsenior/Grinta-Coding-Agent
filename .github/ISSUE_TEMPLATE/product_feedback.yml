@@ -1,0 +1,82 @@
+name: Product Feedback
+description: Report onboarding, UX, reliability, performance, or documentation feedback
+title: "[Feedback]: "
+labels: ["feedback", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Grinta. Do not include API keys, secrets, or private source code.
+  - type: dropdown
+    id: feedback_area
+    attributes:
+      label: Feedback area
+      options:
+        - First-run onboarding (install/init/config)
+        - CLI UX and discoverability
+        - Reliability or stability
+        - Performance or resource usage
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Impact
+      options:
+        - High (blocks task completion)
+        - Medium (significant friction but workable)
+        - Low (minor improvement)
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe what you expected and what actually happened.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Include commands, prompts, and the sequence of actions when applicable.
+  - type: input
+    id: grinta_version
+    attributes:
+      label: Grinta version
+      description: Paste the output of `grinta --version` or provide the commit SHA.
+    validations:
+      required: true
+  - type: dropdown
+    id: installation
+    attributes:
+      label: Installation path
+      options:
+        - pipx from PyPI
+        - Editable source install
+        - Source runner with uv
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - WSL2
+        - Linux
+        - macOS
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Model/provider used
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs or screenshots
+      description: Remove secrets, private code, and personal data before submitting.

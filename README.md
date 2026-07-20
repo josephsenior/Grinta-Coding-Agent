@@ -12,11 +12,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Status: release candidate](https://img.shields.io/badge/status-release%20candidate-CC1836)](docs/RELEASE_CHECKLIST.md)
 
-[![Grinta autonomously diagnoses a Raft test failure, edits the implementation, and returns the suite to 39/39 passing](docs/assets/grinta-demo-preview.webp)](docs/assets/grinta-demo.mp4)
+**Demo recording:** published with the corresponding GitHub Release rather than stored in the source repository.
 
 Grinta plans, edits, runs commands, debugs failures, validates the result, and continues until the task is finished. Its control plane and session state stay local; inference can use a major hosted provider or a local model.
 
-[Install](#install) · [Watch the full demo](docs/assets/grinta-demo.mp4) · [Documentation](docs/README.md) · [Architecture](docs/ARCHITECTURE.md) · [Showcase](SHOWCASE.md)
+[Install](#install) · [Documentation](docs/README.md) · [Architecture](docs/ARCHITECTURE.md) · [Showcase](SHOWCASE.md)
 
 > **4h 33m autonomous run · 16,393 events · 373 tool outcomes · no additional user messages**
 >

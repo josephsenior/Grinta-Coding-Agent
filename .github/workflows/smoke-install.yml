@@ -34,8 +34,11 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Build wheel
-        run: uv build --wheel
+      - name: Build wheel and source distribution
+        run: uv build
+
+      - name: Verify distribution contents
+        run: python .github/scripts/check_distribution_contents.py dist
 
       - name: Run wheel smoke install (Unix)
         if: runner.os != 'Windows'

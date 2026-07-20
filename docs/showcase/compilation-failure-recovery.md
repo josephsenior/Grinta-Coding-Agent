@@ -16,9 +16,9 @@ During recorded development runs, Grinta read failure output, traced the defect 
 
 Exact duration and file-count metrics were not retained for the separate compilation-error run, so they are intentionally not estimated here.
 
-## Watch
+## Recording
 
-[Animated recovery sequence](../assets/grinta-demo-preview.webp) · [Full demo](../assets/grinta-demo.mp4)
+The recovery recording is distributed as a GitHub Release asset rather than committed to the source tree.
 
 ## Inspect
 

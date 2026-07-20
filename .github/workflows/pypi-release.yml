@@ -1,44 +1,55 @@
-# Publishes the Grinta PyPI package
-name: Publish PyPi Package
+# Build, test, and publish the exact stable tag artifacts through PyPI OIDC.
+name: Publish PyPI Package
 
-# Triggered manually
 on:
-  workflow_dispatch:
-    inputs:
-      reason:
-        description: 'Reason for manual trigger'
-        required: true
-        default: ''
+  push:
+    tags:
+      - 'v*'
 
 permissions:
   contents: read
-  id-token: write
+
+concurrency:
+  group: pypi-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  # Gate: run tests before publishing
-  pre-release-tests:
+  validate-release-tag:
+    name: Validate stable release tag
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.12'
+      - name: Verify tag, package metadata, lockfile, and stable classifier
+        run: python .github/scripts/verify_release_tag.py --tag "${{ github.ref_name }}" --require-stable
+      - name: Require tagged commit to be on main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
+            echo "::error::Tagged commit is not reachable from origin/main"
+            exit 1
+          }
       - name: Install uv
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990
         with:
           enable-cache: true
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: 3.12
-      - name: Install dependencies
+      - name: Install release-test dependencies
         run: python scripts/bootstrap_env.py dev-test
       - name: Run type checks
         run: uv run mypy --config-file mypy.ini
       - name: Run unit tests
         run: uv run pytest backend/tests/unit -q
 
-  release:
-    needs: pre-release-tests
+  build:
+    name: Build exact release artifacts
+    needs: validate-release-tag
     runs-on: ubuntu-latest
-    environment:
-      name: pypi
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
       - name: Install uv
@@ -47,52 +58,105 @@ jobs:
           enable-cache: true
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
-          python-version: 3.12
-      - name: Install dependencies
-        run: python scripts/bootstrap_env.py base
-      - name: Build package
+          python-version: '3.12'
+      - name: Build wheel and source distribution once
         run: uv build
-      - name: Generate SHA256 checksums
-        shell: bash
-        run: |
-          cd dist
-          sha256sum *.whl *.tar.gz > SHA256SUMS
-      - name: Smoke test built wheel
+      - name: Verify distribution contents
+        run: python .github/scripts/check_distribution_contents.py dist
+      - name: Generate SHA256 checksums outside the publish directory
         shell: bash
         run: |
           set -euo pipefail
-          python -m venv .venv-smoke
-          . .venv-smoke/bin/activate
-          python -m pip install --upgrade pip
-          python -m pip install dist/*.whl
-          grinta --help
-          grinta --version
-          mkdir -p .package-smoke-workspace
-          export APP_ROOT="$PWD/.package-smoke-app"
-          mkdir -p "$APP_ROOT"
-          cat > "$APP_ROOT/settings.json" <<'JSON'
-          {
-            "llm_provider": "openai",
-            "llm_model": "openai/gpt-4.1",
-            "llm_api_key": "${LLM_API_KEY}",
-            "llm_base_url": ""
-          }
-          JSON
-          printf '/help\n' | env \
-            APP_ROOT="$APP_ROOT" \
-            LLM_API_KEY=sk-test-release-smoke \
-            LLM_MODEL=openai/gpt-4.1 \
-            GRINTA_NO_SPLASH=1 \
-            LOG_TO_FILE=false \
-            grinta --project .package-smoke-workspace --no-splash
-      - name: Upload release distributions and checksums
+          mkdir -p release-assets
+          sha256sum dist/*.whl dist/*.tar.gz > release-assets/SHA256SUMS
+      - name: Upload immutable candidate artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: grinta-distributions
+          name: grinta-${{ github.ref_name }}
           path: |
             dist/*.whl
             dist/*.tar.gz
-            dist/SHA256SUMS
+            release-assets/SHA256SUMS
           if-no-files-found: error
-      - name: Publish to PyPI (Trusted Publishing)
+          retention-days: 30
+
+  smoke-test-artifacts:
+    name: Smoke exact artifacts (${{ matrix.os }})
+    needs: build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.12'
+      - name: Download exact build output
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: grinta-${{ github.ref_name }}
+          path: .release
+      - name: Re-verify downloaded distributions
+        run: python .github/scripts/check_distribution_contents.py .release/dist
+      - name: Smoke wheel on Unix
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv .venv-wheel
+          . .venv-wheel/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install .release/dist/*.whl
+          grinta --help
+          grinta --version
+      - name: Smoke source distribution on Unix
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv .venv-sdist
+          . .venv-sdist/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install .release/dist/*.tar.gz
+          grinta --help
+          grinta --version
+      - name: Smoke wheel on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python -m venv .venv-wheel
+          .\.venv-wheel\Scripts\python.exe -m pip install --upgrade pip
+          .\.venv-wheel\Scripts\python.exe -m pip install (Get-ChildItem .release\dist\*.whl).FullName
+          .\.venv-wheel\Scripts\grinta.exe --help
+          .\.venv-wheel\Scripts\grinta.exe --version
+      - name: Smoke source distribution on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python -m venv .venv-sdist
+          .\.venv-sdist\Scripts\python.exe -m pip install --upgrade pip
+          .\.venv-sdist\Scripts\python.exe -m pip install (Get-ChildItem .release\dist\*.tar.gz).FullName
+          .\.venv-sdist\Scripts\grinta.exe --help
+          .\.venv-sdist\Scripts\grinta.exe --version
+
+  publish:
+    name: Publish exact artifacts to PyPI
+    needs: smoke-test-artifacts
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Download exact tested build output
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: grinta-${{ github.ref_name }}
+          path: .release
+      - name: Publish with PyPI Trusted Publishing
         uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
+        with:
+          packages-dir: .release/dist

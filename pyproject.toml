@@ -132,6 +132,17 @@ test = [
   "requests>=2.32.4,<3",
 ]
 
+[tool.hatch.build]
+exclude = [
+  "/backend/.grinta/**",
+  "/backend/conftest.py",
+  "/backend/scripts/refactor/**",
+  "/backend/tests/**",
+  "/docs/assets/**",
+  "/traces/**",
+  "/rustup-init.exe",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = [
   "backend",
@@ -169,6 +180,8 @@ exclude = [
   "**/.mypy_cache",
   "**/.ruff_cache",
   "backend/tests",
+  "backend/conftest.py",
+  "backend/scripts/refactor",
   "scripts/__pycache__",
 ]
 

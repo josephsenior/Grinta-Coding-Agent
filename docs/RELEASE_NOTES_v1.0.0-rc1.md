@@ -27,8 +27,8 @@ For the current support contract and CI certification depth, see [SUPPORT_MATRIX
 
 - [Showcase index](../SHOWCASE.md)
 - [4h 33m autonomous execution report](evidence/2026-07-09-autonomous-run-report.md)
-- [Raft key-value store demo](assets/grinta-demo.mp4)
-- [Animated recovery preview](assets/grinta-demo-preview.webp)
+- Raft key-value store recording (attach as a GitHub Release asset)
+- Recovery preview (attach as a GitHub Release asset)
 
 ## Notable release-candidate improvements
 

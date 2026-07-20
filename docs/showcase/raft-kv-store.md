@@ -15,10 +15,10 @@ Grinta created the project and test suite, encountered an asynchronous race arou
 - Human follow-up messages during recovery: **0**
 - Demonstrated behavior: election, replication, failover, partition handling, persistence, and log consistency
 
-## Watch
+## Recording
 
-[Animated recovery sequence](../assets/grinta-demo-preview.webp) · [Full demo](../assets/grinta-demo.mp4)
+The recording is distributed as a GitHub Release asset so large media is not embedded in the source repository or Python package.
 
 ## Inspect
 
-The recording is the public evidence for this run. A sanitized transcript and diff are not currently published.
+The release recording is the public evidence for this run. A sanitized transcript and diff are not currently published.

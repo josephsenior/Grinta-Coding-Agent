@@ -71,3 +71,11 @@ tsc_errors*.txt
 backend/MagicMock/
 .pytest-reliability/
 bandit-out.json
+
+# Release assets and generated agent state
+backend/.grinta/
+rustup-init.exe
+grinta_raft.mp4
+docs/assets/grinta-demo.mp4
+docs/assets/grinta-demo-preview.webp
+traces/**/session.zip

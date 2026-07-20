@@ -16,7 +16,7 @@ and “met the original specification” are treated as separate claims.
 
 | Claim | Evidence | Boundary |
 | --- | --- | --- |
-| A public autonomous run lasted about 106 minutes | [`traces/ouroboros/README.md`](../../traces/ouroboros/README.md), [`session.audit.txt`](../../traces/ouroboros/session.audit.txt), compressed raw session in `traces/ouroboros/session.zip`; introduced in commit `4ad1b0d62` | The generated system contains deliberate simplifications. A long run is not proof of full Ouroboros conformance. |
+| A public autonomous run lasted about 106 minutes | [`traces/ouroboros/README.md`](../../traces/ouroboros/README.md), [`session.audit.txt`](../../traces/ouroboros/session.audit.txt); introduced in commit `4ad1b0d62` | The generated system contains deliberate simplifications. The raw archive is kept outside Git and should be attached to a release/evidence record before it is cited as a downloadable artifact. |
 | A separate July 9 run reached `FINISHED` after 273.5 minutes | [`docs/evidence/2026-07-09-autonomous-run-report.md`](../evidence/2026-07-09-autonomous-run-report.md) | This is a sanitized report. It records 16,393 events and 373 tool outcomes, but does not publish the complete raw trace. |
 | Durable task state became a subsystem rather than a compaction side effect | `backend/task_state/`, tests under `backend/tests/unit/task_state/`; commits `83a5ab697`, `b26bbddfc`, `9155ea9b9` | The implementation continued changing after the initial subsystem landed. |
 | Project memory became orchestrator-owned | `backend/context/memory/project_memory.py`; commit `e35189783` | This is repository memory, not a claim that the system learns autonomously without review. |

@@ -2,7 +2,9 @@
 
 import importlib
 import os
+import shutil
 import sys
+import tempfile
 
 
 def _sanitize_sys_path():
@@ -22,6 +24,33 @@ from collections.abc import Iterator  # noqa: E402
 import pytest  # noqa: E402
 
 
+_TEST_HOME: pathlib.Path | None = None
+
+
+def _configure_isolated_test_home() -> None:
+    """Redirect user-level state into a disposable directory before collection."""
+    global _TEST_HOME
+    if _TEST_HOME is None:
+        _TEST_HOME = pathlib.Path(
+            tempfile.mkdtemp(prefix='grinta-pytest-home-')
+        ).resolve()
+
+    home = _TEST_HOME
+    env_paths = {
+        'HOME': home,
+        'USERPROFILE': home,
+        'XDG_CONFIG_HOME': home / '.config',
+        'XDG_CACHE_HOME': home / '.cache',
+        'XDG_DATA_HOME': home / '.local' / 'share',
+        'APPDATA': home / 'AppData' / 'Roaming',
+        'LOCALAPPDATA': home / 'AppData' / 'Local',
+    }
+    for name, value in env_paths.items():
+        value.mkdir(parents=True, exist_ok=True)
+        os.environ[name] = str(value)
+    os.environ['GRINTA_TEST_HOME'] = str(home)
+
+
 def _has_pkg(name: str) -> bool:
     try:
         importlib.import_module(name)
@@ -31,6 +60,7 @@ def _has_pkg(name: str) -> bool:
 
 
 def pytest_configure(config):
+    _configure_isolated_test_home()
     # Tests must not write session logs under logs/workspaces/ (no PROJECT_ROOT).
     os.environ['LOG_TO_FILE'] = 'false'
     markers = [
@@ -43,6 +73,15 @@ def pytest_configure(config):
     ]
     for m in markers:
         config.addinivalue_line('markers', f'{m}: mark test as {m}')
+
+
+def pytest_unconfigure(config):
+    """Remove disposable user state after the test process exits."""
+    del config
+    global _TEST_HOME
+    if _TEST_HOME is not None:
+        shutil.rmtree(_TEST_HOME, ignore_errors=True)
+        _TEST_HOME = None
 
 
 def _clear_app_modules() -> None:

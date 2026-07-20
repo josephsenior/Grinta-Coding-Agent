@@ -97,3 +97,5 @@ jobs:
             exit 1
           fi
           echo "No cache artifacts are tracked in the repository."
+      - name: Check tracked repository payload
+        run: python .github/scripts/check_repository_hygiene.py
