@@ -6,7 +6,7 @@ requires = [
 
 [project]
 name = "grinta"
-version = "1.0.0rc1"
+version = "1.0.0"
 description = "Local-first autonomous coding agent with provider-agnostic inference, LSP, debugging, durable sessions, and a terminal UI"
 readme = "README.md"
 keywords = [
@@ -24,7 +24,7 @@ license = "MIT"
 authors = [ { name = "Youssef Mejdi" } ]
 requires-python = ">=3.12,<3.14"
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Developers",
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",

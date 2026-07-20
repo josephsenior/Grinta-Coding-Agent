@@ -33,7 +33,7 @@ Grinta plans, edits, runs commands, debugs failures, validates the result, and c
 
 ## Install
 
-The repository is prepared as `1.0.0rc1`. Until the public package and tag are available, install the release candidate from source:
+Install the stable version from PyPI or source:
 
 ```bash
 git clone https://github.com/josephsenior/Grinta-Coding-Agent.git Grinta
@@ -42,7 +42,7 @@ pipx install -e .
 grinta
 ```
 
-Once `v1.0.0-rc1` is published to PyPI, the installation becomes:
+Or install directly from PyPI:
 
 ```bash
 pipx install grinta

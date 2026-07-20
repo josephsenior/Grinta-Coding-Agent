@@ -49,7 +49,7 @@ warnings.filterwarnings(
 from importlib.metadata import PackageNotFoundError, version  # noqa: E402
 from pathlib import Path  # noqa: E402
 
-_DEFAULT_VERSION = '1.0.0rc1'
+_DEFAULT_VERSION = '1.0.0'
 __version__ = _DEFAULT_VERSION
 __package_name__ = 'grinta'
 

@@ -1,12 +1,12 @@
 {
-  "version": "1.0.0rc1",
+  "version": "1.0.0",
   "description": "Autonomous local-first CLI coding agent",
   "homepage": "https://github.com/josephsenior/Grinta-Coding-Agent",
   "license": "MIT",
   "depends": "python312",
-  "url": "https://files.pythonhosted.org/packages/source/g/grinta/grinta-1.0.0rc1.tar.gz",
+  "url": "https://files.pythonhosted.org/packages/source/g/grinta/grinta-1.0.0.tar.gz",
   "hash": "e898dbfbe588b60b3375797287b85a709faafd9c8d942ce7371e7a2c9e8f9d30",
-  "extract_dir": "grinta_ai-1.0.0rc1",
+  "extract_dir": "grinta_ai-1.0.0",
   "installer": {
     "script": [
       "python -m venv \"$dir\\.venv\"",

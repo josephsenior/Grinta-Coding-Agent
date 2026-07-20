@@ -226,8 +226,7 @@ Minimal fields in `settings.template.json`:
 - `llm_api_key`
 - `llm_base_url`
 
-The package metadata currently reports `1.0.0rc1`; release notes and support
-claims should treat the project as an RC until the GA checklist is satisfied.
+The package metadata reports `1.0.0`.
 
 ## Reliability and Safety
 
