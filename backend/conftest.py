@@ -78,9 +78,9 @@ def pytest_unconfigure(config):
     """Remove disposable user state after the test process exits."""
     del config
     global _TEST_HOME
-    if _TEST_HOME is not None:
-        shutil.rmtree(_TEST_HOME, ignore_errors=True)
-        _TEST_HOME = None
+    # Avoid deleting the directory to prevent race conditions where worker processes
+    # or background tasks try to access it after a process has unconfigured.
+    _TEST_HOME = None
 
 
 def _clear_app_modules() -> None:
