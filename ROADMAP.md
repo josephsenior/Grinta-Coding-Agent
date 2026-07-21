@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap tracks **post-`v1.0.0-rc1` priorities** for the current terminal product surface.
+This roadmap tracks **post-`v1.0.0` priorities** for the current terminal product surface.
 It intentionally separates **release trust work** from future capability work so maintainers
 can improve the project without changing the agent's core behavior.
 

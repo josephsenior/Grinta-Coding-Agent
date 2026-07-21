@@ -298,7 +298,8 @@ HTTP server.
   local `AuditLogger`. No outbound calls are made beyond configured LLM
   providers and explicitly enabled MCP servers.
 
-[Unreleased]: https://github.com/josephsenior/Grinta-Coding-Agent/compare/v1.0.0-rc1...HEAD
+[Unreleased]: https://github.com/josephsenior/Grinta-Coding-Agent/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/josephsenior/Grinta-Coding-Agent/releases/tag/v1.0.0
 [1.0.0-rc1]: https://github.com/josephsenior/Grinta-Coding-Agent/releases/tag/v1.0.0-rc1
 [0.56.0]: https://github.com/josephsenior/Grinta-Coding-Agent/releases/tag/v0.56.0
 [0.55.0]: https://github.com/josephsenior/Grinta-Coding-Agent/releases/tag/v0.55.0
