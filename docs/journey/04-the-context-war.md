@@ -161,6 +161,14 @@ That messiness is valuable to me. I do not want this chapter to read like I calm
 
 ## What Survived Into the Later Architecture
 
+> **July 2026 correction:** The detailed list below describes the
+> post-experiment snapshot discussed in this chapter. A later composition pass
+> removed `AutoCompactor`, `auto_selector`, and other standalone variants. The
+> current directory contains no-op, recent-events, observation-masking, smart,
+> structured-summary, microcompact, pipeline, and composition modules. The
+> durable task-state work in chapter 48 also reduced how much compaction itself
+> must carry.
+
 The current Grinta architecture retains a more disciplined set of compactor strategies. The surviving system includes several important approaches, each solving a different memory problem.
 
 All of them operate on a view abstraction built from event history, not on a naive chat transcript. That matters because the view layer has to account for prior compactions, pruned events, preserved summaries, and pending compaction requests. Even the substrate is more serious than it looks from the outside.

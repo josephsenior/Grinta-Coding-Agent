@@ -142,7 +142,7 @@ mess and present the agent with one stable contract.
 
 This is one of the places where the project grew by shrinking.
 
-The public file API is now centered on:
+At this snapshot, the public file API was centered on:
 
 - `read`
 - `find_symbols`
@@ -161,10 +161,12 @@ file is prose, config, generated code, or otherwise unsuitable for AST edits, it
 uses grounded string replacement. If the edit spans files, it uses `multiedit`
 as a transaction.
 
-The older docs sometimes named `write` or `read_symbol_definition`. Those were
-true in earlier shapes of the system, but the current surface is smaller and
-more honest. That is why this chapter belongs in the journey: the point is not
-that the API name changed. The point is that the agent's mental load got lower.
+Even older docs sometimes named `write` or `read_symbol_definition`. Those were
+true in earlier shapes of the system, while the six-tool surface in this chapter
+was a later reduction. It was reduced again after this snapshot, as the note at
+the top explains. That is why this chapter belongs in the journey: the point is
+not that one API name won forever. The point is that the agent's mental load kept
+getting lower when a tool failed to justify its place.
 
 ---
 

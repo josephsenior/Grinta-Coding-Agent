@@ -1367,7 +1367,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27,<1" },
     { name = "json-repair", specifier = ">=0.48,<1" },
     { name = "libtmux", specifier = ">=0.37,<0.63" },
-    { name = "mcp", specifier = ">=1.10,<2" },
+    { name = "mcp", specifier = ">=1.28.1,<2" },
     { name = "openai", specifier = ">=1.40,<3" },
     { name = "orjson", specifier = ">=3.10,<4" },
     { name = "pathspec", specifier = ">=0.12,<2" },

@@ -16,6 +16,19 @@ compress a blocked step into a vague sentence, or reinterpret the objective whil
 trying to make the conversation coherent. The next turn then inherits a cleaner
 story and a less accurate contract.
 
+## Acceptance Criteria Became Data
+
+Before durable task state existed, the July 3 work made acceptance criteria
+explicit tools and visible state. Commits `03eff6eb2`, `61db0bd80`, `64f89d83e`,
+and `aa521e25b` added creation, refinement, audit behavior, TUI handling, and
+prompt guidance.
+
+That was an important intermediate step. A criterion written only in the
+original prompt is easy to dilute during a long session. A criterion represented
+as data can be reviewed and checked. But acceptance criteria alone still did not
+own the full lifecycle of tasks, blockers, superseded objectives, and completion
+state. That need produced the subsystem that followed.
+
 ## Durable Task State Left the Summary
 
 The first task-state subsystem landed in commit `83a5ab697`. It introduced a
@@ -98,6 +111,20 @@ the default to match the environment most Windows users already have. The prompt
 and executor still need to agree on shell identity, and cross-platform command
 semantics are still a contract rather than a string substitution problem.
 
+## Onboarding Became a Reliability Path
+
+The July 8–10 onboarding work (`566591f70`, `baaf5f1ea`, `1bb3adf4d`, and
+`0d6149417`) treated first launch as part of the runtime contract. Source
+checkouts, installed wheels, native Windows, Git Bash, and WSL do not begin with
+the same paths or capabilities. Health checks, setup scripts, defaults, and the
+GA onboarding gate were tightened so a user could discover a missing dependency
+or invalid setting before an agent session failed mysteriously.
+
+This belongs in the journey because packaging trust is operational reliability.
+A correct engine that launches through the wrong module, writes settings to the
+wrong home, or teaches the model the wrong shell is not correct from the user's
+point of view.
+
 ## Completion Became Immediate and Observable
 
 Two July 14 changes (`ce94df862`, `78b63eab6`) tightened the path from completed
@@ -121,6 +148,17 @@ gates, and coverage moved above the earlier baseline.
 Commits `60ee4bb36`, `35bcfdee2`, `58837abe3`, and `785760631` are the relevant
 receipts. Live CI status, not this chapter, is the authority on whether the gates
 pass today.
+
+## The Release Name Lagged Behind the Internal Plan
+
+Chapter 46 used “8.1 → 9.0” for an internal sequence of improvement phases. It
+was not the package version. As of 17 July 2026, `pyproject.toml` still reports
+`1.0.0rc1`, and the GA checklist remains the release boundary.
+
+This distinction matters because internal maturity language can accidentally
+read like public release history. Refactor phases describe how I organized the
+work. Semantic versions describe what users can install and what compatibility
+the project promises.
 
 ## What Continuity Means Now
 
