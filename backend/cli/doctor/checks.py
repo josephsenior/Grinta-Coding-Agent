@@ -499,6 +499,7 @@ def collect_doctor_checks(*, verbose: bool = False) -> list[DoctorCheck]:
         check_execution_profile(),
         check_binary('git'),
         check_binary('rg'),
+        check_binary('uv', critical=False),
     ]
     if sys.platform.startswith('linux') or is_wsl_runtime():
         checks.append(check_binary('tmux'))

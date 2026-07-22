@@ -25,7 +25,22 @@ def _quiet_console() -> Console:
 def test_collect_checks_includes_core_rows() -> None:
     checks = collect_checks()
     names = {check.name for check in checks}
-    assert {'version', 'python', 'platform', 'settings', 'llm', 'git', 'rg'} <= names
+    assert {
+        'version',
+        'python',
+        'platform',
+        'settings',
+        'llm',
+        'git',
+        'rg',
+        'uv',
+    } <= names
+
+
+def test_collect_checks_marks_uv_non_critical() -> None:
+    checks = collect_checks()
+    uv_check = next(check for check in checks if check.name == 'uv')
+    assert uv_check.critical is False
 
 
 def test_check_binary_found() -> None:
