@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import platform
 import shutil
 import subprocess
@@ -10,6 +11,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from backend.core.os_capabilities import is_linux, is_macos, is_windows
 
 
 @dataclass(frozen=True)
@@ -255,6 +258,21 @@ def check_binary(name: str, *, critical: bool = True) -> DoctorCheck:
     return DoctorCheck(name, False, 'not found on PATH', critical=critical)
 
 
+def check_encoding() -> DoctorCheck:
+    encoding = sys.stdout.encoding
+    normalized = None
+    if encoding is not None:
+        normalized = encoding.lower().replace('-', '').replace('_', '')
+    if normalized == 'utf8':
+        return DoctorCheck('terminal_encoding', True, encoding, critical=False)
+    return DoctorCheck(
+        'terminal_encoding',
+        False,
+        f'found encoding: {encoding}; expected UTF-8 - set PYTHONUTF8=1',
+        critical=False,
+    )
+
+
 def check_optional_imports() -> DoctorCheck:
     script = (
         _repo_root() / 'backend' / 'scripts' / 'verify' / 'verify_optional_imports.py'
@@ -284,6 +302,42 @@ def check_optional_imports() -> DoctorCheck:
     detail = (proc.stderr or proc.stdout or 'failed').strip().splitlines()
     first = detail[0] if detail else 'failed'
     return DoctorCheck('optional_imports', False, first, critical=False)
+
+
+def check_package_manager_path() -> DoctorCheck:
+    if is_windows():
+        target = Path.home() / 'scoop' / 'shims'
+        installed = target.exists()
+    elif is_macos() or is_linux():
+        prefixes = [
+            '/opt/homebrew/bin/brew',
+            '/usr/local/bin/brew',
+            '/home/linuxbrew/.linuxbrew/bin/brew',
+        ]
+        installed = False
+        for prefix in prefixes:
+            target = Path(prefix).parent
+            if Path(prefix).exists():
+                installed = True
+                break
+    else:
+        return DoctorCheck('package_manager_path', True, 'n/a', critical=False)
+    if not installed:
+        return DoctorCheck('package_manager_path', True, 'not detected', critical=False)
+
+    full_path = os.environ.get('PATH', '')
+    delimiter = os.pathsep
+    paths = full_path.split(delimiter)
+    paths_normalized = [os.path.normcase(os.path.normpath(p)) for p in paths]
+    target_normalized = os.path.normcase(os.path.normpath(target))
+
+    if target_normalized in paths_normalized:
+        return DoctorCheck(
+            'package_manager_path', True, f'{target} on PATH', critical=False
+        )
+    return DoctorCheck(
+        'package_manager_path', False, f'{target} not on PATH', critical=False
+    )
 
 
 def check_editing_stack() -> DoctorCheck:
@@ -499,6 +553,9 @@ def collect_doctor_checks(*, verbose: bool = False) -> list[DoctorCheck]:
         check_execution_profile(),
         check_binary('git'),
         check_binary('rg'),
+        check_binary('uv', critical=False),
+        check_encoding(),
+        check_package_manager_path(),
     ]
     if sys.platform.startswith('linux') or is_wsl_runtime():
         checks.append(check_binary('tmux'))
@@ -539,9 +596,11 @@ __all__ = [
     'DoctorCheck',
     'check_binary',
     'check_editing_stack',
+    'check_encoding',
     'check_execution_profile',
     'check_llm_config',
     'check_optional_imports',
+    'check_package_manager_path',
     'check_platform',
     'check_python',
     'check_security_settings_values',
