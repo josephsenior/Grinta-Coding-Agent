@@ -19,6 +19,9 @@ from backend.cli.doctor.checks import (
     check_binary as _check_binary,
 )
 from backend.cli.doctor.checks import (
+    check_encoding as _check_encoding,
+)
+from backend.cli.doctor.checks import (
     check_llm_config as _check_llm_config,
 )
 from backend.cli.doctor.checks import (
@@ -122,6 +125,7 @@ def cmd_doctor(console: Console, *, verbose: bool = False) -> int:
 __all__ = [
     'DoctorCheck',
     '_check_binary',
+    '_check_encoding',
     '_check_llm_config',
     '_check_settings_schema',
     'collect_checks',

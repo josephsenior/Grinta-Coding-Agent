@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from rich.console import Console
@@ -11,6 +12,7 @@ from rich.console import Console
 from backend.cli.doctor.doctor_cli import (
     DoctorCheck,
     _check_binary,
+    _check_encoding,
     _check_llm_config,
     _check_settings_schema,
     cmd_doctor,
@@ -34,6 +36,7 @@ def test_collect_checks_includes_core_rows() -> None:
         'git',
         'rg',
         'uv',
+        'terminal_encoding',
     } <= names
 
 
@@ -55,6 +58,24 @@ def test_check_binary_missing() -> None:
         check = _check_binary('rg')
     assert check.ok is False
     assert 'PATH' in check.detail
+
+
+def test_check_encoding_is_utf8() -> None:
+    with patch(
+        'backend.cli.doctor.checks.sys.stdout', SimpleNamespace(encoding='utf-8')
+    ):
+        check = _check_encoding()
+    assert check.ok is True
+    assert check.detail == 'utf-8'
+
+
+def test_check_encoding_is_not_utf8() -> None:
+    with patch(
+        'backend.cli.doctor.checks.sys.stdout', SimpleNamespace(encoding='cp1252')
+    ):
+        check = _check_encoding()
+    assert check.ok is False
+    assert 'cp1252' in check.detail
 
 
 def test_check_settings_schema_flags_nested_agent(tmp_path: Path, monkeypatch) -> None:

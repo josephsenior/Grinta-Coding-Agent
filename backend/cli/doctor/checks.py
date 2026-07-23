@@ -255,6 +255,21 @@ def check_binary(name: str, *, critical: bool = True) -> DoctorCheck:
     return DoctorCheck(name, False, 'not found on PATH', critical=critical)
 
 
+def check_encoding() -> DoctorCheck:
+    encoding = sys.stdout.encoding
+    normalized = None
+    if encoding is not None:
+        normalized = encoding.lower().replace('-', '').replace('_', '')
+    if normalized == 'utf8':
+        return DoctorCheck('terminal_encoding', True, encoding, critical=False)
+    return DoctorCheck(
+        'terminal_encoding',
+        False,
+        f'found encoding: {encoding}; expected UTF-8 - set PYTHONUTF8=1',
+        critical=False,
+    )
+
+
 def check_optional_imports() -> DoctorCheck:
     script = (
         _repo_root() / 'backend' / 'scripts' / 'verify' / 'verify_optional_imports.py'
@@ -500,6 +515,7 @@ def collect_doctor_checks(*, verbose: bool = False) -> list[DoctorCheck]:
         check_binary('git'),
         check_binary('rg'),
         check_binary('uv', critical=False),
+        check_encoding(),
     ]
     if sys.platform.startswith('linux') or is_wsl_runtime():
         checks.append(check_binary('tmux'))
@@ -540,6 +556,7 @@ __all__ = [
     'DoctorCheck',
     'check_binary',
     'check_editing_stack',
+    'check_encoding',
     'check_execution_profile',
     'check_llm_config',
     'check_optional_imports',
