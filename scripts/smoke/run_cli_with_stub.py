@@ -29,6 +29,18 @@ def _patch_agent_loop_end_states() -> None:
         await original(controller, runtime, memory, extended)
 
     agent_loop.run_agent_until_done = run_agent_until_done
+    try:
+        import backend.app.main as app_main
+
+        app_main.run_agent_until_done = run_agent_until_done
+    except Exception:
+        pass
+    try:
+        import backend.cli.tui.screen.lifecycle_dispatch as lifecycle_dispatch
+
+        lifecycle_dispatch.run_agent_until_done = run_agent_until_done
+    except Exception:
+        pass
 
 
 def main() -> None:

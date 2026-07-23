@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
 from typing import TYPE_CHECKING, Any
 
 from rich import box
@@ -273,6 +274,10 @@ class MessagesMixin(CLIEventRenderer if TYPE_CHECKING else object):
             return
 
         self._console.print(framed)
+        try:
+            sys.stdout.flush()
+        except Exception:
+            pass
 
     async def _safe_print_above_prompt(self, renderable: Any) -> None:
         from prompt_toolkit.application import run_in_terminal

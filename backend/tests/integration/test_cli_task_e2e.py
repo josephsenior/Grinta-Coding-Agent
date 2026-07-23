@@ -54,6 +54,7 @@ def test_launch_entry_completes_one_task_via_subprocess(tmp_path: Path) -> None:
     env['GRINTA_NO_SPLASH'] = '1'
     env['LOG_TO_FILE'] = 'false'
     env['PYTHONUTF8'] = '1'
+    env['PYTHONIOENCODING'] = 'utf-8'
     env['GRINTA_AGENT_RUN_HARD_TIMEOUT_SECONDS'] = '90'
     env['APP_ROOT'] = str(app_root)
     env['HOME'] = str(tmp_path)

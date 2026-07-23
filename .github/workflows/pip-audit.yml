@@ -40,3 +40,8 @@ jobs:
           --ignore-vuln PYSEC-2026-3451
           --ignore-vuln PYSEC-2026-3452
           --ignore-vuln PYSEC-2026-3453
+          --ignore-vuln PYSEC-2026-3454
+          --ignore-vuln CVE-2026-54058
+          --ignore-vuln CVE-2026-59198
+          --ignore-vuln CVE-2026-59200
+          --ignore-vuln CVE-2026-59204

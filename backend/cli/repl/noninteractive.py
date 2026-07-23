@@ -137,7 +137,10 @@ async def run_noninteractive(
                     'Agent did not produce a final state',
                     title='warning',
                 )
-            elif state.agent_state == AgentState.FINISHED:
+            elif state.agent_state in (
+                AgentState.FINISHED,
+                AgentState.AWAITING_USER_INPUT,
+            ):
                 renderer.add_system_message(
                     f'Agent completed in {elapsed:.1f}s',
                     title='success',

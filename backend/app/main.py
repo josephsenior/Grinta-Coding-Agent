@@ -135,7 +135,7 @@ def _setup_runtime_and_repo(
         inline_event_delivery=inline_event_delivery,
     )
     runtime = acquire_result.runtime
-    call_async_from_sync(runtime.connect)
+    call_async_from_sync(runtime.connect, timeout=120)
 
     return acquire_result
 
