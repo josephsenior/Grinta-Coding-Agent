@@ -85,7 +85,11 @@ def _get_screen(app: GrintaTUIApp) -> GrintaScreen:
 
 
 def _static_render_plain(static: Static) -> str:
-    rendered = static.renderable
+    rendered = getattr(static, '_renderable', None) or getattr(
+        static, 'renderable', None
+    )
+    if rendered is None and hasattr(static, 'render'):
+        rendered = static.render()
     if hasattr(rendered, 'plain'):
         return str(rendered.plain)
     console = RichConsole()

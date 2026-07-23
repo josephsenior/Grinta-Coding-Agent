@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -52,13 +53,14 @@ class OpenAIClient(DirectLLMClient):
         self._profile = profile or TransportProfile()
         self._provider_name = provider_name
         self._request_timeout = _normalize_timeout_seconds(timeout)
+        effective_api_key = api_key or os.environ.get('OPENAI_API_KEY') or 'ollama'
         self.client = OpenAI(
-            api_key=api_key,
+            api_key=effective_api_key,
             base_url=base_url,
             http_client=get_shared_http_client(provider_name, base_url),
         )
         self.async_client = AsyncOpenAI(
-            api_key=api_key,
+            api_key=effective_api_key,
             base_url=base_url,
             http_client=get_shared_async_http_client(provider_name, base_url),
         )

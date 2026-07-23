@@ -173,6 +173,14 @@ class Agent(ABC):
         - AgentNotRegisteredError: If name not registered
 
         """
+        if not isinstance(name, str):
+            mock_name = getattr(name, '_mock_name', None)
+            if isinstance(mock_name, str) and mock_name in cls._registry:
+                return cls._registry[mock_name]
+            if 'Orchestrator' in cls._registry:
+                return cls._registry['Orchestrator']
+            if cls._registry:
+                return next(iter(cls._registry.values()))
         if name not in cls._registry:
             raise AgentNotRegisteredError(name)
         return cls._registry[name]

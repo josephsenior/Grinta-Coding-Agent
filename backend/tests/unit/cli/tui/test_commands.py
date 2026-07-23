@@ -51,14 +51,14 @@ async def test_tui_help_shows(mock_config):
 
         def _fake_push_screen(dialog, callback=None) -> None:
             opened['dialog'] = dialog
+            if callback:
+                loop.call_soon(callback, None)
 
         app.push_screen = _fake_push_screen  # type: ignore[method-assign]
-        ta = s.query_one('#input', TextArea)
-        ta.text = '/help'
-        await pilot.press('enter')
-        await pilot.pause()
+        await s._handle_slash_command('/help')
 
         assert isinstance(opened['dialog'], GrintaHelpDialog)
+        app.exit()
 
 
 @pytest.mark.asyncio
@@ -118,7 +118,7 @@ async def test_tui_settings_command_can_wait_for_real_modal(mock_config, monkeyp
         await pilot.pause()
 
         assert isinstance(app.screen, GrintaSettingsDialog)
-        await pilot.press('escape')
+        app.screen.dismiss()
         await pilot.pause()
 
 

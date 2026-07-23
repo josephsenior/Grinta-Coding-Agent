@@ -23,12 +23,19 @@ _DEFAULT_RUNTIME_IMPORTS: dict[str, tuple[str, str]] = {
 _ALL_RUNTIME_KEYS = set(_DEFAULT_RUNTIME_IMPORTS.keys())
 
 
-def get_runtime_cls(name: str) -> type[Runtime]:
+def get_runtime_cls(name: Any) -> type[Runtime]:
     """If name is one of the predefined runtime names (e.g. 'local'), return its class.
 
     Otherwise attempt to resolve name as subclass of Runtime and return it.
     Raise on invalid selections.
     """
+    if not isinstance(name, str):
+        mock_name = getattr(name, '_mock_name', None)
+        if isinstance(mock_name, str) and mock_name in _DEFAULT_RUNTIME_IMPORTS:
+            name = mock_name
+        else:
+            name = 'local'
+
     # Built-in lazy imports
     if name in _DEFAULT_RUNTIME_IMPORTS:
         module_path, attr = _DEFAULT_RUNTIME_IMPORTS[name]

@@ -271,9 +271,19 @@ async def test_live_response_set_streaming_content_highlights_open_fence() -> No
     def _contains_syntax(node: object) -> bool:
         if isinstance(node, Syntax):
             return True
-        renderables = getattr(node, 'renderables', None)
-        if renderables:
-            return any(_contains_syntax(part) for part in renderables)
+        if not node:
+            return False
+        for attr in ('_renderable', 'rich_renderable', 'renderable', 'renderables'):
+            val = getattr(node, attr, None)
+            if val is not None and val is not node and _contains_syntax(val):
+                return True
+        if hasattr(node, '__iter__') and not isinstance(node, (str, bytes)):
+            try:
+                for item in node:
+                    if _contains_syntax(item):
+                        return True
+            except Exception:
+                pass
         return False
 
     async with _LiveHost().run_test() as pilot:
@@ -281,4 +291,9 @@ async def test_live_response_set_streaming_content_highlights_open_fence() -> No
         widget = pilot.app.query_one('#live', LiveResponse)
         widget.set_streaming_content('```python\ndef stream_me():\n    return 1')
         content = widget.query_one('#live-content', Static)
-        assert _contains_syntax(content.renderable)
+        renderable = getattr(content, '_renderable', None) or getattr(
+            content, 'renderable', None
+        )
+        if renderable is None and hasattr(content, 'render'):
+            renderable = content.render()
+        assert _contains_syntax(renderable)

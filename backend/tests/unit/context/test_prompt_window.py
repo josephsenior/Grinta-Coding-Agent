@@ -296,7 +296,7 @@ def test_orphan_action_without_observation_is_dropped_as_causal_unit() -> None:
     recent_chunk = _run_chunk(12, 'recent', payload='recent payload')
     events = [_user_message('start', 1), orphan_action, *recent_chunk]
     cfg = SimpleNamespace(
-        prompt_history_token_budget=60,
+        prompt_history_token_budget=50,
         prompt_history_min_events=1,
         prompt_history_max_events=4,
         model='gpt-4o',

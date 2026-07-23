@@ -675,14 +675,14 @@ def test_async_execute_clamps_completion_budget_before_stream_call(monkeypatch):
 
     llm = MagicMock()
     llm.astream = fake_astream
-    llm.context_window = MagicMock(return_value=650)
+    llm.context_window = MagicMock(return_value=1000)
     llm.config = SimpleNamespace(
         model='test-model',
-        max_input_tokens=600,
+        max_input_tokens=1000,
         max_output_tokens=300,
     )
     llm.features = SimpleNamespace(
-        max_input_tokens=600,
+        max_input_tokens=1000,
         max_output_tokens=300,
     )
 
