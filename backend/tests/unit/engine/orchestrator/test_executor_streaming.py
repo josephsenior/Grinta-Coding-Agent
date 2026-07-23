@@ -693,7 +693,7 @@ def test_async_execute_clamps_completion_budget_before_stream_call(monkeypatch):
         mcp_tools_provider=lambda: {},
     )
 
-    params = {'messages': [{'role': 'user', 'content': 'x' * 2000}]}
+    params = {'messages': [{'role': 'user', 'content': 'x' * 500}]}
     expected = executor._apply_context_window_preflight(dict(params))
 
     asyncio.run(
