@@ -25,6 +25,7 @@ from backend.cli.doctor.doctor_cli import (
 BREW_MAC = '/opt/homebrew/bin/brew'
 BREW_LINUX = '/home/linuxbrew/.linuxbrew/bin/brew'
 SCOOP_SHIMS = str(Path.home() / 'scoop' / 'shims')
+BREW_INTEL = '/usr/local/bin/brew'
 
 
 def _quiet_console() -> Console:
@@ -44,6 +45,7 @@ def test_collect_checks_includes_core_rows() -> None:
         'rg',
         'uv',
         'terminal_encoding',
+        'package_manager_path',
     } <= names
 
 
@@ -182,6 +184,13 @@ def test_verbose_collect_includes_editing_stack() -> None:
             False,
             'not on PATH',
         ),  # on windows + scoop installed + not on path
+        (
+            'macos',
+            BREW_INTEL,
+            ['/usr/local/bin'],
+            True,
+            'on PATH',
+        ),  # intel mac homebrew
         ('macos', None, ['/usr/bin'], True, 'not detected'),  # on mac + not detected
         ('other', None, [], True, 'n/a'),  # other os
     ],

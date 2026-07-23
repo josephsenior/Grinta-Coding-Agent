@@ -328,8 +328,9 @@ def check_package_manager_path() -> DoctorCheck:
     full_path = os.environ.get('PATH', '')
     delimiter = os.pathsep
     paths = full_path.split(delimiter)
-    paths_normalized = [os.path.normcase(p) for p in paths]
-    target_normalized = os.path.normcase(target)
+    paths_normalized = [os.path.normcase(os.path.normpath(p)) for p in paths]
+    target_normalized = os.path.normcase(os.path.normpath(target))
+
     if target_normalized in paths_normalized:
         return DoctorCheck(
             'package_manager_path', True, f'{target} on PATH', critical=False
