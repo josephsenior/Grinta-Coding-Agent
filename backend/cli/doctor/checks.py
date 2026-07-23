@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import platform
 import shutil
 import subprocess
@@ -10,6 +11,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from backend.core.os_capabilities import is_linux, is_macos, is_windows
 
 
 @dataclass(frozen=True)
@@ -301,6 +304,41 @@ def check_optional_imports() -> DoctorCheck:
     return DoctorCheck('optional_imports', False, first, critical=False)
 
 
+def check_package_manager_path() -> DoctorCheck:
+    if is_windows():
+        target = Path.home() / 'scoop' / 'shims'
+        installed = target.exists()
+    elif is_macos() or is_linux():
+        prefixes = [
+            '/opt/homebrew/bin/brew',
+            '/usr/local/bin/brew',
+            '/home/linuxbrew/.linuxbrew/bin/brew',
+        ]
+        installed = False
+        for prefix in prefixes:
+            target = Path(prefix).parent
+            if Path(prefix).exists():
+                installed = True
+                break
+    else:
+        return DoctorCheck('package_manager_path', True, 'n/a', critical=False)
+    if not installed:
+        return DoctorCheck('package_manager_path', True, 'not detected', critical=False)
+
+    full_path = os.environ.get('PATH', '')
+    delimiter = os.pathsep
+    paths = full_path.split(delimiter)
+    paths_normalized = [os.path.normcase(p) for p in paths]
+    target_normalized = os.path.normcase(target)
+    if target_normalized in paths_normalized:
+        return DoctorCheck(
+            'package_manager_path', True, f'{target} on PATH', critical=False
+        )
+    return DoctorCheck(
+        'package_manager_path', False, f'{target} not on PATH', critical=False
+    )
+
+
 def check_editing_stack() -> DoctorCheck:
     from backend.engine.tools.health_check import run_production_health_check
 
@@ -516,6 +554,7 @@ def collect_doctor_checks(*, verbose: bool = False) -> list[DoctorCheck]:
         check_binary('rg'),
         check_binary('uv', critical=False),
         check_encoding(),
+        check_package_manager_path(),
     ]
     if sys.platform.startswith('linux') or is_wsl_runtime():
         checks.append(check_binary('tmux'))
@@ -560,6 +599,7 @@ __all__ = [
     'check_execution_profile',
     'check_llm_config',
     'check_optional_imports',
+    'check_package_manager_path',
     'check_platform',
     'check_python',
     'check_security_settings_values',

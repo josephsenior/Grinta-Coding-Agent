@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
 from rich.console import Console
 
 from backend.cli.doctor.doctor_cli import (
@@ -14,10 +16,15 @@ from backend.cli.doctor.doctor_cli import (
     _check_binary,
     _check_encoding,
     _check_llm_config,
+    _check_package_manager_path,
     _check_settings_schema,
     cmd_doctor,
     collect_checks,
 )
+
+BREW_MAC = '/opt/homebrew/bin/brew'
+BREW_LINUX = '/home/linuxbrew/.linuxbrew/bin/brew'
+SCOOP_SHIMS = str(Path.home() / 'scoop' / 'shims')
 
 
 def _quiet_console() -> Console:
@@ -135,3 +142,65 @@ def test_check_llm_config_passes_for_local_provider_without_key(
 def test_verbose_collect_includes_editing_stack() -> None:
     checks = collect_checks(verbose=True)
     assert any(check.name == 'editing_stack' for check in checks)
+
+
+@pytest.mark.parametrize(
+    'os_name, exists_path, path_dirs, expected_ok, fragment',
+    [
+        (
+            'macos',
+            BREW_MAC,
+            ['/opt/homebrew/bin'],
+            True,
+            'on PATH',
+        ),  # on mac + brew installed + on path
+        (
+            'macos',
+            BREW_MAC,
+            ['/usr/bin'],
+            False,
+            'not on PATH',
+        ),  # on mac + brew installed + not on path
+        (
+            'linux',
+            BREW_LINUX,
+            ['/home/linuxbrew/.linuxbrew/bin'],
+            True,
+            'on PATH',
+        ),  # on linux + brew installed + on path
+        (
+            'windows',
+            SCOOP_SHIMS,
+            [SCOOP_SHIMS],
+            True,
+            'on PATH',
+        ),  # on windows + scoop installed + on path
+        (
+            'windows',
+            SCOOP_SHIMS,
+            ['C:/other'],
+            False,
+            'not on PATH',
+        ),  # on windows + scoop installed + not on path
+        ('macos', None, ['/usr/bin'], True, 'not detected'),  # on mac + not detected
+        ('other', None, [], True, 'n/a'),  # other os
+    ],
+)
+def test_package_manager_path(
+    monkeypatch, os_name, exists_path, path_dirs, expected_ok, fragment
+) -> None:
+    for name in ('is_windows', 'is_macos', 'is_linux'):
+        monkeypatch.setattr(
+            f'backend.cli.doctor.checks.{name}', lambda n=name: n == f'is_{os_name}'
+        )
+        monkeypatch.setattr(
+            'backend.cli.doctor.checks.Path.exists',
+            lambda self: (
+                str(self) == exists_path
+            ),  # None -> never matched -> not installed
+        )
+    monkeypatch.setenv('PATH', os.pathsep.join(path_dirs))
+
+    check = _check_package_manager_path()
+    assert check.ok is expected_ok
+    assert fragment in check.detail
