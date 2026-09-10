@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-ollama-codellama",
+  "object": "chat.completion",
+  "created": 1777996801,
+  "model": "codellama",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "def fibonacci(n):\n    if n < 2:\n        return n\n    return",
+        "tool_calls": null
+      },
+      "finish_reason": "length"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 22,
+    "completion_tokens": 16,
+    "total_tokens": 38
+  }
+}

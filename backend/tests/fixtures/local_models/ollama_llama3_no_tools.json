@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-ollama-llama3",
+  "object": "chat.completion",
+  "created": 1777996800,
+  "model": "llama3",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "The repository contains a Python backend.",
+        "tool_calls": null
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 18,
+    "completion_tokens": 8,
+    "total_tokens": 26
+  }
+}
