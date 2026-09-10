@@ -1,0 +1,31 @@
+{
+  "id": "chatcmpl-ollama-mistral",
+  "object": "chat.completion",
+  "created": 1777996802,
+  "model": "mistral",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_local_1",
+            "type": "function",
+            "function": {
+              "name": "read_file",
+              "arguments": "{\"path\":\"README.md\"}"
+            }
+          }
+        ]
+      },
+      "finish_reason": "tool_calls"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 31,
+    "completion_tokens": 12,
+    "total_tokens": 43
+  }
+}
