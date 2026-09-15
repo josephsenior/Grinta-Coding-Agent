@@ -59,7 +59,7 @@ dependencies = [
   "psutil>=7.2.2,<8",
   "ptyprocess>=0.7,<1; sys_platform!='win32'",
   "pyfiglet>=1.0.4",
-  "pygit2>=1.20,<2",
+  "pygit2>=1.20.1,<2",
   "pylatexenc>=2.11,<3",
   "pypdf>=6.18.1,<7",
   "pyperclip>=1.11,<2",
@@ -79,7 +79,7 @@ dependencies = [
   "termcolor>=3.3,<4",
   "textual>=8.2.8,<9",
   "tree-sitter>=0.26,<0.27",
-  "tree-sitter-language-pack>=1.17.0,<1.18",
+  "tree-sitter-language-pack>=1.19.0,<1.20",
   "truststore>=0.10.4,<1",
   "urllib3>=2.7,<3",
 ]
