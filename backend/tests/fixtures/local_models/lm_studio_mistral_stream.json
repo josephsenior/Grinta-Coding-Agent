@@ -1,0 +1,53 @@
+[
+  {
+    "id": "chatcmpl-lm-studio-mistral",
+    "object": "chat.completion.chunk",
+    "created": 1777996803,
+    "model": "mistral-7b-instruct",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {"role": "assistant", "content": "The answer is "},
+        "finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "chatcmpl-lm-studio-mistral",
+    "object": "chat.completion.chunk",
+    "created": 1777996803,
+    "model": "mistral-7b-instruct",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {"content": "truncated"},
+        "finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "chatcmpl-lm-studio-mistral",
+    "object": "chat.completion.chunk",
+    "created": 1777996803,
+    "model": "mistral-7b-instruct",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {},
+        "finish_reason": "length"
+      }
+    ]
+  },
+  {
+    "id": "chatcmpl-lm-studio-mistral",
+    "object": "chat.completion.chunk",
+    "created": 1777996803,
+    "model": "mistral-7b-instruct",
+    "choices": [],
+    "usage": {
+      "prompt_tokens": 14,
+      "completion_tokens": 5,
+      "total_tokens": 19
+    }
+  }
+]

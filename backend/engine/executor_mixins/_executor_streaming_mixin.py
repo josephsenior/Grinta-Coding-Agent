@@ -179,6 +179,15 @@ class _ExecutorStreamingMixin:
             state.stream_response_id = chunk_id.strip()
 
     @staticmethod
+    def _capture_stream_finish_reason(
+        state: _AsyncStreamingState,
+        choice: dict[str, Any],
+    ) -> None:
+        finish_reason = choice.get('finish_reason')
+        if isinstance(finish_reason, str) and finish_reason:
+            state.finish_reason = finish_reason
+
+    @staticmethod
     def _capture_fallback_response_id(
         state: _AsyncStreamingState,
         fallback: Any,
@@ -210,6 +219,7 @@ class _ExecutorStreamingMixin:
         streamed_usage: dict[str, int] | None,
         *,
         stream_response_id: str = '',
+        finish_reason: str = 'stop',
     ) -> Any:
         from backend.inference.clients import LLMResponse
 
@@ -228,7 +238,7 @@ class _ExecutorStreamingMixin:
             model=model_name,
             usage=resolved_usage,
             response_id=resolved_response_id,
-            finish_reason='stop',
+            finish_reason=finish_reason,
             tool_calls=tool_calls_list,
             reasoning_content=thinking_accum,
         )
@@ -312,6 +322,7 @@ class _ExecutorStreamingMixin:
 
         choices = first_chunk.get('choices', [])
         if choices:
+            self._capture_stream_finish_reason(state, choices[0])
             await self._process_stream_delta(
                 choices[0].get('delta', {}),
                 state,
@@ -362,6 +373,7 @@ class _ExecutorStreamingMixin:
                 if isinstance(chunk_usage, dict):
                     state.streamed_usage = chunk_usage
                 continue
+            self._capture_stream_finish_reason(state, choices[0])
             await self._process_stream_delta(
                 choices[0].get('delta', {}),
                 state,

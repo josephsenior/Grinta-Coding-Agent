@@ -14,7 +14,7 @@ from fastmcp.client.transports import (
     StdioTransport,
     StreamableHttpTransport,
 )
-from mcp import McpError
+from mcp import MCPError as McpError
 from mcp.types import Implementation
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
@@ -183,7 +183,7 @@ class MCPClient(BaseModel):
             server_tool = MCPClientTool(
                 name=tool.name,
                 description=tool.description,
-                inputSchema=tool.inputSchema,
+                input_schema=tool.input_schema,
             )
             self.tool_map[tool.name] = server_tool
             self.tools.append(server_tool)

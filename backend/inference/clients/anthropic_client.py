@@ -5,13 +5,20 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Any
 
-from anthropic import Anthropic, AsyncAnthropic
+from anthropic import (
+    Anthropic,
+    AsyncAnthropic,
+    DefaultAsyncHttpxClient,
+    DefaultHttpxClient,
+)
+from anthropic import (
+    Timeout as AnthropicTimeout,
+)
 
 from backend.inference.clients.base import (
     DirectLLMClient,
     LLMResponse,
     _normalize_timeout_seconds,
-    _with_default_timeout,
     get_shared_async_http_client,
     get_shared_http_client,
 )
@@ -33,6 +40,20 @@ from backend.inference.providers.anthropic_ops import (
 )
 
 
+def _with_anthropic_timeout(
+    kwargs: dict[str, Any], timeout: float | int | None
+) -> dict[str, Any]:
+    raw_timeout = kwargs.get('timeout', timeout)
+    if raw_timeout is None or isinstance(raw_timeout, AnthropicTimeout):
+        return kwargs
+    normalized = _normalize_timeout_seconds(raw_timeout)
+    if normalized is None:
+        normalized = _normalize_timeout_seconds(getattr(raw_timeout, 'read', None))
+    if normalized is None:
+        return kwargs
+    return {**kwargs, 'timeout': AnthropicTimeout(normalized)}
+
+
 class AnthropicClient(DirectLLMClient):
     """Client for Anthropic Claude."""
 
@@ -50,12 +71,22 @@ class AnthropicClient(DirectLLMClient):
         self.client = Anthropic(
             api_key=api_key,
             base_url=base_url,
-            http_client=get_shared_http_client(provider_name, base_url),
+            http_client=get_shared_http_client(
+                provider_name,
+                base_url,
+                client_factory=DefaultHttpxClient,
+                pool_namespace='anthropic',
+            ),
         )
         self.async_client = AsyncAnthropic(
             api_key=api_key,
             base_url=base_url,
-            http_client=get_shared_async_http_client(provider_name, base_url),
+            http_client=get_shared_async_http_client(
+                provider_name,
+                base_url,
+                client_factory=DefaultAsyncHttpxClient,
+                pool_namespace='anthropic',
+            ),
         )
 
     @staticmethod
@@ -73,18 +104,18 @@ class AnthropicClient(DirectLLMClient):
         return _map_anthropic_error_impl(self, exc)
 
     def completion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
-        kwargs = _with_default_timeout(kwargs, self._request_timeout)
+        kwargs = _with_anthropic_timeout(kwargs, self._request_timeout)
         return _anthropic_completion(self, messages, **kwargs)
 
     async def acompletion(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> LLMResponse:
-        kwargs = _with_default_timeout(kwargs, self._request_timeout)
+        kwargs = _with_anthropic_timeout(kwargs, self._request_timeout)
         return await _anthropic_acompletion(self, messages, **kwargs)
 
     async def astream(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> AsyncIterator[dict[str, Any]]:
-        kwargs = _with_default_timeout(kwargs, self._request_timeout, streaming=True)
+        kwargs = _with_anthropic_timeout(kwargs, self._request_timeout)
         async for chunk in _anthropic_astream(self, messages, **kwargs):
             yield chunk

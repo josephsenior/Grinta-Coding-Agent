@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
+from anthropic import Timeout as AnthropicTimeout
 
 from backend.inference.clients import (
     LLMResponse,
@@ -234,7 +235,31 @@ class TestSharedHttpClients:
             client = AnthropicClient('claude-3', 'sk-test', timeout=9)
             client.completion(messages=[])
 
-        assert completion.call_args.kwargs['timeout'].read == 9.0
+        timeout = completion.call_args.kwargs['timeout']
+        assert timeout.read == 9.0
+        assert isinstance(timeout, AnthropicTimeout)
+
+    @pytest.mark.asyncio
+    async def test_anthropic_client_reuses_shared_sdk_transports(self):
+        from backend.inference.clients import AnthropicClient
+
+        first = AnthropicClient(
+            'claude-3', 'sk-test', provider_name='test_anthropic_shared'
+        )
+        second = AnthropicClient(
+            'claude-3', 'sk-test', provider_name='test_anthropic_shared'
+        )
+
+        assert first.client._client is second.client._client
+        assert first.async_client._client is second.async_client._client
+
+        sync_transport = first.client._client
+        async_transport = first.async_client._client
+
+        await aclose_shared_http_clients()
+
+        assert sync_transport.is_closed
+        assert async_transport.is_closed
 
     def test_gemini_client_uses_configured_timeout_ms(self):
         from backend.inference.clients import GeminiClient

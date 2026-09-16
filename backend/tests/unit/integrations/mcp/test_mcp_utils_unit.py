@@ -192,7 +192,7 @@ def test_prepare_connected_mcp_tools_updates_bootstrap() -> None:
     tool = SimpleNamespace(
         name='remote_tool',
         description='d',
-        inputSchema={},
+        input_schema={},
     )
     client = SimpleNamespace(
         tools=[tool],

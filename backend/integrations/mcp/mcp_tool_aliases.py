@@ -45,7 +45,7 @@ def prepare_mcp_tool_exposed_names(mcps: list[MCPClient], reserved: set[str]) ->
             nt = MCPClientTool(
                 name=exposed,
                 description=t.description,
-                inputSchema=t.inputSchema,
+                input_schema=t.input_schema,
             )
             new_tools.append(nt)
             new_map[exposed] = nt

@@ -1003,6 +1003,9 @@ class OrchestratorPlanner:
 
     def _llm_supports_function_calling(self) -> bool:
         try:
+            native_tool_calling = getattr(self._llm.config, 'native_tool_calling', None)
+            if isinstance(native_tool_calling, bool):
+                return native_tool_calling
             model = (self._llm.config.model or '').strip()
             if not model:
                 return False

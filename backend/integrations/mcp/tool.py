@@ -16,14 +16,14 @@ class MCPClientTool(Tool):
     def to_param(self) -> dict:
         """Convert tool to function call format.
 
-        When the MCP tool exposes an ``outputSchema`` (or ``annotations``
+        When the MCP tool exposes an ``output_schema`` (or ``annotations``
         with ``output_description``), the information is appended to the
         tool's description so the LLM knows what to expect in the response.
         """
         description = self.description or ''
 
         # Surface output schema metadata if provided by the MCP server.
-        output_schema = getattr(self, 'outputSchema', None)
+        output_schema = self.output_schema
         annotations = getattr(self, 'annotations', None)
         output_hint = ''
         if output_schema and isinstance(output_schema, dict):
@@ -39,6 +39,6 @@ class MCPClientTool(Tool):
             'function': {
                 'name': self.name,
                 'description': description + output_hint,
-                'parameters': self.inputSchema,
+                'parameters': self.input_schema,
             },
         }

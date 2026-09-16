@@ -7,7 +7,7 @@ import ssl
 import sys
 import threading
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any
@@ -29,8 +29,8 @@ _POOL_LIMITS = httpx.Limits(
     keepalive_expiry=120,
 )
 
-_shared_sync_clients: dict[str, httpx.Client] = {}
-_shared_async_clients: dict[str, httpx.AsyncClient] = {}
+_shared_sync_clients: dict[str, Any] = {}
+_shared_async_clients: dict[str, Any] = {}
 _pool_lock = threading.Lock()
 
 _HTTPX_VERIFY: ssl.SSLContext | bool = True
@@ -193,39 +193,59 @@ def _pool_key(provider: str, base_url: str | None) -> str:
     return f'{provider}::{base_url or "default"}'
 
 
-def get_shared_http_client(provider: str, base_url: str | None = None) -> Any:
-    """Return a shared *sync* httpx.Client for the given provider."""
-    key = _pool_key(provider, base_url)
+def get_shared_http_client(
+    provider: str,
+    base_url: str | None = None,
+    *,
+    client_factory: Callable[[], Any] | None = None,
+    pool_namespace: str = 'httpx',
+) -> Any:
+    """Return a shared synchronous HTTP transport for the given provider."""
+    key = f'{pool_namespace}::{_pool_key(provider, base_url)}'
     if key not in _shared_sync_clients:
         with _pool_lock:
             if key not in _shared_sync_clients:
-                _shared_sync_clients[key] = httpx.Client(
-                    limits=_POOL_LIMITS,
-                    timeout=_shared_llm_pool_timeout(),
-                    follow_redirects=True,
-                    verify=_HTTPX_VERIFY,
+                _shared_sync_clients[key] = (
+                    client_factory()
+                    if client_factory is not None
+                    else httpx.Client(
+                        limits=_POOL_LIMITS,
+                        timeout=_shared_llm_pool_timeout(),
+                        follow_redirects=True,
+                        verify=_HTTPX_VERIFY,
+                    )
                 )
                 logger.debug('Created shared sync httpx pool for %s', key)
     return _shared_sync_clients[key]
 
 
-def get_shared_async_http_client(provider: str, base_url: str | None = None) -> Any:
-    """Return a shared *async* httpx.AsyncClient for the given provider."""
-    key = _pool_key(provider, base_url)
+def get_shared_async_http_client(
+    provider: str,
+    base_url: str | None = None,
+    *,
+    client_factory: Callable[[], Any] | None = None,
+    pool_namespace: str = 'httpx',
+) -> Any:
+    """Return a shared asynchronous HTTP transport for the given provider."""
+    key = f'{pool_namespace}::{_pool_key(provider, base_url)}'
     if key not in _shared_async_clients:
         with _pool_lock:
             if key not in _shared_async_clients:
-                _shared_async_clients[key] = httpx.AsyncClient(
-                    limits=_POOL_LIMITS,
-                    timeout=_shared_llm_pool_timeout(),
-                    follow_redirects=True,
-                    verify=_HTTPX_VERIFY,
+                _shared_async_clients[key] = (
+                    client_factory()
+                    if client_factory is not None
+                    else httpx.AsyncClient(
+                        limits=_POOL_LIMITS,
+                        timeout=_shared_llm_pool_timeout(),
+                        follow_redirects=True,
+                        verify=_HTTPX_VERIFY,
+                    )
                 )
                 logger.debug('Created shared async httpx pool for %s', key)
     return _shared_async_clients[key]
 
 
-def _drain_shared_http_clients() -> tuple[list[httpx.Client], list[httpx.AsyncClient]]:
+def _drain_shared_http_clients() -> tuple[list[Any], list[Any]]:
     with _pool_lock:
         sync_clients = list(_shared_sync_clients.values())
         async_clients = list(_shared_async_clients.values())
@@ -234,7 +254,7 @@ def _drain_shared_http_clients() -> tuple[list[httpx.Client], list[httpx.AsyncCl
     return sync_clients, async_clients
 
 
-async def _aclose_async_clients(clients: list[httpx.AsyncClient]) -> None:
+async def _aclose_async_clients(clients: list[Any]) -> None:
     for client in clients:
         with suppress(Exception):
             await client.aclose()

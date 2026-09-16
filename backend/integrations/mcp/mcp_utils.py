@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from backend.ledger.observation.observation import Observation
     from backend.orchestration.agent import Agent
 
-from mcp import McpError
+from mcp import MCPError as McpError
 
 from backend.core.config.mcp_config import (
     MCPConfig,
@@ -919,7 +919,9 @@ async def _execute_direct_tool(
             )
             tool_obj = getattr(matching_client, 'tool_map', {}).get(resolved_name)
             schema = (
-                getattr(tool_obj, 'inputSchema', None) if tool_obj is not None else None
+                getattr(tool_obj, 'input_schema', None)
+                if tool_obj is not None
+                else None
             )
             repaired_args, changed = _repair_args_with_schema(action.arguments, schema)
 
