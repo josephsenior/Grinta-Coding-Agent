@@ -830,6 +830,65 @@
         "display_name": "Qwen 3.7 Max (Vercel Gateway)"
       }
     },
+    "alibaba/qwen3.8-max": {
+      "runtime": {
+        "aliases": [
+          "vercel/alibaba/qwen3.8-max"
+        ],
+        "context_window_tokens": 1000000,
+        "max_input_tokens": 867904,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 2.0,
+        "output_price_per_m": 6.0,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_reasoning_effort": true,
+        "supports_vision": true,
+        "reasoning_efforts": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "reasoning_wire": "openai_thinking_enabled",
+        "supports_stop_words": true,
+        "supports_response_schema": true
+      },
+      "metadata": {
+        "display_name": "Qwen 3.8 Max (Vercel Gateway)",
+        "family": "qwen3.8",
+        "release_date": "2026-08-03",
+        "source": "https://vercel.com/ai-gateway/models/qwen3.8-max",
+        "notes": "Alibaba's flagship: 2.4T-parameter MoE, ~95B active. Accepts text, image, and video input; hybrid thinking mode on by default. A dated snapshot alias 'qwen3.8-max-0902' also exists on the gateway (2026-09-02 refresh, same pricing/limits) but is not modeled as a separate entry. Native Alibaba Model Studio pricing (Beijing region, $1.65/$4.951) is lower than this Vercel Gateway markup; Grinta has no first-party Alibaba/DashScope provider yet, so this is the only route to the model in this catalog."
+      }
+    },
+    "alibaba/qwen3.8-flash": {
+      "runtime": {
+        "aliases": [
+          "vercel/alibaba/qwen3.8-flash"
+        ],
+        "context_window_tokens": 991000,
+        "max_input_tokens": 858904,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 0.15,
+        "output_price_per_m": 0.47,
+        "verified": true,
+        "featured": false,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_vision": true,
+        "supports_stop_words": true,
+        "supports_response_schema": true
+      },
+      "metadata": {
+        "display_name": "Qwen 3.8 Flash (Vercel Gateway)",
+        "family": "qwen3.8",
+        "release_date": "2026-08-26",
+        "source": "https://vercel.com/ai-gateway/models/qwen3.8-flash",
+        "notes": "Budget/low-latency sibling of Qwen 3.8 Max. Vercel's page does not document a reasoning-effort control for this route, so it is not marked as reasoning-capable here even though Alibaba's own Model Studio docs describe a separate thinking-mode toggle."
+      }
+    },
     "minimax/minimax-m2.7": {
       "runtime": {
         "aliases": [

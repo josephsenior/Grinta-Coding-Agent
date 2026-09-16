@@ -2,25 +2,29 @@
   "provider": "deepseek",
   "client": "openai_compatible",
   "models": {
-    "deepseek-v4-flash": {
+    "deepseek-flash": {
       "runtime": {
         "aliases": [
+          "deepseek/deepseek-flash",
+          "deepseek-flash",
+          "deepseek flash",
           "deepseek/deepseek-v4-flash",
           "deepseek-v4-flash",
-          "deepseek v4 flash"
+          "deepseek v4 flash",
+          "deepseek-v4-flash-vision-exp"
         ],
         "context_window_tokens": 1000000,
         "max_input_tokens": 611904,
         "max_output_tokens": 384000,
-        "input_price_per_m": 0.14,
-        "cached_input_price_per_m": 0.0028,
-        "output_price_per_m": 0.28,
+        "input_price_per_m": 0.15,
+        "cached_input_price_per_m": 0.003,
+        "output_price_per_m": 0.6,
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
         "supports_parallel_tool_calls": true,
         "supports_reasoning_effort": true,
-        "supports_vision": false,
+        "supports_vision": true,
         "supports_stop_words": true,
         "reasoning_efforts": [
           "low",
@@ -31,7 +35,13 @@
         "reasoning_wire": "openai_reasoning_effort",
         "supports_response_schema": true
       },
-      "metadata": {}
+      "metadata": {
+        "display_name": "DeepSeek Flash",
+        "family": "deepseek-v4",
+        "release_date": "2026-09-10",
+        "source": "https://api-docs.deepseek.com/quick_start/pricing",
+        "notes": "Model id renamed from deepseek-v4-flash to deepseek-flash; the old id and deepseek-v4-flash-vision-exp are still accepted by DeepSeek's API and routed here, so both stay as aliases. Underlying model is DeepSeek-V4.1-Flash: new architecture (552B total / 8B input-active / 16B output-active params), native image input, MIT-licensed weights. Prices shown are DeepSeek's off-peak rate; peak hours (01:00-04:00 and 06:00-10:00 UTC, Mon-Fri) bill at exactly 2x these input/cached/output rates and are not modeled as a separate entry."
+      }
     },
     "deepseek-v4-pro": {
       "runtime": {
@@ -43,9 +53,9 @@
         "context_window_tokens": 1000000,
         "max_input_tokens": 611904,
         "max_output_tokens": 384000,
-        "input_price_per_m": 0.435,
-        "cached_input_price_per_m": 0.003625,
-        "output_price_per_m": 0.87,
+        "input_price_per_m": 0.66,
+        "cached_input_price_per_m": 0.022,
+        "output_price_per_m": 1.98,
         "verified": true,
         "featured": true,
         "supports_function_calling": true,
@@ -62,7 +72,13 @@
         "reasoning_wire": "openai_reasoning_effort",
         "supports_response_schema": true
       },
-      "metadata": {}
+      "metadata": {
+        "display_name": "DeepSeek V4 Pro",
+        "family": "deepseek-v4",
+        "release_date": "2026-08-13",
+        "source": "https://api-docs.deepseek.com/quick_start/pricing",
+        "notes": "GA build is dated snapshot DeepSeek-V4-Pro-0813 (2026-08-13) behind the rolling deepseek-v4-pro id; there is no separate '08-31' snapshot in DeepSeek's official docs as of this update. Prices shown are DeepSeek's off-peak rate; peak hours (01:00-04:00 and 06:00-10:00 UTC, Mon-Fri) bill at exactly 2x these input/cached/output rates and are not modeled as a separate entry."
+      }
     }
   }
 }

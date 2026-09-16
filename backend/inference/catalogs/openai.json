@@ -667,6 +667,47 @@
         "reasoning_wire": "openai_reasoning_effort"
       },
       "metadata": {}
+    },
+    "gpt-6-astra": {
+      "runtime": {
+        "aliases": [
+          "openai/gpt-6-astra",
+          "gpt-6-astra",
+          "gpt 6 astra"
+        ],
+        "context_window_tokens": 1050000,
+        "max_input_tokens": 917904,
+        "max_output_tokens": 128000,
+        "input_price_per_m": 10.0,
+        "cached_input_price_per_m": 1.0,
+        "output_price_per_m": 50.0,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_response_schema": true,
+        "supports_vision": true,
+        "supports_reasoning_effort": true,
+        "strip_temperature": true,
+        "strip_top_p": true,
+        "use_max_completion_tokens": true,
+        "supports_stop_words": true,
+        "reasoning_efforts": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "reasoning_wire": "openai_reasoning_effort"
+      },
+      "metadata": {
+        "display_name": "GPT-6 Astra",
+        "family": "gpt-6",
+        "release_date": "2026-09",
+        "source": "https://developers.openai.com/api/docs/models/gpt-6-astra",
+        "notes": "Successor to GPT-5.6 Sol. Reasoning is mandatory: 'none' and 'minimal' effort levels from the GPT-5.x family are not available, so callers migrating from those should start at 'low'. Adds native computer/browser-use tool support (not modeled as a separate capability flag here). Fast mode (higher-latency-sensitive routing) bills at 2x the listed input/output/cached rates and is not modeled as a separate catalog entry."
+      }
     }
   }
 }

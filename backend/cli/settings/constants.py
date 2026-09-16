@@ -26,7 +26,7 @@ DEFAULT_MODEL_BY_PROVIDER: dict[str, str] = {
     'openrouter': 'openrouter/anthropic/claude-4.5-sonnet',
     'vercel': 'vercel/anthropic/claude-haiku-4.5',
     'xai': 'xai/grok-build-0.1',
-    'deepseek': 'deepseek/deepseek-v4-flash',
+    'deepseek': 'deepseek/deepseek-flash',
     'kimi': 'kimi/k3',
     'moonshot': 'moonshot/kimi-k2.5',
     'nvidia': 'nvidia/meta/llama-3.1-8b-instruct',

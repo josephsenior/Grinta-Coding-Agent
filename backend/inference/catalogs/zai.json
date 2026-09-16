@@ -35,6 +35,78 @@
         "release_date": "2026-06-13",
         "notes": "Use glm-5.2[1m] alias for the full 1M-token context window."
       }
+    },
+    "glm-5.3": {
+      "runtime": {
+        "aliases": [
+          "zai/glm-5.3",
+          "glm-5.3[1m]"
+        ],
+        "context_window_tokens": 1000000,
+        "max_input_tokens": 868928,
+        "max_output_tokens": 131072,
+        "input_price_per_m": 1.4,
+        "cached_input_price_per_m": 0.26,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 4.4,
+        "verified": true,
+        "featured": true,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_reasoning_effort": true,
+        "supports_stop_words": true,
+        "inference_endpoint": "/chat/completions",
+        "reasoning_efforts": [
+          "low",
+          "high",
+          "max"
+        ],
+        "reasoning_wire": "glm_thinking",
+        "supports_response_schema": true
+      },
+      "metadata": {
+        "display_name": "GLM-5.3",
+        "family": "glm",
+        "release_date": "2026-09",
+        "source": "https://docs.z.ai/guides/llm/glm-5.3 ; https://docs.z.ai/guides/overview/pricing",
+        "notes": "Reasoning is always on and cannot be disabled. Text-only input (no vision). Use glm-5.3[1m] alias for the full 1M-token context window, matching the glm-5.2[1m] convention."
+      }
+    },
+    "glm-5.3-flash": {
+      "runtime": {
+        "aliases": [
+          "zai/glm-5.3-flash",
+          "glm-5.3-flash"
+        ],
+        "context_window_tokens": 1000000,
+        "max_input_tokens": 868928,
+        "max_output_tokens": 131072,
+        "input_price_per_m": 0.15,
+        "cached_input_price_per_m": 0.03,
+        "cached_write_price_per_m": 0,
+        "output_price_per_m": 0.5,
+        "verified": true,
+        "featured": false,
+        "supports_function_calling": true,
+        "supports_parallel_tool_calls": true,
+        "supports_reasoning_effort": true,
+        "supports_stop_words": true,
+        "inference_endpoint": "/chat/completions",
+        "reasoning_efforts": [
+          "low",
+          "high",
+          "max"
+        ],
+        "reasoning_wire": "glm_thinking",
+        "supports_response_schema": true
+      },
+      "metadata": {
+        "display_name": "GLM-5.3-Flash",
+        "family": "glm",
+        "release_date": "2026-09",
+        "source": "https://docs.z.ai/guides/overview/pricing",
+        "notes": "Budget/low-latency sibling of GLM-5.3, found on the same official pricing page; added alongside GLM-5.3 for completeness, not explicitly requested."
+      }
     }
   }
 }
