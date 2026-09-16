@@ -28,10 +28,14 @@ async def test_tui_renderer_pending_events_are_bounded(monkeypatch):
         loop=loop,
     )
 
-    for event in range(5):
+    from backend.ledger.observation import NullObservation
+
+    for index in range(5):
+        event = NullObservation(content='')
+        event.id = index
         renderer._on_event(event)
 
-    assert list(renderer._pending_events) == [2, 3, 4]
+    assert [event.id for event in renderer._pending_events] == [2, 3, 4]
     assert renderer._pending_events_dropped == 2
     assert renderer._pending_backpressure is True
     assert loop.call_soon_threadsafe.call_count == 5
@@ -327,7 +331,10 @@ async def test_tui_renderer_does_not_replace_pending_prose_with_tool_arguments()
 
 @pytest.mark.asyncio
 async def test_tui_renderer_schedules_single_drain_message_per_backlog():
-    fake_tui = SimpleNamespace(post_message=MagicMock())
+    posted = asyncio.Event()
+    fake_tui = SimpleNamespace(
+        post_message=MagicMock(side_effect=lambda _: posted.set())
+    )
     renderer = tui_app.TUIRenderer(
         console=SimpleNamespace(width=100),
         hud=SimpleNamespace(
@@ -341,7 +348,7 @@ async def test_tui_renderer_schedules_single_drain_message_per_backlog():
     renderer._on_event('first')
     renderer._on_event('second')
     renderer._on_event('third')
-    await asyncio.sleep(0.03)
+    await asyncio.wait_for(posted.wait(), timeout=1)
 
     assert fake_tui.post_message.call_count == 1
 

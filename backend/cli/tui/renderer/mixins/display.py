@@ -125,7 +125,30 @@ class RendererDisplayMixin:
         if mounted is not None:
             mounted.discard(event_id)
 
+    def _release_history_widget(self, widget: Any) -> None:
+        """Retain copyable content without retaining an unmounted DOM tree."""
+        from textual.widgets import Static
+
+        for index, item in enumerate(self._history):
+            if item is widget:
+                # Keep the source content, not Static.visual (which may hold
+                # a RichVisual referencing its owning widget).
+                # Keep formatting until Copy Transcript actually needs text.
+                if isinstance(widget, Static):
+                    self._history[index] = widget.content
+                else:
+                    self._history[index] = Group(
+                        *(child.content for child in widget.query(Static))
+                    )
+
     def clear_history(self) -> None:
+        self._render_generation += 1
+        self._streaming_render_state = None
+        self._streaming_render_cache.clear()
+        self._pending_final_commits.clear()
+        self._deferred_stream_chunk = None
+        self._live_response_pending_text = ''
+        self._last_streaming_response_applied_text = ''
         self._live_thinking_widget = None
         self._live_response_widget = None
         self._terminal_cards_by_session = {}

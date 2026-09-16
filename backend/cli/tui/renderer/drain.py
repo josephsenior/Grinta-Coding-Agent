@@ -5,7 +5,7 @@ Owns:
   transcript.
 - ``wait_for_activity`` — async wait until either new events arrive or the
   timeout fires.
-- ``_on_event`` — enqueue an event from any thread, bounded by
+- ``_on_event`` — enqueue an event from any thread, coalescing progress above
   ``_TUI_PENDING_EVENT_LIMIT`` (the test suite monkey-patches this constant
   on the mixin module, so the constant is resolved at call time via a
   deferred import).
@@ -128,6 +128,7 @@ def _collapse_streaming_chunks(events: list[Any]) -> list[Any]:
             while (
                 end < len(events)
                 and isinstance(events[end], StreamingChunkAction)
+                and not events[end - 1].is_final
                 and _streaming_channel_key(events[end]) == channel
             ):
                 end += 1
@@ -156,73 +157,25 @@ def _try_coalesce_streaming_enqueue(pending: Any, event: Any) -> bool:
     return True
 
 
-def _try_coalesce_terminal_enqueue(pending: Any, event: Any) -> bool:
-    """Collapse consecutive terminal observations for the same session."""
-    from backend.ledger.observation.terminal import TerminalObservation
-
-    if not isinstance(event, TerminalObservation) or not pending:
-        return False
-    session_id = (event.session_id or '').strip()
-    if not session_id:
-        return False
-    for idx in range(len(pending) - 1, -1, -1):
-        candidate = pending[idx]
-        if not isinstance(candidate, TerminalObservation):
-            continue
-        if (candidate.session_id or '').strip() != session_id:
-            continue
-        pending[idx] = event
-        return True
-    return False
-
-
 def _coalesce_pending_backlog(pending: Any) -> int:
-    """Merge adjacent streaming/terminal events; return slots reclaimed."""
-    from backend.ledger.action.message import StreamingChunkAction
-    from backend.ledger.observation.terminal import TerminalObservation
+    """Merge adjacent stream snapshots with a linear pass over the deque.
 
-    if len(pending) < 2:
-        return 0
-    reclaimed = 0
-    idx = 1
-    while idx < len(pending):
-        prev = pending[idx - 1]
-        cur = pending[idx]
-        if isinstance(prev, StreamingChunkAction) and isinstance(
-            cur, StreamingChunkAction
-        ):
-            if _streaming_channel_key(prev) == _streaming_channel_key(cur):
-                pending[idx - 1] = cur
-                del pending[idx]
-                reclaimed += 1
-                continue
-        if isinstance(prev, TerminalObservation) and isinstance(
-            cur, TerminalObservation
-        ):
-            if (prev.session_id or '') == (cur.session_id or ''):
-                pending[idx - 1] = cur
-                del pending[idx]
-                reclaimed += 1
-                continue
-        idx += 1
+    Terminal observations can carry output deltas and have distinct action
+    causes. Replacing an earlier observation loses output and card completions.
+    """
+    original_length = len(pending)
+    compacted = _collapse_streaming_chunks(list(pending))
+    reclaimed = original_length - len(compacted)
+    if reclaimed:
+        pending.clear()
+        pending.extend(compacted)
     return reclaimed
 
 
 def _is_low_value_backlog_event(event: Any) -> bool:
     """Return True for events that are safe to skip under TUI pressure."""
     name = type(event).__name__
-    if name in {
-        'AgentThinkAction',
-        'SystemHintAction',
-        'AgentThinkObservation',
-        'NullObservation',
-        'StatusObservation',
-        'TerminalObservation',
-        'TerminalReadAction',
-        'TerminalWaitAction',
-        'TerminalListAction',
-        'TerminalCloseAction',
-    }:
+    if name == 'NullObservation':
         return True
     if name == 'StreamingChunkAction':
         return not bool(getattr(event, 'is_final', False))
@@ -237,8 +190,9 @@ def _drop_one_pending_event_for_backpressure(pending: Any) -> bool:
         if _is_low_value_backlog_event(event):
             del pending[idx]
             return True
-    pending.popleft()
-    return True
+    # The limit is a high-water mark for progress noise, not permission to
+    # discard tool results, confirmations, or final assistant messages.
+    return False
 
 
 def _make_backpressure_room(
@@ -246,8 +200,11 @@ def _make_backpressure_room(
     pending: Any,
     limit: int,
 ) -> bool:
-    """Keep the pending queue bounded before appending a new event."""
+    """Bound disposable progress; retain milestones even above the soft limit."""
     if limit <= 0 or len(pending) < limit:
+        return False
+    next_scan = getattr(orch, '_next_backpressure_scan_depth', 0)
+    if isinstance(next_scan, int) and len(pending) < next_scan:
         return False
 
     reclaimed = _coalesce_pending_backlog(pending)
@@ -267,6 +224,9 @@ def _make_backpressure_room(
     if dropped:
         orch._pending_events_dropped += dropped
         orch._pending_backpressure = True
+    if len(pending) >= limit:
+        # Avoid rescanning an all-milestone backlog on every arrival.
+        orch._next_backpressure_scan_depth = len(pending) + 256
     return bool(reclaimed or dropped)
 
 
@@ -319,6 +279,7 @@ def drain_events(orch: 'RendererEventProcessorMixin') -> None:
         dropped = orch._pending_events_dropped
         orch._pending_events_dropped = 0
         orch._pending_backpressure = False
+        orch._next_backpressure_scan_depth = 0
     if not events:
         flush = getattr(orch, 'flush_live_ui', None)
         if callable(flush):
@@ -361,6 +322,7 @@ def _collect_pending_events(
         dropped = orch._pending_events_dropped
         orch._pending_events_dropped = 0
         orch._pending_backpressure = False
+        orch._next_backpressure_scan_depth = 0
     return events, dropped
 
 
@@ -452,9 +414,24 @@ async def _process_events_with_frame_budget(
     """Process events until the frame budget elapses. Returns count processed."""
     started = time.monotonic()
     processed = 0
+    generation = getattr(orch, '_render_generation', 0)
     for event in events:
+        event_started = time.monotonic()
         await _preprocess_event_async(orch, event)
+        if generation != getattr(orch, '_render_generation', 0):
+            # Clear Transcript ran while preparation was in flight. Consume
+            # this old batch without resurrecting its content on the screen.
+            return len(events)
+        prepared_at = time.monotonic()
         orch._process_event(event)
+        event_finished = time.monotonic()
+        if event_finished - event_started >= 0.05:
+            _tui_logger.debug(
+                'tui_slow_event=%s prep_ms=%.1f dispatch_ms=%.1f',
+                type(event).__name__,
+                (prepared_at - event_started) * 1000,
+                (event_finished - prepared_at) * 1000,
+            )
         processed += 1
         if _is_tool_step_preamble(event):
             # The caller requeues the remaining events and returns to the
@@ -547,39 +524,30 @@ async def drain_events_async(orch: 'RendererEventProcessorMixin') -> None:
 
             elapsed = time.monotonic() - invocation_started
             if elapsed >= _TUI_DRAIN_INVOCATION_BUDGET_SECONDS:
-                _force_immediate_drain(orch)
                 break
 
             await asyncio.sleep(0)
     finally:
         orch._async_drain_active = False
-        _set_display_backpressure(orch, False)
         has_pending_after_drain = False
         with orch._pending_lock:
             orch._drain_requested_while_active = False
             has_pending_after_drain = bool(orch._pending_events)
+            pending_depth = len(orch._pending_events)
+        _set_display_backpressure(orch, has_pending_after_drain)
+        _tui_logger.debug(
+            'tui_drain_ms=%.1f tui_pending_depth=%d tui_last_batch=%d '
+            'streaming_only=%s',
+            (time.monotonic() - invocation_started) * 1000,
+            pending_depth,
+            len(last_batch),
+            last_streaming_only,
+        )
         if has_pending_after_drain:
             if getattr(orch, '_tool_preamble_paint_pending', False) is True:
                 _schedule_resume_after_tool_preamble_paint(orch)
-                return  # noqa: B012
-            _force_immediate_drain(orch)
-            return  # noqa: B012
-
-    elapsed_ms = (time.monotonic() - invocation_started) * 1000.0
-    pending_depth = 0
-    with orch._pending_lock:
-        pending_depth = len(orch._pending_events)
-    prep_depth = len(getattr(orch, '_render_prep_cache', {}) or {})
-    len(getattr(orch, '_mounted_event_ids', set()) or set())
-    _tui_logger.debug(
-        'tui_drain_ms=%.1f tui_pending_depth=%d tui_prep_queue_depth=%d '
-        'tui_last_batch=%d streaming_only=%s',
-        elapsed_ms,
-        pending_depth,
-        prep_depth,
-        len(last_batch),
-        last_streaming_only,
-    )
+            else:
+                _force_immediate_drain(orch)
 
 
 async def wait_for_activity(
@@ -589,7 +557,7 @@ async def wait_for_activity(
     with orch._pending_lock:
         has_pending = bool(orch._pending_events)
     if has_pending:
-        await drain_events_async(orch)
+        await orch.drain_events_async()
         orch._state_event.clear()
         return orch._current_state
     try:
@@ -598,7 +566,7 @@ async def wait_for_activity(
         return None
     finally:
         orch._state_event.clear()
-    await drain_events_async(orch)
+    await orch.drain_events_async()
     return orch._current_state
 
 
@@ -627,23 +595,31 @@ async def hydrate_recent_transcript(
     get_welcome = getattr(orch._tui, '_get_welcome_widget', None)
     if callable(get_welcome) and get_welcome() is not None:
         return 0
-    if getattr(display, 'child_widget_count', lambda: 0)() > 0:
+    count = getattr(display, 'child_widget_count', 0)
+    if (count() if callable(count) else count) > 0:
         return 0
+    generation = getattr(orch, '_render_generation', 0)
     try:
-        events = list(event_stream.search_events(reverse=True, limit=limit))
+        events = await asyncio.to_thread(
+            lambda: list(event_stream.search_events(reverse=True, limit=limit))
+        )
     except Exception:
         return 0
-    if not events:
+    if not events or generation != getattr(orch, '_render_generation', 0):
         return 0
     events.reverse()
     orch._replay_mode = True
     try:
         idx = 0
         while idx < len(events):
+            if generation != getattr(orch, '_render_generation', 0):
+                return 0
             chunk = events[idx : idx + 25]
             processed = await _process_events_with_frame_budget(orch, chunk)
             idx += max(processed, 1)
             await asyncio.sleep(0)
+        if generation != getattr(orch, '_render_generation', 0):
+            return 0
     finally:
         orch._replay_mode = False
     sync = getattr(orch, '_sync_transcript_viewport', None)
@@ -668,18 +644,21 @@ async def load_earlier_messages(
         return 0
 
     start_id = max(0, min_id - batch_size)
+    generation = getattr(orch, '_render_generation', 0)
     try:
-        events = list(
-            event_stream.search_events(
-                start_id=start_id,
-                end_id=min_id,
-                reverse=False,
+        events = await asyncio.to_thread(
+            lambda: list(
+                event_stream.search_events(
+                    start_id=start_id,
+                    end_id=min_id,
+                    reverse=False,
+                )
             )
         )
     except Exception:
         return 0
 
-    if not events:
+    if not events or generation != getattr(orch, '_render_generation', 0):
         return 0
 
     orch._replay_mode = True
@@ -687,10 +666,14 @@ async def load_earlier_messages(
     try:
         idx = 0
         while idx < len(events):
+            if generation != getattr(orch, '_render_generation', 0):
+                return 0
             chunk = events[idx : idx + 25]
             processed = await _process_events_with_frame_budget(orch, chunk)
             idx += max(processed, 1)
             await asyncio.sleep(0)
+        if generation != getattr(orch, '_render_generation', 0):
+            return 0
         flush = getattr(orch, 'flush_live_ui', None)
         if callable(flush):
             flush()
@@ -727,9 +710,7 @@ def _on_event(orch: 'RendererEventProcessorMixin', event: Any) -> None:
             ):
                 orch._min_rendered_event_id = event_id
             orch._max_rendered_event_id = max(orch._max_rendered_event_id, event_id)
-        coalesced = _try_coalesce_streaming_enqueue(
-            orch._pending_events, event
-        ) or _try_coalesce_terminal_enqueue(orch._pending_events, event)
+        coalesced = _try_coalesce_streaming_enqueue(orch._pending_events, event)
         if not coalesced:
             if _make_backpressure_room(
                 orch,

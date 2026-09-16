@@ -115,10 +115,8 @@ class RendererLiveMixin:
         widget = self._live_response_widget
         if widget is None:
             return
-        if (
-            not force
-            and not getattr(self, '_streaming_active', False)
-            and text == getattr(self, '_last_streaming_response_applied_text', '')
+        if not force and text == getattr(
+            self, '_last_streaming_response_applied_text', ''
         ):
             return
 

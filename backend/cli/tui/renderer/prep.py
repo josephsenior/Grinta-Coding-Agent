@@ -312,6 +312,7 @@ class StreamingRenderState:
 
     committed_parts: list[Any] = field(default_factory=list)
     committed_upto: int = 0
+    committed_text: str = ''
 
 
 def _last_complete_fence_end(text: str) -> int:
@@ -346,8 +347,14 @@ def prep_streaming_renderable_incremental(
     if state is None:
         state = StreamingRenderState()
 
-    if state.committed_upto > len(content):
+    if not content.startswith(state.committed_text):
         state = StreamingRenderState()
+    else:
+        # The worker may outlive a cancelled UI task. Never mutate shared state
+        # or renderable lists while the UI is consuming the previous frame.
+        state = StreamingRenderState(
+            list(state.committed_parts), state.committed_upto, state.committed_text
+        )
 
     stable_end = _last_complete_fence_end(content)
     if stable_end > state.committed_upto:
@@ -358,6 +365,7 @@ def prep_streaming_renderable_incremental(
             )
             state.committed_parts.extend(_flatten_renderable(rendered))
         state.committed_upto = stable_end
+        state.committed_text = content[:stable_end]
 
     tail = content[state.committed_upto :]
     parts = list(state.committed_parts)
@@ -459,15 +467,19 @@ async def prep_streaming_response_async(orch: Any, text: str) -> None:
     key = streaming_render_cache_key(content)
     if key in cache:
         return
+    generation = getattr(orch, '_render_generation', 0)
     try:
-        renderable = await asyncio.to_thread(prep_streaming_renderable, content)
+        renderable, state = await asyncio.to_thread(
+            prep_streaming_renderable_incremental,
+            content,
+            getattr(orch, '_streaming_render_state', None),
+        )
     except Exception:
         return
+    if generation != getattr(orch, '_render_generation', 0):
+        return
     cache[key] = renderable
-    if getattr(orch, '_live_response', '') == content:
-        apply = getattr(orch, '_apply_live_response_render', None)
-        if callable(apply):
-            apply(content, force=True)
+    orch._streaming_render_state = state
     # Bound the cache: streaming text only grows, so the oldest (shortest)
     # snapshots are the safest to drop.
     if len(cache) > _STREAMING_RENDER_CACHE_MAX:

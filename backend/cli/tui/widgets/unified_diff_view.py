@@ -489,8 +489,9 @@ class UnifiedDiffView(VerticalScroll):
                 if value is not None:
                     gutter_width = max(gutter_width, len(str(value)))
 
-        for row in rows:
-            yield UnifiedDiffRow(row, gutter_width=gutter_width)
+        from backend.cli.tui.widgets.diff_lines import DiffLines
+
+        yield DiffLines(rows, gutter_width=gutter_width)
 
         total = 0
         if self._patch:

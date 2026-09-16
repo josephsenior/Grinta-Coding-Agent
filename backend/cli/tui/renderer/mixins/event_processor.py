@@ -67,16 +67,19 @@ class RendererEventProcessorMixin:
         drain_events(self)
 
     async def drain_events_async(self) -> None:
-        await drain_events_async(self)
+        async with self._render_lock:
+            await drain_events_async(self)
 
     async def wait_for_activity(self, wait_timeout_sec: float = 0.5):
         return await wait_for_activity(self, wait_timeout_sec)
 
     async def load_earlier_messages(self, batch_size: int = 100) -> int:
-        return await load_earlier_messages(self, batch_size)
+        async with self._render_lock:
+            return await load_earlier_messages(self, batch_size)
 
     async def hydrate_recent_transcript(self, *, limit: int | None = None) -> int:
-        return await hydrate_recent_transcript(self, limit=limit)
+        async with self._render_lock:
+            return await hydrate_recent_transcript(self, limit=limit)
 
     def _on_event(self, event) -> None:
         _on_event(self, event)

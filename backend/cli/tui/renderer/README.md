@@ -42,3 +42,35 @@ existing layout and keeps the per-domain split consistent.
   `cli/event_rendering/` (the Rich non-TUI renderer). They are separate
   implementations on purpose; share *data* through `TUIRenderer`'s
   state, not code.
+
+## Responsiveness
+
+Screen drain and history-load messages schedule screen-owned workers and return
+immediately. Workers still apply widget changes on the Textual event loop; only
+render preparation and ledger reads run in threads. The renderer's async lock
+serializes live dispatch and history replay. Clear Transcript invalidates work
+that was already preparing content.
+
+Streaming preparation reuses complete fenced blocks and applies each text
+snapshot once. Final snapshots form coalescing boundaries. Queue pressure removes
+only interim streaming snapshots and null observations; meaningful events may
+temporarily exceed the queue's soft limit. Backlog compaction uses a linear pass.
+
+Unified diffs use `DiffLines`, a line-API widget that draws only visible rows.
+The enclosing diff view keeps the existing compact/detail scrolling behavior.
+Gutters, semantic colors, selection, and the complete supplied diff stay available.
+This virtualizes diff rows; transcript-level card pruning is still a separate
+mechanism. Pruning replaces history references to removed widgets with source
+content so Copy Transcript does not keep detached DOM trees alive.
+
+Diagnostics in the `grinta.tui` debug log:
+
+- `tui_loop_lag_ms`: event-loop stalls above 100 ms, sampled twice a second.
+- `tui_slow_event`, `prep_ms`, `dispatch_ms`: events taking at least 50 ms.
+- `tui_drain_ms`, `tui_pending_depth`: every drain pass, including backlog passes.
+
+Run `python -m backend.tests.manual.tui_performance` in the project environment
+to compare the former per-row widget tree with virtual lines. It makes no provider
+calls. On this Windows workspace, a 1,000-row headless comparison measured 5,001
+versus 2 descendants, 8,835 versus 95 ms to display, and 1,786 versus 47 ms to
+scroll. These are isolated benchmark results, not live-session latency guarantees.

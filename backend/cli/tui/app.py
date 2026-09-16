@@ -202,7 +202,11 @@ class GrintaScreen(
         self._bootstrap_task: asyncio.Task[Any] | None = None
         self._environment_ready: asyncio.Event | None = None
         self._environment_probe_task: asyncio.Task[Any] | None = None
+        self._responsiveness_task: asyncio.Task[None] | None = None
         self._is_unmounted = False
+        self._renderer_drain_worker: Any | None = None
+        self._renderer_drain_again = False
+        self._history_load_worker: Any | None = None
         self._suggestion_matches: list[str] = []
         self._command_hint = ''
         self._phase_label = 'Ready'
@@ -277,6 +281,8 @@ class TUIRenderer(
         self._current_state: Any = None
         self._pending_events: deque[Any] = deque()
         self._pending_lock = threading.Lock()
+        self._render_lock = asyncio.Lock()
+        self._render_generation = 0
         self._drain_scheduled = False
         self._drain_debounce_handle: Any | None = None
         self._last_scroll_paint_at: float = 0.0

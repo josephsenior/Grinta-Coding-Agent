@@ -127,6 +127,11 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
     def on_mount(self) -> None:
         _tui_logger.debug('on_mount: GrintaScreen mounted')
         self._is_unmounted = False
+        from backend.cli.tui.services.responsiveness import monitor_responsiveness
+
+        self._responsiveness_task = asyncio.create_task(
+            monitor_responsiveness(), name='tui-responsiveness'
+        )
 
         self._render_hud_bar()
         self.call_after_refresh(self._mark_hud_controls_ready)
@@ -151,17 +156,33 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
     def _mark_hud_controls_ready(self) -> None:
         self._hud_controls_ready = True
 
-    async def on_renderer_drain_requested(
-        self, _message: RendererDrainRequested
-    ) -> None:
-        if self._renderer is not None:
-            await self._renderer.drain_events_async()
-        if not self._welcome_visible:
-            return
-        if self._transcript_has_real_content():
-            self._hide_welcome()
+    def on_renderer_drain_requested(self, _message: RendererDrainRequested) -> None:
+        # Awaiting preparation here holds the screen's message pump, including
+        # keyboard actions, even when the preparation itself runs in a thread.
+        self._renderer_drain_again = True
+        worker = getattr(self, '_renderer_drain_worker', None)
+        if worker is None or worker.is_finished:
+            self._renderer_drain_worker = self.run_worker(
+                self._drain_renderer_background(), name='transcript-drain'
+            )
 
-    async def on_load_earlier_requested(self, _message: LoadEarlierRequested) -> None:
+    async def _drain_renderer_background(self) -> None:
+        while self._renderer_drain_again and not self._is_unmounted:
+            self._renderer_drain_again = False
+            if self._renderer is not None:
+                await self._renderer.drain_events_async()
+            if self._welcome_visible and self._transcript_has_real_content():
+                self._hide_welcome()
+            await asyncio.sleep(0)
+
+    def on_load_earlier_requested(self, _message: LoadEarlierRequested) -> None:
+        worker = getattr(self, '_history_load_worker', None)
+        if worker is None or worker.is_finished:
+            self._history_load_worker = self.run_worker(
+                self._load_earlier_background(), name='transcript-history'
+            )
+
+    async def _load_earlier_background(self) -> None:
         if self._renderer is None:
             return
         try:
@@ -223,6 +244,9 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
         if self._environment_probe_task and not self._environment_probe_task.done():
             self._environment_probe_task.cancel()
             self._environment_probe_task = None
+        if self._responsiveness_task and not self._responsiveness_task.done():
+            self._responsiveness_task.cancel()
+            self._responsiveness_task = None
 
         # Tear down the MCP live-reload plumbing (file watcher + bus
         # adapter). Done best-effort; a failure here must not stop the

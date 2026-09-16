@@ -284,6 +284,9 @@ class Transcript(VerticalScroll):
         to_unmount = widgets[:overflow]
         forget = getattr(renderer, '_forget_event_state', None)
         for widget in to_unmount:
+            release = getattr(renderer, '_release_history_widget', None)
+            if callable(release):
+                release(widget)
             setattr(widget, '_tui_removing', True)
             self._note_content_widget_removed()
             if callable(forget):
@@ -337,6 +340,9 @@ class Transcript(VerticalScroll):
         forget = getattr(renderer, '_forget_event_state', None)
         removed = 0
         for widget in prunable:
+            release = getattr(renderer, '_release_history_widget', None)
+            if callable(release):
+                release(widget)
             setattr(widget, '_tui_removing', True)
             self._note_content_widget_removed()
             if callable(forget):
