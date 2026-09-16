@@ -1,14 +1,19 @@
-"""Headless TUI — renderer sidebar."""
+"""Headless TUI — Environment modal, Tasks drawer, and the HUD task summary.
+
+MCP Servers, LSP Servers, Debug Adapters, and Skills moved from a permanent
+sidebar column into ``GrintaEnvironmentDialog``, opened on demand (Ctrl+B).
+Tasks moved from its own permanent sidebar column into a compact HUD line
+summary plus ``GrintaTasksDialog`` (Ctrl+T) for the full list. See
+backend/cli/tui/dialogs/environment.py and backend/cli/tui/dialogs/tasks.py.
+"""
 
 from backend.tests.unit.cli.tui._shared import (
     AsyncMock,
     GrintaScreen,
     GrintaTUIApp,
     HUDBar,
-    Label,
     ReasoningDisplay,
     RichConsole,
-    Select,
     SimpleNamespace,
     TaskTrackingObservation,
     _get_screen,
@@ -19,6 +24,8 @@ from backend.tests.unit.cli.tui._shared import (
 
 @pytest.mark.asyncio
 async def test_tui_autonomy_visibility_follows_mode(mock_config):
+    from textual.widgets import Label, Select
+
     console = RichConsole()
     loop = asyncio.get_running_loop()
     agent_config = SimpleNamespace(mode='agent')
@@ -49,7 +56,7 @@ async def test_tui_autonomy_visibility_follows_mode(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_tui_sidebar_mcp_rows_have_switch_and_skills_are_read_only(
+async def test_environment_dialog_mcp_rows_have_switch_and_skills_are_read_only(
     mock_config, monkeypatch
 ):
     console = RichConsole()
@@ -84,6 +91,7 @@ async def test_tui_sidebar_mcp_rows_have_switch_and_skills_are_read_only(
 
         s = _get_screen(app)
         from backend.cli.tui.app import TUIRenderer
+        from backend.cli.tui.dialogs import GrintaEnvironmentDialog
         from backend.cli.tui.widgets.collapsible import McpServerRow, SidebarRow
 
         renderer = TUIRenderer(
@@ -93,7 +101,6 @@ async def test_tui_sidebar_mcp_rows_have_switch_and_skills_are_read_only(
             tui=s,
             loop=loop,
         )
-        renderer._refresh_display()
 
         skill_items = renderer._build_skills_sidebar_items()
         bundled_items = [
@@ -103,7 +110,11 @@ async def test_tui_sidebar_mcp_rows_have_switch_and_skills_are_read_only(
         ]
         assert len(bundled_items) == 1
 
-        rows = list(s.query('.sidebar-item-row'))
+        dialog = GrintaEnvironmentDialog(renderer)
+        await app.push_screen(dialog)
+        await pilot.pause()
+
+        rows = list(dialog.query('.sidebar-item-row'))
         mcp_rows = [
             row for row in rows if getattr(row, 'item_id', '').startswith('mcp:')
         ]
@@ -116,7 +127,7 @@ async def test_tui_sidebar_mcp_rows_have_switch_and_skills_are_read_only(
 
 
 @pytest.mark.asyncio
-async def test_tui_lsp_sidebar_lists_detected_servers(mock_config):
+async def test_environment_dialog_lists_detected_lsp_servers(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     agent_config = SimpleNamespace(enable_lsp_query=True, enable_debugger=False)
@@ -128,6 +139,7 @@ async def test_tui_lsp_sidebar_lists_detected_servers(mock_config):
 
         s = _get_screen(app)
         from backend.cli.tui.app import TUIRenderer
+        from backend.cli.tui.dialogs import GrintaEnvironmentDialog
         from backend.cli.tui.widgets.collapsible import CollapsibleSection, SidebarRow
 
         renderer = TUIRenderer(
@@ -147,11 +159,12 @@ async def test_tui_lsp_sidebar_lists_detected_servers(mock_config):
                 spec=SimpleNamespace(language='go', extensions=('.go',)),
             ),
         }
-        renderer._last_lsp_sidebar_signature = None
-        renderer._refresh_lsp_sidebar()
+
+        dialog = GrintaEnvironmentDialog(renderer)
+        await app.push_screen(dialog)
         await pilot.pause()
 
-        lsp_section = s.query_one('#sidebar-lsp', CollapsibleSection)
+        lsp_section = dialog.query_one('#env-lsp', CollapsibleSection)
         assert lsp_section._section_title == 'LSP Servers (1)'
 
         rows = [
@@ -167,7 +180,7 @@ async def test_tui_lsp_sidebar_lists_detected_servers(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_tui_dap_sidebar_lists_detected_adapters(mock_config):
+async def test_environment_dialog_lists_detected_dap_adapters(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     agent_config = SimpleNamespace(enable_lsp_query=False, enable_debugger=True)
@@ -179,6 +192,7 @@ async def test_tui_dap_sidebar_lists_detected_adapters(mock_config):
 
         s = _get_screen(app)
         from backend.cli.tui.app import TUIRenderer
+        from backend.cli.tui.dialogs import GrintaEnvironmentDialog
         from backend.cli.tui.widgets.collapsible import CollapsibleSection, SidebarRow
 
         renderer = TUIRenderer(
@@ -208,11 +222,12 @@ async def test_tui_dap_sidebar_lists_detected_adapters(mock_config):
                 'auto_resolvable': False,
             },
         ]
-        renderer._last_dap_sidebar_signature = None
-        renderer._refresh_dap_sidebar()
+
+        dialog = GrintaEnvironmentDialog(renderer)
+        await app.push_screen(dialog)
         await pilot.pause()
 
-        dap_section = s.query_one('#sidebar-dap', CollapsibleSection)
+        dap_section = dialog.query_one('#env-dap', CollapsibleSection)
         assert dap_section._section_title == 'Debug Adapters (2)'
 
         rows = [
@@ -230,7 +245,7 @@ async def test_tui_dap_sidebar_lists_detected_adapters(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_tui_lsp_sidebar_shows_disabled_when_feature_off(
+async def test_environment_dialog_lsp_shows_disabled_when_feature_off(
     mock_config, monkeypatch
 ):
     console = RichConsole()
@@ -244,9 +259,8 @@ async def test_tui_lsp_sidebar_shows_disabled_when_feature_off(
         await pilot.pause()
 
         s = _get_screen(app)
-        from textual.widgets import Static
-
         from backend.cli.tui.app import TUIRenderer
+        from backend.cli.tui.dialogs import GrintaEnvironmentDialog
         from backend.cli.tui.widgets.collapsible import CollapsibleSection
 
         renderer = TUIRenderer(
@@ -256,25 +270,18 @@ async def test_tui_lsp_sidebar_shows_disabled_when_feature_off(
             tui=s,
             loop=loop,
         )
-        renderer._lsp_servers_cache = {
-            'rust': SimpleNamespace(
-                available=True,
-                spec=SimpleNamespace(language='rust', extensions=('.rs',)),
-            ),
-        }
-        renderer._last_lsp_sidebar_signature = None
-        renderer._refresh_lsp_sidebar()
+
+        dialog = GrintaEnvironmentDialog(renderer)
+        await app.push_screen(dialog)
         await pilot.pause()
 
-        lsp_section = s.query_one('#sidebar-lsp', CollapsibleSection)
+        lsp_section = dialog.query_one('#env-lsp', CollapsibleSection)
         assert lsp_section._section_title == 'LSP Servers'
-        empty = lsp_section.query_one('#empty-text', Static)
-        assert 'Disabled' in str(empty.render())
         assert lsp_section.feature_enabled is False
 
 
 @pytest.mark.asyncio
-async def test_tui_dap_sidebar_shows_disabled_when_feature_off(
+async def test_environment_dialog_dap_shows_disabled_when_feature_off(
     mock_config, monkeypatch
 ):
     console = RichConsole()
@@ -288,9 +295,8 @@ async def test_tui_dap_sidebar_shows_disabled_when_feature_off(
         await pilot.pause()
 
         s = _get_screen(app)
-        from textual.widgets import Static
-
         from backend.cli.tui.app import TUIRenderer
+        from backend.cli.tui.dialogs import GrintaEnvironmentDialog
         from backend.cli.tui.widgets.collapsible import CollapsibleSection
 
         renderer = TUIRenderer(
@@ -300,27 +306,18 @@ async def test_tui_dap_sidebar_shows_disabled_when_feature_off(
             tui=s,
             loop=loop,
         )
-        renderer._dap_adapters_cache = [
-            {
-                'language': 'python',
-                'adapter': 'debugpy',
-                'available': True,
-                'auto_resolvable': True,
-            },
-        ]
-        renderer._last_dap_sidebar_signature = None
-        renderer._refresh_dap_sidebar()
+
+        dialog = GrintaEnvironmentDialog(renderer)
+        await app.push_screen(dialog)
         await pilot.pause()
 
-        dap_section = s.query_one('#sidebar-dap', CollapsibleSection)
+        dap_section = dialog.query_one('#env-dap', CollapsibleSection)
         assert dap_section._section_title == 'Debug Adapters'
-        empty = dap_section.query_one('#empty-text', Static)
-        assert 'Disabled' in str(empty.render())
         assert dap_section.feature_enabled is False
 
 
 @pytest.mark.asyncio
-async def test_tui_mcp_sidebar_shows_disabled_when_feature_off(
+async def test_environment_dialog_mcp_shows_disabled_when_feature_off(
     mock_config, monkeypatch
 ):
     console = RichConsole()
@@ -342,6 +339,7 @@ async def test_tui_mcp_sidebar_shows_disabled_when_feature_off(
         if s._bootstrapping is not None:
             s._bootstrapping.set()
         from backend.cli.tui.app import TUIRenderer
+        from backend.cli.tui.dialogs import GrintaEnvironmentDialog
         from backend.cli.tui.widgets.collapsible import CollapsibleSection
 
         renderer = TUIRenderer(
@@ -352,20 +350,19 @@ async def test_tui_mcp_sidebar_shows_disabled_when_feature_off(
             loop=loop,
         )
         assert renderer._sidebar_mcp_enabled() is False
-        renderer._last_sidebar_state = None
-        renderer._refresh_display()
-        mcp_section = s.query_one('#sidebar-mcp', CollapsibleSection)
+
+        dialog = GrintaEnvironmentDialog(renderer)
+        await app.push_screen(dialog)
+        await pilot.pause()
+
+        mcp_section = dialog.query_one('#env-mcp', CollapsibleSection)
         assert mcp_section._section_title == 'MCP Servers'
         assert mcp_section._content == 'Disabled'
-        from textual.widgets import Static
-
-        empty = mcp_section.query_one('#empty-text', Static)
-        assert 'Disabled' in str(empty.render())
         assert mcp_section.feature_enabled is False
 
 
 @pytest.mark.asyncio
-async def test_tui_mcp_server_row_shows_disabled_label_when_server_off(
+async def test_environment_dialog_mcp_server_row_shows_disabled_label(
     mock_config, monkeypatch
 ):
     console = RichConsole()
@@ -389,6 +386,7 @@ async def test_tui_mcp_server_row_shows_disabled_label_when_server_off(
         if s._bootstrapping is not None:
             s._bootstrapping.set()
         from backend.cli.tui.app import TUIRenderer
+        from backend.cli.tui.dialogs import GrintaEnvironmentDialog
         from backend.cli.tui.widgets.collapsible import McpServerRow
 
         renderer = TUIRenderer(
@@ -398,11 +396,12 @@ async def test_tui_mcp_server_row_shows_disabled_label_when_server_off(
             tui=s,
             loop=loop,
         )
-        renderer._last_sidebar_state = None
-        renderer._refresh_display()
+
+        dialog = GrintaEnvironmentDialog(renderer)
+        await app.push_screen(dialog)
         await pilot.pause()
 
-        row = s.query_one('McpServerRow', McpServerRow)
+        row = dialog.query_one('McpServerRow', McpServerRow)
         label = row.query_one('#row-label')
         rendered = str(label.render())
         assert 'github' in rendered
@@ -411,9 +410,7 @@ async def test_tui_mcp_server_row_shows_disabled_label_when_server_off(
 
 
 @pytest.mark.asyncio
-async def test_tui_task_sidebar_does_not_clear_on_empty_view_payload(
-    mock_config, monkeypatch
-):
+async def test_hud_task_summary_reflects_task_list(mock_config, monkeypatch):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     monkeypatch.setattr(GrintaScreen, '_bootstrap', AsyncMock())
@@ -424,7 +421,6 @@ async def test_tui_task_sidebar_does_not_clear_on_empty_view_payload(
 
         s = _get_screen(app)
         from backend.cli.tui.app import TUIRenderer
-        from backend.cli.tui.widgets.collapsible import CollapsibleSection
 
         renderer = TUIRenderer(
             console=console,
@@ -433,42 +429,18 @@ async def test_tui_task_sidebar_does_not_clear_on_empty_view_payload(
             tui=s,
             loop=loop,
         )
+        s._renderer = renderer
+
+        # No tasks: the HUD line carries no task summary at all — no reserved
+        # space for an empty panel, unlike the old permanent sidebar column.
+        assert s._hud_tasks_summary_markup() == ''
+
         renderer._task_list = [
             {'id': '1', 'description': 'Persist task panel', 'status': 'in_progress'}
         ]
-        renderer._refresh_display()
-
-        tasks_widget = s.query_one('#sidebar-tasks', CollapsibleSection)
-        assert tasks_widget._section_title == 'Tasks · 0/1 done'
-
-
-@pytest.mark.asyncio
-async def test_tui_task_sidebar_does_not_clear_on_ambiguous_empty_update_payload(
-    mock_config, monkeypatch
-):
-    console = RichConsole()
-    loop = asyncio.get_running_loop()
-    monkeypatch.setattr(GrintaScreen, '_bootstrap', AsyncMock())
-    app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
-
-    async with app.run_test(size=(120, 36)) as pilot:
-        await pilot.pause()
-
-        s = _get_screen(app)
-        from backend.cli.tui.app import TUIRenderer
-        from backend.cli.tui.widgets.collapsible import CollapsibleSection
-
-        renderer = TUIRenderer(
-            console=console,
-            hud=HUDBar(),
-            reasoning=ReasoningDisplay(),
-            tui=s,
-            loop=loop,
-        )
-        renderer._task_list = [
-            {'id': '1', 'description': 'Persist task panel', 'status': 'in_progress'}
-        ]
-        renderer._refresh_display()
+        summary = s._hud_tasks_summary_markup()
+        assert '0/1' in summary
+        assert 'Persist task panel' in summary
 
         renderer._process_event(
             TaskTrackingObservation(
@@ -477,15 +449,12 @@ async def test_tui_task_sidebar_does_not_clear_on_ambiguous_empty_update_payload
                 task_list=[],
             )
         )
-
-        tasks_widget = s.query_one('#sidebar-tasks', CollapsibleSection)
-        assert tasks_widget._section_title == 'Tasks · 0/1 done'
+        # Ambiguous empty payloads must not silently blank out the summary.
+        assert '0/1' in s._hud_tasks_summary_markup()
 
 
 @pytest.mark.asyncio
-async def test_tui_task_sidebar_allows_explicit_empty_update_clear(
-    mock_config, monkeypatch
-):
+async def test_tasks_dialog_lists_current_tasks(mock_config, monkeypatch):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     monkeypatch.setattr(GrintaScreen, '_bootstrap', AsyncMock())
@@ -496,6 +465,7 @@ async def test_tui_task_sidebar_allows_explicit_empty_update_clear(
 
         s = _get_screen(app)
         from backend.cli.tui.app import TUIRenderer
+        from backend.cli.tui.dialogs import GrintaTasksDialog
         from backend.cli.tui.widgets.collapsible import CollapsibleSection
 
         renderer = TUIRenderer(
@@ -506,35 +476,20 @@ async def test_tui_task_sidebar_allows_explicit_empty_update_clear(
             loop=loop,
         )
         renderer._task_list = [
-            {'id': '1', 'description': 'Persist task panel', 'status': 'in_progress'}
+            {'id': '1', 'description': 'Persist task panel', 'status': 'done'},
+            {'id': '2', 'description': 'Wire HUD summary', 'status': 'in_progress'},
         ]
-        renderer._refresh_display()
 
-        renderer._process_event(
-            TaskTrackingObservation(
-                content='✅ Plan updated with 0 tasks. Now begin implementing the first todo task.',
-                command='update',
-                task_list=[],
-            )
-        )
+        dialog = GrintaTasksDialog(renderer)
+        await app.push_screen(dialog)
+        await pilot.pause()
 
-        tasks_widget = s.query_one('#sidebar-tasks', CollapsibleSection)
-        assert tasks_widget._section_title == 'Tasks'
-
-        renderer._process_event(
-            TaskTrackingObservation(
-                content='viewed',
-                command='view',
-                task_list=[],
-            )
-        )
-
-        tasks_widget = s.query_one('#sidebar-tasks', CollapsibleSection)
-        assert tasks_widget._section_title == 'Tasks'
+        section = dialog.query_one('#tasks-list', CollapsibleSection)
+        assert section._section_title == 'Tasks · 1/2 done'
 
 
 @pytest.mark.asyncio
-async def test_tui_toggle_sidebar_adjusts_left_column_width(mock_config):
+async def test_environment_and_tasks_bindings_push_dialogs(mock_config):
     console = RichConsole()
     loop = asyncio.get_running_loop()
     app = GrintaTUIApp(config=mock_config, console=console, loop=loop)
@@ -543,20 +498,24 @@ async def test_tui_toggle_sidebar_adjusts_left_column_width(mock_config):
         await pilot.pause()
 
         s = _get_screen(app)
-        sidebar = s.query_one('#sidebar')
-        left_col = s.query_one('#left-column')
+        from backend.cli.tui.app import TUIRenderer
+        from backend.cli.tui.dialogs import GrintaEnvironmentDialog, GrintaTasksDialog
 
-        # Initially, sidebar is visible (doesn't have -hidden class)
-        assert not sidebar.has_class('-hidden')
+        if s._renderer is None:
+            s._renderer = TUIRenderer(
+                console=console,
+                hud=HUDBar(),
+                reasoning=ReasoningDisplay(),
+                tui=s,
+                loop=loop,
+            )
 
-        # Toggle sidebar off (hide it)
-        s.action_toggle_sidebar()
+        s.action_show_environment()
         await pilot.pause()
-        assert sidebar.has_class('-hidden')
-        assert str(left_col.styles.width) == '100w'
-
-        # Toggle sidebar back on (show it)
-        s.action_toggle_sidebar()
+        assert isinstance(app.screen, GrintaEnvironmentDialog)
+        app.pop_screen()
         await pilot.pause()
-        assert not sidebar.has_class('-hidden')
-        assert str(left_col.styles.width) == '78w'
+
+        s.action_show_tasks()
+        await pilot.pause()
+        assert isinstance(app.screen, GrintaTasksDialog)

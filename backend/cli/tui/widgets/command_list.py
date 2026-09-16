@@ -23,7 +23,8 @@ SLASH_COMMAND_DESCRIPTIONS: dict[str, str] = {
 KEYBOARD_SHORTCUTS: list[tuple[str, str]] = [
     ('F1', 'Open help'),
     ('Ctrl+C', 'Interrupt agent or copy selection'),
-    ('Ctrl+B', 'Toggle sidebar'),
+    ('Ctrl+B', 'Open Environment (MCP/LSP/Debug Adapters/Skills)'),
+    ('Ctrl+T', 'Open Tasks'),
     ('Ctrl+L', 'Clear transcript'),
     ('Ctrl+Space', 'Autocomplete slash commands'),
     ('PageUp / PageDown', 'Scroll transcript'),
@@ -48,6 +49,7 @@ _BINDING_KEY_ALIASES: dict[str, str] = {
     'home': 'Home',
     'end': 'End',
     'ctrl+b': 'Ctrl+B',
+    'ctrl+t': 'Ctrl+T',
     'f1': 'F1',
     'ctrl+j': 'Ctrl+J',
     'ctrl+k': 'Ctrl+K',

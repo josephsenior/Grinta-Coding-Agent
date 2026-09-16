@@ -172,6 +172,7 @@ class OrchestratorPlanner:
         self._add_web_tools(tools)
         self._add_docs_tools(tools)
         self._add_editor_tools(tools)
+        self._add_delegation_tools(tools)
         self._add_execute_mcp_tool_tool(tools)
 
         mode = self._current_mode()
@@ -373,6 +374,25 @@ class OrchestratorPlanner:
             tools.append(create_replace_string_tool())
             tools.append(create_multiedit_tool())
             tools.append(create_undo_last_edit_tool())
+
+    def _add_delegation_tools(self, tools: list) -> None:
+        """Expose delegate_task, and the blackboard when one is attached.
+
+        Delegated workers are built with ``enable_swarming=False``, so this is
+        also what caps delegation at depth 1: a worker never sees the tool.
+        """
+        if getattr(self._config, 'enable_swarming', False):
+            from backend.engine.tools.delegate_task import create_delegate_task_tool
+
+            tools.append(create_delegate_task_tool())
+
+        # The blackboard is only meaningful once a shared board exists, which
+        # today means this agent is a worker in a parallel batch.
+        if getattr(self._config, 'enable_blackboard', False):
+            if getattr(self._agent, 'blackboard', None) is not None:
+                from backend.engine.tools.blackboard import create_blackboard_tool
+
+                tools.append(create_blackboard_tool())
 
     def _add_execute_mcp_tool_tool(self, tools: list) -> None:
         if getattr(self._config, 'enable_mcp', True):

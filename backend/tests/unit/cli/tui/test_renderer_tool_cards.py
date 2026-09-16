@@ -810,12 +810,21 @@ async def test_tui_task_state_refreshes_sidebar_and_transcript(
         await pilot.pause()
 
         renderer._tui._write_log.assert_not_called()
+        from backend.cli.tui.dialogs import GrintaTasksDialog
         from backend.cli.tui.widgets.collapsible import CollapsibleSection, SidebarRow
 
-        tasks = s.query_one('#sidebar-tasks', CollapsibleSection)
+        s._renderer = renderer
+        assert '1/2' in s._hud_tasks_summary_markup()
+
+        dialog = GrintaTasksDialog(renderer)
+        await app.push_screen(dialog)
+        await pilot.pause()
+        tasks = dialog.query_one('#tasks-list', CollapsibleSection)
         assert tasks._section_title == 'Tasks · 1/2 done'
         rows = list(tasks.query(SidebarRow).results())
         assert len(rows) == 2
+        app.pop_screen()
+        await pilot.pause()
 
         from backend.cli.tui.widgets.activity_card import ToolResult
         from backend.cli.tui.widgets.scan_line import TaskStateCard

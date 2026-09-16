@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from backend.ledger.observation.observation import Observation
     from backend.orchestration.agent import Agent
 
-from mcp import MCPError as McpError
+from mcp import McpError
 
 from backend.core.config.mcp_config import (
     MCPConfig,

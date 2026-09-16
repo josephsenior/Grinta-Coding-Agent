@@ -18,29 +18,13 @@ from textual.widgets import (
 from backend.app.setup import (
     generate_sid,
 )
-from backend.cli.theme import (
-    NAVY_BRAND,
-    NAVY_DOMAIN_MCP,
-    NAVY_DOMAIN_SKILLS,
-    NAVY_FOCUS_ACCENT,
-    NAVY_RUNNING,
-)
 from backend.cli.tui._a11y import animations_enabled
 from backend.cli.tui.constants import _tui_logger
 from backend.cli.tui.dialogs import ConfirmWidget, GrintaHelpDialog
 from backend.cli.tui.screen.lifecycle_bootstrap import ScreenLifecycleBootstrapMixin
 from backend.cli.tui.screen.lifecycle_dispatch import ScreenLifecycleDispatchMixin
-from backend.cli.tui.strings import (
-    EMPTY_MCP,
-    EMPTY_SKILLS,
-    EMPTY_TASKS,
-    LOADING_DAP,
-    LOADING_LSP,
-)
-from backend.cli.tui.widgets.collapsible import CollapsibleSection
 from backend.cli.tui.widgets.small import (
     HUD,
-    InfoSidebar,
     InputBar,
     LoadEarlierRequested,
     PromptTextArea,
@@ -57,6 +41,16 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
     """Lifecycle-related methods of GrintaScreen."""
 
     def compose(self) -> ComposeResult:
+        # Mission Control used to split this screen into a transcript column
+        # plus a permanent sidebar (Tasks, MCP Servers, LSP Servers, Debug
+        # Adapters, Skills) at 22% of terminal width, for the whole session,
+        # whether or not any of that had anything to show. MCP/LSP/Debug
+        # Adapters/Skills are per-session capability info you check
+        # occasionally, not live state — they moved into the Environment
+        # modal (Ctrl+B), opened on demand. Tasks is live run state, so it
+        # stays visible by default, but as a HUD line rather than a column:
+        # see _render_hud_bar's task summary and the Tasks drawer (Ctrl+T).
+        # The transcript gets the full width unconditionally now.
         with Horizontal(id='app-layout'):
             with Vertical(id='left-column'):
                 yield Transcript(id='main-display')
@@ -68,61 +62,6 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
                         yield Static(id='spinner', classes='-hidden')
                         yield PromptTextArea(id='input', show_line_numbers=False)
                 yield HUD(id='hud-bar')
-            with Vertical(id='sidebar'):
-                with InfoSidebar(id='sidebar-container'):
-                    yield CollapsibleSection(
-                        title='Tasks',
-                        content=EMPTY_TASKS,
-                        collapsed=False,
-                        accent_color=NAVY_BRAND,
-                        section_icon='▣',
-                        id='sidebar-tasks',
-                    )
-                    yield CollapsibleSection(
-                        title='MCP Servers',
-                        content=EMPTY_MCP,
-                        collapsed=False,
-                        accent_color=NAVY_DOMAIN_MCP,
-                        section_icon='⬡',
-                        action_label='Edit',
-                        action_button_class='-mcp',
-                        feature_enabled=self._sidebar_mcp_enabled(),
-                        id='sidebar-mcp',
-                    )
-                    yield CollapsibleSection(
-                        title='LSP Servers',
-                        content=(
-                            LOADING_LSP if self._sidebar_lsp_enabled() else 'Disabled'
-                        ),
-                        collapsed=False,
-                        accent_color=NAVY_FOCUS_ACCENT,
-                        section_icon='◈',
-                        feature_enabled=self._sidebar_lsp_enabled(),
-                        id='sidebar-lsp',
-                    )
-                    yield CollapsibleSection(
-                        title='Debug Adapters',
-                        content=(
-                            LOADING_DAP
-                            if self._sidebar_debugger_enabled()
-                            else 'Disabled'
-                        ),
-                        collapsed=False,
-                        accent_color=NAVY_RUNNING,
-                        section_icon='◆',
-                        feature_enabled=self._sidebar_debugger_enabled(),
-                        id='sidebar-dap',
-                    )
-                    yield CollapsibleSection(
-                        title='Skills',
-                        content=EMPTY_SKILLS,
-                        collapsed=False,
-                        accent_color=NAVY_DOMAIN_SKILLS,
-                        section_icon='✦',
-                        action_label='Edit',
-                        action_button_class='-skill',
-                        id='sidebar-skills',
-                    )
 
     def on_mount(self) -> None:
         _tui_logger.debug('on_mount: GrintaScreen mounted')

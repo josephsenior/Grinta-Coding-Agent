@@ -19,6 +19,10 @@ def _make_config(**kwargs):
     cfg.enable_browsing = True
     cfg.enable_web = True
     cfg.enable_debugger = True
+    # Must be set explicitly: cfg is a MagicMock, so an unset attribute would
+    # read back as a truthy Mock rather than the real AgentConfig default.
+    cfg.enable_swarming = False
+    cfg.enable_blackboard = False
     cfg.mode = 'agent'
     cfg.mcp.servers = []
 
@@ -216,7 +220,7 @@ class TestFeatureFlagToolPresence:
 
     def test_swarming_enabled(self):
         names = _build_toolset(enable_swarming=True)
-        assert 'delegate_task' not in names
+        assert 'delegate_task' in names
         self._assert_dispatch_covered(names)
 
     def test_swarming_disabled(self):

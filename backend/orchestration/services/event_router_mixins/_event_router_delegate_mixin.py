@@ -290,6 +290,38 @@ class _EventRouterDelegateMixin:
                         'warning', f'Failed to inherit parent task plan: {e}'
                     )
 
+                # ── Constrain the worker to read-only ──
+                #
+                # Tools split into two kinds. The unambiguously edit-only ones
+                # (create_file, replace_string, multiedit, undo_last_edit) are
+                # omitted outright by dropping enable_editor — cheap and exact.
+                #
+                # The terminal tool is the hard case: it reads (git log, rg) as
+                # much as it writes, and classifying shell invocations as safe
+                # or unsafe is not something we can do reliably. The guarantee
+                # has to come from below the tool layer instead, from a
+                # workspace the worker physically cannot write —
+                # SecurityConfig.readonly_workspace under the sandboxed_local
+                # profile. That is implemented in backend/execution/sandboxing.py
+                # but not yet reachable from here: worker actions are bridged to
+                # the *parent's* runtime below, which shares the parent's single
+                # 'default' shell session and therefore the parent's writable
+                # sandbox policy. Until a worker's commands are routed to their
+                # own read-only shell session, we withhold the terminal rather
+                # than ship a read-only worker that can still write.
+                #
+                # enable_swarming=False is what caps delegation at depth 1: the
+                # worker never sees delegate_task at all.
+                worker_agent_config = worker_agent_config.model_copy(
+                    update={
+                        'enable_editor': False,
+                        'enable_terminal': False,
+                        'enable_swarming': False,
+                        'enable_checkpoints': False,
+                        'enable_blackboard': shared_blackboard is not None,
+                    }
+                )
+
                 # We need to reuse the same file store/workspace as the parent
                 llm_registry = getattr(self._ctrl.agent, 'llm_registry', None)
                 if llm_registry is None:
@@ -571,18 +603,11 @@ class _EventRouterDelegateMixin:
                 if outputs:
                     extracted_outputs = outputs
 
+                # Only FINISHED counts. A worker sitting in RUNNING or
+                # AWAITING_USER_INPUT has not answered the question it was given,
+                # and reporting it as a success because `outputs` happened to be
+                # non-empty hands the parent a partial answer labelled complete.
                 success = final_state == AgentState.FINISHED
-                if (
-                    not success
-                    and extracted_outputs is not None
-                    and final_state
-                    in (
-                        AgentState.RUNNING,
-                        AgentState.AWAITING_USER_INPUT,
-                    )
-                ):
-                    success = True
-                    final_state = AgentState.FINISHED
 
                 content = (
                     str(extracted_outputs)

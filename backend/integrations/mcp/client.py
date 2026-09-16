@@ -14,7 +14,7 @@ from fastmcp.client.transports import (
     StdioTransport,
     StreamableHttpTransport,
 )
-from mcp import MCPError as McpError
+from mcp import McpError
 from mcp.types import Implementation
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
