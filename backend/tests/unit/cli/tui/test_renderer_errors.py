@@ -726,9 +726,15 @@ async def test_tui_live_response_uses_streaming_widget(mock_config, monkeypatch)
 
 
 @pytest.mark.asyncio
-async def test_tui_tasks_sidebar_refreshes_during_streaming_skip(
+async def test_tui_task_hud_summary_refreshes_during_streaming_skip(
     mock_config, monkeypatch
 ):
+    """Tasks refresh even when ``skip_sidebar=True`` skips MCP/skills.
+
+    Previously verified via the permanent Tasks sidebar column; tasks now
+    surface as a HUD line summary instead (see
+    GrintaScreen._hud_tasks_summary_markup), so this checks that summary.
+    """
     console = RichConsole()
     loop = asyncio.get_running_loop()
     monkeypatch.setattr(GrintaScreen, '_bootstrap', AsyncMock())
@@ -738,7 +744,6 @@ async def test_tui_tasks_sidebar_refreshes_during_streaming_skip(
         await pilot.pause()
 
         s = _get_screen(app)
-        from backend.cli.tui.widgets.collapsible import CollapsibleSection, SidebarRow
 
         renderer = TUIRenderer(
             console=console,
@@ -747,13 +752,13 @@ async def test_tui_tasks_sidebar_refreshes_during_streaming_skip(
             tui=s,
             loop=loop,
         )
+        s._renderer = renderer
         renderer._task_list = [
             {'id': '1', 'description': 'First task', 'status': 'todo'},
         ]
         renderer._refresh_display(skip_sidebar=True)
 
-        tasks_widget = s.query_one('#sidebar-tasks', CollapsibleSection)
-        assert tasks_widget._section_title == 'Tasks · 0/1 done'
+        assert '0/1' in s._hud_tasks_summary_markup()
 
         renderer._task_list = [
             {'id': '1', 'description': 'First task', 'status': 'in_progress'},
@@ -761,7 +766,6 @@ async def test_tui_tasks_sidebar_refreshes_during_streaming_skip(
         renderer._refresh_display(skip_sidebar=True)
         await pilot.pause()
 
-        tasks_widget = s.query_one('#sidebar-tasks', CollapsibleSection)
-        assert not tasks_widget.is_collapsed
-        rows = list(tasks_widget.query(SidebarRow).results())
-        assert any(row.has_class('-active-task') for row in rows)
+        summary = s._hud_tasks_summary_markup()
+        assert '0/1' in summary
+        assert 'First task' in summary

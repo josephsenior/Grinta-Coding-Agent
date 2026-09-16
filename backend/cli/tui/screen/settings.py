@@ -5,13 +5,7 @@ from typing import Any
 
 from textual import events, work
 
-from backend.cli.event_rendering.panels import task_panel_signature
 from backend.cli.tui.constants import _tui_logger
-from backend.cli.tui.dialogs import (  # noqa: F401
-    GrintaManageMCPDialog,
-    GrintaManageSkillsDialog,
-)
-from backend.cli.tui.widgets.collapsible import CollapsibleSection, SidebarRow
 from backend.cli.tui.widgets.small import (
     HUD,
     InputBar,
@@ -60,17 +54,6 @@ class ScreenSettingsMixin:
 
     def on_resize(self, event: events.Resize) -> None:
         self._resize_input_bar()
-        try:
-            sidebar = self.query_one('#sidebar')
-            left_column = self.query_one('#left-column')
-            if event.size.width < 100:
-                sidebar.add_class('-hidden')
-                left_column.styles.width = '100%'
-            elif not getattr(self, '_sidebar_user_hidden', False):
-                sidebar.remove_class('-hidden')
-                left_column.styles.width = '78%'
-        except Exception:
-            pass
 
     @work
     async def on_hud_controls_requested(self, event: HUD.ControlsRequested) -> None:
@@ -383,59 +366,15 @@ class ScreenSettingsMixin:
         except Exception:
             pass
 
-    def on_sidebar_row_selected(self, event: Any) -> None:
-        """Handle SidebarRow selected events and notify the user."""
-        if not isinstance(event, SidebarRow.Selected):
-            return
-        item_id = event.item_id
-        if not item_id:
-            return
-        if item_id.startswith('task:'):
-            task_id = item_id.split(':', 1)[1]
-            desc = 'Unknown task'
-            tasks = task_panel_signature(
-                self._renderer._task_list if self._renderer else []
-            )
-            for tid, _status, description in tasks:
-                if tid == task_id:
-                    desc = description or desc
-                    break
-            try:
-                from backend.cli.tui.widgets.collapsible import CollapsibleSection
+    # "Follow live activity" on selecting a task row now lives on
+    # GrintaTasksDialog, since Tasks moved from a permanent sidebar section
+    # into that on-demand drawer (see backend/cli/tui/dialogs/tasks.py).
 
-                section = self.query_one('#sidebar-tasks', CollapsibleSection)
-                section.expand()
-            except Exception:
-                pass
-            try:
-                display = self._get_display()
-                display.force_scroll_end()
-            except Exception:
-                pass
-            self.notify(
-                f'Following live activity · {desc}',
-                severity='info',
-                timeout=2.5,
-            )
-
-    def on_sidebar_row_toggle_requested(self, event: Any) -> None:
-        if not isinstance(event, SidebarRow.ToggleRequested) or not event.item_id:
-            return
-        if event.item_id.startswith('mcp:'):
-            mcp_name = event.item_id.split(':', 1)[1]
-            self.run_worker(self._toggle_mcp_server(mcp_name), exclusive=True)
-
-    def on_collapsible_section_feature_toggle_changed(self, event: Any) -> None:
-        if not isinstance(event, CollapsibleSection.FeatureToggleChanged):
-            return
-        section_id = getattr(event.control, 'id', None)
-        enabled = bool(event.enabled)
-        if section_id == 'sidebar-mcp':
-            self.run_worker(self._toggle_mcp_master(enabled), exclusive=True)
-        elif section_id == 'sidebar-lsp':
-            self.run_worker(self._toggle_lsp_query(enabled), exclusive=True)
-        elif section_id == 'sidebar-dap':
-            self.run_worker(self._toggle_debugger(enabled), exclusive=True)
+    # Sidebar-row/collapsible-section events for MCP/LSP/Debug Adapters/Skills
+    # are now handled by GrintaEnvironmentDialog itself (those sections moved
+    # out of this screen's DOM into that modal, so messages from them no
+    # longer bubble here). The toggle coroutines below are shared: the modal
+    # awaits them directly rather than duplicating the mutation logic.
 
     async def _toggle_mcp_master(self, enabled: bool) -> None:
         from backend.cli.settings.mcp import set_mcp_master_enabled
@@ -561,25 +500,3 @@ class ScreenSettingsMixin:
         self._reload_mcp_config_and_refresh_sidebar()
         state = 'enabled' if enabled else 'disabled'
         self.notify(f'MCP {name}: {state}', severity='information', timeout=2.0)
-
-    @work
-    async def on_collapsible_section_action_clicked(self, event: Any) -> None:
-        """Open manage dialogs from sidebar section headers."""
-        if not event.control:
-            return
-
-        from backend.core.config import load_app_config
-
-        if event.control.id == 'sidebar-skills':
-            changed = await self.app.push_screen_wait(GrintaManageSkillsDialog())
-            if changed:
-                self._refresh_sidebar()
-                self.notify('Skills updated', severity='information', timeout=2.0)
-        elif event.control.id == 'sidebar-mcp':
-            self._config = load_app_config()
-            changed = await self.app.push_screen_wait(
-                GrintaManageMCPDialog(self._config)
-            )
-            if changed:
-                self._reload_mcp_config_and_refresh_sidebar()
-                self.notify('MCP servers updated', severity='information', timeout=2.0)

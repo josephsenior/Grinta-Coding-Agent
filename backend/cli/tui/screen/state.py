@@ -250,9 +250,45 @@ class ScreenStateMixin:
         )
         self._render_hud_status_label()
 
-    @staticmethod
-    def _build_hud_line2_leading(ws_display: str) -> str:
-        return f'[#91abec]● Grinta[/]  [{NAVY_TEXT_DIM}]Ws: {ws_display}[/]'
+    def _build_hud_line2_leading(self, ws_display: str) -> str:
+        base = f'[#91abec]● Grinta[/]  [{NAVY_TEXT_DIM}]Ws: {ws_display}[/]'
+        tasks_markup = self._hud_tasks_summary_markup()
+        if tasks_markup:
+            base += f'  {tasks_markup}'
+        return base
+
+    def _hud_tasks_summary_markup(self) -> str:
+        """Compact ``▣ done/total · current task`` markup for the HUD line.
+
+        Tasks replaced a permanent sidebar column with this one-line summary:
+        live enough to glance at while the agent works, and simply absent
+        (returns '') when there are no tasks, rather than reserving space for
+        an empty panel. Ctrl+T opens the full list (GrintaTasksDialog).
+        """
+        renderer = getattr(self, '_renderer', None)
+        task_list = getattr(renderer, '_task_list', None) if renderer else None
+        if not task_list:
+            return ''
+
+        from backend.cli.event_rendering.panels import task_panel_signature
+        from backend.core.tasks.task_status import TASK_STATUS_DONE
+
+        signature = task_panel_signature(task_list)
+        total = len(signature)
+        if total == 0:
+            return ''
+        done = sum(1 for _tid, status, _desc in signature if status == TASK_STATUS_DONE)
+        active_desc = next(
+            (desc for _tid, status, desc in signature if status == 'in_progress'),
+            None,
+        )
+        summary = f'▣ {done}/{total}'
+        if active_desc:
+            max_len = 32
+            if len(active_desc) > max_len:
+                active_desc = active_desc[: max_len - 1] + '…'
+            summary += f' · {active_desc}'
+        return f'[{NAVY_TEXT_DIM}]{summary}[/]'
 
     @staticmethod
     def _build_context_display(used: int, limit: int) -> str:

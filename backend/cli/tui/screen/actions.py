@@ -31,18 +31,23 @@ class ScreenActionsMixin:
         """Scroll transcript to bottom."""
         self._scroll_to_bottom()
 
-    def action_toggle_sidebar(self) -> None:
-        """Toggle sidebar visibility."""
-        sidebar = self.query_one('#sidebar')
-        left_col = self.query_one('#left-column')
-        if sidebar.has_class('-hidden'):
-            sidebar.remove_class('-hidden')
-            left_col.styles.width = '78%'
-            self._sidebar_user_hidden = False
-        else:
-            sidebar.add_class('-hidden')
-            left_col.styles.width = '100%'
-            self._sidebar_user_hidden = True
+    def action_show_environment(self) -> None:
+        """Open the Environment modal (MCP/LSP/Debug Adapters/Skills)."""
+        from backend.cli.tui.dialogs import GrintaEnvironmentDialog
+
+        renderer = self._renderer
+        if renderer is None:
+            return
+        self.app.push_screen(GrintaEnvironmentDialog(renderer))
+
+    def action_show_tasks(self) -> None:
+        """Open the Tasks drawer with the full current task list."""
+        from backend.cli.tui.dialogs import GrintaTasksDialog
+
+        renderer = self._renderer
+        if renderer is None:
+            return
+        self.app.push_screen(GrintaTasksDialog(renderer))
 
     def action_show_help(self) -> None:
         """Show help information."""
