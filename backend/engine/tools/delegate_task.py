@@ -1,12 +1,17 @@
-"""delegate_task tool — spawn sub-agents for parallelizable tasks.
+"""delegate_task tool — spawn read-only worker agents for parallel investigation.
 
-Allows the orchestrator to map-reduce its workload by spinning up isolated
-workers with constrained tools to solve parallelizable sub-problems.
+Lets the orchestrator fan out research it would otherwise run in its own
+context, then reduce the workers' conclusions. Workers are read-only: the
+file-editing tools are withheld from them and their workspace is mounted
+read-only, so a worker can report what should change but never changes it.
 """
 
 from __future__ import annotations
 
-from backend.core.constants import MAX_DELEGATION_DEPTH
+from backend.core.constants import (
+    DELEGATE_WORKER_TIMEOUT_SECONDS,
+    MAX_PARALLEL_DELEGATE_WORKERS,
+)
 from backend.core.tools.tool_names import DELEGATE_TASK_TOOL_NAME
 from backend.ledger.action.agent import DelegateTaskAction
 
@@ -18,63 +23,64 @@ def create_delegate_task_tool() -> dict:
         'function': {
             'name': DELEGATE_TASK_TOOL_NAME,
             'description': (
-                'Delegate a specific, isolated sub-task to a worker agent. '
-                'Use this to parallelize work such as writing unit tests for '
-                'multiple files, summarizing text, or performing isolated refactors. '
-                'The worker agent will have its own runtime and context, '
-                'and will return its final observation once complete.\n\n'
-                'MODES:\n'
-                '1. FOREGROUND (default): Worker runs and you wait for the result.\n'
-                '2. BACKGROUND: Set `run_in_background=true` to spawn worker(s) asynchronously. '
-                '   The worker runs in the background while you continue working. '
-                '   Use `shared_task_board` to monitor progress and retrieve results.\n\n'
-                'PARALLEL MODE: Pass `parallel_tasks` (a list of task objects) instead of '
-                '`task_description` to spawn all workers simultaneously. '
-                "Each task object needs 'task_description' and optionally 'files'. "
-                'Use parallel mode when sub-tasks are fully independent (no shared files).\n\n'
+                'Delegate a read-only investigation to a worker agent. Use this to '
+                'parallelize research across a large codebase — tracing how a feature '
+                'works, finding every call site of a symbol, summarizing a subsystem — '
+                'and get back a conclusion instead of spending your own context on the '
+                'search.\n\n'
+                'The worker has its own context and returns its final observation when '
+                'done. It can read, search and run read commands freely, but it CANNOT '
+                'modify the workspace: the file-editing tools are withheld from it and '
+                'its filesystem is mounted read-only. Apply any change it recommends '
+                'yourself.\n\n'
+                'PARALLEL MODE: pass `parallel_tasks` (a list of objects, each with '
+                "'task_description') instead of `task_description` to run several "
+                f'investigations at once, up to {MAX_PARALLEL_DELEGATE_WORKERS}. The '
+                'observation contains every worker result.\n\n'
                 'LIMITS:\n'
-                f'- Maximum delegation depth: {MAX_DELEGATION_DEPTH} levels (parent → worker → sub-worker)\n'
-                '- Worker timeout: 5 minutes per worker (automatically terminated if exceeded)\n'
-                '- Use `shared_task_board` to coordinate between background workers'
+                '- Workers cannot delegate further; delegation is one level deep.\n'
+                f'- A worker is terminated after {int(DELEGATE_WORKER_TIMEOUT_SECONDS)}s.\n'
+                '- You wait for the result, so delegate only work you need before '
+                'continuing.'
             ),
             'parameters': {
                 'type': 'object',
                 'properties': {
                     'task_description': {
                         'type': 'string',
-                        'description': 'Clear and detailed instructions for a single worker agent. Required unless parallel_tasks is provided.',
+                        'description': (
+                            'Clear and detailed instructions for a single worker, '
+                            'including what it should report back. Required unless '
+                            'parallel_tasks is provided.'
+                        ),
                     },
                     'files': {
                         'type': 'array',
                         'items': {'type': 'string'},
-                        'description': 'List of file paths the worker agent needs to read or modify.',
-                    },
-                    'run_in_background': {
-                        'type': 'boolean',
-                        'description': 'If true, spawns the worker(s) in the background and returns immediately. Use `shared_task_board` to monitor progress. Workers timeout after 5 minutes.',
+                        'description': (
+                            'File paths the worker should start from. Advisory only — '
+                            'the worker can read anything in the workspace.'
+                        ),
                     },
                     'parallel_tasks': {
                         'type': 'array',
                         'description': (
-                            'List of independent sub-tasks to run concurrently. '
-                            'When provided, task_description and files at the top level are ignored. '
-                            'All workers run in parallel; the observation contains all their results.'
+                            'Independent investigations to run concurrently. '
+                            'When provided, task_description and files at the top '
+                            'level are ignored. At most '
+                            f'{MAX_PARALLEL_DELEGATE_WORKERS} are accepted.'
                         ),
                         'items': {
                             'type': 'object',
                             'properties': {
                                 'task_description': {
                                     'type': 'string',
-                                    'description': 'What this specific worker should do.',
+                                    'description': 'What this specific worker should investigate.',
                                 },
                                 'files': {
                                     'type': 'array',
                                     'items': {'type': 'string'},
                                     'description': 'Files relevant to this sub-task.',
-                                },
-                                'run_in_background': {
-                                    'type': 'boolean',
-                                    'description': 'If true, this specific worker runs in background.',
                                 },
                             },
                             'required': ['task_description'],
@@ -97,8 +103,17 @@ def build_delegate_task_action(arguments: dict, depth: int = 0) -> DelegateTaskA
     from backend.core.errors import FunctionCallValidationError
 
     parallel_tasks = arguments.get('parallel_tasks', [])
+    # Background workers are not exposed in the schema: there is no join or
+    # handle for them yet, so a background result would be unobservable. The
+    # handler still supports the flag for programmatic callers.
     run_in_background = arguments.get('run_in_background', False)
     if parallel_tasks:
+        if len(parallel_tasks) > MAX_PARALLEL_DELEGATE_WORKERS:
+            raise FunctionCallValidationError(
+                f'parallel_tasks has {len(parallel_tasks)} entries, which exceeds the '
+                f'limit of {MAX_PARALLEL_DELEGATE_WORKERS} concurrent workers. '
+                'Group the work into fewer, broader investigations.'
+            )
         # Parallel mode — validate each task has task_description
         for i, t in enumerate(parallel_tasks):
             if not t.get('task_description'):

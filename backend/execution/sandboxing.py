@@ -58,6 +58,10 @@ class ExecutionSandboxPolicy:
     backend: SandboxBackend
     workspace_root: str
     allow_network: bool = False
+    read_only_workspace: bool = False
+    """Mount the workspace read-only. The sandbox temp dir stays writable so
+    tools that need scratch space still work, but the project tree cannot be
+    mutated by any command run through the sandbox."""
 
     def wrap_argv(self, argv: Sequence[str], *, cwd: str) -> list[str]:
         """Return a sandbox-prefixed argv for the target child command."""
@@ -113,7 +117,7 @@ class ExecutionSandboxPolicy:
 
         args.extend(
             [
-                '--bind',
+                '--ro-bind' if self.read_only_workspace else '--bind',
                 self.workspace_root,
                 self.workspace_root,
                 '--chdir',
@@ -154,9 +158,10 @@ class ExecutionSandboxPolicy:
             '(allow file-write*',
             '    (subpath "/tmp")',
             '    (subpath "/private/tmp")',
-            f'    (subpath "{workspace}")',
-            ')',
         ]
+        if not self.read_only_workspace:
+            policy_lines.append(f'    (subpath "{workspace}")')
+        policy_lines.append(')')
         if self.allow_network:
             policy_lines.append('(allow network*)')
         else:
@@ -177,6 +182,8 @@ class ExecutionSandboxPolicy:
             cwd,
             '--network',
             '1' if self.allow_network else '0',
+            '--readonly',
+            '1' if self.read_only_workspace else '0',
             '--',
             *list(argv),
         ]
@@ -193,6 +200,7 @@ def resolve_execution_sandbox_policy(
 
     workspace = str(Path(workspace_root).resolve())
     allow_network = bool(getattr(security_config, 'allow_network_commands', False))
+    read_only = bool(getattr(security_config, 'readonly_workspace', False))
 
     if OS_CAPS.is_linux:
         if not (shutil.which('bwrap') or shutil.which('bubblewrap')):
@@ -203,6 +211,7 @@ def resolve_execution_sandbox_policy(
             backend='bubblewrap',
             workspace_root=workspace,
             allow_network=allow_network,
+            read_only_workspace=read_only,
         )
 
     if OS_CAPS.is_macos:
@@ -214,6 +223,7 @@ def resolve_execution_sandbox_policy(
             backend='sandbox-exec',
             workspace_root=workspace,
             allow_network=allow_network,
+            read_only_workspace=read_only,
         )
 
     if OS_CAPS.is_windows:
@@ -221,6 +231,7 @@ def resolve_execution_sandbox_policy(
             backend='appcontainer',
             workspace_root=workspace,
             allow_network=allow_network,
+            read_only_workspace=read_only,
         )
 
     raise RuntimeError(

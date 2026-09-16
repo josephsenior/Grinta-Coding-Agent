@@ -198,13 +198,20 @@ def _sid_to_string(sid: wintypes.LPVOID) -> str:
             LocalFree(string_ptr)
 
 
-def _grant_workspace_access(workspace: Path, sid_string: str) -> None:
+def _grant_workspace_access(
+    workspace: Path, sid_string: str, *, read_only: bool = False
+) -> None:
+    # 'RX' grants read+execute only, so the AppContainer child cannot mutate the
+    # workspace. Its stdout/stderr still work: those files are opened by this
+    # parent process and passed down as inherited handles, and Windows checks
+    # the ACL at open time rather than on each write.
+    rights = '(OI)(CI)RX' if read_only else '(OI)(CI)F'
     grant = subprocess.run(
         [
             'icacls',
             str(workspace),
             '/grant',
-            f'*{sid_string}:(OI)(CI)F',
+            f'*{sid_string}:{rights}',
             '/T',
             '/C',
         ],
@@ -270,7 +277,14 @@ def _create_appcontainer(name: str) -> wintypes.LPVOID:
     return sid
 
 
-def _launch(argv: list[str], *, cwd: str, workspace: Path, allow_network: bool) -> int:
+def _launch(
+    argv: list[str],
+    *,
+    cwd: str,
+    workspace: Path,
+    allow_network: bool,
+    read_only_workspace: bool = False,
+) -> int:
     profile_name = f'GrintaSandbox_{os.getpid()}_{uuid.uuid4().hex[:8]}'
     sid = _create_appcontainer(profile_name)
     sid_string = _sid_to_string(sid)
@@ -293,7 +307,9 @@ def _launch(argv: list[str], *, cwd: str, workspace: Path, allow_network: bool) 
         os.set_handle_inheritable(stdout_handle, True)
         os.set_handle_inheritable(stderr_handle, True)
         os.set_handle_inheritable(stdin_handle, True)
-        _grant_workspace_access(workspace, sid_string)
+        _grant_workspace_access(
+            workspace, sid_string, read_only=read_only_workspace
+        )
 
         caps_array, capability_ptrs = _make_capabilities(allow_network)
         security_caps = SECURITY_CAPABILITIES()
@@ -406,6 +422,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--workspace', required=True)
     parser.add_argument('--cwd', required=True)
     parser.add_argument('--network', choices=['0', '1'], default='0')
+    parser.add_argument('--readonly', choices=['0', '1'], default='0')
     parser.add_argument('command', nargs=argparse.REMAINDER)
     ns = parser.parse_args(argv)
 
@@ -419,7 +436,11 @@ def main(argv: list[str] | None = None) -> int:
     workspace = Path(ns.workspace).resolve()
     cwd = str(Path(ns.cwd).resolve())
     return _launch(
-        command, cwd=cwd, workspace=workspace, allow_network=ns.network == '1'
+        command,
+        cwd=cwd,
+        workspace=workspace,
+        allow_network=ns.network == '1',
+        read_only_workspace=ns.readonly == '1',
     )
 
 

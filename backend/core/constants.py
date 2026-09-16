@@ -259,7 +259,14 @@ DELEGATE_WORKER_TIMEOUT_SECONDS = float(
 )
 # Maximum delegation depth: prevents infinite recursion of delegate_task calls.
 # Default: 2 (parent → worker → sub-worker). Override via GRINTA_MAX_DELEGATION_DEPTH.
+# Note: workers are currently built with enable_swarming=False, so in practice
+# delegation stops at depth 1 regardless of this ceiling.
 MAX_DELEGATION_DEPTH = int(os.getenv('GRINTA_MAX_DELEGATION_DEPTH', '2'))
+# Maximum workers in a single parallel_tasks batch. Each worker is a full agent
+# with its own budget, so an uncapped fan-out multiplies the cost of one turn.
+MAX_PARALLEL_DELEGATE_WORKERS = int(
+    os.getenv('GRINTA_MAX_PARALLEL_DELEGATE_WORKERS', '4')
+)
 
 # ─ Threshold Constants ─────────────────────────────────────────────
 IDLE_RECLAIM_SPIKE_THRESHOLD = 3

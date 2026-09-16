@@ -69,6 +69,17 @@ class SecurityConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             'this controls whether the sandbox backend grants network access.'
         ),
     )
+    readonly_workspace: bool = Field(
+        default=False,
+        description=(
+            "When execution_profile='sandboxed_local', mount the workspace read-only so no "
+            'command executed through the sandbox can mutate it. Used by read-only delegated '
+            'workers: rather than classifying shell commands as read or write (unreliable, '
+            'since shells do both), the filesystem itself is made immutable. Scratch space '
+            'under the sandbox temp dir stays writable. Has no effect on other profiles, '
+            'which do not interpose on process filesystem access.'
+        ),
+    )
     allow_package_installs: bool = Field(
         default=False,
         description=(

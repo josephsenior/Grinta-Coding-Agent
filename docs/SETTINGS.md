@@ -58,8 +58,31 @@ The default agent name is `Orchestrator`. Common overrides:
 | `enable_task_tracker_tool` | Structured plan tracking in Plan mode |
 | `enable_lsp_query` | LSP tool (`lsp`); default off — set `true` when language servers are installed |
 | `enable_debugger` | Interactive DAP debugger tool; default off — set `true` when debug adapters are available |
+| `enable_swarming` | `delegate_task` tool for delegating read-only investigation to worker agents; default off. See below. |
+| `enable_blackboard` | `shared_task_board` tool, for workers in a parallel batch to coordinate through a shared key-value board; default off, and only exposed to a worker that actually has a board attached. |
 
-**Disabled in v1.0:** `enable_blackboard` and `enable_swarming` — schema only, not wired. Autonomy: [USER_GUIDE.md](USER_GUIDE.md).
+Autonomy: [USER_GUIDE.md](USER_GUIDE.md).
+
+### Delegation (`enable_swarming`)
+
+With `enable_swarming` on, the agent can hand a worker agent a read-only
+investigation — tracing a feature, finding call sites, summarizing a subsystem —
+and get back a conclusion without spending its own context on the search. Up to
+4 workers run concurrently (`GRINTA_MAX_PARALLEL_DELEGATE_WORKERS`), each
+terminated after 5 minutes (`GRINTA_DELEGATE_WORKER_TIMEOUT`). Workers cannot
+delegate in turn, so delegation is one level deep.
+
+Workers cannot modify the workspace. Two mechanisms enforce that, matching the
+two kinds of tool: the unambiguously edit-only tools are withheld from the
+worker outright, while the guarantee for dual-use tools — a shell both reads and
+writes, and classifying invocations as safe is not reliable — comes from below
+the tool layer, via a workspace the worker cannot write
+(`security.readonly_workspace` under `execution_profile: sandboxed_local`).
+That sandbox support exists, but worker commands are not yet routed through it,
+so for now the terminal tool is withheld from workers too. Workers investigate
+with the read and search tools (`read_file`, `grep`, `glob`, `find_symbols`,
+`lsp`, `analyze_project_structure`) and the parent applies whatever they
+recommend.
 
 See `backend/core/config/agent_config.py` for the full schema.
 
@@ -75,6 +98,7 @@ See `backend/core/config/agent_config.py` for the full schema.
 | `allow_package_installs` | `false` | Allow package installs in `hardened_local` / `sandboxed_local` |
 | `allow_background_processes` | `false` | Allow background processes in `hardened_local` / `sandboxed_local` |
 | `allow_sensitive_path_access` | `false` | Allow sensitive workspace paths in `hardened_local` / `sandboxed_local` |
+| `readonly_workspace` | `false` | Mount the workspace read-only in `sandboxed_local`, so no command run through the sandbox can mutate it. Sandbox scratch space stays writable. No effect on other profiles, which do not interpose on filesystem access. |
 | `allow_read_outside_workspace` | `false` | Opt in to read-only paths outside the project |
 | `additional_read_roots` | `[]` | Approved absolute paths when outside reads are enabled |
 | `validation_mode` | `permissive` | `permissive` (single-user default) or `strict` conversation ownership |
