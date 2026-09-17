@@ -294,11 +294,8 @@ committing literal keys. Grinta also supports per-agent settings, MCP servers,
 budget limits, context and output limits, execution profiles, Windows shell
 selection, and explicit read-only roots outside the workspace.
 
-Optional semantic retrieval is available through the `rag` extra:
-
-```bash
-pipx install "grinta[rag]"
-```
+There are no optional extras: history search (`search_history`) is built in
+and runs on SQLite, so the plain install has every feature.
 
 See [SETTINGS.md](docs/SETTINGS.md) and the checked-in
 [`settings.template.json`](settings.template.json) for the complete schema.

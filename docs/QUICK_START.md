@@ -54,16 +54,9 @@ grinta
 
 ## Optional features
 
-For optional dependency sets, clone the source tree and install the desired
-extra:
-
-```bash
-git clone https://github.com/josephsenior/Grinta-Coding-Agent.git Grinta
-cd Grinta
-pipx install ".[rag]"       # vector-memory support
-pipx install ".[browser]"   # browser tools
-pipx install ".[all]"       # all optional integrations
-```
+There are no optional extras to install. History search (`search_history`) is
+built in and runs on SQLite from the Python standard library; turn it off with
+`"enable_vector_memory": false` in settings if you don't want it.
 
 ## Develop from source
 

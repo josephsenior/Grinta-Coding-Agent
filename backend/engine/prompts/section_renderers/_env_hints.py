@@ -173,6 +173,8 @@ def _routing_memory_tool_placeholders(
             '**search_history** tool:\n'
             '- `search_history(query=...)`: search earlier conversation and tool-event history when required '
             'information is no longer visible.\n'
+            '- It is keyword search (BM25), not semantic: query with exact terms from the text you need '
+            '(function names, file paths, error messages), not a paraphrased question.\n'
             '</MEMORY_AND_CONTEXT>'
         )
     else:

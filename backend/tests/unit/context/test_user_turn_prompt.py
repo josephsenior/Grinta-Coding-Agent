@@ -34,7 +34,6 @@ def _make_memory() -> ContextMemory:
     config.enable_vector_memory = False
     config.enable_som_visual_browsing = False
     config.cli_mode = True
-    config.enable_hybrid_retrieval = False
     return ContextMemory(config=config, prompt_manager=prompt_manager)
 
 

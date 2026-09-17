@@ -345,11 +345,9 @@ DEFAULT_AGENT_PROMPT_EXTENSIONS_ENABLED = True
 DEFAULT_AGENT_BROWSING_ENABLED = True
 DEFAULT_AGENT_WEB_ENABLED = True
 DEFAULT_AGENT_DOCS_ENABLED = True
-# Vector memory & hybrid retrieval use the optional `[rag]` extra at runtime.
-# Defaults are on; tools/prompts appear only when chromadb is installed.
-# Disable in settings.json: `"enable_vector_memory": false`.
+# History search (search_history) runs on stdlib SQLite FTS5, on every install.
+# Disable in settings.json: `"enable_vector_memory": false` (historical key name).
 DEFAULT_AGENT_VECTOR_MEMORY_ENABLED = True
-DEFAULT_AGENT_HYBRID_RETRIEVAL_ENABLED = True
 DEFAULT_AGENT_AUTO_LINT_ENABLED = True
 DEFAULT_AGENT_AUTO_RETRY_ON_ERROR = True
 DEFAULT_AGENT_AUTONOMY_LEVEL = 'balanced'
@@ -458,14 +456,6 @@ DEFAULT_STUCK_CONTEXT_HIGH_GROWTH = 1000
 # Stuck-detection recovery: how much one progress signal decrements the
 # counter (game-able if too high; ignored if too low).
 DEFAULT_STUCK_PROGRESS_SIGNAL_DECREMENT = 2
-
-# ── Knowledge Base Defaults ─────────────────────────────────────────
-DEFAULT_KB_ENABLED = True
-DEFAULT_KB_ACTIVE_COLLECTION_IDS: list[str] = []
-DEFAULT_KB_SEARCH_TOP_K = 5
-DEFAULT_KB_RELEVANCE_THRESHOLD = 0.7
-DEFAULT_KB_AUTO_SEARCH = True
-DEFAULT_KB_SEARCH_STRATEGY = 'hybrid'
 
 # ── Logging & Debug (env-var driven) ────────────────────────────────
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()

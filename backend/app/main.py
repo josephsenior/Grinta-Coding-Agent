@@ -187,7 +187,6 @@ async def _setup_memory(
             conversation_instructions=conversation_instructions,
             working_dir=config_.workspace_mount_path_in_runtime,
         )
-    _warm_agent_vector_memory(agent)
     return memory
 
 
@@ -195,17 +194,6 @@ async def _setup_mcp_tools(agent: Agent, runtime: Runtime, memory: Memory) -> No
     """Warm MCP tools after chat becomes usable."""
     if agent.config.enable_mcp:
         await add_mcp_tools_to_agent(agent, runtime, memory)
-
-
-def _warm_agent_vector_memory(agent: Agent) -> None:
-    """Start optional vector-memory warmup outside the critical agent-init path."""
-    conversation_memory = getattr(agent, 'conversation_memory', None)
-    starter = getattr(conversation_memory, 'start_vector_memory_warmup', None)
-    if callable(starter):
-        try:
-            starter()
-        except Exception:
-            logger.debug('Vector-memory warmup skipped', exc_info=True)
 
 
 def _setup_replay_events(
@@ -386,7 +374,6 @@ def _initialize_session_components(
         config_, session_id, None
     )
     agent = create_agent(config_, llm_registry)
-    _warm_agent_vector_memory(agent)
     return session_id, llm_registry, conversation_stats, config_, agent
 
 

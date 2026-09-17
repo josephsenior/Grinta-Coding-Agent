@@ -24,7 +24,6 @@ def _make_config(**overrides) -> SimpleNamespace:
     defaults = {
         'enable_vector_memory': False,
         'enable_som_visual_browsing': False,
-        'enable_hybrid_retrieval': False,
         'cli_mode': True,
     }
     defaults.update(overrides)

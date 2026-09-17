@@ -1,4 +1,4 @@
-"""Tests for optional pip extra detection and runtime gating."""
+"""Tests for runtime feature gating (config flags and manually installed modules)."""
 
 from __future__ import annotations
 
@@ -27,23 +27,27 @@ def test_browser_tool_disabled_in_settings(monkeypatch) -> None:
     assert oe.browser_tool_enabled(cfg) is False
 
 
-def test_vector_memory_enabled_requires_extra_and_flag(monkeypatch) -> None:
+def test_vector_memory_enabled_follows_config_flag_only() -> None:
+    def cfg(flag: bool) -> SimpleNamespace:
+        return SimpleNamespace(
+            default_agent='Orchestrator',
+            get_agent_config=lambda _name: SimpleNamespace(enable_vector_memory=flag),
+        )
+
+    # History search needs no optional package, so the flag alone decides.
+    assert oe.vector_memory_enabled(cfg(True)) is True
+    assert oe.vector_memory_enabled(cfg(False)) is False
+
+
+def test_rag_extra_gate_is_gone() -> None:
+    assert not hasattr(oe, 'is_rag_extra_available')
+
+
+def test_semantic_recall_active_requires_live_store() -> None:
     cfg = SimpleNamespace(
         default_agent='Orchestrator',
         get_agent_config=lambda _name: SimpleNamespace(enable_vector_memory=True),
     )
-    monkeypatch.setattr(oe, 'is_rag_extra_available', lambda: False)
-    assert oe.vector_memory_enabled(cfg) is False
-    monkeypatch.setattr(oe, 'is_rag_extra_available', lambda: True)
-    assert oe.vector_memory_enabled(cfg) is True
-
-
-def test_semantic_recall_active_requires_live_store(monkeypatch) -> None:
-    cfg = SimpleNamespace(
-        default_agent='Orchestrator',
-        get_agent_config=lambda _name: SimpleNamespace(enable_vector_memory=True),
-    )
-    monkeypatch.setattr(oe, 'is_rag_extra_available', lambda: True)
     assert (
         oe.semantic_recall_active(cfg, vector_store=None, require_live_store=True)
         is False
@@ -53,30 +57,27 @@ def test_semantic_recall_active_requires_live_store(monkeypatch) -> None:
     )
 
 
-def test_semantic_recall_active_when_disabled(monkeypatch) -> None:
+def test_semantic_recall_active_when_disabled() -> None:
     cfg = SimpleNamespace(
         default_agent='Orchestrator',
         get_agent_config=lambda _name: SimpleNamespace(enable_vector_memory=False),
     )
-    monkeypatch.setattr(oe, 'is_rag_extra_available', lambda: True)
     assert oe.semantic_recall_active(cfg, require_live_store=False) is False
 
 
-def test_semantic_recall_active_no_live_store_needed(monkeypatch) -> None:
+def test_semantic_recall_active_no_live_store_needed() -> None:
     cfg = SimpleNamespace(
         default_agent='Orchestrator',
         get_agent_config=lambda _name: SimpleNamespace(enable_vector_memory=True),
     )
-    monkeypatch.setattr(oe, 'is_rag_extra_available', lambda: True)
     assert oe.semantic_recall_active(cfg, require_live_store=False) is True
 
 
-def test_resolve_semantic_recall_for_prompt(monkeypatch) -> None:
+def test_resolve_semantic_recall_for_prompt() -> None:
     cfg = SimpleNamespace(
         default_agent='Orchestrator',
         get_agent_config=lambda _name: SimpleNamespace(enable_vector_memory=True),
     )
-    monkeypatch.setattr(oe, 'is_rag_extra_available', lambda: True)
 
     assert (
         oe.resolve_semantic_recall_for_prompt(cfg, semantic_recall_active=True) is True

@@ -277,10 +277,7 @@ class TestSystemCapabilitiesModeSpecific:
         body = self._render_caps(mode='agent', enable_browsing=True)
         self._assert_not_contains(body, 'Browser (`browser`)')
 
-    def test_agent_mode_shows_search_history(self, monkeypatch):
-        from backend.utils import optional_extras as oe
-
-        monkeypatch.setattr(oe, 'is_rag_extra_available', lambda: True)
+    def test_agent_mode_shows_search_history(self):
         body = self._render_caps(mode='agent', enable_vector_memory=True)
         self._assert_contains(body, 'Search History (`search_history`)')
 
@@ -312,10 +309,7 @@ class TestSystemCapabilitiesModeSpecific:
         body = self._render_caps(mode='chat')
         self._assert_not_contains(body, 'Browser (`browser`)')
 
-    def test_chat_mode_shows_search_history_when_enabled(self, monkeypatch):
-        from backend.utils import optional_extras as oe
-
-        monkeypatch.setattr(oe, 'is_rag_extra_available', lambda: True)
+    def test_chat_mode_shows_search_history_when_enabled(self):
         body = self._render_caps(mode='chat', enable_vector_memory=True)
         self._assert_contains(body, 'Search History (`search_history`)')
 
@@ -341,10 +335,7 @@ class TestSystemCapabilitiesModeSpecific:
         body = self._render_caps(mode='plan')
         self._assert_not_contains(body, 'Browser (`browser`)')
 
-    def test_plan_mode_shows_search_history_when_enabled(self, monkeypatch):
-        from backend.utils import optional_extras as oe
-
-        monkeypatch.setattr(oe, 'is_rag_extra_available', lambda: True)
+    def test_plan_mode_shows_search_history_when_enabled(self):
         body = self._render_caps(mode='plan', enable_vector_memory=True)
         self._assert_contains(body, 'Search History (`search_history`)')
 

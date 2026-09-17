@@ -1,4 +1,4 @@
-"""Runtime detection for pip optional extras ([rag]) and manually installed modules."""
+"""Runtime feature gates: config flags plus manually installed modules."""
 
 from __future__ import annotations
 
@@ -13,11 +13,6 @@ def _optional_extra_installed(module_name: str) -> bool:
         return importlib.util.find_spec(module_name) is not None
     except (ImportError, ModuleNotFoundError, ValueError):
         return False
-
-
-def is_rag_extra_available() -> bool:
-    """Return True when the ``[rag]`` extra (chromadb stack) is installed."""
-    return _optional_extra_installed('chromadb')
 
 
 def is_browser_extra_available() -> bool:
@@ -46,11 +41,13 @@ def browser_tool_enabled(config: Any) -> bool:
 
 
 def vector_memory_enabled(config: Any) -> bool:
-    """Config allows vector memory **and** the ``[rag]`` extra is installed."""
+    """Config allows history search (``enable_vector_memory``, default on).
+
+    History search runs on SQLite FTS5 from the standard library, so there is
+    no install-time dependency to check — the config flag alone decides.
+    """
     agent = _resolve_agent_config(config)
-    return (
-        bool(getattr(agent, 'enable_vector_memory', False)) and is_rag_extra_available()
-    )
+    return bool(getattr(agent, 'enable_vector_memory', False))
 
 
 def semantic_recall_active(
@@ -59,11 +56,11 @@ def semantic_recall_active(
     vector_store: Any | None = None,
     require_live_store: bool = False,
 ) -> bool:
-    """Return True when semantic ``memory(recall)`` should be exposed.
+    """Return True when history search (``search_history``) should be exposed.
 
     When *require_live_store* is True (runtime tool/prompt assembly), the
-    vector store must have initialized successfully — config + ``[rag]`` alone
-    is not enough.
+    search store must have initialized successfully — the config flag alone
+    is not enough, since the SQLite database can still fail to open.
     """
     if not vector_memory_enabled(config):
         return False

@@ -35,7 +35,6 @@ from backend.core.constants import (
     DEFAULT_AGENT_ENABLE_FIRST_TURN_ORIENTATION_PROMPT,
     DEFAULT_AGENT_ERROR_RATE_WINDOW,
     DEFAULT_AGENT_HISTORY_TRUNCATION_ENABLED,
-    DEFAULT_AGENT_HYBRID_RETRIEVAL_ENABLED,
     DEFAULT_AGENT_LSP_QUERY_ENABLED,
     DEFAULT_AGENT_MAX_AUTONOMOUS_ITERATIONS,
     DEFAULT_AGENT_MAX_CONSECUTIVE_ERRORS,
@@ -152,15 +151,9 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     enable_vector_memory: bool = Field(
         default=DEFAULT_AGENT_VECTOR_MEMORY_ENABLED,
         description=(
-            'Vector memory / semantic recall. Default on; active only when the '
-            '`[rag]` extra is installed. Set false in settings to disable.'
-        ),
-    )
-    enable_hybrid_retrieval: bool = Field(
-        default=DEFAULT_AGENT_HYBRID_RETRIEVAL_ENABLED,
-        description=(
-            'Hybrid BM25 + vector retrieval (requires `[rag]`). Default on; gated at '
-            'runtime like enable_vector_memory.'
+            'History search (`search_history`): keyword search over this '
+            "session's earlier events via SQLite FTS5. Default on, no extra install. "
+            'The key name is historical. Set false in settings to disable.'
         ),
     )
     prompt_render_cache_enabled: bool = Field(

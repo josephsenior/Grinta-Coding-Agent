@@ -52,7 +52,6 @@ def _prompt_manager():
     pm = MagicMock()
     pm.build_workspace_context.return_value = 'workspace-ctx'
     pm.build_playbook_info.return_value = 'playbook-info'
-    pm.build_knowledge_base_info.return_value = 'kb-info'
     return pm
 
 

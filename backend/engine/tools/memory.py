@@ -20,8 +20,9 @@ _MEMORY_DESCRIPTION_BASE = (
 
 _MEMORY_RECALL_BLOCK = (
     '\n\n'
-    '**recall** — fuzzy search across indexed conversation history when the visible '
-    'window no longer shows what you need. Pass key as the search phrase.'
+    '**recall** — keyword search across indexed conversation history when the visible '
+    'window no longer shows what you need. Pass key as space-separated exact terms '
+    '(identifiers, file paths, error text).'
 )
 
 
@@ -42,7 +43,7 @@ def create_memory_tool(
     )
     action_description = (
         'Memory operation: working (session state), persist (workspace facts), '
-        'or recall (semantic search over indexed history).'
+        'or recall (keyword search over indexed history).'
         if include_semantic_recall
         else 'Memory operation: working (session state) or persist (workspace facts).'
     )
@@ -58,7 +59,7 @@ def create_memory_tool(
             'key': {
                 'type': 'string',
                 'description': (
-                    'For persist: short identifier. For recall: natural-language search phrase.'
+                    'For persist: short identifier. For recall: space-separated keywords.'
                 ),
             },
             'kind': {
@@ -116,12 +117,17 @@ def create_search_history_tool() -> ChatCompletionToolParam:
         name='search_history',
         description=(
             'Search earlier conversation and tool-event history when required '
-            'information is no longer visible.'
+            'information is no longer visible. Keyword search: use exact terms '
+            'that would appear in the text (identifiers, file paths, error '
+            'messages, command names) rather than a natural-language question.'
         ),
         properties={
             'query': {
                 'type': 'string',
-                'description': 'Search query or keyword phrase.',
+                'description': (
+                    'Space-separated keywords, e.g. "parse_config settings.py KeyError". '
+                    'Results match any of the terms, ranked by relevance.'
+                ),
             },
             'max_results': {
                 'type': 'integer',

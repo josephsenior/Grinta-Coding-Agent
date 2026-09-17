@@ -15,8 +15,7 @@
       "enable_web": false,
       "enable_mcp": false,
       "enable_swarming": false,
-      "enable_vector_memory": false,
-      "enable_hybrid_retrieval": false
+      "enable_vector_memory": false
     }
   }
 }

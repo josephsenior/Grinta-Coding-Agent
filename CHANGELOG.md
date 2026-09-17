@@ -35,6 +35,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **`[rag]` and `[all]` extras removed; `search_history` is now on for every
+  install.** The ChromaDB + fastembed semantic backend and the optional
+  flashrank re-ranker are gone. History search is keyword (BM25) search on
+  SQLite FTS5 from the standard library, which previously ran alongside the
+  semantic backend but was only reachable when `chromadb` was installed — so
+  base installs had no `search_history` at all. Agent history queries are
+  mostly identifiers, file paths and error text, where keyword matching is
+  strong; the embedding stack cost ~40 MB of wheels, a first-run model
+  download and 28+ transitive packages. Recall stays scoped to the current
+  session, as before. `enable_vector_memory` keeps its name and still toggles
+  the feature (default on). `enable_hybrid_retrieval` is removed; existing
+  settings files that set it still load, with a warning. `VectorBackend`
+  remains a pluggable interface (`EnhancedVectorStore(backend=...)`) for
+  experimenting with other retrieval strategies. The regenerated `uv.lock`
+  also picks up pin bumps that recent dependency updates had left unlocked.
+
 - **`[browser]` optional extra removed** (and with it `browser-use` from
   `[all]`). The adapter code in `backend/execution/browser/` remains with
   lazy imports and a clear runtime error; see the `Changed` entry above for

@@ -247,15 +247,14 @@ def execute_memory_persist(action: MemoryPersistAction) -> MemoryPersistObservat
 
 
 def execute_memory_recall(action: MemoryRecallAction) -> MemoryRecallObservation:
-    """Semantic recall over indexed conversation history."""
+    """Keyword search over indexed conversation history."""
     query = action.query
     recall_fn = _semantic_recall_registry.get('fn')
     if recall_fn is None:
         return MemoryRecallObservation(
             content=(
-                'Semantic recall is not available in this session. Install optional RAG '
-                'with pip install "grinta[rag]" (auto-enabled when installed) or set '
-                'agent.Orchestrator.enable_vector_memory to false to hide recall.'
+                'History search is not available in this session: it is disabled '
+                '(enable_vector_memory is false) or its SQLite store failed to open.'
             ),
             query=query,
         )
@@ -296,9 +295,8 @@ def _handle_memory_tool(arguments: Mapping[str, Any]) -> Action:
             )
         if get_semantic_recall_fn() is None:
             raise FunctionCallValidationError(
-                'memory(recall) is not available in this session. Install optional '
-                'RAG support with pip install "grinta[rag]" or set '
-                'enable_vector_memory to false in settings.'
+                'memory(recall) is not available in this session: history search is '
+                'disabled (enable_vector_memory is false) or its store failed to open.'
             )
         return MemoryRecallAction(query=query)
 
@@ -341,9 +339,8 @@ def _handle_search_history_tool(arguments: Mapping[str, Any]) -> Action:
         raise FunctionCallValidationError('Missing search query in search_history.')
     if get_semantic_recall_fn() is None:
         raise FunctionCallValidationError(
-            'search_history is not available in this session. Install optional '
-            'RAG support with pip install "grinta[rag]" or set '
-            'enable_vector_memory to false in settings.'
+            'search_history is not available in this session: history search is '
+            'disabled (enable_vector_memory is false) or its store failed to open.'
         )
     try:
         max_results = int(arguments.get('max_results', 8))

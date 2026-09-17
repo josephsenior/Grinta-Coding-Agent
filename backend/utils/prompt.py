@@ -12,7 +12,6 @@ from backend.core.os_capabilities import OS_CAPS
 if TYPE_CHECKING:
     from backend.ledger.observation.agent import PlaybookKnowledge
     from backend.orchestration.state.state import State
-    from backend.persistence.data_models.knowledge_base import KnowledgeBaseSearchResult
 
 
 @dataclass
@@ -141,16 +140,6 @@ class PromptManager:
         from backend.engine.prompts.prompt_builder import build_playbook_info as _build
 
         return _build(triggered_agents)
-
-    def build_knowledge_base_info(
-        self, kb_results: list[KnowledgeBaseSearchResult]
-    ) -> str:
-        """Render knowledge base search results."""
-        from backend.engine.prompts.prompt_builder import (
-            build_knowledge_base_info as _build,
-        )
-
-        return _build(kb_results)
 
     def add_turns_left_reminder(self, messages: list[Message], state: State) -> None:
         """Append reminder about remaining turns to the most recent user message."""

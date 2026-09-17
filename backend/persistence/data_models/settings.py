@@ -19,16 +19,6 @@ from pydantic import (  # noqa: E402
 
 from backend.core.config.config_loader import load_app_config  # noqa: E402
 from backend.core.config.mcp_config import MCPConfig  # noqa: E402
-from backend.core.constants import (  # noqa: E402
-    DEFAULT_KB_AUTO_SEARCH,
-    DEFAULT_KB_ENABLED,
-    DEFAULT_KB_RELEVANCE_THRESHOLD,
-    DEFAULT_KB_SEARCH_STRATEGY,
-    DEFAULT_KB_SEARCH_TOP_K,
-)
-from backend.persistence.data_models.knowledge_base import (
-    KnowledgeBaseSettings,  # noqa: E402
-)
 from backend.persistence.data_models.user_secrets import UserSecrets  # noqa: E402
 
 try:
@@ -59,13 +49,6 @@ class Settings(BaseModel):
     enable_proactive_conversation_starters: bool = True
     enable_solvability_analysis: bool = True
 
-    kb_enabled: bool = DEFAULT_KB_ENABLED
-    kb_active_collection_ids: list[str] = Field(default_factory=list)
-    kb_search_top_k: int = DEFAULT_KB_SEARCH_TOP_K
-    kb_relevance_threshold: float = DEFAULT_KB_RELEVANCE_THRESHOLD
-    kb_auto_search: bool = DEFAULT_KB_AUTO_SEARCH
-    kb_search_strategy: str = DEFAULT_KB_SEARCH_STRATEGY
-
     llm_model: str | None = None
     llm_provider: str | None = None
     llm_api_key: SecretStr | None = None
@@ -91,17 +74,6 @@ class Settings(BaseModel):
         from backend.inference.provider_resolver import normalize_provider_name
 
         return normalize_provider_name(value)
-
-    @property
-    def knowledge_base(self) -> KnowledgeBaseSettings:
-        return KnowledgeBaseSettings(
-            enabled=self.kb_enabled,
-            active_collection_ids=self.kb_active_collection_ids,
-            search_top_k=self.kb_search_top_k,
-            relevance_threshold=self.kb_relevance_threshold,
-            auto_search=self.kb_auto_search,
-            search_strategy=self.kb_search_strategy,
-        )
 
     @model_validator(mode='after')
     def canonicalize_llm_selection(self) -> Settings:

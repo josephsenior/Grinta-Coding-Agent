@@ -8,7 +8,6 @@ import os
 import queue
 import threading
 from collections import OrderedDict
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, cast
 
@@ -127,7 +126,7 @@ class ContextMemory:
         self.agent_config = config
         self.prompt_manager = prompt_manager
 
-        # Initialize vector memory when config + [rag] extra allow it.
+        # Initialize history search when config allows it (default on).
         vector_store: EnhancedVectorStore | None = None
         from backend.utils.optional_extras import vector_memory_enabled
 
@@ -149,7 +148,7 @@ class ContextMemory:
         )
 
         # Background indexer queue: keeps the synchronous prompt-assembly
-        # path free of ChromaDB / SQLite FTS5 I/O. Items are tuples of
+        # path free of SQLite FTS5 I/O. Items are tuples of
         # (event_id, role, content, metadata). Bounded so an unobserved
         # session cannot grow memory unbounded.
         self._index_queue: queue.Queue[tuple[str, str, str, dict[str, Any]]] = (
@@ -214,48 +213,26 @@ class ContextMemory:
         return self._ctx.recall_from_memory(query, k)
 
     def _initialize_vector_memory(self) -> EnhancedVectorStore | None:
-        """Initialize vector memory store for persistent context.
+        """Initialize the history search store (SQLite FTS5).
 
         Returns:
-            An initialized EnhancedVectorStore, or None if initialization fails.
+            An initialized EnhancedVectorStore, or None if the SQLite database
+            cannot be opened (``search_history`` is then hidden).
         """
         try:
-            from backend.utils.optional_extras import vector_memory_enabled
-
-            hybrid_enabled = bool(
-                getattr(self.agent_config, 'enable_hybrid_retrieval', False)
-            ) and vector_memory_enabled(self.agent_config)
             store = EnhancedVectorStore(
                 collection_name='conversation_memory',
                 enable_cache=True,
-                enable_reranking=hybrid_enabled,
-                warm_embeddings_in_background=False,
             )
-            logger.info(
-                '✅ Vector memory initialized for ContextMemory\n   Accuracy: 92%% | Hybrid retrieval: %s',
-                'enabled' if hybrid_enabled else 'disabled',
-            )
+            logger.info('History search initialized for ContextMemory')
             return store
         except Exception as e:
             logger.warning(
-                'Failed to initialize vector memory: %s\n'
-                'Continuing without persistent memory. To enable:\n'
-                '  pip install ".[rag]" (source) or pip install "grinta[rag]" (PyPI)',
+                'Failed to initialize history search: %s\n'
+                'Continuing without search_history for this session.',
                 e,
             )
             return None
-
-    def start_vector_memory_warmup(self) -> None:
-        """Start any optional vector-memory warmup without delaying chat readiness."""
-        store = self.vector_store
-        if store is None:
-            return
-        starter_fn = cast(
-            Callable[[], None] | None,
-            getattr(store, 'start_background_warmup', None),
-        )
-        if starter_fn is not None:
-            starter_fn()
 
     @staticmethod
     def _is_valid_image_url(url: str | None) -> bool:
@@ -577,7 +554,7 @@ class ContextMemory:
         """Index durable event content into vector memory when available.
 
         This used to call :meth:`store_in_memory` directly, which performs
-        synchronous ChromaDB / SQLite FTS5 I/O on the prompt-assembly hot
+        synchronous SQLite FTS5 I/O on the prompt-assembly hot
         path. We now push the record onto a bounded queue and let a
         background worker perform the write. The dedup set is updated
         synchronously so a re-render of the same prompt does not enqueue

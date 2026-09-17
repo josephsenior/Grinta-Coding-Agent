@@ -289,18 +289,6 @@ class TestOrchestratorPromptManager:
         assert "`action='start'`" not in result
         assert 'do not refer to `terminal`' not in result
 
-    def test_build_knowledge_base_info(self, tmp_path):
-        from backend.utils.prompt import PromptManager
-
-        pm = PromptManager(prompt_dir=str(tmp_path))
-        mock_result = MagicMock()
-        mock_result.content = 'kb_content'
-        mock_result.filename = 'doc.md'
-        mock_result.relevance_score = 0.95
-        mock_result.chunk_content = 'kb_content'
-        result = pm.build_knowledge_base_info([mock_result])
-        assert 'kb_content' in result
-
     def test_add_turns_left_reminder(self, tmp_path):
         from backend.core.message import Message, TextContent
         from backend.utils.prompt import PromptManager
@@ -874,10 +862,6 @@ class TestBuildSystemPromptRenders:
             lambda: True,
         )
         monkeypatch.setattr(
-            'backend.utils.optional_extras.is_rag_extra_available',
-            lambda: True,
-        )
-        monkeypatch.setattr(
             'backend.utils.optional_extras.vector_memory_enabled',
             lambda _config: True,
         )
@@ -1097,7 +1081,9 @@ class TestBuildSystemPromptRenders:
         assert 'search_history(query=...)' in result
         assert 'memory(action="working"' not in result
 
-    def test_working_memory_enabled_omits_recall_when_rag_inactive(self) -> None:
+    def test_working_memory_enabled_omits_recall_when_history_search_inactive(
+        self,
+    ) -> None:
         result = self._assert_renders_cleanly(
             active_llm_model='gpt-4o',
             is_windows=False,

@@ -9,7 +9,7 @@ triggers:
 
 # Long-lived project memory
 
-**Tool choice** (`memory` actions: working / persist; plus `recall` only when `[rag]` is installed) is defined in the system prompt — use that; this playbook covers **file-based lessons** and `/remember`.
+**Tool choice** (`memory` actions: working / persist; `search_history` for earlier turns) is defined in the system prompt — use that; this playbook covers **file-based lessons** and `/remember`.
 
 ## `lessons.md` (project lessons)
 
@@ -19,11 +19,11 @@ triggers:
 
 **Debug tier:** Richer `lessons.md` content may appear in system prompt when the session is in debug tier — keep entries concise.
 
-## Vector / semantic recall
+## Searching earlier turns
 
-Only when the optional `[rag]` extra is installed and vector memory initialized at runtime.
+Past turns that fell out of the visible window → use **`search_history(query="...")`** when it is in your tool list.
 
-Past turns and fuzzy “what did we decide about X?” → use **`memory(action=recall, key="...")`** when that tool action is present in your tool list.
+It is keyword search, not semantic: query with exact terms from the text you need (function names, file paths, error messages, command names). “parse_config KeyError” finds far more than “what went wrong with config loading?”.
 
 ## `/remember` workflow
 

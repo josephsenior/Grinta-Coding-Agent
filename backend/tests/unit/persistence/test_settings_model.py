@@ -68,32 +68,6 @@ class TestSettingsDefaults:
         assert Settings(llm_provider=None).llm_provider is None
 
 
-class TestKnowledgeBaseProperty:
-    def test_default_kb_settings(self):
-        s = Settings()
-        kb = s.knowledge_base
-        assert kb.enabled is True
-        assert kb.search_top_k == 5
-        assert kb.relevance_threshold == 0.7
-        assert kb.auto_search is True
-        assert kb.search_strategy == 'hybrid'
-        assert kb.active_collection_ids == []
-
-    def test_custom_kb_settings(self):
-        s = Settings(
-            kb_enabled=False,
-            kb_active_collection_ids=['c1'],
-            kb_search_top_k=10,
-            kb_relevance_threshold=0.5,
-            kb_auto_search=False,
-            kb_search_strategy='semantic',
-        )
-        kb = s.knowledge_base
-        assert kb.enabled is False
-        assert kb.search_top_k == 10
-        assert kb.active_collection_ids == ['c1']
-
-
 class TestApiKeySerialization:
     def test_hidden_by_default(self):
         s = Settings(llm_api_key=SecretStr('sk-secret'))

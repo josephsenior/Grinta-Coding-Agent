@@ -1,11 +1,18 @@
-"""Enhanced local vector store: hybrid (semantic + BM25) search with LRU cache.
+"""History search store: SQLite FTS5 (BM25) keyword search with an LRU query cache.
 
-Features:
-- ChromaDB (ONNX MiniLM) semantic backend
-- SQLite FTS5 BM25 lexical backend
-- LRU query cache with TTL
+This is what backs ``search_history``. It depends only on the standard
+library's ``sqlite3`` (FTS5), so it is available on every install.
 
-Requires the optional ``[rag]`` extra (``pip install 'grinta[rag]'``).
+It used to be a hybrid store that also ran a ChromaDB/fastembed semantic
+backend and optional flashrank re-ranking behind a ``[rag]`` extra. That stack
+was removed: agent history queries are dominated by identifiers, file paths
+and error strings, where keyword matching is strong, while the embedding stack
+cost a heavy install and first-run model downloads, and left ``search_history``
+unavailable on the base install.
+
+The storage backend is pluggable: pass any :class:`VectorBackend` as
+``backend=`` to experiment with a different retrieval strategy (for example a
+semantic one) without changing callers.
 """
 
 from __future__ import annotations
@@ -13,13 +20,11 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import importlib
-import itertools
 import json
 import logging
 import threading
 import time
 from collections import OrderedDict
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 _LOCAL_VECTOR_STORE = importlib.import_module(
@@ -29,7 +34,7 @@ SQLiteBM25Backend = _LOCAL_VECTOR_STORE.SQLiteBM25Backend
 
 logger = logging.getLogger(__name__)
 
-# Metadata key used to scope vector documents to a session/tenant.
+# Metadata key used to scope stored documents to a session/tenant.
 # All search() calls (or callers like ContextTracker) should add a filter
 # so cross-session data cannot leak.
 TENANT_METADATA_KEY = 'session_id'
@@ -200,12 +205,10 @@ class QueryCache:
 
 
 class EnhancedVectorStore:
-    """Hybrid (semantic + BM25) local vector store with LRU query cache.
+    """History search store: one pluggable backend plus an LRU query cache.
 
-    Re-ranking with a cross-encoder is **optional**: when ``enable_reranking``
-    is True and ``flashrank`` is importable, results are re-ranked by
-    ``ms-marco-TinyBERT-L-2-v2``; otherwise results come from BM25 + ANN
-    deduplication alone.
+    Defaults to :class:`SQLiteBM25Backend` (SQLite FTS5 keyword search, no
+    third-party dependencies). The class name is kept for API stability.
 
     Multi-tenant isolation: callers MUST pass ``tenant_id`` (typically the
     session id) to :meth:`add` and :meth:`search` so documents and cached
@@ -214,98 +217,43 @@ class EnhancedVectorStore:
     a tenant id is provided.
     """
 
-    def __init__(  # noqa: D417
+    def __init__(
         self,
         collection_name: str = 'APP_memory',
-        backend_type: str | None = None,
+        *,
+        backend: Any | None = None,
         enable_cache: bool = True,
-        enable_reranking: bool = False,
         cache_size: int = 10000,
         cache_ttl: int = 3600,
-        warm_embeddings_in_background: bool = True,
     ) -> None:
-        """Initialize enhanced vector store.
+        """Initialize the store.
 
         Args:
-            collection_name: Name of the collection
-            backend_type: Reserved for future multi-backend support. The
-                only currently-supported backend is the local ChromaDB
-                hybrid store; any non-None value is accepted but ignored.
-            enable_cache: Enable query caching
-            enable_reranking: When True and ``flashrank`` is installed,
-                re-rank results with a small cross-encoder. Default
-                ``False`` to keep the install footprint minimal.
-            cache_size: Maximum cache entries
-            cache_ttl: Cache TTL in seconds
-
+            collection_name: Name of the collection (the SQLite table namespace).
+            backend: Optional :class:`VectorBackend` to use instead of the
+                default SQLite FTS5 keyword backend.
+            enable_cache: Enable query caching.
+            cache_size: Maximum cache entries.
+            cache_ttl: Cache TTL in seconds.
         """
-        del backend_type  # kept for API stability; only ChromaDB is wired up.
-        chroma_backend_cls = _LOCAL_VECTOR_STORE.ChromaDBBackend
-
-        self.backend: Any = chroma_backend_cls(
-            collection_name,
-            warm_model_in_background=warm_embeddings_in_background,
+        self.backend: Any = (
+            backend if backend is not None else SQLiteBM25Backend(collection_name)
         )
-        self.bm25_backend = SQLiteBM25Backend(collection_name)
 
-        # Initialize cache
         self.cache: QueryCache | None = (
             QueryCache(max_size=cache_size, ttl=cache_ttl) if enable_cache else None
         )
 
-        self.enable_reranking = enable_reranking
-        self.reranker: Any = None
-        if self.enable_reranking:
-            try:
-                import os
-
-                from flashrank import Ranker
-
-                cache_dir = _LOCAL_VECTOR_STORE._default_memory_persist_directory(
-                    'flashrank'
-                )
-                os.makedirs(cache_dir, exist_ok=True)
-                # tinybert is very fast and lightweight
-                self.reranker = Ranker(
-                    model_name='ms-marco-TinyBERT-L-2-v2', cache_dir=str(cache_dir)
-                )
-            except ImportError:
-                logger.info('flashrank not installed; reranking disabled at runtime')
-                self.reranker = None
-
-        # Configuration
         self.config: dict[str, bool | int | float] = {
             'caching_enabled': enable_cache,
-            'initial_k': 20,
             'final_k': 5,
         }
 
-        # Shared, persistent thread pool for parallel semantic + BM25 search.
-        # Using one process-wide pool per store avoids the cost of creating
-        # and tearing down a ThreadPoolExecutor on every search() call.
-        self._search_pool: ThreadPoolExecutor = ThreadPoolExecutor(
-            max_workers=2,
-            thread_name_prefix=f'evs-search-{collection_name}',
-        )
-
         logger.info(
-            'Initialized EnhancedVectorStore\n  Backend: %s\n  Cache: %s',
+            'Initialized history search store (backend: %s, cache: %s)',
             getattr(self.backend, 'backend_name', type(self.backend).__name__),
             'enabled' if enable_cache else 'disabled',
         )
-
-    def shutdown(self) -> None:
-        """Release the shared thread pool (call on teardown)."""
-        pool = getattr(self, '_search_pool', None)
-        if pool is not None:
-            pool.shutdown(wait=False, cancel_futures=True)
-            self._search_pool = None  # type: ignore[assignment]
-
-    def start_background_warmup(self) -> None:
-        """Kick off any optional backend warmup without blocking startup."""
-        starter = getattr(self.backend, 'warm_model_in_background', None)
-        if callable(starter):
-            starter()
 
     @staticmethod
     def _attach_tenant_metadata(
@@ -332,16 +280,13 @@ class EnhancedVectorStore:
         *,
         tenant_id: str | None = None,
     ) -> None:
-        """Add a document to both backends.
+        """Add a document.
 
         The tenant (session) id is stamped into the document metadata so
         future :meth:`search` calls with the same tenant can filter on it.
         """
         merged = self._attach_tenant_metadata(metadata, tenant_id)
         self.backend.add(step_id, role, artifact_hash, rationale, content_text, merged)
-        self.bm25_backend.add(
-            step_id, role, artifact_hash, rationale, content_text, merged
-        )
 
     def add_batch(
         self,
@@ -354,7 +299,7 @@ class EnhancedVectorStore:
         *,
         tenant_id: str | None = None,
     ) -> None:
-        """Add multiple documents to both backends in a single batch call.
+        """Add multiple documents in a single batch call.
 
         All batched documents share the same *tenant_id*; the value is
         stamped into each document's metadata.
@@ -365,9 +310,6 @@ class EnhancedVectorStore:
             self._attach_tenant_metadata(meta, tenant_id) for meta in metadatas
         ]
         self.backend.add_batch(
-            step_ids, roles, artifact_hashes, rationales, content_texts, merged_metas
-        )
-        self.bm25_backend.add_batch(
             step_ids, roles, artifact_hashes, rationales, content_texts, merged_metas
         )
 
@@ -382,10 +324,7 @@ class EnhancedVectorStore:
         *,
         tenant_id: str | None = None,
     ) -> None:
-        """Async wrapper to add a document without blocking the event loop.
-
-        Offloads potentially CPU and I/O heavy operations to a worker thread.
-        """
+        """Async wrapper to add a document without blocking the event loop."""
         await asyncio.to_thread(
             self.add,
             step_id,
@@ -420,76 +359,6 @@ class EnhancedVectorStore:
             tenant_id=tenant_id,
         )
 
-    def _effective_initial_k(self, k: int) -> int:
-        initial_k_raw = self.config.get('initial_k', 20)
-        if isinstance(initial_k_raw, bool):
-            initial_k_raw = 20
-        elif not isinstance(initial_k_raw, int):
-            initial_k_raw = int(initial_k_raw)
-        return max(initial_k_raw, k * 2)
-
-    @staticmethod
-    def _dedupe_candidates_by_step_id(
-        semantic_candidates: list[dict[str, Any]],
-        lexical_candidates: list[dict[str, Any]],
-    ) -> list[dict[str, Any]]:
-        seen_ids: set[str] = set()
-        candidates: list[dict[str, Any]] = []
-        for doc in itertools.chain(semantic_candidates, lexical_candidates):
-            step_id = doc['step_id']
-            if step_id in seen_ids:
-                continue
-            seen_ids.add(step_id)
-            candidates.append(doc)
-        return candidates
-
-    def _finalize_hybrid_results(
-        self,
-        query: str,
-        k: int,
-        candidates: list[dict[str, Any]],
-    ) -> list[dict[str, Any]]:
-        if not self.reranker or not candidates:
-            return candidates[:k]
-
-        try:
-            from flashrank import RerankRequest
-
-            passages = [
-                {
-                    'id': c.get('step_id', str(i)),
-                    'text': c.get('excerpt', ''),
-                }
-                for i, c in enumerate(candidates)
-            ]
-
-            rerank_request = RerankRequest(query=query, passages=passages)
-            results = self.reranker.rerank(rerank_request)
-
-            # Map back to original candidate dicts
-            candidates_by_id = {c.get('step_id'): c for c in candidates}
-            reranked_candidates = []
-            for r in results:
-                original = candidates_by_id.get(r.get('id'))
-                if original:
-                    new_candidate = dict(original)
-                    new_candidate['score'] = r.get('score', new_candidate['score'])
-                    reranked_candidates.append(new_candidate)
-
-            # If some candidates were dropped by the reranker (shouldn't happen), append them
-            returned_ids = {r.get('id') for r in results}
-            for c in candidates:
-                if c.get('step_id') not in returned_ids:
-                    reranked_candidates.append(c)
-
-            return reranked_candidates[:k]
-
-        except Exception as e:
-            logger.warning(
-                'FlashRank reranking failed, falling back to original order: %s', e
-            )
-            return candidates[:k]
-
     def _try_cached_search(
         self,
         query: str,
@@ -513,61 +382,6 @@ class EnhancedVectorStore:
         logger.debug('Cache hit! Returned in %.1fms', elapsed_ms)
         return filtered_results
 
-    def _search_backends_in_parallel(
-        self,
-        query: str,
-        initial_k: int,
-        filter_metadata: dict[str, Any] | None,
-        *,
-        tenant_id: str | None,
-    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-        """Run semantic and BM25 searches concurrently and return both result sets.
-
-        Uses the store's persistent ``_search_pool`` rather than a fresh
-        ``ThreadPoolExecutor`` per call, which would otherwise dominate
-        agent-loop latency under sustained recall traffic.
-
-        The tenant id is folded into ``filter_metadata`` so the underlying
-        backends can push it into their ``where`` clause (ChromaDB) or
-        row-level filter (SQLite BM25).
-        """
-        semantic_candidates: list[dict[str, Any]] = []
-        lexical_candidates: list[dict[str, Any]] = []
-
-        merged_filter = self._attach_tenant_metadata(filter_metadata, tenant_id)
-
-        pool = self._search_pool
-        sem_future = pool.submit(
-            self.backend.search,
-            query,
-            k=initial_k,
-            filter_metadata=merged_filter,
-        )
-        lex_future = pool.submit(
-            self.bm25_backend.search,
-            query,
-            k=initial_k,
-            filter_metadata=merged_filter,
-        )
-        for future in as_completed([sem_future, lex_future]):
-            try:
-                result = future.result()
-                if future is sem_future:
-                    semantic_candidates = result
-                else:
-                    lexical_candidates = result
-            except Exception:
-                # If one backend fails, fall back to the other
-                logger.warning(
-                    'One backend failed during parallel search', exc_info=True
-                )
-                if future is sem_future:
-                    semantic_candidates = []
-                else:
-                    lexical_candidates = []
-
-        return semantic_candidates, lexical_candidates
-
     def search(
         self,
         query: str,
@@ -576,16 +390,14 @@ class EnhancedVectorStore:
         *,
         tenant_id: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Search with caching and re-ranking for maximum accuracy.
+        """Search stored history.
 
         Process:
-        1. Check cache (if enabled) — scoped by *tenant_id* and filter
-        2. Vector search with higher k (20 vs 5) — both backends run in parallel
-        3. Re-rank with cross-encoder (if enabled)
-        4. Apply tenant filter post-hoc to defend against a missing
-           ``where`` clause in either backend
-        5. Return top k results
-        6. Cache for future queries
+        1. Check cache (if enabled), scoped by *tenant_id* and filter
+        2. Query the backend with the tenant folded into the filter
+        3. Re-apply the tenant filter in Python, defending against a backend
+           that ignores the filter
+        4. Cache and return the top k results
 
         Args:
             query: Search query
@@ -596,8 +408,7 @@ class EnhancedVectorStore:
                 tenant. Defaults to the currently bound session id, if any.
 
         Returns:
-            List of top k results with high accuracy
-
+            List of up to k results, best match first.
         """
         if tenant_id is None:
             tenant_id = _resolve_current_tenant()
@@ -610,17 +421,13 @@ class EnhancedVectorStore:
         if cached is not None:
             return cached
 
-        initial_k = self._effective_initial_k(k)
-        semantic_candidates, lexical_candidates = self._search_backends_in_parallel(
-            query, initial_k, filter_metadata, tenant_id=tenant_id
-        )
+        merged_filter = self._attach_tenant_metadata(filter_metadata, tenant_id)
+        try:
+            candidates = self.backend.search(query, k=k, filter_metadata=merged_filter)
+        except Exception:
+            logger.warning('History search backend failed', exc_info=True)
+            return []
 
-        candidates = self._dedupe_candidates_by_step_id(
-            semantic_candidates, lexical_candidates
-        )
-
-        # Defensive tenant filter — even when the backend supports a where
-        # clause the caller might not pass one, so we re-filter in Python.
         if tenant_id:
             candidates = [
                 c
@@ -629,12 +436,10 @@ class EnhancedVectorStore:
                 or c.get(TENANT_METADATA_KEY) == tenant_id
             ]
 
-        if not candidates:
+        results = candidates[:k]
+        if not results:
             return []
 
-        results = self._finalize_hybrid_results(query, k, candidates)
-
-        # Cache the results
         if self.cache:
             self.cache.store(
                 query, results, tenant_id=tenant_id, filter_metadata=filter_metadata
@@ -642,12 +447,8 @@ class EnhancedVectorStore:
 
         elapsed_ms = (time.time() - start_time) * 1000
         logger.debug(
-            'Search completed in %.1fms (retrieved %s, re-ranked to %s)',
-            elapsed_ms,
-            len(candidates),
-            len(results),
+            'Search completed in %.1fms (%s results)', elapsed_ms, len(results)
         )
-
         return results
 
     async def async_search(
@@ -658,55 +459,22 @@ class EnhancedVectorStore:
         *,
         tenant_id: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Async wrapper for search to avoid blocking the event loop.
-
-        Executes the synchronous search in a thread, preserving existing logic
-        including caching and optional re-ranking.
-        """
+        """Async wrapper for search to avoid blocking the event loop."""
         return await asyncio.to_thread(
             self.search, query, k, filter_metadata, tenant_id=tenant_id
         )
-
-    def _delete_backends_in_parallel(
-        self,
-        delete_fn_semantic: Any,
-        delete_fn_lexical: Any,
-        *args: Any,
-    ) -> int:
-        """Run delete operations on both backends concurrently."""
-        c1: int = 0
-        c2: int = 0
-        pool = self._search_pool
-        f1 = pool.submit(delete_fn_semantic, *args)
-        f2 = pool.submit(delete_fn_lexical, *args)
-        try:
-            c1 = f1.result()
-        except Exception:
-            logger.warning('Semantic backend delete failed', exc_info=True)
-        try:
-            c2 = f2.result()
-        except Exception:
-            logger.warning('BM25 backend delete failed', exc_info=True)
-        return max(c1, c2)
 
     def delete_by_metadata(self, filter_metadata: dict[str, Any]) -> int:
         """Delete documents matching metadata filters.
 
         Also selectively invalidates cache entries that reference deleted documents.
         """
-        deleted_count = self._delete_backends_in_parallel(
-            self.backend.delete_by_metadata,
-            self.bm25_backend.delete_by_metadata,
-            filter_metadata,
-        )
-
-        # Selectively invalidate cache entries matching the deleted metadata
+        deleted_count = self.backend.delete_by_metadata(filter_metadata)
         if self.cache:
             evicted = self.cache.invalidate_by_metadata(filter_metadata)
             logger.debug(
                 'Invalidated %s cache entries after metadata-based deletion', evicted
             )
-
         return deleted_count
 
     def delete_by_ids(self, ids: list[str]) -> int:
@@ -714,33 +482,22 @@ class EnhancedVectorStore:
 
         Also selectively invalidates cache entries that reference deleted documents.
         """
-        deleted_count = self._delete_backends_in_parallel(
-            self.backend.delete_by_ids,
-            self.bm25_backend.delete_by_ids,
-            ids,
-        )
-
-        # Selectively invalidate cache entries referencing deleted step_ids
+        deleted_count = self.backend.delete_by_ids(ids)
         if self.cache:
             evicted = self.cache.invalidate_by_step_ids(set(ids))
             logger.debug(
                 'Invalidated %s cache entries after ID-based deletion', evicted
             )
-
         return deleted_count
 
     def stats(self) -> dict[str, Any]:
         """Get comprehensive statistics."""
-        backend_stats = self.backend.stats()
-
         stats = {
-            **backend_stats,
+            **self.backend.stats(),
             'config': self.config,
         }
-
         if self.cache:
             stats['cache'] = self.cache.stats()
-
         return stats
 
     @staticmethod

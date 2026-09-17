@@ -1,1 +1,0 @@
-"""Knowledge base storage implementations."""

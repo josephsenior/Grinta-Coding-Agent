@@ -28,7 +28,6 @@ def memory(mock_event_stream):
     with (
         patch.object(Memory, '_load_global_playbooks'),
         patch.object(Memory, '_load_user_playbooks'),
-        patch('backend.context.memory.agent_memory.KnowledgeBaseManager'),
     ):
         return Memory(mock_event_stream, sid='test-sid')
 
@@ -48,7 +47,6 @@ class TestMemoryInit:
         with (
             patch.object(Memory, '_load_global_playbooks'),
             patch.object(Memory, '_load_user_playbooks'),
-            patch('backend.context.memory.agent_memory.KnowledgeBaseManager'),
         ):
             Memory(mock_event_stream, sid='sub-test')
         mock_event_stream.subscribe.assert_called_once()
@@ -210,18 +208,15 @@ class TestOnPlaybookRecall:
         action = MagicMock(spec=RecallAction)
         action.recall_type = RecallType.KNOWLEDGE
         action.query = ''
-        memory._kb_manager.search = MagicMock(return_value=[])
         obs = memory._on_playbook_recall(action)
         assert isinstance(obs, RecallObservation)
         assert obs.recall_type == RecallType.KNOWLEDGE
         assert obs.playbook_knowledge == []
-        assert obs.knowledge_base_results == []
 
     def test_no_match_returns_empty_success(self, memory):
         action = MagicMock(spec=RecallAction)
         action.recall_type = RecallType.KNOWLEDGE
         action.query = 'plain user question with no playbook trigger'
-        memory._kb_manager.search = MagicMock(return_value=[])
         obs = memory._on_playbook_recall(action)
         assert isinstance(obs, RecallObservation)
         assert obs.playbook_knowledge == []

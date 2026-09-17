@@ -228,12 +228,6 @@ def _process_knowledge_recall(
             prompt_manager.build_playbook_info(triggered_agents=filtered_agents)
         )
 
-    kb_results = getattr(obs, 'knowledge_base_results', [])
-    if kb_results:
-        formatted_parts.append(
-            prompt_manager.build_knowledge_base_info(kb_results=kb_results)
-        )
-
     if formatted_parts:
         formatted_text = '\n\n'.join(formatted_parts)
         content_items: list[TextContent | ImageContent] = [

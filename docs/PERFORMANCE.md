@@ -43,11 +43,11 @@ If you observe latencies meaningfully worse than p95 targets, investigate before
 
 ## Memory footprint
 
-Measured on a clean base wheel built from the source checkout (no `[rag]` / `[browser]` extras), Python 3.12, Linux x86_64:
+Measured on a clean wheel built from the source checkout, Python 3.12, Linux x86_64:
 
 - Idle REPL: ~150 MB RSS (target; run `ps` after launch to verify on your machine)
-- Base install on disk: ~400 MB under `~/.local/pipx/venvs/grinta` before optional extras (tree-sitter grammars dominate)
-- Mid-task with semantic RAG warm: ~600 MB–1.2 GB (ChromaDB + FastEmbed ONNX)
+- Install on disk: ~400 MB under `~/.local/pipx/venvs/grinta` (tree-sitter grammars dominate)
+- History search adds no resident model: its index is an on-disk SQLite FTS5 database
 - Long sessions: bounded by auto-compaction; if memory grows unboundedly, file an issue.
 
 ## Measuring

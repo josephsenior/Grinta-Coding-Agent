@@ -83,20 +83,13 @@ dependencies = [
   "truststore>=0.10.4,<1",
   "urllib3>=2.7,<3",
 ]
-optional-dependencies.all = [
-  "chromadb>=1.5.9,<2",
-  "fastembed>=0.8,<1",
-  "flashrank>=0.2.10,<1",
-]
-optional-dependencies.rag = [
-  "chromadb>=1.5.9,<2",
-  "fastembed>=0.8,<1",
-  "flashrank>=0.2.10,<1",
-]
 urls = { Homepage = "https://github.com/josephsenior/Grinta-Coding-Agent", Repository = "https://github.com/josephsenior/Grinta-Coding-Agent", Documentation = "https://github.com/josephsenior/Grinta-Coding-Agent/tree/main/docs", Changelog = "https://github.com/josephsenior/Grinta-Coding-Agent/blob/main/CHANGELOG.md", Issues = "https://github.com/josephsenior/Grinta-Coding-Agent/issues", Discussions = "https://github.com/josephsenior/Grinta-Coding-Agent/discussions" }
-# User-installable extras. Base install includes PDF/DOCX/PPTX/LaTeX parsers.
-# pip install "grinta[rag]" — long-term semantic memory (Chroma + ONNX embeddings)
-# pip install "grinta[all]" — rag
+# No optional extras: one install ships every feature, including PDF/DOCX/PPTX/
+# LaTeX parsers and history search (stdlib SQLite FTS5).
+#
+# NOTE: the `rag` and `all` extras were removed. `search_history` used to need
+# chromadb + fastembed + flashrank for semantic retrieval; it is now keyword
+# search on SQLite FTS5, which needs no third-party packages.
 #
 # NOTE: the `browser` extra was removed (v1.0.1). browser-use 0.13.x pins its
 # entire transitive tree with exact `==` specifiers (openai==2.16.0, mcp==1.26.0,

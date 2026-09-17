@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-import sys
 import time
-import types
-from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import MagicMock, patch
 
-from backend.context.vector_store import EnhancedVectorStore, QueryCache
+from backend.context.vector_store import (
+    EnhancedVectorStore,
+    QueryCache,
+    SQLiteBM25Backend,
+)
 from backend.context.vector_store import _vector_store as vs
 
 TENANT_METADATA_KEY = vs.TENANT_METADATA_KEY
@@ -17,19 +18,9 @@ TENANT_METADATA_KEY = vs.TENANT_METADATA_KEY
 def make_store() -> EnhancedVectorStore:
     store = object.__new__(EnhancedVectorStore)
     store.cache = None
-    store.config = {'initial_k': 20, 'final_k': 5}
-    store.enable_reranking = False
-    store.reranker = None
+    store.config = {'final_k': 5}
     store.backend = MagicMock()
-    store.bm25_backend = MagicMock()
-    store._search_pool = ThreadPoolExecutor(max_workers=2)
     return store
-
-
-def shutdown_pool(store: EnhancedVectorStore) -> None:
-    pool = getattr(store, '_search_pool', None)
-    if pool is not None:
-        pool.shutdown(wait=True)
 
 
 class TestResolveCurrentTenant:
@@ -115,74 +106,25 @@ class TestQueryCacheExtra:
 
 
 class TestEnhancedInit:
-    def test_reranking_enabled_creates_ranker(self, tmp_path) -> None:
-        fake_ranker = MagicMock()
-        flashrank_mod = types.ModuleType('flashrank')
-        flashrank_mod.Ranker = MagicMock(return_value=fake_ranker)
-        with (
-            patch.dict(sys.modules, {'flashrank': flashrank_mod}),
-            patch(
-                'backend.context.vector_store._local_vector_store.ChromaDBBackend',
-                return_value=MagicMock(),
-            ),
-            patch(
-                'backend.context.vector_store._vector_store.SQLiteBM25Backend',
-                return_value=MagicMock(),
-            ),
-            patch(
-                'backend.context.vector_store._local_vector_store.get_active_local_data_root',
-                return_value=str(tmp_path),
-            ),
+    def test_defaults_to_sqlite_bm25_backend(self, tmp_path) -> None:
+        with patch(
+            'backend.context.vector_store._local_vector_store.get_active_local_data_root',
+            return_value=str(tmp_path),
         ):
-            store = EnhancedVectorStore(
-                collection_name='demo',
-                enable_reranking=True,
-                warm_embeddings_in_background=False,
-            )
-        assert store.reranker is fake_ranker
-        store.shutdown()
+            store = EnhancedVectorStore(collection_name='demo')
+        assert isinstance(store.backend, SQLiteBM25Backend)
+        assert store.cache is not None
 
-    def test_reranking_enabled_without_flashrank(self) -> None:
+    def test_injected_backend_is_used(self) -> None:
         fake_backend = MagicMock()
         fake_backend.backend_name = 'Fake'
-        with (
-            patch(
-                'backend.context.vector_store._local_vector_store.ChromaDBBackend',
-                return_value=fake_backend,
-            ),
-            patch(
-                'backend.context.vector_store._vector_store.SQLiteBM25Backend',
-                return_value=MagicMock(),
-            ),
-        ):
-            store = EnhancedVectorStore(
-                collection_name='demo',
-                enable_reranking=True,
-                warm_embeddings_in_background=False,
-            )
-        assert store.reranker is None
-        store.shutdown()
+        store = EnhancedVectorStore(collection_name='demo', backend=fake_backend)
+        assert store.backend is fake_backend
 
-    def test_shutdown(self) -> None:
-        store = make_store()
-        store.shutdown()
-        assert store._search_pool is None
-
-    def test_shutdown_idempotent(self) -> None:
-        store = make_store()
-        store._search_pool = None
-        store.shutdown()
-
-    def test_start_background_warmup(self) -> None:
-        store = make_store()
-        store.backend.warm_model_in_background = MagicMock()
-        store.start_background_warmup()
-        store.backend.warm_model_in_background.assert_called_once()
-
-    def test_start_background_warmup_without_support(self) -> None:
-        store = make_store()
-        del store.backend.warm_model_in_background
-        store.start_background_warmup()
+    def test_cache_can_be_disabled(self) -> None:
+        store = EnhancedVectorStore(backend=MagicMock(), enable_cache=False)
+        assert store.cache is None
+        assert store.config['caching_enabled'] is False
 
 
 class TestAttachTenant:
@@ -208,15 +150,13 @@ class TestAttachTenant:
 
 
 class TestEnhancedAdd:
-    def test_add_both_backends(self) -> None:
+    def test_add_stamps_tenant(self) -> None:
         store = make_store()
         store.add('s1', 'user', 'h', 'r', 'text', {'role': 'user'}, tenant_id='sess')
         store.backend.add.assert_called_once()
         call = store.backend.add.call_args
         assert call.args[0] == 's1'
         assert call.args[5][TENANT_METADATA_KEY] == 'sess'
-        store.bm25_backend.add.assert_called_once()
-        shutdown_pool(store)
 
     def test_add_batch_default_metadatas(self) -> None:
         store = make_store()
@@ -232,14 +172,11 @@ class TestEnhancedAdd:
         call = store.backend.add_batch.call_args
         assert call.args[5][0][TENANT_METADATA_KEY] == 'sess'
         assert call.args[5][1][TENANT_METADATA_KEY] == 'sess'
-        store.bm25_backend.add_batch.assert_called_once()
-        shutdown_pool(store)
 
     async def test_async_add(self) -> None:
         store = make_store()
         await store.async_add('s1', 'user', None, None, 'text', tenant_id='sess')
         store.backend.add.assert_called_once()
-        shutdown_pool(store)
 
     async def test_async_add_batch(self) -> None:
         store = make_store()
@@ -247,100 +184,6 @@ class TestEnhancedAdd:
             ['s1'], ['user'], [None], [None], ['text'], tenant_id='sess'
         )
         store.backend.add_batch.assert_called_once()
-        shutdown_pool(store)
-
-
-class TestEffectiveInitialK:
-    def test_default(self) -> None:
-        store = make_store()
-        assert store._effective_initial_k(5) == 20
-
-    def test_bool_coerced(self) -> None:
-        store = make_store()
-        store.config['initial_k'] = True
-        assert store._effective_initial_k(5) == 20
-
-    def test_float_coerced(self) -> None:
-        store = make_store()
-        store.config['initial_k'] = 30.7
-        assert store._effective_initial_k(5) == 30
-
-    def test_int_larger_than_k_double(self) -> None:
-        store = make_store()
-        store.config['initial_k'] = 30
-        assert store._effective_initial_k(5) == 30
-
-    def test_k_double_dominates(self) -> None:
-        store = make_store()
-        store.config['initial_k'] = 3
-        assert store._effective_initial_k(5) == 10
-
-
-class TestDedupe:
-    def test_deduplicates_by_step_id(self) -> None:
-        candidates = EnhancedVectorStore._dedupe_candidates_by_step_id(
-            [{'step_id': 'a'}, {'step_id': 'b'}],
-            [{'step_id': 'b'}, {'step_id': 'c'}],
-        )
-        assert [c['step_id'] for c in candidates] == ['a', 'b', 'c']
-
-
-class TestFinalizeHybrid:
-    def test_no_reranker_truncates(self) -> None:
-        store = make_store()
-        candidates = [{'step_id': 'a'}, {'step_id': 'b'}, {'step_id': 'c'}]
-        assert store._finalize_hybrid_results('q', 2, candidates) == candidates[:2]
-
-    def test_no_candidates_returns_empty(self) -> None:
-        store = make_store()
-        assert store._finalize_hybrid_results('q', 5, []) == []
-
-    def test_rerank_maps_scores(self) -> None:
-        store = make_store()
-        fake_ranker = MagicMock()
-        fake_ranker.rerank.return_value = [
-            {'id': 'a', 'score': 0.9},
-            {'id': 'b', 'score': 0.7},
-        ]
-        store.reranker = fake_ranker
-        candidates = [
-            {'step_id': 'a', 'excerpt': 'ta', 'score': 0.1},
-            {'step_id': 'b', 'excerpt': 'tb', 'score': 0.2},
-        ]
-        flashrank_mod = types.ModuleType('flashrank')
-        flashrank_mod.RerankRequest = MagicMock(return_value=MagicMock())
-        with patch.dict(sys.modules, {'flashrank': flashrank_mod}):
-            result = store._finalize_hybrid_results('q', 5, candidates)
-        assert result[0]['score'] == 0.9
-        assert result[1]['score'] == 0.7
-
-    def test_rerank_appends_dropped_candidates(self) -> None:
-        store = make_store()
-        fake_ranker = MagicMock()
-        fake_ranker.rerank.return_value = [{'id': 'a', 'score': 0.9}]
-        store.reranker = fake_ranker
-        candidates = [
-            {'step_id': 'a', 'excerpt': 'ta', 'score': 0.1},
-            {'step_id': 'b', 'excerpt': 'tb', 'score': 0.2},
-        ]
-        flashrank_mod = types.ModuleType('flashrank')
-        flashrank_mod.RerankRequest = MagicMock(return_value=MagicMock())
-        with patch.dict(sys.modules, {'flashrank': flashrank_mod}):
-            result = store._finalize_hybrid_results('q', 5, candidates)
-        assert len(result) == 2
-        assert result[1]['step_id'] == 'b'
-
-    def test_rerank_failure_falls_back(self) -> None:
-        store = make_store()
-        fake_ranker = MagicMock()
-        fake_ranker.rerank.side_effect = RuntimeError('boom')
-        store.reranker = fake_ranker
-        candidates = [{'step_id': 'a'}, {'step_id': 'b'}]
-        flashrank_mod = types.ModuleType('flashrank')
-        flashrank_mod.RerankRequest = MagicMock(return_value=MagicMock())
-        with patch.dict(sys.modules, {'flashrank': flashrank_mod}):
-            result = store._finalize_hybrid_results('q', 5, candidates)
-        assert result == candidates
 
 
 class TestTryCachedSearch:
@@ -365,54 +208,22 @@ class TestTryCachedSearch:
         assert result == [{'step_id': 'a', 'score': 1.0}]
 
 
-class TestParallelSearch:
-    def test_both_backends_return(self) -> None:
-        store = make_store()
-        store.backend.search.return_value = [{'step_id': 'a'}]
-        store.bm25_backend.search.return_value = [{'step_id': 'b'}]
-        semantic, lexical = store._search_backends_in_parallel(
-            'q', 10, None, tenant_id='t'
-        )
-        assert semantic == [{'step_id': 'a'}]
-        assert lexical == [{'step_id': 'b'}]
-        store.backend.search.assert_called_once_with(
-            'q', k=10, filter_metadata={TENANT_METADATA_KEY: 't'}
-        )
-        shutdown_pool(store)
-
-    def test_semantic_failure_falls_back_to_lexical(self) -> None:
-        store = make_store()
-        store.backend.search.side_effect = RuntimeError('boom')
-        store.bm25_backend.search.return_value = [{'step_id': 'b'}]
-        semantic, lexical = store._search_backends_in_parallel(
-            'q', 10, None, tenant_id='t'
-        )
-        assert semantic == []
-        assert lexical == [{'step_id': 'b'}]
-        shutdown_pool(store)
-
-    def test_lexical_failure_falls_back_to_semantic(self) -> None:
-        store = make_store()
-        store.backend.search.return_value = [{'step_id': 'a'}]
-        store.bm25_backend.search.side_effect = RuntimeError('boom')
-        semantic, lexical = store._search_backends_in_parallel(
-            'q', 10, None, tenant_id='t'
-        )
-        assert semantic == [{'step_id': 'a'}]
-        assert lexical == []
-        shutdown_pool(store)
-
-
 class TestSearch:
+    def test_passes_tenant_filter_to_backend(self) -> None:
+        store = make_store()
+        store.backend.search.return_value = []
+        store.search('q', k=7, tenant_id='t')
+        store.backend.search.assert_called_once_with(
+            'q', k=7, filter_metadata={TENANT_METADATA_KEY: 't'}
+        )
+
     def test_tenant_resolved_when_missing(self) -> None:
         store = make_store()
         store.cache = QueryCache()
         store.backend.search.return_value = [{'step_id': 'a', TENANT_METADATA_KEY: 't'}]
-        store.bm25_backend.search.return_value = []
         with patch.object(vs, '_resolve_current_tenant', return_value='t'):
             results = store.search('q', tenant_id=None)
         assert results == [{'step_id': 'a', TENANT_METADATA_KEY: 't'}]
-        shutdown_pool(store)
 
     def test_cache_hit_short_circuits(self) -> None:
         store = make_store()
@@ -423,7 +234,6 @@ class TestSearch:
         results = store.search('q', tenant_id='t')
         assert results == [{'step_id': 'a', TENANT_METADATA_KEY: 't'}]
         store.backend.search.assert_not_called()
-        shutdown_pool(store)
 
     def test_full_flow_with_cache_store(self) -> None:
         store = make_store()
@@ -431,11 +241,9 @@ class TestSearch:
         store.backend.search.return_value = [
             {'step_id': 'a', TENANT_METADATA_KEY: 't', 'score': 0.9}
         ]
-        store.bm25_backend.search.return_value = []
         results = store.search('q', tenant_id='t')
         assert results == [{'step_id': 'a', TENANT_METADATA_KEY: 't', 'score': 0.9}]
         assert store.cache.get('q', tenant_id='t') == results
-        shutdown_pool(store)
 
     def test_tenant_filter_drops_foreign_docs(self) -> None:
         store = make_store()
@@ -444,31 +252,79 @@ class TestSearch:
             {'step_id': 'b', TENANT_METADATA_KEY: 't2'},
             {'step_id': 'c'},
         ]
-        store.bm25_backend.search.return_value = []
         results = store.search('q', tenant_id='t1')
         assert [r['step_id'] for r in results] == ['a', 'c']
-        shutdown_pool(store)
+
+    def test_results_truncated_to_k(self) -> None:
+        store = make_store()
+        store.backend.search.return_value = [{'step_id': str(i)} for i in range(5)]
+        assert len(store.search('q', k=2, tenant_id='t')) == 2
 
     def test_no_candidates_returns_empty(self) -> None:
         store = make_store()
         store.backend.search.return_value = []
-        store.bm25_backend.search.return_value = []
         assert store.search('q', tenant_id='t') == []
-        shutdown_pool(store)
+
+    def test_backend_failure_returns_empty(self) -> None:
+        store = make_store()
+        store.cache = QueryCache()
+        store.backend.search.side_effect = RuntimeError('boom')
+        assert store.search('q', tenant_id='t') == []
+        assert store.cache.get('q', tenant_id='t') is None
 
     def test_search_without_cache(self) -> None:
         store = make_store()
         store.backend.search.return_value = [{'step_id': 'a'}]
-        store.bm25_backend.search.return_value = []
         assert store.search('q', tenant_id='t') == [{'step_id': 'a'}]
-        shutdown_pool(store)
 
     async def test_async_search(self) -> None:
         store = make_store()
         store.backend.search.return_value = []
-        store.bm25_backend.search.return_value = []
         assert await store.async_search('q', tenant_id='t') == []
-        shutdown_pool(store)
+
+
+class TestKeywordSearchEndToEnd:
+    """Real SQLite FTS5 backend: what search_history actually runs on."""
+
+    def _store(self, tmp_path) -> EnhancedVectorStore:
+        backend = SQLiteBM25Backend(collection_name='e2e', persist_directory=tmp_path)
+        return EnhancedVectorStore(collection_name='e2e', backend=backend)
+
+    def test_finds_identifier_and_ranks_best_match_first(self, tmp_path) -> None:
+        store = self._store(tmp_path)
+        store.add('e1', 'tool', None, None, 'Ran pytest: 12 passed', tenant_id='s')
+        store.add(
+            'e2',
+            'tool',
+            None,
+            None,
+            'KeyError in parse_config while loading settings.py: parse_config failed',
+            tenant_id='s',
+        )
+        store.add('e3', 'assistant', None, None, 'Edited parse_config', tenant_id='s')
+        results = store.search('parse_config KeyError', k=5, tenant_id='s')
+        assert [r['step_id'] for r in results][:1] == ['e2']
+        assert {r['step_id'] for r in results} == {'e2', 'e3'}
+
+    def test_matches_file_paths_and_punctuation(self, tmp_path) -> None:
+        store = self._store(tmp_path)
+        store.add(
+            'e1',
+            'tool',
+            None,
+            None,
+            'error in backend/app/main.py line 40',
+            tenant_id='s',
+        )
+        results = store.search('backend/app/main.py', tenant_id='s')
+        assert [r['step_id'] for r in results] == ['e1']
+
+    def test_sessions_do_not_leak(self, tmp_path) -> None:
+        store = self._store(tmp_path)
+        store.add('a1', 'tool', None, None, 'deploy script failed', tenant_id='s1')
+        store.add('b1', 'tool', None, None, 'deploy script failed', tenant_id='s2')
+        assert [r['step_id'] for r in store.search('deploy', tenant_id='s1')] == ['a1']
+        assert [r['step_id'] for r in store.search('deploy', tenant_id='s2')] == ['b1']
 
 
 class TestDelete:
@@ -476,35 +332,19 @@ class TestDelete:
         store = make_store()
         store.cache = QueryCache()
         store.backend.delete_by_metadata.return_value = 3
-        store.bm25_backend.delete_by_metadata.return_value = 2
         store.cache.store('q', [{'step_id': 'a', 'role': 'user'}])
         assert store.delete_by_metadata({'role': 'user'}) == 3
         store.backend.delete_by_metadata.assert_called_once_with({'role': 'user'})
         assert store.cache.get('q') is None
-        shutdown_pool(store)
 
     def test_delete_by_ids(self) -> None:
         store = make_store()
         store.cache = QueryCache()
         store.backend.delete_by_ids.return_value = 2
-        store.bm25_backend.delete_by_ids.return_value = 2
         store.cache.store('q', [{'step_id': 'a'}])
         assert store.delete_by_ids(['a']) == 2
         store.backend.delete_by_ids.assert_called_once_with(['a'])
         assert store.cache.get('q') is None
-        shutdown_pool(store)
-
-    def test_delete_backends_in_parallel_both_fail(self) -> None:
-        store = make_store()
-        store.backend.delete_by_ids.side_effect = RuntimeError('boom')
-        store.bm25_backend.delete_by_ids.side_effect = RuntimeError('boom')
-        assert (
-            store._delete_backends_in_parallel(
-                store.backend.delete_by_ids, store.bm25_backend.delete_by_ids, ['a']
-            )
-            == 0
-        )
-        shutdown_pool(store)
 
 
 class TestStats:
@@ -515,13 +355,11 @@ class TestStats:
         stats = store.stats()
         assert stats['backend'] == 'x'
         assert stats['cache']['size'] == 0
-        shutdown_pool(store)
 
     def test_stats_without_cache(self) -> None:
         store = make_store()
         store.backend.stats.return_value = {'backend': 'x'}
         assert 'cache' not in store.stats()
-        shutdown_pool(store)
 
 
 class TestApplyFilters:

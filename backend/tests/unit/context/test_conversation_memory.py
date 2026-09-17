@@ -63,7 +63,6 @@ def _make_config(**overrides):
     cfg.enable_vector_memory = False
     cfg.enable_som_visual_browsing = False
     cfg.cli_mode = True
-    cfg.enable_hybrid_retrieval = False
     for k, v in overrides.items():
         setattr(cfg, k, v)
     return cfg
@@ -709,17 +708,12 @@ class TestVectorMemoryInit:
     def test_enable_vector_memory_does_not_crash_and_sets_store(self, monkeypatch):
         from unittest.mock import MagicMock
 
-        # Patch EnhancedVectorStore constructor to avoid optional deps.
+        # Patch EnhancedVectorStore so the test does not touch the SQLite store.
         import backend.context.memory.conversation_memory as cm
 
         fake_store = MagicMock(name='vector_store')
         monkeypatch.setattr(
             cm, 'EnhancedVectorStore', MagicMock(return_value=fake_store)
-        )
-
-        monkeypatch.setattr(
-            'backend.utils.optional_extras.is_rag_extra_available',
-            lambda: True,
         )
 
         mem = _make_memory(enable_vector_memory=True)

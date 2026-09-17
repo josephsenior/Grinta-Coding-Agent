@@ -10,7 +10,6 @@ build_system_prompt(**ctx)   → full system prompt string
 measure_system_prompt_sections(**ctx) → token/char breakdown (for budgeting; run ``python -m backend.engine.prompts.prompt_builder``)
 build_workspace_context(...) → additional_info block
 build_playbook_info(...)     → playbook block
-build_knowledge_base_info(.) → knowledge-base block
 """
 
 from __future__ import annotations
@@ -872,23 +871,6 @@ def build_playbook_info(triggered_agents: list[Any]) -> str:
             f"It may or may not be relevant to the user's request.\n\n"
             f'{content}\n'
             f'</EXTRA_INFO>'
-        )
-    return '\n'.join(blocks).strip()
-
-
-def build_knowledge_base_info(kb_results: list[Any]) -> str:
-    """Render knowledge base search results."""
-    blocks: list[str] = []
-    for result in kb_results:
-        filename = getattr(result, 'filename', '')
-        score = getattr(result, 'relevance_score', 0.0)
-        chunk = getattr(result, 'chunk_content', '')
-        blocks.append(
-            f'<KNOWLEDGE_BASE_INFO>\n'
-            f'The following information was found in your knowledge base (Document: {filename}).\n'
-            f'Relevance score: {score:.2f}\n\n'
-            f'{chunk}\n'
-            f'</KNOWLEDGE_BASE_INFO>'
         )
     return '\n'.join(blocks).strip()
 

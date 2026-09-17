@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -12,7 +12,6 @@ from backend.core.workspace_resolution import workspace_storage_id
 from backend.persistence.conversation.file_conversation_store import (
     FileConversationStore,
 )
-from backend.persistence.knowledge_base.knowledge_base_store import KnowledgeBaseStore
 from backend.persistence.locations import (
     get_local_data_root,
     get_project_local_data_root,
@@ -178,23 +177,3 @@ def test_file_conversation_store_uses_app_dir_under_project_root(
 
     assert store._local_conversations_dir == root / 'users' / 'u1' / 'conversations'
     assert store._local_conversations_dir.exists()
-
-
-def test_knowledge_base_store_defaults_to_home_app_kb(tmp_path) -> None:
-    with patch(
-        'backend.persistence.knowledge_base.knowledge_base_store.get_active_local_data_root',
-        return_value=str(tmp_path / '.grinta' / 'storage'),
-    ):
-        store = KnowledgeBaseStore(storage_dir=None)
-
-    assert store.storage_dir == tmp_path / '.grinta' / 'storage' / 'kb'
-    assert store.storage_dir.exists()
-
-
-def test_knowledge_base_store_keeps_explicit_storage_dir(tmp_path) -> None:
-    storage_dir = tmp_path / 'custom-kb'
-
-    store = KnowledgeBaseStore(storage_dir=storage_dir)
-
-    assert store.storage_dir == storage_dir
-    assert store.storage_dir.exists()

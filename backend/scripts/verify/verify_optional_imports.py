@@ -14,8 +14,6 @@ import sys
 OPTIONAL_TOP_LEVEL_MODULES = {
     # caching
     'redis',
-    # memory / RAG (extras: rag)
-    'chromadb',
     # browser (manually installed; [browser] extra removed in v1.0.1)
     'browser_use',
     # telemetry

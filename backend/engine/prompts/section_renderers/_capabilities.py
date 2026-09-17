@@ -149,7 +149,7 @@ def _render_system_capabilities(
     )
 
     condensation_tiers = (
-        'working / episodic / semantic'
+        'working / episodic / searchable history'
         if _semantic_recall_runtime(
             config, semantic_recall_active=semantic_recall_active
         )
@@ -204,7 +204,7 @@ def _render_system_capabilities(
     if _semantic_recall_runtime(config, semantic_recall_active=semantic_recall_active):
         memory_line = (
             '- **Search History (`search_history`)**: search earlier conversation and tool-event history when required '
-            'information is no longer visible.'
+            'information is no longer visible. Keyword search: query with exact identifiers, paths, or error text.'
         )
 
     checkpoint_line = ''

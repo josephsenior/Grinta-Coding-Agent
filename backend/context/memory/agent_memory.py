@@ -16,14 +16,6 @@ import backend
 from backend.core.constants import RECALL_PIPELINE_TIMEOUT_SECONDS
 from backend.core.enums import RecallType, RuntimeStatus
 from backend.core.logging.logger import app_logger as logger
-
-try:
-    from backend.knowledge import KnowledgeBaseManager
-
-    _KNOWLEDGE_BASE_AVAILABLE = True
-except ImportError:
-    KnowledgeBaseManager = None  # type: ignore[assignment,misc]
-    _KNOWLEDGE_BASE_AVAILABLE = False
 from backend.ledger.action.agent import RecallAction
 from backend.ledger.event import Event, EventSource
 from backend.ledger.observation.agent import (
@@ -39,7 +31,6 @@ from backend.utils.prompt import ConversationInstructions, RepositoryInfo, Runti
 if TYPE_CHECKING:
     from backend.core.config.mcp_config import MCPConfig
     from backend.execution.server.base import Runtime
-    from backend.persistence.data_models.knowledge_base import KnowledgeBaseSettings
     from backend.playbooks.engine import (
         BasePlaybook,
         KnowledgePlaybook,
@@ -48,28 +39,6 @@ if TYPE_CHECKING:
 
 GLOBAL_PLAYBOOKS_DIR = os.path.join(os.path.dirname(backend.__file__), 'playbooks')
 USER_PLAYBOOKS_DIR = Path.home() / '.grinta' / 'playbooks'
-
-
-# Shared, process-wide thread pool for recall side effects. Creating a
-# fresh ThreadPoolExecutor per recall (the previous behaviour) imposes
-# significant overhead — both for the kernel and for Python's import-
-# level locks. The pool grows on demand and never shrinks, so sustained
-# recall traffic amortises the cost.
-_RECALL_POOL: concurrent.futures.ThreadPoolExecutor | None = None
-_RECALL_POOL_LOCK = __import__('threading').Lock()
-
-
-def _get_recall_pool() -> concurrent.futures.ThreadPoolExecutor:
-    global _RECALL_POOL
-    if _RECALL_POOL is not None:
-        return _RECALL_POOL
-    with _RECALL_POOL_LOCK:
-        if _RECALL_POOL is None:
-            _RECALL_POOL = concurrent.futures.ThreadPoolExecutor(
-                max_workers=4,
-                thread_name_prefix='agent-recall',
-            )
-    return _RECALL_POOL
 
 
 class Memory:
@@ -109,16 +78,6 @@ class Memory:
         self.conversation_instructions: ConversationInstructions | None = None
         self._load_global_playbooks()
         self._load_user_playbooks()
-        if _KNOWLEDGE_BASE_AVAILABLE:
-            try:
-                self._kb_manager = KnowledgeBaseManager(user_id=user_id or 'default')
-            except (ImportError, RuntimeError) as exc:
-                logger.info(
-                    'Knowledge base disabled (optional [rag] extra missing): %s', exc
-                )
-                self._kb_manager = None  # type: ignore[assignment]
-        else:
-            self._kb_manager = None  # type: ignore[assignment]
 
     def on_event(self, event: Event) -> None:
         """Handle an event from the event stream."""
@@ -250,7 +209,6 @@ class Memory:
         return RecallObservation(
             recall_type=RecallType.KNOWLEDGE,
             playbook_knowledge=[],
-            knowledge_base_results=[],
             content='',
         )
 
@@ -427,67 +385,24 @@ class Memory:
         )
 
     def _on_playbook_recall(self, event: RecallAction) -> RecallObservation | None:
-        """When a playbook action triggers playbooks, create a RecallObservation with structured data.
-
-        Runs playbook matching and KB search in parallel to minimize recall latency.
-        """
-        playbook_knowledge: list[PlaybookKnowledge] = []
-        kb_results: list[Any] = []
-
-        def _find_playbooks() -> list[PlaybookKnowledge]:
-            return self._find_playbook_knowledge(event.query)
-
-        def _search_kb() -> list[Any]:
-            if not (hasattr(self, '_kb_settings') and self._kb_settings):
-                kb_enabled = True
-                kb_threshold = 0.7
-                kb_top_k = 5
-                kb_collections = None
-            else:
-                kb_enabled = self._kb_settings.auto_search
-                kb_threshold = self._kb_settings.relevance_threshold
-                kb_top_k = self._kb_settings.search_top_k
-                kb_collections = self._kb_settings.active_collection_ids
-
-            if kb_enabled and self._kb_manager is not None:
-                return self._kb_manager.search(
-                    query=event.query,
-                    relevance_threshold=kb_threshold,
-                    top_k=kb_top_k,
-                    collection_ids=kb_collections,
-                )
-            return []
-
-        pool = _get_recall_pool()
-        playbook_future = pool.submit(_find_playbooks)
-        kb_future = pool.submit(_search_kb)
+        """When a playbook action triggers playbooks, create a RecallObservation with structured data."""
         try:
-            playbook_knowledge = playbook_future.result()
+            playbook_knowledge = self._find_playbook_knowledge(event.query)
         except Exception as e:
             logger.error('Error finding playbook knowledge: %s', e)
-        try:
-            kb_results = kb_future.result()
-        except Exception as e:
-            logger.error('Error searching knowledge base during recall: %s', e)
+            playbook_knowledge = []
 
-        if playbook_knowledge or kb_results:
+        if playbook_knowledge:
             return RecallObservation(
                 recall_type=RecallType.KNOWLEDGE,
                 playbook_knowledge=playbook_knowledge,
-                knowledge_base_results=kb_results,
-                content='Retrieved knowledge from playbooks and knowledge base',
+                content='Retrieved knowledge from playbooks',
             )
         return RecallObservation(
             recall_type=RecallType.KNOWLEDGE,
             playbook_knowledge=[],
-            knowledge_base_results=[],
             content='',
         )
-
-    def set_knowledge_base_settings(self, settings: KnowledgeBaseSettings) -> None:
-        """Update knowledge base settings for this memory instance."""
-        self._kb_settings = settings
-        logger.info('Knowledge base settings updated for session %s', self.sid)
 
     def _find_playbook_knowledge(self, query: str) -> list[PlaybookKnowledge]:
         """Find playbook knowledge based on a query.

@@ -53,8 +53,7 @@ The default agent name is `Orchestrator`. Common overrides:
 | `autonomy_level` | `conservative`, `balanced`, or `full` |
 | `enable_mcp` | Toggle MCP tools |
 | `enable_browsing` | Native `browser` tool (default on; requires `[browser]` extra at runtime). Set `false` to disable. |
-| `enable_vector_memory` | Semantic recall / vector store (default on; requires `[rag]` extra at runtime). Set `false` to disable. |
-| `enable_hybrid_retrieval` | Hybrid search with `[rag]` (default on; same gating as vector memory). |
+| `enable_vector_memory` | History search (`search_history`): keyword search over this session's earlier events, backed by SQLite FTS5. Default on, no extra install; the key name is historical. Set `false` to disable. |
 | `enable_task_tracker_tool` | Structured plan tracking in Plan mode |
 | `enable_lsp_query` | LSP tool (`lsp`); default off — set `true` when language servers are installed |
 | `enable_debugger` | Interactive DAP debugger tool; default off — set `true` when debug adapters are available |

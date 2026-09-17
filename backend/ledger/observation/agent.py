@@ -1,10 +1,7 @@
 """Agent-scoped observation types emitted by Grinta event stream."""
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, ClassVar
-
-if TYPE_CHECKING:
-    from backend.persistence.data_models.knowledge_base import KnowledgeBaseSearchResult
+from typing import ClassVar
 
 from backend.core.enums import RecallType
 from backend.core.schemas import AgentState, ObservationType
@@ -88,9 +85,6 @@ class RecallObservation(Observation):
     conversation_instructions: str = ''
     working_dir: str = ''
     playbook_knowledge: list[PlaybookKnowledge] = field(default_factory=list)
-    knowledge_base_results: list['KnowledgeBaseSearchResult'] = field(
-        default_factory=list
-    )
     '\n    A list of PlaybookKnowledge objects, each containing information from a triggered playbook.\n\n    Example:\n    [\n        PlaybookKnowledge(\n            name="python_best_practices",\n            trigger="python",\n            content="Always use virtual environments for Python projects."\n        ),\n        PlaybookKnowledge(\n            name="git_workflow",\n            trigger="git",\n            content="Create a new branch for each feature or bugfix."\n        )\n    ]\n    '
     observation: ClassVar[str] = ObservationType.RECALL
 

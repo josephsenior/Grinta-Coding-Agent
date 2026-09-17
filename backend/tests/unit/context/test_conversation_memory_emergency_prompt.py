@@ -14,7 +14,6 @@ def _make_memory() -> ContextMemory:
     config = SimpleNamespace(
         enable_vector_memory=False,
         enable_som_visual_browsing=False,
-        enable_hybrid_retrieval=False,
         cli_mode=True,
     )
     prompt_manager = MagicMock()

@@ -111,13 +111,12 @@ captures the boundaries operators care about most.
 - PostgreSQL (optional, knowledge-base migrations only): `backend/persistence/knowledge_base/migrations/` can apply SQL migrations when you opt into a Postgres-backed knowledge store. You are responsible for transport encryption and credential management. This is **not** required for normal CLI usage.
 - Workspace data is never uploaded to a third party by Grinta itself.
 
-### Optional extras
+### History search storage
 
-- **`[rag]` / ChromaDB** — Grinta uses the embedded `PersistentClient` only (local
-  disk under the project workspace). It does **not** start or expose the ChromaDB
-  HTTP/FastAPI server. Do not run a standalone ChromaDB server on an untrusted
-  network; [CVE-2026-45829](https://github.com/advisories/GHSA-f4j7-r4q5-qw2c)
-  affects network-exposed ChromaDB API deployments until upstream ships a fix.
+- **`search_history`** stores indexed session events in a local SQLite database
+  under the project's Grinta data directory. It opens no network listener and
+  has no third-party database dependency. (Grinta no longer ships ChromaDB, so
+  ChromaDB server advisories do not apply.)
 
 ### Supply chain
 

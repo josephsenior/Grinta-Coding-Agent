@@ -2,8 +2,6 @@
 # Each line is a vulture whitelist entry using the expression-statement format.
 # mypy: ignore-errors
 
-backend_type
-enable_reranking
 encapsulate_solution
 try_parse
 llm_config_arg
