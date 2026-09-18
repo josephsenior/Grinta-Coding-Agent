@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The browser tool works again, with no new dependency.** It now speaks the
+  Chrome DevTools Protocol directly over `websockets` (already a Grinta
+  dependency) and drives whichever Chromium-family browser is installed —
+  Chrome, Edge, Chromium or Brave — so there is nothing to `pip install` and no
+  bundled browser to download. `GRINTA_BROWSER_BINARY` overrides discovery. The
+  tool is hidden when no such browser is found, replacing the old gate on the
+  `browser_use` package (`is_browser_extra_available` is now
+  `is_browser_available`). All 17 subcommands are covered end to end against a
+  real browser in `backend/tests/integration/test_cdp_browser_integration.py`.
+
+  The element index the agent clicks is produced by a page-side serializer that
+  stores nodes on `window.__grinta_els`, so indices survive without any CDP node
+  bookkeeping. It walks shadow DOM and same-origin iframes (translating click
+  coordinates through the frame chain) and reports cross-origin frames as a
+  single entry pointing at their `src`. Only in-viewport elements are indexed;
+  the tool description now tells the agent to scroll and re-snapshot.
+
 - **Repository launch surface:** a compact README hero, animated recovery
   preview, capability table, contributor call, and direct links to the
   strongest autonomous-run evidence.

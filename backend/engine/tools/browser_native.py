@@ -1,4 +1,4 @@
-"""Native browser tool (browser-use library, in-process)."""
+"""Native browser tool: drives an installed Chromium browser over CDP."""
 
 from __future__ import annotations
 
@@ -34,9 +34,11 @@ _BROWSER_COMMANDS = (
 )
 
 _DESCRIPTION = """\
-In-process browser automation (Chromium via browser-use). Grinta is the only planner — no nested browser agent.
+Browser automation over the Chrome DevTools Protocol. Grinta is the only planner — no nested browser agent.
 
 Each call runs one subcommand; chain calls until the browsing goal is met. `start` is optional.
+
+Element indices come from `snapshot` and cover only elements currently in the viewport: if the element you want is not listed, `scroll` (or `scroll` with to_text) and snapshot again. Indices are reassigned by every snapshot and after navigation, so act on fresh ones.
 
 Commands:
 - start / close: session lifecycle.
@@ -53,7 +55,7 @@ Commands:
 - upload_file: index + path under workspace.
 - select_dropdown_option: index plus option_text or option_value.
 
-Requires: browser-use installed in an isolated environment (the `[browser]` extra was removed in v1.0.1) and `uvx browser-use install` for Chromium.
+Requires: a Chromium-based browser installed locally (Chrome, Edge, Chromium or Brave). No extra Python packages.
 
 Debugging: GRINTA_BROWSER_TRACE=1 prints browser stages to stderr.
 """

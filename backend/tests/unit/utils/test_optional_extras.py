@@ -12,9 +12,9 @@ def test_browser_tool_enabled_requires_extra(monkeypatch) -> None:
         default_agent='Orchestrator',
         get_agent_config=lambda _name: SimpleNamespace(enable_browsing=True),
     )
-    monkeypatch.setattr(oe, 'is_browser_extra_available', lambda: False)
+    monkeypatch.setattr(oe, 'is_browser_available', lambda: False)
     assert oe.browser_tool_enabled(cfg) is False
-    monkeypatch.setattr(oe, 'is_browser_extra_available', lambda: True)
+    monkeypatch.setattr(oe, 'is_browser_available', lambda: True)
     assert oe.browser_tool_enabled(cfg) is True
 
 
@@ -23,7 +23,7 @@ def test_browser_tool_disabled_in_settings(monkeypatch) -> None:
         default_agent='Orchestrator',
         get_agent_config=lambda _name: SimpleNamespace(enable_browsing=False),
     )
-    monkeypatch.setattr(oe, 'is_browser_extra_available', lambda: True)
+    monkeypatch.setattr(oe, 'is_browser_available', lambda: True)
     assert oe.browser_tool_enabled(cfg) is False
 
 

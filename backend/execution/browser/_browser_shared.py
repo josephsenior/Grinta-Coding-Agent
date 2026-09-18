@@ -49,18 +49,23 @@ def _validate_http_url(url: str) -> str | None:
     return None
 
 
-async def _await_nav_event(nav: Any) -> None:
-    await nav
-    await nav.event_result(raise_if_any=True, raise_if_none=False)
-
-
 async def _snapshot_text_chain(browser: Any) -> str:
-    await browser.get_browser_state_summary(include_screenshot=False)
-    return await browser.get_state_as_text()
+    """Page prose followed by the indexed interactive elements.
+
+    Callers slice this two ways: ``full`` keeps everything, ``interactive``
+    keeps only the ``[n]`` lines (see :func:`_interactive_index_lines`).
+    Rebuilding the snapshot also refreshes the page-side selector map that
+    ``click``/``type`` resolve indices through.
+    """
+    elements = await browser.snapshot_text()
+    prose = await browser.page_text()
+    if prose and elements:
+        return f'{prose}\n\n{elements}'
+    return elements or prose
 
 
 def _interactive_index_lines(full_text: str) -> list[str]:
-    """Lines that look like browser-use index markers ``[n]``."""
+    """Lines carrying an ``[n]`` element index."""
     out: list[str] = []
     for line in full_text.splitlines():
         s = line.rstrip()

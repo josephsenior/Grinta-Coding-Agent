@@ -25,7 +25,7 @@ TIMEOUT_GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
         ErrorGuidance(
             summary='The local runtime sync bridge timed out waiting for an async tool to finish.',
             steps=(
-                'This is usually the in-process executor thread (e.g. native browser / browser-use), not the LLM provider.',
+                'This is usually the in-process executor thread (e.g. the native browser), not the LLM provider.',
                 'Close stray Chromium or Chrome processes, restart the CLI, and retry.',
                 'Set GRINTA_BROWSER_TRACE=1 to print browser stage lines to stderr; optional env vars: CALL_ASYNC_LOOP_SHUTDOWN_WAIT_SEC (task cancel wait, default 2s), CALL_ASYNC_LOOP_FINALIZE_WAIT_SEC (asyncgen/executor shutdown cap, default 3s).',
                 'If the action may still be running in the background, check processes before retrying.',

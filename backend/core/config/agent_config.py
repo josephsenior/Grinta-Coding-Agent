@@ -130,8 +130,9 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     enable_browsing: bool = Field(
         default=DEFAULT_AGENT_BROWSING_ENABLED,
         description=(
-            'Native browser tool. Default on; exposed only when the `[browser]` '
-            'extra is installed. Set false in settings to disable.'
+            'Native browser tool, driving a locally installed Chromium browser '
+            '(Chrome, Edge, Chromium or Brave) over CDP. Default on; exposed only '
+            'when such a browser is found. Set false in settings to disable.'
         ),
     )
     enable_web: bool = Field(

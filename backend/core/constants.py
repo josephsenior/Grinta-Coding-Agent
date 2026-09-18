@@ -226,8 +226,10 @@ TOOL_BRIDGE_TIMEOUT_TERMINAL_RUN = TERMINAL_RUN_PENDING_ACTION_TIMEOUT_FLOOR
 TOOL_BRIDGE_TIMEOUT_TERMINAL_IO = TERMINAL_IO_PENDING_ACTION_TIMEOUT_FLOOR
 TOOL_BRIDGE_TIMEOUT_BUFFER = 10.0
 # Native browser: per-stage fail-fast budgets (see GrintaNativeBrowser).
-BROWSER_SESSION_START_TIMEOUT_SEC = 90.0
-BROWSER_CDP_NAVIGATE_TIMEOUT_SEC = 20.0
+# Launching an already-installed browser measures ~0.6s; the budget stays
+# generous for cold disks and antivirus scanning, but no longer has to cover
+# downloading a browser the way the old browser-use path did.
+BROWSER_SESSION_START_TIMEOUT_SEC = 30.0
 BROWSER_NAVIGATE_TOTAL_TIMEOUT_SEC = 45.0
 BROWSER_SNAPSHOT_CHAIN_TIMEOUT_SEC = 40.0
 BROWSER_SCREENSHOT_TIMEOUT_SEC = 45.0

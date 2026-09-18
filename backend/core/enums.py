@@ -71,7 +71,7 @@ class ActionType(str, Enum):
     DEBUGGER = 'debugger'
     BROWSE = 'browse'
     BROWSE_INTERACTIVE = 'browse_interactive'
-    # Native in-process browser (browser-use library; name avoids clashing with RuntimeExecutor.browser)
+    # Native CDP browser (name avoids clashing with RuntimeExecutor.browser)
     BROWSER_TOOL = 'browser_tool'
     MCP = 'call_tool_mcp'
     THINK = 'think'

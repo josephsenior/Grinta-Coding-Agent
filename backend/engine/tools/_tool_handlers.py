@@ -97,7 +97,7 @@ def get_semantic_recall_fn() -> Callable[[str, int], list[dict[str, Any]]] | Non
 
 
 def _handle_browser_tool(arguments: Mapping[str, Any]) -> BrowserToolAction:
-    """Handle native browser-use tool calls."""
+    """Handle native browser tool calls."""
     validate_security_risk(arguments, BROWSER_TOOL_NAME)
     action = build_browser_tool_action(dict(arguments))
     set_security_risk(action, arguments)

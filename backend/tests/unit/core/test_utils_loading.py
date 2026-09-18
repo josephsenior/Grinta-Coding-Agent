@@ -132,7 +132,7 @@ class TestFinalization:
                 return_value=[],
             ),
             patch(
-                'backend.utils.optional_extras.is_browser_extra_available',
+                'backend.utils.optional_extras.is_browser_available',
                 return_value=True,
             ),
         ):

@@ -223,10 +223,10 @@ def _shutdown_executor_atexit() -> None:
 
 atexit.register(_shutdown_executor_atexit)
 
-# Hard cap for cancelling stray tasks after the main coroutine completes (e.g. browser-use CDP tasks).
+# Hard cap for cancelling stray tasks after the main coroutine completes (e.g. browser CDP tasks).
 _LOOP_SHUTDOWN_WAIT_SEC = float(os.getenv('CALL_ASYNC_LOOP_SHUTDOWN_WAIT_SEC', '2.0'))
 # Cap for shutdown_asyncgens / shutdown_default_executor — the latter can otherwise block for minutes
-# on Windows when browser-use leaves work on the loop's default executor threads.
+# on Windows when the browser leaves work on the loop's default executor threads.
 _LOOP_FINALIZE_WAIT_SEC = float(os.getenv('CALL_ASYNC_LOOP_FINALIZE_WAIT_SEC', '3.0'))
 
 

@@ -161,12 +161,7 @@ async def _execute_screenshot_body(
 
     try:
         raw = await asyncio.wait_for(
-            browser.take_screenshot(
-                path=None,
-                full_page=full_page,
-                format='jpeg',
-                quality=jpeg_quality,
-            ),
+            browser.screenshot(full_page=full_page, quality=jpeg_quality),
             timeout=BROWSER_SCREENSHOT_TIMEOUT_SEC,
         )
     except Exception as exc:
@@ -191,7 +186,7 @@ async def _execute_screenshot_body(
         )
 
     if not raw:
-        _browser_trace('screenshot: take_screenshot returned no data')
+        _browser_trace('screenshot: capture returned no data')
         return _finalize_observation(
             cmd,
             ErrorObservation(

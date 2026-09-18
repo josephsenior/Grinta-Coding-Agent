@@ -1,4 +1,4 @@
-"""In-process browser automation via optional browser-use dependency."""
+"""Browser automation over CDP against a locally installed Chromium browser."""
 
 from backend.execution.browser.grinta_browser import GrintaNativeBrowser
 

@@ -4,7 +4,7 @@ Module functions are extracted method bodies for the click, type,
 scroll, send_keys, wait, extract, upload_file, and select_dropdown
 commands on ``GrintaNativeBrowser``, plus the small helpers they
 share (parse_browser_index, get_browser_node, resolve_workspace_path,
-page_targets_ordered, dispatch_bus_event).
+page_targets_ordered).
 
 Module functions invoke other methods via ``self._method(...)`` so
 monkey-patching of the class methods in tests still works.
@@ -55,19 +55,23 @@ def parse_browser_index_impl(
 async def get_browser_node_impl(
     self, browser: Any, *, cmd: str, index: int
 ) -> tuple[Any | None, Observation | None]:
-    node = await browser.get_element_by_index(index)
-    if node is not None:
-        return node, None
-    await browser.get_browser_state_summary(include_screenshot=False)
-    node = await browser.get_element_by_index(index)
-    if node is None:
+    """Resolve a snapshot index to a live element box.
+
+    Retries once after rebuilding the page selector map, which covers the
+    common case of the agent acting on an index from before a navigation.
+    """
+    box = await browser.resolve_index(index)
+    if box is None:
+        await browser.snapshot_text()
+        box = await browser.resolve_index(index)
+    if box is None:
         return None, _finalize_observation(
             cmd,
             ErrorObservation(
                 content=f'ERROR: No element at index {index}. Run snapshot first.'
             ),
         )
-    return node, None
+    return box, None
 
 
 async def execute_click_impl(self, cmd: str, params: dict[str, Any]) -> Observation:
@@ -88,11 +92,8 @@ async def execute_click_impl(self, cmd: str, params: dict[str, Any]) -> Observat
     if error_observation is not None:
         return error_observation
 
-    from browser_use.browser.events import ClickElementEvent
-
-    evt = browser.event_bus.dispatch(ClickElementEvent(node=node))
-    await evt
-    await evt.event_result(raise_if_any=True, raise_if_none=False)
+    del node
+    await browser.click_index(index or 0)
     base = f'Clicked element index {index}.'
     content = await self._maybe_append_page_state(browser, params=params, prefix=base)
     return _finalize_observation(
@@ -131,20 +132,13 @@ async def execute_type_impl(self, cmd: str, params: dict[str, Any]) -> Observati
         return error_observation
 
     clear = bool(params.get('clear', True))
-    from browser_use.browser.events import TypeTextEvent
-
-    evt = browser.event_bus.dispatch(TypeTextEvent(node=node, text=text, clear=clear))
-    await evt
-    await evt.event_result(raise_if_any=True, raise_if_none=False)
+    del node
+    await browser.type_index(index or 0, text, clear=clear)
     base = f'Typed into element index {index}.'
     content = await self._maybe_append_page_state(browser, params=params, prefix=base)
     return _finalize_observation(
         cmd,
-        CmdOutputObservation(
-            content=content,
-            command='browser type',
-            exit_code=0,
-        ),
+        CmdOutputObservation(content=content, command='browser type', exit_code=0),
     )
 
 
@@ -162,17 +156,13 @@ async def execute_scroll_impl(self, cmd: str, params: dict[str, Any]) -> Observa
 async def _scroll_to_text(
     self, cmd: str, browser: Any, params: dict[str, Any], to_text: Any
 ) -> Observation:
-    from browser_use.browser.events import ScrollToTextEvent
-
     text = str(to_text).strip()
     if not text:
         return _finalize_observation(
             cmd, ErrorObservation(content='ERROR: to_text is empty.')
         )
-    await self._dispatch_bus_event(
-        browser, ScrollToTextEvent(text=text, direction='down')
-    )
-    base = 'Scrolled toward text match.'
+    found = await browser.scroll_to_text(text)
+    base = 'Scrolled to text match.' if found else 'Text not found on the current page.'
     content = await self._maybe_append_page_state(browser, params=params, prefix=base)
     return _finalize_observation(
         cmd,
@@ -183,13 +173,8 @@ async def _scroll_to_text(
 async def _scroll_to_edge(
     self, cmd: str, browser: Any, params: dict[str, Any], direction: str
 ) -> Observation:
-    from browser_use.browser.events import ScrollEvent
-
-    amt = 50_000
-    dir1 = 'up' if direction == 'top' else 'down'
-    await self._dispatch_bus_event(
-        browser, ScrollEvent(direction=dir1, amount=amt, node=None)
-    )
+    amount = 50_000 if direction == 'bottom' else -50_000
+    await browser.scroll(delta_y=amount)
     base = f'Scrolled {direction}.'
     content = await self._maybe_append_page_state(browser, params=params, prefix=base)
     return _finalize_observation(
@@ -201,8 +186,6 @@ async def _scroll_to_edge(
 async def _scroll_directional(
     self, cmd: str, browser: Any, params: dict[str, Any], direction: str
 ) -> Observation:
-    from browser_use.browser.events import ScrollEvent
-
     if direction not in ('up', 'down', 'left', 'right'):
         return _finalize_observation(
             cmd,
@@ -210,20 +193,19 @@ async def _scroll_directional(
         )
     px = params.get('pixels')
     amount = int(px) if px is not None else 500
-    node = None
     if params.get('scroll_index') is not None:
         six, err = self._parse_browser_index(
             cmd, params.get('scroll_index'), action_name='scroll'
         )
         if err is not None:
             return err
-        node, err2 = await self._get_browser_node(browser, cmd=cmd, index=six or 0)
+        # Bring the anchor element into view first, then scroll from there.
+        _, err2 = await self._get_browser_node(browser, cmd=cmd, index=six or 0)
         if err2 is not None:
             return err2
-    await self._dispatch_bus_event(
-        browser,
-        ScrollEvent(direction=direction, amount=amount, node=node),
-    )
+    delta_x = amount if direction == 'right' else -amount if direction == 'left' else 0
+    delta_y = amount if direction == 'down' else -amount if direction == 'up' else 0
+    await browser.scroll(delta_x=delta_x, delta_y=delta_y)
     base = f'Scrolled {direction} by {amount}px.'
     content = await self._maybe_append_page_state(browser, params=params, prefix=base)
     return _finalize_observation(
@@ -233,15 +215,13 @@ async def _scroll_directional(
 
 
 async def execute_send_keys_impl(self, cmd: str, params: dict[str, Any]) -> Observation:
-    from browser_use.browser.events import SendKeysEvent
-
     keys = str(params.get('keys') or '').strip()
     if not keys:
         return _finalize_observation(
             cmd, ErrorObservation(content='ERROR: keys required.')
         )
     browser = await self._ensure_session()
-    await self._dispatch_bus_event(browser, SendKeysEvent(keys=keys))
+    await browser.send_keys(keys)
     base = f'Sent keys: {keys!r}'
     content = await self._maybe_append_page_state(browser, params=params, prefix=base)
     return _finalize_observation(
@@ -253,10 +233,9 @@ async def execute_send_keys_impl(self, cmd: str, params: dict[str, Any]) -> Obse
 async def _wait_for_timeout(
     browser: Any, params: dict[str, Any], timeout_sec: float
 ) -> str:
-    from browser_use.browser.events import WaitEvent
-
+    del browser
     sec = min(float(params.get('seconds') or timeout_sec), 10.0)
-    await browser.event_bus.dispatch(WaitEvent(seconds=sec))
+    await asyncio.sleep(sec)
     return f'Waited {sec}s.'
 
 
@@ -414,8 +393,6 @@ async def execute_extract_impl(self, cmd: str, params: dict[str, Any]) -> Observ
 async def execute_upload_file_impl(
     self, cmd: str, params: dict[str, Any]
 ) -> Observation:
-    from browser_use.browser.events import UploadFileEvent
-
     raw_path = str(params.get('path') or '').strip()
     resolved, perr = self._resolve_workspace_path(raw_path)
     if perr:
@@ -430,12 +407,15 @@ async def execute_upload_file_impl(
     if err is not None:
         return err
     browser = await self._ensure_session()
-    node, err2 = await self._get_browser_node(browser, cmd=cmd, index=idx or 0)
+    _, err2 = await self._get_browser_node(browser, cmd=cmd, index=idx or 0)
     if err2 is not None:
         return err2
-    await self._dispatch_bus_event(
-        browser, UploadFileEvent(node=node, file_path=str(resolved))
-    )
+    try:
+        await browser.upload_file(idx or 0, str(resolved))
+    except Exception as exc:
+        return _finalize_observation(
+            cmd, ErrorObservation(content=f'ERROR: upload failed: {exc}')
+        )
     base = f'Uploaded {resolved.name} to element index {idx}.'
     content = await self._maybe_append_page_state(browser, params=params, prefix=base)
     return _finalize_observation(
@@ -449,8 +429,6 @@ async def execute_upload_file_impl(
 async def execute_select_dropdown_impl(
     self, cmd: str, params: dict[str, Any]
 ) -> Observation:
-    from browser_use.browser.events import SelectDropdownOptionEvent
-
     opt_text = params.get('option_text')
     opt_val = params.get('option_value')
     choice = (str(opt_text).strip() if opt_text else '') or (
@@ -467,12 +445,13 @@ async def execute_select_dropdown_impl(
     if err is not None:
         return err
     browser = await self._ensure_session()
-    node, err2 = await self._get_browser_node(browser, cmd=cmd, index=idx or 0)
+    _, err2 = await self._get_browser_node(browser, cmd=cmd, index=idx or 0)
     if err2 is not None:
         return err2
-    await self._dispatch_bus_event(
-        browser, SelectDropdownOptionEvent(node=node, text=choice)
-    )
+    try:
+        await browser.select_option(idx or 0, choice)
+    except Exception as exc:
+        return _finalize_observation(cmd, ErrorObservation(content=f'ERROR: {exc}'))
     base = f'Selected dropdown option {choice!r} at index {idx}.'
     content = await self._maybe_append_page_state(browser, params=params, prefix=base)
     return _finalize_observation(
@@ -498,15 +477,9 @@ def resolve_workspace_path_impl(self, raw: str) -> tuple[Path | None, str | None
     return candidate, None
 
 
-def page_targets_ordered_impl(browser: Any) -> list[Any]:
+async def page_targets_ordered_impl(browser: Any) -> list[dict[str, Any]]:
+    """Page targets in browser order; empty when the session is not running."""
     try:
-        pages = browser.get_page_targets()
+        return await browser.page_targets()
     except Exception:
-        pages = []
-    return list(pages or [])
-
-
-async def dispatch_bus_event_impl(self, browser: Any, event_obj: Any) -> None:
-    evt = browser.event_bus.dispatch(event_obj)
-    await evt
-    await evt.event_result(raise_if_any=True, raise_if_none=False)
+        return []

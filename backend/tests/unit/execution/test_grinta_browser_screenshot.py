@@ -1,39 +1,32 @@
 """Tests for the screenshot path in GrintaNativeBrowser.
 
-The screenshot command delegates to ``browser.take_screenshot()`` (browser-use's
-built-in), which handles CDP session management and focus validation internally.
-These tests verify the wrapper logic: timeout enforcement, base64 injection,
-and error handling. Screenshots are inline base64 — no disk persistence.
+The screenshot command delegates to the CDP engine's ``browser.screenshot()``,
+which owns session management and capture. These tests verify the wrapper
+logic: timeout enforcement, base64 injection, and error handling. Screenshots
+are inline base64 — no disk persistence.
 """
 
 from __future__ import annotations
 
 import asyncio
 import base64
-import sys
-import types
 from typing import Any
 
 import pytest
 
-if 'browser_use' not in sys.modules:
-    stub = types.ModuleType('browser_use')
-    stub.Browser = object  # type: ignore[attr-defined]
-    sys.modules['browser_use'] = stub
-
-from backend.execution.browser import grinta_browser as gb  # noqa: E402
-from backend.ledger.observation import (  # noqa: E402
+from backend.execution.browser import grinta_browser as gb
+from backend.ledger.observation import (
     BrowserScreenshotObservation,
     ErrorObservation,
 )
-from backend.ledger.serialization.event import (  # noqa: E402
+from backend.ledger.serialization.event import (
     event_from_dict,
     event_to_dict,
 )
 
 
 class _FakeBrowser:
-    """Minimal browser stub that implements ``take_screenshot``."""
+    """Minimal browser stub that implements the engine's ``screenshot``."""
 
     def __init__(
         self,
@@ -43,18 +36,15 @@ class _FakeBrowser:
     ) -> None:
         self._screenshot_data = screenshot_data
         self._raise_exc = raise_exc
-        self.take_screenshot_calls: list[dict[str, Any]] = []
+        self.screenshot_calls: list[dict[str, Any]] = []
 
-    async def take_screenshot(
+    async def screenshot(
         self,
-        path: str | None = None,
+        *,
         full_page: bool = False,
-        format: str = 'png',
-        quality: int | None = None,
+        quality: int = 60,
     ) -> bytes:
-        self.take_screenshot_calls.append(
-            {'path': path, 'full_page': full_page, 'format': format, 'quality': quality}
-        )
+        self.screenshot_calls.append({'full_page': full_page, 'quality': quality})
         if self._raise_exc is not None:
             raise self._raise_exc
         if self._screenshot_data is None:
@@ -70,9 +60,8 @@ def _assert_screenshot_result(
 ) -> None:
     assert 'Screenshot captured' in obs.content
     assert obs.image_b64
-    assert browser.take_screenshot_calls, 'take_screenshot was never called'
-    call = browser.take_screenshot_calls[0]
-    assert call['format'] == 'jpeg'
+    assert browser.screenshot_calls, 'screenshot was never called'
+    call = browser.screenshot_calls[0]
     assert call['quality'] == 80
     assert call['full_page'] is full_page
     decoded = base64.b64decode(obs.image_b64)
@@ -165,12 +154,11 @@ async def test_screenshot_timeout_returns_error(
     monkeypatch.setattr(snap_mod, 'BROWSER_SCREENSHOT_TIMEOUT_SEC', 2.0)
 
     class _SlowBrowser(_FakeBrowser):
-        async def take_screenshot(
+        async def screenshot(
             self,
-            path: str | None = None,
+            *,
             full_page: bool = False,
-            format: str = 'png',
-            quality: int | None = None,
+            quality: int = 60,
         ) -> bytes:
             await asyncio.sleep(100)
             return b''

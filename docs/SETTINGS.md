@@ -52,7 +52,7 @@ The default agent name is `Orchestrator`. Common overrides:
 | `mode` | `agent`, `chat`, or `plan` |
 | `autonomy_level` | `conservative`, `balanced`, or `full` |
 | `enable_mcp` | Toggle MCP tools |
-| `enable_browsing` | Native `browser` tool (default on; requires `[browser]` extra at runtime). Set `false` to disable. |
+| `enable_browsing` | Native `browser` tool, driving a locally installed Chromium browser (Chrome, Edge, Chromium or Brave) over CDP. Default on; hidden when no such browser is found. No extra install. Override the executable with `GRINTA_BROWSER_BINARY`. Set `false` to disable. |
 | `enable_vector_memory` | History search (`search_history`): keyword search over this session's earlier events, backed by SQLite FTS5. Default on, no extra install; the key name is historical. Set `false` to disable. |
 | `enable_task_tracker_tool` | Structured plan tracking in Plan mode |
 | `enable_lsp_query` | LSP tool (`lsp`); default off — set `true` when language servers are installed |

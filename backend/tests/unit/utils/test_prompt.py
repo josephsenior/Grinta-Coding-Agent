@@ -858,7 +858,7 @@ class TestBuildSystemPromptRenders:
     @pytest.fixture(autouse=True)
     def _optional_extras_available(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(
-            'backend.utils.optional_extras.is_browser_extra_available',
+            'backend.utils.optional_extras.is_browser_available',
             lambda: True,
         )
         monkeypatch.setattr(

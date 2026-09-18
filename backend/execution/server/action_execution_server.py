@@ -143,7 +143,7 @@ class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
 
             set_active_tool_registry(self.session_manager.tool_registry)
 
-        # Legacy attribute; native browser uses GrintaNativeBrowser (optional browser-use).
+        # Legacy attribute; the native browser uses GrintaNativeBrowser (CDP).
         self.browser: Any | None = None
         self.enable_browser = enable_browser
         self._native_browser: Any | None = None
@@ -426,7 +426,7 @@ class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
         return await asyncio.to_thread(execute_scratchpad_recall, action)
 
     async def browser_tool(self, action: BrowserToolAction) -> Observation:
-        """Run native browser-use commands (in-process; optional dependency)."""
+        """Run native browser commands against a locally installed Chromium."""
         if not self.enable_browser:
             return ErrorObservation(
                 content=(

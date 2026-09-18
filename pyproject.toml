@@ -91,12 +91,13 @@ urls = { Homepage = "https://github.com/josephsenior/Grinta-Coding-Agent", Repos
 # chromadb + fastembed + flashrank for semantic retrieval; it is now keyword
 # search on SQLite FTS5, which needs no third-party packages.
 #
-# NOTE: the `browser` extra was removed (v1.0.1). browser-use 0.13.x pins its
-# entire transitive tree with exact `==` specifiers (openai==2.16.0, mcp==1.26.0,
-# rich==14.3.1, requests==2.33.0, aiohttp==3.13.4, ...) which conflicts with
-# Grinta's modern dependency floor, making the extra permanently unresolvable.
-# The adapter in backend/execution/browser stays dormant with lazy imports and
-# can be revived once browser-use adopts sane pinning. See docs/ for details.
+# NOTE: the `browser` extra is gone for good. The browser tool now speaks the
+# Chrome DevTools Protocol directly over `websockets` (already a dependency)
+# and drives whichever Chromium-family browser is installed on the machine, so
+# it needs no Python packages and no bundled browser download. browser-use was
+# dropped because 0.13.x still pins its entire transitive tree with exact `==`
+# specifiers (openai, anthropic, google-genai, rich, ...) that conflict with
+# Grinta's dependency floor.
 scripts.grinta = "launch.entry:main"
 scripts.grinta-deepswe = "evaluation.deepswe.run_grinta:main"
 

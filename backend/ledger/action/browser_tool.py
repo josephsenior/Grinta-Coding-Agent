@@ -1,4 +1,4 @@
-"""Action for native in-process browser automation (browser-use library)."""
+"""Action for native browser automation over the Chrome DevTools Protocol."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from backend.ledger.action.action import Action
 class BrowserToolAction(Action):
     """One browser tool invocation (navigate, snapshot, click, etc.).
 
-    The orchestrator LLM is the only policy; this does not wrap browser_use.Agent.
+    The orchestrator LLM is the only policy; there is no nested browser agent.
     """
 
     command: str = ''

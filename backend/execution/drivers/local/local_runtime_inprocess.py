@@ -550,7 +550,7 @@ class LocalRuntimeInProcess(Runtime):
         self._executor.set_browser_structured_extract(fn)
 
     def browser_tool(self, action: Any) -> Observation:
-        """Native browser-use tool via RuntimeExecutor."""
+        """Native browser tool via RuntimeExecutor."""
         from backend.ledger.action.browser_tool import BrowserToolAction
 
         if self._executor is None:

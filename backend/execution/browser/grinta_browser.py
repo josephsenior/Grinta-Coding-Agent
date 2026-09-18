@@ -1,4 +1,4 @@
-"""Native browser operations using browser-use (BrowserSession) — no nested Agent.
+"""Native browser operations over the Chrome DevTools Protocol — no nested Agent.
 
 This module is a thin shim that exposes the public
 ``GrintaNativeBrowser`` class and its ``execute`` dispatcher. The
@@ -8,12 +8,11 @@ in tests (``self.editor._method = ...``) keeps working.
 
 Per-mode helpers:
   - backend.execution.browser._browser_shared         (constants, trace, finalize, snapshot text)
-  - backend.execution.browser._browser_cdp            (CDP low-level: resolve, preflight, capture, navigate)
+  - backend.execution.browser._cdp_engine             (CDP transport, browser launch, page operations)
   - backend.execution.browser._browser_snapshot       (snapshot + screenshot command bodies)
   - backend.execution.browser._browser_navigation     (start/close/navigate/go_back/tab command bodies)
   - backend.execution.browser._browser_interaction    (click/type/scroll/wait/extract/upload/select)
 
-Pure code motion: no logic changes.
 """
 
 from __future__ import annotations
@@ -25,11 +24,17 @@ from typing import Any
 
 from backend.core.constants import BROWSER_SESSION_START_TIMEOUT_SEC
 from backend.core.logging.logger import app_logger as logger
-from backend.execution.browser._browser_cdp import (
-    _navigate_direct_cdp,
+from backend.execution.browser._browser_interaction import (
+    _dispatch_wait as _dispatch_wait_impl,
 )
 from backend.execution.browser._browser_interaction import (
-    dispatch_bus_event_impl as _dispatch_bus_event_impl,
+    _scroll_directional as _scroll_directional_impl,
+)
+from backend.execution.browser._browser_interaction import (
+    _scroll_to_edge as _scroll_to_edge_impl,
+)
+from backend.execution.browser._browser_interaction import (
+    _scroll_to_text as _scroll_to_text_impl,
 )
 from backend.execution.browser._browser_interaction import (
     execute_click_impl as _execute_click_impl,
@@ -97,6 +102,9 @@ from backend.execution.browser._browser_shared import (
     _finalize_observation,
 )
 from backend.execution.browser._browser_snapshot import (
+    _snapshot_diff as _snapshot_diff_impl,
+)
+from backend.execution.browser._browser_snapshot import (
     execute_screenshot_impl as _execute_screenshot_impl,
 )
 from backend.execution.browser._browser_snapshot import (
@@ -117,13 +125,12 @@ __all__ = [
     'GrintaNativeBrowser',
     'StructuredExtractFn',
     # Re-exports for tests that import these as module-level functions.
-    '_navigate_direct_cdp',
     '_finalize_observation',
 ]
 
 
 class GrintaNativeBrowser:
-    """Thin async wrapper around browser_use.Browser (BrowserSession)."""
+    """Async wrapper around a CDP-driven Chromium session."""
 
     def __init__(
         self,
@@ -146,40 +153,44 @@ class GrintaNativeBrowser:
     async def _ensure_session(self) -> Any:
         if self._session is not None:
             return self._session
-        try:
-            from browser_use import Browser as BrowserCls  # pyright: ignore[reportMissingImports]  # noqa: I001
-        except ImportError as e:
+        from backend.execution.browser._cdp_engine import (
+            CDPBrowser,
+            find_browser_binary,
+        )
+
+        binary = find_browser_binary()
+        if binary is None:
             raise RuntimeError(
-                'browser-use is not installed. The `[browser]` extra was removed in '
-                'v1.0.1 (browser-use pins a conflicting transitive tree); install it '
-                'manually into an isolated environment if needed, then run '
-                '`uvx browser-use install` to download Chromium.'
-            ) from e
-        browser = BrowserCls(headless=True)
+                'No Chromium-based browser found. Install Google Chrome, Microsoft '
+                'Edge, Chromium or Brave, or set GRINTA_BROWSER_BINARY to the '
+                'executable path.'
+            )
+
+        browser = CDPBrowser(headless=True)
         t0 = time.monotonic()
         _browser_trace(
-            f'starting Chromium (budget {BROWSER_SESSION_START_TIMEOUT_SEC:.0f}s; '
-            'pre-run: uvx browser-use install)'
-        )
-        logger.info(
-            'browser-use: starting Chromium (timeout %.0fs; pre-run: uvx browser-use install).',
-            BROWSER_SESSION_START_TIMEOUT_SEC,
+            f'starting {Path(binary).name} '
+            f'(budget {BROWSER_SESSION_START_TIMEOUT_SEC:.0f}s)'
         )
         try:
             await asyncio.wait_for(
-                browser.start(),
+                browser.start(timeout_sec=BROWSER_SESSION_START_TIMEOUT_SEC),
                 timeout=BROWSER_SESSION_START_TIMEOUT_SEC,
             )
         except TimeoutError as e:
-            _browser_trace('Chromium start timed out (asyncio.wait_for)')
+            _browser_trace('browser start timed out')
+            await browser.stop()
             raise RuntimeError(
                 f'Browser failed to start within {BROWSER_SESSION_START_TIMEOUT_SEC:.0f}s. '
-                'Pre-install Chromium when possible: uvx browser-use install. '
-                'Then retry; check disk space, VPN, and antivirus blocking the browser binary.'
+                'Check that antivirus or sandbox policy is not blocking '
+                f'{Path(binary).name}, then retry.'
             ) from e
+        except Exception:
+            await browser.stop()
+            raise
         elapsed_ms = (time.monotonic() - t0) * 1000
-        _browser_trace(f'Chromium session ready in {elapsed_ms:.0f}ms')
-        logger.info('browser-use: Chromium session ready in %.0fms', elapsed_ms)
+        _browser_trace(f'browser session ready in {elapsed_ms:.0f}ms')
+        logger.info('browser session ready in %.0fms', elapsed_ms)
         self._session = browser
         return browser
 
@@ -190,10 +201,6 @@ class GrintaNativeBrowser:
             await self._session.stop()
         except Exception as exc:
             logger.debug('browser stop: %s', exc)
-        try:
-            await self._session.close()
-        except Exception as exc:
-            logger.debug('browser close: %s', exc)
         self._session = None
 
     async def _snapshot_formatted(self, browser: Any, mode: str) -> str:
@@ -260,14 +267,41 @@ class GrintaNativeBrowser:
         return _resolve_workspace_path_impl(self, raw)
 
     @staticmethod
-    def _page_targets_ordered(browser: Any) -> list[Any]:
-        return _page_targets_ordered_impl(browser)
-
-    async def _dispatch_bus_event(self, browser: Any, event_obj: Any) -> None:
-        await _dispatch_bus_event_impl(self, browser, event_obj)
+    async def _page_targets_ordered(browser: Any) -> list[dict[str, Any]]:
+        return await _page_targets_ordered_impl(browser)
 
     async def _execute_scroll(self, cmd: str, params: dict[str, Any]) -> Observation:
         return await _execute_scroll_impl(self, cmd, params)
+
+    async def _scroll_to_text(
+        self, cmd: str, browser: Any, params: dict[str, Any], to_text: Any
+    ) -> Observation:
+        return await _scroll_to_text_impl(self, cmd, browser, params, to_text)
+
+    async def _scroll_to_edge(
+        self, cmd: str, browser: Any, params: dict[str, Any], direction: str
+    ) -> Observation:
+        return await _scroll_to_edge_impl(self, cmd, browser, params, direction)
+
+    async def _scroll_directional(
+        self, cmd: str, browser: Any, params: dict[str, Any], direction: str
+    ) -> Observation:
+        return await _scroll_directional_impl(self, cmd, browser, params, direction)
+
+    async def _dispatch_wait(
+        self,
+        browser: Any,
+        params: dict[str, Any],
+        wait_kind: str,
+        timeout_sec: float,
+        cmd: str,
+    ) -> tuple[str | None, Observation | None]:
+        return await _dispatch_wait_impl(
+            self, browser, params, wait_kind, timeout_sec, cmd
+        )
+
+    def _snapshot_diff(self, raw_text: str, cap: int) -> str:
+        return _snapshot_diff_impl(self, raw_text, cap)
 
     async def _execute_send_keys(self, cmd: str, params: dict[str, Any]) -> Observation:
         return await _execute_send_keys_impl(self, cmd, params)
@@ -353,7 +387,10 @@ class GrintaNativeBrowser:
                 or 'browser' in msg.lower()
                 and 'executable' in msg.lower()
             ):
-                hint = ' If the browser binary is missing, run: uvx browser-use install'
+                hint = (
+                    ' Install Google Chrome, Microsoft Edge, Chromium or Brave, '
+                    'or set GRINTA_BROWSER_BINARY to the executable path.'
+                )
             return _finalize_observation(
                 cmd,
                 ErrorObservation(

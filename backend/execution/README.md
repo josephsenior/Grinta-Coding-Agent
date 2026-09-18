@@ -51,7 +51,7 @@ Key features of the runtime executor:
    - Different types of actions are executed:
      - Bash commands using `run` method
      - File operations (read/write) using `read` and `write` methods
-   - Web browsing via external MCP tools (e.g., browser-use)
+   - Web browsing via the native CDP browser tool
 
 4. **Observation Generation**:
    - After action execution, corresponding observations are generated.

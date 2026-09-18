@@ -1,2 +1,0 @@
-# Keep Trunk Ruff behavior aligned with the canonical project Ruff config.
-extend = "../../pyproject.toml"

@@ -1,7 +1,8 @@
-"""Runtime feature gates: config flags plus manually installed modules."""
+"""Runtime feature gates: config flags plus what the machine actually provides."""
 
 from __future__ import annotations
 
+import functools
 import importlib.util
 from typing import Any
 
@@ -15,14 +16,21 @@ def _optional_extra_installed(module_name: str) -> bool:
         return False
 
 
-def is_browser_extra_available() -> bool:
-    """Return True when ``browser_use`` is installed.
+@functools.lru_cache(maxsize=1)
+def _browser_binary_present() -> bool:
+    """Whether a Chromium-family browser is installed (cached: filesystem probe)."""
+    from backend.execution.browser._cdp_engine import find_browser_binary
 
-    The ``[browser]`` extra was removed (v1.0.1) because browser-use 0.13.x
-    pins a conflicting transitive tree; this check still detects a manual
-    install so the dormant adapter works when available.
+    return find_browser_binary() is not None
+
+
+def is_browser_available() -> bool:
+    """Return True when a Chromium-based browser can be driven over CDP.
+
+    The browser tool needs no Python package beyond Grinta's own dependencies;
+    it drives Chrome, Edge, Chromium or Brave already installed on the machine.
     """
-    return _optional_extra_installed('browser_use')
+    return _browser_binary_present()
 
 
 def _resolve_agent_config(config: Any) -> Any:
@@ -33,11 +41,9 @@ def _resolve_agent_config(config: Any) -> Any:
 
 
 def browser_tool_enabled(config: Any) -> bool:
-    """Config allows browser **and** ``browser_use`` is installed."""
+    """Config allows browsing **and** a Chromium-family browser is installed."""
     agent = _resolve_agent_config(config)
-    return (
-        bool(getattr(agent, 'enable_browsing', True)) and is_browser_extra_available()
-    )
+    return bool(getattr(agent, 'enable_browsing', True)) and is_browser_available()
 
 
 def vector_memory_enabled(config: Any) -> bool:

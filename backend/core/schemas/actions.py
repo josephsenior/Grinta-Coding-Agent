@@ -356,7 +356,7 @@ class BrowseInteractiveActionSchema(ActionSchemaV1):
 
 
 class BrowserToolActionSchema(ActionSchemaV1):
-    """Schema for native browser-use tool actions (in-process, no nested Agent)."""
+    """Schema for native browser tool actions (CDP-driven, no nested Agent)."""
 
     action_type: Literal['browser_tool'] = Field(
         ActionType.BROWSER_TOOL.value, frozen=True
