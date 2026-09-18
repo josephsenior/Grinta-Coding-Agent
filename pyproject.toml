@@ -39,7 +39,7 @@ classifiers = [
 ]
 dependencies = [
   "aiohttp>=3.14.3",
-  "anthropic>=1.5.0,<2",
+  "anthropic>=1.6.0,<2",
   "anyio>=4.15.1,<5",
   "bashlex>=0.18,<0.19",
   "binaryornot>=0.6,<0.7",
@@ -52,7 +52,7 @@ dependencies = [
   "libtmux>=0.62,<0.63",
   # FastMCP 4 requires MCP 2.x.
   "mcp>=2.2.0,<3",
-  "openai>=3.13.0,<4",
+  "openai>=3.14.0,<4",
   "orjson>=3.12,<4",
   "pathspec>=1.1.1,<2",
   "prompt-toolkit>=3.0.53,<4",
@@ -79,7 +79,7 @@ dependencies = [
   "termcolor>=3.3,<4",
   "textual>=8.2.8,<9",
   "tree-sitter>=0.26,<0.27",
-  "tree-sitter-language-pack>=1.19.1,<1.20",
+  "tree-sitter-language-pack>=1.20.0,<1.21",
   "truststore>=0.10.4,<1",
   "urllib3>=2.7,<3",
 ]
