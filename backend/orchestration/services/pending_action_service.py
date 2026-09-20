@@ -123,8 +123,14 @@ _TIMEOUT_POLICY_BY_ACTION_NAME = {
     'MCPAction': lambda base, _action: max(
         float(base), MCP_PENDING_ACTION_TIMEOUT_FLOOR
     ),
-    'BrowserToolAction': lambda base, action: max(
-        float(base), browser_tool_sync_bridge_timeout_seconds(action)
+    # Not maxed against `base`: browser_tool_sync_bridge_timeout_seconds already
+    # encodes the full intended budget per command — the generic five-minute
+    # ceiling for most commands, but a deliberately tighter one for screenshot
+    # (see its docstring). Wrapping it in max(base, ...) let a larger generic
+    # `base` silently override that tighter screenshot budget, defeating the
+    # whole point of having one.
+    'BrowserToolAction': lambda _base, action: browser_tool_sync_bridge_timeout_seconds(
+        action
     ),
     'TerminalRunAction': _terminal_run_pending_timeout,
     'TerminalInputAction': _terminal_io_pending_timeout,
