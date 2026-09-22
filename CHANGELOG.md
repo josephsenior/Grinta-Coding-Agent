@@ -108,7 +108,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`evaluate`/`snapshot_text`/`page_text` 30s → 45s, `screenshot` now exposes
   its own 40s budget) and `BROWSER_SNAPSHOT_CHAIN_TIMEOUT_SEC` (40s → 100s) so
   an outer wrapper can never cut off two sequential inner calls that are still
-  genuinely progressing.
+  genuinely progressing. Neither change stopped a residual macOS-only stall:
+  the same two tests, out of thirteen, still hit a 45s-old `Runtime.evaluate`
+  timeout on an otherwise-healthy session, with no reproduction locally or on
+  Linux/Windows CI across many runs — host scheduling jitter on that runner
+  pool, not a code defect. Added `pytest-rerunfailures` (test-only dependency)
+  and marked the file `flaky(reruns=2)`; each test launches its own fresh
+  browser, so a rerun gets a clean session rather than retrying into the same
+  stuck one.
 - **CI was red: `from mcp import McpError` no longer matches the resolved
   `mcp` package.** `pyproject.toml` pins `mcp>=2.2.0,<3`; that SDK renamed the
   exception to `MCPError` with no backward-compatible alias, breaking mypy,
