@@ -376,9 +376,21 @@ jobs:
         run: uv run python -m compileall backend
       - name: Run integration, e2e, and stress tests
         run: >-
-          PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q -n 2
+          PYTHONPATH=".:$PYTHONPATH" uv run pytest -q -n 2
           --cov=backend --cov-fail-under=0
+          --ignore=backend/tests/integration/test_cdp_browser_integration.py
           backend/tests/integration backend/tests/e2e backend/tests/stress
+      - name: Run CDP browser integration tests
+        # Isolated from the rest of the suite (no -n, runs after everything
+        # else): each test launches a real Chrome process and drives it over
+        # CDP, and running it alongside the parallel e2e/stress load starved
+        # it of CPU on shared runners badly enough that Runtime.evaluate calls
+        # never got scheduled in time, even after raising timeouts and adding
+        # rerun-on-failure.
+        run: >-
+          PYTHONPATH=".:$PYTHONPATH" uv run pytest -q
+          --cov=backend --cov-append --cov-fail-under=0
+          backend/tests/integration/test_cdp_browser_integration.py
       - name: Stage coverage data
         run: cp .coverage coverage-shard-extended.dat
       - name: Upload coverage data
@@ -477,7 +489,20 @@ jobs:
       - name: Compile backend (syntax gate)
         run: uv run python -m compileall backend
       - name: Run integration, e2e, and stress tests
-        run: uv run pytest --maxfail=1 -q -n 2 backend/tests/integration backend/tests/e2e backend/tests/stress
+        run: >-
+          uv run pytest -q -n 2
+          --ignore=backend/tests/integration/test_cdp_browser_integration.py
+          backend/tests/integration backend/tests/e2e backend/tests/stress
+        env:
+          PYTHONPATH: '.;$env:PYTHONPATH'
+      - name: Run CDP browser integration tests
+        # Isolated from the rest of the suite (no -n, runs after everything
+        # else): each test launches a real Chrome process and drives it over
+        # CDP, and running it alongside the parallel e2e/stress load starved
+        # it of CPU on shared runners badly enough that Runtime.evaluate calls
+        # never got scheduled in time, even after raising timeouts and adding
+        # rerun-on-failure.
+        run: uv run pytest -q backend/tests/integration/test_cdp_browser_integration.py
         env:
           PYTHONPATH: '.;$env:PYTHONPATH'
 
@@ -568,4 +593,16 @@ jobs:
       - name: Compile backend (syntax gate)
         run: uv run python -m compileall backend
       - name: Run integration, e2e, and stress tests
-        run: PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q -n 2 backend/tests/integration backend/tests/e2e backend/tests/stress
+        run: >-
+          PYTHONPATH=".:$PYTHONPATH" uv run pytest -q -n 2
+          --ignore=backend/tests/integration/test_cdp_browser_integration.py
+          backend/tests/integration backend/tests/e2e backend/tests/stress
+      - name: Run CDP browser integration tests
+        # Isolated from the rest of the suite (no -n, runs after everything
+        # else): each test launches a real Chrome process and drives it over
+        # CDP, and running it alongside the parallel e2e/stress load starved
+        # it of CPU on this shared macOS runner badly enough that
+        # Runtime.evaluate calls never got scheduled in time, even after
+        # raising timeouts, switching headless modes, and adding
+        # rerun-on-failure — all of which left the same two tests failing.
+        run: PYTHONPATH=".:$PYTHONPATH" uv run pytest -q backend/tests/integration/test_cdp_browser_integration.py

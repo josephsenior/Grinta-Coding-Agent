@@ -115,7 +115,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pool, not a code defect. Added `pytest-rerunfailures` (test-only dependency)
   and marked the file `flaky(reruns=2)`; each test launches its own fresh
   browser, so a rerun gets a clean session rather than retrying into the same
-  stuck one.
+  stuck one. That still wasn't enough: the reruns fired (verified locally
+  that `pytest-rerunfailures` correctly re-executes setup/call/teardown under
+  `-n 2`, including with `--maxfail=1`) but failed identically each time,
+  ruling out ordinary flakiness — the actual cause was the browser suite
+  sharing CPU with the parallel e2e/stress load on the same shared runner via
+  `-n 2`, starving real Chrome processes badly enough that CDP calls never
+  got scheduled before their deadline. Moved
+  `test_cdp_browser_integration.py` into its own CI step, run serially after
+  everything else with nothing competing for CPU, on all three OSes.
 - **CI was red: `from mcp import McpError` no longer matches the resolved
   `mcp` package.** `pyproject.toml` pins `mcp>=2.2.0,<3`; that SDK renamed the
   exception to `MCPError` with no backward-compatible alias, breaking mypy,
