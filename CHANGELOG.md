@@ -91,6 +91,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **CI was red: the new CDP browser integration suite hung on macOS runners,
+  and two shard commands in `py-tests.yml` pointed at test files the RAG/CDP
+  cleanups had already deleted.** Three independent causes: (1)
+  `--headless=new` shares headed Chrome's compositor path, which can stall
+  `Runtime.evaluate`/`Page.captureScreenshot` indefinitely on GPU-less CI
+  machines since there's never a real frame for it to wait on — reproduced
+  only on the macOS runner (Linux and Windows extended gates, and every local
+  run, were fine); switched to classic `--headless`. (2) two workers each
+  launching their own Chrome under `-n 2` could still starve each other on
+  constrained hardware, so the whole integration file is now pinned to one
+  xdist worker via `xdist_group`. (3) `backend/tests/unit/test_start_server.py`
+  and `backend/tests/unit/knowledge` no longer exist but were still hardcoded
+  into two Linux shard commands, failing with "file or directory not found";
+  removed from `py-tests.yml`. Also raised the CDP engine's per-call timeouts
+  (`evaluate`/`snapshot_text`/`page_text` 30s → 45s, `screenshot` now exposes
+  its own 40s budget) and `BROWSER_SNAPSHOT_CHAIN_TIMEOUT_SEC` (40s → 100s) so
+  an outer wrapper can never cut off two sequential inner calls that are still
+  genuinely progressing.
 - **CI was red: `from mcp import McpError` no longer matches the resolved
   `mcp` package.** `pyproject.toml` pins `mcp>=2.2.0,<3`; that SDK renamed the
   exception to `MCPError` with no backward-compatible alias, breaking mypy,

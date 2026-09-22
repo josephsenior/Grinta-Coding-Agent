@@ -343,7 +343,13 @@ class CDPBrowser:
             'about:blank',
         ]
         if self._headless:
-            argv.insert(1, '--headless=new')
+            # Classic headless, not --headless=new: the new mode shares
+            # headed Chrome's compositor path, which can stall Runtime.evaluate
+            # and Page.captureScreenshot indefinitely on GPU-less CI runners
+            # (observed hanging past a 45s budget on macOS GitHub Actions
+            # runners specifically, while Linux/Windows CI and local runs were
+            # fine) since there's never a real frame for it to wait on.
+            argv.insert(1, '--headless')
 
         _browser_trace(f'launching {os.path.basename(binary)} on port {port}')
         self._process = await asyncio.create_subprocess_exec(
