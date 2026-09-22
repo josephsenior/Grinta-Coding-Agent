@@ -30,14 +30,6 @@ pytestmark = [
     # of CPU and make an in-flight CDP call time out. Serializing relative to
     # other files in this module is enough — no event-loop-scope change needed.
     pytest.mark.xdist_group(name='cdp-browser'),
-    # macOS GitHub Actions runners occasionally stall an in-flight
-    # Runtime.evaluate for 45s+ on an otherwise-healthy Chrome session, with
-    # no reproduction locally or on Linux/Windows CI across many runs and no
-    # change from raising timeouts or switching headless modes — i.e. host
-    # scheduling jitter, not a code defect. Each test launches its own fresh
-    # browser, so a rerun gets a clean session rather than retrying into the
-    # same stuck state.
-    pytest.mark.flaky(reruns=2, reruns_delay=3),
 ]
 
 FIXTURE_HTML = (
