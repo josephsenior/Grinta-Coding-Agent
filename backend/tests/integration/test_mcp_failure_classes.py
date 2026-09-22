@@ -38,7 +38,7 @@ async def test_mcp_validation_error_envelope() -> None:
         side_effect=FakeMcpError('MCP error -32602: invalid_type')
     )
 
-    with patch('backend.integrations.mcp.mcp_utils.McpError', FakeMcpError):
+    with patch('backend.integrations.mcp.mcp_utils.MCPError', FakeMcpError):
         obs = await call_tool_mcp([client], action)
 
     payload = json.loads(obs.content)

@@ -91,6 +91,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **CI was red: `from mcp import McpError` no longer matches the resolved
+  `mcp` package.** `pyproject.toml` pins `mcp>=2.2.0,<3`; that SDK renamed the
+  exception to `MCPError` with no backward-compatible alias, breaking mypy,
+  every test that imports `backend.integrations.mcp.client` or `.mcp_utils`
+  transitively, and a real wheel install (`Smoke Install`, `CLI Regression
+  Tests`). Fixed in both modules; verified against a wheel built from source
+  and installed into a clean venv with the CI-resolved `mcp==2.2.0`, running
+  the same stub CLI task Smoke Install runs. Also applied the
+  `pyproject-fmt`/`ruff format` normalization a dependency bump had left
+  failing (trailing-zero version pins, one long call split unnecessarily).
 - **`_cancel_pending_tasks_bounded` could hang forever on Windows
   Proactor.** A background task that swallows `CancelledError` (as
   browser-style CDP tasks do) made `wait_for(gather(...))` never time

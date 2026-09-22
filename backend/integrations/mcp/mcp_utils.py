@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from backend.ledger.observation.observation import Observation
     from backend.orchestration.agent import Agent
 
-from mcp import McpError
+from mcp import MCPError
 
 from backend.core.config.mcp_config import (
     MCPConfig,
@@ -909,7 +909,7 @@ async def _execute_direct_tool(
         return _make_mcp_observation(
             action, _normalize_mcp_success_payload(result_dict)
         )
-    except McpError as e:
+    except MCPError as e:
         err_text = str(e)
         logger.error('MCP error when calling tool %s: %s', action.name, err_text)
 

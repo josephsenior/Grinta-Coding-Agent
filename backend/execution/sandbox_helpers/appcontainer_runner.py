@@ -307,9 +307,7 @@ def _launch(
         os.set_handle_inheritable(stdout_handle, True)
         os.set_handle_inheritable(stderr_handle, True)
         os.set_handle_inheritable(stdin_handle, True)
-        _grant_workspace_access(
-            workspace, sid_string, read_only=read_only_workspace
-        )
+        _grant_workspace_access(workspace, sid_string, read_only=read_only_workspace)
 
         caps_array, capability_ptrs = _make_capabilities(allow_network)
         security_caps = SECURITY_CAPABILITIES()

@@ -14,7 +14,7 @@ from fastmcp.client.transports import (
     StdioTransport,
     StreamableHttpTransport,
 )
-from mcp import McpError
+from mcp import MCPError
 from mcp.types import Implementation
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
@@ -297,7 +297,7 @@ class MCPClient(BaseModel):
 
         Raises:
             ValueError: If server URL is missing
-            McpError: On MCP-specific errors
+            MCPError: On MCP-specific errors
             Exception: On other connection errors
 
         """
@@ -317,7 +317,7 @@ class MCPClient(BaseModel):
             self._server_config = server
             await self._open_session()
             await self._populate_tools()
-        except McpError as e:
+        except MCPError as e:
             self._handle_connection_error(server_url, server, e, is_mcp_error=True)
             raise
         except Exception as e:
@@ -356,7 +356,7 @@ class MCPClient(BaseModel):
         is_mcp_error: bool = False,
     ) -> None:
         """Handle and record connection errors."""
-        error_prefix = 'McpError' if is_mcp_error else 'Error'
+        error_prefix = 'MCPError' if is_mcp_error else 'Error'
         error_msg = f'{error_prefix} connecting to {server_url}: {error}'
         logger.error(error_msg)
 
