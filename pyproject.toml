@@ -52,7 +52,7 @@ dependencies = [
   "libtmux>=0.62,<0.63",
   # FastMCP 4 requires MCP 2.x.
   "mcp>=2.2,<3",
-  "openai>=3.16,<4",
+  "openai>=3.16.2,<4",
   "orjson>=3.12,<4",
   "pathspec>=1.1.1,<2",
   "prompt-toolkit>=3.0.53,<4",
@@ -127,7 +127,7 @@ test = [
   "pytest>=9.1.1",
   "pytest-asyncio>=1.4,<2",
   "pytest-cov>=7.1,<8",
-  "pytest-rerunfailures>=16,<17",
+  "pytest-rerunfailures>=16.7,<17",
   "pytest-timeout>=2.4",
   "pytest-xdist>=3.8,<4",
   "requests>=2.34.2,<3",
