@@ -231,7 +231,11 @@ TOOL_BRIDGE_TIMEOUT_BUFFER = 10.0
 # downloading a browser the way the old browser-use path did.
 BROWSER_SESSION_START_TIMEOUT_SEC = 30.0
 BROWSER_NAVIGATE_TOTAL_TIMEOUT_SEC = 45.0
-BROWSER_SNAPSHOT_CHAIN_TIMEOUT_SEC = 40.0
+# _snapshot_text_chain runs snapshot_text() then page_text() sequentially,
+# each with its own 45s per-call budget (CDPBrowser.evaluate default) — the
+# outer budget must clear their combined worst case or it can cut off work
+# that was still genuinely progressing, not hung.
+BROWSER_SNAPSHOT_CHAIN_TIMEOUT_SEC = 100.0
 BROWSER_SCREENSHOT_TIMEOUT_SEC = 45.0
 # Inline JPEG bytes into LLM context only below this size (vision providers vary).
 # Env-configurable so operators can tune for provider-specific limits.

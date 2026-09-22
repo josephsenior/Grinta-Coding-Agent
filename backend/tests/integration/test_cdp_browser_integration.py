@@ -24,6 +24,12 @@ pytestmark = [
         find_browser_binary() is None,
         reason='no Chromium-based browser installed',
     ),
+    # Keep every test in this file on one xdist worker. Each test launches its
+    # own Chrome process; on shared/constrained CI hardware (notably macOS
+    # runners under -n 2) two workers launching Chrome at once can starve both
+    # of CPU and make an in-flight CDP call time out. Serializing relative to
+    # other files in this module is enough — no event-loop-scope change needed.
+    pytest.mark.xdist_group(name='cdp-browser'),
 ]
 
 FIXTURE_HTML = (

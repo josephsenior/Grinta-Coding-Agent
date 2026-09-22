@@ -475,7 +475,7 @@ class CDPBrowser:
         self.focused_target_id = target_id
         return session_id
 
-    async def evaluate(self, expression: str, *, timeout_sec: float = 30.0) -> Any:
+    async def evaluate(self, expression: str, *, timeout_sec: float = 45.0) -> Any:
         """Evaluate JS in the focused page and return the value by value."""
         result = await self.page_send(
             'Runtime.evaluate',
@@ -582,12 +582,12 @@ class CDPBrowser:
 
     # ── page state ───────────────────────────────────────────────────
 
-    async def snapshot_text(self, *, timeout_sec: float = 30.0) -> str:
+    async def snapshot_text(self, *, timeout_sec: float = 45.0) -> str:
         """Rebuild the page selector map and return indexed element lines."""
         value = await self.evaluate(_SERIALIZER_JS, timeout_sec=timeout_sec)
         return str(value or '')
 
-    async def page_text(self, *, timeout_sec: float = 30.0) -> str:
+    async def page_text(self, *, timeout_sec: float = 45.0) -> str:
         value = await self.evaluate(_PAGE_TEXT_JS, timeout_sec=timeout_sec)
         return str(value or '')
 
@@ -601,13 +601,21 @@ class CDPBrowser:
         except ValueError:
             return None
 
-    async def screenshot(self, *, full_page: bool = False, quality: int = 60) -> bytes:
+    async def screenshot(
+        self, *, full_page: bool = False, quality: int = 60, timeout_sec: float = 40.0
+    ) -> bytes:
         import base64
 
+        # Kept under BROWSER_SCREENSHOT_TIMEOUT_SEC's default outer
+        # asyncio.wait_for wrapper (_browser_snapshot.py) so a slow-but-live
+        # capture hits this inner timeout with a clear message rather than
+        # being cut off by the outer wrapper first.
         params: dict[str, Any] = {'format': 'jpeg', 'quality': quality}
         if full_page:
             params['captureBeyondViewport'] = True
-        result = await self.page_send('Page.captureScreenshot', params, timeout_sec=60)
+        result = await self.page_send(
+            'Page.captureScreenshot', params, timeout_sec=timeout_sec
+        )
         return base64.b64decode(result.get('data', ''))
 
     # ── interaction ──────────────────────────────────────────────────
