@@ -22,6 +22,30 @@ Responsibilities:
 
 Configuration keys and param validation live in [`backend/core/config/`](../backend/core/config/). Prompt assembly lives in [`backend/engine/prompts/`](../backend/engine/prompts/) and [`backend/context/`](../backend/context/) — those consume inference; they do not call providers directly.
 
+### Tsubasa through the OpenAI-compatible client
+
+Merge these values into `settings.json` and set `LLM_API_KEY` in your environment
+or local `.env` file:
+
+```json
+{
+  "llm_provider": "openai",
+  "llm_model": "tsubasa-fast",
+  "llm_base_url": "https://api.tsubasa.sh/v1",
+  "llm_api_key": "${LLM_API_KEY}",
+  "llm_context_window_tokens": 32768,
+  "llm_max_output_tokens": 4096
+}
+```
+
+Use `tsubasa-pro` for the other alias; the same limits above apply. The output
+setting reserves part of the 32,768-token context window, so prompts, tool
+definitions and conversation history must fit alongside it. This configuration
+sends prompts and the configured key to `api.tsubasa.sh`. Grinta's agent requires
+tool calls to be enabled for the selected endpoint and model; configuring a
+custom alias does not enable that capability. See [SETTINGS.md](SETTINGS.md) for
+configuration locations and precedence.
+
 ### Model listing sources
 
 Grinta uses **catalog-only listing** for hosted providers and **live probes** for local runtimes:
