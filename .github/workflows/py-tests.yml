@@ -68,7 +68,7 @@ jobs:
       - name: Stage coverage data
         run: cp .coverage coverage-shard-a.dat
       - name: Upload coverage data
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: coverage-linux-a
           path: coverage-shard-a.dat
@@ -110,7 +110,7 @@ jobs:
       - name: Stage coverage data
         run: cp .coverage coverage-shard-b.dat
       - name: Upload coverage data
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: coverage-linux-b
           path: coverage-shard-b.dat
@@ -157,7 +157,7 @@ jobs:
       - name: Stage coverage data
         run: cp .coverage coverage-shard-d.dat
       - name: Upload coverage data
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: coverage-linux-d
           path: coverage-shard-d.dat
@@ -204,7 +204,7 @@ jobs:
       - name: Stage coverage data
         run: cp .coverage coverage-shard-g.dat
       - name: Upload coverage data
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: coverage-linux-g
           path: coverage-shard-g.dat
@@ -244,7 +244,7 @@ jobs:
       - name: Stage coverage data
         run: cp .coverage coverage-shard-e.dat
       - name: Upload coverage data
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: coverage-linux-e
           path: coverage-shard-e.dat
@@ -287,7 +287,7 @@ jobs:
       - name: Stage coverage data
         run: cp .coverage coverage-shard-c.dat
       - name: Upload coverage data
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: coverage-linux-c
           path: coverage-shard-c.dat
@@ -394,7 +394,7 @@ jobs:
       - name: Stage coverage data
         run: cp .coverage coverage-shard-extended.dat
       - name: Upload coverage data
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: coverage-linux-extended
           path: coverage-shard-extended.dat
