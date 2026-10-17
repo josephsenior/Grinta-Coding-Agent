@@ -75,8 +75,8 @@ dependencies = [
   "ripgrep==15.1; sys_platform!='win32'",
   # Use the standalone repository until ShadowGit is published on PyPI.
   "shadowgit @ git+https://github.com/josephsenior/ShadowGit.git@114704ea6a79a58862c1f90f51bee6d8f6305c3a",
-  # google-genai currently requires tenacity<9.2; keep clean installs resolvable.
-  "tenacity>=9.1.4,<9.2",
+  # Let the resolver select the newest version compatible with the model SDKs.
+  "tenacity>=9.1.4,<10",
   "termcolor>=3.3,<4",
   "textual>=8.2.8,<9",
   "tree-sitter>=0.26,<0.27",
