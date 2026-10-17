@@ -39,21 +39,21 @@ classifiers = [
 ]
 dependencies = [
   "aiohttp>=3.14.5",
-  "anthropic>=1.13.0,<2",
+  "anthropic>=1.13,<2",
   "anyio>=4.15.1,<5",
   "bashlex>=0.18,<0.19",
   "binaryornot>=0.6,<0.7",
   "chardet>=7.6,<8",
   "charset-normalizer>=3.5.2,<4",
-  "fastmcp>=4.1.0,<5",
+  "fastmcp>=4.1,<5",
   "google-genai>=2.30.1",
   "httpx>=0.28.1,<1",
-  "json-repair>=0.64.0,<1",
+  "json-repair>=0.64,<1",
   "libtmux>=0.62,<0.63",
   # FastMCP 4 requires MCP 2.x.
   "mcp>=2.3,<3",
-  "openai>=3.29.0,<4",
-  "orjson>=3.13.0,<4",
+  "openai>=3.29,<4",
+  "orjson>=3.13,<4",
   "pathspec>=1.1.1,<2",
   "prompt-toolkit>=3.0.53,<4",
   "psutil>=7.2.2,<8",
@@ -75,7 +75,8 @@ dependencies = [
   "ripgrep==15.1; sys_platform!='win32'",
   # Use the standalone repository until ShadowGit is published on PyPI.
   "shadowgit @ git+https://github.com/josephsenior/ShadowGit.git@114704ea6a79a58862c1f90f51bee6d8f6305c3a",
-  "tenacity>=9.2.1,<10",
+  # google-genai currently requires tenacity<9.2; keep clean installs resolvable.
+  "tenacity>=9.1.4,<9.2",
   "termcolor>=3.3,<4",
   "textual>=8.2.8,<9",
   "tree-sitter>=0.26,<0.27",
@@ -115,7 +116,7 @@ dev = [
   "pylint>=4.1.3,<5",
   "pytest>=9.1.1",
   "pytest-asyncio>=1.4,<2",
-  "ruff==0.17.0",
+  "ruff==0.17",
   "tiktoken>=0.14",
   "types-pyyaml>=6.0.12.20260906",
   "types-requests>=2.33.0.20261006",
@@ -193,7 +194,7 @@ constraint-dependencies = [
 ]
 override-dependencies = [
   "aiohttp>=3.14.5",
-  "pypdf>=6.16.1",
+  "pypdf>=6.20.1,<7",
 ]
 
 [tool.ruff]
