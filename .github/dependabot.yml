@@ -7,6 +7,14 @@ updates:
     schedule:
       interval: 'daily'
     open-pull-requests-limit: 1
+    ignore:
+      # This dependency is intentionally installed from a pinned Git commit;
+      # the updater incorrectly tries to replace it with a PyPI requirement.
+      - dependency-name: 'shadowgit'
+      # These published releases conflict with google-genai 2.31.0's <9.2
+      # requirement. Revisit when the SDK supports them; future releases remain eligible.
+      - dependency-name: 'tenacity'
+        versions: ['9.2.0', '9.2.1']
     groups:
       # put packages in their own group if they have a history of breaking the build or needing to be reverted
       pre-commit:
