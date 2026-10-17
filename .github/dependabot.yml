@@ -32,7 +32,6 @@ updates:
       interval: 'weekly'
 
   - package-ecosystem: 'docker'
-    directories:
-      - 'containers/*'
+    directory: '/scripts/smoke'
     schedule:
       interval: 'weekly'
