@@ -39,3 +39,30 @@ def test_legacy_installer_retains_its_original_toolchain_setup():
     assert 'apt-get update' in scripts
     assert 'nvm install 22' in scripts
     assert '/usr/local/bin/node' in scripts
+
+
+def test_shared_pier_profile_preserves_numba_resources_without_host_mounts():
+    from evaluation.deepswe.shared_environment import compose_profile
+
+    record = {
+        'environment': {
+            'network': {'agent_and_candidate_validation': 'none'},
+            'user': {'user': 'root'},
+            'extra_hosts': {},
+            'limits': {
+                'memory_mb': 8192,
+                'cpus': 2,
+                'pids_limit': 2048,
+                'swap_policy': 'docker-default',
+                'scratch_mode': 'volume',
+                'scratch_mb': None,
+            },
+        }
+    }
+    main = compose_profile(record, 'sha256:' + 'a' * 64)['services']['main']
+    assert main['read_only'] is True
+    assert main['network_mode'] == 'none'
+    assert main['cap_drop'] == ['ALL']
+    assert main['volumes'] == [{'type': 'volume', 'target': '/tmp'}]
+    assert main['cpus'] == 2 and main['mem_limit'] == '8192m'
+    assert 'memswap_limit' not in main

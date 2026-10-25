@@ -16,8 +16,9 @@ def installation_steps(
     allow_tree_sitter_bootstrap,
     tree_sitter_languages,
     preserve_task_toolchain=False,
+    grinta_source=None,
 ):
-    grinta_requirement = f'git+{grinta_repo}@{grinta_commit}'
+    grinta_requirement = grinta_source or f'git+{grinta_repo}@{grinta_commit}'
     codex_npm_args = codex_npm_install_args(codex_version)
     root_install = (
         'if command -v apt-get >/dev/null; then '

@@ -31,6 +31,11 @@ implemented. Ordinary Grinta and the older Pier path are unchanged.
 Actionlint and Numba matched in the 25 October 2026 source/configuration checks.
 These checks did not install Grinta inside a task container, prove Pier runtime
 equivalence, enforce the remaining edit restrictions or run benchmark tests.
+The later [controlled container rehearsal](https://github.com/josephsenior/Agentless-ML/blob/main/docs/history/shared-container-rehearsal-2026-10-25.md)
+did compare real Agentless and Pier containers after installing Grinta core.
+Their observed settings and starting source bytes/modes matched. Native edits
+passed the authored unit test, and unsupported edits were rejected. This is
+one diagnostic environment; model transport remains deferred.
 
 The opt-in Pier parameter `preserve_task_toolchain=True` uses the image's
 existing curl/Git/Node/npm/uv and installs Codex under the image user's private
@@ -47,6 +52,21 @@ products outside source or use the repository's existing ignore rules.
 The guard checks resulting states, as agreed: deleting and restoring a file
 within one command is allowed. It does not monitor intermediate writes inside
 that command or claim protection against a deliberately hostile process.
+
+`shared_environment.create_shared_environment()` applies the shared record's
+container limits through Pier's real Docker lifecycle. Runtime installation is
+completed beforehand into an explicitly identified prepared image, which both
+arms can use. The profile disables agent egress, drops capabilities, uses a
+read-only root and confines writes to `/tmp`, including Pier's internal logs.
+It passes source archives without Windows newline rewriting. Cleanup removes
+only the session's containers and volumes and preserves the shared images.
+
+`python -m evaluation.deepswe.rehearse_shared_runtime` runs a bounded provisioning
+diagnostic with task-tool fingerprints before and after installation. Network
+is enabled during this setup phase. `--source-archive` accepts a local Git
+archive of the exact requested commit to avoid unreliable Git transfer;
+archive files, executable bits and symlink targets are checked against Git.
+The diagnostic does not copy authentication or call a model.
 
 ## Paired case study
 

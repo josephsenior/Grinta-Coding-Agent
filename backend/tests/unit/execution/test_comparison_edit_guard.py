@@ -131,3 +131,33 @@ def test_delete_and_restore_within_one_action_is_intentionally_allowed(source):
     (repo / 'a.py').unlink()
     (repo / 'a.py').write_bytes(b'x = 1\n')
     guard.check()
+
+
+def test_new_path_cannot_replace_a_removed_file_with_a_directory(source):
+    repo, guard = source
+    (repo / 'old.py').unlink()
+    (repo / 'old.py').mkdir()
+    (repo / 'old.py/child.py').write_bytes(b'x = 1\n')
+    with pytest.raises(ComparisonContractError, match='collides'):
+        guard.check()
+
+
+def test_unchanged_gitlink_is_allowed_but_pointer_change_is_rejected(source):
+    repo, _ = source
+    nested = repo / 'module'
+    nested.mkdir()
+    git(nested, 'init')
+    (nested / 'file.txt').write_bytes(b'base\n')
+    git(nested, 'add', '.')
+    git(nested, 'commit', '-m', 'nested base')
+    git(repo, 'add', 'module')
+    git(repo, 'commit', '-m', 'gitlink')
+    guard = ComparisonEditGuard(repo)
+    guard.check()
+    (repo / 'a.py').write_bytes(b'x = 2\n')
+    guard.check()
+    (nested / 'file.txt').write_bytes(b'changed\n')
+    git(nested, 'add', '.')
+    git(nested, 'commit', '-m', 'changed pointer')
+    with pytest.raises(ComparisonContractError, match='submodule'):
+        guard.check()

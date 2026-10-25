@@ -122,10 +122,13 @@ class ComparisonEditGuard:
                 if len(folded.get(path.casefold(), [])) > 1:
                     raise ComparisonContractError(f'case-colliding source path: {path}')
                 if before is None and any(
-                    old.casefold() == path.casefold() for old in self.original
+                    old.casefold() == path.casefold()
+                    or path.casefold().startswith(old.casefold() + '/')
+                    or old.casefold().startswith(path.casefold() + '/')
+                    for old in self.original
                 ):
                     raise ComparisonContractError(
-                        f'case-only replacement is unsupported: {path}'
+                        f'new source path collides with the starting tree: {path}'
                     )
                 if before and before[0] not in {'100644', '100755'}:
                     raise ComparisonContractError(
