@@ -69,6 +69,9 @@ def _parser() -> argparse.ArgumentParser:
     task = parser.add_mutually_exclusive_group(required=True)
     task.add_argument('--instruction-file', help='UTF-8 task instruction file')
     task.add_argument('--instruction', help='Task instruction text')
+    task.add_argument(
+        '--shared-task', help='Shared DeepSWE task.json (model-free preflight only)'
+    )
     parser.add_argument(
         '--model',
         default='codex/gpt-5.6-sol',
@@ -344,6 +347,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     output_dir = Path(args.output_dir).resolve()
     if not workspace.is_dir():
         raise SystemExit(f'Workspace does not exist: {workspace}')
+    if args.shared_task:
+        from evaluation.deepswe.shared_task import load_shared_task, preflight_manifest
+
+        record = load_shared_task(args.shared_task)
+        if args.task_id != record['identity']['task_id']:
+            raise SystemExit('Task ID disagrees with shared record')
+        if not args.dry_run:
+            raise SystemExit(
+                'Shared comparison live execution is deferred: model/access, budgets '
+                'and observed container matching are not configured. Use --dry-run.'
+            )
+        manifest = preflight_manifest(record, workspace, 'grinta', args.grinta_commit)
+        print(json.dumps(manifest, indent=2, sort_keys=True))
+        return 0
     if not config_path.is_file():
         raise SystemExit(f'Benchmark config does not exist: {config_path}')
     try:

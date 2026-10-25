@@ -4,6 +4,34 @@ This is the preliminary, reproducible Grinta evaluation protocol. It uses the
 official DataCurve **Pier** harness and DeepSWE's external behavioral verifier.
 Grinta's own `FINISHED` state is diagnostic and can never produce a PASS.
 
+## Agentless-ML shared comparison (model-free)
+
+The separate shared comparison path accepts an exported DeepSWE `task.json`
+and its adjacent native public report. It does not inherit the older protocol's
+model defaults or launch a model:
+
+```bash
+python -m evaluation.deepswe.run_grinta \
+  --workspace /path/to/clean-pinned-checkout \
+  --shared-task /path/to/task.json \
+  --task-id actionlint-action-pinning-lint \
+  --grinta-commit <current-commit> \
+  --output-dir /path/to/output --dry-run
+```
+
+This mode verifies hashes, the starting commit/tree and a clean checkout, then
+reports the shared problem, public resources and configured environment. It
+bypasses legacy model settings. Shared-record execution without `--dry-run`
+is blocked until model/access, budgets and observed environment matching are
+implemented. Ordinary Grinta and the older Pier path are unchanged.
+
+`shared_task.py` is the byte-identical stdlib reader mirrored from Agentless-ML's
+`src/agentless_ml/shared_task.py`; update both copies together. Agentless-ML's
+`tools/compare_shared_deepswe_starts.py` exercises both actual CLI preflights.
+Actionlint and Numba matched in the 25 October 2026 source/configuration checks.
+These checks did not install Grinta inside a task container, prove Pier runtime
+equivalence, enforce the remaining edit restrictions or run benchmark tests.
+
 ## Paired case study
 
 The completed eight-task paired case study is documented in

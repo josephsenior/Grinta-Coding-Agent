@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 from pathlib import Path
 from types import SimpleNamespace
+
+import pytest
 
 from evaluation.deepswe.run_grinta import (
     _benchmark_user_response,
@@ -16,6 +19,91 @@ from evaluation.deepswe.run_grinta import (
     _parser,
     _validate_subscription_model,
 )
+
+
+def test_shared_preflight_bypasses_legacy_model_defaults(tmp_path, monkeypatch, capsys):
+    from evaluation.deepswe import run_grinta, shared_task
+
+    monkeypatch.setattr(
+        shared_task, 'load_shared_task', lambda p: {'identity': {'task_id': 'shared'}}
+    )
+    monkeypatch.setattr(
+        shared_task,
+        'preflight_manifest',
+        lambda *a: {'model': None, 'live_model_calls': 0},
+    )
+    monkeypatch.setattr(
+        run_grinta,
+        '_validate_subscription_model',
+        lambda *a: pytest.fail('legacy model settings used'),
+    )
+    assert (
+        run_grinta.main(
+            [
+                '--workspace',
+                str(tmp_path),
+                '--shared-task',
+                'task.json',
+                '--task-id',
+                'shared',
+                '--grinta-commit',
+                'a' * 40,
+                '--output-dir',
+                str(tmp_path / 'output'),
+                '--dry-run',
+            ]
+        )
+        == 0
+    )
+    assert json.loads(capsys.readouterr().out)['model'] is None
+    assert not (tmp_path / 'output').exists()
+
+
+def test_shared_record_cannot_start_live_model(tmp_path, monkeypatch):
+    from evaluation.deepswe import run_grinta, shared_task
+
+    monkeypatch.setattr(
+        shared_task, 'load_shared_task', lambda p: {'identity': {'task_id': 'shared'}}
+    )
+    with pytest.raises(SystemExit, match='live execution is deferred'):
+        run_grinta.main(
+            [
+                '--workspace',
+                str(tmp_path),
+                '--shared-task',
+                'task.json',
+                '--task-id',
+                'shared',
+                '--grinta-commit',
+                'a' * 40,
+                '--output-dir',
+                str(tmp_path / 'output'),
+            ]
+        )
+
+
+def test_shared_record_rejects_different_task_id(tmp_path, monkeypatch):
+    from evaluation.deepswe import run_grinta, shared_task
+
+    monkeypatch.setattr(
+        shared_task, 'load_shared_task', lambda p: {'identity': {'task_id': 'shared'}}
+    )
+    with pytest.raises(SystemExit, match='Task ID disagrees'):
+        run_grinta.main(
+            [
+                '--workspace',
+                str(tmp_path),
+                '--shared-task',
+                'task.json',
+                '--task-id',
+                'another',
+                '--grinta-commit',
+                'a' * 40,
+                '--output-dir',
+                str(tmp_path / 'output'),
+                '--dry-run',
+            ]
+        )
 
 
 def _git(repo: Path, *args: str) -> None:
