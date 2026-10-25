@@ -32,6 +32,22 @@ Actionlint and Numba matched in the 25 October 2026 source/configuration checks.
 These checks did not install Grinta inside a task container, prove Pier runtime
 equivalence, enforce the remaining edit restrictions or run benchmark tests.
 
+The opt-in Pier parameter `preserve_task_toolchain=True` uses the image's
+existing curl/Git/Node/npm/uv and installs Codex under the image user's private
+directory. It avoids package-manager upgrades, Node replacement and system
+symlinks. Missing prerequisites stop setup for review. The legacy installer
+remains the default for historical evaluations.
+
+`security.comparison_edit_profile: "agentless-ml-v1"` enables completed-action
+source checks in the real RuntimeExecutor and a final patch check. Text edits,
+creation, deletion and renaming are permitted; changed binary/non-UTF-8 files,
+mode changes, symlink/submodule changes and unsupported paths stop the attempt.
+Ignored build products remain outside the submitted source inventory. Run build
+products outside source or use the repository's existing ignore rules.
+The guard checks resulting states, as agreed: deleting and restoring a file
+within one command is allowed. It does not monitor intermediate writes inside
+that command or claim protection against a deliberately hostile process.
+
 ## Paired case study
 
 The completed eight-task paired case study is documented in

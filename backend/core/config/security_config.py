@@ -26,6 +26,10 @@ class SecurityConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     """
 
     security_analyzer: str | None = Field(default=None)
+    comparison_edit_profile: Literal['agentless-ml-v1'] | None = Field(
+        default=None,
+        description='Opt-in research comparison: validate persistent text edits at action boundaries.',
+    )
     enforce_security: bool = Field(
         default=True,
         description='When True, HIGH-risk actions are blocked or require confirmation. '

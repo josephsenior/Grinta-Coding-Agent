@@ -124,6 +124,14 @@ class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
         self.username = username
         self.user_id = user_id
         self._initial_cwd = work_dir
+        self._comparison_edit_guard = None
+        if (
+            getattr(security_config, 'comparison_edit_profile', None)
+            == 'agentless-ml-v1'
+        ):
+            from backend.execution.comparison_edit_guard import ComparisonEditGuard
+
+            self._comparison_edit_guard = ComparisonEditGuard(work_dir)
         self.max_memory_gb: int | None = None  # Will be set during ainit if available
         self.tool_registry = tool_registry
 

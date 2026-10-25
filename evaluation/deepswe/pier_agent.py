@@ -22,10 +22,9 @@ from pier.models.agent.install import AgentInstallSpec, InstallStep
 from pier.models.agent.network import NetworkAllowlist
 from pier.models.trial.paths import EnvironmentPaths
 
+from evaluation.deepswe.install_recipe import installation_steps
 from evaluation.deepswe.pier_compat import (
-    codex_npm_install_args,
     normalize_shell_script_lf,
-    resilient_uv_tool_install,
 )
 
 
@@ -85,6 +84,7 @@ class Grinta(BaseInstalledAgent):
         prevalidate_startup_health: bool = False,
         allow_tree_sitter_bootstrap: bool = False,
         tree_sitter_languages: str = 'python',
+        preserve_task_toolchain: bool = False,
         **kwargs: Any,
     ) -> None:
         if len(grinta_commit) != 40 or any(
@@ -99,6 +99,7 @@ class Grinta(BaseInstalledAgent):
         self.grinta_repo = grinta_repo
         self.reasoning_effort = reasoning_effort
         self.codex_version = codex_version
+        self.preserve_task_toolchain = preserve_task_toolchain
         self.prevalidate_startup_health = prevalidate_startup_health
         self.allow_tree_sitter_bootstrap = allow_tree_sitter_bootstrap
         requested_languages = ['python', *tree_sitter_languages.split(',')]
@@ -133,66 +134,19 @@ class Grinta(BaseInstalledAgent):
         return NetworkAllowlist(domains=domains)
 
     def install_spec(self) -> AgentInstallSpec:
-        grinta_requirement = f'git+{self.grinta_repo}@{self.grinta_commit}'
-        codex_npm_args = codex_npm_install_args(self.codex_version)
-        root_install = (
-            'if command -v apt-get >/dev/null; then '
-            'apt-get update && apt-get install -y ca-certificates curl git; '
-            'elif command -v apk >/dev/null; then apk add --no-cache ca-certificates curl git; '
-            'elif command -v yum >/dev/null; then yum install -y ca-certificates curl git; '
-            'else echo "A supported package manager is required" >&2; exit 1; fi'
-        )
-        parser_prefetch = ''
-        if not self.allow_tree_sitter_bootstrap:
-            prefetch_commands = [
-                (
-                    'for grinta_prefetch_attempt in 1 2 3; do '
-                    f'"$grinta_python" -c {
-                        shlex.quote(
-                            "from tree_sitter_language_pack import manifest_languages, prefetch; "
-                            f"language={language!r}; available=set(manifest_languages()); "
-                            "assert language in available, f'unsupported tree-sitter language: {language}'; "
-                            "prefetch([language])"
-                        )
-                    } && break; '
-                    'if [ "$grinta_prefetch_attempt" -eq 3 ]; then exit 1; fi; '
-                    'sleep $((grinta_prefetch_attempt * 5)); '
-                    'done; '
-                )
-                for language in self.tree_sitter_languages
-            ]
-            parser_prefetch = (
-                'grinta_python="$(head -n 1 "$(command -v grinta-deepswe)" | cut -c 3-)"; '
-                + ''.join(prefetch_commands)
-            )
-        system_runtime_links = ''
-        if not self.allow_tree_sitter_bootstrap:
-            system_runtime_links = (
-                'ln -sf "$(command -v codex)" /usr/local/bin/codex; '
-                'ln -sf "$(command -v node)" /usr/local/bin/node; '
-            )
-        grinta_install = (
-            'set -euo pipefail; '
-            f'{resilient_uv_tool_install(grinta_requirement)}'
-            f'{parser_prefetch}'
-            'grinta-deepswe --help >/dev/null'
-        )
-        codex_install = (
-            'set -euo pipefail; '
-            'curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash; '
-            'export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"; '
-            'nvm install 22; '
-            f'npm install -g {codex_npm_args}; '
-            f'{system_runtime_links}'
-            'codex --version'
-        )
         return AgentInstallSpec(
             agent_name=self.name(),
             version=self.grinta_commit,
             steps=[
-                InstallStep(user='root', run=root_install),
-                InstallStep(user='agent', run=grinta_install),
-                InstallStep(user='agent', run=codex_install),
+                InstallStep(**step)
+                for step in installation_steps(
+                    grinta_repo=self.grinta_repo,
+                    grinta_commit=self.grinta_commit,
+                    codex_version=self.codex_version,
+                    allow_tree_sitter_bootstrap=self.allow_tree_sitter_bootstrap,
+                    tree_sitter_languages=self.tree_sitter_languages,
+                    preserve_task_toolchain=self.preserve_task_toolchain,
+                )
             ],
         )
 
@@ -256,6 +210,8 @@ class Grinta(BaseInstalledAgent):
                 '/usr/sbin:/usr/bin:/sbin:/bin'
             ),
         }
+        if self.preserve_task_toolchain:
+            env.pop('PATH')
         setup = f'ln -sf {shlex.quote(remote_auth)} {shlex.quote(remote_home + "/auth.json")}'
         await self.exec_as_agent(environment, setup, env=env)
         runtime_setup = (
@@ -265,6 +221,14 @@ class Grinta(BaseInstalledAgent):
             'ln -sf "$(command -v node)" /tmp/grinta-bin/node; '
             '/tmp/grinta-bin/codex --version >/dev/null'
         )
+        if self.preserve_task_toolchain:
+            runtime_setup = (
+                'export PATH="$HOME/.local/share/grinta-comparison/codex/bin:$HOME/.local/bin:$PATH"; '
+                'mkdir -p /tmp/grinta-bin; '
+                'ln -sf "$(command -v codex)" /tmp/grinta-bin/codex; '
+                'ln -sf "$(command -v grinta-deepswe)" /tmp/grinta-bin/grinta-deepswe; '
+                '/tmp/grinta-bin/codex --version >/dev/null'
+            )
         await self.exec_as_agent(environment, runtime_setup, env=env)
         if self.prevalidate_startup_health:
             # Smoke-only compatibility mode: validate the real production check
@@ -293,6 +257,8 @@ class Grinta(BaseInstalledAgent):
             f'--reasoning-effort {shlex.quote(self.reasoning_effort)} '
             f'--output-dir {shlex.quote(EnvironmentPaths.agent_dir.as_posix())}'
         )
+        if self.preserve_task_toolchain:
+            command = 'export PATH="/tmp/grinta-bin:$HOME/.local/bin:$PATH"; ' + command
         try:
             await self.exec_as_agent(environment, command, env=env)
         finally:

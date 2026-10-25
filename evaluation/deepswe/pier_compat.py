@@ -25,7 +25,12 @@ def codex_npm_install_args(version: str) -> str:
     return f'{shlex.quote(wrapper)} {shlex.quote(linux_x64)}'
 
 
-def resilient_uv_tool_install(requirement: str, python_version: str = '3.12') -> str:
+def resilient_uv_tool_install(
+    requirement: str,
+    python_version: str = '3.12',
+    *,
+    preserve_existing_uv: bool = False,
+) -> str:
     """Return a Docker-friendly uv install fragment resilient to slow indexes.
 
     The outer loop is intentional: uv keeps completed downloads in its cache
@@ -34,10 +39,14 @@ def resilient_uv_tool_install(requirement: str, python_version: str = '3.12') ->
     """
     quoted_requirement = shlex.quote(requirement)
     quoted_python = shlex.quote(python_version)
-    return (
+    bootstrap = (
         'curl --retry 5 --retry-all-errors --connect-timeout 30 --max-time 600 '
         '-LsSf https://astral.sh/uv/install.sh | sh; '
-        'export PATH="$HOME/.local/bin:$PATH"; '
+    )
+    if preserve_existing_uv:
+        bootstrap = 'command -v uv >/dev/null || { echo "Shared setup requires preprovisioned uv" >&2; exit 1; }; '
+    return (
+        bootstrap + 'export PATH="$HOME/.local/bin:$PATH"; '
         'export UV_HTTP_TIMEOUT=300 UV_HTTP_RETRIES=10; '
         'for grinta_install_attempt in 1 2 3; do '
         f'if uv tool install --python {quoted_python} --force {quoted_requirement}; then '

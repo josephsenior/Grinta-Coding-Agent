@@ -134,13 +134,19 @@ def _sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
 
-def _capture_patch(workspace: Path, baseline_commit: str) -> str:
+def _capture_patch(
+    workspace: Path, baseline_commit: str, *, comparison_edit_profile: str | None = None
+) -> str:
     """Capture tracked, untracked, staged, and agent-committed changes.
 
     A temporary index gives Git a view of the final worktree without changing the
     task repository's real index. Comparing that index to the initial commit also
     includes changes if the agent created commits during its run.
     """
+    if comparison_edit_profile == 'agentless-ml-v1':
+        from backend.execution.comparison_edit_guard import ComparisonEditGuard
+
+        ComparisonEditGuard(workspace, baseline_commit).check()
     with tempfile.TemporaryDirectory(prefix='grinta-benchmark-index-') as tmp:
         index_path = Path(tmp) / 'index'
         env = dict(os.environ)
@@ -404,7 +410,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         if auth_error:
             raise BenchmarkAuthenticationError(auth_error)
         metrics = _extract_metrics(state)
-        patch = _capture_patch(workspace, baseline_commit)
+        patch = _capture_patch(
+            workspace,
+            baseline_commit,
+            comparison_edit_profile=getattr(
+                config.security, 'comparison_edit_profile', None
+            ),
+        )
         patch_path.write_text(patch, encoding='utf-8')
         submission_packaging = _materialize_submission_head(
             workspace, baseline_commit, patch
