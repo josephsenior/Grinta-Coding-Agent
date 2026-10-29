@@ -59,6 +59,7 @@ KNOWN_PROVIDER_PREFIXES: frozenset[str] = frozenset(
         'anthropic',
         'cerebras',
         'codex',
+        'chatgpt-plan',
         'deepinfra',
         'deepseek',
         'digitalocean',

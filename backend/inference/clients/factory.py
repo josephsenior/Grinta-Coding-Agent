@@ -49,6 +49,11 @@ def get_direct_client(
         json.dumps(metadata, sort_keys=True),
     )
 
+    if provider == 'chatgpt-plan':
+        from backend.inference.clients.chatgpt_plan import ChatGPTPlanClient
+
+        return ChatGPTPlanClient(model_name=stripped_model, timeout=timeout)
+
     if provider == 'codex':
         from backend.inference.clients.codex_app_server import CodexResponsesClient
 
