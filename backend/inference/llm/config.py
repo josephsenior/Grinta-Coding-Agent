@@ -49,7 +49,9 @@ def _validate_api_key_or_local(
 ) -> None:
     """Raise AuthenticationError if API key missing and model is not local."""
     provider = str(getattr(config, 'custom_llm_provider', '') or '').strip().lower()
-    if provider == 'codex' or str(getattr(config, 'model', '')).startswith('codex/'):
+    if provider in {'codex', 'chatgpt-plan'} or str(
+        getattr(config, 'model', '')
+    ).startswith(('codex/', 'chatgpt-plan/')):
         return
     if api_key_value or _is_local_model(config, resolver):
         return

@@ -84,6 +84,9 @@ class ChatGPTPlanClient(CodexResponsesClient):
 
     def _build_payload(self, messages, kwargs):
         payload = super()._build_payload(messages, kwargs)
+        # SDK timeout is a local option, not part of the relay's JSON API body.
+        if os.environ.get('GRINTA_SUBSCRIPTION_STDIO'):
+            payload.pop('timeout', None)
         tools = payload.get('tools', [])
         if any(tool.get('type') != 'function' for tool in tools):
             raise ValueError(
