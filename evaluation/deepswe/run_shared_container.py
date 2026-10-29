@@ -105,7 +105,7 @@ def run(args):
             name,
             'sh',
             '-c',
-            'mkdir -p /tmp/work /tmp/grinta-app; tar -xf - -C /tmp/work',
+            'mkdir -p /tmp/work /tmp/grinta-app /tmp/grinta-state; tar -xf - -C /tmp/work',
             data=(args.output / 'source.tar').read_bytes(),
         )
         actual = (
@@ -166,6 +166,21 @@ def run(args):
                 data=data,
             )
         if args.prepare_only:
+            check = (
+                'from pathlib import Path; '
+                'from evaluation.deepswe.run_grinta import _load_config; '
+                '_load_config(Path("/tmp/config.json"),Path("/tmp/work"),'
+                'Path("/tmp/diagnostic-trajectory.json"),"chatgpt-plan/gpt-6.1-sol","medium"); '
+                'print("configuration startup passed")'
+            )
+            output = docker(
+                'exec',
+                name,
+                '/root/.local/share/uv/tools/grinta/bin/python',
+                '-c',
+                check,
+            )
+            (args.output / 'startup-check.log').write_bytes(output)
             result['status'] = 'setup_verified'
             return 0
         argv = [
