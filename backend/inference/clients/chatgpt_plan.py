@@ -33,11 +33,19 @@ class ChatGPTPlanClient(CodexResponsesClient):
     def _credentials(self):
         token = os.environ.get('GRINTA_CHATGPT_PLAN_ACCESS_TOKEN', '').strip()
         if not token:
-            raise ChatGPTPlanError(
-                'ChatGPT-plan authorization required. Supply an access token from '
-                'the documented Sign in with ChatGPT plan-usage flow in '
-                'GRINTA_CHATGPT_PLAN_ACCESS_TOKEN. Codex credentials are not reused.'
+            from backend.inference.clients.chatgpt_plan_auth import (
+                PlanAuthError,
+                access_token,
             )
+
+            try:
+                token = access_token(
+                    os.environ.get('GRINTA_CHATGPT_PLAN_PROFILE', 'default')
+                )
+            except PlanAuthError as exc:
+                raise ChatGPTPlanError(
+                    'ChatGPT-plan authorization required. ' + str(exc)
+                ) from None
         return token, ''
 
     def _resolved_model_name(self):

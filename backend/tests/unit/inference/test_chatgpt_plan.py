@@ -17,6 +17,12 @@ def test_factory_keeps_codex_separate():
 
 
 def test_no_api_key_or_codex_fallback(monkeypatch):
+    from backend.inference.clients import chatgpt_plan_auth as auth
+
+    def missing(profile):
+        raise auth.PlanAuthError('No saved authorization')
+
+    monkeypatch.setattr(auth, 'access_token', missing)
     monkeypatch.delenv('GRINTA_CHATGPT_PLAN_ACCESS_TOKEN', raising=False)
     monkeypatch.setenv('OPENAI_API_KEY', 'must-not-be-used')
     with pytest.raises(ChatGPTPlanError, match='authorization required'):

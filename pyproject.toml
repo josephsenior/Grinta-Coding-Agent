@@ -38,6 +38,9 @@ classifiers = [
   "Topic :: Utilities",
 ]
 dependencies = [
+  "filelock>=3.16,<5",
+  "keyring>=25,<26",
+  "PyJWT[crypto]>=2.10,<3",
   "aiohttp>=3.14.5",
   "anthropic>=1.13,<2",
   "anyio>=4.15.1,<5",
