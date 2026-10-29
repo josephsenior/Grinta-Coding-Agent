@@ -31,6 +31,11 @@ class ChatGPTPlanClient(CodexResponsesClient):
         super().__init__(model_name, timeout=timeout)
 
     def _credentials(self):
+        from backend.inference.comparison_scope import active_budget
+
+        budget = active_budget.get()
+        if budget is not None:
+            budget.check()
         token = os.environ.get('GRINTA_CHATGPT_PLAN_ACCESS_TOKEN', '').strip()
         if not token:
             from backend.inference.clients.chatgpt_plan_auth import (
@@ -102,10 +107,19 @@ class ChatGPTPlanClient(CodexResponsesClient):
             )
 
     def _response_from_events(self, events):
+        from backend.inference.comparison_scope import active_budget
+
         def checked():
             completed = False
             for event in events:
                 self._check_event(event)
+                if _get(event, 'type') == 'response.completed':
+                    budget = active_budget.get()
+                    if budget is not None:
+                        usage = _get(_get(event, 'response'), 'usage')
+                        budget.charge(
+                            _get(usage, 'input_tokens'), _get(usage, 'output_tokens')
+                        )
                 completed |= _get(event, 'type') == 'response.completed'
                 yield event
             if not completed:

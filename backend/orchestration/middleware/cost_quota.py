@@ -19,6 +19,11 @@ class CostQuotaMiddleware(ToolInvocationMiddleware):
         self.controller = controller
 
     async def execute(self, ctx: ToolInvocationContext) -> None:
+        from backend.inference.comparison_scope import active_budget
+
+        budget = active_budget.get()
+        if budget is not None:
+            budget.check()
         llm = getattr(self.controller.agent, 'llm', None)
         metrics = getattr(llm, 'metrics', None)
         if metrics is not None:

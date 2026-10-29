@@ -62,6 +62,11 @@ class _AesIoInitMixin:
     async def run_action(self, action) -> Observation:
         """Execute any action through action execution server."""
         async with self.lock:
+            from backend.inference.comparison_scope import active_budget
+
+            budget = active_budget.get()
+            if budget is not None:
+                budget.check()
             guard = getattr(self, '_comparison_edit_guard', None)
             if guard is not None:
                 guard.check()
@@ -71,6 +76,8 @@ class _AesIoInitMixin:
             finally:
                 if guard is not None:
                     guard.check()
+                if budget is not None:
+                    budget.check()
 
         if hasattr(obs, 'content') and isinstance(obs.content, str):
             obs.content = self._strip_ansi_obs_text(obs.content)

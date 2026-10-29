@@ -65,6 +65,11 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description='Run Grinta once in a prepared DeepSWE/Pier task workspace.'
     )
+    parser.add_argument(
+        '--pilot-budget',
+        action='store_true',
+        help='Use the agreed 7200-second/2000000-token comparison budget',
+    )
     parser.add_argument('--workspace', required=True, help='Prepared task repository')
     task = parser.add_mutually_exclusive_group(required=True)
     task.add_argument('--instruction-file', help='UTF-8 task instruction file')
@@ -270,7 +275,7 @@ def _extract_metrics(state: Any) -> dict[str, Any]:
 
 
 def _validate_subscription_model(model: str) -> None:
-    if not model.startswith(_SUBSCRIPTION_MODEL_PREFIX):
+    if not model.startswith((_SUBSCRIPTION_MODEL_PREFIX, 'chatgpt-plan/')):
         raise ValueError(
             'This protocol is subscription-only: model must use the codex/ transport, '
             'not a usage-billed API provider.'
@@ -297,6 +302,8 @@ def _load_config(
     config.save_screenshots_in_trajectory = False
     llm = config.get_llm_config()
     llm.model = model
+    if model.startswith('chatgpt-plan/'):
+        llm.custom_llm_provider = 'chatgpt-plan'
     llm.reasoning_effort = reasoning_effort
     # Catalog prices are useful for comparison but are not the user's actual
     # subscription charge. Never stop a Plus-backed run on a synthetic USD cap.
@@ -394,6 +401,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     started = time.monotonic()
     run_started_at = datetime.now(UTC).isoformat()
 
+    budget = None
+    if args.pilot_budget:
+        from backend.inference.comparison_budget import AttemptBudget
+
+        if (
+            args.model != 'chatgpt-plan/gpt-6.1-sol'
+            or args.reasoning_effort != 'medium'
+        ):
+            raise SystemExit(
+                'Pilot budget requires chatgpt-plan/gpt-6.1-sol with medium reasoning'
+            )
+        budget = AttemptBudget()
     try:
         config = _load_config(
             config_path,
@@ -402,7 +421,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.model,
             args.reasoning_effort,
         )
-        state = asyncio.run(_run(config, instruction))
+        if budget is not None:
+            from backend.inference.comparison_scope import run_budgeted
+
+            state = asyncio.run(run_budgeted(lambda: _run(config, instruction), budget))
+        else:
+            state = asyncio.run(_run(config, instruction))
         usage_limit = _find_subscription_usage_limit(state)
         if usage_limit:
             raise SubscriptionUsageLimitError(usage_limit)
@@ -434,7 +458,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             }
         )
     except Exception as exc:
-        if isinstance(exc, SubscriptionUsageLimitError):
+        from backend.inference.comparison_budget import BudgetExceeded
+
+        if isinstance(exc, BudgetExceeded):
+            run_status = 'budget_exhausted'
+        elif isinstance(exc, SubscriptionUsageLimitError):
             run_status = 'capacity_error'
         elif isinstance(exc, BenchmarkAuthenticationError):
             run_status = 'authentication_error'
@@ -449,12 +477,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                 'error': str(exc),
             }
         )
+        if budget is not None:
+            manifest['attempt_budget'] = budget.snapshot()
         manifest_path.write_text(
             json.dumps(manifest, indent=2, sort_keys=True) + '\n', encoding='utf-8'
         )
         print(f'Grinta benchmark run failed; see {manifest_path}', file=sys.stderr)
         return 1
 
+    if budget is not None:
+        manifest['attempt_budget'] = budget.snapshot()
     manifest_path.write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + '\n', encoding='utf-8'
     )

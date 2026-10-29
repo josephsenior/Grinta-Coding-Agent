@@ -29,6 +29,10 @@ def get_direct_client(
 
     resolver = get_resolver()
     provider = resolver.resolve_provider(model, config_provider=provider)
+    from backend.inference.comparison_scope import active_budget
+
+    if active_budget.get() is not None and provider != 'chatgpt-plan':
+        raise ValueError('Budgeted pilot model calls must use chatgpt-plan transport')
     stripped_model = _strip_transport_provider_prefix(model, provider)
     resolved_base_url = resolver.resolve_base_url(
         model, base_url, config_provider=provider
