@@ -45,12 +45,47 @@ def _store():
 
 
 def _load(profile):
-    value = _store().get_password(SERVICE, profile)
-    return json.loads(value) if value else None
+    store = _store()
+    value = store.get_password(SERVICE, profile)
+    if not value:
+        return None
+    record = json.loads(value)
+    if record.get('format') == 'chunked-v1':
+        count = record['chunks']
+        if not isinstance(count, int) or not 1 <= count <= 128:
+            raise PlanAuthError('Invalid saved session; sign in again.')
+        parts = [
+            store.get_password(SERVICE, f'{profile}:{record["generation"]}:{i}')
+            for i in range(count)
+        ]
+        if any(part is None for part in parts):
+            raise PlanAuthError('Incomplete saved session; sign in again.')
+        return json.loads(''.join(parts))
+    return record
 
 
 def _save(profile, value):
-    _store().set_password(SERVICE, profile, json.dumps(value))
+    # Windows generic credentials have a small per-entry blob limit. Keep every
+    # part in the OS vault and publish its generation pointer only after all
+    # parts have been saved. A failed write leaves the previous session usable.
+    store = _store()
+    serialized = json.dumps(value, ensure_ascii=True)
+    if len(serialized) <= 600:
+        store.set_password(SERVICE, profile, serialized)
+        return
+    generation = uuid.uuid4().hex
+    parts = [serialized[i : i + 600] for i in range(0, len(serialized), 600)]
+    if len(parts) > 128:
+        raise PlanAuthError('Session exceeds the protected storage limit.')
+    for i, part in enumerate(parts):
+        store.set_password(SERVICE, f'{profile}:{generation}:{i}', part)
+    store.set_password(
+        SERVICE,
+        profile,
+        json.dumps(
+            {'format': 'chunked-v1', 'generation': generation, 'chunks': len(parts)}
+        ),
+    )
 
 
 def _lock():

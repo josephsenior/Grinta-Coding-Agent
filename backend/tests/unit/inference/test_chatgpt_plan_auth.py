@@ -7,6 +7,43 @@ import pytest
 from backend.inference.clients import chatgpt_plan_auth as auth
 
 
+def test_large_session_uses_bounded_os_vault_entries(monkeypatch):
+    values = {}
+
+    class Vault:
+        def get_password(self, service, name):
+            return values.get(name)
+
+        def set_password(self, service, name, value):
+            assert len(value.encode('utf-16-le')) <= 2400
+            values[name] = value
+
+    monkeypatch.setattr(auth, '_store', lambda: Vault())
+    session = {'access_token': 'a' * 5000, 'id_token': 'b' * 5000}
+    auth._save('profile', session)
+    assert auth._load('profile') == session
+    assert 'access_token' not in values['profile']
+
+
+def test_failed_chunk_write_keeps_previous_session(monkeypatch):
+    values = {}
+
+    class Vault:
+        def get_password(self, service, name):
+            return values.get(name)
+
+        def set_password(self, service, name, value):
+            if name.endswith(':1'):
+                raise RuntimeError('storage failure')
+            values[name] = value
+
+    monkeypatch.setattr(auth, '_store', lambda: Vault())
+    auth._save('profile', {'old': True})
+    with pytest.raises(RuntimeError, match='storage failure'):
+        auth._save('profile', {'access_token': 'a' * 5000})
+    assert auth._load('profile') == {'old': True}
+
+
 @pytest.mark.parametrize(
     'query',
     [
