@@ -36,6 +36,8 @@ class ChatGPTPlanClient(CodexResponsesClient):
         budget = active_budget.get()
         if budget is not None:
             budget.check()
+        if os.environ.get('GRINTA_SUBSCRIPTION_STDIO'):
+            return 'host-relay-no-credential', ''
         token = os.environ.get('GRINTA_CHATGPT_PLAN_ACCESS_TOKEN', '').strip()
         if not token:
             from backend.inference.clients.chatgpt_plan_auth import (
@@ -57,6 +59,10 @@ class ChatGPTPlanClient(CodexResponsesClient):
         return self._model_name
 
     def _sync_responses_client(self, token, account_id):
+        if os.environ.get('GRINTA_SUBSCRIPTION_STDIO'):
+            from backend.inference.clients.subscription_stdio import pipe_client
+
+            return pipe_client()
         return OpenAI(
             api_key=token,
             base_url=BASE_URL,
@@ -65,6 +71,10 @@ class ChatGPTPlanClient(CodexResponsesClient):
         )
 
     def _async_responses_client(self, token, account_id):
+        if os.environ.get('GRINTA_SUBSCRIPTION_STDIO'):
+            from backend.inference.clients.subscription_stdio import pipe_client
+
+            return pipe_client(asynchronous=True)
         return AsyncOpenAI(
             api_key=token,
             base_url=BASE_URL,
