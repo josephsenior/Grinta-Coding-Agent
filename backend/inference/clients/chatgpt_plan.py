@@ -75,6 +75,14 @@ class ChatGPTPlanClient(CodexResponsesClient):
                 'ChatGPT-plan provider currently supports Grinta function tools only'
             )
         if tools:
+            choice = payload.get('tool_choice')
+            if isinstance(choice, dict) and choice.get('type') == 'function':
+                tools = [tool for tool in tools if tool['name'] == choice['name']]
+                if not tools:
+                    raise ValueError('Selected function was not declared')
+                # This endpoint rejects tool_choice.namespace. Limit the
+                # namespace to the selected function and require a tool call.
+                payload['tool_choice'] = 'required'
             payload['tools'] = [
                 {
                     'type': 'namespace',
@@ -83,9 +91,6 @@ class ChatGPTPlanClient(CodexResponsesClient):
                     'tools': tools,
                 }
             ]
-            choice = payload.get('tool_choice')
-            if isinstance(choice, dict) and choice.get('type') == 'function':
-                payload['tool_choice'] = {**choice, 'namespace': 'grinta'}
         return payload
 
     @staticmethod

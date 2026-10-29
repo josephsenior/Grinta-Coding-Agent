@@ -2,6 +2,16 @@
 
 import pytest
 
+
+def test_selected_function_restricts_namespace_without_unsupported_choice_field():
+    client = ChatGPTPlanClient('gpt-6.1-sol')
+    payload = client._build_payload([{'role': 'user', 'content': 'test'}], {
+        'tools': [{'type': 'function', 'function': {'name': name}}
+                  for name in ('chosen', 'other')],
+        'tool_choice': {'type': 'function', 'function': {'name': 'chosen'}}})
+    assert payload['tool_choice'] == 'required'
+    assert [tool['name'] for tool in payload['tools'][0]['tools']] == ['chosen']
+
 from backend.inference.clients.chatgpt_plan import ChatGPTPlanClient, ChatGPTPlanError
 from backend.inference.clients.factory import get_direct_client
 

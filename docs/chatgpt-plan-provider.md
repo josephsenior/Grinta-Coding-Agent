@@ -38,7 +38,12 @@ to the existing response converter's behavior and is not evidence of zero usage.
 
 Verification includes offline transport and authorization tests, including a
 simulated model/tool/result exchange, callback rejection and token rotation.
-Live sign-in and inference need account authorization before they can be verified.
+Live sign-in, protected session storage and model discovery have now succeeded.
+A small live `gpt-6.1-sol` check with medium reasoning completed a fixed
+function-call/result exchange: 97 tokens on the first response and 95 on the
+second (192 reported tokens total). This used no benchmark task or repository
+tools. An initial rejected request exposed unsupported `tool_choice.namespace`;
+named selection now restricts the namespace to that function and uses `required`.
 This provider is not yet selected by the DeepSWE experiment
 protocol; benchmark provisioning and credential delivery need separate updates.
 
