@@ -83,6 +83,13 @@ class ChatGPTPlanClient(CodexResponsesClient):
         )
 
     def _build_payload(self, messages, kwargs):
+        # The common OpenAI-compatible sanitizer tunnels reasoning_effort into
+        # extra_body. This direct Responses client must recover that setting
+        # before the shared message converter builds the request body.
+        kwargs = dict(kwargs)
+        extra_body = kwargs.get('extra_body') or {}
+        if 'reasoning_effort' not in kwargs and 'reasoning_effort' in extra_body:
+            kwargs['reasoning_effort'] = extra_body['reasoning_effort']
         payload = super()._build_payload(messages, kwargs)
         # SDK timeout is a local option, not part of the relay's JSON API body.
         if os.environ.get('GRINTA_SUBSCRIPTION_STDIO'):

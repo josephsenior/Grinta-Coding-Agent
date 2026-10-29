@@ -3,6 +3,23 @@
 import pytest
 
 
+def test_reasoning_survives_full_catalog_sanitizer_path():
+    from backend.inference.catalog.catalog_loader import (
+        apply_model_param_overrides,
+        sanitize_call_kwargs_for_provider,
+    )
+
+    model = 'chatgpt-plan/gpt-6.1-sol'
+    kwargs = apply_model_param_overrides(
+        model, {}, reasoning_effort='medium', is_stream=False, provider='chatgpt-plan'
+    )
+    kwargs = sanitize_call_kwargs_for_provider(model, kwargs)
+    payload = ChatGPTPlanClient('gpt-6.1-sol')._build_payload(
+        [{'role': 'user', 'content': 'test'}], kwargs
+    )
+    assert payload['reasoning']['effort'] == 'medium'
+
+
 def test_selected_function_restricts_namespace_without_unsupported_choice_field():
     client = ChatGPTPlanClient('gpt-6.1-sol')
     payload = client._build_payload(
