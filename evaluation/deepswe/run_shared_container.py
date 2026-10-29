@@ -72,6 +72,8 @@ def run(args):
         'GRINTA_LOG_ROOT=/tmp/grinta-logs',
         '--env',
         'APP_ROOT=/tmp/grinta-app',
+        '--env',
+        'APP_DATA_DIR=/tmp/grinta-data',
         '--entrypoint',
         '/bin/sh',
         image,
@@ -167,6 +169,9 @@ def run(args):
             )
         if args.prepare_only:
             check = (
+                'import os; '
+                'from backend.engine.streaming_checkpoint import StreamingCheckpoint; '
+                'StreamingCheckpoint(os.path.join(os.environ["APP_DATA_DIR"],"streaming_checkpoints","diagnostic")); '
                 'from pathlib import Path; '
                 'from evaluation.deepswe.run_grinta import _load_config; '
                 '_load_config(Path("/tmp/config.json"),Path("/tmp/work"),'

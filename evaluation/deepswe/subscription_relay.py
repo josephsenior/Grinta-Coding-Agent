@@ -47,6 +47,8 @@ def relay(command, *, marker, budget, log, profile='default', on_stop=None):
                 log.flush()
                 continue
             payload = json.loads(line[len(marker) :])
+            log.write('[model-request] starting subscription inference\n')
+            log.flush()
             if (
                 payload.get('model') != 'gpt-6.1-sol'
                 or payload.get('reasoning', {}).get('effort') != 'medium'
@@ -92,6 +94,8 @@ def relay(command, *, marker, budget, log, profile='default', on_stop=None):
                 raise RuntimeError('subscription relay response interrupted')
             usage = completed.get('usage') or {}
             budget.charge(usage.get('input_tokens'), usage.get('output_tokens'))
+            log.write('[model-usage] ' + json.dumps(budget.snapshot()) + '\n')
+            log.flush()
             process.stdin.write(json.dumps({'response': completed}) + '\n')
             process.stdin.flush()
     finally:
