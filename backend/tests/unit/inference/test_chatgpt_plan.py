@@ -3,6 +3,43 @@
 import pytest
 
 
+def test_async_stream_emits_real_response_id_and_tool_call(monkeypatch):
+    import asyncio
+
+    from backend.inference.clients.base import LLMResponse
+
+    client = ChatGPTPlanClient('gpt-6.1-sol')
+
+    async def complete(*args, **kwargs):
+        return LLMResponse(
+            content='',
+            model='gpt-6.1-sol',
+            response_id='response-1',
+            tool_calls=[
+                {
+                    'id': 'call-1',
+                    'type': 'function',
+                    'function': {'name': 'read_file', 'arguments': '{"path":"a.py"}'},
+                }
+            ],
+            finish_reason='tool_calls',
+            usage={'prompt_tokens': 10, 'completion_tokens': 2},
+        )
+
+    monkeypatch.setattr(client, 'acompletion', complete)
+
+    async def collect():
+        return [chunk async for chunk in client.astream([])]
+
+    chunks = asyncio.run(collect())
+    assert chunks[0]['id'] == 'response-1'
+    assert (
+        chunks[0]['choices'][0]['delta']['tool_calls'][0]['function']['name']
+        == 'read_file'
+    )
+    assert chunks[0]['usage']['prompt_tokens'] == 10
+
+
 def test_reasoning_survives_full_catalog_sanitizer_path():
     from backend.inference.catalog.catalog_loader import (
         apply_model_param_overrides,

@@ -158,7 +158,7 @@ class ChatGPTPlanClient(CodexResponsesClient):
                 dict(call, index=i) for i, call in enumerate(response.tool_calls)
             ]
         yield {
-            'id': response.response_id,
+            'id': response.id,
             'model': response.model,
             'choices': [{'delta': delta, 'finish_reason': response.finish_reason}],
             'usage': response.usage,

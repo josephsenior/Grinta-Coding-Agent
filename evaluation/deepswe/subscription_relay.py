@@ -78,6 +78,7 @@ def relay(command, *, marker, budget, log, profile='default', on_stop=None):
                 timeout=min(120, budget.remaining),
             )
             completed = None
+            output_items = {}
             with client.responses.create(**payload) as stream:
                 for event in stream:
                     budget.check()
@@ -87,14 +88,34 @@ def relay(command, *, marker, budget, log, profile='default', on_stop=None):
                         'error',
                     }:
                         raise RuntimeError('subscription relay response failed')
+                    if event.type == 'response.output_item.done':
+                        output_items[event.output_index] = event.item.model_dump(
+                            mode='json'
+                        )
                     if event.type == 'response.completed':
                         completed = event.response.model_dump(mode='json')
+                        # Finalized item events carry tool arguments and text.
+                        # Preserve them if the terminal response omits output.
+                        output = dict(enumerate(completed.get('output') or []))
+                        output.update(output_items)
+                        completed['output'] = [output[i] for i in sorted(output)]
                         break
             if completed is None:
                 raise RuntimeError('subscription relay response interrupted')
             usage = completed.get('usage') or {}
             budget.charge(usage.get('input_tokens'), usage.get('output_tokens'))
             log.write('[model-usage] ' + json.dumps(budget.snapshot()) + '\n')
+            log.write(
+                '[model-output] '
+                + json.dumps(
+                    {
+                        'types': [
+                            item.get('type') for item in completed.get('output', [])
+                        ],
+                    }
+                )
+                + '\n'
+            )
             log.flush()
             process.stdin.write(json.dumps({'response': completed}) + '\n')
             process.stdin.flush()
