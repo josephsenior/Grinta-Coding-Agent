@@ -40,3 +40,6 @@ def test_source_archive_excludes_future_commits(tmp_path):
     assert not (extracted / 'solution.py').exists()
     assert git(extracted, 'rev-parse', 'HEAD').stdout.decode().strip() == base
     assert git(extracted, 'cat-file', '-e', future, check=False).returncode != 0
+    assert git(extracted, 'status', '--porcelain').stdout == b''
+    (extracted / 'code.py').write_text('base = False\n')
+    assert b'code.py' in git(extracted, 'diff', '--name-only').stdout

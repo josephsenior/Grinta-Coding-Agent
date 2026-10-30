@@ -45,6 +45,9 @@ def archive_source(repository, commit, destination):
         git(root, 'update-ref', 'refs/heads/task-base', commit)
         git(root, 'symbolic-ref', 'HEAD', 'refs/heads/task-base')
         git(root, 'config', 'core.filemode', 'true')
+        # Populate tracking metadata without checking out or changing source.
+        # Otherwise the extracted tree appears deleted/untracked to Git.
+        git(root, 'read-tree', commit)
         with tarfile.open(destination, 'w') as archive:
             archive.add(root / '.git', arcname='.git')
             for entry in listing.split(b'\0'):
