@@ -5,11 +5,16 @@ import json
 import sys
 from types import SimpleNamespace as NS
 
+import pytest
+
 from backend.inference.comparison_budget import AttemptBudget
 from evaluation.deepswe import subscription_relay
 
 
-def test_relay_retains_tool_item_when_completed_event_has_no_output(monkeypatch):
+@pytest.mark.parametrize('once_only', [False, True])
+def test_relay_retains_tool_item_when_completed_event_has_no_output(
+    monkeypatch, once_only
+):
     item = {
         'type': 'function_call',
         'id': 'fc1',
@@ -64,7 +69,7 @@ def test_relay_retains_tool_item_when_completed_event_has_no_output(monkeypatch)
         f'assert r["response"]["output"]=={[item]!r}; '
         'print("tool delivered",flush=True)'
     )
-    budget = AttemptBudget()
+    budget = AttemptBudget.pilot() if once_only else AttemptBudget()
     log = io.StringIO()
     assert (
         subscription_relay.relay(
@@ -72,5 +77,6 @@ def test_relay_retains_tool_item_when_completed_event_has_no_output(monkeypatch)
         )
         == 0
     )
-    assert budget.snapshot()['used_tokens'] == 15
+    assert budget.snapshot()['processed_tokens'] == 15
+    assert budget.snapshot()['used_tokens'] > 0
     assert 'tool delivered' in log.getvalue()

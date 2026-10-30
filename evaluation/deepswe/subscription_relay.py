@@ -71,6 +71,7 @@ def relay(command, *, marker, budget, log, profile='default', on_stop=None):
             }
             if set(payload) - allowed:
                 raise ValueError('unsupported relay request fields')
+            budget.observe_request(payload)
             client = OpenAI(
                 api_key=access_token(profile),
                 base_url='https://api.openai.com/v1',
@@ -104,6 +105,7 @@ def relay(command, *, marker, budget, log, profile='default', on_stop=None):
                 raise RuntimeError('subscription relay response interrupted')
             usage = completed.get('usage') or {}
             budget.charge(usage.get('input_tokens'), usage.get('output_tokens'))
+            budget.observe_response(completed.get('output', []))
             log.write('[model-usage] ' + json.dumps(budget.snapshot()) + '\n')
             log.write(
                 '[model-output] '

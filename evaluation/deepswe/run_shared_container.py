@@ -32,7 +32,7 @@ def run(args):
     )
     name = 'shared-pilot-' + secrets.token_hex(6)
     marker = 'GRINTA_MODEL_' + secrets.token_hex(16) + ':'
-    budget = AttemptBudget()
+    budget = AttemptBudget.pilot()
     limits = record['environment']['limits']
     if limits['scratch_mode'] != 'tmpfs' or limits['swap_policy'] != 'disabled':
         raise ValueError(

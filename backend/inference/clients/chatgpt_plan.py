@@ -116,6 +116,11 @@ class ChatGPTPlanClient(CodexResponsesClient):
                     'tools': tools,
                 }
             ]
+        from backend.inference.comparison_scope import active_budget
+
+        budget = active_budget.get()
+        if budget is not None:
+            budget.observe_request(payload)
         return payload
 
     @staticmethod
@@ -147,7 +152,15 @@ class ChatGPTPlanClient(CodexResponsesClient):
                     'ChatGPT-plan stream ended before response.completed'
                 )
 
-        return super()._response_from_events(checked())
+        response = super()._response_from_events(checked())
+        budget = active_budget.get()
+        if budget is not None:
+            output = [
+                item if isinstance(item, dict) else item.model_dump(mode='json')
+                for item in response.get('output', [])
+            ]
+            budget.observe_response(output)
+        return response
 
     async def astream(self, messages, **kwargs):
         # Buffer until completion so interrupted tool calls cannot reach execution.

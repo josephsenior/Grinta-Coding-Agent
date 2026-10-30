@@ -68,7 +68,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         '--pilot-budget',
         action='store_true',
-        help='Use the agreed 7200-second/2000000-token comparison budget',
+        help='Use 7200 seconds and 1000000 once-only content tokens',
     )
     parser.add_argument('--workspace', required=True, help='Prepared task repository')
     task = parser.add_mutually_exclusive_group(required=True)
@@ -412,7 +412,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise SystemExit(
                 'Pilot budget requires chatgpt-plan/gpt-6.1-sol with medium reasoning'
             )
-        budget = AttemptBudget()
+        budget = AttemptBudget.pilot()
     try:
         config = _load_config(
             config_path,
