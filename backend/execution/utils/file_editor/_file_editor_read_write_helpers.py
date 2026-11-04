@@ -79,6 +79,15 @@ def write_file_impl(self, file_path: Path, content: str) -> str:
     content = _normalize_newlines_for_metadata(content, meta)
     data = _encode_disk_payload(content, meta)
 
+    # SafeEdit owns the guarded atomic write path for UTF-8 text. Keep the
+    # legacy encoder for BOM and non-UTF-8 files so Grinta preserves their
+    # existing on-disk representation.
+    safeedit_adapter = getattr(self, '_safeedit_adapter', None)
+    if safeedit_adapter is not None and safeedit_adapter.write_utf8(
+        file_path, content, data
+    ):
+        return content
+
     try:
         temp_path.write_bytes(data)
         temp_path.replace(file_path)

@@ -41,6 +41,7 @@ from backend.execution.utils.file_editor.file_editor_rollback_mixin import (
 from backend.execution.utils.file_editor.file_editor_view_mixin import (
     FileEditorViewMixin,
 )
+from backend.execution.utils.file_editor.safeedit_adapter import SafeEditAdapter
 
 _GLOBAL_UNDO_HISTORY: dict[str, deque[str | None]] = defaultdict(
     lambda: deque(maxlen=32)
@@ -85,6 +86,7 @@ class FileEditor(
             workspace_root: Root directory for file operations (defaults to current directory)
         """
         self.workspace_root = Path(workspace_root) if workspace_root else Path.cwd()
+        self._safeedit_adapter = SafeEditAdapter(self.workspace_root)
         # Transaction support: stack of backup dictionaries
         # Each backup dict maps file_path -> original_content (None if file didn't exist)
         self._transaction_stack: list[dict[str, str | None]] = []

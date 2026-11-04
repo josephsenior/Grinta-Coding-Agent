@@ -6,6 +6,7 @@ that module under the 40 KB file-size cap. No logic changes.
 
 from __future__ import annotations
 
+import hashlib
 import shutil
 import tempfile
 from collections.abc import Mapping
@@ -226,13 +227,14 @@ def _apply_multi_edit_to_temp_files(
     workspace_root: str | Path,
     temp_root: Path,
     temp_editor: Any,
-) -> tuple[dict[str, str | None], dict[str, str], list[str]]:
+) -> tuple[dict[str, str | None], dict[str, str | None], dict[str, str], list[str]]:
     """Apply multi_edit operations in declaration order against per-file temp copies.
 
     Each operation sees the temp file as left by all prior operations in the batch.
     Syntax is validated once per file after all operations complete.
     """
     original_snapshots: dict[str, str | None] = {}
+    original_hashes: dict[str, str | None] = {}
     final_contents: dict[str, str] = {}
     temp_paths: dict[str, Path] = {}
     syntax_warnings: list[str] = []
@@ -252,10 +254,13 @@ def _apply_multi_edit_to_temp_files(
             temp_paths[item_path] = temp_path
             temp_path.parent.mkdir(parents=True, exist_ok=True)
             if real_path.exists():
+                original_bytes = real_path.read_bytes()
+                original_hashes[item_path] = hashlib.sha256(original_bytes).hexdigest()
                 original_snapshots[item_path] = real_path.read_text(encoding='utf-8')
                 shutil.copyfile(real_path, temp_path)
             else:
                 original_snapshots[item_path] = None
+                original_hashes[item_path] = None
         _apply_multi_edit_operation(
             rel_path=rel_path,
             temp_path=temp_path,
@@ -288,17 +293,20 @@ def _apply_multi_edit_to_temp_files(
             syntax_warnings.append(f'{rel_path}:\n{warning}')
         final_contents[item_path] = temp_path.read_text(encoding='utf-8')
 
-    return original_snapshots, final_contents, syntax_warnings
+    return original_snapshots, original_hashes, final_contents, syntax_warnings
 
 
 def _verify_no_concurrent_modifications(
     original_snapshots: dict[str, str | None],
+    original_hashes: dict[str, str | None],
     workspace_root: str | Path,
 ) -> None:
     for item_path, old_content in original_snapshots.items():
         real_path = Path(item_path)
         disk_now = real_path.read_text(encoding='utf-8') if real_path.exists() else None
-        if disk_now != old_content:
+        disk_bytes = real_path.read_bytes() if real_path.exists() else None
+        disk_hash = hashlib.sha256(disk_bytes).hexdigest() if disk_bytes is not None else None
+        if disk_now != old_content or disk_hash != original_hashes[item_path]:
             _multi_edit_raise(
                 'multi_edit aborted: file changed on disk during batch preparation.',
                 error_code='CONCURRENT_MODIFICATION',
@@ -310,20 +318,17 @@ def _verify_no_concurrent_modifications(
 
 
 def _commit_multi_edit_transaction(
-    refactor: Any,
-    transaction: Any,
+    workspace_root: str | Path,
     final_contents: dict[str, str],
-) -> Any:
-    for item_path, final_content in final_contents.items():
-        operation = 'modify' if Path(item_path).exists() else 'create'
-        refactor.add_file_edit(
-            transaction, item_path, final_content, operation=operation
-        )
-    return refactor.commit(transaction, validate=False)
+    expected_hashes: dict[str, str | None],
+) -> None:
+    from backend.execution.utils.file_editor.safeedit_adapter import SafeEditAdapter
+
+    SafeEditAdapter(workspace_root).write_utf8_batch(final_contents, expected_hashes)
 
 
 def _format_multi_edit_success(
-    parsed: list, result: Any, *, syntax_warnings: list[str] | None = None
+    parsed: list, *, syntax_warnings: list[str] | None = None
 ) -> MessageAction:
     paths = sorted(
         {display_path for _item_path, display_path, _operation, _item in parsed}
@@ -370,13 +375,11 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
     seen_paths = {p for p, _, _, _ in parsed}
 
     from backend.core.workspace_resolution import require_effective_workspace_root
-    from backend.engine.tools.atomic_refactor import AtomicRefactor
     from backend.execution.utils.file_editor import FileEditor, _file_lock_for_path
 
     workspace_root = require_effective_workspace_root()
-    refactor = AtomicRefactor()
-    transaction = refactor.begin_transaction()
     syntax_warnings: list[str] = []
+    temp_editor: Any | None = None
     try:
         with ExitStack() as stack:
             for item_path in sorted(seen_paths):
@@ -386,8 +389,10 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
             ) as temp_root_str:
                 temp_root = Path(temp_root_str)
                 temp_editor = FileEditor(workspace_root=str(temp_root))
+                # Temporary simulation edits must not create durable SafeEdit journals.
+                temp_editor._safeedit_adapter = None
                 temp_editor._defer_syntax_validation = True
-                original_snapshots, final_contents, syntax_warnings = (
+                original_snapshots, original_hashes, final_contents, syntax_warnings = (
                     _apply_multi_edit_to_temp_files(
                         parsed,
                         seen_paths,
@@ -396,19 +401,20 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
                         temp_editor,
                     )
                 )
-            _verify_no_concurrent_modifications(original_snapshots, workspace_root)
-            result = _commit_multi_edit_transaction(
-                refactor, transaction, final_contents
+            _verify_no_concurrent_modifications(
+                original_snapshots, original_hashes, workspace_root
             )
+            _commit_multi_edit_transaction(
+                workspace_root, final_contents, original_hashes
+            )
+            if temp_editor is not None:
+                for item_path, old_content in original_snapshots.items():
+                    temp_editor._push_undo_snapshot(Path(item_path), old_content)
     except FunctionCallValidationError:
         raise
     except ToolExecutionError:
         raise
     except Exception as e:
-        try:
-            refactor.rollback(transaction)
-        except Exception:
-            pass
         _multi_edit_raise(
             f'multi_edit failed: {e}',
             error_code='MULTI_EDIT_COMMIT_FAILED',
@@ -418,8 +424,4 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
             retryable=True,
         )
 
-    if result.success:
-        return _format_multi_edit_success(
-            parsed, result, syntax_warnings=syntax_warnings
-        )
-    _format_multi_edit_failure(result)
+    return _format_multi_edit_success(parsed, syntax_warnings=syntax_warnings)

@@ -940,6 +940,7 @@ dependencies = [
     { name = "requests" },
     { name = "rich" },
     { name = "ripgrep", marker = "sys_platform != 'win32'" },
+    { name = "safeedit" },
     { name = "shadowgit" },
     { name = "tenacity" },
     { name = "termcolor" },
@@ -1020,6 +1021,7 @@ requires-dist = [
     { name = "requests", specifier = ">=2.34.2,<3" },
     { name = "rich", specifier = ">=15,<16" },
     { name = "ripgrep", marker = "sys_platform != 'win32'", specifier = "==15.1" },
+    { name = "safeedit", git = "https://github.com/josephsenior/SafeEdit.git?rev=5916f20bac3eb1c1f93b3008312def00f9bb8f3d" },
     { name = "shadowgit", git = "https://github.com/josephsenior/ShadowGit.git?rev=114704ea6a79a58862c1f90f51bee6d8f6305c3a" },
     { name = "tenacity", specifier = ">=9.1.4,<10" },
     { name = "termcolor", specifier = ">=3.3,<4" },
@@ -2852,6 +2854,11 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/cc/77/1ee73df41dcc8d1cdb686ee4bc46ea29704ea175feb6b95c78420f631ab8/ruff-0.17.0-py3-none-win_amd64.whl", hash = "sha256:8ab76bcda86dfd28e13776cb5de3c7bcdcf1ae3d37ed761113d1a5a415dc134c", size = 10115585, upload-time = "2026-10-09T19:47:22.698Z" },
     { url = "https://files.pythonhosted.org/packages/fd/71/eb4f0ccc844aece56963e8578df9c95d4c00f580547d52329d4035d3af18/ruff-0.17.0-py3-none-win_arm64.whl", hash = "sha256:c154c73ff43f9854395e24cac507af13078962e53d2b511605058d22af1fdb88", size = 9872035, upload-time = "2026-10-09T19:47:26.306Z" },
 ]
+
+[[package]]
+name = "safeedit"
+version = "0.1.1"
+source = { git = "https://github.com/josephsenior/SafeEdit.git?rev=5916f20bac3eb1c1f93b3008312def00f9bb8f3d#5916f20bac3eb1c1f93b3008312def00f9bb8f3d" }
 
 [[package]]
 name = "secretstorage"

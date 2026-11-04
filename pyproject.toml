@@ -76,6 +76,8 @@ dependencies = [
   "requests>=2.34.2,<3",
   "rich>=15,<16",
   "ripgrep==15.1; sys_platform!='win32'",
+  # SafeEdit provides guarded atomic writes and multi-file edit transactions.
+  "safeedit @ git+https://github.com/josephsenior/SafeEdit.git@5916f20bac3eb1c1f93b3008312def00f9bb8f3d",
   # Use the standalone repository until ShadowGit is published on PyPI.
   "shadowgit @ git+https://github.com/josephsenior/ShadowGit.git@114704ea6a79a58862c1f90f51bee6d8f6305c3a",
   # Let the resolver select the newest version compatible with the model SDKs.
