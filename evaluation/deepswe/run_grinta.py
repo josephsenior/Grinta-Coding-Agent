@@ -68,7 +68,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         '--pilot-budget',
         action='store_true',
-        help='Use 7200 seconds and 1000000 once-only content tokens',
+        help='Use 7200 seconds and 2000000 once-only content tokens',
     )
     parser.add_argument('--workspace', required=True, help='Prepared task repository')
     task = parser.add_mutually_exclusive_group(required=True)

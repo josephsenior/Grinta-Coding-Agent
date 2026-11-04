@@ -1,7 +1,7 @@
 # Agreed paired-pilot limits
 
-As revised by Youssef on 30 October 2026, each system receives 7,200 seconds and
-1,000,000 once-only content tokens per task, using GPT-6.1 Sol, medium reasoning,
+As revised by Youssef on 4 November 2026, each system receives 7,200 seconds and
+2,000,000 once-only content tokens per task, using GPT-6.1 Sol, medium reasoning,
 and the ChatGPT-plan connection. Replayed history does not consume the content
 allowance again. Actual cumulative provider input/output usage is still reported
 separately and does not enforce this content cap.
@@ -24,5 +24,6 @@ measure is not provider billing or exact model-specific context-window usage.
 Provisioning and the initial public baseline are excluded from time. The first
 reached work limit stops the run; cleanup may continue. Missing usage remains a
 failure. Subscription limits are independent and no API-key fallback is enabled.
-Earlier runs and budget snapshots retain their original cumulative-token meaning.
+Earlier runs and snapshots retain the accounting mode and cap they actually used.
+Prepared images built under the 1M contract must be refreshed for this pilot.
 The revised accounting was checked without live model requests.

@@ -49,7 +49,7 @@ class AttemptBudget:
 
     @classmethod
     def pilot(cls):
-        return cls(tokens=1000000, accounting='once_only_context')
+        return cls(tokens=2_000_000, accounting='once_only_context')
 
     @property
     def counted_tokens(self):

@@ -101,6 +101,13 @@ def run(args):
         docker(*command[1:])
         observed = json.loads(docker('inspect', name))[0]
         (args.output / 'container.json').write_text(json.dumps(observed, indent=2))
+        container_limits = json.loads(docker(
+            'exec', name, '/root/.local/share/uv/tools/grinta/bin/python', '-c',
+            'import json; from backend.inference.comparison_budget import AttemptBudget; '
+            'b = AttemptBudget.pilot(); print(json.dumps([b.seconds, b.tokens, b.accounting]))',
+        ))
+        if container_limits != [budget.seconds, budget.tokens, budget.accounting]:
+            raise ValueError('prepared Grinta image uses a different pilot budget; refresh it')
         docker(
             'exec',
             '-i',
