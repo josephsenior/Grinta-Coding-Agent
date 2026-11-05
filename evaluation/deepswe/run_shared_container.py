@@ -74,6 +74,8 @@ def run(args):
         'APP_ROOT=/tmp/grinta-app',
         '--env',
         'APP_DATA_DIR=/tmp/grinta-data',
+        '--env',
+        'LOCAL_DATA_ROOT=/tmp/grinta-store',
         '--entrypoint',
         '/bin/sh',
         image,
@@ -149,9 +151,10 @@ def run(args):
         )
         (args.output / 'baseline.stdout.log').write_bytes(baseline.stdout)
         (args.output / 'baseline.stderr.log').write_bytes(baseline.stderr)
-        report = record['public_validation']['command']['report']['path']
-        (args.output / 'baseline-report.xml').write_bytes(
-            docker('exec', name, 'cat', report)
+        report = record['public_validation']['command']['report']
+        suffix = 'json' if report['format'] == 'ctrf-json' else 'xml'
+        (args.output / f'baseline-report.{suffix}').write_bytes(
+            docker('exec', '-w', '/tmp/work', name, 'cat', report['path'])
         )
         if baseline.returncode:
             raise ValueError('initial public baseline failed')
@@ -187,6 +190,8 @@ def run(args):
             )
             output = docker(
                 'exec',
+                '-w',
+                '/tmp/work',
                 name,
                 '/root/.local/share/uv/tools/grinta/bin/python',
                 '-c',
@@ -201,6 +206,8 @@ def run(args):
             '-i',
             '-e',
             'GRINTA_SUBSCRIPTION_STDIO=' + marker,
+            '-w',
+            '/tmp/work',
             name,
             '/root/.local/share/uv/tools/grinta/bin/python',
             '-u',
@@ -239,6 +246,8 @@ def run(args):
             archive.extractall(args.output / 'agent', filter='data')
     except Exception as exc:
         result.update(status='failed', error_type=type(exc).__name__, error=str(exc))
+        if isinstance(exc, subprocess.CalledProcessError) and exc.stderr:
+            (args.output / 'setup.stderr.log').write_bytes(exc.stderr)
     finally:
         result['attempt_budget'] = budget.snapshot()
         (args.output / 'result.json').write_text(json.dumps(result, indent=2))
