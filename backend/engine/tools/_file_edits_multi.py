@@ -305,7 +305,9 @@ def _verify_no_concurrent_modifications(
         real_path = Path(item_path)
         disk_now = real_path.read_text(encoding='utf-8') if real_path.exists() else None
         disk_bytes = real_path.read_bytes() if real_path.exists() else None
-        disk_hash = hashlib.sha256(disk_bytes).hexdigest() if disk_bytes is not None else None
+        disk_hash = (
+            hashlib.sha256(disk_bytes).hexdigest() if disk_bytes is not None else None
+        )
         if disk_now != old_content or disk_hash != original_hashes[item_path]:
             _multi_edit_raise(
                 'multi_edit aborted: file changed on disk during batch preparation.',

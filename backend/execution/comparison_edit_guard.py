@@ -98,7 +98,7 @@ class ComparisonEditGuard:
             raise ComparisonContractError(self.failed)
         try:
             current = self._current_tree()
-            folded = {}
+            folded: dict[str, list[str]] = {}
             for path in current:
                 folded.setdefault(path.casefold(), []).append(path)
             # Each newly located executable needs one executable path removed

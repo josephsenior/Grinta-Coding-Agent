@@ -62,29 +62,20 @@ class _AsyncStreamingState:
 class _FunctionCallingProxy:
     """Proxy that forwards attribute access to the live function_calling module.
 
-    Keeps track of attribute overrides (via monkeypatch) so they persist even if
-    the underlying module is reloaded during other tests.
+    Overrides assigned to the proxy live in the instance ``__dict__`` (the
+    default attribute machinery) so they persist even if the underlying module
+    is reloaded, and so ``monkeypatch`` can restore or delete them normally.
     """
 
     def __init__(self, module_name: str) -> None:
         self.module_name = module_name
-        self._overrides: dict[str, Any] = {}
 
     @property
     def module(self):
         return sys.modules[self.module_name]
 
     def __getattr__(self, item):
-        if item in self._overrides:
-            return self._overrides[item]
         return getattr(self.module, item)
-
-    def __setattr__(self, key, value):
-        if key in {'module_name', '_overrides'}:
-            object.__setattr__(self, key, value)
-        else:
-            self._overrides[key] = value
-            setattr(self.module, key, value)
 
 
 orchestrator_function_calling = _FunctionCallingProxy(

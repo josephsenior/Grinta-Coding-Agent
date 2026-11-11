@@ -1,5 +1,7 @@
 """Verify subscription routing and a model/tool/result exchange without inference."""
 
+from typing import Any
+
 import pytest
 
 
@@ -103,11 +105,12 @@ def test_no_api_key_or_codex_fallback(monkeypatch):
 def test_tool_call_result_exchange(monkeypatch):
     client = ChatGPTPlanClient('gpt-6.1-sol')
     monkeypatch.setenv('GRINTA_CHATGPT_PLAN_ACCESS_TOKEN', 'offline-test-token')
-    payloads = []
+    payloads: list[dict[str, Any]] = []
 
     class Responses:
         def create(self, **payload):
             payloads.append(payload)
+            output: list[dict[str, Any]]
             if len(payloads) == 1:
                 output = [
                     {
@@ -144,7 +147,7 @@ def test_tool_call_result_exchange(monkeypatch):
         responses = Responses()
 
     monkeypatch.setattr(client, '_sync_responses_client', lambda *args: Transport())
-    messages = [
+    messages: list[dict[str, Any]] = [
         {'role': 'system', 'content': 'Use Grinta tools.'},
         {'role': 'user', 'content': 'Read a.py'},
     ]

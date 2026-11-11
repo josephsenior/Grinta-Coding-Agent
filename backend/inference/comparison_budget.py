@@ -38,7 +38,7 @@ class AttemptBudget:
         self.used = 0
         self.processed_inputs = self.processed_outputs = 0
         self.context_used = 0
-        self._seen = Counter()
+        self._seen: Counter[str] = Counter()
         self._encoding = None
         if accounting == 'once_only_context':
             import tiktoken
@@ -83,7 +83,7 @@ class AttemptBudget:
         if self.accounting != 'once_only_context':
             return
         with self.lock:
-            counts = Counter()
+            counts: Counter[str] = Counter()
             costs = {}
             for entry in entries:
                 if entry is None:

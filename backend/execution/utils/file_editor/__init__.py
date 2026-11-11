@@ -86,7 +86,12 @@ class FileEditor(
             workspace_root: Root directory for file operations (defaults to current directory)
         """
         self.workspace_root = Path(workspace_root) if workspace_root else Path.cwd()
-        self._safeedit_adapter = SafeEditAdapter(self.workspace_root)
+        try:
+            self._safeedit_adapter: SafeEditAdapter | None = SafeEditAdapter(
+                self.workspace_root
+            )
+        except OSError:
+            self._safeedit_adapter = None
         # Transaction support: stack of backup dictionaries
         # Each backup dict maps file_path -> original_content (None if file didn't exist)
         self._transaction_stack: list[dict[str, str | None]] = []

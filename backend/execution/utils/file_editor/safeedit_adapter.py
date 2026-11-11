@@ -14,7 +14,7 @@ _MAX_SAFEEDIT_FILE_BYTES = 100_000_000
 
 def _workspace_key(root: Path) -> str:
     normalized = os.path.normcase(str(root.resolve()))
-    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+    return hashlib.sha256(normalized.encode('utf-8')).hexdigest()
 
 
 class SafeEditAdapter:
@@ -23,10 +23,7 @@ class SafeEditAdapter:
     def __init__(self, workspace_root: str | Path) -> None:
         self.workspace_root = Path(workspace_root).resolve(strict=True)
         journal_dir = (
-            Path.home()
-            / ".grinta"
-            / "safeedit"
-            / _workspace_key(self.workspace_root)
+            Path.home() / '.grinta' / 'safeedit' / _workspace_key(self.workspace_root)
         )
         self.engine = SafeEdit(
             self.workspace_root,
@@ -39,12 +36,16 @@ class SafeEditAdapter:
         try:
             return resolved.relative_to(self.workspace_root).as_posix()
         except ValueError as exc:
-            raise ValueError(f"File path is outside the SafeEdit workspace: {path}") from exc
+            raise ValueError(
+                f'File path is outside the SafeEdit workspace: {path}'
+            ) from exc
 
     def write_utf8(self, path: Path, content: str, payload: bytes) -> bool:
         """Write a UTF-8 payload through SafeEdit, or return False for other encodings."""
-
-        if payload != content.encode("utf-8") or len(payload) > _MAX_SAFEEDIT_FILE_BYTES:
+        if (
+            payload != content.encode('utf-8')
+            or len(payload) > _MAX_SAFEEDIT_FILE_BYTES
+        ):
             return False
         # FileEditor has legacy callers that pass absolute paths outside its
         # workspace. Its existing path validation remains authoritative there;
@@ -58,16 +59,17 @@ class SafeEditAdapter:
             if len(before) > _MAX_SAFEEDIT_FILE_BYTES:
                 return False
             try:
-                before.decode("utf-8")
+                before.decode('utf-8')
             except UnicodeDecodeError:
                 return False
             if before == payload:
                 return True
-        relative = self._relative_path(path)
         operation = WriteFile(
             path=relative_path,
             content=content,
-            expected_sha256=hashlib.sha256(before).hexdigest() if before is not None else None,
+            expected_sha256=hashlib.sha256(before).hexdigest()
+            if before is not None
+            else None,
             create_only=before is None,
         )
         self.engine.commit(self.engine.plan([operation]))
@@ -79,7 +81,6 @@ class SafeEditAdapter:
         expected_hashes: Mapping[str, str | None],
     ) -> None:
         """Commit final UTF-8 contents for several workspace-relative paths."""
-
         operations = [
             WriteFile(
                 path=self._relative_path(Path(path)),

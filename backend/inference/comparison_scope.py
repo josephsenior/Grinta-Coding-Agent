@@ -2,8 +2,9 @@
 
 import asyncio
 from contextvars import ContextVar
+from typing import Any
 
-active_budget = ContextVar('comparison_attempt_budget', default=None)
+active_budget: ContextVar[Any] = ContextVar('comparison_attempt_budget', default=None)
 
 
 async def run_budgeted(operation, budget):

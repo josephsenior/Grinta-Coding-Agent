@@ -38,9 +38,6 @@ classifiers = [
   "Topic :: Utilities",
 ]
 dependencies = [
-  "filelock>=3.16,<5",
-  "keyring>=25,<26",
-  "PyJWT[crypto]>=2.10,<3",
   "aiohttp>=3.14.5",
   "anthropic>=1.13,<2",
   "anyio>=4.15.1,<5",
@@ -49,9 +46,11 @@ dependencies = [
   "chardet>=7.6,<8",
   "charset-normalizer>=3.5.2,<4",
   "fastmcp>=4.1,<5",
+  "filelock>=3.16,<5",
   "google-genai>=2.30.1",
   "httpx>=0.28.1,<1",
   "json-repair>=0.64,<1",
+  "keyring>=25,<26",
   "libtmux>=0.62,<0.63",
   # FastMCP 4 requires MCP 2.x.
   "mcp>=2.3,<3",
@@ -63,6 +62,7 @@ dependencies = [
   "ptyprocess>=0.7,<1; sys_platform!='win32'",
   "pyfiglet>=1.0.4",
   "pygit2>=1.20.1,<2",
+  "pyjwt[crypto]>=2.10,<3",
   "pylatexenc>=2.11,<3",
   "pypdf>=6.20.1,<7",
   "pyperclip>=1.11,<2",

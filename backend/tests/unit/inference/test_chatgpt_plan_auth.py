@@ -8,7 +8,7 @@ from backend.inference.clients import chatgpt_plan_auth as auth
 
 
 def test_large_session_uses_bounded_os_vault_entries(monkeypatch):
-    values = {}
+    values: dict[str, str] = {}
 
     class Vault:
         def get_password(self, service, name):
@@ -26,7 +26,7 @@ def test_large_session_uses_bounded_os_vault_entries(monkeypatch):
 
 
 def test_failed_chunk_write_keeps_previous_session(monkeypatch):
-    values = {}
+    values: dict[str, str] = {}
 
     class Vault:
         def get_password(self, service, name):

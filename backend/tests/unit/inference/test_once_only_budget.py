@@ -1,5 +1,7 @@
 """A once-only content allowance is distinct from processed model usage."""
 
+from typing import Any
+
 import pytest
 
 from backend.inference.comparison_budget import AttemptBudget, BudgetExceeded
@@ -103,7 +105,7 @@ def test_provider_and_host_relay_see_identical_content_across_tool_roundtrip():
 
     remote, host = AttemptBudget.pilot(), AttemptBudget.pilot()
     client = ChatGPTPlanClient('gpt-6.1-sol')
-    messages = [{'role': 'user', 'content': 'Read a.py'}]
+    messages: list[dict[str, Any]] = [{'role': 'user', 'content': 'Read a.py'}]
     output = [
         {
             'type': 'function_call',
