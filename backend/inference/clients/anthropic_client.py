@@ -21,6 +21,7 @@ from backend.inference.clients.base import (
     _normalize_timeout_seconds,
     get_shared_async_http_client,
     get_shared_http_client,
+    opencode_request_headers,
 )
 from backend.inference.providers.anthropic_ops import (
     acompletion as _anthropic_acompletion,
@@ -68,9 +69,11 @@ class AnthropicClient(DirectLLMClient):
         self._model_name = model_name
         self._provider_name = provider_name
         self._request_timeout = _normalize_timeout_seconds(timeout)
+        default_headers = opencode_request_headers(provider_name) or None
         self.client = Anthropic(
             api_key=api_key,
             base_url=base_url,
+            default_headers=default_headers,
             http_client=get_shared_http_client(
                 provider_name,
                 base_url,
@@ -81,6 +84,7 @@ class AnthropicClient(DirectLLMClient):
         self.async_client = AsyncAnthropic(
             api_key=api_key,
             base_url=base_url,
+            default_headers=default_headers,
             http_client=get_shared_async_http_client(
                 provider_name,
                 base_url,

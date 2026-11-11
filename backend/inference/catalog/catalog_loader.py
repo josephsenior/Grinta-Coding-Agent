@@ -350,9 +350,10 @@ def validate_model_transport(
 
     endpoint = entry.inference_endpoint
     provider = entry.provider
-    if endpoint == '/responses' and provider == 'opencode':
+    opencode_surface = provider in {'opencode', 'opencode-go'}
+    if endpoint == '/responses' and opencode_surface:
         return
-    if endpoint and endpoint.startswith('/models/') and provider == 'opencode':
+    if endpoint and endpoint.startswith('/models/') and opencode_surface:
         return
     if endpoint == '/responses':
         raise BadRequestError(

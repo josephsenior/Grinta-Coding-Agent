@@ -12,7 +12,10 @@ from backend.inference.clients import (
     get_shared_async_http_client,
     get_shared_http_client,
 )
-from backend.inference.clients.base import _normalize_timeout_seconds
+from backend.inference.clients.base import (
+    _normalize_timeout_seconds,
+    opencode_request_headers,
+)
 
 
 def _message_content_to_text(content: Any) -> str:
@@ -47,7 +50,7 @@ def _messages_to_gemini_contents(
 
 
 class OpenCodeGeminiClient(DirectLLMClient):
-    """Call OpenCode Zen ``/models/{model}`` Gemini-native endpoints."""
+    """Call OpenCode Zen Gemini-native ``models/{model}:generateContent`` endpoints."""
 
     def __init__(
         self,
@@ -62,13 +65,17 @@ class OpenCodeGeminiClient(DirectLLMClient):
         self._model_name = model_name
         self._provider_name = provider_name
         self._request_timeout = _normalize_timeout_seconds(timeout)
-        root = (base_url or 'https://opencode.ai/zen/v1').rstrip('/')
+        root = (base_url or 'https://opencode.ai/inference/google/v1beta').rstrip('/')
         if root.endswith('/v1'):
             root = root[:-3]
-        self._url = f'{root}{endpoint_path}'
+        action = (
+            '' if endpoint_path.endswith(':generateContent') else ':generateContent'
+        )
+        self._url = f'{root}{endpoint_path}{action}'
         self._headers = {
             'Authorization': f'Bearer {api_key}',
             'Content-Type': 'application/json',
+            **opencode_request_headers(provider_name),
         }
         self._http = get_shared_http_client(provider_name, base_url)
         self._async_http = get_shared_async_http_client(provider_name, base_url)

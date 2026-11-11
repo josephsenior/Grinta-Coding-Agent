@@ -714,6 +714,96 @@ class TestGetDirectClientRouting:
         assert type(client).__name__ == 'OpenAIClient'
         assert client._model_name == 'deepseek-v4-flash'
 
+    @pytest.mark.parametrize(
+        ('provider', 'surface', 'expected'),
+        [
+            (
+                'opencode',
+                'openai',
+                'https://opencode.ai/inference/openai/v1',
+            ),
+            (
+                'opencode',
+                'anthropic',
+                'https://opencode.ai/inference/anthropic/v1',
+            ),
+            (
+                'opencode',
+                'google',
+                'https://opencode.ai/inference/google/v1beta',
+            ),
+            (
+                'opencode-go',
+                'openai',
+                'https://opencode.ai/inference/go/openai/v1',
+            ),
+            (
+                'opencode-go',
+                'anthropic',
+                'https://opencode.ai/inference/go/anthropic/v1',
+            ),
+            (
+                'opencode-go',
+                'google',
+                'https://opencode.ai/inference/go/google/v1beta',
+            ),
+        ],
+    )
+    def test_opencode_surface_base_urls(self, provider, surface, expected):
+        from backend.inference.clients.factory import _opencode_surface_base_url
+
+        assert _opencode_surface_base_url(provider, surface, None) == expected
+        legacy = (
+            'https://opencode.ai/zen/go/v1'
+            if provider == 'opencode-go'
+            else 'https://opencode.ai/zen/v1'
+        )
+        assert _opencode_surface_base_url(provider, surface, legacy) == expected
+
+    def test_opencode_custom_base_url_is_preserved(self):
+        from backend.inference.clients.factory import _opencode_surface_base_url
+
+        custom = 'https://proxy.example/v1'
+        assert _opencode_surface_base_url('opencode', 'anthropic', custom) == custom
+
+    @patch(
+        'backend.inference.clients.get_shared_async_http_client',
+        return_value=MagicMock(),
+    )
+    @patch(
+        'backend.inference.clients.get_shared_http_client',
+        return_value=MagicMock(),
+    )
+    def test_opencode_gemini_new_model_uses_native_base(self, _h, _ah):
+        client = get_direct_client('opencode/gemini-4-argon', api_key='key')
+        assert client._url == (
+            'https://opencode.ai/inference/google/v1beta/models/'
+            'gemini-4-argon:generateContent'
+        )
+        assert client._headers['x-opencode-session']
+        assert client._headers['User-Agent'].startswith('Grinta/')
+
+    @patch('backend.inference.clients.openai_client.AsyncOpenAI')
+    @patch('backend.inference.clients.openai_client.OpenAI')
+    @patch(
+        'backend.inference.clients.get_shared_async_http_client',
+        return_value=MagicMock(),
+    )
+    @patch(
+        'backend.inference.clients.get_shared_http_client',
+        return_value=MagicMock(),
+    )
+    def test_opencode_chat_new_model_uses_openai_inference_base(
+        self, _h, _ah, _oai, _aoai
+    ):
+        client = get_direct_client('opencode/deepseek-v4.1-flash', api_key='key')
+        assert client._api_base_url == 'https://opencode.ai/inference/openai/v1'
+        headers = _oai.call_args.kwargs['default_headers']
+        assert headers['x-opencode-session']
+        assert headers['User-Agent'].startswith('Grinta/')
+        async_headers = _aoai.call_args.kwargs['default_headers']
+        assert async_headers['x-opencode-session'] == headers['x-opencode-session']
+
 
 # ---------------------------------------------------------------------------
 # DirectLLMClient.model_name validation

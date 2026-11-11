@@ -6,6 +6,7 @@ import asyncio
 import ssl
 import sys
 import threading
+import uuid
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Callable
 from contextlib import suppress
@@ -41,6 +42,26 @@ if sys.platform == 'win32':
         logger.warning('truststore is unavailable; falling back to Python CA bundle.')
     else:
         _HTTPX_VERIFY = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+
+
+def opencode_request_headers(provider_name: str) -> dict[str, str]:
+    """Return OpenCode request headers required for routing and cache affinity."""
+    normalized = (provider_name or '').strip().lower()
+    if normalized not in {'opencode', 'opencode-go'}:
+        return {}
+
+    from backend.core.logging.session_event_logger import get_bound_session_id
+
+    session_id = get_bound_session_id()
+    if not session_id:
+        session_id = f'grinta-{uuid.uuid4()}'
+
+    from backend import __version__
+
+    return {
+        'User-Agent': f'Grinta/{__version__}',
+        'x-opencode-session': str(session_id),
+    }
 
 
 def _is_openai_api_base(base_url: str | None) -> bool:

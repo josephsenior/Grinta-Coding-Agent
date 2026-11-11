@@ -134,6 +134,33 @@ def test_groq_onboarding_default_resolves() -> None:
     assert 'scout' in entry.name.lower()
 
 
+@pytest.mark.parametrize(
+    ('provider', 'model_id'),
+    [
+        ('opencode', 'deepseek-v4.1-flash'),
+        ('opencode', 'deepseek-v4.1-flash-free'),
+        ('opencode', 'gpt-6.1-sol'),
+        ('opencode', 'gemini-4-argon'),
+        ('opencode-go', 'deepseek-v4.1-flash'),
+        ('opencode-go', 'gpt-6-luna'),
+        ('opencode-go', 'gemini-4-argon'),
+    ],
+)
+def test_current_opencode_models_resolve(provider: str, model_id: str) -> None:
+    entry = lookup_provider_model(provider, model_id, allow_aliases=True)
+    assert entry is not None
+    assert entry.provider == provider
+    assert entry.verified is True
+    assert entry.featured is True
+
+
+def test_removed_opencode_models_are_deprecated() -> None:
+    entry = lookup_provider_model('opencode', 'deepseek-v4-flash', allow_aliases=True)
+    assert entry is not None
+    assert entry.featured is False
+    assert entry.metadata['status'] == 'deprecated'
+
+
 def test_loaded_catalog_resolution_invariants() -> None:
     issues = validate_loaded_catalog()
     assert not issues, '\n'.join(str(issue) for issue in issues[:20])
@@ -158,16 +185,19 @@ def test_build_model_entries_includes_all_catalog_models() -> None:
         assert not missing, f'{provider} picker missing: {missing[:5]}'
 
 
-def test_all_opencode_catalog_models_have_grinta_transport() -> None:
+@pytest.mark.parametrize('provider', ['opencode', 'opencode-go'])
+def test_all_opencode_catalog_models_have_grinta_transport(
+    provider: str,
+) -> None:
     from backend.inference.catalog.catalog_loader import validate_model_transport
 
     blocked: list[str] = []
     for entry in get_catalog():
-        if entry.provider != 'opencode':
+        if entry.provider != provider:
             continue
         try:
             validate_model_transport(
-                f'opencode/{entry.name}', config_provider='opencode'
+                f'{provider}/{entry.name}', config_provider=provider
             )
         except Exception as exc:
             blocked.append(f'{entry.name}: {exc}')

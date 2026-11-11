@@ -16,6 +16,47 @@ from backend.inference.clients.openai_client import (
     OpenCodeResponsesClient,
 )
 
+_OPENCODE_PROVIDERS = frozenset({'opencode', 'opencode-go'})
+_OPENCODE_SURFACE_BASE_URLS: dict[str, dict[str, str]] = {
+    'opencode': {
+        'openai': 'https://opencode.ai/inference/openai/v1',
+        'anthropic': 'https://opencode.ai/inference/anthropic/v1',
+        'google': 'https://opencode.ai/inference/google/v1beta',
+    },
+    'opencode-go': {
+        'openai': 'https://opencode.ai/inference/go/openai/v1',
+        'anthropic': 'https://opencode.ai/inference/go/anthropic/v1',
+        'google': 'https://opencode.ai/inference/go/google/v1beta',
+    },
+}
+_OPENCODE_LEGACY_DEFAULT_BASE_URLS: dict[str, str] = {
+    'opencode': 'https://opencode.ai/zen/v1',
+    'opencode-go': 'https://opencode.ai/zen/go/v1',
+}
+
+
+def _opencode_surface_base_url(
+    provider: str,
+    surface: str,
+    resolved_base_url: str | None,
+) -> str | None:
+    """Use the current OpenCode surface base unless a custom proxy is configured."""
+    from backend.inference.catalog.provider_catalog import PROVIDER_DEFAULT_URLS
+
+    surface_base = _OPENCODE_SURFACE_BASE_URLS.get(provider, {}).get(surface)
+    if not surface_base:
+        return resolved_base_url
+    if not resolved_base_url:
+        return surface_base
+    configured = resolved_base_url.rstrip('/')
+    known_defaults = {
+        str(PROVIDER_DEFAULT_URLS.get(provider, '')).rstrip('/'),
+        _OPENCODE_LEGACY_DEFAULT_BASE_URLS.get(provider, '').rstrip('/'),
+    }
+    if not configured or configured in known_defaults:
+        return surface_base
+    return resolved_base_url
+
 
 def get_direct_client(
     model: str,
@@ -202,20 +243,31 @@ def _try_opencode_responses_client(
     timeout: float | int | None,
     resolved_base_url: str | None,
 ) -> OpenCodeResponsesClient | None:
-    if provider != 'opencode':
+    if provider not in _OPENCODE_PROVIDERS:
         return None
-    from backend.inference.provider_resolver import opencode_required_endpoint
+    from backend.inference.provider_resolver import (
+        opencode_go_required_endpoint,
+        opencode_required_endpoint,
+    )
 
-    if opencode_required_endpoint(stripped_model) != '/responses':
+    required_endpoint = (
+        opencode_go_required_endpoint(stripped_model)
+        if provider == 'opencode-go'
+        else opencode_required_endpoint(stripped_model)
+    )
+    if required_endpoint != '/responses':
         return None
-    profile = _resolve_transport_profile('opencode', resolved_base_url)
+    response_base_url = _opencode_surface_base_url(
+        provider, 'openai', resolved_base_url
+    )
+    profile = _resolve_transport_profile(provider, response_base_url)
     return OpenCodeResponsesClient(
         model_name=stripped_model,
         api_key=api_key,
-        base_url=resolved_base_url,
+        base_url=response_base_url,
         profile=profile,
         timeout=timeout,
-        provider_name='opencode',
+        provider_name=provider,
     )
 
 
@@ -226,30 +278,37 @@ def _try_opencode_gemini_client(
     timeout: float | int | None,
     resolved_base_url: str | None,
 ) -> DirectLLMClient | None:
-    if provider != 'opencode':
+    if provider not in _OPENCODE_PROVIDERS:
         return None
-    from backend.inference.provider_resolver import opencode_required_endpoint
+    from backend.inference.provider_resolver import (
+        opencode_go_required_endpoint,
+        opencode_required_endpoint,
+    )
     from backend.inference.providers.opencode_gemini_ops import (
         OpenCodeGeminiClient,
     )
 
-    endpoint = opencode_required_endpoint(stripped_model)
+    endpoint = (
+        opencode_go_required_endpoint(stripped_model)
+        if provider == 'opencode-go'
+        else opencode_required_endpoint(stripped_model)
+    )
     if not endpoint.startswith('/models/'):
         return None
     return OpenCodeGeminiClient(
         model_name=stripped_model,
         api_key=api_key,
         endpoint_path=endpoint,
-        base_url=resolved_base_url,
+        base_url=_opencode_surface_base_url(provider, 'google', resolved_base_url),
         timeout=timeout,
-        provider_name='opencode',
+        provider_name=provider,
     )
 
 
 def _try_opencode_messages_client(
     provider, stripped_model, api_key, timeout, resolved_base_url
 ):
-    if provider not in {'opencode', 'opencode-go'}:
+    if provider not in _OPENCODE_PROVIDERS:
         return None
     from backend.inference.provider_resolver import (
         opencode_go_required_endpoint,
@@ -262,7 +321,9 @@ def _try_opencode_messages_client(
         required_endpoint = opencode_required_endpoint(stripped_model)
     if required_endpoint != '/messages':
         return None
-    anthropic_base_url = resolved_base_url
+    anthropic_base_url = _opencode_surface_base_url(
+        provider, 'anthropic', resolved_base_url
+    )
     if anthropic_base_url and anthropic_base_url.rstrip('/').endswith('/v1'):
         anthropic_base_url = anthropic_base_url.rstrip('/')[:-3]
     return AnthropicClient(
@@ -325,11 +386,16 @@ def _route_by_provider(
             model_family = resolver.resolve_provider(stripped_model)
         except (ValueError, Exception):
             pass
-    profile = _resolve_transport_profile(model_family, resolved_base_url)
+    openai_base_url = (
+        _opencode_surface_base_url(provider, 'openai', resolved_base_url)
+        if provider in _OPENCODE_PROVIDERS
+        else resolved_base_url
+    )
+    profile = _resolve_transport_profile(model_family, openai_base_url)
     return OpenAIClient(
         model_name=stripped_model,
         api_key=api_key,
-        base_url=resolved_base_url,
+        base_url=openai_base_url,
         profile=profile,
         timeout=timeout,
         provider_name=provider,

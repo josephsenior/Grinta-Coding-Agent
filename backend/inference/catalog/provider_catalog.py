@@ -49,8 +49,8 @@ PROVIDER_DEFAULT_URLS: dict[str, str] = {
     'cerebras': 'https://api.cerebras.ai/v1',
     'mistral': 'https://api.mistral.ai/v1',
     'kimi': 'https://api.kimi.com/coding/v1',
-    'opencode': 'https://opencode.ai/zen/v1',
-    'opencode-go': 'https://opencode.ai/zen/go/v1',
+    'opencode': 'https://opencode.ai/inference/openai/v1',
+    'opencode-go': 'https://opencode.ai/inference/go/openai/v1',
     'zai': 'https://api.z.ai/api/paas/v4',
 }
 

@@ -16,6 +16,7 @@ from backend.inference.clients.base import (
     _with_default_timeout,
     get_shared_async_http_client,
     get_shared_http_client,
+    opencode_request_headers,
 )
 from backend.inference.providers.openai_ops import (
     acompletion as _openai_acompletion,
@@ -54,14 +55,17 @@ class OpenAIClient(DirectLLMClient):
         self._provider_name = provider_name
         self._request_timeout = _normalize_timeout_seconds(timeout)
         effective_api_key = api_key or os.environ.get('OPENAI_API_KEY') or 'ollama'
+        default_headers = opencode_request_headers(provider_name) or None
         self.client = OpenAI(
             api_key=effective_api_key,
             base_url=base_url,
+            default_headers=default_headers,
             http_client=get_shared_http_client(provider_name, base_url),
         )
         self.async_client = AsyncOpenAI(
             api_key=effective_api_key,
             base_url=base_url,
+            default_headers=default_headers,
             http_client=get_shared_async_http_client(provider_name, base_url),
         )
 

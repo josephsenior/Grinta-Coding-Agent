@@ -124,12 +124,12 @@ def opencode_required_endpoint(model_name: str) -> str:
     if endpoint := _catalog_inference_endpoint('opencode', model_name):
         return endpoint
     model = _strip_known_transport_prefixes(model_name).lower()
-    if model.startswith('gpt-5'):
+    if model.startswith(('gpt-5', 'gpt-6', 'grok-4.6', 'grok-4.7', 'muse-')):
         return '/responses'
-    if model.startswith('claude-'):
+    if model.startswith(('claude-', 'qwen3.8-')):
         return '/messages'
     if model.startswith('gemini-'):
-        return '/models'
+        return f'/models/{model}'
     return '/chat/completions'
 
 
@@ -138,8 +138,12 @@ def opencode_go_required_endpoint(model_name: str) -> str:
     if endpoint := _catalog_inference_endpoint('opencode-go', model_name):
         return endpoint
     model = _strip_known_transport_prefixes(model_name).lower()
-    if model.startswith('minimax-m2.'):
+    if model.startswith(('gpt-5', 'gpt-6', 'grok-4.7', 'muse-')):
+        return '/responses'
+    if model.startswith(('claude-', 'qwen3.8-', 'minimax-m2.')):
         return '/messages'
+    if model.startswith('gemini-'):
+        return f'/models/{model}'
     return '/chat/completions'
 
 

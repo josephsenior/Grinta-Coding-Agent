@@ -28,11 +28,11 @@ def _ensure_opencode_chat_completions_model_supported(client: Any) -> None:
 
     llm_provider = 'opencode-go' if provider_name == 'opencode-go' else 'opencode'
     example_models = (
-        "'opencode-go/deepseek-v4-flash', 'opencode-go/glm-5.1', "
-        "'opencode-go/kimi-k2.6'"
+        "'opencode-go/deepseek-v4.1-flash', 'opencode-go/glm-5.3', "
+        "'opencode-go/kimi-k3'"
         if provider_name == 'opencode-go'
-        else "'opencode/deepseek-v4-flash-free', 'opencode/minimax-m2.5', "
-        "'opencode/kimi-k2.6'"
+        else "'opencode/deepseek-v4.1-flash-free', 'opencode/glm-5.3', "
+        "'opencode/kimi-k3'"
     )
     raise BadRequestError(
         (
