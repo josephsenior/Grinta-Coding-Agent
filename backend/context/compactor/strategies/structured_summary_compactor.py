@@ -11,6 +11,7 @@ canonical patch.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import Any
 
 from backend.context.compactor.compactor import BaseLLMCompactor, Compaction
@@ -45,6 +46,170 @@ _REPAIR_NUDGE = (
     'USER GOAL fallback without verbatim user quotes. Be precise, exhaustive, and '
     'complete.'
 )
+
+
+@dataclass
+class _EventDigest:
+    files_created: list[str] = field(default_factory=list)
+    files_edited: list[str] = field(default_factory=list)
+    commands_run: list[tuple[str, int | None]] = field(default_factory=list)
+    agent_thoughts: list[str] = field(default_factory=list)
+    code_nav: list[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+    other_count: int = 0
+
+
+def _digest_file_edit(event: Event, digest: _EventDigest) -> None:
+    path = getattr(event, 'path', '')
+    if not path:
+        return
+    if getattr(event, 'command', '') == 'create_file':
+        digest.files_created.append(path)
+    else:
+        digest.files_edited.append(path)
+
+
+def _digest_file_edit_observation(event: Event, digest: _EventDigest) -> None:
+    path = getattr(event, 'path', '')
+    if path and path not in digest.files_edited:
+        digest.files_edited.append(path)
+
+
+def _digest_cmd_run(event: Event, digest: _EventDigest) -> None:
+    command = getattr(event, 'command', '')
+    if command:
+        digest.commands_run.append((command, None))
+
+
+def _digest_cmd_output(event: Event, digest: _EventDigest) -> None:
+    command = getattr(event, 'command', '')
+    exit_code = getattr(event, 'exit_code', None)
+    if not command:
+        return
+    if exit_code and exit_code != 0:
+        digest.errors.append(f'{command} (exit={exit_code}): {str(event)[:200]}')
+    digest.commands_run.append((command, exit_code))
+
+
+def _digest_error_observation(event: Event, digest: _EventDigest) -> None:
+    if getattr(event, 'notify_ui_only', False):
+        return
+    digest.errors.append(str(event)[:200])
+
+
+def _digest_message_action(event: Event, digest: _EventDigest) -> None:
+    source = getattr(event, 'source', None)
+    if source and 'user' in str(source).lower():
+        return
+    digest.agent_thoughts.append(str(event))
+
+
+def _digest_think_action(event: Event, digest: _EventDigest) -> None:
+    digest.agent_thoughts.append(str(event)[:200])
+
+
+def _digest_code_nav(event: Event, digest: _EventDigest) -> None:
+    type_name = type(event).__name__
+    path = (
+        getattr(event, 'path', '')
+        or getattr(event, 'query', '')
+        or getattr(event, 'pattern', '')
+    )
+    digest.code_nav.append(
+        f'{type_name.replace("Action", "")}: {path}' if path else type_name
+    )
+
+
+def _digest_other(_event: Event, digest: _EventDigest) -> None:
+    digest.other_count += 1
+
+
+def _ignore_digest_event(_event: Event, _digest: _EventDigest) -> None:
+    return
+
+
+_DIGEST_HANDLERS = {
+    'FileEditAction': _digest_file_edit,
+    'FileEditObservation': _digest_file_edit_observation,
+    'CmdRunAction': _digest_cmd_run,
+    'CmdOutputObservation': _digest_cmd_output,
+    'ErrorObservation': _digest_error_observation,
+    'MessageAction': _digest_message_action,
+    'AgentThinkAction': _digest_think_action,
+    'SystemHintAction': _digest_think_action,
+    'FileReadAction': _digest_code_nav,
+    'GlobAction': _digest_code_nav,
+    'GrepAction': _digest_code_nav,
+    'FindSymbolsAction': _digest_code_nav,
+    'LspQueryAction': _digest_code_nav,
+    'AgentCondensationObservation': _ignore_digest_event,
+    'NullAction': _ignore_digest_event,
+    'NullObservation': _ignore_digest_event,
+}
+
+
+def _render_created_files(files: list[str]) -> list[str]:
+    if not files:
+        return []
+    if len(files) <= 15:
+        return [f'Files created ({len(files)}): {", ".join(files)}']
+    return [
+        f'Files created ({len(files)}): {", ".join(files[:15])}, '
+        f'... and {len(files) - 15} more'
+    ]
+
+
+def _render_edited_files(files: list[str]) -> list[str]:
+    if not files:
+        return []
+    unique = list(dict.fromkeys(files))
+    if len(unique) <= 15:
+        return [f'Files edited ({len(unique)} unique): {", ".join(unique)}']
+    return [
+        f'Files edited ({len(unique)} unique): {", ".join(unique[:15])}, '
+        f'... and {len(unique) - 15} more'
+    ]
+
+
+def _render_commands(commands: list[tuple[str, int | None]]) -> list[str]:
+    if not commands:
+        return []
+    unique = list(dict.fromkeys(commands))
+    command_strings = [
+        f'{command} (exit={exit_code})' if exit_code is not None else command
+        for command, exit_code in unique[:20]
+    ]
+    return [f'Commands run ({len(unique)} unique): {"; ".join(command_strings)}']
+
+
+def _render_errors(errors: list[str]) -> list[str]:
+    if not errors:
+        return []
+    lines = [f'Errors ({len(errors)}):']
+    lines.extend(f'  - {error}' for error in errors[:10])
+    return lines
+
+
+def _render_code_nav(entries: list[str]) -> list[str]:
+    if not entries:
+        return []
+    unique = list(dict.fromkeys(entries))
+    return [f'Code navigation ({len(unique)}): {"; ".join(unique[:20])}']
+
+
+def _render_digest(digest: _EventDigest) -> list[str]:
+    lines = [
+        *_render_created_files(digest.files_created),
+        *_render_edited_files(digest.files_edited),
+        *_render_commands(digest.commands_run),
+        *_render_errors(digest.errors),
+    ]
+    if digest.agent_thoughts:
+        lines.append(f'Agent reasoning/thought steps: {len(digest.agent_thoughts)}')
+    lines.extend(_render_code_nav(digest.code_nav))
+    if digest.other_count:
+        lines.append(f'Other events: {digest.other_count}')
+    return lines
 
 
 class StructuredSummaryCompactor(BaseLLMCompactor):
@@ -340,123 +505,11 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
         This reduces prompt size 5-10x and reduces recency bias by showing the
         big picture (e.g. "19 files created") rather than burying it in detail.
         """
-        files_created: list[str] = []
-        files_edited: list[str] = []
-        commands_run: list[tuple[str, int | None]] = []
-        agent_thoughts: list[str] = []
-        code_nav: list[str] = []
-        errors: list[str] = []
-        other_count = 0
-
+        digest = _EventDigest()
         for event in events:
-            type_name = type(event).__name__
-
-            if type_name == 'FileEditAction':
-                path = getattr(event, 'path', '')
-                cmd = getattr(event, 'command', '')
-                if path:
-                    if cmd == 'create_file':
-                        files_created.append(path)
-                    else:
-                        files_edited.append(path)
-            elif type_name == 'FileEditObservation':
-                path = getattr(event, 'path', '')
-                if path and path not in files_edited:
-                    files_edited.append(path)
-            elif type_name == 'CmdRunAction':
-                cmd = getattr(event, 'command', '')
-                if cmd:
-                    commands_run.append((cmd, None))
-            elif type_name == 'CmdOutputObservation':
-                cmd = getattr(event, 'command', '')
-                exit_code = getattr(event, 'exit_code', None)
-                if cmd:
-                    if exit_code and exit_code != 0:
-                        content = str(event)[:200]
-                        errors.append(f'{cmd} (exit={exit_code}): {content}')
-                    commands_run.append((cmd, exit_code))
-            elif type_name == 'ErrorObservation':
-                if getattr(event, 'notify_ui_only', False):
-                    continue
-                content = str(event)[:200]
-                errors.append(content)
-            elif type_name == 'MessageAction':
-                source = getattr(event, 'source', None)
-                if source and 'user' in str(source).lower():
-                    continue
-                agent_thoughts.append(str(event))
-            elif type_name in ('AgentThinkAction', 'SystemHintAction'):
-                agent_thoughts.append(str(event)[:200])
-            elif type_name in (
-                'FileReadAction',
-                'GlobAction',
-                'GrepAction',
-                'FindSymbolsAction',
-                'LspQueryAction',
-            ):
-                path = (
-                    getattr(event, 'path', '')
-                    or getattr(event, 'query', '')
-                    or getattr(event, 'pattern', '')
-                )
-                code_nav.append(
-                    f'{type_name.replace("Action", "")}: {path}' if path else type_name
-                )
-            elif type_name in (
-                'AgentCondensationObservation',
-                'NullAction',
-                'NullObservation',
-            ):
-                continue
-            else:
-                other_count += 1
-
-        lines: list[str] = []
-
-        if files_created:
-            if len(files_created) <= 15:
-                lines.append(
-                    f'Files created ({len(files_created)}): {", ".join(files_created)}'
-                )
-            else:
-                lines.append(
-                    f'Files created ({len(files_created)}): {", ".join(files_created[:15])}, '
-                    f'... and {len(files_created) - 15} more'
-                )
-        if files_edited:
-            unique_edited = list(dict.fromkeys(files_edited))
-            if len(unique_edited) <= 15:
-                lines.append(
-                    f'Files edited ({len(unique_edited)} unique): {", ".join(unique_edited)}'
-                )
-            else:
-                lines.append(
-                    f'Files edited ({len(unique_edited)} unique): {", ".join(unique_edited[:15])}, '
-                    f'... and {len(unique_edited) - 15} more'
-                )
-        if commands_run:
-            unique_cmds = list(dict.fromkeys(commands_run))
-            cmd_strs = [
-                f'{cmd} (exit={exit_code})' if exit_code is not None else cmd
-                for cmd, exit_code in unique_cmds[:20]
-            ]
-            lines.append(
-                f'Commands run ({len(unique_cmds)} unique): {"; ".join(cmd_strs)}'
-            )
-        if errors:
-            lines.append(f'Errors ({len(errors)}):')
-            for err in errors[:10]:
-                lines.append(f'  - {err}')
-        if agent_thoughts:
-            lines.append(f'Agent reasoning/thought steps: {len(agent_thoughts)}')
-        if code_nav:
-            unique_nav = list(dict.fromkeys(code_nav))
-            lines.append(
-                f'Code navigation ({len(unique_nav)}): {"; ".join(unique_nav[:20])}'
-            )
-        if other_count:
-            lines.append(f'Other events: {other_count}')
-
+            handler = _DIGEST_HANDLERS.get(type(event).__name__, _digest_other)
+            handler(event, digest)
+        lines = _render_digest(digest)
         return '\n'.join(lines) if lines else '(no events)'
 
     @staticmethod

@@ -90,6 +90,227 @@ def _as_bool(value: Any) -> bool:
     return bool(value) if isinstance(value, bool) else False
 
 
+def _validate_function_calling_block(
+    *,
+    provider: str,
+    model_name: str,
+    runtime: dict[str, Any],
+) -> list[CatalogValidationIssue]:
+    if provider in _SEARCH_ONLY_PROVIDERS:
+        return []
+
+    if not _as_bool(runtime.get('supports_function_calling', False)):
+        return [
+            CatalogValidationIssue(
+                provider,
+                model_name,
+                'runtime.supports_function_calling should be true for catalog models',
+            )
+        ]
+
+    aliases = runtime.get('aliases', [])
+    alias_list = aliases if isinstance(aliases, list) else []
+    expected_schema = should_support_response_schema(
+        model_name,
+        provider=provider,
+        aliases=[str(alias) for alias in alias_list],
+    )
+    has_schema = _as_bool(runtime.get('supports_response_schema', False))
+    if expected_schema and not has_schema:
+        return [
+            CatalogValidationIssue(
+                provider,
+                model_name,
+                'supports_response_schema should be true (vendor documents JSON/schema mode)',
+            )
+        ]
+    if has_schema and not expected_schema:
+        return [
+            CatalogValidationIssue(
+                provider,
+                model_name,
+                'supports_response_schema is true but model is not in documented schema patterns',
+            )
+        ]
+    return []
+
+
+def _validate_token_limits_block(
+    *,
+    provider: str,
+    model_name: str,
+    runtime: dict[str, Any],
+) -> list[CatalogValidationIssue]:
+    context = runtime.get('context_window_tokens')
+    max_in = runtime.get('max_input_tokens')
+    max_out = runtime.get('max_output_tokens')
+    if not (
+        isinstance(context, int)
+        and isinstance(max_in, int)
+        and isinstance(max_out, int)
+    ):
+        return []
+    if max_in + max_out > context:
+        return [
+            CatalogValidationIssue(
+                provider,
+                model_name,
+                'max_input_tokens + max_output_tokens exceeds context_window_tokens',
+            )
+        ]
+    return []
+
+
+def _validate_reasoning_effort_block(
+    *,
+    provider: str,
+    model_name: str,
+    wire: Any,
+    efforts: Any,
+    has_variants: bool,
+    supports_effort: bool,
+) -> list[CatalogValidationIssue]:
+    if not supports_effort:
+        return []
+
+    issues: list[CatalogValidationIssue] = []
+    if not has_variants and not isinstance(efforts, list):
+        issues.append(
+            CatalogValidationIssue(
+                provider,
+                model_name,
+                'supports_reasoning_effort requires reasoning_efforts or metadata.variants',
+            )
+        )
+    wire_value = wire.strip().lower() if isinstance(wire, str) else ''
+    if wire_value == WIRE_NONE and (has_variants or isinstance(efforts, list)):
+        issues.append(
+            CatalogValidationIssue(
+                provider,
+                model_name,
+                'supports_reasoning_effort with tiers requires a non-none reasoning_wire',
+            )
+        )
+    if isinstance(wire, str) and wire.strip() and wire not in VALID_REASONING_WIRES:
+        issues.append(
+            CatalogValidationIssue(
+                provider,
+                model_name,
+                f'invalid reasoning_wire {wire!r}',
+            )
+        )
+    if isinstance(efforts, list):
+        issues.extend(
+            _validate_reasoning_tiers(
+                provider=provider,
+                model_name=model_name,
+                efforts=efforts,
+            )
+        )
+    return issues
+
+
+def _validate_reasoning_tiers(
+    *,
+    provider: str,
+    model_name: str,
+    efforts: list[Any],
+) -> list[CatalogValidationIssue]:
+    issues: list[CatalogValidationIssue] = []
+    for effort in efforts:
+        if not isinstance(effort, str):
+            continue
+        normalized = effort.strip().lower()
+        if normalized and normalized not in _ALLOWED_REASONING_TIERS:
+            issues.append(
+                CatalogValidationIssue(
+                    provider,
+                    model_name,
+                    f'reasoning tier {effort!r} is not in tier_order',
+                )
+            )
+    return issues
+
+
+def _validate_strip_reasoning_effort_block(
+    *,
+    provider: str,
+    model_name: str,
+    runtime: dict[str, Any],
+) -> list[CatalogValidationIssue]:
+    if not (
+        _as_bool(runtime.get('strip_reasoning_effort', False))
+        and _as_bool(runtime.get('supports_reasoning_effort', False))
+    ):
+        return []
+    wire = runtime.get('reasoning_wire')
+    native_wire = isinstance(wire, str) and wire in _NATIVE_REASONING_WIRES
+    if provider != 'anthropic' and not native_wire:
+        return [
+            CatalogValidationIssue(
+                provider,
+                model_name,
+                'strip_reasoning_effort and supports_reasoning_effort are both true',
+            )
+        ]
+    return []
+
+
+def _validate_prompt_cache_mode_block(
+    *,
+    provider: str,
+    model_name: str,
+    runtime: dict[str, Any],
+) -> list[CatalogValidationIssue]:
+    cache_mode = runtime.get('prompt_cache_mode')
+    if cache_mode is None:
+        return []
+    if not isinstance(cache_mode, str):
+        return [
+            CatalogValidationIssue(
+                provider,
+                model_name,
+                'prompt_cache_mode must be a string',
+            )
+        ]
+    if cache_mode.strip().lower() not in VALID_PROMPT_CACHE_MODES:
+        return [
+            CatalogValidationIssue(
+                provider,
+                model_name,
+                f'invalid prompt_cache_mode {cache_mode!r}',
+            )
+        ]
+    return []
+
+
+def _validate_aliases_block(
+    *,
+    provider: str,
+    model_name: str,
+    runtime: dict[str, Any],
+) -> list[CatalogValidationIssue]:
+    aliases = runtime.get('aliases', [])
+    if not isinstance(aliases, list):
+        return [
+            CatalogValidationIssue(
+                provider, model_name, 'runtime.aliases must be a list'
+            )
+        ]
+    prefixed = f'{provider}/{model_name}'
+    if prefixed not in aliases and prefixed.lower() not in {
+        str(a).lower() for a in aliases
+    }:
+        return [
+            CatalogValidationIssue(
+                provider,
+                model_name,
+                f'missing canonical alias {prefixed!r}',
+            )
+        ]
+    return []
+
+
 def _validate_runtime_block(
     *,
     provider: str,
@@ -99,155 +320,57 @@ def _validate_runtime_block(
 ) -> list[CatalogValidationIssue]:
     issues: list[CatalogValidationIssue] = []
 
-    if not _as_bool(runtime.get('supports_function_calling', False)):
-        if provider not in _SEARCH_ONLY_PROVIDERS:
-            issues.append(
-                CatalogValidationIssue(
-                    provider,
-                    model_name,
-                    'runtime.supports_function_calling should be true for catalog models',
-                )
-            )
-    elif provider not in _SEARCH_ONLY_PROVIDERS:
-        aliases = runtime.get('aliases', [])
-        alias_list = aliases if isinstance(aliases, list) else []
-        expected_schema = should_support_response_schema(
-            model_name,
+    issues.extend(
+        _validate_function_calling_block(
             provider=provider,
-            aliases=[str(alias) for alias in alias_list],
+            model_name=model_name,
+            runtime=runtime,
         )
-        has_schema = _as_bool(runtime.get('supports_response_schema', False))
-        if expected_schema and not has_schema:
-            issues.append(
-                CatalogValidationIssue(
-                    provider,
-                    model_name,
-                    'supports_response_schema should be true (vendor documents JSON/schema mode)',
-                )
-            )
-        elif has_schema and not expected_schema:
-            issues.append(
-                CatalogValidationIssue(
-                    provider,
-                    model_name,
-                    'supports_response_schema is true but model is not in documented schema patterns',
-                )
-            )
-
-    context = runtime.get('context_window_tokens')
-    max_in = runtime.get('max_input_tokens')
-    max_out = runtime.get('max_output_tokens')
-    if (
-        isinstance(context, int)
-        and isinstance(max_in, int)
-        and isinstance(max_out, int)
-    ):
-        if max_in + max_out > context:
-            issues.append(
-                CatalogValidationIssue(
-                    provider,
-                    model_name,
-                    'max_input_tokens + max_output_tokens exceeds context_window_tokens',
-                )
-            )
+    )
+    issues.extend(
+        _validate_token_limits_block(
+            provider=provider,
+            model_name=model_name,
+            runtime=runtime,
+        )
+    )
 
     wire = runtime.get('reasoning_wire')
     efforts = runtime.get('reasoning_efforts')
     variants = metadata.get('variants') if isinstance(metadata, dict) else None
     has_variants = isinstance(variants, dict) and bool(variants)
 
-    if _as_bool(runtime.get('supports_reasoning_effort', False)):
-        if not has_variants and not isinstance(efforts, list):
-            issues.append(
-                CatalogValidationIssue(
-                    provider,
-                    model_name,
-                    'supports_reasoning_effort requires reasoning_efforts or metadata.variants',
-                )
-            )
-        wire_value = wire.strip().lower() if isinstance(wire, str) else ''
-        if wire_value == WIRE_NONE and (has_variants or isinstance(efforts, list)):
-            issues.append(
-                CatalogValidationIssue(
-                    provider,
-                    model_name,
-                    'supports_reasoning_effort with tiers requires a non-none reasoning_wire',
-                )
-            )
-        if isinstance(wire, str) and wire.strip() and wire not in VALID_REASONING_WIRES:
-            issues.append(
-                CatalogValidationIssue(
-                    provider,
-                    model_name,
-                    f'invalid reasoning_wire {wire!r}',
-                )
-            )
-        if isinstance(efforts, list):
-            for effort in efforts:
-                if not isinstance(effort, str):
-                    continue
-                normalized = effort.strip().lower()
-                if normalized and normalized not in _ALLOWED_REASONING_TIERS:
-                    issues.append(
-                        CatalogValidationIssue(
-                            provider,
-                            model_name,
-                            f'reasoning tier {effort!r} is not in tier_order',
-                        )
-                    )
-
-    if _as_bool(runtime.get('strip_reasoning_effort', False)) and _as_bool(
-        runtime.get('supports_reasoning_effort', False)
-    ):
-        wire = runtime.get('reasoning_wire')
-        native_wire = isinstance(wire, str) and wire in _NATIVE_REASONING_WIRES
-        if provider != 'anthropic' and not native_wire:
-            issues.append(
-                CatalogValidationIssue(
-                    provider,
-                    model_name,
-                    'strip_reasoning_effort and supports_reasoning_effort are both true',
-                )
-            )
-
-    cache_mode = runtime.get('prompt_cache_mode')
-    if cache_mode is not None:
-        if not isinstance(cache_mode, str):
-            issues.append(
-                CatalogValidationIssue(
-                    provider,
-                    model_name,
-                    'prompt_cache_mode must be a string',
-                )
-            )
-        elif cache_mode.strip().lower() not in VALID_PROMPT_CACHE_MODES:
-            issues.append(
-                CatalogValidationIssue(
-                    provider,
-                    model_name,
-                    f'invalid prompt_cache_mode {cache_mode!r}',
-                )
-            )
-
-    aliases = runtime.get('aliases', [])
-    if not isinstance(aliases, list):
-        issues.append(
-            CatalogValidationIssue(
-                provider, model_name, 'runtime.aliases must be a list'
-            )
+    issues.extend(
+        _validate_reasoning_effort_block(
+            provider=provider,
+            model_name=model_name,
+            wire=wire,
+            efforts=efforts,
+            has_variants=has_variants,
+            supports_effort=_as_bool(runtime.get('supports_reasoning_effort', False)),
         )
-    else:
-        prefixed = f'{provider}/{model_name}'
-        if prefixed not in aliases and prefixed.lower() not in {
-            str(a).lower() for a in aliases
-        }:
-            issues.append(
-                CatalogValidationIssue(
-                    provider,
-                    model_name,
-                    f'missing canonical alias {prefixed!r}',
-                )
-            )
+    )
+    issues.extend(
+        _validate_strip_reasoning_effort_block(
+            provider=provider,
+            model_name=model_name,
+            runtime=runtime,
+        )
+    )
+    issues.extend(
+        _validate_prompt_cache_mode_block(
+            provider=provider,
+            model_name=model_name,
+            runtime=runtime,
+        )
+    )
+    issues.extend(
+        _validate_aliases_block(
+            provider=provider,
+            model_name=model_name,
+            runtime=runtime,
+        )
+    )
 
     return issues
 

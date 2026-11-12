@@ -119,32 +119,62 @@ def summarize_editor_error(result: Any) -> tuple[str, str, bool, dict[str, Any]]
     return error_code, summary, retryable, {'detail': detail, **extra}
 
 
-def format_agent_edit_error_message(
-    context: dict[str, Any],
-    *,
-    fallback: str,
-) -> str:
-    lines = [
-        fallback.rstrip('.') + '.'
-        if fallback and not fallback.endswith('.')
-        else fallback
-    ]
+def _edit_error_fallback_line(fallback: str) -> str:
+    if fallback and not fallback.endswith('.'):
+        return fallback.rstrip('.') + '.'
+    return fallback
+
+
+def _edit_error_location_line(context: dict[str, Any]) -> str | None:
+    path = context.get('failed_path') or context.get('path')
+    if not path:
+        return None
+    line = context.get('line')
+    location = f'{path}:{line}' if line is not None else str(path)
+    return f'File: {location}'
+
+
+def _edit_error_operation_line(context: dict[str, Any]) -> str | None:
+    op_index = context.get('failed_op_index')
+    if op_index is None:
+        return None
+    total_ops = context.get('total_ops')
+    if total_ops is not None:
+        return f'Operation: {op_index + 1}/{total_ops}'
+    return f'Operation index: {op_index}'
+
+
+def _edit_error_unmodified_notice(context: dict[str, Any]) -> str | None:
+    if not context.get('include_unmodified_notice', True):
+        return None
+    if context.get('transaction_rolled_back'):
+        return 'Batch rolled back; no files changed. Fix the edit and retry.'
+    if context.get('files_modified', 0) == 0:
+        return _FILES_UNMODIFIED
+    return None
+
+
+def _edit_error_identity_lines(context: dict[str, Any]) -> list[str]:
     path = context.get('failed_path') or context.get('path')
     line = context.get('line')
-    if path:
-        location = f'{path}:{line}' if line is not None else str(path)
-        lines.append(f'File: {location}')
-    op_index = context.get('failed_op_index')
-    total_ops = context.get('total_ops')
-    if op_index is not None:
-        if total_ops is not None:
-            lines.append(f'Operation: {op_index + 1}/{total_ops}')
-        else:
-            lines.append(f'Operation index: {op_index}')
+    lines: list[str] = []
+    if location := _edit_error_location_line(context):
+        lines.append(location)
+    if operation := _edit_error_operation_line(context):
+        lines.append(operation)
     if symbol := context.get('symbol'):
         lines.append(f'Symbol: {symbol}')
     if line and not path:
         lines.append(f'Line: {line}')
+    return lines
+
+
+def _edit_error_detail_lines(
+    context: dict[str, Any],
+    *,
+    fallback: str,
+) -> list[str]:
+    lines: list[str] = []
     if detail := context.get('detail'):
         lines.append(f'Detail: {detail}')
     if existing := context.get('existing_content'):
@@ -152,13 +182,21 @@ def format_agent_edit_error_message(
     if hint := context.get('hint'):
         if hint not in fallback:
             lines.append(hint)
-    if context.get('include_unmodified_notice', True) and (
-        context.get('transaction_rolled_back') or context.get('files_modified', 0) == 0
-    ):
-        if context.get('transaction_rolled_back'):
-            lines.append('Batch rolled back; no files changed. Fix the edit and retry.')
-        else:
-            lines.append(_FILES_UNMODIFIED)
+    if notice := _edit_error_unmodified_notice(context):
+        lines.append(notice)
+    return lines
+
+
+def format_agent_edit_error_message(
+    context: dict[str, Any],
+    *,
+    fallback: str,
+) -> str:
+    lines = [
+        _edit_error_fallback_line(fallback),
+        *_edit_error_identity_lines(context),
+        *_edit_error_detail_lines(context, fallback=fallback),
+    ]
     return '\n'.join(line for line in lines if line)
 
 

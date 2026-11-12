@@ -257,6 +257,20 @@ def _reasoning_replay_item(item: Any) -> dict[str, Any] | None:
     return replay
 
 
+def _item_call_id(item: Any) -> str:
+    return str(_get(item, 'call_id') or _get(item, 'id') or '')
+
+
+def _done_item_arguments(
+    item: Any,
+    tool_index: int,
+    streamed_arguments: set[int],
+) -> str:
+    if tool_index in streamed_arguments:
+        return ''
+    return str(_get(item, 'arguments') or '')
+
+
 class CodexResponsesClient(DirectLLMClient):
     """Use Codex OAuth credits while Grinta owns the complete agent harness."""
 
@@ -317,125 +331,236 @@ class CodexResponsesClient(DirectLLMClient):
             if event_response is not None:
                 response_id = str(_get(event_response, 'id') or response_id)
 
-            if event_type == 'response.output_text.delta':
-                delta = _get(event, 'delta')
-                if isinstance(delta, str) and delta:
-                    yield {
-                        'id': response_id,
-                        'choices': [{'delta': {'content': delta}}],
-                    }
-                continue
-
-            if event_type in {
-                'response.reasoning_summary_text.delta',
-                'response.reasoning_text.delta',
-            }:
-                delta = _get(event, 'delta')
-                if isinstance(delta, str) and delta:
-                    yield {
-                        'id': response_id,
-                        'choices': [
-                            {
-                                'delta': {
-                                    'reasoning_content': delta,
-                                    '_reasoning_item_id': str(
-                                        _get(event, 'item_id') or ''
-                                    ),
-                                }
-                            }
-                        ],
-                    }
-                continue
-
-            if event_type == 'response.output_item.added':
-                item = _get(event, 'item')
-                if _get(item, 'type') != 'function_call':
-                    continue
-                output_index = int(_get(event, 'output_index', 0) or 0)
-                tool_index = len(tool_indexes)
-                tool_indexes[output_index] = tool_index
-                item_id = str(_get(item, 'id') or '')
-                if item_id:
-                    tool_item_indexes[item_id] = tool_index
-                call_id = str(_get(item, 'call_id') or item_id)
-                if call_id:
-                    call_ids.append(call_id)
-                yield self._tool_call_chunk(
-                    response_id=response_id,
-                    index=tool_index,
-                    call_id=call_id,
-                    name=str(_get(item, 'name') or ''),
-                    arguments='',
-                )
-                continue
-
-            if event_type == 'response.function_call_arguments.delta':
-                output_index = int(_get(event, 'output_index', 0) or 0)
-                delta_tool_index: int | None = tool_indexes.get(output_index)
-                if delta_tool_index is None:
-                    item_id = str(_get(event, 'item_id') or '')
-                    delta_tool_index = tool_item_indexes.get(item_id)
-                if delta_tool_index is None:
-                    delta_tool_index = len(tool_indexes)
-                    tool_indexes[output_index] = delta_tool_index
-                delta = _get(event, 'delta')
-                if isinstance(delta, str) and delta:
-                    streamed_arguments.add(delta_tool_index)
-                    yield self._tool_call_chunk(
-                        response_id=response_id,
-                        index=delta_tool_index,
-                        arguments=delta,
-                    )
-                continue
-
-            if event_type == 'response.output_item.done':
-                item = _get(event, 'item')
-                item_type = _get(item, 'type')
-                if item_type == 'reasoning':
-                    replay = _reasoning_replay_item(item)
-                    if replay is not None:
-                        reasoning_items.append(replay)
-                    continue
-                if item_type != 'function_call':
-                    continue
-                output_index = int(_get(event, 'output_index', 0) or 0)
-                done_tool_index: int | None = tool_indexes.get(output_index)
-                if done_tool_index is None:
-                    done_tool_index = len(tool_indexes)
-                    tool_indexes[output_index] = done_tool_index
-                call_id = str(_get(item, 'call_id') or _get(item, 'id') or '')
-                if call_id and call_id not in call_ids:
-                    call_ids.append(call_id)
-                name = str(_get(item, 'name') or '')
-                arguments = (
-                    ''
-                    if done_tool_index in streamed_arguments
-                    else str(_get(item, 'arguments') or '')
-                )
-                if name or arguments:
-                    yield self._tool_call_chunk(
-                        response_id=response_id,
-                        index=done_tool_index,
-                        call_id=call_id,
-                        name=name,
-                        arguments=arguments,
-                    )
-                continue
-
             if event_type == 'response.completed':
-                completed = _get(event, 'response')
-                if completed is not None:
-                    response_id = str(_get(completed, 'id') or response_id)
-                    self._cache_reasoning_items(
-                        _get(completed, 'output') or [],
-                        call_ids=call_ids,
-                        extra_reasoning=reasoning_items,
-                    )
-                    yield {
-                        'id': response_id,
-                        'usage': _usage_dict(_get(completed, 'usage')),
-                    }
+                chunk, response_id = self._stream_completed_chunk(
+                    event,
+                    response_id,
+                    call_ids,
+                    reasoning_items,
+                )
+                if chunk is not None:
+                    yield chunk
                 break
+
+            chunk = self._stream_event_chunk(
+                event,
+                event_type,
+                response_id,
+                tool_indexes,
+                tool_item_indexes,
+                call_ids,
+                streamed_arguments,
+                reasoning_items,
+            )
+            if chunk is not None:
+                yield chunk
+
+    def _stream_event_chunk(
+        self,
+        event: Any,
+        event_type: str,
+        response_id: str,
+        tool_indexes: dict[int, int],
+        tool_item_indexes: dict[str, int],
+        call_ids: list[str],
+        streamed_arguments: set[int],
+        reasoning_items: list[dict[str, Any]],
+    ) -> dict[str, Any] | None:
+        if event_type == 'response.output_text.delta':
+            return self._stream_text_delta_chunk(event, response_id)
+        if event_type in {
+            'response.reasoning_summary_text.delta',
+            'response.reasoning_text.delta',
+        }:
+            return self._stream_reasoning_delta_chunk(event, response_id)
+        if event_type == 'response.output_item.added':
+            return self._stream_output_item_added_chunk(
+                event,
+                response_id,
+                tool_indexes,
+                tool_item_indexes,
+                call_ids,
+            )
+        if event_type == 'response.function_call_arguments.delta':
+            return self._stream_arguments_delta_chunk(
+                event,
+                response_id,
+                tool_indexes,
+                tool_item_indexes,
+                streamed_arguments,
+            )
+        if event_type == 'response.output_item.done':
+            return self._stream_output_item_done_chunk(
+                event,
+                response_id,
+                tool_indexes,
+                streamed_arguments,
+                call_ids,
+                reasoning_items,
+            )
+        return None
+
+    def _stream_completed_chunk(
+        self,
+        event: Any,
+        response_id: str,
+        call_ids: list[str],
+        reasoning_items: list[dict[str, Any]],
+    ) -> tuple[dict[str, Any] | None, str]:
+        completed = _get(event, 'response')
+        if completed is None:
+            return None, response_id
+        response_id = str(_get(completed, 'id') or response_id)
+        self._cache_reasoning_items(
+            _get(completed, 'output') or [],
+            call_ids=call_ids,
+            extra_reasoning=reasoning_items,
+        )
+        return (
+            {
+                'id': response_id,
+                'usage': _usage_dict(_get(completed, 'usage')),
+            },
+            response_id,
+        )
+
+    def _stream_text_delta_chunk(
+        self, event: Any, response_id: str
+    ) -> dict[str, Any] | None:
+        delta = _get(event, 'delta')
+        if not isinstance(delta, str) or not delta:
+            return None
+        return {
+            'id': response_id,
+            'choices': [{'delta': {'content': delta}}],
+        }
+
+    def _stream_reasoning_delta_chunk(
+        self, event: Any, response_id: str
+    ) -> dict[str, Any] | None:
+        delta = _get(event, 'delta')
+        if not isinstance(delta, str) or not delta:
+            return None
+        return {
+            'id': response_id,
+            'choices': [
+                {
+                    'delta': {
+                        'reasoning_content': delta,
+                        '_reasoning_item_id': str(_get(event, 'item_id') or ''),
+                    }
+                }
+            ],
+        }
+
+    def _stream_output_item_added_chunk(
+        self,
+        event: Any,
+        response_id: str,
+        tool_indexes: dict[int, int],
+        tool_item_indexes: dict[str, int],
+        call_ids: list[str],
+    ) -> dict[str, Any] | None:
+        item = _get(event, 'item')
+        if _get(item, 'type') != 'function_call':
+            return None
+        output_index = int(_get(event, 'output_index', 0) or 0)
+        tool_index = len(tool_indexes)
+        tool_indexes[output_index] = tool_index
+        item_id = str(_get(item, 'id') or '')
+        if item_id:
+            tool_item_indexes[item_id] = tool_index
+        call_id = str(_get(item, 'call_id') or item_id)
+        if call_id:
+            call_ids.append(call_id)
+        return self._tool_call_chunk(
+            response_id=response_id,
+            index=tool_index,
+            call_id=call_id,
+            name=str(_get(item, 'name') or ''),
+            arguments='',
+        )
+
+    def _stream_arguments_delta_chunk(
+        self,
+        event: Any,
+        response_id: str,
+        tool_indexes: dict[int, int],
+        tool_item_indexes: dict[str, int],
+        streamed_arguments: set[int],
+    ) -> dict[str, Any] | None:
+        output_index = int(_get(event, 'output_index', 0) or 0)
+        tool_index: int | None = tool_indexes.get(output_index)
+        if tool_index is None:
+            item_id = str(_get(event, 'item_id') or '')
+            tool_index = tool_item_indexes.get(item_id)
+        if tool_index is None:
+            tool_index = len(tool_indexes)
+            tool_indexes[output_index] = tool_index
+        delta = _get(event, 'delta')
+        if not isinstance(delta, str) or not delta:
+            return None
+        streamed_arguments.add(tool_index)
+        return self._tool_call_chunk(
+            response_id=response_id,
+            index=tool_index,
+            arguments=delta,
+        )
+
+    def _stream_output_item_done_chunk(
+        self,
+        event: Any,
+        response_id: str,
+        tool_indexes: dict[int, int],
+        streamed_arguments: set[int],
+        call_ids: list[str],
+        reasoning_items: list[dict[str, Any]],
+    ) -> dict[str, Any] | None:
+        item = _get(event, 'item')
+        item_type = _get(item, 'type')
+        if item_type == 'reasoning':
+            replay = _reasoning_replay_item(item)
+            if replay is not None:
+                reasoning_items.append(replay)
+            return None
+        if item_type != 'function_call':
+            return None
+        return self._function_call_done_chunk(
+            event,
+            response_id,
+            tool_indexes,
+            streamed_arguments,
+            call_ids,
+        )
+
+    def _function_call_done_chunk(
+        self,
+        event: Any,
+        response_id: str,
+        tool_indexes: dict[int, int],
+        streamed_arguments: set[int],
+        call_ids: list[str],
+    ) -> dict[str, Any] | None:
+        item = _get(event, 'item')
+        output_index = int(_get(event, 'output_index', 0) or 0)
+        tool_index: int | None = tool_indexes.get(output_index)
+        if tool_index is None:
+            tool_index = len(tool_indexes)
+            tool_indexes[output_index] = tool_index
+        call_id = _item_call_id(item)
+        if call_id and call_id not in call_ids:
+            call_ids.append(call_id)
+        name = str(_get(item, 'name') or '')
+        arguments = _done_item_arguments(item, tool_index, streamed_arguments)
+        if not name and not arguments:
+            return None
+        return self._tool_call_chunk(
+            response_id=response_id,
+            index=tool_index,
+            call_id=call_id,
+            name=name,
+            arguments=arguments,
+        )
 
     def close(self) -> None:
         process = self._process
@@ -772,38 +897,59 @@ class CodexResponsesClient(DirectLLMClient):
             event_type = str(_get(event, 'type') or '')
             event_response = _get(event, 'response')
             if event_response is not None:
-                response['id'] = str(_get(event_response, 'id') or response['id'])
-                response['model'] = str(
-                    _get(event_response, 'model') or response['model']
-                )
+                self._apply_event_response_metadata(response, event_response)
             if event_type == 'response.output_text.delta':
-                delta = _get(event, 'delta')
-                if isinstance(delta, str):
-                    text_deltas.append(delta)
-                continue
-            if event_type in {
+                self._append_text_delta(event, text_deltas)
+            elif event_type in {
                 'response.reasoning_summary_text.delta',
                 'response.reasoning_text.delta',
             }:
-                delta = _get(event, 'delta')
-                if isinstance(delta, str):
-                    reasoning_deltas.append(delta)
-                continue
-            if event_type == 'response.output_item.done':
+                self._append_reasoning_delta(event, reasoning_deltas)
+            elif event_type == 'response.output_item.done':
                 item = _get(event, 'item')
                 if item is not None:
                     response['output'].append(item)
-                continue
-            if event_type != 'response.completed' or event_response is None:
-                continue
-            response['status'] = str(
-                _get(event_response, 'status') or response['status']
-            )
-            response['usage'] = _get(event_response, 'usage')
-            completed_output = _get(event_response, 'output')
-            if completed_output:
-                response['output'] = list(completed_output)
+            elif event_type == 'response.completed' and event_response is not None:
+                self._apply_completed_response(response, event_response)
 
+        self._append_synthesized_deltas(response, text_deltas, reasoning_deltas)
+        return response
+
+    @staticmethod
+    def _apply_event_response_metadata(
+        response: dict[str, Any], event_response: Any
+    ) -> None:
+        response['id'] = str(_get(event_response, 'id') or response['id'])
+        response['model'] = str(_get(event_response, 'model') or response['model'])
+
+    @staticmethod
+    def _apply_completed_response(
+        response: dict[str, Any], event_response: Any
+    ) -> None:
+        response['status'] = str(_get(event_response, 'status') or response['status'])
+        response['usage'] = _get(event_response, 'usage')
+        completed_output = _get(event_response, 'output')
+        if completed_output:
+            response['output'] = list(completed_output)
+
+    @staticmethod
+    def _append_text_delta(event: Any, text_deltas: list[str]) -> None:
+        delta = _get(event, 'delta')
+        if isinstance(delta, str):
+            text_deltas.append(delta)
+
+    @staticmethod
+    def _append_reasoning_delta(event: Any, reasoning_deltas: list[str]) -> None:
+        delta = _get(event, 'delta')
+        if isinstance(delta, str):
+            reasoning_deltas.append(delta)
+
+    @staticmethod
+    def _append_synthesized_deltas(
+        response: dict[str, Any],
+        text_deltas: list[str],
+        reasoning_deltas: list[str],
+    ) -> None:
         output_types = {_get(item, 'type') for item in response['output']}
         if text_deltas and 'message' not in output_types:
             response['output'].append(
@@ -823,7 +969,6 @@ class CodexResponsesClient(DirectLLMClient):
                     ],
                 },
             )
-        return response
 
     def _cache_reasoning_items(
         self,

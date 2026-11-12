@@ -185,25 +185,7 @@ def infer_family(entry: ModelEntry) -> str:
     return entry.provider.lower()
 
 
-def supports_reasoning(entry: ModelEntry) -> bool:
-    """Return whether Grinta can safely configure reasoning for this entry."""
-    caps = _capabilities(entry)
-    if caps.get('reasoning') is False:
-        return False
-    if entry.thinking_mode:
-        return True
-
-    executable = _executable_reasoning_configuration(entry)
-    if executable is None:
-        return False
-    _wire, _allowed = executable
-
-    if entry.supports_reasoning_effort:
-        return True
-    variants = _variants(entry)
-    if caps.get('reasoning') is True and variants:
-        return True
-
+def _provider_supports_reasoning(entry: ModelEntry) -> bool | None:
     if entry.provider == 'anthropic':
         return infer_family(entry).startswith('claude')
     if entry.provider == 'google':
@@ -216,7 +198,10 @@ def supports_reasoning(entry: ModelEntry) -> bool:
         'grok-4'
     ):
         return True
+    return None
 
+
+def _vendor_supports_reasoning(entry: ModelEntry) -> bool | None:
     vendor, logical = _split_upstream_model_id(entry.name)
     logical_lower = logical.lower()
     if vendor == 'anthropic' and logical_lower.startswith('claude'):
@@ -231,7 +216,33 @@ def supports_reasoning(entry: ModelEntry) -> bool:
         token in logical_lower for token in ('reasoner', 'r1', 'thinking')
     ):
         return True
+    return None
 
+
+def supports_reasoning(entry: ModelEntry) -> bool:
+    """Return whether Grinta can safely configure reasoning for this entry."""
+    caps = _capabilities(entry)
+    if caps.get('reasoning') is False:
+        return False
+    if entry.thinking_mode:
+        return True
+
+    executable = _executable_reasoning_configuration(entry)
+    if executable is None:
+        return False
+
+    if entry.supports_reasoning_effort:
+        return True
+    variants = _variants(entry)
+    if caps.get('reasoning') is True and variants:
+        return True
+
+    provider_support = _provider_supports_reasoning(entry)
+    if provider_support is not None:
+        return provider_support
+    vendor_support = _vendor_supports_reasoning(entry)
+    if vendor_support is not None:
+        return vendor_support
     return _model_name_supports_reasoning(entry)
 
 
@@ -249,7 +260,7 @@ def _executable_reasoning_configuration(
     return wire, allowed
 
 
-def _resolve_wire_schema(entry: ModelEntry, family: str) -> str:
+def _explicit_wire_schema(entry: ModelEntry) -> str | None:
     if entry.reasoning_wire == WIRE_VERCEL_GATEWAY_REASONING:
         return WIRE_VERCEL_GATEWAY_REASONING
     if entry.provider == 'vercel' and entry.supports_reasoning_effort:
@@ -267,29 +278,44 @@ def _resolve_wire_schema(entry: ModelEntry, family: str) -> str:
         wire = runtime_reasoning.get('wire')
         if isinstance(wire, str) and wire.strip():
             return wire.strip()
+    return None
 
-    transport = _transport_client_for_entry(entry)
-    endpoint = entry.inference_endpoint or ''
 
+def _transport_wire_schema(
+    entry: ModelEntry,
+    family: str,
+    transport: str,
+    endpoint: str,
+) -> str | None:
     if transport == 'google_native':
         return WIRE_GEMINI_NATIVE
     if transport == 'anthropic_native' or endpoint == '/messages':
-        if family.startswith(('claude', 'minimax', 'qwen')):
-            return WIRE_ANTHROPIC_EXTENDED
         return WIRE_ANTHROPIC_EXTENDED
     if family.startswith('gpt') or (
         entry.provider == 'openai' and entry.supports_reasoning_effort
     ):
         return WIRE_OPENAI_REASONING_EFFORT
+    return None
+
+
+def _deepseek_wire_schema(entry: ModelEntry, transport: str) -> str:
+    # OpenAI SDK chat.completions rejects top-level ``thinking``; DeepSeek
+    # gateways on /chat/completions may expose ``reasoning_effort``, but
+    # only send it when the provider catalog explicitly advertises support.
+    if transport == TRANSPORT_CLIENT_OPENAI and entry.supports_reasoning_effort:
+        return WIRE_OPENAI_REASONING_EFFORT
+    if entry.supports_reasoning_effort:
+        return WIRE_OPENAI_THINKING_AND_EFFORT
+    return WIRE_NONE
+
+
+def _family_wire_schema(
+    entry: ModelEntry,
+    family: str,
+    transport: str,
+) -> str | None:
     if family.startswith('deepseek') or 'deepseek' in entry.name.lower():
-        # OpenAI SDK chat.completions rejects top-level ``thinking``; DeepSeek
-        # gateways on /chat/completions may expose ``reasoning_effort``, but
-        # only send it when the provider catalog explicitly advertises support.
-        if transport == TRANSPORT_CLIENT_OPENAI and entry.supports_reasoning_effort:
-            return WIRE_OPENAI_REASONING_EFFORT
-        if entry.supports_reasoning_effort:
-            return WIRE_OPENAI_THINKING_AND_EFFORT
-        return WIRE_NONE
+        return _deepseek_wire_schema(entry, transport)
     if family.startswith('gemini'):
         return WIRE_GEMINI_OPENAI_COMPAT
     if family.startswith(('kimi', 'qwen')):
@@ -300,6 +326,25 @@ def _resolve_wire_schema(entry: ModelEntry, family: str) -> str:
         return WIRE_OPENAI_REASONING_EFFORT
     if family.startswith('claude') and transport == TRANSPORT_CLIENT_OPENAI:
         return WIRE_OPENAI_REASONING_EFFORT
+    return None
+
+
+def _resolve_wire_schema(entry: ModelEntry, family: str) -> str:
+    explicit = _explicit_wire_schema(entry)
+    if explicit is not None:
+        return explicit
+
+    transport = _transport_client_for_entry(entry)
+    endpoint = entry.inference_endpoint or ''
+
+    transport_wire = _transport_wire_schema(entry, family, transport, endpoint)
+    if transport_wire is not None:
+        return transport_wire
+
+    family_wire = _family_wire_schema(entry, family, transport)
+    if family_wire is not None:
+        return family_wire
+
     if entry.supports_reasoning_effort:
         return WIRE_OPENAI_REASONING_EFFORT
     return WIRE_NONE

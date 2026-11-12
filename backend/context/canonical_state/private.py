@@ -156,48 +156,68 @@ def _merge_background_tasks(
     for item in tasks:
         if not isinstance(item, dict):
             continue
-        session_id = str(item.get('session_id', '')).strip()
-        command = str(item.get('command', '')).strip()
-        key = session_id or _normalize(command)
-        if not key:
+        key, task = _build_background_task(item, by_key, event_id)
+        if task is None:
             continue
-        prev = by_key.get(key)
-        recent_output = str(item.get('recent_output', ''))[:2000]
-        if not recent_output and prev is not None:
-            recent_output = prev.recent_output
-        item_outcome_known = bool(item.get('outcome_known', False))
-        # A stale compaction snapshot may still describe a command as running
-        # after the runtime has recorded its final lifecycle. Never regress a
-        # known terminal outcome to an inferred pending state.
-        keep_final = bool(
-            prev is not None and prev.outcome_known and not item_outcome_known
-        )
-        by_key[key] = BackgroundTaskState(
-            session_id=session_id,
-            command=command[:240],
-            status=(
-                prev.status
-                if keep_final and prev is not None
-                else str(item.get('status', 'still running'))[:80]
-            ),
-            exit_code=(
-                prev.exit_code
-                if keep_final and prev is not None
-                else int(item['exit_code'])
-                if isinstance(item.get('exit_code'), int)
-                else (prev.exit_code if prev is not None else None)
-            ),
-            outcome_known=item_outcome_known
-            or bool(prev is not None and prev.outcome_known),
-            next_action=str(item.get('next_action', 'terminal_read'))[:200],
-            recent_output=recent_output,
-            event_id=event_id,
-            updated_at=_now(),
-        )
+        by_key[key] = task
         changed = True
     if changed:
         canonical.background_tasks = list(by_key.values())[-_MAX_BACKGROUND_TASKS:]
         _touch_field(canonical, 'background_tasks', event_id, source)
+
+
+def _build_background_task(
+    item: dict[str, Any],
+    by_key: dict[str, BackgroundTaskState],
+    event_id: int | None,
+) -> tuple[str, BackgroundTaskState | None]:
+    session_id = str(item.get('session_id', '')).strip()
+    command = str(item.get('command', '')).strip()
+    key = session_id or _normalize(command)
+    if not key:
+        return key, None
+    prev = by_key.get(key)
+    recent_output = str(item.get('recent_output', ''))[:2000]
+    if not recent_output and prev is not None:
+        recent_output = prev.recent_output
+    item_outcome_known = bool(item.get('outcome_known', False))
+    keep_final = bool(
+        prev is not None and prev.outcome_known and not item_outcome_known
+    )
+    return key, BackgroundTaskState(
+        session_id=session_id,
+        command=command[:240],
+        status=_background_task_status(prev, item, keep_final),
+        exit_code=_background_task_exit_code(prev, item, keep_final),
+        outcome_known=item_outcome_known
+        or bool(prev is not None and prev.outcome_known),
+        next_action=str(item.get('next_action', 'terminal_read'))[:200],
+        recent_output=recent_output,
+        event_id=event_id,
+        updated_at=_now(),
+    )
+
+
+def _background_task_status(
+    prev: BackgroundTaskState | None,
+    item: dict[str, Any],
+    keep_final: bool,
+) -> str:
+    if keep_final and prev is not None:
+        return prev.status
+    return str(item.get('status', 'still running'))[:80]
+
+
+def _background_task_exit_code(
+    prev: BackgroundTaskState | None,
+    item: dict[str, Any],
+    keep_final: bool,
+) -> int | None:
+    if keep_final and prev is not None:
+        return prev.exit_code
+    if isinstance(item.get('exit_code'), int):
+        return int(item['exit_code'])
+    return prev.exit_code if prev is not None else None
 
 
 def _merge_task_plan(
@@ -432,82 +452,12 @@ def _merge_recent_work(
     event_id: int | None,
     source: str,
 ) -> None:
-    incoming: list[RecentWorkItem] = []
-    files = snapshot.get('files_touched', {})
-    if isinstance(files, dict):
-        for path, info in list(files.items())[-12:]:
-            if not isinstance(path, str) or not path:
-                continue
-            action = '?'
-            outcome = ''
-            if isinstance(info, dict):
-                action = str(info.get('action', '?'))[:40]
-                file_hash = info.get('sha256')
-                if isinstance(file_hash, str) and file_hash:
-                    outcome = f'sha256:{file_hash[:12]}'
-            incoming.append(
-                RecentWorkItem(
-                    kind='file',
-                    detail=f'{action}: {path}'[:300],
-                    outcome=outcome,
-                    event_id=event_id,
-                    updated_at=_now(),
-                )
-            )
-
-    commands = snapshot.get('recent_commands', [])
-    if isinstance(commands, list):
-        for item in commands[-10:]:
-            if not isinstance(item, dict):
-                continue
-            command = str(item.get('command', '')).strip()
-            if not command:
-                continue
-            incoming.append(
-                RecentWorkItem(
-                    kind='command',
-                    detail=command[:240],
-                    outcome=_summarize_work_output(item.get('output', '')),
-                    event_id=event_id,
-                    updated_at=_now(),
-                )
-            )
-
-    latest_test = _latest_dict(snapshot.get('test_results', []))
-    if latest_test:
-        command = str(latest_test.get('command', '')).strip()
-        status = str(latest_test.get('status', '')).upper()
-        if command:
-            incoming.append(
-                RecentWorkItem(
-                    kind='verification',
-                    detail=command[:240],
-                    outcome=f'{status} exit={latest_test.get("exit_code")}',
-                    event_id=latest_test.get('event_id')
-                    if isinstance(latest_test.get('event_id'), int)
-                    else event_id,
-                    updated_at=_now(),
-                )
-            )
-
-    raw_plan = snapshot.get('task_plan')
-    if isinstance(raw_plan, dict):
-        next_action = str(raw_plan.get('next_action', '') or '').strip()
-        tasks = raw_plan.get('tasks')
-        task_count = len(tasks) if isinstance(tasks, list) else 0
-        if next_action or task_count:
-            incoming.append(
-                RecentWorkItem(
-                    kind='plan',
-                    detail=(next_action or f'{task_count} task tracker items')[:240],
-                    outcome=f'{task_count} tasks' if task_count else '',
-                    event_id=raw_plan.get('event_id')
-                    if isinstance(raw_plan.get('event_id'), int)
-                    else event_id,
-                    updated_at=_now(),
-                )
-            )
-
+    incoming = [
+        *_recent_work_from_files(snapshot, event_id),
+        *_recent_work_from_commands(snapshot, event_id),
+        *_recent_work_from_verification(snapshot, event_id),
+        *_recent_work_from_plan(snapshot, event_id),
+    ]
     if not incoming:
         return
     by_key = {
@@ -522,6 +472,107 @@ def _merge_recent_work(
         by_key[key] = item
     canonical.recent_work = list(by_key.values())[-_MAX_RECENT_WORK:]
     _touch_field(canonical, 'recent_work', event_id, source)
+
+
+def _recent_work_from_files(
+    snapshot: dict[str, Any], event_id: int | None
+) -> list[RecentWorkItem]:
+    files = snapshot.get('files_touched', {})
+    if not isinstance(files, dict):
+        return []
+    items: list[RecentWorkItem] = []
+    for path, info in list(files.items())[-12:]:
+        if not isinstance(path, str) or not path:
+            continue
+        action = '?'
+        outcome = ''
+        if isinstance(info, dict):
+            action = str(info.get('action', '?'))[:40]
+            file_hash = info.get('sha256')
+            if isinstance(file_hash, str) and file_hash:
+                outcome = f'sha256:{file_hash[:12]}'
+        items.append(
+            RecentWorkItem(
+                kind='file',
+                detail=f'{action}: {path}'[:300],
+                outcome=outcome,
+                event_id=event_id,
+                updated_at=_now(),
+            )
+        )
+    return items
+
+
+def _recent_work_from_commands(
+    snapshot: dict[str, Any], event_id: int | None
+) -> list[RecentWorkItem]:
+    commands = snapshot.get('recent_commands', [])
+    if not isinstance(commands, list):
+        return []
+    items: list[RecentWorkItem] = []
+    for item in commands[-10:]:
+        if not isinstance(item, dict):
+            continue
+        command = str(item.get('command', '')).strip()
+        if not command:
+            continue
+        items.append(
+            RecentWorkItem(
+                kind='command',
+                detail=command[:240],
+                outcome=_summarize_work_output(item.get('output', '')),
+                event_id=event_id,
+                updated_at=_now(),
+            )
+        )
+    return items
+
+
+def _recent_work_from_verification(
+    snapshot: dict[str, Any], event_id: int | None
+) -> list[RecentWorkItem]:
+    latest_test = _latest_dict(snapshot.get('test_results', []))
+    if not latest_test:
+        return []
+    command = str(latest_test.get('command', '')).strip()
+    if not command:
+        return []
+    status = str(latest_test.get('status', '')).upper()
+    return [
+        RecentWorkItem(
+            kind='verification',
+            detail=command[:240],
+            outcome=f'{status} exit={latest_test.get("exit_code")}',
+            event_id=_int_or_default(latest_test.get('event_id'), event_id),
+            updated_at=_now(),
+        )
+    ]
+
+
+def _recent_work_from_plan(
+    snapshot: dict[str, Any], event_id: int | None
+) -> list[RecentWorkItem]:
+    raw_plan = snapshot.get('task_plan')
+    if not isinstance(raw_plan, dict):
+        return []
+    next_action = str(raw_plan.get('next_action', '') or '').strip()
+    tasks = raw_plan.get('tasks')
+    task_count = len(tasks) if isinstance(tasks, list) else 0
+    if not next_action and not task_count:
+        return []
+    return [
+        RecentWorkItem(
+            kind='plan',
+            detail=(next_action or f'{task_count} task tracker items')[:240],
+            outcome=f'{task_count} tasks' if task_count else '',
+            event_id=_int_or_default(raw_plan.get('event_id'), event_id),
+            updated_at=_now(),
+        )
+    ]
+
+
+def _int_or_default(value: object, default: int | None) -> int | None:
+    return value if isinstance(value, int) else default
 
 
 def _update_blockers(

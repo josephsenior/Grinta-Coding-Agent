@@ -80,6 +80,142 @@ async def call_mcp_action(
         )
 
 
+def _server_identity(server: Any) -> tuple[str, str]:
+    return (getattr(server, 'name', ''), getattr(server, 'type', ''))
+
+
+def _is_active_server(server: Any) -> bool:
+    return bool(getattr(server, 'enabled', True))
+
+
+def _active_servers(servers: list[Any]) -> list[Any]:
+    return [s for s in servers if _is_active_server(s)]
+
+
+def _server_maps(
+    active_new: list[Any], active_old: list[Any]
+) -> tuple[dict[tuple[str, str], Any], dict[tuple[str, str], Any]]:
+    old_by_id = {_server_identity(s): s for s in active_old}
+    new_by_id = {_server_identity(s): s for s in active_new}
+    return old_by_id, new_by_id
+
+
+def _reload_summary(
+    *,
+    added_ids: set[tuple[str, str]],
+    removed_ids: set[tuple[str, str]],
+    new_by_id: dict[tuple[str, str], Any],
+    old_by_id: dict[tuple[str, str], Any],
+    reconnect_names: list[str],
+    unchanged_names: list[str],
+    failed_names: list[str],
+) -> dict[str, list[str]]:
+    return {
+        'added': [new_by_id[k].name for k in sorted(added_ids)],
+        'removed': [old_by_id[k].name for k in sorted(removed_ids)],
+        'reconnected': reconnect_names,
+        'unchanged': unchanged_names,
+        'failed': failed_names,
+    }
+
+
+async def _disconnect_quietly(client: Any, message: str, *args: Any) -> None:
+    try:
+        await client.disconnect()
+    except Exception as exc:
+        logger.debug(message, *args, exc)
+
+
+async def _reconcile_existing_clients(
+    existing_clients: list[Any],
+    *,
+    new_by_id: dict[tuple[str, str], Any],
+    removed_ids: set[tuple[str, str]],
+    shared_ids: set[tuple[str, str]],
+    kept_clients: list[Any],
+    kept_servers: list[Any],
+    reconnect_targets: list[Any],
+    reconnect_ids: set[tuple[str, str]],
+    unchanged_names: list[str],
+) -> None:
+    for client in existing_clients:
+        cfg = getattr(client, '_server_config', None)
+        if cfg is None:
+            await _disconnect_quietly(
+                client, 'MCP reload: failed to disconnect unknown client: %s'
+            )
+            continue
+        ident = _server_identity(cfg)
+        if ident in removed_ids:
+            await _disconnect_quietly(
+                client,
+                'MCP reload: disconnect removed server %s: %s',
+                cfg.name,
+            )
+            continue
+        if ident in shared_ids:
+            new_cfg = new_by_id[ident]
+            if cfg == new_cfg:
+                kept_clients.append(client)
+                kept_servers.append(new_cfg)
+                unchanged_names.append(new_cfg.name)
+                continue
+            await _disconnect_quietly(
+                client,
+                'MCP reload: disconnect changed server %s: %s',
+                cfg.name,
+            )
+            reconnect_targets.append(new_cfg)
+            reconnect_ids.add(ident)
+        else:
+            # Server identity is not in the new pool at all (no overlap
+            # with ``shared_ids`` or ``removed_ids`` means the client's
+            # server was renamed in-place). Drop the client to keep the
+            # pool clean.
+            await _disconnect_quietly(
+                client,
+                'MCP reload: disconnect stale client %s: %s',
+                cfg.name,
+            )
+
+
+async def _connect_targets(
+    connect_targets: list[Any],
+    *,
+    reconnect_ids: set[tuple[str, str]],
+    create_mcps: Any,
+    kept_clients: list[Any],
+    kept_servers: list[Any],
+    failed_names: list[str],
+    reconnect_names: list[str],
+) -> None:
+    if not connect_targets:
+        return
+
+    try:
+        new_clients = await create_mcps(connect_targets)
+    except Exception as exc:
+        logger.error('MCP reload: create_mcps raised: %s', exc, exc_info=True)
+        new_clients = []
+
+    connected_by_id: dict[tuple[str, str], Any] = {}
+    for client in new_clients:
+        cfg = getattr(client, '_server_config', None)
+        if cfg is not None:
+            connected_by_id[_server_identity(cfg)] = client
+
+    for target in connect_targets:
+        ident = _server_identity(target)
+        client = connected_by_id.get(ident)
+        if client is None:
+            failed_names.append(target.name)
+            continue
+        if ident in reconnect_ids:
+            reconnect_names.append(target.name)
+        kept_clients.append(client)
+        kept_servers.append(target)
+
+
 async def reload_mcp_servers(
     *,
     new_servers: list[Any],
@@ -119,17 +255,9 @@ async def reload_mcp_servers(
     filtered_new = _filter_windows_stdio_servers(list(new_servers or []))
     filtered_old = _filter_windows_stdio_servers(list(current_servers_resolved or []))
 
-    def _is_active(server: Any) -> bool:
-        return bool(getattr(server, 'enabled', True))
-
-    active_new = [s for s in filtered_new if _is_active(s)]
-    active_old = [s for s in filtered_old if _is_active(s)]
-
-    def _identity(server: Any) -> tuple[str, str]:
-        return (getattr(server, 'name', ''), getattr(server, 'type', ''))
-
-    old_by_id: dict[tuple[str, str], Any] = {_identity(s): s for s in active_old}
-    new_by_id: dict[tuple[str, str], Any] = {_identity(s): s for s in active_new}
+    active_new = _active_servers(filtered_new)
+    active_old = _active_servers(filtered_old)
+    old_by_id, new_by_id = _server_maps(active_new, active_old)
 
     added_ids = set(new_by_id) - set(old_by_id)
     removed_ids = set(old_by_id) - set(new_by_id)
@@ -141,88 +269,30 @@ async def reload_mcp_servers(
     reconnect_ids: set[tuple[str, str]] = set()
     unchanged_names: list[str] = []
     reconnect_names: list[str] = []
+    failed_names: list[str] = []
 
-    existing_clients = list(current_clients or [])
-    for client in existing_clients:
-        cfg = getattr(client, '_server_config', None)
-        if cfg is None:
-            try:
-                await client.disconnect()
-            except Exception as exc:
-                logger.debug('MCP reload: failed to disconnect unknown client: %s', exc)
-            continue
-        ident = _identity(cfg)
-        if ident in removed_ids:
-            try:
-                await client.disconnect()
-            except Exception as exc:
-                logger.debug(
-                    'MCP reload: disconnect removed server %s: %s',
-                    cfg.name,
-                    exc,
-                )
-            continue
-        if ident in shared_ids:
-            new_cfg = new_by_id[ident]
-            if cfg == new_cfg:
-                kept_clients.append(client)
-                kept_servers.append(new_cfg)
-                unchanged_names.append(new_cfg.name)
-                continue
-            try:
-                await client.disconnect()
-            except Exception as exc:
-                logger.debug(
-                    'MCP reload: disconnect changed server %s: %s',
-                    cfg.name,
-                    exc,
-                )
-            reconnect_targets.append(new_cfg)
-            reconnect_ids.add(ident)
-        else:
-            # Server identity is not in the new pool at all (no overlap
-            # with ``shared_ids`` or ``removed_ids`` means the client's
-            # server was renamed in-place). Drop the client to keep the
-            # pool clean.
-            try:
-                await client.disconnect()
-            except Exception as exc:
-                logger.debug(
-                    'MCP reload: disconnect stale client %s: %s',
-                    cfg.name,
-                    exc,
-                )
+    await _reconcile_existing_clients(
+        list(current_clients or []),
+        new_by_id=new_by_id,
+        removed_ids=removed_ids,
+        shared_ids=shared_ids,
+        kept_clients=kept_clients,
+        kept_servers=kept_servers,
+        reconnect_targets=reconnect_targets,
+        reconnect_ids=reconnect_ids,
+        unchanged_names=unchanged_names,
+    )
 
     added_targets = [new_by_id[k] for k in sorted(added_ids)]
-    connect_targets = added_targets + reconnect_targets
-
-    new_clients: list[Any] = []
-    failed_names: list[str] = []
-    if connect_targets:
-        try:
-            new_clients = await create_mcps(connect_targets)
-        except Exception as exc:
-            logger.error('MCP reload: create_mcps raised: %s', exc, exc_info=True)
-            new_clients = []
-
-        connected_by_id: dict[tuple[str, str], Any] = {}
-        for client in new_clients:
-            cfg = getattr(client, '_server_config', None)
-            if cfg is not None:
-                connected_by_id[_identity(cfg)] = client
-
-        for target in connect_targets:
-            ident = _identity(target)
-            client = connected_by_id.get(ident)
-            if client is None:
-                failed_names.append(target.name)
-                continue
-            if ident in reconnect_ids:
-                reconnect_names.append(target.name)
-            kept_clients.append(client)
-            kept_servers.append(target)
-    else:
-        new_clients = []
+    await _connect_targets(
+        added_targets + reconnect_targets,
+        reconnect_ids=reconnect_ids,
+        create_mcps=create_mcps,
+        kept_clients=kept_clients,
+        kept_servers=kept_servers,
+        failed_names=failed_names,
+        reconnect_names=reconnect_names,
+    )
 
     if reserved_tool_names is not None and kept_clients:
         try:
@@ -230,13 +300,15 @@ async def reload_mcp_servers(
         except Exception as exc:
             logger.debug('MCP reload: alias preparation failed: %s', exc, exc_info=True)
 
-    summary = {
-        'added': [new_by_id[k].name for k in sorted(added_ids)],
-        'removed': [old_by_id[k].name for k in sorted(removed_ids)],
-        'reconnected': reconnect_names,
-        'unchanged': unchanged_names,
-        'failed': failed_names,
-    }
+    summary = _reload_summary(
+        added_ids=added_ids,
+        removed_ids=removed_ids,
+        new_by_id=new_by_id,
+        old_by_id=old_by_id,
+        reconnect_names=reconnect_names,
+        unchanged_names=unchanged_names,
+        failed_names=failed_names,
+    )
     return kept_clients, kept_servers, summary
 
 

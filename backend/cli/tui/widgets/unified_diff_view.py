@@ -116,6 +116,161 @@ def _limit_hunk_context(
     return result
 
 
+def _append_equal_rows(
+    rows: list[DiffViewRow],
+    old_lines: list[str],
+    *,
+    i1: int,
+    i2: int,
+    j1: int,
+    max_lines: int,
+) -> bool:
+    for offset, old_index in enumerate(range(i1, i2)):
+        if len(rows) >= max_lines:
+            return False
+        rows.append(
+            DiffViewRow(
+                old_index + 1,
+                j1 + offset + 1,
+                'ctx',
+                old_lines[old_index],
+            )
+        )
+    return True
+
+
+def _append_delete_rows(
+    rows: list[DiffViewRow],
+    old_lines: list[str],
+    *,
+    i1: int,
+    i2: int,
+    max_lines: int,
+) -> bool:
+    for old_index in range(i1, i2):
+        if len(rows) >= max_lines:
+            return False
+        rows.append(DiffViewRow(old_index + 1, None, 'rem', old_lines[old_index]))
+    return True
+
+
+def _append_insert_rows(
+    rows: list[DiffViewRow],
+    new_lines: list[str],
+    *,
+    j1: int,
+    j2: int,
+    max_lines: int,
+) -> bool:
+    for new_index in range(j1, j2):
+        if len(rows) >= max_lines:
+            return False
+        rows.append(DiffViewRow(None, new_index + 1, 'add', new_lines[new_index]))
+    return True
+
+
+def _append_replace_pair(
+    rows: list[DiffViewRow],
+    *,
+    old_index: int,
+    new_index: int,
+    old_text: str,
+    new_text: str,
+    max_lines: int,
+) -> bool:
+    if old_text and new_text:
+        rows.append(
+            DiffViewRow(
+                old_index + 1,
+                None,
+                'rem',
+                old_text,
+                pair_text=new_text,
+            )
+        )
+        if len(rows) >= max_lines:
+            return False
+        rows.append(
+            DiffViewRow(
+                None,
+                new_index + 1,
+                'add',
+                new_text,
+                pair_text=old_text,
+            )
+        )
+    elif old_text:
+        rows.append(DiffViewRow(old_index + 1, None, 'rem', old_text))
+    elif new_text:
+        rows.append(DiffViewRow(None, new_index + 1, 'add', new_text))
+    return True
+
+
+def _append_replace_rows(
+    rows: list[DiffViewRow],
+    old_lines: list[str],
+    new_lines: list[str],
+    *,
+    i1: int,
+    i2: int,
+    j1: int,
+    j2: int,
+    max_lines: int,
+) -> bool:
+    old_slice = old_lines[i1:i2]
+    new_slice = new_lines[j1:j2]
+    pair_count = max(len(old_slice), len(new_slice))
+    for offset in range(pair_count):
+        if len(rows) >= max_lines:
+            return False
+        old_text = old_slice[offset] if offset < len(old_slice) else ''
+        new_text = new_slice[offset] if offset < len(new_slice) else ''
+        if not _append_replace_pair(
+            rows,
+            old_index=i1 + offset,
+            new_index=j1 + offset,
+            old_text=old_text,
+            new_text=new_text,
+            max_lines=max_lines,
+        ):
+            return False
+    return True
+
+
+def _append_opcode_rows(
+    rows: list[DiffViewRow],
+    old_lines: list[str],
+    new_lines: list[str],
+    tag: str,
+    i1: int,
+    i2: int,
+    j1: int,
+    j2: int,
+    *,
+    max_lines: int,
+) -> bool:
+    if tag == 'equal':
+        return _append_equal_rows(
+            rows, old_lines, i1=i1, i2=i2, j1=j1, max_lines=max_lines
+        )
+    if tag == 'delete':
+        return _append_delete_rows(rows, old_lines, i1=i1, i2=i2, max_lines=max_lines)
+    if tag == 'insert':
+        return _append_insert_rows(rows, new_lines, j1=j1, j2=j2, max_lines=max_lines)
+    if tag == 'replace':
+        return _append_replace_rows(
+            rows,
+            old_lines,
+            new_lines,
+            i1=i1,
+            i2=i2,
+            j1=j1,
+            j2=j2,
+            max_lines=max_lines,
+        )
+    return True
+
+
 def _rows_from_old_new(
     old_content: str,
     new_content: str,
@@ -134,79 +289,18 @@ def _rows_from_old_new(
                 break
             rows.append(DiffViewRow(None, None, 'hdr', '…'))
         for tag, i1, i2, j1, j2 in group:
-            if tag == 'equal':
-                for offset, old_index in enumerate(range(i1, i2)):
-                    if len(rows) >= max_lines:
-                        return rows
-                    new_index = j1 + offset
-                    rows.append(
-                        DiffViewRow(
-                            old_index + 1,
-                            new_index + 1,
-                            'ctx',
-                            old_lines[old_index],
-                        )
-                    )
-            elif tag == 'delete':
-                for old_index in range(i1, i2):
-                    if len(rows) >= max_lines:
-                        return rows
-                    rows.append(
-                        DiffViewRow(
-                            old_index + 1,
-                            None,
-                            'rem',
-                            old_lines[old_index],
-                        )
-                    )
-            elif tag == 'insert':
-                for new_index in range(j1, j2):
-                    if len(rows) >= max_lines:
-                        return rows
-                    rows.append(
-                        DiffViewRow(
-                            None,
-                            new_index + 1,
-                            'add',
-                            new_lines[new_index],
-                        )
-                    )
-            elif tag == 'replace':
-                old_slice = old_lines[i1:i2]
-                new_slice = new_lines[j1:j2]
-                pair_count = max(len(old_slice), len(new_slice))
-                for offset in range(pair_count):
-                    if len(rows) >= max_lines:
-                        return rows
-                    old_index = i1 + offset
-                    new_index = j1 + offset
-                    old_text = old_slice[offset] if offset < len(old_slice) else ''
-                    new_text = new_slice[offset] if offset < len(new_slice) else ''
-                    if old_text and new_text:
-                        rows.append(
-                            DiffViewRow(
-                                old_index + 1,
-                                None,
-                                'rem',
-                                old_text,
-                                pair_text=new_text,
-                            )
-                        )
-                        if len(rows) >= max_lines:
-                            return rows
-                        rows.append(
-                            DiffViewRow(
-                                None,
-                                new_index + 1,
-                                'add',
-                                new_text,
-                                pair_text=old_text,
-                            )
-                        )
-                    elif old_text:
-                        rows.append(DiffViewRow(old_index + 1, None, 'rem', old_text))
-                    elif new_text:
-                        rows.append(DiffViewRow(None, new_index + 1, 'add', new_text))
+            if not _append_opcode_rows(
+                rows,
+                old_lines,
+                new_lines,
+                tag,
+                i1,
+                i2,
+                j1,
+                j2,
+                max_lines=max_lines,
+            ):
+                return rows
     return rows
 
 

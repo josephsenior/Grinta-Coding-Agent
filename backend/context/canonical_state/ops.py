@@ -173,47 +173,8 @@ def reduce_snapshot_into_state(
     if event_id is None:
         event_id = _snapshot_latest_event_id(snapshot)
 
-    from backend.context.compactor.pre_condensation_snapshot import (
-        active_file_paths_from_files_touched,
-        snapshot_user_objective,
-    )
-
-    objective, latest_directive = snapshot_user_objective(snapshot)
-    objective = _clean(objective)
-    if objective and not canonical.objective:
-        _set_field(canonical, 'objective', objective, event_id, source)
-    latest_directive = _clean(latest_directive)
-    if latest_directive:
-        _set_field(canonical, 'latest_directive', latest_directive, event_id, source)
-        if (
-            canonical.objective
-            and _normalize(latest_directive) != _normalize(canonical.objective)
-            and _is_pivot_directive(latest_directive)
-        ):
-            _set_field(
-                canonical,
-                'superseding_directive',
-                latest_directive,
-                event_id,
-                source,
-            )
-            if canonical.objective:
-                prior = [
-                    item
-                    for item in [*canonical.prior_objectives, canonical.objective]
-                    if item and item not in canonical.prior_objectives
-                ]
-                canonical.prior_objectives = prior[-_MAX_PRIOR_OBJECTIVES:]
-            _set_field(canonical, 'objective', latest_directive, event_id, source)
-
-    files = snapshot.get('files_touched', {})
-    if isinstance(files, dict) and files:
-        canonical.active_files = _merge_strings(
-            canonical.active_files,
-            active_file_paths_from_files_touched(files, max_files=_MAX_ACTIVE_FILES),
-            _MAX_ACTIVE_FILES,
-        )
-        _touch_field(canonical, 'active_files', event_id, source)
+    _apply_snapshot_directives(canonical, snapshot, event_id, source)
+    _apply_snapshot_files(canonical, snapshot, event_id, source)
 
     latest_test = _latest_dict(snapshot.get('test_results', []))
     if latest_test:
@@ -231,6 +192,93 @@ def reduce_snapshot_into_state(
     _merge_acceptance_criteria(canonical, snapshot, event_id, source)
     _merge_recent_work(canonical, snapshot, event_id, source)
     _update_blockers(canonical, snapshot, event_id, source)
+    _merge_snapshot_string_lists(canonical, snapshot, event_id, source)
+    _update_vcs_status(canonical, snapshot, event_id, source)
+    if not canonical.next_action:
+        inferred = _infer_next_action(canonical)
+        if inferred:
+            _set_field(canonical, 'next_action', inferred, event_id, source)
+    canonical.last_updated = _now()
+    return canonical
+
+
+def _apply_snapshot_directives(
+    canonical: CanonicalTaskState,
+    snapshot: dict[str, Any],
+    event_id: int | None,
+    source: str,
+) -> None:
+    from backend.context.compactor.pre_condensation_snapshot import (
+        snapshot_user_objective,
+    )
+
+    objective, latest_directive = snapshot_user_objective(snapshot)
+    objective = _clean(objective)
+    if objective and not canonical.objective:
+        _set_field(canonical, 'objective', objective, event_id, source)
+    latest_directive = _clean(latest_directive)
+    if not latest_directive:
+        return
+    _set_field(canonical, 'latest_directive', latest_directive, event_id, source)
+    if not _is_new_pivot(canonical, latest_directive):
+        return
+    _set_field(
+        canonical,
+        'superseding_directive',
+        latest_directive,
+        event_id,
+        source,
+    )
+    _archive_prior_objective(canonical)
+    _set_field(canonical, 'objective', latest_directive, event_id, source)
+
+
+def _is_new_pivot(canonical: CanonicalTaskState, latest_directive: str) -> bool:
+    return bool(
+        canonical.objective
+        and _normalize(latest_directive) != _normalize(canonical.objective)
+        and _is_pivot_directive(latest_directive)
+    )
+
+
+def _archive_prior_objective(canonical: CanonicalTaskState) -> None:
+    if not canonical.objective:
+        return
+    prior = [
+        item
+        for item in [*canonical.prior_objectives, canonical.objective]
+        if item and item not in canonical.prior_objectives
+    ]
+    canonical.prior_objectives = prior[-_MAX_PRIOR_OBJECTIVES:]
+
+
+def _apply_snapshot_files(
+    canonical: CanonicalTaskState,
+    snapshot: dict[str, Any],
+    event_id: int | None,
+    source: str,
+) -> None:
+    from backend.context.compactor.pre_condensation_snapshot import (
+        active_file_paths_from_files_touched,
+    )
+
+    files = snapshot.get('files_touched', {})
+    if not isinstance(files, dict) or not files:
+        return
+    canonical.active_files = _merge_strings(
+        canonical.active_files,
+        active_file_paths_from_files_touched(files, max_files=_MAX_ACTIVE_FILES),
+        _MAX_ACTIVE_FILES,
+    )
+    _touch_field(canonical, 'active_files', event_id, source)
+
+
+def _merge_snapshot_string_lists(
+    canonical: CanonicalTaskState,
+    snapshot: dict[str, Any],
+    event_id: int | None,
+    source: str,
+) -> None:
     canonical.decisions = _merge_strings(
         canonical.decisions,
         _string_tail(snapshot.get('decisions', []), _MAX_DECISIONS, _MAX_OUTPUT_CHARS),
@@ -249,13 +297,6 @@ def reduce_snapshot_into_state(
     )
     if canonical.invalidated_assumptions:
         _touch_field(canonical, 'invalidated_assumptions', event_id, source)
-    _update_vcs_status(canonical, snapshot, event_id, source)
-    if not canonical.next_action:
-        inferred = _infer_next_action(canonical)
-        if inferred:
-            _set_field(canonical, 'next_action', inferred, event_id, source)
-    canonical.last_updated = _now()
-    return canonical
 
 
 def _hydrate_persisted_task_plan(
@@ -316,6 +357,25 @@ def apply_canonical_patch(
     source: str = 'llm_patch',
 ) -> CanonicalTaskState:
     """Apply low-authority LLM enrichment without overwriting newer facts."""
+    _apply_patch_text_fields(canonical, patch, event_id, source)
+    _apply_patch_narrative(canonical, patch, event_id, source)
+    _apply_patch_completed_tasks(canonical, patch, event_id, source)
+    _apply_patch_list_fields(canonical, patch, event_id, source)
+    _apply_patch_open_questions(canonical, patch, event_id, source)
+    _apply_patch_test_summary(canonical, patch, event_id, source)
+    _apply_patch_dependencies(canonical, patch, event_id, source)
+    _apply_patch_session_metadata(canonical, patch, event_id, source)
+    _apply_patch_environment(canonical, patch, event_id, source)
+    canonical.last_updated = _now()
+    return canonical
+
+
+def _apply_patch_text_fields(
+    canonical: CanonicalTaskState,
+    patch: dict[str, Any],
+    event_id: int | None,
+    source: str,
+) -> None:
     text_fields = {
         'active_plan': 'active_plan',
         'next_action': 'next_action',
@@ -327,16 +387,38 @@ def apply_canonical_patch(
         if value:
             _set_field(canonical, field_name, value, event_id, source)
 
-    incoming_narrative = _clean(patch.get('narrative_summary'))
-    if incoming_narrative:
-        existing = getattr(canonical, 'narrative_summary', '')
-        merged = _merge_narrative(existing, incoming_narrative)
-        _set_field(canonical, 'narrative_summary', merged, event_id, source)
 
+def _apply_patch_narrative(
+    canonical: CanonicalTaskState,
+    patch: dict[str, Any],
+    event_id: int | None,
+    source: str,
+) -> None:
+    incoming_narrative = _clean(patch.get('narrative_summary'))
+    if not incoming_narrative:
+        return
+    existing = getattr(canonical, 'narrative_summary', '')
+    merged = _merge_narrative(existing, incoming_narrative)
+    _set_field(canonical, 'narrative_summary', merged, event_id, source)
+
+
+def _apply_patch_completed_tasks(
+    canonical: CanonicalTaskState,
+    patch: dict[str, Any],
+    event_id: int | None,
+    source: str,
+) -> None:
     incoming_completed = _clean(patch.get('completed_tasks'))
     if incoming_completed:
         _set_field(canonical, 'completed_tasks', incoming_completed, event_id, source)
 
+
+def _apply_patch_list_fields(
+    canonical: CanonicalTaskState,
+    patch: dict[str, Any],
+    event_id: int | None,
+    source: str,
+) -> None:
     for incoming, field_name, limit in (
         ('blockers', 'blockers', _MAX_BLOCKERS),
         ('decisions', 'decisions', _MAX_DECISIONS),
@@ -344,88 +426,142 @@ def apply_canonical_patch(
         ('active_files', 'active_files', _MAX_ACTIVE_FILES),
     ):
         values = _coerce_string_list(patch.get(incoming))
-        if values:
-            setattr(
-                canonical,
-                field_name,
-                _merge_strings(getattr(canonical, field_name), values, limit),
-            )
-            _touch_field(canonical, field_name, event_id, source)
+        if not values:
+            continue
+        setattr(
+            canonical,
+            field_name,
+            _merge_strings(getattr(canonical, field_name), values, limit),
+        )
+        _touch_field(canonical, field_name, event_id, source)
 
+
+def _apply_patch_open_questions(
+    canonical: CanonicalTaskState,
+    patch: dict[str, Any],
+    event_id: int | None,
+    source: str,
+) -> None:
     open_questions = _clean(patch.get('open_questions'))
     if open_questions:
         _set_field(canonical, 'open_questions', open_questions[:800], event_id, source)
 
+
+def _coerce_patch_items(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [
+        str(item)[:120]
+        for item in value
+        if isinstance(item, (str, int)) and str(item).strip()
+    ][-_MAX_DEPENDENCIES:]
+
+
+def _apply_patch_test_summary(
+    canonical: CanonicalTaskState,
+    patch: dict[str, Any],
+    event_id: int | None,
+    source: str,
+) -> None:
     test_patch = patch.get('test_summary')
-    if isinstance(test_patch, dict) and test_patch.get('overall'):
-        canonical.test_summary = TestSummary(
-            overall=str(test_patch.get('overall', ''))[:40],
-            failing=[
-                str(t)[:120]
-                for t in test_patch.get('failing', [])
-                if isinstance(t, (str, int)) and str(t).strip()
-            ][-_MAX_DEPENDENCIES:],
-            not_run=[
-                str(t)[:120]
-                for t in test_patch.get('not_run', [])
-                if isinstance(t, (str, int)) and str(t).strip()
-            ][-_MAX_DEPENDENCIES:],
-            last_run_clean=bool(test_patch.get('last_run_clean', False)),
-        )
-        _touch_field(canonical, 'test_summary', event_id, source)
+    if not isinstance(test_patch, dict) or not test_patch.get('overall'):
+        return
+    canonical.test_summary = TestSummary(
+        overall=str(test_patch.get('overall', ''))[:40],
+        failing=_coerce_patch_items(test_patch.get('failing', [])),
+        not_run=_coerce_patch_items(test_patch.get('not_run', [])),
+        last_run_clean=bool(test_patch.get('last_run_clean', False)),
+    )
+    _touch_field(canonical, 'test_summary', event_id, source)
 
+
+def _apply_patch_dependencies(
+    canonical: CanonicalTaskState,
+    patch: dict[str, Any],
+    event_id: int | None,
+    source: str,
+) -> None:
     deps_patch = patch.get('dependencies')
-    if isinstance(deps_patch, list) and deps_patch:
-        incoming_deps = [
-            DependencyEntry(
-                name=str(d.get('name', ''))[:120],
-                version=str(d.get('version', ''))[:60],
-            )
-            for d in deps_patch
-            if isinstance(d, dict) and d.get('name')
-        ]
-        if incoming_deps:
-            by_name = {dep.name: dep for dep in canonical.dependencies}
-            for dep in incoming_deps:
-                by_name[dep.name] = dep
-            canonical.dependencies = list(by_name.values())[-_MAX_DEPENDENCIES:]
-            _touch_field(canonical, 'dependencies', event_id, source)
+    if not isinstance(deps_patch, list) or not deps_patch:
+        return
+    incoming_deps = [
+        DependencyEntry(
+            name=str(d.get('name', ''))[:120],
+            version=str(d.get('version', ''))[:60],
+        )
+        for d in deps_patch
+        if isinstance(d, dict) and d.get('name')
+    ]
+    if not incoming_deps:
+        return
+    by_name = {dep.name: dep for dep in canonical.dependencies}
+    for dep in incoming_deps:
+        by_name[dep.name] = dep
+    canonical.dependencies = list(by_name.values())[-_MAX_DEPENDENCIES:]
+    _touch_field(canonical, 'dependencies', event_id, source)
 
+
+def _apply_patch_session_metadata(
+    canonical: CanonicalTaskState,
+    patch: dict[str, Any],
+    event_id: int | None,
+    source: str,
+) -> None:
     session_meta = patch.get('session_metadata')
-    if isinstance(session_meta, dict) and session_meta:
-        canonical.session_metadata = SessionMetadata(
-            compaction_timestamp=str(session_meta.get('compaction_timestamp', ''))[:40],
-            turn_count=int(session_meta.get('turn_count', 0) or 0),
-            compaction_sequence=int(session_meta.get('compaction_sequence', 0) or 0),
-        )
-        _touch_field(canonical, 'session_metadata', event_id, source)
+    if not isinstance(session_meta, dict) or not session_meta:
+        return
+    canonical.session_metadata = SessionMetadata(
+        compaction_timestamp=str(session_meta.get('compaction_timestamp', ''))[:40],
+        turn_count=int(session_meta.get('turn_count', 0) or 0),
+        compaction_sequence=int(session_meta.get('compaction_sequence', 0) or 0),
+    )
+    _touch_field(canonical, 'session_metadata', event_id, source)
 
+
+def _coerce_processes(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [
+        str(item)[:200]
+        for item in value
+        if isinstance(item, (str, int)) and str(item).strip()
+    ][-_MAX_DEPENDENCIES:]
+
+
+def _coerce_ports(value: Any) -> list[int]:
+    if not isinstance(value, list):
+        return []
+    return [
+        int(item)
+        for item in value
+        if isinstance(item, int) or (isinstance(item, str) and item.isdigit())
+    ][-_MAX_DEPENDENCIES:]
+
+
+def _coerce_env_vars(value: object) -> dict[str, str]:
+    if not isinstance(value, dict):
+        return {}
+    return {
+        str(key)[:80]: str(item)[:200] for key, item in value.items() if key and item
+    }
+
+
+def _apply_patch_environment(
+    canonical: CanonicalTaskState,
+    patch: dict[str, Any],
+    event_id: int | None,
+    source: str,
+) -> None:
     env_patch = patch.get('environment_state')
-    if isinstance(env_patch, dict) and env_patch:
-        canonical.environment_state = EnvironmentState(
-            running_processes=[
-                str(p)[:200]
-                for p in env_patch.get('running_processes', [])
-                if isinstance(p, (str, int)) and str(p).strip()
-            ][-_MAX_DEPENDENCIES:],
-            active_ports=[
-                int(p)
-                for p in env_patch.get('active_ports', [])
-                if isinstance(p, int) or (isinstance(p, str) and p.isdigit())
-            ][-_MAX_DEPENDENCIES:],
-            env_vars={
-                str(k)[:80]: str(v)[:200]
-                for k, v in env_patch.get('env_vars', {}).items()
-                if k and v
-            }
-            if isinstance(env_patch.get('env_vars'), dict)
-            else {},
-            auth_status=str(env_patch.get('auth_status', ''))[:200],
-        )
-        _touch_field(canonical, 'environment_state', event_id, source)
-
-    canonical.last_updated = _now()
-    return canonical
+    if not isinstance(env_patch, dict) or not env_patch:
+        return
+    canonical.environment_state = EnvironmentState(
+        running_processes=_coerce_processes(env_patch.get('running_processes', [])),
+        active_ports=_coerce_ports(env_patch.get('active_ports', [])),
+        env_vars=_coerce_env_vars(env_patch.get('env_vars')),
+        auth_status=str(env_patch.get('auth_status', ''))[:200],
+    )
+    _touch_field(canonical, 'environment_state', event_id, source)
 
 
 def render_canonical_state_for_prompt(
@@ -438,6 +574,49 @@ def render_canonical_state_for_prompt(
     include_task_plan_and_criteria: bool = True,
 ) -> str:
     lines = [CANONICAL_STATE_MARKER, 'Canonical task state:']
+    _render_directives(
+        lines,
+        canonical,
+        include_objective=include_objective,
+        include_latest_directive=include_latest_directive,
+        include_next_action=include_next_action,
+    )
+    _render_verification(lines, canonical)
+    _append(lines, f'- Active plan: {canonical.active_plan}')
+    _render_task_plan(lines, canonical, include_task_plan_and_criteria)
+    _render_prior_objectives_and_blockers(lines, canonical)
+    _render_background_tasks(lines, canonical)
+    _render_recent_work(lines, canonical)
+    _render_failed_approaches(lines, canonical)
+    _append_list(
+        lines, 'Invalidated assumptions', canonical.invalidated_assumptions[-5:]
+    )
+    _append_list(lines, 'Decisions', canonical.decisions[-5:])
+    _append(lines, f'- VCS status: {canonical.vcs_status}')
+    _render_completed_and_tests(lines, canonical)
+    _render_dependencies_and_questions(lines, canonical)
+    _render_session_metadata(lines, canonical)
+    _render_environment_state(lines, canonical)
+    _append(lines, f'- Summary: {canonical.narrative_summary}')
+    lines.append(CANONICAL_STATE_MARKER)
+    block = '\n'.join(line for line in lines if line.strip())
+    if len(block) > char_budget:
+        block = (
+            block[: char_budget - 48].rstrip()
+            + '\n... (canonical state truncated)\n'
+            + CANONICAL_STATE_MARKER
+        )
+    return block
+
+
+def _render_directives(
+    lines: list[str],
+    canonical: CanonicalTaskState,
+    *,
+    include_objective: bool,
+    include_latest_directive: bool,
+    include_next_action: bool,
+) -> None:
     if include_objective:
         _append(lines, f'- Objective: {canonical.objective}')
     if canonical.superseding_directive:
@@ -456,23 +635,33 @@ def render_canonical_state_for_prompt(
     _append(
         lines, f'- Implementation checkpoint: {canonical.implementation_checkpoint}'
     )
-    if canonical.verification.command:
-        status = canonical.verification.status.upper() or '?'
-        _append(
-            lines,
-            f'- Latest verification: {status} '
-            f'(exit={canonical.verification.exit_code}): {canonical.verification.command}',
-        )
-        _append(
-            lines,
-            '  Output: '
-            + clip_with_marker(
-                canonical.verification.output,
-                _RENDER_VERIFICATION_OUTPUT_CHARS,
-                prefer='tail',
-            ),
-        )
-    _append(lines, f'- Active plan: {canonical.active_plan}')
+
+
+def _render_verification(lines: list[str], canonical: CanonicalTaskState) -> None:
+    if not canonical.verification.command:
+        return
+    status = canonical.verification.status.upper() or '?'
+    _append(
+        lines,
+        f'- Latest verification: {status} '
+        f'(exit={canonical.verification.exit_code}): {canonical.verification.command}',
+    )
+    _append(
+        lines,
+        '  Output: '
+        + clip_with_marker(
+            canonical.verification.output,
+            _RENDER_VERIFICATION_OUTPUT_CHARS,
+            prefer='tail',
+        ),
+    )
+
+
+def _render_task_plan(
+    lines: list[str],
+    canonical: CanonicalTaskState,
+    include_task_plan_and_criteria: bool,
+) -> None:
     if include_task_plan_and_criteria and canonical.task_plan:
         _append(lines, '- Task tracker:')
         for plan_item in canonical.task_plan[-10:]:
@@ -489,52 +678,73 @@ def render_canonical_state_for_prompt(
             if item.evidence:
                 detail += f' (evidence: {item.evidence})'
             _append(lines, f'  - {detail}')
+
+
+def _render_prior_objectives_and_blockers(
+    lines: list[str], canonical: CanonicalTaskState
+) -> None:
     if canonical.prior_objectives:
         _append(
             lines, '- Prior objectives: ' + ' | '.join(canonical.prior_objectives[-3:])
         )
     _append_list(lines, 'Blockers', canonical.blockers[-6:])
-    if canonical.background_tasks:
-        _append(lines, '- Background tasks:')
-        for task in canonical.background_tasks[-4:]:
-            session = task.session_id or 'unknown session'
-            _append(lines, f'  - {session}: {task.command} ({task.status})')
-            _append(lines, f'    Next: {task.next_action}')
-            if task.recent_output:
-                snippet = task.recent_output
-                if len(snippet) > 800:
-                    snippet = snippet[:800] + '...'
-                _append(lines, f'    Recent output: {snippet}')
-    if canonical.recent_work:
-        _append(lines, '- Recent work ledger:')
-        for work_item in canonical.recent_work[-8:]:
-            detail = f'[{work_item.kind}] {work_item.detail}'
-            if work_item.outcome:
-                detail += f' -> {work_item.outcome}'
-            _append(lines, f'  - {detail}')
-    if canonical.failed_approaches:
-        _append(lines, '- Failed approaches to avoid unless inputs changed:')
-        for approach in canonical.failed_approaches[-6:]:
-            _append(
-                lines, f'  - [{approach.kind}] {approach.detail} -> {approach.outcome}'
-            )
-    _append_list(
-        lines, 'Invalidated assumptions', canonical.invalidated_assumptions[-5:]
-    )
-    _append_list(lines, 'Decisions', canonical.decisions[-5:])
-    _append(lines, f'- VCS status: {canonical.vcs_status}')
+
+
+def _render_background_tasks(lines: list[str], canonical: CanonicalTaskState) -> None:
+    if not canonical.background_tasks:
+        return
+    _append(lines, '- Background tasks:')
+    for task in canonical.background_tasks[-4:]:
+        session = task.session_id or 'unknown session'
+        _append(lines, f'  - {session}: {task.command} ({task.status})')
+        _append(lines, f'    Next: {task.next_action}')
+        if task.recent_output:
+            snippet = task.recent_output
+            if len(snippet) > 800:
+                snippet = snippet[:800] + '...'
+            _append(lines, f'    Recent output: {snippet}')
+
+
+def _render_recent_work(lines: list[str], canonical: CanonicalTaskState) -> None:
+    if not canonical.recent_work:
+        return
+    _append(lines, '- Recent work ledger:')
+    for work_item in canonical.recent_work[-8:]:
+        detail = f'[{work_item.kind}] {work_item.detail}'
+        if work_item.outcome:
+            detail += f' -> {work_item.outcome}'
+        _append(lines, f'  - {detail}')
+
+
+def _render_failed_approaches(lines: list[str], canonical: CanonicalTaskState) -> None:
+    if not canonical.failed_approaches:
+        return
+    _append(lines, '- Failed approaches to avoid unless inputs changed:')
+    for approach in canonical.failed_approaches[-6:]:
+        _append(lines, f'  - [{approach.kind}] {approach.detail} -> {approach.outcome}')
+
+
+def _render_completed_and_tests(
+    lines: list[str], canonical: CanonicalTaskState
+) -> None:
     if canonical.completed_tasks:
         _append(
             lines,
             f'- Work completed this session: {canonical.completed_tasks[:600]}',
         )
-    if canonical.test_summary.overall:
-        test_line = f'- Test summary: {canonical.test_summary.overall}'
-        if canonical.test_summary.failing:
-            test_line += f' (failing: {", ".join(canonical.test_summary.failing[:8])})'
-        if canonical.test_summary.last_run_clean:
-            test_line += ' [last run clean]'
-        _append(lines, test_line)
+    if not canonical.test_summary.overall:
+        return
+    test_line = f'- Test summary: {canonical.test_summary.overall}'
+    if canonical.test_summary.failing:
+        test_line += f' (failing: {", ".join(canonical.test_summary.failing[:8])})'
+    if canonical.test_summary.last_run_clean:
+        test_line += ' [last run clean]'
+    _append(lines, test_line)
+
+
+def _render_dependencies_and_questions(
+    lines: list[str], canonical: CanonicalTaskState
+) -> None:
     if canonical.dependencies:
         deps_str = ', '.join(
             f'{d.name}@{d.version}' for d in canonical.dependencies[-10:]
@@ -542,36 +752,34 @@ def render_canonical_state_for_prompt(
         _append(lines, f'- Dependencies: {deps_str}')
     if canonical.open_questions:
         _append(lines, f'- Open questions: {canonical.open_questions[:400]}')
-    if canonical.session_metadata.compaction_timestamp:
-        meta = canonical.session_metadata
+
+
+def _render_session_metadata(lines: list[str], canonical: CanonicalTaskState) -> None:
+    if not canonical.session_metadata.compaction_timestamp:
+        return
+    meta = canonical.session_metadata
+    _append(
+        lines,
+        f'- Session metadata: turn={meta.turn_count}, '
+        f'compaction=#{meta.compaction_sequence}, '
+        f'at={meta.compaction_timestamp}',
+    )
+
+
+def _render_environment_state(lines: list[str], canonical: CanonicalTaskState) -> None:
+    if not canonical.environment_state.running_processes:
+        return
+    env = canonical.environment_state
+    _append(lines, '- Environment state:')
+    for proc in env.running_processes[-5:]:
+        _append(lines, f'  - Running: {proc}')
+    if env.active_ports:
         _append(
             lines,
-            f'- Session metadata: turn={meta.turn_count}, '
-            f'compaction=#{meta.compaction_sequence}, '
-            f'at={meta.compaction_timestamp}',
+            f'  - Active ports: {", ".join(str(p) for p in env.active_ports)}',
         )
-    if canonical.environment_state.running_processes:
-        env = canonical.environment_state
-        _append(lines, '- Environment state:')
-        for proc in env.running_processes[-5:]:
-            _append(lines, f'  - Running: {proc}')
-        if env.active_ports:
-            _append(
-                lines,
-                f'  - Active ports: {", ".join(str(p) for p in env.active_ports)}',
-            )
-        if env.auth_status:
-            _append(lines, f'  - Auth: {env.auth_status}')
-    _append(lines, f'- Summary: {canonical.narrative_summary}')
-    lines.append(CANONICAL_STATE_MARKER)
-    block = '\n'.join(line for line in lines if line.strip())
-    if len(block) > char_budget:
-        block = (
-            block[: char_budget - 48].rstrip()
-            + '\n... (canonical state truncated)\n'
-            + CANONICAL_STATE_MARKER
-        )
-    return block
+    if env.auth_status:
+        _append(lines, f'  - Auth: {env.auth_status}')
 
 
 def validate_canonical_state_for_compaction(
@@ -582,45 +790,92 @@ def validate_canonical_state_for_compaction(
 
     snapshot = extract_snapshot(events)
     missing: list[str] = []
+    missing.extend(_validate_snapshot_fields(canonical, snapshot))
+    if _acceptance_criteria_available(snapshot) and not canonical.acceptance_criteria:
+        missing.append('acceptance_criteria')
+    missing.extend(_validate_failed_approaches(canonical))
+    missing.extend(_validate_control_noise(canonical))
+    return CanonicalValidationResult(ok=not missing, missing=tuple(missing))
+
+
+def _validate_snapshot_fields(
+    canonical: CanonicalTaskState,
+    snapshot: dict[str, Any],
+) -> list[str]:
+    missing = _validate_directive_field(canonical, snapshot)
+    missing.extend(_validate_snapshot_files_and_verification(canonical, snapshot))
+    missing.extend(_validate_snapshot_background_and_plan(canonical, snapshot))
+    return missing
+
+
+def _validate_directive_field(
+    canonical: CanonicalTaskState,
+    snapshot: dict[str, Any],
+) -> list[str]:
     from backend.context.compactor.pre_condensation_snapshot import (
         snapshot_user_objective,
     )
 
     _, latest_directive = snapshot_user_objective(snapshot)
     if latest_directive and not canonical.latest_directive:
-        missing.append('latest_directive')
+        return ['latest_directive']
+    return []
+
+
+def _validate_snapshot_files_and_verification(
+    canonical: CanonicalTaskState,
+    snapshot: dict[str, Any],
+) -> list[str]:
+    missing: list[str] = []
     if snapshot.get('files_touched') and not canonical.active_files:
         missing.append('active_files')
     if snapshot.get('test_results') and not canonical.verification.command:
         missing.append('latest_verification')
+    return missing
+
+
+def _validate_snapshot_background_and_plan(
+    canonical: CanonicalTaskState,
+    snapshot: dict[str, Any],
+) -> list[str]:
+    missing: list[str] = []
     if snapshot.get('background_tasks') and not canonical.background_tasks:
         missing.append('background_tasks')
     if snapshot.get('task_plan') and not canonical.task_plan:
         missing.append('task_plan')
     if snapshot.get('task_plan') and not canonical.next_action:
         missing.append('next_action')
-    has_ac = bool(snapshot.get('acceptance_criteria'))
-    if not has_ac:
-        try:
-            from backend.core.criteria.acceptance_criteria_store import (
-                AcceptanceCriteriaStore,
-            )
+    return missing
 
-            has_ac = bool(AcceptanceCriteriaStore().load_from_file())
-        except Exception:
-            has_ac = False
-    if has_ac and not canonical.acceptance_criteria:
-        missing.append('acceptance_criteria')
+
+def _acceptance_criteria_available(snapshot: dict[str, Any]) -> bool:
+    if snapshot.get('acceptance_criteria'):
+        return True
+    try:
+        from backend.core.criteria.acceptance_criteria_store import (
+            AcceptanceCriteriaStore,
+        )
+
+        return bool(AcceptanceCriteriaStore().load_from_file())
+    except Exception:
+        return False
+
+
+def _validate_failed_approaches(canonical: CanonicalTaskState) -> list[str]:
     fingerprints = [
         item.fingerprint for item in canonical.failed_approaches if item.fingerprint
     ]
     if len(fingerprints) != len(set(fingerprints)):
-        missing.append('deduped_failed_approaches')
+        return ['deduped_failed_approaches']
+    return []
+
+
+def _validate_control_noise(canonical: CanonicalTaskState) -> list[str]:
     if any(
         _is_control_noise(text) for text in [*canonical.decisions, *canonical.blockers]
     ):
-        missing.append('control_noise_removed')
-    return CanonicalValidationResult(ok=not missing, missing=tuple(missing))
+        return ['control_noise_removed']
+    return []
 
 
 def _import_legacy_state(*, state: State | None = None) -> CanonicalTaskState:

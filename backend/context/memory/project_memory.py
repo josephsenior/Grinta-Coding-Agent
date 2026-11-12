@@ -29,79 +29,85 @@ def parse_markdown_memory(text: str) -> list[ProjectMemoryEntry]:
     entries = []
     blocks = re.split(r'\n##\s+', '\n' + text)
     for block in blocks:
-        block = block.strip()
-        if not block or block.startswith('# '):
-            continue
-        lines = block.splitlines()
-        header_line = lines[0].strip()
-        header_parts = [p.strip() for p in header_line.split('·')]
-        if len(header_parts) < 3:
-            continue
-        entry_id, kind, status = header_parts[0], header_parts[1], header_parts[2]
-
-        fact = ''
-        evidence = []
-        created = ''
-        last_verified = ''
-        confidence = 1.0
-        source_sessions = []
-        superseded_by = []
-
-        in_evidence = False
-        for line in lines[1:]:
-            line_stripped = line.strip()
-            if not line_stripped:
-                continue
-            if line_stripped.startswith('**Fact:**'):
-                fact = line_stripped[9:].strip()
-                in_evidence = False
-            elif line_stripped.startswith('**Evidence:**'):
-                in_evidence = True
-            elif line_stripped.startswith('**Created:**'):
-                created = line_stripped[12:].strip()
-                in_evidence = False
-            elif line_stripped.startswith('**Last verified:**'):
-                last_verified = line_stripped[18:].strip()
-                in_evidence = False
-            elif line_stripped.startswith('**Confidence:**'):
-                try:
-                    confidence = float(line_stripped[15:].strip())
-                except ValueError:
-                    confidence = 1.0
-                in_evidence = False
-            elif line_stripped.startswith('**Source sessions:**'):
-                source_sessions = [
-                    s.strip() for s in line_stripped[20:].split(',') if s.strip()
-                ]
-                in_evidence = False
-            elif line_stripped.startswith('**Superseded by:**'):
-                superseded_by = [
-                    s.strip() for s in line_stripped[18:].split(',') if s.strip()
-                ]
-                in_evidence = False
-            elif in_evidence:
-                if line_stripped.startswith('---'):
-                    in_evidence = False
-                elif line_stripped.startswith('- ') or line_stripped.startswith('* '):
-                    evidence.append(line_stripped[2:].strip())
-                else:
-                    evidence.append(line_stripped)
-
-        entries.append(
-            ProjectMemoryEntry(
-                id=entry_id,
-                kind=kind,
-                status=status,
-                fact=fact,
-                evidence=evidence,
-                created=created,
-                last_verified=last_verified,
-                confidence=confidence,
-                source_sessions=source_sessions,
-                superseded_by=superseded_by,
-            )
-        )
+        entry = _parse_memory_block(block)
+        if entry is not None:
+            entries.append(entry)
     return entries
+
+
+def _parse_memory_block(block: str) -> ProjectMemoryEntry | None:
+    block = block.strip()
+    if not block or block.startswith('# '):
+        return None
+    lines = block.splitlines()
+    header_parts = [part.strip() for part in lines[0].strip().split('·')]
+    if len(header_parts) < 3:
+        return None
+
+    entry = ProjectMemoryEntry(
+        id=header_parts[0],
+        kind=header_parts[1],
+        status=header_parts[2],
+        fact='',
+    )
+    in_evidence = False
+    for line in lines[1:]:
+        line_stripped = line.strip()
+        if not line_stripped:
+            continue
+        in_evidence = _parse_memory_line(line_stripped, entry, in_evidence)
+    return entry
+
+
+def _parse_memory_line(
+    line_stripped: str,
+    entry: ProjectMemoryEntry,
+    in_evidence: bool,
+) -> bool:
+    if line_stripped.startswith('**Fact:**'):
+        entry.fact = line_stripped[9:].strip()
+        return False
+    if line_stripped.startswith('**Evidence:**'):
+        return True
+    if line_stripped.startswith('**Created:**'):
+        entry.created = line_stripped[12:].strip()
+        return False
+    if line_stripped.startswith('**Last verified:**'):
+        entry.last_verified = line_stripped[18:].strip()
+        return False
+    if line_stripped.startswith('**Confidence:**'):
+        entry.confidence = _parse_confidence(line_stripped[15:].strip())
+        return False
+    if line_stripped.startswith('**Source sessions:**'):
+        entry.source_sessions = _split_memory_list(line_stripped[20:])
+        return False
+    if line_stripped.startswith('**Superseded by:**'):
+        entry.superseded_by = _split_memory_list(line_stripped[18:])
+        return False
+    if in_evidence:
+        return _append_evidence_line(line_stripped, entry.evidence)
+    return False
+
+
+def _parse_confidence(value: str) -> float:
+    try:
+        return float(value)
+    except ValueError:
+        return 1.0
+
+
+def _split_memory_list(value: str) -> list[str]:
+    return [item.strip() for item in value.split(',') if item.strip()]
+
+
+def _append_evidence_line(line_stripped: str, evidence: list[str]) -> bool:
+    if line_stripped.startswith('---'):
+        return False
+    if line_stripped.startswith('- ') or line_stripped.startswith('* '):
+        evidence.append(line_stripped[2:].strip())
+    else:
+        evidence.append(line_stripped)
+    return True
 
 
 def serialize_markdown_memory(entries: list[ProjectMemoryEntry]) -> str:
@@ -300,32 +306,73 @@ class ProjectMemoryService:
         return [item[1] for item in scored[:limit]]
 
 
-def migrate_legacy_memories(workspace_root: Path | None = None) -> None:
-    """Migrate legacy workspace_memory.json and lessons.md to project_memory.md."""
-    from backend.core.workspace_resolution import workspace_agent_state_dir
+def _legacy_json_facts() -> list[tuple[str, str, str, int]]:
     from backend.engine.tools.workspace_memory import list_entries
 
+    migrated_facts: list[tuple[str, str, str, int]] = []
+    try:
+        for entry in list_entries():
+            kind = entry.get('kind', 'lesson')
+            key = entry.get('key', '')
+            value = entry.get('value', '')
+            if key == 'session_summary' or kind == 'preference':
+                continue
+            fact = f'{key}: {value}' if key else value
+            migrated_facts.append(
+                (kind, fact, entry.get('created', ''), entry.get('seen_count', 1))
+            )
+    except Exception:
+        pass
+    return migrated_facts
+
+
+def _append_lesson_fact(
+    migrated_facts: list[tuple[str, str, str, int]], fact: str
+) -> None:
+    if fact and not any(existing[1] == fact for existing in migrated_facts):
+        migrated_facts.append(('lesson', fact, '', 1))
+
+
+def _parse_lesson_line(line: str) -> str:
+    line = line.strip()
+    if line.startswith('- ') or line.startswith('* '):
+        return line[2:].strip()
+    if line and not line.startswith('#') and not line.startswith('---'):
+        return line
+    return ''
+
+
+def _load_lesson_facts(
+    workspace_root: Path,
+    migrated_facts: list[tuple[str, str, str, int]],
+) -> None:
+    from backend.core.workspace_resolution import workspace_agent_state_dir
+
+    paths = [
+        workspace_agent_state_dir(workspace_root) / 'lessons.md',
+        workspace_root / 'memories' / 'repo' / 'lessons.md',
+    ]
+    for path in paths:
+        if not path.is_file():
+            continue
+        try:
+            content = path.read_text(encoding='utf-8')
+            for line in content.splitlines():
+                fact = _parse_lesson_line(line)
+                if fact:
+                    _append_lesson_fact(migrated_facts, fact)
+        except Exception:
+            pass
+
+
+def migrate_legacy_memories(workspace_root: Path | None = None) -> None:
+    """Migrate legacy workspace_memory.json and lessons.md to project_memory.md."""
     service = ProjectMemoryService(workspace_root)
     pm_file = service._memory_file_path()
     if pm_file.is_file():
         return
 
-    migrated_facts = []
-
-    try:
-        json_entries = list_entries()
-        for je in json_entries:
-            kind = je.get('kind', 'lesson')
-            key = je.get('key', '')
-            value = je.get('value', '')
-            if key == 'session_summary' or kind == 'preference':
-                continue
-            fact = f'{key}: {value}' if key else value
-            migrated_facts.append(
-                (kind, fact, je.get('created', ''), je.get('seen_count', 1))
-            )
-    except Exception:
-        pass
+    migrated_facts = _legacy_json_facts()
 
     if workspace_root is None:
         from backend.core.workspace_resolution import get_effective_workspace_root
@@ -333,29 +380,7 @@ def migrate_legacy_memories(workspace_root: Path | None = None) -> None:
         workspace_root = get_effective_workspace_root()
 
     if workspace_root:
-        paths = [
-            workspace_agent_state_dir(workspace_root) / 'lessons.md',
-            workspace_root / 'memories' / 'repo' / 'lessons.md',
-        ]
-        for path in paths:
-            if path.is_file():
-                try:
-                    content = path.read_text(encoding='utf-8')
-                    for line in content.splitlines():
-                        line = line.strip()
-                        if line.startswith('- ') or line.startswith('* '):
-                            fact = line[2:].strip()
-                            if fact and not any(f[1] == fact for f in migrated_facts):
-                                migrated_facts.append(('lesson', fact, '', 1))
-                        elif (
-                            line
-                            and not line.startswith('#')
-                            and not line.startswith('---')
-                        ):
-                            if not any(f[1] == line for f in migrated_facts):
-                                migrated_facts.append(('lesson', line, '', 1))
-                except Exception:
-                    pass
+        _load_lesson_facts(workspace_root, migrated_facts)
 
     for kind, fact, created, seen_count in migrated_facts:
         service.upsert_candidate(

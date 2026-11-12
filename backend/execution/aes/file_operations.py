@@ -439,6 +439,35 @@ def _content_size(lines: list[_DiffLine]) -> int:
     return sum(_line_cost(dl) for dl in lines if dl.priority < _PRIORITY_HUNK_HEADER)
 
 
+def _drop_lines_with_priority(content_lines: list[_DiffLine], priority: int) -> None:
+    for dl in content_lines:
+        if dl.priority == priority:
+            dl.kept = False
+
+
+def _kept_content_size(content_lines: list[_DiffLine]) -> int:
+    return sum(_line_cost(dl) for dl in content_lines if dl.kept)
+
+
+def _drop_changes_from_lowest_density_hunks(
+    content_lines: list[_DiffLine],
+    hunks: list[_HunkInfo],
+    used: int,
+    content_budget: int,
+) -> None:
+    hunks_by_change_count = sorted(
+        [h for h in hunks if h.additions + h.deletions > 0],
+        key=lambda h: h.additions + h.deletions,
+    )
+    for hi in hunks_by_change_count:
+        if used <= content_budget:
+            break
+        for dl in content_lines:
+            if dl.hunk_idx == hi.idx and dl.category in ('add', 'remove') and dl.kept:
+                dl.kept = False
+                used -= _line_cost(dl)
+
+
 def _allocate_budget(
     lines: list[_DiffLine],
     hunks: list[_HunkInfo],
@@ -464,40 +493,15 @@ def _allocate_budget(
         return 'full', _build_telemetry(files, hunks, lines, dropped_any=False)
 
     # --- Truncated mode: drop by priority (lowest first) ---
-
-    # Phase 1: drop plain context (priority 5)
-    for dl in content_lines:
-        if dl.priority == _PRIORITY_CONTEXT:
-            dl.kept = False
-    used = sum(_line_cost(dl) for dl in content_lines if dl.kept)
-    if used <= content_budget:
-        return 'truncated', _build_telemetry(files, hunks, lines, dropped_any=True)
-
-    # Phase 2: drop adjacent context (priority 40)
-    for dl in content_lines:
-        if dl.priority == _PRIORITY_ADJ_CONTEXT:
-            dl.kept = False
-    used = sum(_line_cost(dl) for dl in content_lines if dl.kept)
-    if used <= content_budget:
-        return 'truncated', _build_telemetry(files, hunks, lines, dropped_any=True)
-
-    # Phase 3: drop changes (priority 80) from lowest-change-count hunks first.
-    # Keep all @@ headers regardless — the agent always knows WHERE a change
-    # occurred even if it can't see WHAT changed.
-    hunks_by_change_count = sorted(
-        [h for h in hunks if h.additions + h.deletions > 0],
-        key=lambda h: h.additions + h.deletions,
-    )
-
-    for hi in hunks_by_change_count:
-        if used <= content_budget:
-            break
-        for dl in content_lines:
-            if dl.hunk_idx == hi.idx and dl.category in ('add', 'remove') and dl.kept:
-                dl.kept = False
-                used -= _line_cost(dl)
-        if used <= content_budget:
-            break
+    _drop_lines_with_priority(content_lines, _PRIORITY_CONTEXT)
+    used = _kept_content_size(content_lines)
+    if used > content_budget:
+        _drop_lines_with_priority(content_lines, _PRIORITY_ADJ_CONTEXT)
+        used = _kept_content_size(content_lines)
+    if used > content_budget:
+        _drop_changes_from_lowest_density_hunks(
+            content_lines, hunks, used, content_budget
+        )
 
     return 'truncated', _build_telemetry(files, hunks, lines, dropped_any=True)
 
@@ -591,6 +595,56 @@ def _emit_truncated(
 # --- Fidelity summary ---
 
 
+def _count_kept_changes(lines: list[_DiffLine], category: str) -> int:
+    return sum(1 for dl in lines if dl.category == category and dl.kept)
+
+
+def _hunk_has_kept_changes(hunk: _HunkInfo, lines: list[_DiffLine]) -> bool:
+    return any(
+        dl.kept
+        for dl in lines
+        if dl.hunk_idx == hunk.idx and dl.category in ('add', 'remove')
+    )
+
+
+def _count_file_kept_changes(
+    lines: list[_DiffLine], file_idx: int, category: str
+) -> int:
+    return sum(
+        1
+        for dl in lines
+        if dl.file_idx == file_idx and dl.category == category and dl.kept
+    )
+
+
+def _file_telemetry(
+    fi: _FileInfo, lines: list[_DiffLine]
+) -> tuple[dict[str, Any], str]:
+    f_hunks = [h for h in fi.hunks if h.file_idx == fi.idx]
+    total_add = sum(h.additions for h in f_hunks)
+    total_del = sum(h.deletions for h in f_hunks)
+    kept_add = _count_file_kept_changes(lines, fi.idx, 'add')
+    kept_del = _count_file_kept_changes(lines, fi.idx, 'remove')
+    omitted_add = total_add - kept_add
+    omitted_del = total_del - kept_del
+    omitted_hunks = sum(1 for h in f_hunks if not _hunk_has_kept_changes(h, lines))
+    if omitted_add == 0 and omitted_del == 0:
+        status = 'full'
+    elif omitted_add == total_add and omitted_del == total_del:
+        status = 'omitted'
+    else:
+        status = 'partial'
+    return (
+        {
+            'path': fi.path,
+            'omitted_hunks': omitted_hunks,
+            'omitted_additions': omitted_add,
+            'omitted_deletions': omitted_del,
+        },
+        status,
+    )
+
+
 def _build_telemetry(
     files: list[_FileInfo],
     hunks: list[_HunkInfo],
@@ -599,70 +653,26 @@ def _build_telemetry(
 ) -> dict[str, Any]:
     total_add = sum(h.additions for h in hunks)
     total_del = sum(h.deletions for h in hunks)
-    kept_add = sum(1 for dl in lines if dl.category == 'add' and dl.kept)
-    kept_del = sum(1 for dl in lines if dl.category == 'remove' and dl.kept)
+    kept_add = _count_kept_changes(lines, 'add')
+    kept_del = _count_kept_changes(lines, 'remove')
     total_changes = total_add + total_del
     kept_changes = kept_add + kept_del
     coverage = (kept_changes / total_changes * 100) if total_changes else 100.0
 
     per_file: list[dict[str, Any]] = []
-    files_full = 0
-    files_partial = 0
-    files_omitted = 0
-
+    file_statuses: list[str] = []
     for fi in files:
-        f_hunks = [h for h in fi.hunks if h.file_idx == fi.idx]
-        f_om_add = sum(h.additions for h in f_hunks) - sum(
-            1
-            for dl in lines
-            if dl.file_idx == fi.idx and dl.category == 'add' and dl.kept
-        )
-        f_om_del = sum(h.deletions for h in f_hunks) - sum(
-            1
-            for dl in lines
-            if dl.file_idx == fi.idx and dl.category == 'remove' and dl.kept
-        )
-        f_om_hunks = sum(
-            1
-            for h in f_hunks
-            if not any(
-                dl.kept
-                for dl in lines
-                if dl.hunk_idx == h.idx and dl.category in ('add', 'remove')
-            )
-        )
-        if f_om_add == 0 and f_om_del == 0:
-            files_full += 1
-        elif f_om_add == sum(h.additions for h in f_hunks) and f_om_del == sum(
-            h.deletions for h in f_hunks
-        ):
-            files_omitted += 1
-        else:
-            files_partial += 1
-        per_file.append(
-            {
-                'path': fi.path,
-                'omitted_hunks': f_om_hunks,
-                'omitted_additions': f_om_add,
-                'omitted_deletions': f_om_del,
-            }
-        )
+        entry, status = _file_telemetry(fi, lines)
+        per_file.append(entry)
+        file_statuses.append(status)
 
     return {
         'coverage': coverage,
-        'files_full': files_full,
-        'files_partial': files_partial,
-        'files_omitted': files_omitted,
+        'files_full': file_statuses.count('full'),
+        'files_partial': file_statuses.count('partial'),
+        'files_omitted': file_statuses.count('omitted'),
         'per_file': per_file,
-        'omitted_hunks': sum(
-            1
-            for h in hunks
-            if not any(
-                dl.kept
-                for dl in lines
-                if dl.hunk_idx == h.idx and dl.category in ('add', 'remove')
-            )
-        ),
+        'omitted_hunks': sum(1 for h in hunks if not _hunk_has_kept_changes(h, lines)),
         'omitted_add': total_add - kept_add,
         'omitted_del': total_del - kept_del,
     }

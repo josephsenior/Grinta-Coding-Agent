@@ -220,6 +220,20 @@ class ToolTelemetry:
     ) -> None:
         tool_name = tool or '<unknown>'
         outcome_name = outcome or 'success'
+        entry = self._build_event_entry(tool_name, outcome_name, duration, telemetry)
+        self._append_recent_event(entry)
+        self._export_prometheus(tool_name, outcome_name, duration)
+        self._emit_execution_evidence(
+            tool_name, outcome_name, duration, action, observation
+        )
+
+    @staticmethod
+    def _build_event_entry(
+        tool_name: str,
+        outcome_name: str,
+        duration: float,
+        telemetry: dict[str, Any] | None,
+    ) -> dict[str, Any]:
         entry: dict[str, Any] = {
             'tool': tool_name,
             'outcome': outcome_name,
@@ -233,12 +247,17 @@ class ToolTelemetry:
                 entry['action_schema'] = telemetry['action_schema']
             if 'observation_schema' in telemetry:
                 entry['observation_schema'] = telemetry['observation_schema']
+        return entry
 
+    def _append_recent_event(self, entry: dict[str, Any]) -> None:
         with self._recent_lock:
             self._recent_events.append(entry)
             if len(self._recent_events) > 200:
                 self._recent_events = self._recent_events[-200:]
 
+    def _export_prometheus(
+        self, tool_name: str, outcome_name: str, duration: float
+    ) -> None:
         # Prometheus metrics are optional; guard against import failures
         try:
             if self._invocations is not None:
@@ -250,68 +269,100 @@ class ToolTelemetry:
         except Exception as exc:  # pragma: no cover - metrics failures shouldn't crash
             logger.debug('Skipping telemetry metric export: %s', exc)
 
+    @staticmethod
+    def _paths_for_action(action: Any, action_type: str, kind: str) -> list[str]:
+        if action_type != kind:
+            return []
+        path = getattr(action, 'path', None)
+        return [str(path)] if path else []
+
+    @staticmethod
+    def _action_evidence(
+        action: Any, tool_name: str
+    ) -> tuple[str, str, list[str], list[str]]:
+        command = str(getattr(action, 'command', '') or '')
+        action_type = str(getattr(action, 'action', tool_name) or tool_name)
+        changed = ToolTelemetry._paths_for_action(action, action_type, 'edit')
+        read = ToolTelemetry._paths_for_action(action, action_type, 'read')
+        return command, action_type, changed, read
+
+    @staticmethod
+    def _observation_exit_code(observation: Any) -> Any:
+        exit_code = getattr(observation, 'exit_code', None)
+        if exit_code is not None:
+            return exit_code
+        meta = getattr(observation, 'metadata', None)
+        return getattr(meta, 'exit_code', None) if meta is not None else None
+
+    @staticmethod
+    def _evidence_payload(
+        tool_name: str,
+        outcome_name: str,
+        duration: float,
+        action: Any,
+        observation: Any,
+    ) -> dict[str, Any]:
+        from backend.telemetry.evidence.fingerprint import fingerprint_json
+        from backend.validation.command_classification import (
+            classify_shell_intent,
+            is_test_run_command,
+        )
+
+        command, action_type, changed, read = ToolTelemetry._action_evidence(
+            action, tool_name
+        )
+        exit_code = ToolTelemetry._observation_exit_code(observation)
+        return {
+            'tool': tool_name,
+            'outcome': outcome_name,
+            'duration_ms': int(duration * 1000),
+            'action_fingerprint': fingerprint_json(
+                {
+                    'tool': action_type,
+                    'command': command,
+                    'path': getattr(action, 'path', None),
+                }
+            ),
+            'result_fingerprint': fingerprint_json(
+                {
+                    'type': type(observation).__name__
+                    if observation is not None
+                    else None,
+                    'exit_code': exit_code,
+                }
+            ),
+            'shell_intent': classify_shell_intent(command) if command else None,
+            'verification_kind': 'test'
+            if command and is_test_run_command(command)
+            else None,
+            'exit_code': exit_code if isinstance(exit_code, int) else None,
+            'changed_paths': changed,
+            'read_paths': read,
+            'result_bytes': len(
+                str(getattr(observation, 'content', '') or '').encode('utf-8')
+            ),
+            'result_truncated': bool(getattr(observation, 'truncated', False)),
+        }
+
+    def _emit_execution_evidence(
+        self,
+        tool_name: str,
+        outcome_name: str,
+        duration: float,
+        action: Any | None,
+        observation: Any | None,
+    ) -> None:
         # Session evidence deliberately avoids the rich schemas above: they may
         # contain command text, file contents, or tool output needed only by the ledger.
         try:
             from backend.telemetry.evidence import EvidenceKind, emit_execution_evidence
-            from backend.telemetry.evidence.fingerprint import fingerprint_json
             from backend.telemetry.evidence.schema import Correlation
-            from backend.validation.command_classification import (
-                classify_shell_intent,
-                is_test_run_command,
-            )
 
-            command = str(getattr(action, 'command', '') or '')
-            action_type = str(getattr(action, 'action', tool_name) or tool_name)
-            changed = (
-                [str(getattr(action, 'path'))]
-                if action_type == 'edit' and getattr(action, 'path', None)
-                else []
-            )
-            read = (
-                [str(getattr(action, 'path'))]
-                if action_type == 'read' and getattr(action, 'path', None)
-                else []
-            )
-            exit_code = getattr(observation, 'exit_code', None)
-            if exit_code is None:
-                meta = getattr(observation, 'metadata', None)
-                exit_code = (
-                    getattr(meta, 'exit_code', None) if meta is not None else None
-                )
             emit_execution_evidence(
                 EvidenceKind.TOOL_EXECUTION,
-                {
-                    'tool': tool_name,
-                    'outcome': outcome_name,
-                    'duration_ms': int(duration * 1000),
-                    'action_fingerprint': fingerprint_json(
-                        {
-                            'tool': action_type,
-                            'command': command,
-                            'path': getattr(action, 'path', None),
-                        }
-                    ),
-                    'result_fingerprint': fingerprint_json(
-                        {
-                            'type': type(observation).__name__
-                            if observation is not None
-                            else None,
-                            'exit_code': exit_code,
-                        }
-                    ),
-                    'shell_intent': classify_shell_intent(command) if command else None,
-                    'verification_kind': 'test'
-                    if command and is_test_run_command(command)
-                    else None,
-                    'exit_code': exit_code if isinstance(exit_code, int) else None,
-                    'changed_paths': changed,
-                    'read_paths': read,
-                    'result_bytes': len(
-                        str(getattr(observation, 'content', '') or '').encode('utf-8')
-                    ),
-                    'result_truncated': bool(getattr(observation, 'truncated', False)),
-                },
+                self._evidence_payload(
+                    tool_name, outcome_name, duration, action, observation
+                ),
                 correlation=Correlation(
                     ledger_event_id=getattr(action, 'id', None),
                     action_id=getattr(action, 'id', None),

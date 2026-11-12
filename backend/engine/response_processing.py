@@ -194,6 +194,48 @@ def build_tool_call_metadata(
     )
 
 
+def _metadata_response_choices(model_response: Any) -> Any:
+    choices = getattr(model_response, 'choices', None)
+    if choices is None and isinstance(model_response, dict):
+        choices = model_response.get('choices')
+    return choices
+
+
+def _choice_message(choice: Any) -> Any:
+    message = getattr(choice, 'message', None)
+    if message is None and isinstance(choice, dict):
+        message = choice.get('message')
+    return message
+
+
+def _message_tool_calls(message: Any) -> Any:
+    tool_calls = getattr(message, 'tool_calls', None)
+    if tool_calls is None and isinstance(message, dict):
+        tool_calls = message.get('tool_calls')
+    return tool_calls
+
+
+def _matching_tool_call_arguments(
+    tool_call: Any,
+    tool_call_id: str,
+) -> dict[str, Any] | None:
+    tc_id = getattr(tool_call, 'id', None)
+    if tc_id is None and isinstance(tool_call, dict):
+        tc_id = tool_call.get('id')
+    if tool_call_id and str(tc_id or '') != tool_call_id:
+        return None
+    function = getattr(tool_call, 'function', None)
+    if function is None and isinstance(tool_call, dict):
+        function = tool_call.get('function')
+    if not isinstance(function, dict):
+        return None
+    raw_args = function.get('arguments', '{}')
+    try:
+        return parse_tool_arguments_object(raw_args)
+    except (TypeError, ValueError):
+        return {}
+
+
 def arguments_from_tool_call_metadata(metadata: Any) -> dict[str, Any]:
     """Best-effort parse of tool-call arguments stored on event metadata."""
     if metadata is None:
@@ -202,38 +244,19 @@ def arguments_from_tool_call_metadata(metadata: Any) -> dict[str, Any]:
     model_response = getattr(metadata, 'model_response', None)
     if model_response is None:
         return {}
-    choices = getattr(model_response, 'choices', None)
-    if choices is None and isinstance(model_response, dict):
-        choices = model_response.get('choices')
+    choices = _metadata_response_choices(model_response)
     if not choices:
         return {}
-    first = choices[0]
-    message = getattr(first, 'message', None)
-    if message is None and isinstance(first, dict):
-        message = first.get('message')
+    message = _choice_message(choices[0])
     if message is None:
         return {}
-    tool_calls = getattr(message, 'tool_calls', None)
-    if tool_calls is None and isinstance(message, dict):
-        tool_calls = message.get('tool_calls')
+    tool_calls = _message_tool_calls(message)
     if not tool_calls:
         return {}
-    for tc in tool_calls:
-        tc_id = getattr(tc, 'id', None)
-        if tc_id is None and isinstance(tc, dict):
-            tc_id = tc.get('id')
-        if tool_call_id and str(tc_id or '') != tool_call_id:
-            continue
-        function = getattr(tc, 'function', None)
-        if function is None and isinstance(tc, dict):
-            function = tc.get('function')
-        if not isinstance(function, dict):
-            continue
-        raw_args = function.get('arguments', '{}')
-        try:
-            return parse_tool_arguments_object(raw_args)
-        except (TypeError, ValueError):
-            return {}
+    for tool_call in tool_calls:
+        arguments = _matching_tool_call_arguments(tool_call, tool_call_id)
+        if arguments is not None:
+            return arguments
     return {}
 
 

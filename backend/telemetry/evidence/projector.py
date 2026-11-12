@@ -77,6 +77,71 @@ def _records(source: Path | Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
     return result
 
 
+def _accepted_payload(row: dict[str, Any], seen: set[str]) -> dict[str, Any] | None:
+    payload = row.get('payload')
+    if not isinstance(payload, dict) or payload.get('schema_version') != 1:
+        return None
+    evidence_id = payload.get('evidence_id')
+    if not isinstance(evidence_id, str) or evidence_id in seen:
+        return None
+    seen.add(evidence_id)
+    data = payload.get('data')
+    if not isinstance(data, dict):
+        return None
+    return payload
+
+
+def _record_timestamp(timestamps: list[datetime], row: dict[str, Any]) -> None:
+    try:
+        timestamps.append(
+            datetime.fromisoformat(str(row.get('ts')).replace('Z', '+00:00'))
+        )
+    except ValueError:
+        pass
+
+
+def _project_checkpoint(summary: dict[str, Any], data: dict[str, Any]) -> None:
+    operation = data.get('operation')
+    if operation == 'create':
+        summary['reliability']['checkpoints_created'] += 1
+    if operation == 'restore':
+        summary['reliability']['restores'] += 1
+
+
+def _project_finish(summary: dict[str, Any], data: dict[str, Any]) -> None:
+    summary['completion']['finish_declared'] = True
+    summary['completion']['task_recorded_status'] = data.get('recorded_task_status')
+    summary['run']['final_agent_state'] = 'FINISHED'
+
+
+def _project_payload(
+    summary: dict[str, Any],
+    payload: dict[str, Any],
+    tools: Counter[str],
+    files_read: set[str],
+    files_changed: set[str],
+) -> int:
+    kind = payload.get('kind')
+    data = payload['data']
+    if kind == 'model_turn':
+        _project_model(summary, data)
+    elif kind == 'tool_execution':
+        _project_tool(summary, data, tools, files_read, files_changed)
+    elif kind == 'user_input':
+        return 1
+    elif kind == 'control_intervention':
+        _project_intervention(summary, data)
+    elif kind == 'context_compaction':
+        summary['reliability']['context_compactions'] += 1
+    elif kind == 'checkpoint':
+        _project_checkpoint(summary, data)
+    elif kind == 'finish_declared':
+        _project_finish(summary, data)
+    elif kind == 'completion_validation':
+        summary['completion']['completion_validator'] = data
+    return 0
+
+
 def project(
     source: Path | Iterable[dict[str, Any]], task_state: dict[str, Any] | None = None
 ) -> dict[str, Any]:
@@ -90,46 +155,13 @@ def project(
     for row in _records(source):
         if row.get('event') != 'EXECUTION_EVIDENCE':
             continue
-        payload = row.get('payload')
-        if not isinstance(payload, dict) or payload.get('schema_version') != 1:
+        payload = _accepted_payload(row, seen)
+        if payload is None:
             continue
-        evidence_id = payload.get('evidence_id')
-        if not isinstance(evidence_id, str) or evidence_id in seen:
-            continue
-        seen.add(evidence_id)
-        data = payload.get('data')
-        if not isinstance(data, dict):
-            continue
-        try:
-            timestamps.append(
-                datetime.fromisoformat(str(row.get('ts')).replace('Z', '+00:00'))
-            )
-        except ValueError:
-            pass
-        kind = payload.get('kind')
-        if kind == 'model_turn':
-            _project_model(summary, data)
-        elif kind == 'tool_execution':
-            _project_tool(summary, data, tools, files_read, files_changed)
-        elif kind == 'user_input':
-            user_inputs += 1
-        elif kind == 'control_intervention':
-            _project_intervention(summary, data)
-        elif kind == 'context_compaction':
-            summary['reliability']['context_compactions'] += 1
-        elif kind == 'checkpoint':
-            if data.get('operation') == 'create':
-                summary['reliability']['checkpoints_created'] += 1
-            if data.get('operation') == 'restore':
-                summary['reliability']['restores'] += 1
-        elif kind == 'finish_declared':
-            summary['completion']['finish_declared'] = True
-            summary['completion']['task_recorded_status'] = data.get(
-                'recorded_task_status'
-            )
-            summary['run']['final_agent_state'] = 'FINISHED'
-        elif kind == 'completion_validation':
-            summary['completion']['completion_validator'] = data
+        _record_timestamp(timestamps, row)
+        user_inputs += _project_payload(
+            summary, payload, tools, files_read, files_changed
+        )
     summary['tools']['by_tool'] = dict(sorted(tools.items()))
     summary['workspace']['files_read'] = sorted(files_read)
     summary['workspace']['files_changed'] = sorted(files_changed)

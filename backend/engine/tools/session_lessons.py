@@ -28,77 +28,88 @@ def _has_unresolved_tasks(state: Any) -> bool:
     return False
 
 
-def detect_reflection_signals(history: list[Any]) -> list[str]:
-    """Scan history for signals of durable memory candidates."""
-    signals = []
+_USER_CORRECTION_WORDS = (
+    'wrong',
+    'mistake',
+    'error',
+    'no, actually',
+    'incorrect',
+    'fix it',
+)
 
-    # 1. Check for file mutations (Create/Edit/Write)
-    mutated = False
+_PLATFORM_QUIRK_WORDS = (
+    'windows',
+    'unix',
+    'permission',
+    'workaround',
+    'quirk',
+)
+
+_COMMAND_OBSERVATION_TYPES = {
+    'TerminalRunObservation',
+    'CmdRunObservation',
+    'RunObservation',
+}
+
+
+def _has_file_mutation(history: list[Any]) -> bool:
     for event in history:
         class_name = type(event).__name__
         if 'File' in class_name and (
             'Edit' in class_name or 'Create' in class_name or 'Write' in class_name
         ):
-            mutated = True
-            break
-    if mutated:
-        signals.append('mutation')
+            return True
+    return False
 
-    # 2. Check for user corrections
-    user_correction = False
+
+def _has_user_correction(history: list[Any]) -> bool:
     for event in history:
-        if getattr(event, 'source', None) == EventSource.USER and hasattr(
+        if getattr(event, 'source', None) != EventSource.USER or not hasattr(
             event, 'content'
         ):
-            content = str(event.content).lower()
-            if any(
-                word in content
-                for word in [
-                    'wrong',
-                    'mistake',
-                    'error',
-                    'no, actually',
-                    'incorrect',
-                    'fix it',
-                ]
-            ):
-                user_correction = True
-                break
-    if user_correction:
-        signals.append('user_correction')
+            continue
+        content = str(event.content).lower()
+        if any(word in content for word in _USER_CORRECTION_WORDS):
+            return True
+    return False
 
-    # 3. Check for command failure recovery
+
+def _has_command_recovery(history: list[Any]) -> bool:
     has_failure = False
     recovered = False
     for event in history:
         class_name = type(event).__name__
-        if class_name in {
-            'TerminalRunObservation',
-            'CmdRunObservation',
-            'RunObservation',
-        }:
-            exit_code = getattr(event, 'exit_code', 0)
-            if isinstance(exit_code, int) and exit_code != 0:
-                has_failure = True
-            elif isinstance(exit_code, int) and exit_code == 0 and has_failure:
-                recovered = True
-    if recovered:
-        signals.append('command_recovery')
+        if class_name not in _COMMAND_OBSERVATION_TYPES:
+            continue
+        exit_code = getattr(event, 'exit_code', 0)
+        if isinstance(exit_code, int) and exit_code != 0:
+            has_failure = True
+        elif isinstance(exit_code, int) and exit_code == 0 and has_failure:
+            recovered = True
+    return recovered
 
-    # 4. Check for platform/quirk keywords in logs
-    has_quirk = False
+
+def _has_platform_quirk(history: list[Any]) -> bool:
     for event in history:
-        if hasattr(event, 'content'):
-            content = str(event.content).lower()
-            if any(
-                word in content
-                for word in ['windows', 'unix', 'permission', 'workaround', 'quirk']
-            ):
-                has_quirk = True
-                break
-    if has_quirk:
-        signals.append('platform_quirk')
+        if not hasattr(event, 'content'):
+            continue
+        content = str(event.content).lower()
+        if any(word in content for word in _PLATFORM_QUIRK_WORDS):
+            return True
+    return False
 
+
+def detect_reflection_signals(history: list[Any]) -> list[str]:
+    """Scan history for signals of durable memory candidates."""
+    signals = []
+    if _has_file_mutation(history):
+        signals.append('mutation')
+    if _has_user_correction(history):
+        signals.append('user_correction')
+    if _has_command_recovery(history):
+        signals.append('command_recovery')
+    if _has_platform_quirk(history):
+        signals.append('platform_quirk')
     return signals
 
 

@@ -55,6 +55,27 @@ _MAX_VERIFICATION_OUTPUT_CHARS = 2000
 # (which lives at the end of a traceback) is what survives.
 _RENDER_VERIFICATION_OUTPUT_CHARS = 220
 
+_SCALAR_STATE_FIELDS = (
+    'schema_version',
+    'objective',
+    'latest_directive',
+    'superseding_directive',
+    'active_plan',
+    'next_action',
+    'implementation_checkpoint',
+    'active_files',
+    'blockers',
+    'invalidated_assumptions',
+    'decisions',
+    'vcs_status',
+    'narrative_summary',
+    'completed_tasks',
+    'open_questions',
+    'prior_objectives',
+    'source_event_ids',
+    'last_updated',
+)
+
 
 def clip_with_marker(
     text: str,
@@ -269,102 +290,11 @@ class CanonicalTaskState:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> 'CanonicalTaskState':
         state = cls()
-        for key in (
-            'schema_version',
-            'objective',
-            'latest_directive',
-            'superseding_directive',
-            'active_plan',
-            'next_action',
-            'implementation_checkpoint',
-            'active_files',
-            'blockers',
-            'invalidated_assumptions',
-            'decisions',
-            'vcs_status',
-            'narrative_summary',
-            'completed_tasks',
-            'open_questions',
-            'prior_objectives',
-            'source_event_ids',
-            'last_updated',
-        ):
-            if key in data:
-                setattr(state, key, data[key])
-        verification = data.get('verification')
-        if isinstance(verification, dict):
-            state.verification = VerificationState(
-                **_known_dataclass_fields(VerificationState, verification)
-            )
-        session_meta = data.get('session_metadata')
-        if isinstance(session_meta, dict):
-            state.session_metadata = SessionMetadata(
-                **_known_dataclass_fields(SessionMetadata, session_meta)
-            )
-        env_state = data.get('environment_state')
-        if isinstance(env_state, dict):
-            state.environment_state = EnvironmentState(
-                **_known_dataclass_fields(EnvironmentState, env_state)
-            )
-        test_summ = data.get('test_summary')
-        if isinstance(test_summ, dict):
-            state.test_summary = TestSummary(
-                **_known_dataclass_fields(TestSummary, test_summ)
-            )
-        raw_deps = data.get('dependencies', [])
-        if isinstance(raw_deps, list):
-            state.dependencies = [
-                DependencyEntry(**_known_dataclass_fields(DependencyEntry, item))
-                for item in raw_deps
-                if isinstance(item, dict)
-            ][-_MAX_DEPENDENCIES:]
-        state.failed_approaches = [
-            FailedApproach(**_known_dataclass_fields(FailedApproach, item))
-            for item in data.get('failed_approaches', [])
-            if isinstance(item, dict)
-        ]
-        state.background_tasks = [
-            BackgroundTaskState(**_known_dataclass_fields(BackgroundTaskState, item))
-            for item in data.get('background_tasks', [])
-            if isinstance(item, dict)
-        ]
-        state.recent_work = [
-            RecentWorkItem(**_known_dataclass_fields(RecentWorkItem, item))
-            for item in data.get('recent_work', [])
-            if isinstance(item, dict)
-        ][-_MAX_RECENT_WORK:]
-        state.task_plan = [
-            TaskPlanItem(**_known_dataclass_fields(TaskPlanItem, item))
-            for item in data.get('task_plan', [])
-            if isinstance(item, dict)
-        ][-_MAX_TASK_PLAN_ITEMS:]
-        state.acceptance_criteria = [
-            CriterionSummary(**_known_dataclass_fields(CriterionSummary, item))
-            for item in data.get('acceptance_criteria', [])
-            if isinstance(item, dict)
-        ][-_MAX_ACCEPTANCE_CRITERIA:]
-        state.prior_objectives = [
-            str(item).strip()
-            for item in data.get('prior_objectives', [])
-            if str(item).strip()
-        ][-_MAX_PRIOR_OBJECTIVES:]
-        freshness: dict[str, FieldFreshness] = {}
-        raw_freshness = data.get('field_freshness', {})
-        if isinstance(raw_freshness, dict):
-            for key, value in raw_freshness.items():
-                if isinstance(value, dict):
-                    freshness[str(key)] = FieldFreshness(
-                        **_known_dataclass_fields(FieldFreshness, value)
-                    )
-        state.field_freshness = freshness
-        from backend.context.canonical_state.private import _string_list
-
-        state.active_files = _string_list(state.active_files, _MAX_ACTIVE_FILES)
-        state.blockers = _string_list(state.blockers, _MAX_BLOCKERS)
-        state.invalidated_assumptions = _string_list(
-            state.invalidated_assumptions, _MAX_INVALIDATED
-        )
-        state.decisions = _string_list(state.decisions, _MAX_DECISIONS)
+        _apply_scalar_state_fields(state, data)
+        _apply_dataclass_state_sections(state, data)
+        _apply_state_lists(state, data)
+        _apply_field_freshness(state, data)
+        _sanitize_string_state_fields(state)
         return state
 
 
@@ -379,3 +309,89 @@ def _known_dataclass_fields(cls: type, data: dict[str, Any]) -> dict[str, Any]:
 
     field_names = {field.name for field in fields(cls)}
     return {key: value for key, value in data.items() if key in field_names}
+
+
+def _apply_scalar_state_fields(state: CanonicalTaskState, data: dict[str, Any]) -> None:
+    for key in _SCALAR_STATE_FIELDS:
+        if key in data:
+            setattr(state, key, data[key])
+
+
+def _apply_dataclass_state_sections(
+    state: CanonicalTaskState, data: dict[str, Any]
+) -> None:
+    for key, field_name, section_type in (
+        ('verification', 'verification', VerificationState),
+        ('session_metadata', 'session_metadata', SessionMetadata),
+        ('environment_state', 'environment_state', EnvironmentState),
+        ('test_summary', 'test_summary', TestSummary),
+    ):
+        value = data.get(key)
+        if isinstance(value, dict):
+            setattr(
+                state,
+                field_name,
+                section_type(**_known_dataclass_fields(section_type, value)),
+            )
+
+
+def _load_dataclass_list(value: Any, cls: type, limit: int | None = None) -> list[Any]:
+    items = [
+        cls(**_known_dataclass_fields(cls, item))
+        for item in value
+        if isinstance(item, dict)
+    ]
+    return items[-limit:] if limit else items
+
+
+def _apply_state_lists(state: CanonicalTaskState, data: dict[str, Any]) -> None:
+    raw_deps = data.get('dependencies', [])
+    if isinstance(raw_deps, list):
+        state.dependencies = _load_dataclass_list(
+            raw_deps, DependencyEntry, _MAX_DEPENDENCIES
+        )
+    state.failed_approaches = _load_dataclass_list(
+        data.get('failed_approaches', []), FailedApproach
+    )
+    state.background_tasks = _load_dataclass_list(
+        data.get('background_tasks', []), BackgroundTaskState
+    )
+    state.recent_work = _load_dataclass_list(
+        data.get('recent_work', []), RecentWorkItem, _MAX_RECENT_WORK
+    )
+    state.task_plan = _load_dataclass_list(
+        data.get('task_plan', []), TaskPlanItem, _MAX_TASK_PLAN_ITEMS
+    )
+    state.acceptance_criteria = _load_dataclass_list(
+        data.get('acceptance_criteria', []),
+        CriterionSummary,
+        _MAX_ACCEPTANCE_CRITERIA,
+    )
+    state.prior_objectives = [
+        str(item).strip()
+        for item in data.get('prior_objectives', [])
+        if str(item).strip()
+    ][-_MAX_PRIOR_OBJECTIVES:]
+
+
+def _apply_field_freshness(state: CanonicalTaskState, data: dict[str, Any]) -> None:
+    freshness: dict[str, FieldFreshness] = {}
+    raw_freshness = data.get('field_freshness', {})
+    if isinstance(raw_freshness, dict):
+        for key, value in raw_freshness.items():
+            if isinstance(value, dict):
+                freshness[str(key)] = FieldFreshness(
+                    **_known_dataclass_fields(FieldFreshness, value)
+                )
+    state.field_freshness = freshness
+
+
+def _sanitize_string_state_fields(state: CanonicalTaskState) -> None:
+    from backend.context.canonical_state.private import _string_list
+
+    state.active_files = _string_list(state.active_files, _MAX_ACTIVE_FILES)
+    state.blockers = _string_list(state.blockers, _MAX_BLOCKERS)
+    state.invalidated_assumptions = _string_list(
+        state.invalidated_assumptions, _MAX_INVALIDATED
+    )
+    state.decisions = _string_list(state.decisions, _MAX_DECISIONS)

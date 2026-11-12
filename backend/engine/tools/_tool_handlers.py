@@ -701,98 +701,107 @@ def _validate_audit_entries(
     return normalized_entries
 
 
-def _handle_acceptance_criteria_tool(arguments: Mapping[str, Any]) -> Action:
-    """Handle acceptance_criteria tool call."""
-    command = require_tool_argument(arguments, 'command', ACCEPTANCE_CRITERIA_TOOL_NAME)
-    if command not in {'view', 'update', 'append', 'refine', 'audit'}:
+def _handle_acceptance_criteria_view(
+    store: AcceptanceCriteriaStore,
+) -> AcceptanceCriteriaAction:
+    raw_list = store.load_from_file()
+    return AcceptanceCriteriaAction(command='view', criteria_list=raw_list)
+
+
+def _handle_acceptance_criteria_refine(
+    arguments: Mapping[str, Any],
+    store: AcceptanceCriteriaStore,
+) -> AcceptanceCriteriaAction:
+    criterion_id = str(arguments.get('criterion_id') or '').strip()
+    new_assertion = str(arguments.get('new_assertion') or '').strip()
+    reason = str(arguments.get('reason') or '').strip()
+    if not criterion_id:
         raise FunctionCallValidationError(
-            f'Unsupported command {command!r} for tool call {ACCEPTANCE_CRITERIA_TOOL_NAME}'
+            'refine requires non-empty criterion_id (from view).'
         )
-
-    store = AcceptanceCriteriaStore()
-
-    if command == 'view':
-        raw_list = store.load_from_file()
-        return AcceptanceCriteriaAction(command='view', criteria_list=raw_list)
-
-    if command == 'refine':
-        criterion_id = str(arguments.get('criterion_id') or '').strip()
-        new_assertion = str(arguments.get('new_assertion') or '').strip()
-        reason = str(arguments.get('reason') or '').strip()
-        if not criterion_id:
-            raise FunctionCallValidationError(
-                'refine requires non-empty criterion_id (from view).'
-            )
-        if not new_assertion:
-            raise FunctionCallValidationError(
-                'refine requires non-empty new_assertion.'
-            )
-        if not reason:
-            raise FunctionCallValidationError(
-                'refine requires non-empty reason explaining the change.'
-            )
-        existing = _criteria_existing_normalized(store)
-        known_ids = {
-            str(item.get('id') or '').strip()
-            for item in existing
-            if str(item.get('id') or '').strip()
-        }
-        if criterion_id not in known_ids:
-            raise FunctionCallValidationError(
-                f'Unknown criterion_id {criterion_id!r}. Call view for current ids.'
-            )
-        return AcceptanceCriteriaAction(
-            command='refine',
-            criterion_id=criterion_id,
-            new_assertion=new_assertion,
-            reason=reason,
-            criteria_list=existing,
-        )
-
-    if command == 'audit':
-        existing = _criteria_existing_normalized(store)
-        if 'audit_entries' in arguments:
-            audit_entries = _validate_audit_entries(
-                arguments.get('audit_entries'), existing
-            )
-            return AcceptanceCriteriaAction(
-                command='audit',
-                audit_entries=audit_entries,
-                criteria_list=existing,
-            )
-
-        if 'criteria_list' not in arguments:
-            raise FunctionCallValidationError(
-                'Missing required argument "audit_entries" (preferred) or '
-                '"criteria_list" (legacy) for "audit" command.'
-            )
-        raw_any = arguments.get('criteria_list', [])
-        if not isinstance(raw_any, Sequence):
-            raise FunctionCallValidationError(
-                f'Invalid format for "criteria_list". Expected a list but got {type(raw_any)}.'
-            )
-        criteria_raw = cast(Sequence[Mapping[str, Any]], raw_any)
-        normalized = _normalize_criteria_list(list(criteria_raw))
-        _validate_audit_criteria(normalized)
-        if existing and len(normalized) != len(existing):
-            raise FunctionCallValidationError(
-                'Audit must include every criterion in the current list with evidence filled.'
-            )
-        return AcceptanceCriteriaAction(command='audit', criteria_list=normalized)
-
-    if 'criteria_list' not in arguments:
+    if not new_assertion:
+        raise FunctionCallValidationError('refine requires non-empty new_assertion.')
+    if not reason:
         raise FunctionCallValidationError(
-            f'Missing required argument "criteria_list" for "{command}" command '
-            f'in tool call {ACCEPTANCE_CRITERIA_TOOL_NAME}'
+            'refine requires non-empty reason explaining the change.'
         )
+    existing = _criteria_existing_normalized(store)
+    known_ids = {
+        str(item.get('id') or '').strip()
+        for item in existing
+        if str(item.get('id') or '').strip()
+    }
+    if criterion_id not in known_ids:
+        raise FunctionCallValidationError(
+            f'Unknown criterion_id {criterion_id!r}. Call view for current ids.'
+        )
+    return AcceptanceCriteriaAction(
+        command='refine',
+        criterion_id=criterion_id,
+        new_assertion=new_assertion,
+        reason=reason,
+        criteria_list=existing,
+    )
 
+
+def _criteria_list_from_arguments(
+    arguments: Mapping[str, Any],
+) -> list[dict[str, Any]]:
     raw_any = arguments.get('criteria_list', [])
     if not isinstance(raw_any, Sequence):
         raise FunctionCallValidationError(
             f'Invalid format for "criteria_list". Expected a list but got {type(raw_any)}.'
         )
     criteria_raw = cast(Sequence[Mapping[str, Any]], raw_any)
-    normalized = _normalize_criteria_list(list(criteria_raw))
+    return _normalize_criteria_list(list(criteria_raw))
+
+
+def _handle_legacy_criteria_audit(
+    arguments: Mapping[str, Any],
+    existing: list[dict[str, Any]],
+) -> AcceptanceCriteriaAction:
+    if 'criteria_list' not in arguments:
+        raise FunctionCallValidationError(
+            'Missing required argument "audit_entries" (preferred) or '
+            '"criteria_list" (legacy) for "audit" command.'
+        )
+    normalized = _criteria_list_from_arguments(arguments)
+    _validate_audit_criteria(normalized)
+    if existing and len(normalized) != len(existing):
+        raise FunctionCallValidationError(
+            'Audit must include every criterion in the current list with evidence filled.'
+        )
+    return AcceptanceCriteriaAction(command='audit', criteria_list=normalized)
+
+
+def _handle_acceptance_criteria_audit(
+    arguments: Mapping[str, Any],
+    store: AcceptanceCriteriaStore,
+) -> AcceptanceCriteriaAction:
+    existing = _criteria_existing_normalized(store)
+    if 'audit_entries' in arguments:
+        audit_entries = _validate_audit_entries(
+            arguments.get('audit_entries'), existing
+        )
+        return AcceptanceCriteriaAction(
+            command='audit',
+            audit_entries=audit_entries,
+            criteria_list=existing,
+        )
+    return _handle_legacy_criteria_audit(arguments, existing)
+
+
+def _handle_acceptance_criteria_update(
+    command: str,
+    arguments: Mapping[str, Any],
+    store: AcceptanceCriteriaStore,
+) -> AcceptanceCriteriaAction:
+    if 'criteria_list' not in arguments:
+        raise FunctionCallValidationError(
+            f'Missing required argument "criteria_list" for "{command}" command '
+            f'in tool call {ACCEPTANCE_CRITERIA_TOOL_NAME}'
+        )
+    normalized = _criteria_list_from_arguments(arguments)
     existing = _criteria_existing_normalized(store)
 
     if command == 'append':
@@ -809,6 +818,25 @@ def _handle_acceptance_criteria_tool(arguments: Mapping[str, Any]) -> Action:
             return noop
 
     return AcceptanceCriteriaAction(command=command, criteria_list=final_list)
+
+
+def _handle_acceptance_criteria_tool(arguments: Mapping[str, Any]) -> Action:
+    """Handle acceptance_criteria tool call."""
+    command = require_tool_argument(arguments, 'command', ACCEPTANCE_CRITERIA_TOOL_NAME)
+    if command not in {'view', 'update', 'append', 'refine', 'audit'}:
+        raise FunctionCallValidationError(
+            f'Unsupported command {command!r} for tool call {ACCEPTANCE_CRITERIA_TOOL_NAME}'
+        )
+
+    store = AcceptanceCriteriaStore()
+
+    if command == 'view':
+        return _handle_acceptance_criteria_view(store)
+    if command == 'refine':
+        return _handle_acceptance_criteria_refine(arguments, store)
+    if command == 'audit':
+        return _handle_acceptance_criteria_audit(arguments, store)
+    return _handle_acceptance_criteria_update(command, arguments, store)
 
 
 def _handle_mcp_tool(

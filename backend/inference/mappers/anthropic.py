@@ -307,39 +307,37 @@ def _merge_combinator_branches(branches: Any) -> dict[str, Any]:
     return merged
 
 
-def _sanitize_json_schema_node(schema: Any, *, at_root: bool) -> dict[str, Any]:
-    if not isinstance(schema, dict) or not schema:
-        return _default_input_schema() if at_root else {}
+def _merge_root_combinators(normalized: dict[str, Any]) -> None:
+    for combinator in _SCHEMA_COMBINATORS:
+        if combinator not in normalized:
+            continue
+        branches = normalized.pop(combinator)
+        # Conditional allOf blocks (if/then) encode optional required fields
+        # Anthropic cannot represent. oneOf/anyOf may define the base shape.
+        if combinator not in ('oneOf', 'anyOf') or normalized.get('properties'):
+            continue
+        merged = _merge_combinator_branches(branches)
+        for key, value in merged.items():
+            if key not in normalized:
+                normalized[key] = value
 
-    normalized: dict[str, Any] = dict(schema)
 
-    if at_root:
-        for combinator in _SCHEMA_COMBINATORS:
-            if combinator not in normalized:
-                continue
-            branches = normalized.pop(combinator)
-            # Conditional allOf blocks (if/then) encode optional required fields
-            # Anthropic cannot represent. oneOf/anyOf may define the base shape.
-            if combinator in ('oneOf', 'anyOf') and not normalized.get('properties'):
-                merged = _merge_combinator_branches(branches)
-                for key, value in merged.items():
-                    if key not in normalized:
-                        normalized[key] = value
-
-    for key in _CONDITIONAL_KEYS:
-        normalized.pop(key, None)
-
+def _sanitize_schema_properties(normalized: dict[str, Any]) -> None:
     props = normalized.get('properties')
-    if isinstance(props, dict):
-        normalized['properties'] = {
-            name: _sanitize_json_schema_node(prop, at_root=False)
-            for name, prop in props.items()
-        }
+    if not isinstance(props, dict):
+        return
+    normalized['properties'] = {
+        name: _sanitize_json_schema_node(prop, at_root=False)
+        for name, prop in props.items()
+    }
 
+
+def _sanitize_schema_items(normalized: dict[str, Any]) -> None:
     items = normalized.get('items')
     if isinstance(items, dict):
         normalized['items'] = _sanitize_json_schema_node(items, at_root=False)
-    elif isinstance(items, list):
+        return
+    if isinstance(items, list):
         normalized['items'] = [
             _sanitize_json_schema_node(item, at_root=False)
             if isinstance(item, dict)
@@ -347,13 +345,33 @@ def _sanitize_json_schema_node(schema: Any, *, at_root: bool) -> dict[str, Any]:
             for item in items
         ]
 
+
+def _ensure_root_object_schema(normalized: dict[str, Any]) -> None:
+    if not isinstance(normalized.get('type'), str) or not normalized.get('type'):
+        normalized['type'] = 'object'
+    if normalized.get('type') == 'object' and not isinstance(
+        normalized.get('properties'), dict
+    ):
+        normalized['properties'] = {}
+
+
+def _sanitize_json_schema_node(schema: Any, *, at_root: bool) -> dict[str, Any]:
+    if not isinstance(schema, dict) or not schema:
+        return _default_input_schema() if at_root else {}
+
+    normalized: dict[str, Any] = dict(schema)
+
     if at_root:
-        if not isinstance(normalized.get('type'), str) or not normalized.get('type'):
-            normalized['type'] = 'object'
-        if normalized.get('type') == 'object' and not isinstance(
-            normalized.get('properties'), dict
-        ):
-            normalized['properties'] = {}
+        _merge_root_combinators(normalized)
+
+    for key in _CONDITIONAL_KEYS:
+        normalized.pop(key, None)
+
+    _sanitize_schema_properties(normalized)
+    _sanitize_schema_items(normalized)
+
+    if at_root:
+        _ensure_root_object_schema(normalized)
 
     return normalized
 

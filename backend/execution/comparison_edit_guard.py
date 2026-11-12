@@ -93,68 +93,94 @@ class ComparisonEditGuard:
             ):
                 raise ComparisonContractError(f'unsupported source path: {path}')
 
+    @staticmethod
+    def _folded_paths(tree: dict[str, tuple[str, str]]) -> dict[str, list[str]]:
+        folded: dict[str, list[str]] = {}
+        for path in tree:
+            folded.setdefault(path.casefold(), []).append(path)
+        return folded
+
+    def _check_executable_modes(self, current: dict[str, tuple[str, str]]) -> None:
+        # Each newly located executable needs one executable path removed
+        # from the base. This checks the resulting mode budget, without
+        # pretending Git's similarity guesses prove a rename.
+        removed_executables = sum(
+            mode == '100755' and path not in current
+            for path, (mode, _) in self.original.items()
+        )
+        new_executables = sum(
+            mode == '100755' and path not in self.original
+            for path, (mode, _) in current.items()
+        )
+        if new_executables > removed_executables:
+            raise ComparisonContractError('new files must use mode 100644')
+
+    def _check_new_path_collision(self, path: str) -> None:
+        folded_path = path.casefold()
+        if any(
+            old.casefold() == folded_path
+            or folded_path.startswith(old.casefold() + '/')
+            or old.casefold().startswith(folded_path + '/')
+            for old in self.original
+        ):
+            raise ComparisonContractError(
+                f'new source path collides with the starting tree: {path}'
+            )
+
+    def _check_entries(
+        self,
+        path: str,
+        before: tuple[str, str] | None,
+        after: tuple[str, str] | None,
+    ) -> None:
+        if before and before[0] not in {'100644', '100755'}:
+            raise ComparisonContractError(
+                f'cannot change a symlink or submodule: {path}'
+            )
+        if after and after[0] not in {'100644', '100755'}:
+            raise ComparisonContractError(
+                f'cannot create a symlink or submodule: {path}'
+            )
+        if before and after and before[0] != after[0]:
+            raise ComparisonContractError(f'permission changes are unsupported: {path}')
+        for entry in (before, after):
+            if entry:
+                data = self._git('cat-file', 'blob', entry[1])
+                if b'\0' in data:
+                    raise ComparisonContractError(f'binary source change: {path}')
+                try:
+                    data.decode('utf-8')
+                except UnicodeDecodeError as exc:
+                    raise ComparisonContractError(
+                        f'non-UTF-8 source change: {path}'
+                    ) from exc
+
+    def _validate_change(
+        self,
+        path: str,
+        before: tuple[str, str] | None,
+        after: tuple[str, str] | None,
+        folded: dict[str, list[str]],
+    ) -> None:
+        self._path(path)
+        if len(folded.get(path.casefold(), [])) > 1:
+            raise ComparisonContractError(f'case-colliding source path: {path}')
+        if before is None:
+            self._check_new_path_collision(path)
+        self._check_entries(path, before, after)
+
     def check(self) -> None:
         if self.failed:
             raise ComparisonContractError(self.failed)
         try:
             current = self._current_tree()
-            folded: dict[str, list[str]] = {}
-            for path in current:
-                folded.setdefault(path.casefold(), []).append(path)
-            # Each newly located executable needs one executable path removed
-            # from the base. This checks the resulting mode budget, without
-            # pretending Git's similarity guesses prove a rename.
-            removed_executables = sum(
-                mode == '100755' and path not in current
-                for path, (mode, _) in self.original.items()
-            )
-            new_executables = sum(
-                mode == '100755' and path not in self.original
-                for path, (mode, _) in current.items()
-            )
-            if new_executables > removed_executables:
-                raise ComparisonContractError('new files must use mode 100644')
+            folded = self._folded_paths(current)
+            self._check_executable_modes(current)
             for path in self.original.keys() | current.keys():
                 before, after = self.original.get(path), current.get(path)
                 if before == after:
                     continue
-                self._path(path)
-                if len(folded.get(path.casefold(), [])) > 1:
-                    raise ComparisonContractError(f'case-colliding source path: {path}')
-                if before is None and any(
-                    old.casefold() == path.casefold()
-                    or path.casefold().startswith(old.casefold() + '/')
-                    or old.casefold().startswith(path.casefold() + '/')
-                    for old in self.original
-                ):
-                    raise ComparisonContractError(
-                        f'new source path collides with the starting tree: {path}'
-                    )
-                if before and before[0] not in {'100644', '100755'}:
-                    raise ComparisonContractError(
-                        f'cannot change a symlink or submodule: {path}'
-                    )
-                if after and after[0] not in {'100644', '100755'}:
-                    raise ComparisonContractError(
-                        f'cannot create a symlink or submodule: {path}'
-                    )
-                if before and after and before[0] != after[0]:
-                    raise ComparisonContractError(
-                        f'permission changes are unsupported: {path}'
-                    )
-                for entry in (before, after):
-                    if entry:
-                        data = self._git('cat-file', 'blob', entry[1])
-                        if b'\0' in data:
-                            raise ComparisonContractError(
-                                f'binary source change: {path}'
-                            )
-                        try:
-                            data.decode('utf-8')
-                        except UnicodeDecodeError as exc:
-                            raise ComparisonContractError(
-                                f'non-UTF-8 source change: {path}'
-                            ) from exc
+                self._validate_change(path, before, after, folded)
         except Exception as exc:
             self.failed = f'Agentless-ML comparison edit contract violated: {exc}'
             raise ComparisonContractError(self.failed) from exc

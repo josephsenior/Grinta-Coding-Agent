@@ -115,6 +115,35 @@ class PreExecDiffMiddleware(ToolInvocationMiddleware):
             normalized = normalized.replace('\n', '\r\n')
         return normalized
 
+    @staticmethod
+    def _is_identifier_char(char: str) -> bool:
+        return char.isalnum() or char == '_'
+
+    def _count_boundary_matches(self, old_content: str, old_match: str) -> int:
+        # Count boundary-aware matches (not naive substring count).
+        import re as _re
+
+        old_starts_with_id = bool(old_match and self._is_identifier_char(old_match[0]))
+        old_ends_with_id = bool(old_match and self._is_identifier_char(old_match[-1]))
+
+        match_count = 0
+        for m in _re.finditer(_re.escape(old_match), old_content):
+            start, end = m.start(), m.end()
+            if (
+                old_starts_with_id
+                and start > 0
+                and self._is_identifier_char(old_content[start - 1])
+            ):
+                continue
+            if (
+                old_ends_with_id
+                and end < len(old_content)
+                and self._is_identifier_char(old_content[end])
+            ):
+                continue
+            match_count += 1
+        return match_count
+
     def _simulate_replace_string(self, old_content: str, action) -> str | None:
         old_string = getattr(action, 'old_string', None)
         if not old_string:
@@ -126,46 +155,18 @@ class PreExecDiffMiddleware(ToolInvocationMiddleware):
         replace_all = getattr(action, 'replace_all', False)
         replace_all = replace_all if isinstance(replace_all, bool) else False
 
-        # Count boundary-aware matches (not naive substring count).
-        import re as _re
-
-        old_starts_with_id = bool(
-            old_match and (old_match[0].isalnum() or old_match[0] == '_')
-        )
-        old_ends_with_id = bool(
-            old_match and (old_match[-1].isalnum() or old_match[-1] == '_')
-        )
-
-        boundary_matches = []
-        for m in _re.finditer(_re.escape(old_match), old_content):
-            start, end = m.start(), m.end()
-            if (
-                old_starts_with_id
-                and start > 0
-                and (old_content[start - 1].isalnum() or old_content[start - 1] == '_')
-            ):
-                continue
-            if (
-                old_ends_with_id
-                and end < len(old_content)
-                and (old_content[end].isalnum() or old_content[end] == '_')
-            ):
-                continue
-            boundary_matches.append(m)
-
-        match_count = len(boundary_matches)
+        match_count = self._count_boundary_matches(old_content, old_match)
         if match_count == 0 or (match_count > 1 and not replace_all):
             return None
 
-        if replace_all:
-            from backend.execution.utils.file_editor._file_editor_edit_helpers import (
-                _replace_all_with_boundary_check,
-            )
+        if not replace_all:
+            return old_content.replace(old_match, new_replacement, 1)
 
-            return _replace_all_with_boundary_check(
-                old_content, old_match, new_replacement
-            )
-        return old_content.replace(old_match, new_replacement, 1)
+        from backend.execution.utils.file_editor._file_editor_edit_helpers import (
+            _replace_all_with_boundary_check,
+        )
+
+        return _replace_all_with_boundary_check(old_content, old_match, new_replacement)
 
     def _simulate_range_edit(self, old_content: str, action) -> str | None:
         start = getattr(action, 'start_line', None)

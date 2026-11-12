@@ -94,6 +94,108 @@ def _ctx_autonomy(record: dict[str, Any]) -> str:
     return 'unknown'
 
 
+def _record_event_timestamp(record: dict[str, Any], acc: _AuditAccumulator) -> None:
+    ts = parse_ts(record.get('ts'))
+    if ts:
+        acc.first_ts = acc.first_ts or ts
+        acc.last_ts = ts
+
+
+def _record_event_metadata(record: dict[str, Any], acc: _AuditAccumulator) -> str:
+    model = _ctx_model(record)
+    if model == 'unknown':
+        model = acc.last_known_model or 'unknown'
+    else:
+        acc.last_known_model = model
+    acc.by_model[model] += 1
+    acc.by_mode[_ctx_mode(record)] += 1
+    acc.by_autonomy[_ctx_autonomy(record)] += 1
+    return model
+
+
+def _record_state_change(
+    event: str, payload: dict[str, Any], line_no: int, acc: _AuditAccumulator
+) -> None:
+    if event != 'STATE_CHANGE':
+        return
+    a, b = payload.get('from'), payload.get('to')
+    if a and b:
+        acc.state_transitions.append((str(a), str(b), line_no))
+        acc.end_state = str(b)
+
+
+def _record_tool_result(
+    event: str, payload: dict[str, Any], model: str, acc: _AuditAccumulator
+) -> None:
+    if event != 'TOOL_RESULT':
+        return
+    ok = payload.get('ok')
+    if ok is True:
+        acc.tool_outcomes['ok'] += 1
+    elif ok is False:
+        acc.tool_outcomes['fail'] += 1
+        acc.tool_fail_by_model[model] += 1
+
+
+def _record_llm_latency(
+    event: str, payload: dict[str, Any], acc: _AuditAccumulator
+) -> None:
+    if event not in {'WIRE_RESPONSE', 'AGENT_STEP'}:
+        return
+    lat = payload.get('latency_ms')
+    if isinstance(lat, (int, float)):
+        acc.llm_latencies_ms.append(int(lat))
+
+
+def _record_file_event(
+    event: str, payload: dict[str, Any], line_no: int, acc: _AuditAccumulator
+) -> None:
+    if event != 'FILE_EVENT':
+        return
+    kind = str(payload.get('kind', 'FILE'))
+    path_preview = str(payload.get('path', ''))[:120]
+    acc.file_events.append((kind, path_preview, line_no))
+
+
+def _record_compaction_fallback(
+    event: str, payload: dict[str, Any], acc: _AuditAccumulator
+) -> None:
+    if event == 'COMPACTION' and payload.get('kind') == 'summary_fallback':
+        acc.compaction_fallbacks += 1
+
+
+def _record_runtime_signals(
+    event: str, payload: dict[str, Any], acc: _AuditAccumulator
+) -> None:
+    if event not in {'ISSUE', 'RUNTIME'}:
+        return
+    msg = str(payload.get('message', ''))
+    msg_type = payload.get('msg_type')
+    if msg_type:
+        acc.runtime_msg_types[str(msg_type)] += 1
+    if re.search(r'pending action timed out', msg, re.I):
+        acc.pending_timeouts += 1
+    if re.search(r'\bretry\b|\bbackoff\b|recover', msg, re.I):
+        acc.retries += 1
+
+
+def _record_issue(
+    event: str,
+    level: str,
+    payload: dict[str, Any],
+    model: str,
+    record: dict[str, Any],
+    line_no: int,
+    acc: _AuditAccumulator,
+) -> None:
+    if event != 'ISSUE' and level not in ISSUE_LEVELS:
+        return
+    acc.issue_lines.append(f'L{line_no}: [{event}] {payload.get("message", payload)}')
+    acc.issues_by_model[model] += 1
+    if acc.first_issue_ctx is None and isinstance(record.get('ctx'), dict):
+        acc.first_issue_ctx = dict(record['ctx'])
+
+
 def _process_event(
     line_no: int, record: dict[str, Any], acc: _AuditAccumulator
 ) -> None:
@@ -104,70 +206,20 @@ def _process_event(
     event = str(record.get('event', 'UNKNOWN'))
     acc.event_types[event] += 1
 
-    ts = parse_ts(record.get('ts'))
-    if ts:
-        acc.first_ts = acc.first_ts or ts
-        acc.last_ts = ts
-
-    model = _ctx_model(record)
-    if model == 'unknown':
-        model = acc.last_known_model or 'unknown'
-    else:
-        acc.last_known_model = model
-    mode = _ctx_mode(record)
-    autonomy = _ctx_autonomy(record)
-    acc.by_model[model] += 1
-    acc.by_mode[mode] += 1
-    acc.by_autonomy[autonomy] += 1
+    _record_event_timestamp(record, acc)
+    model = _record_event_metadata(record, acc)
 
     payload = record.get('payload')
     if not isinstance(payload, dict):
         payload = {}
 
-    if event == 'STATE_CHANGE':
-        a, b = payload.get('from'), payload.get('to')
-        if a and b:
-            acc.state_transitions.append((str(a), str(b), line_no))
-            acc.end_state = str(b)
-
-    if event == 'TOOL_RESULT':
-        ok = payload.get('ok')
-        if ok is True:
-            acc.tool_outcomes['ok'] += 1
-        elif ok is False:
-            acc.tool_outcomes['fail'] += 1
-            acc.tool_fail_by_model[model] += 1
-
-    if event in {'WIRE_RESPONSE', 'AGENT_STEP'}:
-        lat = payload.get('latency_ms')
-        if isinstance(lat, (int, float)):
-            acc.llm_latencies_ms.append(int(lat))
-
-    if event == 'FILE_EVENT':
-        kind = str(payload.get('kind', 'FILE'))
-        path_preview = str(payload.get('path', ''))[:120]
-        acc.file_events.append((kind, path_preview, line_no))
-
-    if event == 'COMPACTION' and payload.get('kind') == 'summary_fallback':
-        acc.compaction_fallbacks += 1
-
-    if event in {'ISSUE', 'RUNTIME'}:
-        msg = str(payload.get('message', ''))
-        msg_type = payload.get('msg_type')
-        if msg_type:
-            acc.runtime_msg_types[str(msg_type)] += 1
-        if re.search(r'pending action timed out', msg, re.I):
-            acc.pending_timeouts += 1
-        if re.search(r'\bretry\b|\bbackoff\b|recover', msg, re.I):
-            acc.retries += 1
-
-    if event == 'ISSUE' or level in ISSUE_LEVELS:
-        acc.issue_lines.append(
-            f'L{line_no}: [{event}] {payload.get("message", payload)}'
-        )
-        acc.issues_by_model[model] += 1
-        if acc.first_issue_ctx is None and isinstance(record.get('ctx'), dict):
-            acc.first_issue_ctx = dict(record['ctx'])
+    _record_state_change(event, payload, line_no, acc)
+    _record_tool_result(event, payload, model, acc)
+    _record_llm_latency(event, payload, acc)
+    _record_file_event(event, payload, line_no, acc)
+    _record_compaction_fallback(event, payload, acc)
+    _record_runtime_signals(event, payload, acc)
+    _record_issue(event, level, payload, model, record, line_no, acc)
 
 
 def _compute_verdict(acc: _AuditAccumulator) -> tuple[str, list[str]]:
@@ -235,14 +287,12 @@ def _write_metadata_breakdowns(rep, acc: _AuditAccumulator) -> None:
     rep.write('\n')
 
 
-def _write_report(
+def _write_report_header(
+    lines: list[str],
     acc: _AuditAccumulator,
     log_path: Path,
     transcript_path: Path,
-    verdict: str,
-    notes: list[str],
-) -> str:
-    lines: list[str] = []
+) -> None:
     w = lines.append
     w('SESSION LOG AUDIT')
     w('=' * 72)
@@ -257,11 +307,19 @@ def _write_report(
         )
     w(f'Final agent state: {acc.end_state or "unknown"}')
     w('')
+
+
+def _write_level_counts(lines: list[str], acc: _AuditAccumulator) -> None:
+    w = lines.append
     w('LEVEL COUNTS')
     w('-' * 40)
     for lvl, cnt in acc.levels.most_common():
         w(f'  {lvl}: {cnt:,}')
     w('')
+
+
+def _write_health_signals(lines: list[str], acc: _AuditAccumulator) -> None:
+    w = lines.append
     w('HEALTH SIGNALS')
     w('-' * 40)
     w(f'  Pending action timeouts: {acc.pending_timeouts}')
@@ -285,51 +343,104 @@ def _write_report(
             f'fail={acc.tool_outcomes.get("fail", 0)}'
         )
     w('')
+
+
+def _write_verdict_section(lines: list[str], verdict: str, notes: list[str]) -> None:
+    w = lines.append
     w(f'VERDICT: {verdict}')
     for note in notes:
         w(f'  • {note}')
     w('')
-    if acc.first_issue_ctx:
-        w('CONFIG AT FIRST ISSUE')
-        w('-' * 40)
-        w(json.dumps(acc.first_issue_ctx, indent=2, default=str))
-        w('')
-    if acc.issue_lines:
-        w(f'ISSUES / WARNINGS ({len(acc.issue_lines)} lines)')
-        w('-' * 40)
-        for item in acc.issue_lines[:200]:
-            w(item)
-        if len(acc.issue_lines) > 200:
-            w(f'... and {len(acc.issue_lines) - 200} more')
-        w('')
+
+
+def _write_first_issue_context(lines: list[str], acc: _AuditAccumulator) -> None:
+    if not acc.first_issue_ctx:
+        return
+    w = lines.append
+    w('CONFIG AT FIRST ISSUE')
+    w('-' * 40)
+    w(json.dumps(acc.first_issue_ctx, indent=2, default=str))
+    w('')
+
+
+def _write_issues_section(lines: list[str], acc: _AuditAccumulator) -> None:
+    if not acc.issue_lines:
+        return
+    w = lines.append
+    w(f'ISSUES / WARNINGS ({len(acc.issue_lines)} lines)')
+    w('-' * 40)
+    for item in acc.issue_lines[:200]:
+        w(item)
+    if len(acc.issue_lines) > 200:
+        w(f'... and {len(acc.issue_lines) - 200} more')
+    w('')
+
+
+def _write_event_type_breakdown(lines: list[str], acc: _AuditAccumulator) -> None:
+    w = lines.append
     w('EVENT TYPE BREAKDOWN')
     w('-' * 40)
     for evt, cnt in acc.event_types.most_common(40):
         w(f'  {cnt:5d}  {evt}')
     w('')
-    if acc.runtime_msg_types:
-        w('RUNTIME MSG_TYPE BREAKDOWN')
-        w('-' * 40)
-        for mt, cnt in acc.runtime_msg_types.most_common(40):
-            w(f'  {cnt:5d}  {mt}')
-        w('')
-    if acc.state_transitions:
-        w('STATE TRANSITION TIMELINE')
-        w('-' * 40)
-        last = None
-        for a, b, ln in acc.state_transitions:
-            pair = (a, b)
-            if pair != last:
-                w(f'L{ln}: {a} -> {b}')
-                last = pair
-        w('')
+
+
+def _write_runtime_msg_breakdown(lines: list[str], acc: _AuditAccumulator) -> None:
+    if not acc.runtime_msg_types:
+        return
+    w = lines.append
+    w('RUNTIME MSG_TYPE BREAKDOWN')
+    w('-' * 40)
+    for mt, cnt in acc.runtime_msg_types.most_common(40):
+        w(f'  {cnt:5d}  {mt}')
+    w('')
+
+
+def _write_state_transition_timeline(lines: list[str], acc: _AuditAccumulator) -> None:
+    if not acc.state_transitions:
+        return
+    w = lines.append
+    w('STATE TRANSITION TIMELINE')
+    w('-' * 40)
+    last = None
+    for a, b, ln in acc.state_transitions:
+        pair = (a, b)
+        if pair != last:
+            w(f'L{ln}: {a} -> {b}')
+            last = pair
+    w('')
+
+
+def _write_file_events_section(lines: list[str], acc: _AuditAccumulator) -> None:
+    if not acc.file_events:
+        return
+    w = lines.append
+    w(f'FILE EVENTS (first 40 of {len(acc.file_events)})')
+    w('-' * 40)
+    for kind, msg, ln in acc.file_events[:40]:
+        w(f'L{ln} [{kind}] {msg}')
+    w('')
+
+
+def _write_report(
+    acc: _AuditAccumulator,
+    log_path: Path,
+    transcript_path: Path,
+    verdict: str,
+    notes: list[str],
+) -> str:
+    lines: list[str] = []
+    _write_report_header(lines, acc, log_path, transcript_path)
+    _write_level_counts(lines, acc)
+    _write_health_signals(lines, acc)
+    _write_verdict_section(lines, verdict, notes)
+    _write_first_issue_context(lines, acc)
+    _write_issues_section(lines, acc)
+    _write_event_type_breakdown(lines, acc)
+    _write_runtime_msg_breakdown(lines, acc)
+    _write_state_transition_timeline(lines, acc)
     _write_metadata_breakdowns_to_lines(lines, acc)
-    if acc.file_events:
-        w(f'FILE EVENTS (first 40 of {len(acc.file_events)})')
-        w('-' * 40)
-        for kind, msg, ln in acc.file_events[:40]:
-            w(f'L{ln} [{kind}] {msg}')
-        w('')
+    _write_file_events_section(lines, acc)
     return '\n'.join(lines)
 
 

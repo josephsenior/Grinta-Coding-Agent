@@ -158,38 +158,68 @@ def _summarize_terminal_manager_args(args: dict[str, Any]) -> str:
     return handler(args) if handler else 'terminal…'
 
 
+_DEBUGGER_SESSION_OPS = frozenset(
+    {
+        'stack',
+        'scopes',
+        'variables',
+        'status',
+        'stop',
+        'continue',
+        'next',
+        'step_in',
+        'step_out',
+        'pause',
+    }
+)
+
+
+def _debugger_start_summary(args: dict[str, Any]) -> str:
+    target = _arg_str(args, 'program', 'adapter', 'language', 'adapter_id')
+    cwd = _arg_str(args, 'cwd')
+    bits = ['start']
+    if target:
+        bits.append(_trunc(target, 72))
+    if cwd:
+        bits.append(f'cwd {_trunc(cwd, 40)}')
+    return ' · '.join(bits)
+
+
+def _debugger_breakpoints_summary(args: dict[str, Any]) -> str:
+    file = _arg_str(args, 'file') or 'breakpoints'
+    lines = args.get('lines')
+    if isinstance(lines, list) and lines:
+        preview = ','.join(str(line) for line in lines[:6])
+        if len(lines) > 6:
+            preview += ',...'
+        return _trunc(f'breakpoints · {file}:{preview}', 120)
+    breakpoints = args.get('breakpoints')
+    if isinstance(breakpoints, list) and breakpoints:
+        return _trunc(f'breakpoints · {file} · {len(breakpoints)}', 120)
+    return _trunc(f'breakpoints · {file}', 120)
+
+
+def _debugger_evaluate_summary(args: dict[str, Any]) -> str:
+    expr = _arg_str(args, 'expression')
+    return f'evaluate · {_trunc(expr, 90)}' if expr else 'evaluate'
+
+
+def _debugger_session_summary(op: str, sid: str) -> str:
+    return f'{op} · {_trunc(sid, 36)}' if sid else op
+
+
 def _summary_debugger(args: dict[str, Any]) -> str:
     """Human-readable line for the DAP ``debugger`` tool."""
     op = str(args.get('action') or args.get('debug_action') or '').strip().lower()
     sid = str(args.get('session_id') or '').strip()
     if op == 'start':
-        target = _arg_str(args, 'program', 'adapter', 'language', 'adapter_id')
-        cwd = _arg_str(args, 'cwd')
-        bits = ['start']
-        if target:
-            bits.append(_trunc(target, 72))
-        if cwd:
-            bits.append(f'cwd {_trunc(cwd, 40)}')
-        return ' · '.join(bits)
+        return _debugger_start_summary(args)
     if op == 'set_breakpoints':
-        file = _arg_str(args, 'file') or 'breakpoints'
-        lines = args.get('lines')
-        if isinstance(lines, list) and lines:
-            preview = ','.join(str(line) for line in lines[:6])
-            if len(lines) > 6:
-                preview += ',...'
-            return _trunc(f'breakpoints · {file}:{preview}', 120)
-        breakpoints = args.get('breakpoints')
-        if isinstance(breakpoints, list) and breakpoints:
-            return _trunc(f'breakpoints · {file} · {len(breakpoints)}', 120)
-        return _trunc(f'breakpoints · {file}', 120)
+        return _debugger_breakpoints_summary(args)
     if op == 'evaluate':
-        expr = _arg_str(args, 'expression')
-        return f'evaluate · {_trunc(expr, 90)}' if expr else 'evaluate'
-    if op in {'stack', 'scopes', 'variables', 'status', 'stop'}:
-        return f'{op} · {_trunc(sid, 36)}' if sid else op
-    if op in {'continue', 'next', 'step_in', 'step_out', 'pause'}:
-        return f'{op} · {_trunc(sid, 36)}' if sid else op
+        return _debugger_evaluate_summary(args)
+    if op in _DEBUGGER_SESSION_OPS:
+        return _debugger_session_summary(op, sid)
     return _trunc(op or sid or 'debugger…', 120)
 
 

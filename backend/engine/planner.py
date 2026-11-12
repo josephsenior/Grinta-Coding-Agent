@@ -22,6 +22,13 @@ from backend.core.interaction_modes import (
     normalize_interaction_mode,
 )
 from backend.core.logging.logger import app_logger as logger
+from backend.engine.planner_turn_context import (
+    message_text as _message_text,
+)
+from backend.engine.planner_turn_context import (
+    record_current_turn_context,
+    restore_prior_turn_context,
+)
 from backend.inference.catalog.catalog_loader import (
     supports_function_calling,
     supports_tool_choice,
@@ -62,8 +69,6 @@ _INJECTED_MSG_MARKERS = (
     '<GRINTA_TURN_CONTEXT',
 )
 
-_TURN_CONTEXT_STATE_KEY = '_prompt_turn_context_v1'
-_MAX_RECORDED_TURN_CONTEXTS = 64
 _PROMPT_TOKEN_COUNT_CACHE_MAX = 128
 
 
@@ -109,21 +114,6 @@ def _get_last_user_text_from_messages(messages: list) -> str:
                 if isinstance(item, dict) and item.get('type') == 'text'
             )
     return ''
-
-
-def _message_text(message: dict[str, Any]) -> str:
-    content = message.get('content', '')
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        parts: list[str] = []
-        for item in content:
-            if isinstance(item, dict):
-                parts.append(str(item.get('text') or item))
-            else:
-                parts.append(str(getattr(item, 'text', item)))
-        return '\n'.join(part for part in parts if part)
-    return str(content)
 
 
 def _message_contains(message: dict[str, Any], marker: str) -> bool:
@@ -455,184 +445,15 @@ class OrchestratorPlanner:
                 )
                 break
 
-    @staticmethod
-    def _user_message_fingerprint(message: dict[str, Any]) -> str:
-        return hashlib.sha256(_message_text(message).encode('utf-8')).hexdigest()
-
-    @staticmethod
-    def _turn_context_payload(state: State) -> dict[str, Any]:
-        extra = getattr(state, 'extra_data', None)
-        if not isinstance(extra, dict):
-            return {}
-        payload = extra.get(_TURN_CONTEXT_STATE_KEY)
-        return payload if isinstance(payload, dict) else {}
-
-    @staticmethod
-    def _record_lookup(
-        messages: list,
-    ) -> tuple[dict[int, tuple[str, int]], int | None]:
-        """Map each user-message index to a stable text fingerprint + occurrence."""
-        identities: dict[int, tuple[str, int]] = {}
-        occurrences: dict[str, int] = {}
-        last_user_index: int | None = None
-        for index, message in enumerate(messages):
-            if not isinstance(message, dict) or message.get('role') != 'user':
-                continue
-            fingerprint = OrchestratorPlanner._user_message_fingerprint(message)
-            occurrence = occurrences.get(fingerprint, 0)
-            occurrences[fingerprint] = occurrence + 1
-            identities[index] = (fingerprint, occurrence)
-            last_user_index = index
-        return identities, last_user_index
-
     def _restore_prior_turn_context(
         self,
         messages: list,
         state: State,
     ) -> tuple[list, bool]:
-        """Restore app context beside retained historical user turns.
-
-        ContextMemory rebuilds messages from ledger events, while planner-only
-        control blocks are intentionally not ledger events. Keeping a compact,
-        content-addressed snapshot in State makes subsequent provider requests
-        append-only for every retained turn.
-        """
-        payload = self._turn_context_payload(state)
-        pool = payload.get('blocks')
-        turns = payload.get('turns')
-        if not isinstance(pool, dict) or not isinstance(turns, list):
-            return list(messages), False
-
-        records: dict[tuple[str, int], list[str]] = {}
-        for record in turns:
-            if not isinstance(record, dict):
-                continue
-            fingerprint = record.get('user_fingerprint')
-            occurrence = record.get('occurrence')
-            block_ids = record.get('block_ids')
-            if (
-                not isinstance(fingerprint, str)
-                or not isinstance(occurrence, int)
-                or not isinstance(block_ids, list)
-            ):
-                continue
-            blocks = [pool.get(block_id) for block_id in block_ids]
-            records[(fingerprint, occurrence)] = [
-                block
-                for block in blocks
-                if isinstance(block, str) and is_turn_context_text(block)
-            ]
-
-        identities, last_user_index = self._record_lookup(messages)
-        if last_user_index is None:
-            return list(messages), False
-        current_identity = identities[last_user_index]
-        current_turn_restored = current_identity in records
-
-        restored: list = []
-        for index, message in enumerate(messages):
-            identity = identities.get(index)
-            if identity is not None and identity in records:
-                # Replace, rather than duplicate, any snapshots supplied by a
-                # future ContextMemory implementation.
-                while (
-                    restored
-                    and isinstance(restored[-1], dict)
-                    and restored[-1].get('role') == 'system'
-                    and is_turn_context_text(_message_text(restored[-1]))
-                ):
-                    restored.pop()
-                restored.extend(
-                    {'role': 'system', 'content': block}
-                    for block in records.get(identity, [])
-                )
-            restored.append(message)
-        return restored, current_turn_restored
+        return restore_prior_turn_context(messages, state)
 
     def _record_current_turn_context(self, messages: list, state: State) -> None:
-        identities, last_user_index = self._record_lookup(messages)
-        if last_user_index is None:
-            return
-
-        blocks: list[str] = []
-        index = last_user_index - 1
-        while index >= 0:
-            message = messages[index]
-            if (
-                not isinstance(message, dict)
-                or message.get('role') != 'system'
-                or not is_turn_context_text(_message_text(message))
-            ):
-                break
-            blocks.append(_message_text(message))
-            index -= 1
-        blocks.reverse()
-        if not blocks:
-            return
-
-        identity = identities[last_user_index]
-        payload = self._turn_context_payload(state)
-        raw_pool = payload.get('blocks')
-        raw_turns = payload.get('turns')
-        pool = dict(raw_pool) if isinstance(raw_pool, dict) else {}
-        turns = (
-            [item for item in raw_turns if isinstance(item, dict)]
-            if isinstance(raw_turns, list)
-            else []
-        )
-
-        block_ids: list[str] = []
-        for block in blocks:
-            block_id = hashlib.sha256(block.encode('utf-8')).hexdigest()
-            pool[block_id] = block
-            block_ids.append(block_id)
-
-        fingerprint, occurrence = identity
-        record = {
-            'user_fingerprint': fingerprint,
-            'occurrence': occurrence,
-            'block_ids': block_ids,
-        }
-        turns = [
-            item
-            for item in turns
-            if (
-                item.get('user_fingerprint'),
-                item.get('occurrence'),
-            )
-            != identity
-        ]
-        turns.append(record)
-        turns = turns[-_MAX_RECORDED_TURN_CONTEXTS:]
-        referenced_ids: set[str] = set()
-        for item in turns:
-            saved_ids = item.get('block_ids')
-            if isinstance(saved_ids, list):
-                referenced_ids.update(
-                    block_id for block_id in saved_ids if isinstance(block_id, str)
-                )
-        new_payload = {
-            'blocks': {
-                block_id: text
-                for block_id, text in pool.items()
-                if block_id in referenced_ids and isinstance(text, str)
-            },
-            'turns': turns,
-        }
-
-        extra = getattr(state, 'extra_data', None)
-        if isinstance(extra, dict):
-            extra[_TURN_CONTEXT_STATE_KEY] = new_payload
-        setter = getattr(state, 'set_extra', None)
-        if callable(setter):
-            try:
-                setter(
-                    _TURN_CONTEXT_STATE_KEY,
-                    new_payload,
-                    source='OrchestratorPlanner',
-                )
-            except Exception:
-                logger.debug('Failed to persist turn context snapshots', exc_info=True)
+        record_current_turn_context(messages, state)
 
     @staticmethod
     def _build_prompt_cache_variant(messages: list, tools: object) -> str:

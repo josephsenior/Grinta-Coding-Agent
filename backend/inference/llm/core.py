@@ -241,7 +241,23 @@ class LLM(RetryMixin, DebugMixin):
         via ``apply_model_param_overrides()``.
         """
         is_stream = kwargs.pop('is_stream', False)
+        prompt_accounting, prompt_cache_variant = self._consume_internal_call_kwargs(
+            kwargs
+        )
+        call_kwargs = self._default_call_kwargs(kwargs)
+        call_kwargs = self._apply_catalog_call_overrides(
+            call_kwargs,
+            is_stream=is_stream,
+            prompt_cache_variant=prompt_cache_variant,
+        )
+        self._cap_generation_fields(call_kwargs)
+        # Drop explicit None values to avoid sending JSON nulls.
+        # Keep falsy values like 0/False.
+        final_kwargs = {k: v for k, v in call_kwargs.items() if v is not None}
+        self._log_call_kwargs(final_kwargs, prompt_accounting)
+        return final_kwargs
 
+    def _consume_internal_call_kwargs(self, kwargs: dict[str, Any]) -> tuple[Any, Any]:
         for param in (
             'drop_params',
             'force_timeout',
@@ -255,8 +271,10 @@ class LLM(RetryMixin, DebugMixin):
         self._last_prompt_accounting = (
             prompt_accounting if isinstance(prompt_accounting, dict) else None
         )
+        return prompt_accounting, prompt_cache_variant
 
-        call_kwargs = {
+    def _default_call_kwargs(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        call_kwargs: dict[str, Any] = {
             'model': self.config.model,
             **kwargs,
         }
@@ -281,7 +299,15 @@ class LLM(RetryMixin, DebugMixin):
         timeout = getattr(self.config, 'timeout', None)
         if timeout is not None:
             call_kwargs['timeout'] = float(timeout)
+        return call_kwargs
 
+    def _apply_catalog_call_overrides(
+        self,
+        call_kwargs: dict[str, Any],
+        *,
+        is_stream: bool,
+        prompt_cache_variant: Any,
+    ) -> dict[str, Any]:
         from backend.inference.catalog.catalog_loader import (
             apply_model_param_overrides,
             sanitize_call_kwargs_for_provider,
@@ -304,8 +330,10 @@ class LLM(RetryMixin, DebugMixin):
         if self.config.seed is not None:
             call_kwargs['seed'] = self.config.seed
 
-        call_kwargs = sanitize_call_kwargs_for_provider(model, call_kwargs)
+        return sanitize_call_kwargs_for_provider(model, call_kwargs)
 
+    @staticmethod
+    def _cap_generation_fields(call_kwargs: dict[str, Any]) -> None:
         from backend.inference.capabilities.context_limits import (
             cap_generation_output_tokens,
         )
@@ -320,9 +348,9 @@ class LLM(RetryMixin, DebugMixin):
             if capped is not None:
                 call_kwargs[field] = capped
 
-        # Drop explicit None values to avoid sending JSON nulls.
-        # Keep falsy values like 0/False.
-        final_kwargs = {k: v for k, v in call_kwargs.items() if v is not None}
+    def _log_call_kwargs(
+        self, final_kwargs: dict[str, Any], prompt_accounting: Any
+    ) -> None:
         log_payload = _safe_call_kwargs_for_log(final_kwargs)
         if isinstance(prompt_accounting, dict):
             log_payload['prompt_accounting'] = prompt_accounting
@@ -334,7 +362,6 @@ class LLM(RetryMixin, DebugMixin):
             'LLM applied call params: %s',
             json.dumps(log_payload, sort_keys=True, default=str),
         )
-        return final_kwargs
 
     def _record_response_metrics(self, response: Any, latency: float) -> None:
         """Record latency, cost, and token usage from an LLM response.

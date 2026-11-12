@@ -419,36 +419,52 @@ def _extract_acceptance_criteria(event: Event, snapshot: dict) -> None:
     """Capture the latest structured acceptance criteria state."""
     cls_name = type(event).__name__
     if cls_name == 'TaskStateObservation':
-        state = getattr(event, 'state', {})
-        contract = state.get('contract', {}) if isinstance(state, dict) else {}
-        groups = ('requirements', 'constraints', 'success_conditions')
-        setattr(
-            event,
-            'criteria_list',
-            [
-                {
-                    'id': item.get('id', ''),
-                    'assertion': item.get('text', ''),
-                    'source': item.get('source', 'agent'),
-                    'evidence': '; '.join(
-                        str(e.get('summary', ''))
-                        for e in item.get('evidence', [])
-                        if isinstance(e, dict)
-                    ),
-                }
-                for group in groups
-                for item in (
-                    contract.get(group, []) if isinstance(contract, dict) else []
-                )
-                if isinstance(item, dict)
-            ],
-        )
+        setattr(event, 'criteria_list', _criteria_from_task_state(event))
     elif cls_name not in ('AcceptanceCriteriaAction', 'AcceptanceCriteriaObservation'):
         return
     criteria_list = getattr(event, 'criteria_list', None)
     if not isinstance(criteria_list, list) or not criteria_list:
         return
 
+    criteria = _coerce_acceptance_criteria(criteria_list)
+    if not criteria:
+        return
+    event_id = getattr(event, 'id', None)
+    snapshot['acceptance_criteria'] = {
+        'event_id': event_id if isinstance(event_id, int) else None,
+        'command': str(getattr(event, 'command', '') or '').strip()[:80],
+        'criteria': criteria,
+    }
+
+
+def _criteria_from_task_state(event: Event) -> list[dict[str, Any]]:
+    state = getattr(event, 'state', {})
+    contract = state.get('contract', {}) if isinstance(state, dict) else {}
+    if not isinstance(contract, dict):
+        return []
+    groups = ('requirements', 'constraints', 'success_conditions')
+    return [
+        {
+            'id': item.get('id', ''),
+            'assertion': item.get('text', ''),
+            'source': item.get('source', 'agent'),
+            'evidence': _criterion_evidence(item),
+        }
+        for group in groups
+        for item in contract.get(group, [])
+        if isinstance(item, dict)
+    ]
+
+
+def _criterion_evidence(item: dict[str, Any]) -> str:
+    return '; '.join(
+        str(evidence.get('summary', ''))
+        for evidence in item.get('evidence', [])
+        if isinstance(evidence, dict)
+    )
+
+
+def _coerce_acceptance_criteria(criteria_list: list) -> list[dict[str, Any]]:
     criteria: list[dict[str, Any]] = []
     for raw in criteria_list[:20]:
         if not isinstance(raw, dict):
@@ -464,14 +480,7 @@ def _extract_acceptance_criteria(event: Event, snapshot: dict) -> None:
                 'source': str(raw.get('source', '') or '').strip()[:40] or 'stated',
             }
         )
-    if not criteria:
-        return
-    event_id = getattr(event, 'id', None)
-    snapshot['acceptance_criteria'] = {
-        'event_id': event_id if isinstance(event_id, int) else None,
-        'command': str(getattr(event, 'command', '') or '').strip()[:80],
-        'criteria': criteria,
-    }
+    return criteria
 
 
 def _task_description(task: dict[str, Any]) -> str:

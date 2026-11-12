@@ -121,6 +121,116 @@ def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
     return lsp_line, dap_line
 
 
+def _render_condensation_line(
+    config: Any,
+    *,
+    semantic_recall_active: bool | None,
+) -> str:
+    condensation_tiers = (
+        'working / episodic / searchable history'
+        if _semantic_recall_runtime(
+            config, semantic_recall_active=semantic_recall_active
+        )
+        else 'working / episodic'
+    )
+    tracker_on = bool(getattr(config, 'enable_task_tracker_tool', True))
+    if tracker_on:
+        survival_list = (
+            'verified facts, the durable overall objective, contract conditions, '
+            'task plan, and the immediate task surface'
+        )
+    else:
+        survival_list = 'verified facts and the immediate task surface'
+    return (
+        '- **Conversation condensation**: AUTOMATIC and middleware-driven. '
+        'It costs ZERO tool calls and ZERO turns from your budget. '
+        f'It uses a {condensation_tiers} memory model and re-injects a pre-condensation '
+        f'snapshot after pruning, so {survival_list} survive. '
+        'Do not describe condensation as "lossy" or as something you must invoke manually.'
+    )
+
+
+def _render_web_line(config: Any) -> str:
+    if not bool(getattr(config, 'enable_web', True)):
+        return ''
+    return (
+        '- **Web (`web_search` / `web_fetch`)**: native tools backed by bundled Exa MCP '
+        '(search + markdown fetch). `EXA_API_KEY` is optional — preferred for higher limits, '
+        'not required. `web_fetch` falls back to fetch MCP when Exa cannot read a URL.'
+    )
+
+
+def _render_docs_line(config: Any) -> str:
+    if not bool(getattr(config, 'enable_docs', True)):
+        return ''
+    return (
+        '- **Library docs (`docs_resolve` / `docs_query`)**: native tools backed by bundled '
+        'Context7 MCP for current framework/SDK documentation. `CONTEXT7_API_KEY` is optional '
+        '— preferred for higher limits, not required. Call `docs_resolve` first unless you '
+        'already have a `/org/project` corpus ID.'
+    )
+
+
+def _render_browser_line(config: Any, *, can_edit: bool) -> str:
+    if not (_browser_runtime(config) and can_edit):
+        return ''
+    web_fetch_hint = (
+        'Use `web_fetch` for static URLs; `browser` when interaction is required.'
+        if bool(getattr(config, 'enable_web', True))
+        else 'Use when pages need interaction (forms, logins, JS SPAs).'
+    )
+    return (
+        '- **Browser (`browser`)**: in-process Chromium for interactive pages — forms, '
+        f'logins, JS SPAs. {web_fetch_hint}'
+    )
+
+
+def _render_memory_line(
+    config: Any,
+    *,
+    semantic_recall_active: bool | None,
+) -> str:
+    if not _semantic_recall_runtime(
+        config, semantic_recall_active=semantic_recall_active
+    ):
+        return ''
+    return (
+        '- **Search History (`search_history`)**: search earlier conversation and tool-event history when required '
+        'information is no longer visible. Keyword search: query with exact identifiers, paths, or error text.'
+    )
+
+
+def _render_checkpoint_line(config: Any, *, can_edit: bool) -> str:
+    if not (bool(getattr(config, 'enable_checkpoints', True)) and can_edit):
+        return ''
+    return (
+        '- **Checkpoints (`checkpoint`)**: risky edits/commands get automatic pre-action snapshots '
+        '(rollback middleware). Use `checkpoint(save)` for named phase milestones, '
+        '`checkpoint(view)` to list checkpoints, `checkpoint(revert)` after a bad edit or failed command, '
+        '`checkpoint(clear)` when the milestone list is stale or a fresh phase starts. '
+        'Prefer `undo_last_edit` for the last file write.'
+    )
+
+
+def _render_detection_section(
+    config: Any,
+    *,
+    can_edit: bool,
+) -> tuple[str, str]:
+    lsp_line, dap_line = _render_runtime_detection_lines(config)
+    if not can_edit:
+        dap_line = ''
+    detection_block = '\n'.join(line for line in (lsp_line, dap_line) if line)
+    runtime_discovery_hint = (
+        '\nIn particular, **never run shell commands like `Get-Command`/`which`/`where` '
+        'to discover language servers or debug adapters** — the bullets in this section '
+        'for those tools are the authoritative answer.'
+        if detection_block
+        else ''
+    )
+    return detection_block, runtime_discovery_hint
+
+
 def _render_system_capabilities(
     config: Any,
     *,
@@ -147,75 +257,18 @@ def _render_system_capabilities(
         config,
         parallel_tool_calls_provider_flag=parallel_tool_calls_provider_flag,
     )
-
-    condensation_tiers = (
-        'working / episodic / searchable history'
-        if _semantic_recall_runtime(
-            config, semantic_recall_active=semantic_recall_active
-        )
-        else 'working / episodic'
+    condensation_line = _render_condensation_line(
+        config,
+        semantic_recall_active=semantic_recall_active,
     )
-    tracker_on = bool(getattr(config, 'enable_task_tracker_tool', True))
-    if tracker_on:
-        survival_list = (
-            'verified facts, the durable overall objective, contract conditions, '
-            'task plan, and the immediate task surface'
-        )
-    else:
-        survival_list = 'verified facts and the immediate task surface'
-    condensation_line = (
-        '- **Conversation condensation**: AUTOMATIC and middleware-driven. '
-        'It costs ZERO tool calls and ZERO turns from your budget. '
-        f'It uses a {condensation_tiers} memory model and re-injects a pre-condensation '
-        f'snapshot after pruning, so {survival_list} survive. '
-        'Do not describe condensation as "lossy" or as something you must invoke manually.'
+    web_line = _render_web_line(config)
+    docs_line = _render_docs_line(config)
+    browser_line = _render_browser_line(config, can_edit=can_edit)
+    memory_line = _render_memory_line(
+        config,
+        semantic_recall_active=semantic_recall_active,
     )
-
-    web_line = ''
-    if bool(getattr(config, 'enable_web', True)):
-        web_line = (
-            '- **Web (`web_search` / `web_fetch`)**: native tools backed by bundled Exa MCP '
-            '(search + markdown fetch). `EXA_API_KEY` is optional — preferred for higher limits, '
-            'not required. `web_fetch` falls back to fetch MCP when Exa cannot read a URL.'
-        )
-
-    docs_line = ''
-    if bool(getattr(config, 'enable_docs', True)):
-        docs_line = (
-            '- **Library docs (`docs_resolve` / `docs_query`)**: native tools backed by bundled '
-            'Context7 MCP for current framework/SDK documentation. `CONTEXT7_API_KEY` is optional '
-            '— preferred for higher limits, not required. Call `docs_resolve` first unless you '
-            'already have a `/org/project` corpus ID.'
-        )
-
-    browser_line = ''
-    if _browser_runtime(config) and can_edit:
-        web_fetch_hint = (
-            'Use `web_fetch` for static URLs; `browser` when interaction is required.'
-            if bool(getattr(config, 'enable_web', True))
-            else 'Use when pages need interaction (forms, logins, JS SPAs).'
-        )
-        browser_line = (
-            '- **Browser (`browser`)**: in-process Chromium for interactive pages — forms, '
-            f'logins, JS SPAs. {web_fetch_hint}'
-        )
-
-    memory_line = ''
-    if _semantic_recall_runtime(config, semantic_recall_active=semantic_recall_active):
-        memory_line = (
-            '- **Search History (`search_history`)**: search earlier conversation and tool-event history when required '
-            'information is no longer visible. Keyword search: query with exact identifiers, paths, or error text.'
-        )
-
-    checkpoint_line = ''
-    if bool(getattr(config, 'enable_checkpoints', True)) and can_edit:
-        checkpoint_line = (
-            '- **Checkpoints (`checkpoint`)**: risky edits/commands get automatic pre-action snapshots '
-            '(rollback middleware). Use `checkpoint(save)` for named phase milestones, '
-            '`checkpoint(view)` to list checkpoints, `checkpoint(revert)` after a bad edit or failed command, '
-            '`checkpoint(clear)` when the milestone list is stale or a fresh phase starts. '
-            'Prefer `undo_last_edit` for the last file write.'
-        )
+    checkpoint_line = _render_checkpoint_line(config, can_edit=can_edit)
 
     # External MCP tool catalogue status — single source of truth for
     # the model so it never has to guess whether MCP tools exist. When
@@ -225,16 +278,9 @@ def _render_system_capabilities(
 
     # Runtime-detected language servers / debug adapters — only when those tools
     # are enabled in config (omit bullets entirely when gated off).
-    lsp_line, dap_line = _render_runtime_detection_lines(config)
-    if not can_edit:
-        dap_line = ''  # debugger not available in Chat/Plan
-    detection_block = '\n'.join(line for line in (lsp_line, dap_line) if line)
-    runtime_discovery_hint = (
-        '\nIn particular, **never run shell commands like `Get-Command`/`which`/`where` '
-        'to discover language servers or debug adapters** — the bullets in this section '
-        'for those tools are the authoritative answer.'
-        if detection_block
-        else ''
+    detection_block, runtime_discovery_hint = _render_detection_section(
+        config,
+        can_edit=can_edit,
     )
 
     parts = [
@@ -244,20 +290,17 @@ def _render_system_capabilities(
         f'{runtime_discovery_hint}\n\n'
         f'{condensation_line}\n'
     ]
-    if parallel_line:
-        parts.append(f'{parallel_line}\n')
-    if web_line:
-        parts.append(f'{web_line}\n')
-    if docs_line:
-        parts.append(f'{docs_line}\n')
-    if mcp_status_line:
-        parts.append(f'{mcp_status_line}\n')
-    if browser_line:
-        parts.append(f'{browser_line}\n')
-    if memory_line:
-        parts.append(f'{memory_line}\n')
-    if checkpoint_line:
-        parts.append(f'{checkpoint_line}\n')
+    for line in (
+        parallel_line,
+        web_line,
+        docs_line,
+        mcp_status_line,
+        browser_line,
+        memory_line,
+        checkpoint_line,
+    ):
+        if line:
+            parts.append(f'{line}\n')
     if detection_block:
         parts.append(detection_block)
 

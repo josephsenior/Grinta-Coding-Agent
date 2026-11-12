@@ -34,6 +34,104 @@ from backend.ledger.observation import (
 logger = logging.getLogger(__name__)
 
 
+def _lsp_payload(content: str) -> Any:
+    try:
+        return json.loads(content)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return None
+
+
+def _lsp_counted_result(data: dict[str, Any]) -> tuple[bool, str | None]:
+    for key in ('definitions', 'references'):
+        items = data.get(key)
+        if not isinstance(items, list):
+            continue
+        if not items:
+            return True, None
+        noun = key.rstrip('s')
+        return True, f'{len(items)} {noun}{"s" if len(items) != 1 else ""}'
+    return False, None
+
+
+def _lsp_diagnostics_result(diagnostics: list[Any]) -> str:
+    count = len(diagnostics)
+    if count == 0:
+        return 'clean'
+    return f'{count} issue{"s" if count != 1 else ""}'
+
+
+def _lsp_text_result(content: str) -> str | None:
+    lines = [line for line in content.split('\n') if line.strip()]
+    if not lines:
+        return None
+    return f'{len(lines)} results'
+
+
+def _lsp_dict_result(data: dict[str, Any], content: str) -> str | None:
+    handled, result = _lsp_counted_result(data)
+    if handled:
+        return result
+    if 'hover' in data or 'contents' in data:
+        return 'completed'
+    symbols = data.get('symbols') or data.get('symbol_list')
+    if isinstance(symbols, list):
+        return f'{len(symbols)} symbols'
+    diagnostics = data.get('diagnostics') or data.get('issues')
+    if isinstance(diagnostics, list):
+        return _lsp_diagnostics_result(diagnostics)
+    actions = data.get('actions')
+    if isinstance(actions, list):
+        return f'{len(actions)} actions'
+    return _lsp_text_result(content)
+
+
+def _analyze_lines(content: str) -> list[str]:
+    return [line.strip() for line in content.split('\n') if line.strip()]
+
+
+def _analyze_result_kind(body_lower: str) -> str:
+    if 'callers' in body_lower or 'caller of' in body_lower:
+        return 'callers'
+    if (
+        'dependency' in body_lower
+        or 'depend on' in body_lower
+        or 'import' in body_lower
+    ):
+        return 'dependencies'
+    if 'symbol' in body_lower:
+        return 'symbols'
+    return 'completed'
+
+
+def _is_caller_line(line: str) -> bool:
+    return (
+        '::' in line or ' -> ' in line or ('  ' in line and '(' in line and ')' in line)
+    )
+
+
+def _analyze_callers_result(lines: list[str]) -> str:
+    caller_lines = [line for line in lines if _is_caller_line(line)]
+    return f'{len(caller_lines)} callers' if caller_lines else 'completed'
+
+
+def _is_dependency_line(line: str) -> bool:
+    return '<-' in line or '->' in line or 'import' in line.lower()
+
+
+def _analyze_dependencies_result(lines: list[str]) -> str:
+    dep_count = sum(1 for line in lines if _is_dependency_line(line))
+    return f'{dep_count} deps' if dep_count else 'completed'
+
+
+def _is_symbol_line(line: str) -> bool:
+    return not line.startswith('#') and not line.startswith('//')
+
+
+def _analyze_symbols_result(lines: list[str]) -> str:
+    symbol_lines = [line for line in lines if _is_symbol_line(line)]
+    return f'{len(symbol_lines)} symbols' if symbol_lines else 'completed'
+
+
 class _ObsExplorationMixin(_ObservationRenderersBase):
     def _render_lsp_query_observation(self, obs: LspQueryObservation) -> None:
         self._stop_reasoning()
@@ -51,44 +149,12 @@ class _ObsExplorationMixin(_ObservationRenderersBase):
             return 'unavailable'
         if not content.strip():
             return None
-        try:
-            data = json.loads(content)
-        except (json.JSONDecodeError, TypeError, ValueError):
-            data = None
+        data = _lsp_payload(content)
         if isinstance(data, dict):
-            # definitions/references → N results
-            for key in ('definitions', 'references'):
-                items = data.get(key)
-                if isinstance(items, list):
-                    count = len(items)
-                    if count == 0:
-                        return None
-                    noun = key.rstrip('s')
-                    return f'{count} {noun}{"s" if count != 1 else ""}'
-            # hover → completed
-            if 'hover' in data or 'contents' in data:
-                return 'completed'
-            # list_symbols → N symbols
-            symbols = data.get('symbols') or data.get('symbol_list')
-            if isinstance(symbols, list):
-                return f'{len(symbols)} symbols'
-            # diagnostics → N issues / clean
-            diagnostics = data.get('diagnostics') or data.get('issues')
-            if isinstance(diagnostics, list):
-                count = len(diagnostics)
-                if count == 0:
-                    return 'clean'
-                return f'{count} issue{"s" if count != 1 else ""}'
-            # code_action → N actions
-            actions = data.get('actions')
-            if isinstance(actions, list):
-                return f'{len(actions)} actions'
+            return _lsp_dict_result(data, content)
         if isinstance(data, list):
             return f'{len(data)} results'
-        lines = [line for line in content.split('\n') if line.strip()]
-        if not lines:
-            return None
-        return f'{len(lines)} results'
+        return _lsp_text_result(content)
 
     def _render_grep_observation(self, obs: GrepObservation) -> None:
         self._stop_reasoning()
@@ -196,51 +262,15 @@ class _ObsExplorationMixin(_ObservationRenderersBase):
             return 'unavailable'
         if not content.strip():
             return 'no output'
-        lines = [line.strip() for line in content.split('\n') if line.strip()]
+        lines = _analyze_lines(content)
         if not lines:
             return None
-        # Extract metric based on common payload patterns
-        body = '\n'.join(lines[:20])
-        body_lower = body.lower()
-        if 'callers' in body_lower or 'caller of' in body_lower:
-            # Count callers
-            caller_lines = [
-                line
-                for line in lines
-                if '::' in line
-                or ' -> ' in line
-                or '  ' in line
-                and '(' in line
-                and ')' in line
-            ]
-            return f'{len(caller_lines)} callers' if caller_lines else 'completed'
-        if (
-            'dependency' in body_lower
-            or 'depend on' in body_lower
-            or 'import' in body_lower
-        ):
-            dep_count = sum(
-                1
-                for line in lines
-                if line.strip()
-                and ('<-' in line or '->' in line or 'import' in line.lower())
-            )
-            return f'{dep_count} deps' if dep_count else 'completed'
-        if 'symbol' in body_lower:
-            symbol_lines = [
-                line
-                for line in lines
-                if line.strip()
-                and not line.startswith('#')
-                and not line.startswith('//')
-            ]
-            return f'{len(symbol_lines)} symbols' if symbol_lines else 'completed'
-        if (
-            'tree' in body_lower
-            or 'file_outline' in body_lower
-            or 'recent' in body_lower
-        ):
-            return 'completed'
-        if 'semantic_search' in body_lower:
-            return 'completed'
+        body_lower = '\n'.join(lines[:20]).lower()
+        kind = _analyze_result_kind(body_lower)
+        if kind == 'callers':
+            return _analyze_callers_result(lines)
+        if kind == 'dependencies':
+            return _analyze_dependencies_result(lines)
+        if kind == 'symbols':
+            return _analyze_symbols_result(lines)
         return 'completed'
