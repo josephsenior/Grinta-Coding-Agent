@@ -223,6 +223,20 @@ def _summary_debugger(args: dict[str, Any]) -> str:
     return _trunc(op or sid or 'debugger…', 120)
 
 
+def _stream_command(partial_json: str) -> str | None:
+    match = re.search(r'"command"\s*:\s*"((?:\\.|[^"\\])*)"', partial_json, re.DOTALL)
+    if not match:
+        return None
+    return match.group(1).replace('\\n', '\n').replace('\\"', '"')
+
+
+def _stream_session_action(op: str, partial_json: str) -> str:
+    match = re.search(r'"session_id"\s*:\s*"((?:\\.|[^"\\])*)"', partial_json)
+    if not match:
+        return op
+    return f'{op} · {_trunc(match.group(1), 40)}'
+
+
 def _streaming_hint_terminal_manager(partial_json: str) -> str:
     """Best-effort label while terminal JSON is still streaming."""
     m_act = re.search(
@@ -232,33 +246,15 @@ def _streaming_hint_terminal_manager(partial_json: str) -> str:
         return ''
     op = m_act.group(1)
     if op in {'open', 'start'}:
-        m_cmd = re.search(
-            r'"command"\s*:\s*"((?:\\.|[^"\\])*)"', partial_json, re.DOTALL
-        )
-        if m_cmd:
-            raw_c = m_cmd.group(1).replace('\\n', '\n').replace('\\"', '"')
-            return f'start · {_trunc(raw_c, 90)}'
-        return 'start'
+        command = _stream_command(partial_json)
+        return f'start · {_trunc(command, 90)}' if command is not None else 'start'
     if op == 'run':
-        m_cmd = re.search(
-            r'"command"\s*:\s*"((?:\\.|[^"\\])*)"', partial_json, re.DOTALL
-        )
-        if m_cmd:
-            raw_c = m_cmd.group(1).replace('\\n', '\n').replace('\\"', '"')
-            return f'$ {_trunc(raw_c, 90)}'
-        return 'run'
+        command = _stream_command(partial_json)
+        return f'$ {_trunc(command, 90)}' if command is not None else 'run'
     if op == 'input':
         return _stream_hint_input(partial_json)
-    if op == 'read':
-        m_sid = re.search(r'"session_id"\s*:\s*"((?:\\.|[^"\\])*)"', partial_json)
-        if m_sid:
-            return f'read · {_trunc(m_sid.group(1), 40)}'
-        return 'read'
-    if op == 'kill':
-        m_sid = re.search(r'"session_id"\s*:\s*"((?:\\.|[^"\\])*)"', partial_json)
-        if m_sid:
-            return f'kill · {_trunc(m_sid.group(1), 40)}'
-        return 'kill'
+    if op in {'read', 'kill'}:
+        return _stream_session_action(op, partial_json)
     return ''
 
 
@@ -347,20 +343,27 @@ def _summary_memory(args: dict[str, Any]) -> str:
     return _trunc(' · '.join(bits), 120) if bits else 'memory…'
 
 
+def _criteria_count_summary(criteria_list: Any, audit_entries: Any) -> str:
+    audit_count = len(audit_entries) if isinstance(audit_entries, list) else 0
+    count = len(criteria_list) if isinstance(criteria_list, list) else 0
+    if audit_count:
+        return f'{audit_count} audit{"s" if audit_count != 1 else ""}'
+    if count:
+        return f'{count} criterion{"s" if count != 1 else ""}'
+    return ''
+
+
 def _summary_acceptance_criteria(args: dict[str, Any]) -> str:
     op = args.get('operation') or args.get('command')
-    criteria_list = args.get('criteria_list')
-    audit_entries = args.get('audit_entries')
     criterion_id = str(args.get('criterion_id') or '').strip()
-    count = len(criteria_list) if isinstance(criteria_list, list) else 0
-    audit_count = len(audit_entries) if isinstance(audit_entries, list) else 0
     parts = [str(x) for x in (op,) if x]
     if criterion_id:
         parts.append(criterion_id)
-    if audit_count:
-        parts.append(f'{audit_count} audit{"s" if audit_count != 1 else ""}')
-    elif count:
-        parts.append(f'{count} criterion{"s" if count != 1 else ""}')
+    count_summary = _criteria_count_summary(
+        args.get('criteria_list'), args.get('audit_entries')
+    )
+    if count_summary:
+        parts.append(count_summary)
     return _trunc(' · '.join(parts), 160) if parts else 'criteria…'
 
 

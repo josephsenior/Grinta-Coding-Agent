@@ -70,15 +70,22 @@ class _AesIoInitMixin:
             guard = getattr(self, '_comparison_edit_guard', None)
             if guard is not None:
                 guard.check()
-            action_type = action.action
-            try:
-                obs = await getattr(self, action_type)(action)
-            finally:
-                if guard is not None:
-                    guard.check()
-                if budget is not None:
-                    budget.check()
+            obs = await self._execute_guarded_action(action, guard, budget)
 
+        self._strip_ansi_from_observation(obs)
+        return obs
+
+    async def _execute_guarded_action(self, action, guard, budget) -> Observation:
+        action_type = action.action
+        try:
+            return await getattr(self, action_type)(action)
+        finally:
+            if guard is not None:
+                guard.check()
+            if budget is not None:
+                budget.check()
+
+    def _strip_ansi_from_observation(self, obs) -> None:
         if hasattr(obs, 'content') and isinstance(obs.content, str):
             obs.content = self._strip_ansi_obs_text(obs.content)
         if hasattr(obs, 'path') and isinstance(obs.path, str):
@@ -88,7 +95,6 @@ class _AesIoInitMixin:
                 obs.message = self._strip_ansi_obs_text(obs.message)
             except AttributeError:
                 pass
-        return obs
 
     @staticmethod
     def _strip_ansi_obs_text(text: str) -> str:

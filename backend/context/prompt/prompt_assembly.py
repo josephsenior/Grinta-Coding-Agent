@@ -162,16 +162,12 @@ def _has_workspace_content(
     return has_repo or has_runtime or has_instructions or has_agents
 
 
-def _build_message_content(
+def _has_workspace_block(
     repo_info: RepositoryInfo | None,
     runtime_info: RuntimeInfo,
-    conversation_instructions: ConversationInstructions | None,
     repo_instructions: str,
-    filtered_agents: list[PlaybookKnowledge],
-    prompt_manager: PromptManager,
-) -> list[TextContent | ImageContent]:
-    message_content: list[TextContent | ImageContent] = []
-
+    conversation_instructions: ConversationInstructions | None,
+) -> bool:
     has_repo = repo_info is not None and (
         repo_info.repo_name or repo_info.repo_directory
     )
@@ -183,8 +179,25 @@ def _build_message_content(
     has_instructions = (
         bool(repo_instructions.strip()) or conversation_instructions is not None
     )
+    return bool(has_repo or has_runtime or has_instructions)
 
-    if has_repo or has_runtime or has_instructions:
+
+def _build_message_content(
+    repo_info: RepositoryInfo | None,
+    runtime_info: RuntimeInfo,
+    conversation_instructions: ConversationInstructions | None,
+    repo_instructions: str,
+    filtered_agents: list[PlaybookKnowledge],
+    prompt_manager: PromptManager,
+) -> list[TextContent | ImageContent]:
+    message_content: list[TextContent | ImageContent] = []
+
+    if _has_workspace_block(
+        repo_info,
+        runtime_info,
+        repo_instructions,
+        conversation_instructions,
+    ):
         formatted_workspace_text = prompt_manager.build_workspace_context(
             repository_info=repo_info,
             runtime_info=runtime_info,

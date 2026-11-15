@@ -57,9 +57,33 @@ def _validate_engine_components_ready(host: RunHelpersHost) -> bool:
     return True
 
 
+def _handle_prompt_input_failure(host: RunHelpersHost, error: Exception) -> str | None:
+    _MAX_CONSECUTIVE_FAILURES = 10
+    host._consecutive_input_failures += 1
+    logger.exception('Prompt input failed')
+    try:
+        host._console.print(
+            f'[{CLR_STATUS_ERR}]Prompt input failed ({host._consecutive_input_failures}/{_MAX_CONSECUTIVE_FAILURES}):[/] {error}',
+        )
+    except Exception:
+        pass
+    if host._consecutive_input_failures >= _MAX_CONSECUTIVE_FAILURES:
+        logger.error(
+            'Too many consecutive prompt failures (%d), forcing exit',
+            host._consecutive_input_failures,
+        )
+        try:
+            host._console.print(
+                f'[{CLR_STATUS_ERR}]Too many consecutive input failures. Exiting.[/]'
+            )
+        except Exception:
+            pass
+        return None
+    return ''
+
+
 async def _read_repl_input(host: RunHelpersHost, session: Any | None) -> str | None:
     """Read one line of input. Returns None to break the loop, '' to continue."""
-    _MAX_CONSECUTIVE_FAILURES = 10
     try:
         if session is None:
             user_input = await host._read_non_interactive_input()
@@ -87,27 +111,7 @@ async def _read_repl_input(host: RunHelpersHost, session: Any | None) -> str | N
         logger.debug('REPL: prompt input cancelled')
         return ''
     except Exception as e:
-        host._consecutive_input_failures += 1
-        logger.exception('Prompt input failed')
-        try:
-            host._console.print(
-                f'[{CLR_STATUS_ERR}]Prompt input failed ({host._consecutive_input_failures}/{_MAX_CONSECUTIVE_FAILURES}):[/] {e}',
-            )
-        except Exception:
-            pass
-        if host._consecutive_input_failures >= _MAX_CONSECUTIVE_FAILURES:
-            logger.error(
-                'Too many consecutive prompt failures (%d), forcing exit',
-                host._consecutive_input_failures,
-            )
-            try:
-                host._console.print(
-                    f'[{CLR_STATUS_ERR}]Too many consecutive input failures. Exiting.[/]'
-                )
-            except Exception:
-                pass
-            return None
-        return ''
+        return _handle_prompt_input_failure(host, e)
 
     host._consecutive_input_failures = 0
     if not host._running:

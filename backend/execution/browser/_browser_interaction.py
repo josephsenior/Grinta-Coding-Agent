@@ -193,16 +193,9 @@ async def _scroll_directional(
         )
     px = params.get('pixels')
     amount = int(px) if px is not None else 500
-    if params.get('scroll_index') is not None:
-        six, err = self._parse_browser_index(
-            cmd, params.get('scroll_index'), action_name='scroll'
-        )
-        if err is not None:
-            return err
-        # Bring the anchor element into view first, then scroll from there.
-        _, err2 = await self._get_browser_node(browser, cmd=cmd, index=six or 0)
-        if err2 is not None:
-            return err2
+    anchor_error = await self._scroll_to_anchor(cmd, browser, params)
+    if anchor_error is not None:
+        return anchor_error
     delta_x = amount if direction == 'right' else -amount if direction == 'left' else 0
     delta_y = amount if direction == 'down' else -amount if direction == 'up' else 0
     await browser.scroll(delta_x=delta_x, delta_y=delta_y)
@@ -212,6 +205,21 @@ async def _scroll_directional(
         cmd,
         CmdOutputObservation(content=content, command='browser scroll', exit_code=0),
     )
+
+
+async def _scroll_to_anchor(
+    self, cmd: str, browser: Any, params: dict[str, Any]
+) -> Observation | None:
+    if params.get('scroll_index') is None:
+        return None
+    six, err = self._parse_browser_index(
+        cmd, params.get('scroll_index'), action_name='scroll'
+    )
+    if err is not None:
+        return err
+    # Bring the anchor element into view first, then scroll from there.
+    _, err2 = await self._get_browser_node(browser, cmd=cmd, index=six or 0)
+    return err2
 
 
 async def execute_send_keys_impl(self, cmd: str, params: dict[str, Any]) -> Observation:

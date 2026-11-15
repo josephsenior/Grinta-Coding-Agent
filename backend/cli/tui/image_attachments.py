@@ -10,6 +10,7 @@ import struct
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from backend.core.os_capabilities import OS_CAPS
 
@@ -100,6 +101,66 @@ def _read_windows_clipboard_image() -> ClipboardImage | None:
     return _read_windows_clipboard_image_ctypes()
 
 
+def _read_clipboard_format_bytes(
+    user32: Any,
+    kernel32: Any,
+    ctypes_module: Any,
+    fmt_id: int,
+) -> bytes:
+    handle = user32.GetClipboardData(fmt_id)
+    if not handle:
+        return b''
+    ptr = kernel32.GlobalLock(handle)
+    if not ptr:
+        return b''
+    try:
+        size = kernel32.GlobalSize(handle)
+        return ctypes_module.string_at(ptr, size)
+    finally:
+        kernel32.GlobalUnlock(handle)
+
+
+def _read_registered_clipboard_image(
+    user32: Any,
+    kernel32: Any,
+    ctypes_module: Any,
+) -> ClipboardImage | None:
+    for fmt_name, mime, label in (
+        ('PNG', 'image/png', 'clipboard.png'),
+        ('JFIF', 'image/jpeg', 'clipboard.jpg'),
+        ('GIF', 'image/gif', 'clipboard.gif'),
+        ('WEBP', 'image/webp', 'clipboard.webp'),
+    ):
+        fmt_id = user32.RegisterClipboardFormatW(fmt_name)
+        if not fmt_id or not user32.IsClipboardFormatAvailable(fmt_id):
+            continue
+        data = _read_clipboard_format_bytes(user32, kernel32, ctypes_module, fmt_id)
+        if data:
+            return ClipboardImage(data=data, mime_type=mime, label=label)
+    return None
+
+
+def _read_clipboard_dib_image(
+    user32: Any,
+    kernel32: Any,
+    ctypes_module: Any,
+) -> ClipboardImage | None:
+    CF_DIB = 8
+    if not user32.IsClipboardFormatAvailable(CF_DIB):
+        return None
+    dib = _read_clipboard_format_bytes(user32, kernel32, ctypes_module, CF_DIB)
+    if not dib:
+        return None
+    bmp = _dib_to_bmp(dib)
+    if not bmp:
+        return None
+    return ClipboardImage(
+        data=bmp,
+        mime_type='image/bmp',
+        label='clipboard.bmp',
+    )
+
+
 def _read_windows_clipboard_image_ctypes() -> ClipboardImage | None:
     import ctypes
 
@@ -114,48 +175,9 @@ def _read_windows_clipboard_image_ctypes() -> ClipboardImage | None:
         return None
 
     try:
-        for fmt_name, mime, label in (
-            ('PNG', 'image/png', 'clipboard.png'),
-            ('JFIF', 'image/jpeg', 'clipboard.jpg'),
-            ('GIF', 'image/gif', 'clipboard.gif'),
-            ('WEBP', 'image/webp', 'clipboard.webp'),
-        ):
-            fmt_id = user32.RegisterClipboardFormatW(fmt_name)
-            if not fmt_id or not user32.IsClipboardFormatAvailable(fmt_id):
-                continue
-            handle = user32.GetClipboardData(fmt_id)
-            if not handle:
-                continue
-            ptr = kernel32.GlobalLock(handle)
-            if not ptr:
-                continue
-            try:
-                size = kernel32.GlobalSize(handle)
-                data = ctypes.string_at(ptr, size)
-            finally:
-                kernel32.GlobalUnlock(handle)
-            if data:
-                return ClipboardImage(data=data, mime_type=mime, label=label)
-
-        CF_DIB = 8
-        if user32.IsClipboardFormatAvailable(CF_DIB):
-            handle = user32.GetClipboardData(CF_DIB)
-            if handle:
-                ptr = kernel32.GlobalLock(handle)
-                if ptr:
-                    try:
-                        size = kernel32.GlobalSize(handle)
-                        dib = ctypes.string_at(ptr, size)
-                    finally:
-                        kernel32.GlobalUnlock(handle)
-                    bmp = _dib_to_bmp(dib)
-                    if bmp:
-                        return ClipboardImage(
-                            data=bmp,
-                            mime_type='image/bmp',
-                            label='clipboard.bmp',
-                        )
-        return None
+        return _read_registered_clipboard_image(
+            user32, kernel32, ctypes
+        ) or _read_clipboard_dib_image(user32, kernel32, ctypes)
     finally:
         user32.CloseClipboard()
 

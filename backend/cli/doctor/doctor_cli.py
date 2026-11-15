@@ -72,34 +72,13 @@ def _status_mark(check: DoctorCheck) -> str:
     return mark_warn()
 
 
-def _render_report(console: Console, checks: list[DoctorCheck]) -> None:
-    table = Table(
-        box=None,
-        show_header=True,
-        header_style=STYLE_DIM,
-        border_style=CLR_CARD_BORDER,
-        title=f'[{CLR_CARD_TITLE}]Grinta doctor[/]',
-        title_style='',
-    )
-    table.add_column('Status', width=6, no_wrap=True)
-    table.add_column('Check', style='bold', no_wrap=True)
-    table.add_column('Detail', overflow='fold')
+def _status_style(check: DoctorCheck) -> str:
+    if check.ok:
+        return CLR_STATUS_OK
+    return CLR_STATUS_ERR if check.critical else CLR_STATUS_WARN
 
-    for check in checks:
-        mark = _status_mark(check)
-        status_style = (
-            CLR_STATUS_OK
-            if check.ok
-            else (CLR_STATUS_ERR if check.critical else CLR_STATUS_WARN)
-        )
-        table.add_row(
-            f'[{status_style}]{mark}[/]',
-            check.name,
-            check.detail,
-        )
 
-    console.print(table)
-
+def _print_report_summary(console: Console, checks: list[DoctorCheck]) -> None:
     critical_failures = [c for c in checks if c.critical and not c.ok]
     warnings = [c for c in checks if not c.critical and not c.ok]
     if critical_failures:
@@ -114,6 +93,30 @@ def _render_report(console: Console, checks: list[DoctorCheck]) -> None:
         )
     else:
         console.print(f'\n[{CLR_STATUS_OK}]All checks passed.[/]')
+
+
+def _render_report(console: Console, checks: list[DoctorCheck]) -> None:
+    table = Table(
+        box=None,
+        show_header=True,
+        header_style=STYLE_DIM,
+        border_style=CLR_CARD_BORDER,
+        title=f'[{CLR_CARD_TITLE}]Grinta doctor[/]',
+        title_style='',
+    )
+    table.add_column('Status', width=6, no_wrap=True)
+    table.add_column('Check', style='bold', no_wrap=True)
+    table.add_column('Detail', overflow='fold')
+
+    for check in checks:
+        table.add_row(
+            f'[{_status_style(check)}]{_status_mark(check)}[/]',
+            check.name,
+            check.detail,
+        )
+
+    console.print(table)
+    _print_report_summary(console, checks)
 
 
 def cmd_doctor(console: Console, *, verbose: bool = False) -> int:

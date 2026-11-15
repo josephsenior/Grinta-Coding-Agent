@@ -349,6 +349,82 @@ class CircuitBreaker:
             self._auto_recover_attempts = 0
             self._last_auto_recover_ts = None
 
+    def _watchdog_agent_is_running(self, agent_state: 'AgentState | None') -> bool:
+        if agent_state is None:
+            agent_state = getattr(self, '_cached_state', None)
+        if agent_state is None:
+            return False
+        return hasattr(agent_state, 'name') and agent_state.name == 'RUNNING'
+
+    def _watchdog_suppress_for_active_work(
+        self,
+        current: float,
+        llm_stream_active: bool,
+        runtime_work_active: bool,
+    ) -> bool:
+        if not (llm_stream_active or runtime_work_active):
+            return False
+        self.record_step_call(ts=current)
+        logger.debug(
+            'No-step-progress watchdog: suppressed while agent work is in flight '
+            '(llm_stream=%s runtime_work=%s)',
+            llm_stream_active,
+            runtime_work_active,
+        )
+        return True
+
+    def _watchdog_auto_recover_if_due(
+        self, elapsed: float, current: float, cooldown: float
+    ) -> CircuitBreakerResult | None:
+        if (
+            self._last_auto_recover_ts is not None
+            and (current - self._last_auto_recover_ts) <= cooldown
+        ):
+            return None
+        self._auto_recover_attempts += 1
+        self._last_auto_recover_ts = current
+        logger.warning(
+            'No step progress for %.1fs; auto-recover #%d',
+            elapsed,
+            self._auto_recover_attempts,
+            extra={'msg_type': 'NO_STEP_PROGRESS_WATCHDOG'},
+        )
+        return CircuitBreakerResult(
+            tripped=False,
+            reason=(
+                f'No step() call recorded for {elapsed:.1f}s while in '
+                f'RUNNING; auto-recover attempt {self._auto_recover_attempts}'
+            ),
+            action='auto_recover_once',
+            recommendation=(
+                'The agent loop appears stalled in RUNNING state with no '
+                'scheduled step.  Issuing one schedule_step_soon() to '
+                'recover.'
+            ),
+        )
+
+    @staticmethod
+    def _watchdog_fatal_stall_result(elapsed: float) -> CircuitBreakerResult:
+        logger.error(
+            'No step progress for %.1fs after auto-recover',
+            elapsed,
+            extra={'msg_type': 'NO_STEP_PROGRESS_WATCHDOG'},
+        )
+        return CircuitBreakerResult(
+            tripped=True,
+            reason=(
+                f'Agent stuck in RUNNING with no step progress for '
+                f'{elapsed:.1f}s after auto-recover attempt'
+            ),
+            action='stop',
+            recommendation=(
+                'The agent loop is stuck in RUNNING state.  This usually '
+                'indicates the _step_pending race documented in '
+                'schedule_step_soon().  Stopping the agent to surface the '
+                'issue to the user.'
+            ),
+        )
+
     def check_no_step_progress(
         self,
         agent_state: 'AgentState | None' = None,
@@ -383,25 +459,16 @@ class CircuitBreaker:
         # Only meaningful while the agent is supposed to be running.
         # Note: AgentState.RUNNING.value is 'running' (lowercase), so we use
         # .name == 'RUNNING' to match the enum member name.
-        if agent_state is None:
-            agent_state = getattr(self, '_cached_state', None)
-        if agent_state is None:
-            return None
-        if not (hasattr(agent_state, 'name') and agent_state.name == 'RUNNING'):
+        if not self._watchdog_agent_is_running(agent_state):
             return None
 
         import time as _time
 
         current = now if now is not None else _time.monotonic()
 
-        if llm_stream_active or runtime_work_active:
-            self.record_step_call(ts=current)
-            logger.debug(
-                'No-step-progress watchdog: suppressed while agent work is in flight '
-                '(llm_stream=%s runtime_work=%s)',
-                llm_stream_active,
-                runtime_work_active,
-            )
+        if self._watchdog_suppress_for_active_work(
+            current, llm_stream_active, runtime_work_active
+        ):
             return None
 
         if self._last_step_call_ts is None:
@@ -412,53 +479,14 @@ class CircuitBreaker:
             return None
 
         # First stall inside the cooldown window → auto-recover once.
-        cooldown = self.config.auto_recover_cooldown_seconds
-        if (
-            self._last_auto_recover_ts is None
-            or (current - self._last_auto_recover_ts) > cooldown
-        ):
-            self._auto_recover_attempts += 1
-            self._last_auto_recover_ts = current
-            logger.warning(
-                'No step progress for %.1fs; auto-recover #%d',
-                elapsed,
-                self._auto_recover_attempts,
-                extra={'msg_type': 'NO_STEP_PROGRESS_WATCHDOG'},
-            )
-            return CircuitBreakerResult(
-                tripped=False,
-                reason=(
-                    f'No step() call recorded for {elapsed:.1f}s while in '
-                    f'RUNNING; auto-recover attempt {self._auto_recover_attempts}'
-                ),
-                action='auto_recover_once',
-                recommendation=(
-                    'The agent loop appears stalled in RUNNING state with no '
-                    'scheduled step.  Issuing one schedule_step_soon() to '
-                    'recover.'
-                ),
-            )
+        recovered = self._watchdog_auto_recover_if_due(
+            elapsed, current, self.config.auto_recover_cooldown_seconds
+        )
+        if recovered is not None:
+            return recovered
 
         # Second stall within the cooldown window → fatal.
-        logger.error(
-            'No step progress for %.1fs after auto-recover',
-            elapsed,
-            extra={'msg_type': 'NO_STEP_PROGRESS_WATCHDOG'},
-        )
-        return CircuitBreakerResult(
-            tripped=True,
-            reason=(
-                f'Agent stuck in RUNNING with no step progress for '
-                f'{elapsed:.1f}s after auto-recover attempt'
-            ),
-            action='stop',
-            recommendation=(
-                'The agent loop is stuck in RUNNING state.  This usually '
-                'indicates the _step_pending race documented in '
-                'schedule_step_soon().  Stopping the agent to surface the '
-                'issue to the user.'
-            ),
-        )
+        return self._watchdog_fatal_stall_result(elapsed)
 
     def update_cached_state(self, agent_state: 'AgentState | None') -> None:
         """Cache the latest AgentState so the watchdog can read it lazily."""

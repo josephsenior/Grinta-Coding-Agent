@@ -57,18 +57,10 @@ def _lsp_language_server_labels() -> list[str]:
     return labels
 
 
-def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
-    r"""Return ``(lsp_line, dap_line)`` summarizing detected runtimes.
-
-    When ``enable_lsp_query`` / ``enable_debugger`` is false, returns ``''`` for that
-    line so the capability block omits the tool entirely (no \"DISABLED\" bullet).
-    """
-    lsp_enabled = bool(
-        getattr(config, 'enable_lsp_query', DEFAULT_AGENT_LSP_QUERY_ENABLED)
-    )
-    debugger_enabled = bool(
-        getattr(config, 'enable_debugger', DEFAULT_AGENT_DEBUGGER_ENABLED)
-    )
+def _runtime_detection_summary(
+    lsp_enabled: bool,
+    debugger_enabled: bool,
+) -> tuple[bool, bool, dict[str, Any]]:
     try:
         from backend.utils.runtime_detect import (
             detection_summary,
@@ -90,35 +82,62 @@ def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
         any_lsp = False
         any_dap = False
         summary = {'lsp_available': [], 'debug_available': []}
+    return any_lsp, any_dap, summary
 
-    lsp_entries = _lsp_language_server_labels() if any_lsp else []
+
+def _render_lsp_detection_line(lsp_enabled: bool, any_lsp: bool) -> str:
     if not lsp_enabled:
-        lsp_line = ''
-    elif lsp_entries:
-        lsp_line = (
-            '- **Language servers (LSP / `lsp`)**: detected → '
-            f'{"; ".join(lsp_entries)}. Use `lsp` for definition / '
-            'references / hover / diagnostics on those languages. '
-            'For file edits use the public file API tools; `lsp` is read-only. For file reads use `read_file`.'
-        )
-    else:
-        lsp_line = ''
+        return ''
+    lsp_entries = _lsp_language_server_labels() if any_lsp else []
+    if not lsp_entries:
+        return ''
+    return (
+        '- **Language servers (LSP / `lsp`)**: detected → '
+        f'{"; ".join(lsp_entries)}. Use `lsp` for definition / '
+        'references / hover / diagnostics on those languages. '
+        'For file edits use the public file API tools; `lsp` is read-only. For file reads use `read_file`.'
+    )
 
+
+def _render_dap_detection_line(
+    debugger_enabled: bool,
+    any_dap: bool,
+    summary: dict[str, Any],
+) -> str:
     if not debugger_enabled:
-        dap_line = ''
-    else:
-        debug_available = summary.get('debug_available', []) if any_dap else []
-        if debug_available:
-            dap_line = (
-                '- **Debug adapters (DAP / `debugger`)**: usable adapters detected → '
-                f'{", ".join(debug_available)}. The `debugger` tool resolves the right '
-                'adapter automatically from the file extension or `adapter` field; do not '
-                'pass `adapter_command` unless you have a custom stdio or DAP-over-TCP '
-                'adapter binary.'
-            )
-        else:
-            dap_line = ''
-    return lsp_line, dap_line
+        return ''
+    debug_available = summary.get('debug_available', []) if any_dap else []
+    if not debug_available:
+        return ''
+    return (
+        '- **Debug adapters (DAP / `debugger`)**: usable adapters detected → '
+        f'{", ".join(debug_available)}. The `debugger` tool resolves the right '
+        'adapter automatically from the file extension or `adapter` field; do not '
+        'pass `adapter_command` unless you have a custom stdio or DAP-over-TCP '
+        'adapter binary.'
+    )
+
+
+def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
+    r"""Return ``(lsp_line, dap_line)`` summarizing detected runtimes.
+
+    When ``enable_lsp_query`` / ``enable_debugger`` is false, returns ``''`` for that
+    line so the capability block omits the tool entirely (no \"DISABLED\" bullet).
+    """
+    lsp_enabled = bool(
+        getattr(config, 'enable_lsp_query', DEFAULT_AGENT_LSP_QUERY_ENABLED)
+    )
+    debugger_enabled = bool(
+        getattr(config, 'enable_debugger', DEFAULT_AGENT_DEBUGGER_ENABLED)
+    )
+    any_lsp, any_dap, summary = _runtime_detection_summary(
+        lsp_enabled,
+        debugger_enabled,
+    )
+    return (
+        _render_lsp_detection_line(lsp_enabled, any_lsp),
+        _render_dap_detection_line(debugger_enabled, any_dap, summary),
+    )
 
 
 def _render_condensation_line(
@@ -307,49 +326,35 @@ def _render_system_capabilities(
     return '\n'.join(parts)
 
 
-def _render_mcp_status_line(config: Any) -> str:
-    """Render the user-configured MCP server status bullet.
-
-    Reads :data:`get_mcp_bootstrap_status` (set by
-    :func:`add_mcp_tools_to_agent`) so the prompt always reflects
-    what is actually wired up — never what the operator *wished* was
-    wired up. Empty state is explicit so the model does not invent
-    tool names when the catalogue is empty.
-    """
-    if not getattr(config, 'enable_mcp', True):
-        return (
-            '- **User-configured MCP servers**: disabled. Bundled native integrations '
-            'such as `web_*` and `docs_*` remain governed by their own capability lines.'
-        )
-
-    mcp_status: dict[str, Any] = {}
+def _resolve_mcp_status(config: Any) -> dict[str, Any]:
     bootstrap = getattr(config, 'mcp_capability_status', None)
     if isinstance(bootstrap, dict):
-        mcp_status = bootstrap
-    else:
-        try:
-            from backend.integrations.mcp.mcp_bootstrap_status import (
-                get_mcp_bootstrap_status,
-            )
-
-            mcp_status = get_mcp_bootstrap_status() or {}
-        except Exception:
-            mcp_status = {}
-
-    state = str(mcp_status.get('state') or 'unknown')
-    remote_tool_count = int(mcp_status.get('remote_tool_param_count') or 0)
-    connected_clients = int(mcp_status.get('connected_client_count') or 0)
-    last_error = mcp_status.get('last_error')
-
-    if remote_tool_count > 0 and connected_clients > 0:
-        return (
-            f'- **User-configured MCP servers**: {remote_tool_count} tool'
-            f'{"s" if remote_tool_count != 1 else ""} from '
-            f'{connected_clients} connected server'
-            f'{"s" if connected_clients != 1 else ""}. See the per-turn '
-            '`<MCP_TOOLS>` section for the names; route calls through '
-            '`call_mcp_tool(tool_name=..., arguments={...})`.'
+        return bootstrap
+    try:
+        from backend.integrations.mcp.mcp_bootstrap_status import (
+            get_mcp_bootstrap_status,
         )
+
+        return get_mcp_bootstrap_status() or {}
+    except Exception:
+        return {}
+
+
+def _render_mcp_connected_status(
+    remote_tool_count: int,
+    connected_clients: int,
+) -> str:
+    return (
+        f'- **User-configured MCP servers**: {remote_tool_count} tool'
+        f'{"s" if remote_tool_count != 1 else ""} from '
+        f'{connected_clients} connected server'
+        f'{"s" if connected_clients != 1 else ""}. See the per-turn '
+        '`<MCP_TOOLS>` section for the names; route calls through '
+        '`call_mcp_tool(tool_name=..., arguments={...})`.'
+    )
+
+
+def _render_mcp_state_status(state: str, last_error: Any) -> str:
     if state == 'mcp_disabled':
         return (
             '- **User-configured MCP servers**: disabled (`mcp_config.enabled=false` in '
@@ -381,3 +386,29 @@ def _render_mcp_status_line(config: Any) -> str:
         '**Settings → MCP Servers**; tools appear under the per-turn '
         '`<MCP_TOOLS>` section once a server is enabled and reachable.'
     )
+
+
+def _render_mcp_status_line(config: Any) -> str:
+    """Render the user-configured MCP server status bullet.
+
+    Reads :data:`get_mcp_bootstrap_status` (set by
+    :func:`add_mcp_tools_to_agent`) so the prompt always reflects
+    what is actually wired up — never what the operator *wished* was
+    wired up. Empty state is explicit so the model does not invent
+    tool names when the catalogue is empty.
+    """
+    if not getattr(config, 'enable_mcp', True):
+        return (
+            '- **User-configured MCP servers**: disabled. Bundled native integrations '
+            'such as `web_*` and `docs_*` remain governed by their own capability lines.'
+        )
+
+    mcp_status = _resolve_mcp_status(config)
+    state = str(mcp_status.get('state') or 'unknown')
+    remote_tool_count = int(mcp_status.get('remote_tool_param_count') or 0)
+    connected_clients = int(mcp_status.get('connected_client_count') or 0)
+    last_error = mcp_status.get('last_error')
+
+    if remote_tool_count > 0 and connected_clients > 0:
+        return _render_mcp_connected_status(remote_tool_count, connected_clients)
+    return _render_mcp_state_status(state, last_error)

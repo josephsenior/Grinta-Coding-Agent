@@ -101,39 +101,60 @@ def _handle_file_read_observation(
     orch._write_orient_line(file_read_observation_model(event))
 
 
-def _handle_file_edit_observation(
-    orch: 'RendererEventProcessorMixin', event: FileEditObservation
-) -> None:
-    clean_file_edit_content(event)
+def _file_edit_badges(
+    event: FileEditObservation,
+) -> tuple[str, str | None, str | None]:
     path = (getattr(event, 'path', '') or '').strip()
     content = getattr(event, 'content', '') or ''
     sys_pass = _parse_syntax_badge(content)
     syntax_error = _extract_syntax_error(content) if sys_pass == 'fail' else None
+    return path, sys_pass, syntax_error
 
+
+def _file_edit_action_for_event(
+    orch: 'RendererEventProcessorMixin',
+    event: FileEditObservation,
+) -> Any | None:
     cause_id = getattr(event, 'cause', None)
-    action = None
-    if cause_id is not None:
-        action = orch._file_edit_actions_by_id.get(cause_id)
+    if cause_id is None:
+        return None
+    return orch._file_edit_actions_by_id.get(cause_id)
 
+
+def _file_edit_line_counts(
+    event: FileEditObservation,
+    *,
+    is_undo: bool,
+    is_create: bool,
+) -> tuple[int, int]:
+    if is_undo:
+        return _undo_line_counts(event)
+    added = getattr(event, 'added', 0) or 0
+    removed = getattr(event, 'removed', 0) or 0
+    if is_create and not added:
+        new_content = getattr(event, 'new_content', '') or ''
+        if new_content:
+            added = new_content.count('\n') + 1 if new_content else 0
+    return added, removed
+
+
+def _is_multiedit_action(action: Any | None) -> bool:
+    return action is not None and getattr(action, 'command', '') == 'multi_edit'
+
+
+def _handle_file_edit_observation(
+    orch: 'RendererEventProcessorMixin', event: FileEditObservation
+) -> None:
+    clean_file_edit_content(event)
+    path, sys_pass, syntax_error = _file_edit_badges(event)
+
+    action = _file_edit_action_for_event(orch, event)
     is_undo = _file_edit_is_undo(orch, event, action)
     is_create = False if is_undo else file_edit_observation_is_new_file(event)
-    added, removed = (
-        _undo_line_counts(event)
-        if is_undo
-        else (
-            getattr(event, 'added', 0) or 0,
-            getattr(event, 'removed', 0) or 0,
-        )
-    )
-
-    # ── create: derive add count from new_content ───────────────────
-    if is_create and not added:
-        nc = getattr(event, 'new_content', '') or ''
-        if nc:
-            added = nc.count('\n') + 1 if nc else 0
+    added, removed = _file_edit_line_counts(event, is_undo=is_undo, is_create=is_create)
 
     # ── multiedit: find causing action and split per-item ────────────
-    if action is not None and getattr(action, 'command', '') == 'multi_edit':
+    if _is_multiedit_action(action):
         _handle_multiedit_observation(
             orch, event, action, path, added, removed, is_create
         )

@@ -61,12 +61,7 @@ class DAPClient:
         """Start the adapter subprocess and reader threads."""
         if self.process is not None or self._socket is not None:
             return
-        if self.transport not in {'stdio', 'tcp'}:
-            raise DAPError(f'Unsupported DAP adapter transport: {self.transport}')
-        if not self.adapter_command and self.transport != 'tcp':
-            raise DAPError('DAP adapter command is empty')
-        if self.transport == 'tcp' and self.port is None:
-            raise DAPError('TCP DAP adapter transport requires a port')
+        self._validate_start()
         _dap_log(
             logging.INFO,
             f'starting adapter over {self.transport} (cwd={self.cwd})',
@@ -78,6 +73,26 @@ class DAPClient:
             dap_port=self.port if self.transport == 'tcp' else None,
         )
         spawn_started = time.monotonic()
+        output_readers_started = self._spawn_transport()
+        self._start_reader_threads(output_readers_started)
+        _dap_log(
+            logging.INFO,
+            'adapter transport ready after start',
+            msg_type='DAP_ADAPTER_SPAWN',
+            adapter_pid=getattr(self.process, 'pid', None),
+            dap_transport=self.transport,
+            spawn_elapsed_seconds=round(time.monotonic() - spawn_started, 3),
+        )
+
+    def _validate_start(self) -> None:
+        if self.transport not in {'stdio', 'tcp'}:
+            raise DAPError(f'Unsupported DAP adapter transport: {self.transport}')
+        if not self.adapter_command and self.transport != 'tcp':
+            raise DAPError('DAP adapter command is empty')
+        if self.transport == 'tcp' and self.port is None:
+            raise DAPError('TCP DAP adapter transport requires a port')
+
+    def _spawn_transport(self) -> bool:
         output_readers_started = False
         try:
             if self.adapter_command:
@@ -108,6 +123,9 @@ class DAPClient:
         except Exception:
             self.close()
             raise
+        return output_readers_started
+
+    def _start_reader_threads(self, output_readers_started: bool) -> None:
         try:
             self._reader = threading.Thread(target=self._reader_loop, daemon=True)
             self._reader.start()
@@ -118,14 +136,6 @@ class DAPClient:
             # the half-spawned subprocess so we never leak a debugpy.adapter.
             self.close()
             raise
-        _dap_log(
-            logging.INFO,
-            'adapter transport ready after start',
-            msg_type='DAP_ADAPTER_SPAWN',
-            adapter_pid=getattr(self.process, 'pid', None),
-            dap_transport=self.transport,
-            spawn_elapsed_seconds=round(time.monotonic() - spawn_started, 3),
-        )
 
     def _spawn_adapter(self) -> subprocess.Popen[bytes]:
         stdin = subprocess.PIPE if self.transport == 'stdio' else subprocess.DEVNULL

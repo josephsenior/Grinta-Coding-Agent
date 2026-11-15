@@ -175,6 +175,34 @@ class WelcomeWidget(Vertical):
                 break
 
 
+def _communicate_subheader(context: str, details: list[str] | None) -> str:
+    details_text = ' '.join(details or [])
+    helper = 'Use up/down + Enter, or click an option.'
+    parts = [part for part in (context, details_text, helper) if part]
+    return ' '.join(parts) if parts else helper
+
+
+def _communicate_suggestions(
+    options: list[tuple[str, str, str, bool]] | None,
+) -> list[str]:
+    return [
+        option[0] + (' (recommended)' if option[3] else '')
+        for option in (options or [])
+    ]
+
+
+def _communicate_suggestion_details(
+    options: list[tuple[str, str, str, bool]] | None,
+) -> list[str]:
+    return [option[2] for option in (options or [])]
+
+
+def _communicate_values(
+    options: list[tuple[str, str, str, bool]] | None,
+) -> list[str]:
+    return [option[1] for option in (options or [])]
+
+
 class CommunicatePromptWidget(WelcomeWidget):
     """Interactive transcript prompt for ask_user."""
 
@@ -188,21 +216,15 @@ class CommunicatePromptWidget(WelcomeWidget):
         options: list[tuple[str, str, str, bool]] | None = None,
         preselected_index: int = 0,
     ) -> None:
-        details_text = ' '.join(details or [])
-        helper = 'Use up/down + Enter, or click an option.'
-        parts = [part for part in (context, details_text, helper) if part]
         super().__init__(
             header=f'{title}: {prompt}',
-            subheader=' '.join(parts) if parts else helper,
-            suggestions=[
-                option[0] + (' (recommended)' if option[3] else '')
-                for option in (options or [])
-            ],
-            suggestion_details=[option[2] for option in (options or [])],
+            subheader=_communicate_subheader(context, details),
+            suggestions=_communicate_suggestions(options),
+            suggestion_details=_communicate_suggestion_details(options),
             callback_name='_handle_communicate_selection',
             show_logo=False,
         )
-        self._values = [option[1] for option in (options or [])]
+        self._values = _communicate_values(options)
         self._active = bool(self._values)
         self._submitted: int | None = None
         # Clamp to valid range; -1 means "leave default".

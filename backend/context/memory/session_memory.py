@@ -149,6 +149,34 @@ def _should_skip_during_condensation_loop(state: State | None) -> bool:
     return pipe.get('consecutive_condensation_steps', 0) >= 1
 
 
+def _session_memory_cursors(pipe: dict[str, Any]) -> tuple[int | None, int]:
+    last_event_id = pipe.get('last_session_memory_event_id')
+    if not isinstance(last_event_id, int):
+        last_event_id = None
+    last_tokens = pipe.get('last_session_memory_tokens')
+    if not isinstance(last_tokens, int):
+        last_tokens = 0
+    return last_event_id, last_tokens
+
+
+def _session_memory_write_due(
+    *,
+    state: State | None,
+    estimated: int,
+    tokens_delta: int,
+    tool_calls: int,
+) -> bool:
+    should_init = (
+        not session_memory_exists(state=state)
+        and estimated >= DEFAULT_SESSION_MEMORY_INIT_TOKENS
+    )
+    should_update = session_memory_exists(state=state) and (
+        tokens_delta >= DEFAULT_SESSION_MEMORY_UPDATE_TOKENS
+        or tool_calls >= DEFAULT_SESSION_MEMORY_UPDATE_TOOL_CALLS
+    )
+    return should_init or should_update
+
+
 def maybe_update(
     state: State | None,
     events: list[Event],
@@ -165,24 +193,16 @@ def maybe_update(
         return False
     estimated = estimate_prompt_events_tokens(events)
     pipe = _pipeline_state(state)
-    last_event_id = pipe.get('last_session_memory_event_id')
-    if not isinstance(last_event_id, int):
-        last_event_id = None
-    last_tokens = pipe.get('last_session_memory_tokens')
-    if not isinstance(last_tokens, int):
-        last_tokens = 0
+    last_event_id, last_tokens = _session_memory_cursors(pipe)
     tool_calls = _count_tool_calls_since(events, last_event_id)
     tokens_delta = max(0, estimated - last_tokens)
 
-    should_init = (
-        not session_memory_exists(state=state)
-        and estimated >= DEFAULT_SESSION_MEMORY_INIT_TOKENS
-    )
-    should_update = session_memory_exists(state=state) and (
-        tokens_delta >= DEFAULT_SESSION_MEMORY_UPDATE_TOKENS
-        or tool_calls >= DEFAULT_SESSION_MEMORY_UPDATE_TOOL_CALLS
-    )
-    if not (should_init or should_update):
+    if not _session_memory_write_due(
+        state=state,
+        estimated=estimated,
+        tokens_delta=tokens_delta,
+        tool_calls=tool_calls,
+    ):
         return False
 
     snapshot = extract_snapshot(events)

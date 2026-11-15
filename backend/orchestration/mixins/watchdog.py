@@ -99,6 +99,48 @@ class _SessionOrchestratorWatchdogMixin:
         """True during LLM streaming or in-flight runtime tool execution."""
         return self._is_llm_stream_active() or self._is_runtime_work_active()
 
+    @staticmethod
+    def _watchdog_configured_timeout(cb_config: object, default: float) -> float:
+        return float(getattr(cb_config, 'no_step_progress_timeout_seconds', default))
+
+    def _watchdog_timeout_seconds(self, cb_config: object, default: float) -> float:
+        watchdog_timeout = getattr(self, '_watchdog_timeout', None)
+        if isinstance(watchdog_timeout, (int, float)):
+            return float(watchdog_timeout)
+        return self._watchdog_configured_timeout(cb_config, default)
+
+    async def _watchdog_recover_or_stop(
+        self,
+        elapsed: float,
+        cooldown: float,
+        auto_recover_attempted: bool,
+        auto_recover_ts: float,
+    ) -> tuple[bool, float, bool]:
+        now = time.monotonic()
+        if not auto_recover_attempted or (now - auto_recover_ts) > cooldown:
+            logger.warning(
+                'No step progress for %.1fs; scheduling recovery',
+                elapsed,
+                extra={'msg_type': 'NO_STEP_PROGRESS_WATCHDOG'},
+            )
+            self._watchdog_last_step_ts = now
+            try:
+                self.schedule_step_soon()
+            except Exception:
+                pass
+            return True, now, False
+
+        logger.error(
+            'No step progress for %.1fs after auto-recover',
+            elapsed,
+            extra={'msg_type': 'NO_STEP_PROGRESS_WATCHDOG'},
+        )
+        try:
+            await self.set_agent_state_to(AgentState.ERROR)
+        except Exception:
+            pass
+        return auto_recover_attempted, auto_recover_ts, True
+
     async def _watchdog_loop(self) -> None:
         """Background loop that checks for step() progress at regular intervals."""
         from backend.core.constants import (
@@ -112,17 +154,9 @@ class _SessionOrchestratorWatchdogMixin:
             'config',
             None,
         )
-        watchdog_timeout = getattr(self, '_watchdog_timeout', None)
-        if isinstance(watchdog_timeout, (int, float)):
-            timeout = float(watchdog_timeout)
-        else:
-            timeout = float(
-                getattr(
-                    cb_config,
-                    'no_step_progress_timeout_seconds',
-                    DEFAULT_NO_STEP_PROGRESS_TIMEOUT_SECONDS,
-                )
-            )
+        timeout = self._watchdog_timeout_seconds(
+            cb_config, DEFAULT_NO_STEP_PROGRESS_TIMEOUT_SECONDS
+        )
         if timeout <= 0:
             return
         cooldown = float(
@@ -159,30 +193,17 @@ class _SessionOrchestratorWatchdogMixin:
                 if elapsed < timeout:
                     continue
 
-                now = time.monotonic()
-                if not auto_recover_attempted or (now - auto_recover_ts) > cooldown:
-                    logger.warning(
-                        'No step progress for %.1fs; scheduling recovery',
-                        elapsed,
-                        extra={'msg_type': 'NO_STEP_PROGRESS_WATCHDOG'},
-                    )
-                    self._watchdog_last_step_ts = now
-                    auto_recover_attempted = True
-                    auto_recover_ts = now
-                    try:
-                        self.schedule_step_soon()
-                    except Exception:
-                        pass
-                else:
-                    logger.error(
-                        'No step progress for %.1fs after auto-recover',
-                        elapsed,
-                        extra={'msg_type': 'NO_STEP_PROGRESS_WATCHDOG'},
-                    )
-                    try:
-                        await self.set_agent_state_to(AgentState.ERROR)
-                    except Exception:
-                        pass
+                (
+                    auto_recover_attempted,
+                    auto_recover_ts,
+                    stop,
+                ) = await self._watchdog_recover_or_stop(
+                    elapsed,
+                    cooldown,
+                    auto_recover_attempted,
+                    auto_recover_ts,
+                )
+                if stop:
                     return
         except asyncio.CancelledError:
             return

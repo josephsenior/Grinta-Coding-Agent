@@ -87,6 +87,28 @@ class NoColorFormatter(logging.Formatter):
         return super().format(new_record)
 
 
+def _add_truthy_record_fields(
+    log_record: dict[str, Any],
+    record: logging.LogRecord,
+    keys: tuple[str, ...],
+) -> None:
+    for key in keys:
+        value = getattr(record, key, None)
+        if value:
+            log_record[key] = value
+
+
+def _add_present_record_fields(
+    log_record: dict[str, Any],
+    record: logging.LogRecord,
+    keys: tuple[str, ...],
+) -> None:
+    for key in keys:
+        value = getattr(record, key, None)
+        if value is not None:
+            log_record[key] = value
+
+
 class EnhancedJSONFormatter(JsonFormatter):
     """Enhanced JSON formatter with request IDs and structured data."""
 
@@ -98,61 +120,36 @@ class EnhancedJSONFormatter(JsonFormatter):
     ) -> None:
         super().add_fields(log_record, record, message_dict)
 
-        request_id = getattr(record, 'request_id', None)
-        if request_id:
-            log_record['request_id'] = request_id
-
-        conversation_id = getattr(record, 'conversation_id', None)
-        if conversation_id:
-            log_record['conversation_id'] = conversation_id
+        _add_truthy_record_fields(log_record, record, ('request_id', 'conversation_id'))
 
         from datetime import datetime
 
         log_record['timestamp'] = datetime.now(UTC).isoformat()
 
-        agent_type = getattr(record, 'agent_type', None)
-        if agent_type:
-            log_record['agent_type'] = agent_type
-
-        action_type = getattr(record, 'action_type', None)
-        if action_type:
-            log_record['action_type'] = action_type
-
-        model_used = getattr(record, 'model_used', None)
-        if model_used:
-            log_record['model_used'] = model_used
-
-        tokens_consumed = getattr(record, 'tokens_consumed', None)
-        if tokens_consumed is not None:
-            log_record['tokens_consumed'] = tokens_consumed
-
-        cost_usd = getattr(record, 'cost_usd', None)
-        if cost_usd is not None:
-            log_record['cost_usd'] = cost_usd
-
-        duration_ms = getattr(record, 'duration_ms', None)
-        if duration_ms is not None:
-            log_record['duration_ms'] = duration_ms
-
-        latency_ms = getattr(record, 'latency_ms', None)
-        if latency_ms is not None:
-            log_record['latency_ms'] = latency_ms
-
-        for key in (
-            'msg_type',
-            'astep_id',
-            'tool',
-            'ok',
-            'step_id',
-            'trace_id',
-            'goal_id',
-            'action_id',
-            'call_id',
-            'observation',
-        ):
-            value = getattr(record, key, None)
-            if value is not None:
-                log_record[key] = value
+        _add_truthy_record_fields(
+            log_record, record, ('agent_type', 'action_type', 'model_used')
+        )
+        _add_present_record_fields(
+            log_record,
+            record,
+            ('tokens_consumed', 'cost_usd', 'duration_ms', 'latency_ms'),
+        )
+        _add_present_record_fields(
+            log_record,
+            record,
+            (
+                'msg_type',
+                'astep_id',
+                'tool',
+                'ok',
+                'step_id',
+                'trace_id',
+                'goal_id',
+                'action_id',
+                'call_id',
+                'observation',
+            ),
+        )
 
         log_record['thread_name'] = record.threadName
         log_record['process_id'] = record.process

@@ -10,6 +10,119 @@ from backend.cli.event_rendering.unified_renderer.utils import _SEARCH_CARD_PRES
 from backend.cli.theme import NAVY_TEXT_DIM, NAVY_TEXT_MUTED
 
 
+def _search_file_count_label(file_count: int) -> str:
+    if file_count == 1:
+        return '1 file'
+    if file_count:
+        return f'{file_count} files'
+    return 'no files'
+
+
+def _search_symbol_label(match_count: int, file_count: int) -> str:
+    if not match_count:
+        return 'no symbols'
+    noun = 'symbol' if match_count == 1 else 'symbols'
+    suffix = f' · {file_count} files' if file_count else ''
+    return f'{match_count} {noun}{suffix}'
+
+
+def _search_match_label(match_count: int, file_count: int) -> str:
+    if match_count and file_count:
+        return f'{match_count} matches · {file_count} files'
+    if match_count:
+        return f'{match_count} matches'
+    return 'no matches'
+
+
+def _search_rendered_result_lines(
+    query: str, result_lines: list[str]
+) -> list[ActivityLine]:
+    from backend.cli.tool_display.renderers.search import (
+        render_search_results,
+    )
+
+    rich_lines = render_search_results(
+        '\n'.join(result_lines),
+        query=query,
+        max_files=10,
+        max_lines_per_file=4,
+    )
+    return [ActivityLine(rl, indent=0) for rl in rich_lines]
+
+
+def _search_symbol_extra_lines(result_lines: list[str]) -> list[ActivityLine]:
+    extra_lines = [
+        ActivityLine(
+            f'• {line}',
+            style=NAVY_TEXT_MUTED,
+            indent=1,
+        )
+        for line in result_lines[:10]
+    ]
+    if len(result_lines) > 10:
+        extra_lines.append(
+            ActivityLine(
+                f'... {len(result_lines) - 10} more symbols',
+                style=NAVY_TEXT_DIM,
+                indent=1,
+            )
+        )
+    return extra_lines
+
+
+def _search_glob_extra_lines(
+    file_list: list[tuple[str, int]], file_count: int
+) -> list[ActivityLine]:
+    max_displayed = 10
+    displayed = file_list[:max_displayed]
+    extra_lines = [
+        ActivityLine(
+            f'• {filepath}',
+            style=NAVY_TEXT_MUTED,
+            indent=1,
+        )
+        for filepath, _count in displayed
+    ]
+    total_displayed = len(displayed)
+    if file_count > total_displayed:
+        remaining_files = file_count - total_displayed
+        extra_lines.append(
+            ActivityLine(
+                f'... {remaining_files} more files',
+                style=NAVY_TEXT_DIM,
+                indent=1,
+            )
+        )
+    return extra_lines
+
+
+def _search_file_list_extra_lines(
+    file_list: list[tuple[str, int]],
+    file_count: int,
+    match_count: int,
+) -> list[ActivityLine]:
+    extra_lines = [
+        ActivityLine(
+            f'• {filepath} ({count} matches)',
+            style=NAVY_TEXT_MUTED,
+            indent=1,
+        )
+        for filepath, count in file_list
+    ]
+    total_displayed = len(file_list)
+    if file_count > total_displayed:
+        remaining_files = file_count - total_displayed
+        remaining_matches = match_count - sum(c for _, c in file_list)
+        extra_lines.append(
+            ActivityLine(
+                f'... {remaining_files} more files, {remaining_matches} matches',
+                style=NAVY_TEXT_DIM,
+                indent=1,
+            )
+        )
+    return extra_lines
+
+
 class _ExplorationMixin:
     @staticmethod
     def _build_search_results_secondary(
@@ -20,34 +133,16 @@ class _ExplorationMixin:
         output_mode: str | None = None,
     ) -> str:
         if source_tool == 'glob':
-            if file_count == 1:
-                return '1 file'
-            if file_count:
-                return f'{file_count} files'
-            return 'no files'
+            return _search_file_count_label(file_count)
         if source_tool == 'find_symbols':
-            if match_count == 1:
-                suffix = f' · {file_count} files' if file_count else ''
-                return f'1 symbol{suffix}'
-            if match_count:
-                suffix = f' · {file_count} files' if file_count else ''
-                return f'{match_count} symbols{suffix}'
-            return 'no symbols'
+            return _search_symbol_label(match_count, file_count)
         if source_tool == 'grep' and output_mode == 'files_with_matches':
-            if file_count == 1:
-                return '1 file'
-            if file_count:
-                return f'{file_count} files'
-            return 'no files'
+            return _search_file_count_label(file_count)
         if source_tool == 'grep' and output_mode == 'count':
             if match_count:
                 return f'{match_count} total matches'
             return 'no matches'
-        if match_count and file_count:
-            return f'{match_count} matches · {file_count} files'
-        if match_count:
-            return f'{match_count} matches'
-        return 'no matches'
+        return _search_match_label(match_count, file_count)
 
     @staticmethod
     def _build_search_results_extra_lines(
@@ -61,80 +156,14 @@ class _ExplorationMixin:
     ) -> list[ActivityLine]:
         extra_lines: list[ActivityLine] = []
         if result_lines and source_tool not in {'glob', 'find_symbols'}:
-            from backend.cli.tool_display.renderers.search import (
-                render_search_results,
-            )
-
-            rich_lines = render_search_results(
-                '\n'.join(result_lines),
-                query=query,
-                max_files=10,
-                max_lines_per_file=4,
-            )
-            for rl in rich_lines:
-                extra_lines.append(ActivityLine(rl, indent=0))
-            return extra_lines
+            return _search_rendered_result_lines(query, result_lines)
         if result_lines and source_tool == 'find_symbols':
-            for line in result_lines[:10]:
-                extra_lines.append(
-                    ActivityLine(
-                        f'• {line}',
-                        style=NAVY_TEXT_MUTED,
-                        indent=1,
-                    )
-                )
-            if len(result_lines) > 10:
-                extra_lines.append(
-                    ActivityLine(
-                        f'... {len(result_lines) - 10} more symbols',
-                        style=NAVY_TEXT_DIM,
-                        indent=1,
-                    )
-                )
-            return extra_lines
+            return _search_symbol_extra_lines(result_lines)
         if not file_list:
             return extra_lines
-        max_displayed = 10
         if source_tool == 'glob':
-            for filepath, _count in file_list[:max_displayed]:
-                extra_lines.append(
-                    ActivityLine(
-                        f'• {filepath}',
-                        style=NAVY_TEXT_MUTED,
-                        indent=1,
-                    )
-                )
-            total_displayed = len(file_list[:max_displayed])
-            if file_count > total_displayed:
-                remaining_files = file_count - total_displayed
-                extra_lines.append(
-                    ActivityLine(
-                        f'... {remaining_files} more files',
-                        style=NAVY_TEXT_DIM,
-                        indent=1,
-                    )
-                )
-            return extra_lines
-        for filepath, count in file_list:
-            extra_lines.append(
-                ActivityLine(
-                    f'• {filepath} ({count} matches)',
-                    style=NAVY_TEXT_MUTED,
-                    indent=1,
-                )
-            )
-        total_displayed = len(file_list)
-        if file_count > total_displayed:
-            remaining_files = file_count - total_displayed
-            remaining_matches = match_count - sum(c for _, c in file_list)
-            extra_lines.append(
-                ActivityLine(
-                    f'... {remaining_files} more files, {remaining_matches} matches',
-                    style=NAVY_TEXT_DIM,
-                    indent=1,
-                )
-            )
-        return extra_lines
+            return _search_glob_extra_lines(file_list, file_count)
+        return _search_file_list_extra_lines(file_list, file_count, match_count)
 
     @staticmethod
     def search_results(

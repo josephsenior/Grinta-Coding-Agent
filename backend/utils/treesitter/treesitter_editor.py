@@ -310,41 +310,14 @@ class TreeSitterEditor:
         tree, file_bytes, language = parse_result
         original_code = file_bytes.decode('utf-8')
 
-        # Find the function or class node
         logger.info(f"Looking for symbol '{function_name}' in {file_path}")
-        try:
-            func_node = self._find_function_node(
-                tree, file_bytes, function_name, language, line_number=line_number
-            )
-        except AmbiguousSymbolError as e:
-            if line_number:
-                for match in e.matches:
-                    if match.line_start == line_number:
-                        break
-                else:
-                    logger.warning(
-                        f"Symbol '{function_name}' not found at line {line_number} in {file_path}"
-                    )
-                    return EditResult(
-                        success=False,
-                        message=f"Function '{function_name}' not found at line {line_number} in {file_path}",
-                    )
-                func_node = None
-            else:
-                logger.warning(f"Ambiguous symbol '{function_name}': {e}")
-                return EditResult(
-                    success=False,
-                    message=str(e),
-                )
-        if not func_node:
-            class_node = self._find_class_node(
-                tree, file_bytes, function_name, language
-            )
-            if class_node is not None:
-                func_node = class_node
+        func_node, error_result = self._find_edit_target_node(
+            tree, file_bytes, function_name, language, file_path, line_number
+        )
+        if error_result is not None:
+            return error_result
 
         if not func_node:
-            # Check if tree has syntax errors (parse was partially successful but broken)
             if has_syntax_errors(tree.root_node):
                 logger.info(
                     f"AST contains errors, attempting text-based fallback for '{function_name}'"
@@ -364,8 +337,76 @@ class TreeSitterEditor:
             )
 
         logger.debug(f"Found node for '{function_name}' (type: {func_node.type})")
+        return self._apply_function_body_edit(
+            file_path,
+            function_name,
+            new_body,
+            original_code,
+            language,
+            func_node,
+            validate,
+        )
 
-        # Extract function body node (language-specific)
+    def _find_edit_target_node(
+        self,
+        tree: Any,
+        file_bytes: bytes,
+        function_name: str,
+        language: str,
+        file_path: str,
+        line_number: int | None,
+    ) -> tuple[Any | None, EditResult | None]:
+        try:
+            func_node = self._find_function_node(
+                tree, file_bytes, function_name, language, line_number=line_number
+            )
+        except AmbiguousSymbolError as e:
+            error_result = self._resolve_ambiguous_edit_symbol(
+                e, function_name, file_path, line_number
+            )
+            if error_result is not None:
+                return None, error_result
+            func_node = None
+
+        if not func_node:
+            func_node = self._find_class_node(tree, file_bytes, function_name, language)
+        return func_node, None
+
+    def _resolve_ambiguous_edit_symbol(
+        self,
+        error: AmbiguousSymbolError,
+        function_name: str,
+        file_path: str,
+        line_number: int | None,
+    ) -> EditResult | None:
+        if line_number:
+            for match in error.matches:
+                if match.line_start == line_number:
+                    return None
+            logger.warning(
+                f"Symbol '{function_name}' not found at line {line_number} in {file_path}"
+            )
+            return EditResult(
+                success=False,
+                message=f"Function '{function_name}' not found at line {line_number} in {file_path}",
+            )
+
+        logger.warning(f"Ambiguous symbol '{function_name}': {error}")
+        return EditResult(
+            success=False,
+            message=str(error),
+        )
+
+    def _apply_function_body_edit(
+        self,
+        file_path: str,
+        function_name: str,
+        new_body: str,
+        original_code: str,
+        language: str,
+        func_node: Any,
+        validate: bool,
+    ) -> EditResult:
         body_node = get_function_body_node(func_node, language)
         if not body_node:
             return EditResult(
@@ -373,10 +414,7 @@ class TreeSitterEditor:
                 message=f"Could not locate function body for '{function_name}'",
             )
 
-        # Expand body range to include comments/decorators between ':' and block
         effective_body = expand_body_range(func_node, body_node)
-
-        # Replace the body
         try:
             new_code = replace_node_content(
                 original_code,
@@ -384,11 +422,8 @@ class TreeSitterEditor:
                 new_body,
                 preserve_indentation=True,
             )
-
-            # Normalize CRLF -> LF early so validation sees a consistent EOL style
             new_code = new_code.replace('\r\n', '\n').replace('\r', '\n')
 
-            # Validate if requested against normalized content
             if validate:
                 validation_result = self.validate_syntax(new_code, file_path, language)
                 if not validation_result[0]:
@@ -399,11 +434,9 @@ class TreeSitterEditor:
                         original_code=original_code,
                     )
 
-            # Write back
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(new_code)
 
-            # Clear cache
             self.tree_cache.pop(file_path, None)
             self.file_cache.pop(file_path, None)
 

@@ -55,10 +55,7 @@ def _compact_llm_config(config: Any) -> dict[str, Any]:
     }
 
 
-def capture_context_snapshot() -> dict[str, Any]:
-    """Return compact ctx dict for session.jsonl envelope."""
-    controller = _CONTROLLER
-    llm_config = _LLM_CONFIG
+def _controller_context_fields(controller: Any) -> tuple[Any, Any, Any]:
     mode = None
     active_run_mode = None
     autonomy = None
@@ -76,7 +73,10 @@ def capture_context_snapshot() -> dict[str, Any]:
         autonomy_ctrl = getattr(controller, 'autonomy_controller', None)
         if autonomy_ctrl is not None:
             autonomy = getattr(autonomy_ctrl, 'autonomy_level', autonomy)
+    return mode, active_run_mode, autonomy
 
+
+def _llm_context_fields(llm_config: Any) -> tuple[Any, Any, Any, dict[str, Any]]:
     model = None
     provider = None
     reasoning_effort = None
@@ -100,7 +100,10 @@ def capture_context_snapshot() -> dict[str, Any]:
                 llm_config_block = {**llm_config_block, **cfg_params}
         except Exception:
             pass
+    return model, provider, reasoning_effort, llm_config_block
 
+
+def _current_astep() -> Any:
     astep = None
     try:
         from backend.core.prompt_role_debug import current_astep_id
@@ -108,6 +111,18 @@ def capture_context_snapshot() -> dict[str, Any]:
         astep = current_astep_id()
     except Exception:
         pass
+    return astep
+
+
+def capture_context_snapshot() -> dict[str, Any]:
+    """Return compact ctx dict for session.jsonl envelope."""
+    controller = _CONTROLLER
+    llm_config = _LLM_CONFIG
+    mode, active_run_mode, autonomy = _controller_context_fields(controller)
+    model, provider, reasoning_effort, llm_config_block = _llm_context_fields(
+        llm_config
+    )
+    astep = _current_astep()
     return {
         'mode': mode,
         'active_run_mode': active_run_mode,

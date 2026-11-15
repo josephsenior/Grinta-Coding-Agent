@@ -71,12 +71,36 @@ def _payload_failed(payload: Any) -> bool:
     return bool(payload.get('error'))
 
 
+def _count_int_keys(payload: dict[str, Any], keys: tuple[str, ...]) -> int | None:
+    for key in keys:
+        value = payload.get(key)
+        if isinstance(value, int):
+            return value
+    return None
+
+
+def _count_content_blocks(blocks: list[Any]) -> int:
+    nested_total = 0
+    saw_nested = False
+    text_blocks = 0
+    for block in blocks:
+        if isinstance(block, dict):
+            raw = block.get('text') or block.get('content')
+        else:
+            raw = block
+        if not isinstance(raw, str) or not raw.strip():
+            continue
+        text_blocks += 1
+        nested = _count_collection(_json_payload(raw))
+        if nested is not None:
+            nested_total += nested
+            saw_nested = True
+    return nested_total if saw_nested else text_blocks
+
+
 def _count_collection(payload: Any) -> int | None:
-    if isinstance(payload, list):
-        return len(payload)
-    if not isinstance(payload, dict):
-        return None
-    for key in (
+    count = _extract_json_list_count(
+        payload,
         'results',
         'items',
         'documents',
@@ -84,34 +108,17 @@ def _count_collection(payload: Any) -> int | None:
         'libraries',
         'entries',
         'data',
-    ):
-        value = payload.get(key)
-        if isinstance(value, list):
-            return len(value)
-    for key in ('total_count', 'totalCount', 'count', 'total'):
-        value = payload.get(key)
-        if isinstance(value, int):
-            return value
+    )
+    if count is not None:
+        return count
+    if not isinstance(payload, dict):
+        return None
+    count = _count_int_keys(payload, ('total_count', 'totalCount', 'count', 'total'))
+    if count is not None:
+        return count
     blocks = payload.get('content')
     if isinstance(blocks, list):
-        nested_total = 0
-        saw_nested = False
-        text_blocks = 0
-        for block in blocks:
-            if isinstance(block, dict):
-                raw = block.get('text') or block.get('content')
-            else:
-                raw = block
-            if isinstance(raw, str) and raw.strip():
-                text_blocks += 1
-                parsed = _json_payload(raw)
-                nested = _count_collection(parsed)
-                if nested is not None:
-                    nested_total += nested
-                    saw_nested = True
-        if saw_nested:
-            return nested_total
-        return text_blocks
+        return _count_content_blocks(blocks)
     return None
 
 
@@ -163,6 +170,20 @@ def grep_observation_model(obs: Any) -> OrientLineModel:
     )
 
 
+def _grep_content_result(match_count: int, file_count: int) -> str:
+    if not match_count and not file_count:
+        return 'no matches'
+    if file_count:
+        return f'{_plural(match_count, "match")} · {_plural(file_count, "file")}'
+    return _plural(match_count, 'match')
+
+
+def _grep_default_result(match_count: int, file_count: int) -> str:
+    if file_count:
+        return _plural(file_count, 'file')
+    return _plural(match_count, 'match') if match_count else 'no matches'
+
+
 def grep_result(
     *,
     match_count: int,
@@ -178,14 +199,8 @@ def grep_result(
     if mode == 'count':
         return _plural(match_count, 'match') if match_count else 'no matches'
     if mode == 'content':
-        if not match_count and not file_count:
-            return 'no matches'
-        if file_count:
-            return f'{_plural(match_count, "match")} · {_plural(file_count, "file")}'
-        return _plural(match_count, 'match')
-    if file_count:
-        return _plural(file_count, 'file')
-    return _plural(match_count, 'match') if match_count else 'no matches'
+        return _grep_content_result(match_count, file_count)
+    return _grep_default_result(match_count, file_count)
 
 
 def glob_action_model(action: Any) -> OrientLineModel:
@@ -324,38 +339,49 @@ def _command_from_target(target: str) -> str:
     return (target or '').split('·', 1)[0].strip()
 
 
+_LSP_DIAGNOSTIC_COMMANDS = frozenset({'diagnostics', 'get_diagnostics'})
+
+_LSP_COUNTED_COMMANDS: dict[str, tuple[tuple[str, ...], str]] = {
+    'code_action': (('actions', 'code_actions'), 'action'),
+    'code_actions': (('actions', 'code_actions'), 'action'),
+    'list_symbols': (('symbols', 'symbol_list'), 'symbol'),
+    'symbols': (('symbols', 'symbol_list'), 'symbol'),
+    'find_definition': (('definitions', 'locations', 'results'), 'result'),
+    'definition': (('definitions', 'locations', 'results'), 'result'),
+    'goto_def': (('definitions', 'locations', 'results'), 'result'),
+    'def': (('definitions', 'locations', 'results'), 'result'),
+    'find_references': (('references', 'locations', 'results'), 'result'),
+    'references': (('references', 'locations', 'results'), 'result'),
+    'refs': (('references', 'locations', 'results'), 'result'),
+    'ref': (('references', 'locations', 'results'), 'result'),
+}
+
+
+def _lsp_list_count(payload: Any, content: str, keys: tuple[str, ...]) -> int:
+    count = _extract_json_list_count(payload, *keys)
+    if count is None:
+        count = _count_result_lines(content)
+    return count
+
+
+def _lsp_diagnostics_result(payload: Any, content: str) -> str:
+    count = _lsp_list_count(payload, content, ('diagnostics', 'issues'))
+    return 'clean' if count == 0 else _plural(count, 'issue')
+
+
 def lsp_result(*, command: str, content: str, available: bool = True) -> str:
     if not available:
         return 'unavailable'
     cmd = (command or '').strip().lower()
-    payload = _json_payload(content)
-    if cmd in {'hover'}:
+    if cmd == 'hover':
         return 'completed'
-    if cmd in {'diagnostics', 'get_diagnostics'}:
-        count = _extract_json_list_count(payload, 'diagnostics', 'issues')
-        if count is None:
-            count = _count_result_lines(content)
-        return 'clean' if count == 0 else _plural(count, 'issue')
-    if cmd in {'code_action', 'code_actions'}:
-        count = _extract_json_list_count(payload, 'actions', 'code_actions')
-        if count is None:
-            count = _count_result_lines(content)
-        return _plural(count, 'action')
-    if cmd in {'list_symbols', 'symbols'}:
-        count = _extract_json_list_count(payload, 'symbols', 'symbol_list')
-        if count is None:
-            count = _count_result_lines(content)
-        return _plural(count, 'symbol')
-    if cmd in {'find_definition', 'definition', 'goto_def', 'def'}:
-        count = _extract_json_list_count(payload, 'definitions', 'locations', 'results')
-        if count is None:
-            count = _count_result_lines(content)
-        return _plural(count, 'result')
-    if cmd in {'find_references', 'references', 'refs', 'ref'}:
-        count = _extract_json_list_count(payload, 'references', 'locations', 'results')
-        if count is None:
-            count = _count_result_lines(content)
-        return _plural(count, 'result')
+    payload = _json_payload(content)
+    if cmd in _LSP_DIAGNOSTIC_COMMANDS:
+        return _lsp_diagnostics_result(payload, content)
+    spec = _LSP_COUNTED_COMMANDS.get(cmd)
+    if spec is not None:
+        keys, noun = spec
+        return _plural(_lsp_list_count(payload, content, keys), noun)
     count = _count_collection(payload)
     if count is not None:
         return _plural(count, 'result')
@@ -413,50 +439,82 @@ def analyze_result(*, command: str, content: str, error: str = '') -> str:
     return 'completed'
 
 
-def mcp_action_model(action: Any) -> OrientLineModel | None:
+def _web_search_action_model(args: dict[str, Any]) -> OrientLineModel:
+    return OrientLineModel(
+        tool='web_search',
+        icon='⚐',
+        verb='Searched',
+        target=_quote(args.get('query'), fallback='query'),
+        result='…',
+        area='web',
+    )
+
+
+def _web_fetch_action_model(args: dict[str, Any]) -> OrientLineModel:
+    return OrientLineModel(
+        tool='web_fetch',
+        icon='⚐',
+        verb='Fetched',
+        target=_fetch_target(args),
+        result='…',
+        area='web',
+    )
+
+
+def _first_truthy_arg(args: dict[str, Any], keys: tuple[str, ...]) -> Any:
+    for key in keys:
+        value = args.get(key)
+        if value:
+            return value
+    return ''
+
+
+def _docs_action_model(
+    args: dict[str, Any],
+    *,
+    tool: str,
+    verb: str,
+    library_keys: tuple[str, ...],
+) -> OrientLineModel:
+    library = _first_truthy_arg(args, library_keys)
+    query = args.get('query') or ''
+    return OrientLineModel(
+        tool=tool,
+        icon='⚐',
+        verb=verb,
+        target=_library_target(library, query),
+        result='…',
+        area='docs',
+    )
+
+
+def _mcp_action_args(action: Any) -> tuple[str, dict[str, Any]]:
     name = str(getattr(action, 'name', '') or '')
     args = getattr(action, 'arguments', None) or {}
+    return name, args
+
+
+def mcp_action_model(action: Any) -> OrientLineModel | None:
+    name, args = _mcp_action_args(action)
     if name not in ORIENT_MCP_TOOL_NAMES:
         return None
     if name == 'web_search_exa':
-        return OrientLineModel(
-            tool='web_search',
-            icon='⚐',
-            verb='Searched',
-            target=_quote(args.get('query'), fallback='query'),
-            result='…',
-            area='web',
-        )
+        return _web_search_action_model(args)
     if name in {'web_fetch_exa', '__native_web_fetch__', 'fetch'}:
-        return OrientLineModel(
-            tool='web_fetch',
-            icon='⚐',
-            verb='Fetched',
-            target=_fetch_target(args),
-            result='…',
-            area='web',
-        )
+        return _web_fetch_action_model(args)
     if name == 'resolve-library-id':
-        library = args.get('libraryName') or args.get('library_name') or ''
-        query = args.get('query') or ''
-        return OrientLineModel(
+        return _docs_action_model(
+            args,
             tool='docs_resolve',
-            icon='⚐',
             verb='Resolved',
-            target=_library_target(library, query),
-            result='…',
-            area='docs',
+            library_keys=('libraryName', 'library_name'),
         )
     if name == 'query-docs':
-        library = args.get('libraryId') or args.get('library_id') or ''
-        query = args.get('query') or ''
-        return OrientLineModel(
+        return _docs_action_model(
+            args,
             tool='docs_query',
-            icon='⚐',
             verb='Queried',
-            target=_library_target(library, query),
-            result='…',
-            area='docs',
+            library_keys=('libraryId', 'library_id'),
         )
     return None
 
@@ -490,19 +548,22 @@ def _library_target(library: Any, query: Any) -> str:
     return lib or (f'"{q}"' if q else 'docs')
 
 
+def _fetch_url_label(url: str, *, include_path: bool) -> str:
+    parsed = urlparse(url)
+    host = parsed.netloc or parsed.path.split('/')[0]
+    path = parsed.path if parsed.netloc else ''
+    if include_path and path and path != '/':
+        return f'{host}{path}'
+    return host
+
+
 def _fetch_target(args: dict[str, Any]) -> str:
     urls = args.get('urls') or args.get('url') or []
     if isinstance(urls, str):
         urls = [urls] if urls.strip() else []
     if not isinstance(urls, list) or not urls:
         return 'web'
-    first = str(urls[0])
-    parsed = urlparse(first)
-    host = parsed.netloc or parsed.path.split('/')[0]
-    path = parsed.path if parsed.netloc else ''
-    label = host
-    if len(urls) == 1 and path and path != '/':
-        label = f'{host}{path}'
+    label = _fetch_url_label(str(urls[0]), include_path=len(urls) == 1)
     return shorten_middle(label, max_len=52, head_min=18)
 
 
@@ -557,33 +618,58 @@ def _checkpoint_summary_from_obs(obs: Any) -> str:
     return content.split('\n', 1)[0].strip() if content else ''
 
 
-def checkpoint_result(obs: Any, *, target: str = '') -> str:
-    if not getattr(obs, 'ok', True):
-        reason = str(getattr(obs, 'reason', '') or getattr(obs, 'status', '') or '')
-        return 'failed' if not reason else reason[:40]
-    data = getattr(obs, 'data', None)
-    if isinstance(data, dict):
-        cp_id = data.get('checkpoint_id')
-        if cp_id is not None:
-            return f'#{cp_id}'
-        total = data.get('total_checkpoints')
-        if isinstance(total, int):
-            return _plural(total, 'checkpoint')
-    status = str(getattr(obs, 'status', '') or '').strip().lower()
+def _checkpoint_failure_result(obs: Any) -> str | None:
+    if getattr(obs, 'ok', True):
+        return None
+    reason = str(getattr(obs, 'reason', '') or getattr(obs, 'status', '') or '')
+    return 'failed' if not reason else reason[:40]
+
+
+def _checkpoint_data_result(data: Any) -> str | None:
+    if not isinstance(data, dict):
+        return None
+    cp_id = data.get('checkpoint_id')
+    if cp_id is not None:
+        return f'#{cp_id}'
+    total = data.get('total_checkpoints')
+    if isinstance(total, int):
+        return _plural(total, 'checkpoint')
+    return None
+
+
+def _checkpoint_status_result(status: str) -> str | None:
     if status == 'noop':
         return 'already saved'
     if status in {'saved', 'reverted', 'cleared', 'empty', 'ok'}:
         return status
-    summary = _checkpoint_summary_from_obs(obs)
+    return None
+
+
+def _checkpoint_summary_result(summary: str, target: str, status: str) -> str:
     target_norm = (target or '').strip()
+    if target_norm and (
+        summary == target_norm
+        or summary.endswith(target_norm)
+        or target_norm in summary
+    ):
+        return status or 'completed'
+    return summary[:44] if len(summary) > 44 else summary
+
+
+def checkpoint_result(obs: Any, *, target: str = '') -> str:
+    failure = _checkpoint_failure_result(obs)
+    if failure is not None:
+        return failure
+    data_result = _checkpoint_data_result(getattr(obs, 'data', None))
+    if data_result is not None:
+        return data_result
+    status = str(getattr(obs, 'status', '') or '').strip().lower()
+    status_result = _checkpoint_status_result(status)
+    if status_result is not None:
+        return status_result
+    summary = _checkpoint_summary_from_obs(obs)
     if summary:
-        if target_norm and (
-            summary == target_norm
-            or summary.endswith(target_norm)
-            or target_norm in summary
-        ):
-            return status or 'completed'
-        return summary[:44] if len(summary) > 44 else summary
+        return _checkpoint_summary_result(summary, target, status)
     if getattr(obs, 'changed_state', False):
         return 'saved'
     return 'completed'

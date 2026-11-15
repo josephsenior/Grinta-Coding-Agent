@@ -60,11 +60,7 @@ def merge_missing_user_turns(
     if not full_history or not prompt_events:
         return prompt_events
 
-    missing = [
-        user
-        for user in collect_user_messages(full_history, max_turns=max_turns)
-        if not user_message_present(prompt_events, user)
-    ]
+    missing = _missing_user_turns(prompt_events, full_history, max_turns)
     if not missing:
         return prompt_events
 
@@ -75,18 +71,38 @@ def merge_missing_user_turns(
     }
     merged = list(prompt_events)
     for user in missing:
-        user_pos = history_index.get(id(user))
-        if user_pos is None:
-            merged.append(user)
-            continue
-        insert_at = len(merged)
-        for index, event in enumerate(merged):
-            event_pos = history_index.get(id(event))
-            if event_pos is not None and event_pos > user_pos:
-                insert_at = index
-                break
-        merged.insert(insert_at, user)
+        _insert_user_turn(merged, user, history_index)
     return merged
+
+
+def _missing_user_turns(
+    prompt_events: list[Event],
+    full_history: list[Event],
+    max_turns: int,
+) -> list[MessageAction]:
+    return [
+        user
+        for user in collect_user_messages(full_history, max_turns=max_turns)
+        if not user_message_present(prompt_events, user)
+    ]
+
+
+def _insert_user_turn(
+    merged: list[Event],
+    user: MessageAction,
+    history_index: dict[int, int],
+) -> None:
+    user_pos = history_index.get(id(user))
+    if user_pos is None:
+        merged.append(user)
+        return
+    insert_at = len(merged)
+    for index, event in enumerate(merged):
+        event_pos = history_index.get(id(event))
+        if event_pos is not None and event_pos > user_pos:
+            insert_at = index
+            break
+    merged.insert(insert_at, user)
 
 
 __all__ = [

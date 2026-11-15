@@ -103,6 +103,31 @@ def _should_clear_outside_window(event: Event, *, index: int, cutoff: int) -> bo
     return False
 
 
+def _apply_microcompact_to_event(
+    event: Event,
+    *,
+    index: int,
+    cutoff: int,
+    frozen_cleared: set[int],
+    state: object | None,
+) -> tuple[Event, bool]:
+    event_id = getattr(event, 'id', None)
+
+    if isinstance(event_id, int) and event_id in frozen_cleared:
+        if _is_microcompactable(event):
+            return _clear_observation_content(event), False
+        return event, False
+
+    if _should_clear_outside_window(event, index=index, cutoff=cutoff):
+        cleared = _clear_observation_content(event)
+        if state is not None and isinstance(event_id, int):
+            _persist_cleared_id(state, event_id)
+            frozen_cleared.add(event_id)
+        return cleared, True
+
+    return event, False
+
+
 def apply_microcompact(
     events: list[Event],
     *,
@@ -123,25 +148,16 @@ def apply_microcompact(
     newly_cleared = 0
 
     for index, event in enumerate(events):
-        event_id = getattr(event, 'id', None)
-
-        if isinstance(event_id, int) and event_id in frozen_cleared:
-            if _is_microcompactable(event):
-                results.append(_clear_observation_content(event))
-            else:
-                results.append(event)
-            continue
-
-        if _should_clear_outside_window(event, index=index, cutoff=cutoff):
-            cleared = _clear_observation_content(event)
-            if state is not None and isinstance(event_id, int):
-                _persist_cleared_id(state, event_id)
-                frozen_cleared.add(event_id)
-            results.append(cleared)
+        result, cleared = _apply_microcompact_to_event(
+            event,
+            index=index,
+            cutoff=cutoff,
+            frozen_cleared=frozen_cleared,
+            state=state,
+        )
+        results.append(result)
+        if cleared:
             newly_cleared += 1
-            continue
-
-        results.append(event)
 
     if newly_cleared:
         from backend.core.logging.logger import app_logger as logger

@@ -269,10 +269,7 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
         table = self.query_one('#sessions-table', DataTable)
         table.clear(columns=False)
         if storage_root is None:
-            self._all_entries = []
-            self._visible_entries = []
-            self._set_feedback('No session storage found.', error=True)
-            self.query_one('#sessions-preview', Static).update('')
+            self._clear_sessions_table()
             return
 
         entries = _list_session_entries(storage_root, sort_by=self._sort_by)
@@ -280,6 +277,16 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
         if self._search:
             entries = _filter_sessions_fuzzy(entries, self._search)
         self._visible_entries = entries[: self._limit]
+        self._populate_sessions_table(table)
+        self._update_sessions_feedback(table)
+
+    def _clear_sessions_table(self) -> None:
+        self._all_entries = []
+        self._visible_entries = []
+        self._set_feedback('No session storage found.', error=True)
+        self.query_one('#sessions-preview', Static).update('')
+
+    def _populate_sessions_table(self, table: DataTable) -> None:
         for i, (sid, meta, event_count, _path) in enumerate(self._visible_entries, 1):
             title = str(meta.get('title') or meta.get('name') or '-')
             updated = str(meta.get('last_updated_at') or meta.get('created_at') or '-')[
@@ -287,21 +294,23 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
             ]
             table.add_row(str(i), sid[:12], title, str(event_count), updated, key=sid)
 
+    def _update_sessions_feedback(self, table: DataTable) -> None:
         if self._visible_entries:
-            table.move_cursor(row=0, column=0, animate=False, scroll=False)
-            self._update_preview(0)
+            self._move_sessions_cursor_to_first(table)
             total = len(self._all_entries)
             shown = len(self._visible_entries)
             suffix = f' (showing {shown} of {total})' if shown < total else ''
             self._set_feedback(f'{shown} session(s) loaded{suffix}.')
-        else:
-            self.query_one('#sessions-preview', Static).update('')
-            if self._search:
-                self._set_feedback(
-                    f'No sessions matching "{self._search}".', error=True
-                )
-            else:
-                self._set_feedback('No sessions found.', error=True)
+            return
+        self.query_one('#sessions-preview', Static).update('')
+        if self._search:
+            self._set_feedback(f'No sessions matching "{self._search}".', error=True)
+            return
+        self._set_feedback('No sessions found.', error=True)
+
+    def _move_sessions_cursor_to_first(self, table: DataTable) -> None:
+        table.move_cursor(row=0, column=0, animate=False, scroll=False)
+        self._update_preview(0)
 
     def _select_target(self, target: str) -> None:
         from backend.cli.session.session_manager import _resolve_target
@@ -368,11 +377,21 @@ class GrintaSessionsDialog(ModalDialog[str | None]):
         lines = [f'[#c8d4e8]ID:[/] {sid}']
         lines.extend(self._build_preview_metadata_lines(meta))
         lines.append(f'[#c8d4e8]Events:[/] {event_count}')
+        lines.extend(self._build_preview_cost_lines(meta))
+        lines.extend(self._build_preview_time_lines(meta))
+        return lines
+
+    def _build_preview_cost_lines(self, meta: dict[str, Any]) -> list[str]:
+        lines: list[str] = []
         cost = float(meta.get('accumulated_cost') or 0)
         if cost:
             lines.append(f'[#c8d4e8]Cost:[/] ${cost:.4f}')
         if line := self._build_preview_tokens_line(meta):
             lines.append(line)
+        return lines
+
+    def _build_preview_time_lines(self, meta: dict[str, Any]) -> list[str]:
+        lines: list[str] = []
         updated = str(meta.get('last_updated_at') or meta.get('created_at') or '')
         if updated:
             lines.append(f'[#c8d4e8]Updated:[/] {updated[:19]}')

@@ -161,27 +161,33 @@ def _validate_token_limits_block(
     return []
 
 
-def _validate_reasoning_effort_block(
+def _reasoning_tier_presence_issues(
+    *,
+    provider: str,
+    model_name: str,
+    efforts: Any,
+    has_variants: bool,
+) -> list[CatalogValidationIssue]:
+    if has_variants or isinstance(efforts, list):
+        return []
+    return [
+        CatalogValidationIssue(
+            provider,
+            model_name,
+            'supports_reasoning_effort requires reasoning_efforts or metadata.variants',
+        )
+    ]
+
+
+def _reasoning_wire_issues(
     *,
     provider: str,
     model_name: str,
     wire: Any,
     efforts: Any,
     has_variants: bool,
-    supports_effort: bool,
 ) -> list[CatalogValidationIssue]:
-    if not supports_effort:
-        return []
-
     issues: list[CatalogValidationIssue] = []
-    if not has_variants and not isinstance(efforts, list):
-        issues.append(
-            CatalogValidationIssue(
-                provider,
-                model_name,
-                'supports_reasoning_effort requires reasoning_efforts or metadata.variants',
-            )
-        )
     wire_value = wire.strip().lower() if isinstance(wire, str) else ''
     if wire_value == WIRE_NONE and (has_variants or isinstance(efforts, list)):
         issues.append(
@@ -199,6 +205,36 @@ def _validate_reasoning_effort_block(
                 f'invalid reasoning_wire {wire!r}',
             )
         )
+    return issues
+
+
+def _validate_reasoning_effort_block(
+    *,
+    provider: str,
+    model_name: str,
+    wire: Any,
+    efforts: Any,
+    has_variants: bool,
+    supports_effort: bool,
+) -> list[CatalogValidationIssue]:
+    if not supports_effort:
+        return []
+
+    issues = _reasoning_tier_presence_issues(
+        provider=provider,
+        model_name=model_name,
+        efforts=efforts,
+        has_variants=has_variants,
+    )
+    issues.extend(
+        _reasoning_wire_issues(
+            provider=provider,
+            model_name=model_name,
+            wire=wire,
+            efforts=efforts,
+            has_variants=has_variants,
+        )
+    )
     if isinstance(efforts, list):
         issues.extend(
             _validate_reasoning_tiers(
@@ -375,20 +411,28 @@ def _validate_runtime_block(
     return issues
 
 
-def validate_catalog_file(path: Path) -> list[CatalogValidationIssue]:
-    """Validate one catalog JSON file before it is loaded into memory."""
-    issues: list[CatalogValidationIssue] = []
+def _load_catalog_json(
+    path: Path,
+) -> tuple[Any | None, list[CatalogValidationIssue]]:
     try:
-        raw = json.loads(path.read_text(encoding='utf-8'))
+        return json.loads(path.read_text(encoding='utf-8')), []
     except json.JSONDecodeError as exc:
-        return [
+        return None, [
             CatalogValidationIssue(path.stem, None, f'invalid JSON: {exc}'),
         ]
 
+
+def _validate_catalog_header(
+    raw: Any,
+    path: Path,
+) -> tuple[str, list[CatalogValidationIssue]]:
     provider = str(raw.get('provider') or path.stem).strip().lower()
     if not provider:
-        return [CatalogValidationIssue(path.stem, None, 'missing provider id')]
+        return provider, [
+            CatalogValidationIssue(path.stem, None, 'missing provider id'),
+        ]
 
+    issues: list[CatalogValidationIssue] = []
     if provider != path.stem:
         issues.append(
             CatalogValidationIssue(
@@ -407,14 +451,65 @@ def validate_catalog_file(path: Path) -> list[CatalogValidationIssue]:
                 f'client must be one of {_VALID_CLIENTS}, got {client!r}',
             )
         )
+    return provider, issues
 
-    models = raw.get('models')
-    if not isinstance(models, dict) or not models:
+
+def _validate_model_info(
+    *,
+    provider: str,
+    model_name: str,
+    info: Any,
+) -> list[CatalogValidationIssue]:
+    if not isinstance(info, dict):
+        return [
+            CatalogValidationIssue(
+                provider, model_name, 'model entry must be an object'
+            )
+        ]
+
+    runtime = info.get('runtime')
+    if not isinstance(runtime, dict):
+        return [
+            CatalogValidationIssue(provider, model_name, "missing 'runtime' object")
+        ]
+
+    issues: list[CatalogValidationIssue] = []
+    metadata = info.get('metadata')
+    if metadata is None:
+        metadata = {}
+    if not isinstance(metadata, dict):
         issues.append(
-            CatalogValidationIssue(provider, None, 'models must be a non-empty object')
+            CatalogValidationIssue(provider, model_name, 'metadata must be an object')
         )
-        return issues
+        metadata = {}
 
+    declared = str(runtime.get('provider') or provider).strip().lower()
+    if declared != provider:
+        issues.append(
+            CatalogValidationIssue(
+                provider,
+                model_name,
+                f'runtime.provider {declared!r} != file provider {provider!r}',
+            )
+        )
+
+    issues.extend(
+        _validate_runtime_block(
+            provider=provider,
+            model_name=model_name,
+            runtime=runtime,
+            metadata=metadata,
+        )
+    )
+    return issues
+
+
+def _validate_models_block(
+    *,
+    provider: str,
+    models: dict[Any, Any],
+) -> list[CatalogValidationIssue]:
+    issues: list[CatalogValidationIssue] = []
     seen_names: set[str] = set()
     for model_name, info in models.items():
         if model_name in seen_names:
@@ -423,55 +518,39 @@ def validate_catalog_file(path: Path) -> list[CatalogValidationIssue]:
             )
         seen_names.add(model_name)
 
-        if not isinstance(info, dict):
-            issues.append(
-                CatalogValidationIssue(
-                    provider, model_name, 'model entry must be an object'
-                )
-            )
-            continue
-
-        runtime = info.get('runtime')
-        if not isinstance(runtime, dict):
-            issues.append(
-                CatalogValidationIssue(provider, model_name, "missing 'runtime' object")
-            )
-            continue
-
-        metadata = info.get('metadata')
-        if metadata is None:
-            metadata = {}
-        if not isinstance(metadata, dict):
-            issues.append(
-                CatalogValidationIssue(
-                    provider, model_name, 'metadata must be an object'
-                )
-            )
-            metadata = {}
-
-        declared = str(runtime.get('provider') or provider).strip().lower()
-        if declared != provider:
-            issues.append(
-                CatalogValidationIssue(
-                    provider,
-                    model_name,
-                    f'runtime.provider {declared!r} != file provider {provider!r}',
-                )
-            )
-
         issues.extend(
-            _validate_runtime_block(
+            _validate_model_info(
                 provider=provider,
                 model_name=model_name,
-                runtime=runtime,
-                metadata=metadata,
+                info=info,
             )
         )
-
     return issues
 
 
-def _validate_entry_resolution(entry: ModelEntry) -> list[CatalogValidationIssue]:
+def validate_catalog_file(path: Path) -> list[CatalogValidationIssue]:
+    """Validate one catalog JSON file before it is loaded into memory."""
+    raw, issues = _load_catalog_json(path)
+    if issues:
+        return issues
+
+    provider, header_issues = _validate_catalog_header(raw, path)
+    issues.extend(header_issues)
+    if not provider:
+        return issues
+
+    models = raw.get('models')
+    if not isinstance(models, dict) or not models:
+        issues.append(
+            CatalogValidationIssue(provider, None, 'models must be a non-empty object')
+        )
+        return issues
+
+    issues.extend(_validate_models_block(provider=provider, models=models))
+    return issues
+
+
+def _validate_primary_lookups(entry: ModelEntry) -> list[CatalogValidationIssue]:
     issues: list[CatalogValidationIssue] = []
     provider = entry.provider
     name = entry.name
@@ -495,6 +574,15 @@ def _validate_entry_resolution(entry: ModelEntry) -> list[CatalogValidationIssue
                 f"lookup('{provider}/{name}') failed",
             )
         )
+    return issues
+
+
+def _validate_alias_resolution(
+    entry: ModelEntry,
+) -> list[CatalogValidationIssue]:
+    issues: list[CatalogValidationIssue] = []
+    provider = entry.provider
+    name = entry.name
 
     for alias in entry.aliases:
         alias_str = str(alias).strip()
@@ -512,29 +600,85 @@ def _validate_entry_resolution(entry: ModelEntry) -> list[CatalogValidationIssue
                     f'alias {alias_str!r} does not resolve to this entry',
                 )
             )
+    return issues
 
+
+def _validate_entry_transport(
+    entry: ModelEntry,
+) -> list[CatalogValidationIssue]:
     try:
-        validate_model_transport(f'{provider}/{name}', config_provider=provider)
+        validate_model_transport(
+            f'{entry.provider}/{entry.name}', config_provider=entry.provider
+        )
     except Exception as exc:
-        issues.append(
+        return [
             CatalogValidationIssue(
-                provider,
-                name,
+                entry.provider,
+                entry.name,
                 f'transport validation failed: {exc}',
             )
-        )
+        ]
+    return []
 
+
+def _validate_entry_reasoning(
+    entry: ModelEntry,
+) -> list[CatalogValidationIssue]:
     if supports_reasoning(entry) and not entry.reasoning_efforts:
         metadata = entry.metadata if isinstance(entry.metadata, dict) else {}
         if not metadata.get('variants'):
+            return [
+                CatalogValidationIssue(
+                    entry.provider,
+                    entry.name,
+                    'supports reasoning but has no reasoning_efforts or variants',
+                )
+            ]
+    return []
+
+
+def _validate_entry_resolution(entry: ModelEntry) -> list[CatalogValidationIssue]:
+    issues: list[CatalogValidationIssue] = []
+    issues.extend(_validate_primary_lookups(entry))
+    issues.extend(_validate_alias_resolution(entry))
+    issues.extend(_validate_entry_transport(entry))
+    issues.extend(_validate_entry_reasoning(entry))
+    return issues
+
+
+def _validate_picker_listing(
+    provider: str,
+    provider_entries: list[ModelEntry],
+) -> list[CatalogValidationIssue]:
+    from backend.inference.catalog.provider_catalog import (
+        build_model_entries_by_provider,
+        list_model_names,
+    )
+
+    issues: list[CatalogValidationIssue] = []
+    listed = set(list_model_names(provider))
+    for entry in provider_entries:
+        model_id = runtime_model_id(entry)
+        if model_id not in listed:
             issues.append(
                 CatalogValidationIssue(
                     provider,
-                    name,
-                    'supports reasoning but has no reasoning_efforts or variants',
+                    entry.name,
+                    f'model {model_id!r} missing from list_model_names()',
                 )
             )
 
+    picker = build_model_entries_by_provider(provider=provider).get(provider, [])
+    picker_names = {item.name for item in picker}
+    for entry in provider_entries:
+        if entry.name not in picker_names:
+            issues.append(
+                CatalogValidationIssue(
+                    provider,
+                    entry.name,
+                    'model missing from build_model_entries_by_provider()',
+                )
+            )
     return issues
 
 
@@ -548,9 +692,7 @@ def validate_loaded_catalog() -> list[CatalogValidationIssue]:
 
     from backend.inference.catalog.provider_catalog import (
         LOCAL_PROVIDERS,
-        build_model_entries_by_provider,
         get_provider_ids,
-        list_model_names,
     )
 
     catalog_by_provider: dict[str, list[ModelEntry]] = {}
@@ -560,7 +702,8 @@ def validate_loaded_catalog() -> list[CatalogValidationIssue]:
     for provider in sorted(get_provider_ids()):
         if provider in LOCAL_PROVIDERS:
             continue
-        if provider not in catalog_by_provider:
+        provider_entries = catalog_by_provider.get(provider)
+        if provider_entries is None:
             issues.append(
                 CatalogValidationIssue(
                     provider,
@@ -569,30 +712,7 @@ def validate_loaded_catalog() -> list[CatalogValidationIssue]:
                 )
             )
             continue
-
-        listed = set(list_model_names(provider))
-        for entry in catalog_by_provider[provider]:
-            model_id = runtime_model_id(entry)
-            if model_id not in listed:
-                issues.append(
-                    CatalogValidationIssue(
-                        provider,
-                        entry.name,
-                        f'model {model_id!r} missing from list_model_names()',
-                    )
-                )
-
-        picker = build_model_entries_by_provider(provider=provider).get(provider, [])
-        picker_names = {item.name for item in picker}
-        for entry in catalog_by_provider[provider]:
-            if entry.name not in picker_names:
-                issues.append(
-                    CatalogValidationIssue(
-                        provider,
-                        entry.name,
-                        'model missing from build_model_entries_by_provider()',
-                    )
-                )
+        issues.extend(_validate_picker_listing(provider, provider_entries))
 
     return issues
 

@@ -19,30 +19,36 @@ def _json_preview(value: Any, limit: int = 160) -> str:
     return _truncate(text, limit)
 
 
+def _debugger_start_detail(action: Any) -> str:
+    target = (
+        getattr(action, 'program', None)
+        or getattr(action, 'adapter', None)
+        or getattr(action, 'language', None)
+        or 'session'
+    )
+    return _truncate(str(target), 90)
+
+
+def _debugger_breakpoints_detail(action: Any) -> str:
+    file = getattr(action, 'file', None) or 'breakpoints'
+    lines = getattr(action, 'lines', None) or []
+    line_text = ','.join(str(line) for line in lines[:4])
+    if len(lines) > 4:
+        line_text += ',...'
+    return _truncate(f'{file}:{line_text}' if line_text else str(file), 90)
+
+
 class RendererDebuggerMixin:
     """DAP debugger scan-line cards."""
 
     def _debugger_card_detail_from_action(self, action: Any) -> str:
         debug_action = str(getattr(action, 'debug_action', '') or 'debugger')
         if debug_action == 'start':
-            target = (
-                getattr(action, 'program', None)
-                or getattr(action, 'adapter', None)
-                or getattr(action, 'language', None)
-                or 'session'
-            )
-            return _truncate(str(target), 90)
+            return _debugger_start_detail(action)
         if debug_action == 'set_breakpoints':
-            file = getattr(action, 'file', None) or 'breakpoints'
-            lines = getattr(action, 'lines', None) or []
-            line_text = ','.join(str(line) for line in lines[:4])
-            if len(lines) > 4:
-                line_text += ',...'
-            return _truncate(f'{file}:{line_text}' if line_text else str(file), 90)
+            return _debugger_breakpoints_detail(action)
         if debug_action == 'evaluate':
             return _truncate(str(getattr(action, 'expression', '') or 'expression'), 90)
-        if debug_action in {'scopes', 'variables'}:
-            return _truncate(debug_action.replace('_', ' '), 90)
         return _truncate(debug_action.replace('_', ' '), 90)
 
     def _debugger_card_detail_from_payload(self, payload: dict[str, Any]) -> str:

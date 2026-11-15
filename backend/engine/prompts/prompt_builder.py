@@ -343,6 +343,129 @@ def _mcp_or_permissions_sections_for_collect(
 # ---------------------------------------------------------------------------
 
 
+def _build_identity_sections(
+    identity_line: str, model_id: str
+) -> list[tuple[str, str]]:
+    return [
+        (
+            'identity_header',
+            f'{identity_line} '
+            'Use clear engineering judgment, methodical reasoning, and tool execution to help with technical work.\n\n'
+            '**Model identity:** The deployment calls you through an API using the configured '
+            'model id below.\n'
+            f'Configured model id: `{model_id}`\n\n'
+            '<SCOPE_AND_PRECEDENCE>\n'
+            '- Write production-quality code by default.\n'
+            '- State your approach alongside the first implementation tool call when it materially helps the user follow the work.\n'
+            '- Calibrate confidence to evidence. Be decisive when tool observations are sufficient; state uncertainty when something remains unverified.\n'
+            '- Keep scope anchored to the latest explicit user objective. You may act on adjacent issues that are clearly required for the requested change to be correct (for example, a bug in a helper you touched, or a broken call site your edit created).\n'
+            '- Follow the active mode protocol and the canonical policy sections below. When policies overlap, security and explicit user instructions take precedence, followed by the more specific policy.\n'
+            '</SCOPE_AND_PRECEDENCE>',
+        ),
+    ]
+
+
+def _external_discovery_hint(web_on: bool, docs_on: bool) -> str:
+    external_discovery_parts: list[str] = []
+    if web_on:
+        external_discovery_parts.append('`web_search` / `web_fetch`')
+    if docs_on:
+        external_discovery_parts.append('`docs_resolve` / `docs_query`')
+    if not external_discovery_parts:
+        return ''
+    return f' (including {" and ".join(external_discovery_parts)} when external context helps)'
+
+
+def _build_mode_protocol_section(
+    mode: str,
+    *,
+    config: Any,
+    external_discovery_hint: str,
+) -> tuple[str, str]:
+    from backend.core.interaction_modes import (
+        is_chat_mode,
+        is_plan_mode,
+    )
+
+    if is_plan_mode(mode):
+        plan_tools_line = (
+            'For substantial plans, use `task_state(set)` to record the overall '
+            'objective, contract conditions, and tasks — see `<TASK_STATE_POLICY>`. Do not '
+            'audit in Plan mode because executable evidence does not exist yet.\n'
+            if bool(getattr(config, 'enable_task_tracker_tool', True))
+            else ''
+        )
+        return (
+            'simplified_plan_protocol',
+            f'You are in Plan mode. Use discovery tools{external_discovery_hint} '
+            'to inspect the codebase.\n\n'
+            f'{plan_tools_line}'
+            'Do **not** edit files or run shell commands in Plan mode.\n\n'
+            'When you need input from the user to continue, see `<ASK_USER_TOOL>`.\n\n'
+            'When planning is complete, write the plan as your final response. '
+            'Plain text ends the run — no completion tool is required.',
+        )
+    if is_chat_mode(mode):
+        return (
+            'simplified_chat_protocol',
+            f'You are in Chat mode. Use discovery tools{external_discovery_hint} '
+            'to investigate when grounding helps.\n\n'
+            'Do **not** edit files or run shell commands in Chat mode.\n\n'
+            'When you need input from the user to continue, see `<ASK_USER_TOOL>`.\n\n'
+            'Respond naturally in prose. Plain text ends the turn unless you used `ask_user`.',
+        )
+    return (
+        'simplified_agent_protocol',
+        'Drive the request through your tools.\n\n'
+        'Intermediate prose may accompany tool calls for approach, risk, or progress updates. '
+        'Plain prose without a tool call is final and ends the run.\n\n'
+        'When you need input from the user to continue, see `<ASK_USER_TOOL>`.\n\n'
+        'When your work is complete, write a comprehensive final summary covering:\n'
+        '- What you did\n'
+        '- What changed\n'
+        '- Verification run and result, or the concrete blocker if verification could not run\n'
+        '- Any important notes or caveats for the user\n'
+        '- Follow-up options only when they are outside the requested objective or the remaining work is concretely blocked\n\n'
+        'Writing that summary ends the run. You do not need to call any special tool to signal completion. Your final response IS the completion.',
+    )
+
+
+def _maybe_append_examples_section(
+    sections: list[tuple[str, str]],
+    *,
+    mode: str,
+    config: Any,
+    is_small_model: bool,
+    resolved_terminal_tool: str,
+    lsp_available: bool,
+) -> None:
+    from backend.core.interaction_modes import (
+        is_chat_mode,
+        is_plan_mode,
+    )
+
+    if is_small_model or not bool(getattr(config, 'enable_editor', True)):
+        return
+    if is_chat_mode(mode) or is_plan_mode(mode):
+        return
+    sections.append(
+        (
+            'system_partial_05_examples',
+            _render_examples(
+                terminal_command_tool=resolved_terminal_tool,
+                tracker_on=bool(getattr(config, 'enable_task_tracker_tool', True)),
+                criteria_on=bool(
+                    getattr(config, 'enable_acceptance_criteria_tool', True)
+                ),
+                working_memory_on=bool(getattr(config, 'enable_working_memory', True)),
+                lsp_available=lsp_available,
+                checkpoints_on=bool(getattr(config, 'enable_checkpoints', True)),
+                web_on=bool(getattr(config, 'enable_web', True)),
+            ),
+        )
+    )
+
+
 def _collect_system_prompt_sections(
     *,
     active_llm_model: str = '',
@@ -380,90 +503,21 @@ def _collect_system_prompt_sections(
         if agent_identity.strip()
         else 'You are Grinta, a careful Autonomous software engineer built by Youssef Mejdi.'
     )
-    sections: list[tuple[str, str]] = [
-        (
-            'identity_header',
-            f'{identity_line} '
-            'Use clear engineering judgment, methodical reasoning, and tool execution to help with technical work.\n\n'
-            '**Model identity:** The deployment calls you through an API using the configured '
-            'model id below.\n'
-            f'Configured model id: `{model_id}`\n\n'
-            '<SCOPE_AND_PRECEDENCE>\n'
-            '- Write production-quality code by default.\n'
-            '- State your approach alongside the first implementation tool call when it materially helps the user follow the work.\n'
-            '- Calibrate confidence to evidence. Be decisive when tool observations are sufficient; state uncertainty when something remains unverified.\n'
-            '- Keep scope anchored to the latest explicit user objective. You may act on adjacent issues that are clearly required for the requested change to be correct (for example, a bug in a helper you touched, or a broken call site your edit created).\n'
-            '- Follow the active mode protocol and the canonical policy sections below. When policies overlap, security and explicit user instructions take precedence, followed by the more specific policy.\n'
-            '</SCOPE_AND_PRECEDENCE>',
-        ),
-    ]
+    sections: list[tuple[str, str]] = _build_identity_sections(identity_line, model_id)
     from backend.core.interaction_modes import (
-        is_chat_mode,
-        is_plan_mode,
         normalize_interaction_mode,
     )
 
     mode = normalize_interaction_mode(getattr(config, 'mode', 'agent'))
     web_on = bool(getattr(config, 'enable_web', True))
     docs_on = bool(getattr(config, 'enable_docs', True))
-    external_discovery_parts: list[str] = []
-    if web_on:
-        external_discovery_parts.append('`web_search` / `web_fetch`')
-    if docs_on:
-        external_discovery_parts.append('`docs_resolve` / `docs_query`')
-    external_discovery_hint = (
-        f' (including {" and ".join(external_discovery_parts)} when external context helps)'
-        if external_discovery_parts
-        else ''
+    sections.append(
+        _build_mode_protocol_section(
+            mode,
+            config=config,
+            external_discovery_hint=_external_discovery_hint(web_on, docs_on),
+        )
     )
-    if is_plan_mode(mode):
-        plan_tools_line = (
-            'For substantial plans, use `task_state(set)` to record the overall '
-            'objective, contract conditions, and tasks — see `<TASK_STATE_POLICY>`. Do not '
-            'audit in Plan mode because executable evidence does not exist yet.\n'
-            if bool(getattr(config, 'enable_task_tracker_tool', True))
-            else ''
-        )
-        sections.append(
-            (
-                'simplified_plan_protocol',
-                f'You are in Plan mode. Use discovery tools{external_discovery_hint} '
-                'to inspect the codebase.\n\n'
-                f'{plan_tools_line}'
-                'Do **not** edit files or run shell commands in Plan mode.\n\n'
-                'When you need input from the user to continue, see `<ASK_USER_TOOL>`.\n\n'
-                'When planning is complete, write the plan as your final response. '
-                'Plain text ends the run — no completion tool is required.',
-            )
-        )
-    elif is_chat_mode(mode):
-        sections.append(
-            (
-                'simplified_chat_protocol',
-                f'You are in Chat mode. Use discovery tools{external_discovery_hint} '
-                'to investigate when grounding helps.\n\n'
-                'Do **not** edit files or run shell commands in Chat mode.\n\n'
-                'When you need input from the user to continue, see `<ASK_USER_TOOL>`.\n\n'
-                'Respond naturally in prose. Plain text ends the turn unless you used `ask_user`.',
-            )
-        )
-    else:
-        sections.append(
-            (
-                'simplified_agent_protocol',
-                'Drive the request through your tools.\n\n'
-                'Intermediate prose may accompany tool calls for approach, risk, or progress updates. '
-                'Plain prose without a tool call is final and ends the run.\n\n'
-                'When you need input from the user to continue, see `<ASK_USER_TOOL>`.\n\n'
-                'When your work is complete, write a comprehensive final summary covering:\n'
-                '- What you did\n'
-                '- What changed\n'
-                '- Verification run and result, or the concrete blocker if verification could not run\n'
-                '- Any important notes or caveats for the user\n'
-                '- Follow-up options only when they are outside the requested objective or the remaining work is concretely blocked\n\n'
-                'Writing that summary ends the run. You do not need to call any special tool to signal completion. Your final response IS the completion.',
-            )
-        )
     if bool(getattr(config, 'enable_terminal', True)):
         sections.extend(
             _shell_identity_sections(
@@ -542,29 +596,14 @@ def _collect_system_prompt_sections(
     sections.append(('system_partial_03_tail', _render_interaction_tail(config)))
 
     # Worked-examples partial — agent mode only; edit-heavy examples mislead Chat/Plan.
-    if (
-        not is_small_model
-        and bool(getattr(config, 'enable_editor', True))
-        and not (is_chat_mode(mode) or is_plan_mode(mode))
-    ):
-        sections.append(
-            (
-                'system_partial_05_examples',
-                _render_examples(
-                    terminal_command_tool=resolved_terminal_tool,
-                    tracker_on=bool(getattr(config, 'enable_task_tracker_tool', True)),
-                    criteria_on=bool(
-                        getattr(config, 'enable_acceptance_criteria_tool', True)
-                    ),
-                    working_memory_on=bool(
-                        getattr(config, 'enable_working_memory', True)
-                    ),
-                    lsp_available=lsp_available,
-                    checkpoints_on=bool(getattr(config, 'enable_checkpoints', True)),
-                    web_on=bool(getattr(config, 'enable_web', True)),
-                ),
-            )
-        )
+    _maybe_append_examples_section(
+        sections,
+        mode=mode,
+        config=config,
+        is_small_model=is_small_model,
+        resolved_terminal_tool=resolved_terminal_tool,
+        lsp_available=lsp_available,
+    )
 
     sections.append(
         (
@@ -754,6 +793,47 @@ def _runtime_secrets_lines(secrets: dict[object, object]) -> list[str]:
     return lines
 
 
+def _runtime_working_dir_lines(working_dir: str) -> list[str]:
+    if not working_dir:
+        return []
+    return [
+        f'The current working directory is {working_dir}',
+        'The open project lives in that directory. Use file and shell paths relative to '
+        'it, or absolute paths on disk that stay under it.',
+        'There is no `/workspace` virtual path — tools and shell commands use real paths only.',
+        'This message does not list project files—do not assume paths like '
+        '`tailwind.config.*` exist. Use `glob` to discover layout, '
+        'then read with editor/view tools.',
+    ]
+
+
+def _runtime_detail_lines(
+    runtime_info: RuntimeInfo,
+    *,
+    workspace_is_bare: bool,
+) -> list[str]:
+    lines: list[str] = []
+
+    extra_instr = getattr(runtime_info, 'additional_agent_instructions', '') or ''
+    if extra_instr:
+        lines.append(extra_instr)
+
+    secrets = getattr(runtime_info, 'custom_secrets_descriptions', None) or {}
+    lines.extend(_runtime_secrets_lines(secrets))
+
+    date = getattr(runtime_info, 'date', '') or ''
+    if date:
+        lines.append(f"Today's date is {date} (UTC).")
+
+    if workspace_is_bare:
+        lines.append(
+            'No cloned repository metadata or repository instructions were detected for '
+            'this directory; treat it as a plain local workspace rather than a known '
+            'project, and rely on discovery tools to learn what is here.'
+        )
+    return lines
+
+
 def _build_runtime_information_block(
     runtime_info: RuntimeInfo | None,
     *,
@@ -764,41 +844,14 @@ def _build_runtime_information_block(
 
     ri_lines: list[str] = ['<RUNTIME_INFORMATION>']
     wd = getattr(runtime_info, 'working_dir', '') or ''
-    if wd:
-        ri_lines.append(f'The current working directory is {wd}')
-        ri_lines.append(
-            'The open project lives in that directory. Use file and shell paths relative to '
-            'it, or absolute paths on disk that stay under it.'
-        )
-        ri_lines.append(
-            'There is no `/workspace` virtual path — tools and shell commands use real paths only.'
-        )
-        ri_lines.append(
-            'This message does not list project files—do not assume paths like '
-            '`tailwind.config.*` exist. Use `glob` to discover layout, '
-            'then read with editor/view tools.'
-        )
+    ri_lines.extend(_runtime_working_dir_lines(wd))
 
     hosts = getattr(runtime_info, 'available_hosts', None) or {}
     ri_lines.extend(_runtime_hosts_lines(hosts))
 
-    extra_instr = getattr(runtime_info, 'additional_agent_instructions', '') or ''
-    if extra_instr:
-        ri_lines.append(extra_instr)
-
-    secrets = getattr(runtime_info, 'custom_secrets_descriptions', None) or {}
-    ri_lines.extend(_runtime_secrets_lines(secrets))
-
-    date = getattr(runtime_info, 'date', '') or ''
-    if date:
-        ri_lines.append(f"Today's date is {date} (UTC).")
-
-    if workspace_is_bare:
-        ri_lines.append(
-            'No cloned repository metadata or repository instructions were detected for '
-            'this directory; treat it as a plain local workspace rather than a known '
-            'project, and rely on discovery tools to learn what is here.'
-        )
+    ri_lines.extend(
+        _runtime_detail_lines(runtime_info, workspace_is_bare=workspace_is_bare)
+    )
 
     ri_lines.append('</RUNTIME_INFORMATION>')
     return '\n'.join(ri_lines)

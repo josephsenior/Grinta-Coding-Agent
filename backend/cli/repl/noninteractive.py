@@ -72,6 +72,18 @@ async def _run_controller_with_renderer(
             _RUNTIME_ORCHESTRATOR.release(acquire_result)
 
 
+def _agent_outcome_message(state: Any, elapsed: float) -> tuple[str, str]:
+    from backend.core.enums import AgentState
+
+    if state is None:
+        return 'Agent did not produce a final state', 'warning'
+    if state.agent_state in (AgentState.FINISHED, AgentState.AWAITING_USER_INPUT):
+        return f'Agent completed in {elapsed:.1f}s', 'success'
+    if state.agent_state == AgentState.ERROR:
+        return f'Agent ended with error in {elapsed:.1f}s', 'error'
+    return f'Agent stopped at {state.agent_state} after {elapsed:.1f}s', 'warning'
+
+
 async def run_noninteractive(
     config: AppConfig,
     console: Console,
@@ -83,7 +95,6 @@ async def run_noninteractive(
     import time
 
     from backend.cli.event_renderer import CLIEventRenderer
-    from backend.core.enums import AgentState
     from backend.ledger.action import MessageAction
 
     hud = HUDBar()
@@ -132,29 +143,8 @@ async def run_noninteractive(
             )
 
             elapsed = time.time() - start_time
-            if state is None:
-                renderer.add_system_message(
-                    'Agent did not produce a final state',
-                    title='warning',
-                )
-            elif state.agent_state in (
-                AgentState.FINISHED,
-                AgentState.AWAITING_USER_INPUT,
-            ):
-                renderer.add_system_message(
-                    f'Agent completed in {elapsed:.1f}s',
-                    title='success',
-                )
-            elif state.agent_state == AgentState.ERROR:
-                renderer.add_system_message(
-                    f'Agent ended with error in {elapsed:.1f}s',
-                    title='error',
-                )
-            else:
-                renderer.add_system_message(
-                    f'Agent stopped at {state.agent_state} after {elapsed:.1f}s',
-                    title='warning',
-                )
+            message, title = _agent_outcome_message(state, elapsed)
+            renderer.add_system_message(message, title=title)
 
     except KeyboardInterrupt:
         renderer.add_system_message('Interrupted by user', title='warning')

@@ -41,6 +41,89 @@ _ACTION_FIELDS = {
 }
 
 
+def _contract_item_line(item: ContractItem) -> str:
+    if item.status == 'satisfied':
+        marker = '[ok]'
+    elif item.status == 'gap':
+        marker = '[gap]'
+    else:
+        marker = '[ ]'
+    return f'{marker} {item.id} {item.text}'
+
+
+def _plan_task_line(task: TrackedTask) -> str:
+    if task.status == 'done':
+        marker = '[done]'
+    elif task.status == 'in_progress':
+        marker = '[active]'
+    else:
+        marker = '[ ]'
+    return f'{marker} {task.id} {task.description}'
+
+
+def _contract_review_lines(contract: TaskContract) -> list[str]:
+    lines = ['', 'OBJECTIVE', contract.objective or '(not recorded)']
+    for heading, items in [
+        ('REQUIREMENTS', contract.requirements),
+        ('CONSTRAINTS', contract.constraints),
+        ('SUCCESS CONDITIONS', contract.success_conditions),
+    ]:
+        lines.append('')
+        lines.append(heading)
+        lines += [_contract_item_line(item) for item in items] or ['(none)']
+    return lines
+
+
+def _plan_review_lines(plan: TaskPlan) -> list[str]:
+    return ['', 'PLAN'] + [_plan_task_line(task) for task in plan.tasks]
+
+
+def _recorded_status_lines(
+    recorded_status: str,
+    unresolved: list[str],
+    actionable: list[str],
+    blocked: list[str],
+) -> list[str]:
+    lines = ['', 'RECORDED STATUS']
+    if recorded_status == 'active':
+        details: list[str] = []
+        if unresolved:
+            details.append('unresolved contract: ' + ', '.join(unresolved))
+        if actionable:
+            details.append('open plan: ' + ', '.join(actionable))
+        lines.append('ACTIVE — ' + '; '.join(details))
+    elif recorded_status == 'blocked':
+        lines.append('BLOCKED — ' + ', '.join(blocked))
+    elif recorded_status == 'clear':
+        lines.append('CLEAR — no unresolved contract conditions or open tasks recorded')
+    else:
+        lines.append('UNTRACKED — no durable contract or plan has been recorded')
+    return lines
+
+
+def _contract_groups(contract: TaskContract | None) -> list[list[ContractItem]]:
+    if not contract:
+        return []
+    return [
+        contract.requirements,
+        contract.constraints,
+        contract.success_conditions,
+    ]
+
+
+def _unresolved_contract_ids(contract: TaskContract | None) -> list[str]:
+    return [
+        item.id
+        for group in _contract_groups(contract)
+        for item in group
+        if item.status in {'unknown', 'gap'}
+    ]
+
+
+def _task_ids_with_status(tasks: list[TrackedTask], statuses: set[str]) -> list[str]:
+    return [task.id for task in tasks if task.status in statuses]
+
+
 class TaskStateService:
     def __init__(self, store: TaskStateStore | None = None):
         self.store = store or TaskStateStore()
@@ -163,85 +246,71 @@ class TaskStateService:
                 return
         raise ValueError(f'Task {task_id!r} not found.')
 
-    def _audit(self, state: TaskState, args: dict[str, Any]) -> None:
-        if not state.contract:
-            raise ValueError('No contract exists. Use task_state(set) first.')
+    @staticmethod
+    def _audit_items_by_id(contract: TaskContract) -> dict[str, ContractItem]:
         all_items = (
-            state.contract.requirements
-            + state.contract.constraints
-            + state.contract.success_conditions
+            contract.requirements + contract.constraints + contract.success_conditions
         )
-        by_id = {item.id: item for item in all_items}
+        return {item.id: item for item in all_items}
+
+    @staticmethod
+    def _audit_evidence_rows(args: dict[str, Any]) -> list[Any]:
         rows = args.get('evidence', [])
         if not isinstance(rows, list):
             raise ValueError('Audit evidence must be a list.')
-        for row in rows:
-            if not isinstance(row, dict):
-                raise ValueError('Audit entries must be objects.')
-            item = by_id.get(str(row.get('item_id', '')))
-            status = str(row.get('status', ''))
-            if item is None or status not in _CONTRACT_STATUSES:
-                raise ValueError('Audit entries need known item_id and valid status.')
-            item.status = status
-            source_event_ids = row.get('source_event_ids', [])
-            if not isinstance(source_event_ids, list):
-                raise ValueError(
-                    'source_event_ids must be a list of non-negative integers.'
-                )
-            if len(source_event_ids) > 50 or any(
-                not isinstance(event_id, int)
-                or isinstance(event_id, bool)
-                or event_id < 0
-                for event_id in source_event_ids
-            ):
-                raise ValueError(
-                    'source_event_ids must contain at most 50 non-negative integers.'
-                )
-            item.evidence.append(
-                Evidence(
-                    kind=str(row.get('kind', 'inspection')),
-                    summary=str(row.get('evidence', '')).strip(),
-                    source_event_ids=list(dict.fromkeys(source_event_ids)),
-                )
+        return rows
+
+    @staticmethod
+    def _validate_audit_source_event_ids(source_event_ids: Any) -> None:
+        if not isinstance(source_event_ids, list):
+            raise ValueError(
+                'source_event_ids must be a list of non-negative integers.'
             )
+        if len(source_event_ids) > 50 or any(
+            not isinstance(event_id, int) or isinstance(event_id, bool) or event_id < 0
+            for event_id in source_event_ids
+        ):
+            raise ValueError(
+                'source_event_ids must contain at most 50 non-negative integers.'
+            )
+
+    @classmethod
+    def _apply_audit_evidence_row(
+        cls,
+        by_id: dict[str, ContractItem],
+        row: Any,
+    ) -> None:
+        if not isinstance(row, dict):
+            raise ValueError('Audit entries must be objects.')
+        item = by_id.get(str(row.get('item_id', '')))
+        status = str(row.get('status', ''))
+        if item is None or status not in _CONTRACT_STATUSES:
+            raise ValueError('Audit entries need known item_id and valid status.')
+        item.status = status
+        source_event_ids = row.get('source_event_ids', [])
+        cls._validate_audit_source_event_ids(source_event_ids)
+        item.evidence.append(
+            Evidence(
+                kind=str(row.get('kind', 'inspection')),
+                summary=str(row.get('evidence', '')).strip(),
+                source_event_ids=list(dict.fromkeys(source_event_ids)),
+            )
+        )
+
+    def _audit(self, state: TaskState, args: dict[str, Any]) -> None:
+        if not state.contract:
+            raise ValueError('No contract exists. Use task_state(set) first.')
+        by_id = self._audit_items_by_id(state.contract)
+        for row in self._audit_evidence_rows(args):
+            self._apply_audit_evidence_row(by_id, row)
 
     def render_review(self, state: TaskState) -> str:
         lines = [f'TASK STATE (revision {state.revision})']
         if state.contract:
-            lines += ['', 'OBJECTIVE', state.contract.objective or '(not recorded)']
-            for heading, items in [
-                ('REQUIREMENTS', state.contract.requirements),
-                ('CONSTRAINTS', state.contract.constraints),
-                ('SUCCESS CONDITIONS', state.contract.success_conditions),
-            ]:
-                lines.append('')
-                lines.append(heading)
-                lines += [
-                    f'{"[ok]" if x.status == "satisfied" else "[gap]" if x.status == "gap" else "[ ]"} {x.id} {x.text}'
-                    for x in items
-                ] or ['(none)']
+            lines += _contract_review_lines(state.contract)
         if state.plan:
-            lines += ['', 'PLAN'] + [
-                f'{"[done]" if x.status == "done" else "[active]" if x.status == "in_progress" else "[ ]"} {x.id} {x.description}'
-                for x in state.plan.tasks
-            ]
-        recorded_status, unresolved, actionable, blocked = self.recorded_status(state)
-        lines += ['', 'RECORDED STATUS']
-        if recorded_status == 'active':
-            details: list[str] = []
-            if unresolved:
-                details.append('unresolved contract: ' + ', '.join(unresolved))
-            if actionable:
-                details.append('open plan: ' + ', '.join(actionable))
-            lines.append('ACTIVE — ' + '; '.join(details))
-        elif recorded_status == 'blocked':
-            lines.append('BLOCKED — ' + ', '.join(blocked))
-        elif recorded_status == 'clear':
-            lines.append(
-                'CLEAR — no unresolved contract conditions or open tasks recorded'
-            )
-        else:
-            lines.append('UNTRACKED — no durable contract or plan has been recorded')
+            lines += _plan_review_lines(state.plan)
+        lines += _recorded_status_lines(*self.recorded_status(state))
         return '\n'.join(lines)
 
     @staticmethod
@@ -253,26 +322,10 @@ class TaskStateService:
         ``CLEAR`` means only that the recorded state has no unresolved contract
         items or open plan work. The model still owns the decision to finish.
         """
-        contract_groups = (
-            [
-                state.contract.requirements,
-                state.contract.constraints,
-                state.contract.success_conditions,
-            ]
-            if state.contract
-            else []
-        )
-        unresolved = [
-            item.id
-            for group in contract_groups
-            for item in group
-            if item.status in {'unknown', 'gap'}
-        ]
+        unresolved = _unresolved_contract_ids(state.contract)
         tasks = state.plan.tasks if state.plan else []
-        actionable = [
-            task.id for task in tasks if task.status in {'todo', 'in_progress'}
-        ]
-        blocked = [task.id for task in tasks if task.status == 'blocked']
+        actionable = _task_ids_with_status(tasks, {'todo', 'in_progress'})
+        blocked = _task_ids_with_status(tasks, {'blocked'})
         if unresolved or actionable:
             return 'active', unresolved, actionable, blocked
         if blocked:

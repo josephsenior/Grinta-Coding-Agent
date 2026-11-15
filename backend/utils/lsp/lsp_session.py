@@ -45,6 +45,37 @@ def _sessions_disabled() -> bool:
     }
 
 
+def _notification_poll_timeout(
+    *,
+    has_matches: bool,
+    grace: float,
+    grace_deadline: float | None,
+    remaining: float,
+) -> float:
+    if has_matches and grace_deadline is not None:
+        return min(grace, max(0.01, remaining))
+    return min(0.2, max(0.01, remaining))
+
+
+def _notification_grace_expired(
+    *, has_matches: bool, grace_deadline: float | None
+) -> bool:
+    return (
+        has_matches
+        and grace_deadline is not None
+        and time.monotonic() >= grace_deadline
+    )
+
+
+def _notification_matches(
+    message: dict[str, Any], method: str, uri: str | None
+) -> bool:
+    if message.get('method') != method:
+        return False
+    params = message.get('params') or {}
+    return uri is None or params.get('uri') == uri
+
+
 class LspSession:
     """One long-lived stdio LSP subprocess for a workspace/server pair."""
 
@@ -123,50 +154,61 @@ class LspSession:
             self._closed = True
             proc = self._process
             was_initialized = self._initialized
-            if proc and proc.stdin and was_initialized:
-                try:
-                    self._write_message(
-                        {
-                            'jsonrpc': '2.0',
-                            'id': 99_999,
-                            'method': 'shutdown',
-                            'params': {},
-                        }
-                    )
-                except Exception:
-                    pass
-            exit_code: int | None = None
-            if proc and proc.poll() is None:
-                try:
-                    proc.kill()
-                except Exception:
-                    pass
-            if proc is not None:
-                try:
-                    exit_code = proc.wait(timeout=1.0)
-                except Exception:
-                    exit_code = proc.poll()
-            # Surface stderr when the server died unexpectedly (non-zero exit or
-            # crash before a clean shutdown). Helps diagnose startup failures
-            # and mid-query crashes that were previously swallowed by DEVNULL.
-            if was_initialized and exit_code not in (None, 0):
-                snippet = self._format_stderr_snippet()
-                if snippet:
-                    logger.warning(
-                        'LSP server %s exited with code %s. Recent stderr:\n%s',
-                        self.ctx.server_name,
-                        exit_code,
-                        snippet,
-                    )
-            elif _stderr_debug_enabled():
-                snippet = self._format_stderr_snippet()
-                if snippet:
-                    logger.debug(
-                        'LSP server %s closing. Stderr tail:\n%s',
-                        self.ctx.server_name,
-                        snippet,
-                    )
+            self._send_shutdown(proc, was_initialized)
+            exit_code = self._stop_process(proc)
+            self._log_process_exit(was_initialized, exit_code)
             self._process = None
+
+    def _send_shutdown(self, proc, was_initialized: bool) -> None:
+        if not (proc and proc.stdin and was_initialized):
+            return
+        try:
+            self._write_message(
+                {
+                    'jsonrpc': '2.0',
+                    'id': 99_999,
+                    'method': 'shutdown',
+                    'params': {},
+                }
+            )
+        except Exception:
+            pass
+
+    @staticmethod
+    def _stop_process(proc) -> int | None:
+        if proc and proc.poll() is None:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+        if proc is None:
+            return None
+        try:
+            return proc.wait(timeout=1.0)
+        except Exception:
+            return proc.poll()
+
+    def _log_process_exit(self, was_initialized: bool, exit_code: int | None) -> None:
+        # Surface stderr when the server died unexpectedly (non-zero exit or
+        # crash before a clean shutdown). Helps diagnose startup failures
+        # and mid-query crashes that were previously swallowed by DEVNULL.
+        if was_initialized and exit_code not in (None, 0):
+            snippet = self._format_stderr_snippet()
+            if snippet:
+                logger.warning(
+                    'LSP server %s exited with code %s. Recent stderr:\n%s',
+                    self.ctx.server_name,
+                    exit_code,
+                    snippet,
+                )
+        elif _stderr_debug_enabled():
+            snippet = self._format_stderr_snippet()
+            if snippet:
+                logger.debug(
+                    'LSP server %s closing. Stderr tail:\n%s',
+                    self.ctx.server_name,
+                    snippet,
+                )
 
     def _read_stdout(self) -> None:
         proc = self._process
@@ -307,74 +349,60 @@ class LspSession:
         grace_deadline: float | None = None
         while time.monotonic() < deadline:
             remaining = deadline - time.monotonic()
-            if matched and grace_deadline is not None:
-                poll_timeout = min(grace, max(0.01, remaining))
-            else:
-                poll_timeout = min(0.2, max(0.01, remaining))
+            poll_timeout = _notification_poll_timeout(
+                has_matches=bool(matched),
+                grace=grace,
+                grace_deadline=grace_deadline,
+                remaining=remaining,
+            )
             message = self._poll_inbox(poll_timeout)
             if message is None:
-                if (
-                    matched
-                    and grace_deadline is not None
-                    and time.monotonic() >= grace_deadline
+                if _notification_grace_expired(
+                    has_matches=bool(matched), grace_deadline=grace_deadline
                 ):
                     break
                 continue
-            if message.get('method') == method:
-                params = message.get('params') or {}
-                if uri is None or params.get('uri') == uri:
-                    matched.append(message)
-                    grace_deadline = time.monotonic() + grace
-                    continue
+            if _notification_matches(message, method, uri):
+                matched.append(message)
+                grace_deadline = time.monotonic() + grace
+                continue
             deferred.append(message)
         for item in deferred:
             self._inbox.put(item)
         return matched
 
-    def ensure_initialized(self, timeout: float | None = None) -> bool:
-        with self._lock:
-            if self._initialized:
-                return True
-            if not self.start():
-                return False
-            init_timeout = timeout or init_timeout_for_server(self.ctx.server_name)
-            init_id = 1
-            root_uri = self.ctx.workspace_root.as_uri()
-            try:
-                self._write_message(
-                    {
-                        'jsonrpc': '2.0',
-                        'id': init_id,
-                        'method': 'initialize',
-                        'params': {
-                            'processId': os.getpid(),
-                            'rootUri': root_uri,
-                            'workspaceFolders': [
-                                {
-                                    'uri': root_uri,
-                                    'name': self.ctx.workspace_root.name or 'workspace',
-                                }
-                            ],
-                            'capabilities': CLIENT_CAPABILITIES,
-                        },
-                    }
-                )
-            except OSError as exc:
-                logger.warning(
-                    'LSP initialize write failed for %s: %s. stderr:\n%s',
-                    self.ctx.server_name,
-                    exc,
-                    self._format_stderr_snippet(),
-                )
-                self.close()
-                return False
+    def _send_initialize_request(self, init_id: int, root_uri: str) -> bool:
+        try:
+            self._write_message(
+                {
+                    'jsonrpc': '2.0',
+                    'id': init_id,
+                    'method': 'initialize',
+                    'params': {
+                        'processId': os.getpid(),
+                        'rootUri': root_uri,
+                        'workspaceFolders': [
+                            {
+                                'uri': root_uri,
+                                'name': self.ctx.workspace_root.name or 'workspace',
+                            }
+                        ],
+                        'capabilities': CLIENT_CAPABILITIES,
+                    },
+                }
+            )
+        except OSError as exc:
+            logger.warning(
+                'LSP initialize write failed for %s: %s. stderr:\n%s',
+                self.ctx.server_name,
+                exc,
+                self._format_stderr_snippet(),
+            )
+            self.close()
+            return False
+        return True
 
-        # Lock released — reader thread can now parse and enqueue the response.
-        # Holding the lock here was the root cause of init always timing out:
-        # _read_stdout needs the same lock to feed_content_length_buffer and
-        # put messages into _inbox, so the initialize response was stranded
-        # in the stdout buffer until the 20s timeout expired.
-        response = self._wait_for_response(init_id, init_timeout)
+    def _complete_initialize(self, response: dict[str, Any] | None) -> bool:
         if response is None:
             logger.warning(
                 'LSP initialize timed out for %s. stderr:\n%s',
@@ -414,6 +442,26 @@ class LspSession:
                 pass
             self._initialized = True
             return True
+
+    def ensure_initialized(self, timeout: float | None = None) -> bool:
+        with self._lock:
+            if self._initialized:
+                return True
+            if not self.start():
+                return False
+            init_timeout = timeout or init_timeout_for_server(self.ctx.server_name)
+            init_id = 1
+            root_uri = self.ctx.workspace_root.as_uri()
+            if not self._send_initialize_request(init_id, root_uri):
+                return False
+
+        # Lock released — reader thread can now parse and enqueue the response.
+        # Holding the lock here was the root cause of init always timing out:
+        # _read_stdout needs the same lock to feed_content_length_buffer and
+        # put messages into _inbox, so the initialize response was stranded
+        # in the stdout buffer until the 20s timeout expired.
+        response = self._wait_for_response(init_id, init_timeout)
+        return self._complete_initialize(response)
 
     def capabilities(self) -> dict[str, Any]:
         """Return the server's advertised capabilities (empty until initialized)."""

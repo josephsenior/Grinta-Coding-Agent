@@ -85,6 +85,21 @@ class InfoSidebar(VerticalScroll):
         pass
 
 
+def _first_visible_widget_index(widgets: list[Any], scroll_y: float) -> int | None:
+    for idx, widget in enumerate(widgets):
+        region = getattr(widget, 'virtual_region', None)
+        if region is None:
+            return None
+        if float(region.y) + float(region.height) > scroll_y:
+            return idx
+    return None
+
+
+def _widget_offset_from_scroll(widget: Any, scroll_y: float) -> float:
+    region = getattr(widget, 'virtual_region', None)
+    return float(region.y) - scroll_y if region is not None else 0.0
+
+
 class Transcript(VerticalScroll):
     """Scrollable conversation transcript container with auto-scroll awareness."""
 
@@ -296,6 +311,41 @@ class Transcript(VerticalScroll):
             except Exception:
                 pass
 
+    def _remove_pruned_widgets(self, renderer: Any, prunable: list[Any]) -> int:
+        forget = getattr(renderer, '_forget_event_state', None)
+        removed = 0
+        for widget in prunable:
+            release = getattr(renderer, '_release_history_widget', None)
+            if callable(release):
+                release(widget)
+            setattr(widget, '_tui_removing', True)
+            self._note_content_widget_removed()
+            if callable(forget):
+                forget(getattr(widget, '_ledger_event_id', None))
+            try:
+                widget.remove()
+                removed += 1
+            except Exception:
+                pass
+        return removed
+
+    def _schedule_prune_reanchor(self, anchor: Any, anchor_offset: float) -> None:
+        # Re-anchor after the removal relayout so the visible content stays put.
+        self._suppress_scroll_sync = True
+
+        def _reanchor() -> None:
+            try:
+                region = getattr(anchor, 'virtual_region', None)
+                if region is not None:
+                    new_y = max(0.0, float(region.y) - anchor_offset)
+                    self.scroll_to(y=new_y, animate=False, immediate=True)
+            except Exception:
+                pass
+            finally:
+                self.call_after_refresh(self._release_programmatic_scroll)
+
+        self.call_after_refresh(_reanchor)
+
     def _prune_above_viewport(
         self,
         renderer: Any,
@@ -315,14 +365,7 @@ class Transcript(VerticalScroll):
         widgets = self._content_widgets()
 
         # Locate the first widget intersecting (or below) the viewport top.
-        anchor_index: int | None = None
-        for idx, widget in enumerate(widgets):
-            region = getattr(widget, 'virtual_region', None)
-            if region is None:
-                return
-            if float(region.y) + float(region.height) > scroll_y:
-                anchor_index = idx
-                break
+        anchor_index = _first_visible_widget_index(widgets, scroll_y)
         if anchor_index is None:
             return
 
@@ -332,45 +375,12 @@ class Transcript(VerticalScroll):
             return
 
         anchor = widgets[anchor_index]
-        anchor_region = getattr(anchor, 'virtual_region', None)
-        anchor_offset = (
-            float(anchor_region.y) - scroll_y if anchor_region is not None else 0.0
-        )
-
-        forget = getattr(renderer, '_forget_event_state', None)
-        removed = 0
-        for widget in prunable:
-            release = getattr(renderer, '_release_history_widget', None)
-            if callable(release):
-                release(widget)
-            setattr(widget, '_tui_removing', True)
-            self._note_content_widget_removed()
-            if callable(forget):
-                forget(getattr(widget, '_ledger_event_id', None))
-            try:
-                widget.remove()
-                removed += 1
-            except Exception:
-                pass
-
+        anchor_offset = _widget_offset_from_scroll(anchor, scroll_y)
+        removed = self._remove_pruned_widgets(renderer, prunable)
         if not removed:
             return
 
-        # Re-anchor after the removal relayout so the visible content stays put.
-        self._suppress_scroll_sync = True
-
-        def _reanchor() -> None:
-            try:
-                region = getattr(anchor, 'virtual_region', None)
-                if region is not None:
-                    new_y = max(0.0, float(region.y) - anchor_offset)
-                    self.scroll_to(y=new_y, animate=False, immediate=True)
-            except Exception:
-                pass
-            finally:
-                self.call_after_refresh(self._release_programmatic_scroll)
-
-        self.call_after_refresh(_reanchor)
+        self._schedule_prune_reanchor(anchor, anchor_offset)
 
     def _maybe_prefetch_earlier(self) -> None:
         if not self._user_scrolled_away:

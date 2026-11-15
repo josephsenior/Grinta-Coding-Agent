@@ -140,15 +140,11 @@ class AcceptanceCriteriaStore:
         return updated
 
 
-def build_refined_criteria_list(
-    existing: list[dict[str, Any]],
-    *,
+def _validated_refinement_inputs(
     criterion_id: str,
     new_assertion: str,
     reason: str,
-    changed_at: str,
-) -> list[dict[str, Any]]:
-    """Return criteria list with one refined assertion and appended change log."""
+) -> tuple[str, str, str]:
     target_id = str(criterion_id or '').strip()
     new_text = str(new_assertion or '').strip()
     change_reason = str(reason or '').strip()
@@ -158,28 +154,63 @@ def build_refined_criteria_list(
         raise ValueError('new_assertion is required')
     if not change_reason:
         raise ValueError('reason is required')
+    return target_id, new_text, change_reason
+
+
+def _refined_criterion_row(
+    item: dict[str, Any],
+    target_id: str,
+    *,
+    new_text: str,
+    change_reason: str,
+    changed_at: str,
+) -> dict[str, Any] | None:
+    if str(item.get('id') or '').strip() != target_id:
+        return None
+    row = dict(item)
+    old_assertion = str(row.get('assertion') or '').strip()
+    changes = list(row.get('changes') or [])
+    changes.append(
+        {
+            'at': changed_at,
+            'old_assertion': old_assertion,
+            'new_assertion': new_text,
+            'reason': change_reason,
+        }
+    )
+    row['assertion'] = new_text
+    row['changes'] = changes
+    return row
+
+
+def build_refined_criteria_list(
+    existing: list[dict[str, Any]],
+    *,
+    criterion_id: str,
+    new_assertion: str,
+    reason: str,
+    changed_at: str,
+) -> list[dict[str, Any]]:
+    """Return criteria list with one refined assertion and appended change log."""
+    target_id, new_text, change_reason = _validated_refinement_inputs(
+        criterion_id, new_assertion, reason
+    )
 
     found = False
     updated: list[dict[str, Any]] = []
     for item in existing:
-        if str(item.get('id') or '').strip() != target_id:
+        refined = _refined_criterion_row(
+            item,
+            target_id,
+            new_text=new_text,
+            change_reason=change_reason,
+            changed_at=changed_at,
+        )
+        if refined is None:
             updated.append(dict(item))
             continue
         found = True
-        row = dict(item)
-        old_assertion = str(row.get('assertion') or '').strip()
-        changes = list(row.get('changes') or [])
-        changes.append(
-            {
-                'at': changed_at,
-                'old_assertion': old_assertion,
-                'new_assertion': new_text,
-                'reason': change_reason,
-            }
-        )
-        row['assertion'] = new_text
-        row['changes'] = changes
-        updated.append(row)
+        updated.append(refined)
 
     if not found:
         raise KeyError(f'Criterion {target_id!r} not found')

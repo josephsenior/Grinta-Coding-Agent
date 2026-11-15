@@ -58,6 +58,20 @@ def _set_prompt_tier_from_recent_history(orch: Orchestrator, state: State) -> No
         orch.prompt_manager.set_prompt_tier('base')
 
 
+def _mcp_server_hint_row(server: object) -> dict[str, str] | None:
+    from backend.integrations.mcp.native_backends import is_user_visible_mcp_server
+
+    name = (getattr(server, 'name', None) or '').strip() or 'unknown'
+    if not is_user_visible_mcp_server(name):
+        return None
+    if not bool(getattr(server, 'enabled', True)):
+        return None
+    hint = (getattr(server, 'usage_hint', None) or '').strip()
+    if not hint:
+        return None
+    return {'server': name, 'hint': hint}
+
+
 def _mcp_server_prompt_hints(orch: Orchestrator) -> list[dict[str, str]]:
     """Build ``[{"server": name, "hint": text}, ...]`` from MCP ``usage_hint`` fields.
 
@@ -66,23 +80,15 @@ def _mcp_server_prompt_hints(orch: Orchestrator) -> list[dict[str, str]]:
     not appear in the system prompt — otherwise the model reasons
     about tools it cannot actually call.
     """
-    from backend.integrations.mcp.native_backends import is_user_visible_mcp_server
-
     try:
         app_cfg = getattr(orch.llm_registry, 'config', None)
         mcp = getattr(app_cfg, 'mcp', None) if app_cfg is not None else None
         servers = getattr(mcp, 'servers', None) or []
         rows: list[dict[str, str]] = []
         for s in servers:
-            name = (getattr(s, 'name', None) or '').strip() or 'unknown'
-            if not is_user_visible_mcp_server(name):
-                continue
-            if not bool(getattr(s, 'enabled', True)):
-                continue
-            hint = (getattr(s, 'usage_hint', None) or '').strip()
-            if not hint:
-                continue
-            rows.append({'server': name, 'hint': hint})
+            row = _mcp_server_hint_row(s)
+            if row is not None:
+                rows.append(row)
         return rows
     except Exception:
         return []
@@ -97,6 +103,59 @@ def _mcp_tool_descriptions_from_specs(mcp_tools: list[dict]) -> dict[str, str]:
         if name and desc:
             descriptions[name] = desc.split('\n')[0][:120]
     return descriptions
+
+
+def _mcp_hidden_facade_tools(
+    orch: Orchestrator, hidden: frozenset[str]
+) -> frozenset[str]:
+    if not getattr(orch.config, 'enable_web', True):
+        from backend.integrations.mcp.native_backends import (
+            MCP_TOOLS_HIDDEN_BY_NATIVE_WEB,
+        )
+
+        hidden = hidden - MCP_TOOLS_HIDDEN_BY_NATIVE_WEB
+    if not getattr(orch.config, 'enable_docs', True):
+        from backend.integrations.mcp.native_backends import (
+            MCP_TOOLS_HIDDEN_BY_NATIVE_DOCS,
+        )
+
+        hidden = hidden - MCP_TOOLS_HIDDEN_BY_NATIVE_DOCS
+    return hidden
+
+
+def _visible_mcp_tool_names(
+    orch: Orchestrator,
+    pm: object,
+    *,
+    native_facades_on: bool,
+    native_server_names: frozenset[str],
+    hidden_facade_tools: frozenset[str],
+) -> list[str]:
+    server_map: dict[str, str] = dict(getattr(pm, 'mcp_tool_server_map', {}) or {})
+    visible_names = [
+        name
+        for name in orch.mcp_tools.keys()
+        if server_map.get(name, '') not in native_server_names
+    ]
+    if not native_facades_on:
+        return visible_names
+    hidden = _mcp_hidden_facade_tools(orch, hidden_facade_tools)
+    return [name for name in visible_names if name not in hidden]
+
+
+def _apply_mcp_tool_descriptions(
+    orch: Orchestrator,
+    pm: object,
+    mcp_tools: list[dict],
+    visible_names: list[str],
+) -> None:
+    descriptions = _mcp_tool_descriptions_from_specs(mcp_tools)
+    if hasattr(pm, 'mcp_tool_descriptions'):
+        pm.mcp_tool_descriptions = {
+            name: descriptions[name] for name in visible_names if name in descriptions
+        }
+    if hasattr(pm, 'mcp_server_hints'):
+        pm.mcp_server_hints = _mcp_server_prompt_hints(orch)
 
 
 def _apply_mcp_tools(orch: Orchestrator, mcp_tools: list[dict]) -> None:
@@ -130,52 +189,21 @@ def _apply_mcp_tools(orch: Orchestrator, mcp_tools: list[dict]) -> None:
         strict=bool(getattr(orch.config, 'strict_mcp_tool_name_collision', False)),
     )
     pm = getattr(orch, '_prompt_manager', None)
-    if pm and hasattr(pm, 'mcp_tool_names'):
-        from backend.integrations.mcp.native_backends import (
-            MCP_TOOLS_HIDDEN_BY_NATIVE_FACADES,
-        )
+    if not pm or not hasattr(pm, 'mcp_tool_names'):
+        return
 
-        native_facades_on = bool(getattr(orch.config, 'enable_web', True)) or bool(
-            getattr(orch.config, 'enable_docs', True)
-        )
-        server_map: dict[str, str] = (
-            dict(getattr(pm, 'mcp_tool_server_map', {}) or {}) if pm is not None else {}
-        )
+    from backend.integrations.mcp.native_backends import (
+        MCP_TOOLS_HIDDEN_BY_NATIVE_FACADES,
+    )
 
-        def _is_hidden_by_server(name: str) -> bool:
-            server_name = server_map.get(name, '')
-            return server_name in NATIVE_MCP_SERVER_NAMES
-
-        visible_names = list(orch.mcp_tools.keys())
-        # 1. Hide by originating server (the new, robust filter).
-        visible_names = [
-            name for name in visible_names if not _is_hidden_by_server(name)
-        ]
-        if native_facades_on:
-            hidden = MCP_TOOLS_HIDDEN_BY_NATIVE_FACADES
-            if not getattr(orch.config, 'enable_web', True):
-                from backend.integrations.mcp.native_backends import (
-                    MCP_TOOLS_HIDDEN_BY_NATIVE_WEB,
-                )
-
-                hidden = hidden - MCP_TOOLS_HIDDEN_BY_NATIVE_WEB
-            if not getattr(orch.config, 'enable_docs', True):
-                from backend.integrations.mcp.native_backends import (
-                    MCP_TOOLS_HIDDEN_BY_NATIVE_DOCS,
-                )
-
-                hidden = hidden - MCP_TOOLS_HIDDEN_BY_NATIVE_DOCS
-            # 2. Hide by tool name (defense in depth, also covers the
-            #    case where the agent's tool list grew outside the
-            #    live client map).
-            visible_names = [name for name in visible_names if name not in hidden]
-        pm.mcp_tool_names = visible_names
-        descriptions = _mcp_tool_descriptions_from_specs(mcp_tools)
-        if hasattr(pm, 'mcp_tool_descriptions'):
-            pm.mcp_tool_descriptions = {
-                name: descriptions[name]
-                for name in visible_names
-                if name in descriptions
-            }
-        if hasattr(pm, 'mcp_server_hints'):
-            pm.mcp_server_hints = _mcp_server_prompt_hints(orch)
+    native_facades_on = bool(getattr(orch.config, 'enable_web', True)) or bool(
+        getattr(orch.config, 'enable_docs', True)
+    )
+    pm.mcp_tool_names = _visible_mcp_tool_names(
+        orch,
+        pm,
+        native_facades_on=native_facades_on,
+        native_server_names=NATIVE_MCP_SERVER_NAMES,
+        hidden_facade_tools=MCP_TOOLS_HIDDEN_BY_NATIVE_FACADES,
+    )
+    _apply_mcp_tool_descriptions(orch, pm, mcp_tools, pm.mcp_tool_names)

@@ -115,11 +115,67 @@ def _glob_failure(*, message: str, pattern: str, path: str) -> Observation:
     )
 
 
+def _execute_glob_with_ripgrep(
+    action: GlobAction,
+    *,
+    path: str,
+    pattern: str,
+    rg_path: str,
+) -> Observation:
+    empty_message = 'No matching files found.'
+    try:
+        result = run_ripgrep_command(
+            build_ripgrep_file_discovery_args(
+                rg_path,
+                file_pattern=pattern,
+                path=path,
+            )
+        )
+    except Exception as exc:
+        message = f'Error running ripgrep: {exc}'
+        return _glob_failure(message=message, pattern=pattern, path=path)
+    if getattr(result, 'timed_out', False):
+        message = 'Search timed out after 30s'
+        return _glob_failure(message=message, pattern=pattern, path=path)
+    truncation_warning = get_ripgrep_truncation_warning(result)
+    files = [line for line in result.stdout.splitlines() if line]
+    content = paginate_line_output(
+        files,
+        offset=action.offset,
+        head_limit=action.head_limit,
+        empty_message=empty_message,
+    )
+    if truncation_warning:
+        content = truncation_warning + '\n' + content
+    return make_glob_observation(
+        pattern=pattern,
+        path=path,
+        files=files,
+        content=content,
+    )
+
+
+def _execute_glob_with_walk(
+    action: GlobAction, *, path: str, pattern: str
+) -> Observation:
+    target_files = collect_python_target_files(path, pattern)
+    content = format_python_file_listing(
+        target_files,
+        offset=action.offset,
+        head_limit=action.head_limit,
+    )
+    return make_glob_observation(
+        pattern=pattern,
+        path=path,
+        files=target_files,
+        content=content,
+    )
+
+
 def execute_glob(action: GlobAction) -> Observation:
     """List files matching ``action.pattern`` under ``action.path``."""
     path = action.path or '.'
     pattern = action.pattern or ''
-    empty_message = 'No matching files found.'
 
     if not pattern:
         message = (
@@ -134,46 +190,11 @@ def execute_glob(action: GlobAction) -> Observation:
 
     rg_path = has_ripgrep()
     if rg_path:
-        try:
-            result = run_ripgrep_command(
-                build_ripgrep_file_discovery_args(
-                    rg_path,
-                    file_pattern=pattern,
-                    path=path,
-                )
-            )
-        except Exception as exc:
-            message = f'Error running ripgrep: {exc}'
-            return _glob_failure(message=message, pattern=pattern, path=path)
-        if getattr(result, 'timed_out', False):
-            message = 'Search timed out after 30s'
-            return _glob_failure(message=message, pattern=pattern, path=path)
-        truncation_warning = get_ripgrep_truncation_warning(result)
-        files = [line for line in result.stdout.splitlines() if line]
-        content = paginate_line_output(
-            files,
-            offset=action.offset,
-            head_limit=action.head_limit,
-            empty_message=empty_message,
-        )
-        if truncation_warning:
-            content = truncation_warning + '\n' + content
-        return make_glob_observation(
-            pattern=pattern,
+        return _execute_glob_with_ripgrep(
+            action,
             path=path,
-            files=files,
-            content=content,
+            pattern=pattern,
+            rg_path=rg_path,
         )
 
-    target_files = collect_python_target_files(path, pattern)
-    content = format_python_file_listing(
-        target_files,
-        offset=action.offset,
-        head_limit=action.head_limit,
-    )
-    return make_glob_observation(
-        pattern=pattern,
-        path=path,
-        files=target_files,
-        content=content,
-    )
+    return _execute_glob_with_walk(action, path=path, pattern=pattern)

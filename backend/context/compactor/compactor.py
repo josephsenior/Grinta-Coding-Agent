@@ -385,6 +385,64 @@ class BaseLLMCompactor(RollingCompactor, ABC):
             choices=[SimpleNamespace(message=SimpleNamespace(content=text))]
         )
 
+    async def _emit_streaming_update(
+        self,
+        emitter: Any,
+        piece: str,
+        accumulated: str,
+        is_final: bool,
+    ) -> None:
+        try:
+            result = emitter(piece, accumulated, is_final)
+            if hasattr(result, '__await__'):
+                await result
+        except Exception as emit_exc:  # noqa: BLE001
+            if is_final:
+                logger.warning(
+                    'compactor streaming emitter (final) raised: %s', emit_exc
+                )
+            else:
+                logger.warning('compactor streaming emitter raised: %s', emit_exc)
+
+    def _stream_chunk_piece(self, chunk: Any) -> str:
+        choices = chunk.get('choices') if isinstance(chunk, dict) else None
+        if not choices:
+            return ''
+        delta = choices[0].get('delta') or {}
+        return self._stream_delta_content(delta)
+
+    async def _consume_astream(
+        self,
+        messages: list[dict[str, Any]],
+        emitter: Any,
+    ) -> tuple[str, dict[str, Any] | None]:
+        accumulated = ''
+        last_chunk: dict[str, Any] | None = None
+        async for chunk in self.llm.astream(messages=messages):
+            last_chunk = chunk
+            piece = self._stream_chunk_piece(chunk)
+            if not piece:
+                continue
+            accumulated += piece
+            await self._emit_streaming_update(emitter, piece, accumulated, False)
+        return accumulated, last_chunk
+
+    async def _finalize_stream_completion(
+        self,
+        messages: list[dict[str, Any]],
+        emitter: Any,
+        accumulated: str,
+        last_chunk: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        if last_chunk is not None:
+            await self._emit_streaming_update(emitter, '', accumulated, True)
+            if accumulated.strip():
+                return self._synthetic_prose_response(accumulated)
+            return last_chunk
+        if accumulated.strip():
+            return self._synthetic_prose_response(accumulated)
+        return await self.llm.acompletion(messages=messages)
+
     async def _stream_llm_completion(
         self, messages: list[dict[str, Any]]
     ) -> dict[str, Any]:
@@ -408,26 +466,8 @@ class BaseLLMCompactor(RollingCompactor, ABC):
         if emitter is None or astream is None:
             return await self.llm.acompletion(messages=messages)
 
-        accumulated = ''
-        last_chunk: dict[str, Any] | None = None
         try:
-            async for chunk in self.llm.astream(messages=messages):
-                last_chunk = chunk
-                choices = chunk.get('choices') if isinstance(chunk, dict) else None
-                if not choices:
-                    continue
-                delta = choices[0].get('delta') or {}
-                piece = self._stream_delta_content(delta)
-                if piece:
-                    accumulated += piece
-                    try:
-                        result = emitter(piece, accumulated, False)
-                        if hasattr(result, '__await__'):
-                            await result
-                    except Exception as emit_exc:  # noqa: BLE001
-                        logger.warning(
-                            'compactor streaming emitter raised: %s', emit_exc
-                        )
+            accumulated, last_chunk = await self._consume_astream(messages, emitter)
         except Exception as stream_exc:
             logger.warning(
                 'Compactor astream failed (%s); falling back to acompletion',
@@ -436,24 +476,9 @@ class BaseLLMCompactor(RollingCompactor, ABC):
             return await self.llm.acompletion(messages=messages)
 
         # Notify emitter of completion.
-        if last_chunk is not None:
-            try:
-                result = emitter('', accumulated, True)
-                if hasattr(result, '__await__'):
-                    await result
-            except Exception as emit_exc:  # noqa: BLE001
-                logger.warning(
-                    'compactor streaming emitter (final) raised: %s', emit_exc
-                )
-            if accumulated.strip():
-                return self._synthetic_prose_response(accumulated)
-            return last_chunk
-
-        if accumulated.strip():
-            return self._synthetic_prose_response(accumulated)
-
-        # Stream produced no chunks — fall back to acompletion.
-        return await self.llm.acompletion(messages=messages)
+        return await self._finalize_stream_completion(
+            messages, emitter, accumulated, last_chunk
+        )
 
     def _create_compaction_result(
         self, pruned_events: list[Event], summary: str

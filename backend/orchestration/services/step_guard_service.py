@@ -81,6 +81,23 @@ def _clear_agent_queued_actions(controller: 'SessionOrchestrator', reason: str) 
         clear_fn(reason=reason)
 
 
+def _is_symbol_edit_failure(content: str) -> bool:
+    return (
+        'symbol edit error' in content
+        or 'symbol ' in content
+        and 'not found' in content
+        or '[editor_recovery_required]' in content
+    )
+
+
+def _is_file_edit_failure(content: str) -> bool:
+    return (
+        'range edit failed' in content
+        or 'stale line range' in content
+        or '[file_edit_guidance]' in content
+    )
+
+
 class StepGuardService:
     """Ensures controller steps are safe w.r.t. circuit breaker and stuck detection."""
 
@@ -539,12 +556,7 @@ class StepGuardService:
         recent_errors: list[str],
     ) -> tuple[str, str] | None:
         symbol_hits = sum(
-            1
-            for content in recent_errors
-            if 'symbol edit error' in content.lower()
-            or 'symbol ' in content.lower()
-            and 'not found' in content.lower()
-            or '[editor_recovery_required]' in content.lower()
+            1 for content in recent_errors if _is_symbol_edit_failure(content.lower())
         )
         if symbol_hits >= 2:
             return (
@@ -553,11 +565,7 @@ class StepGuardService:
             )
 
         file_edit_hits = sum(
-            1
-            for content in recent_errors
-            if 'range edit failed' in content.lower()
-            or 'stale line range' in content.lower()
-            or '[file_edit_guidance]' in content.lower()
+            1 for content in recent_errors if _is_file_edit_failure(content.lower())
         )
         if file_edit_hits < 2:
             return None

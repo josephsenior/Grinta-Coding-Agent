@@ -74,7 +74,18 @@ def _sync_failed_approaches(
     ]
     if not failed:
         return None
-    existing = memory.get('_failed_approach_records')
+    by_fingerprint = _existing_failed_approaches(memory.get('_failed_approach_records'))
+    timestamp = str(snapshot.get('timestamp', ''))
+    for approach in failed:
+        _upsert_failed_approach(by_fingerprint, approach, timestamp)
+
+    updated_records = list(by_fingerprint.values())[-_MAX_FAILED_APPROACH_RECORDS:]
+    memory['_failed_approach_records'] = updated_records
+    memory['failed_approaches'] = _render_failed_approaches(updated_records)
+    return 'failed_approaches'
+
+
+def _existing_failed_approaches(existing: object) -> dict[str, dict[str, str]]:
     records = existing if isinstance(existing, list) else []
     by_fingerprint: dict[str, dict[str, str]] = {}
     for item in records:
@@ -89,24 +100,23 @@ def _sync_failed_approaches(
                 'outcome': str(item.get('outcome', ''))[:240],
                 'last_seen': str(item.get('last_seen', '')),
             }
+    return by_fingerprint
 
-    timestamp = str(snapshot.get('timestamp', ''))
-    for approach in failed:
-        fingerprint = _failed_approach_fingerprint(approach)
-        if fingerprint in by_fingerprint:
-            by_fingerprint.pop(fingerprint)
-        by_fingerprint[fingerprint] = {
-            'fingerprint': fingerprint,
-            'type': str(approach.get('type', '?'))[:80],
-            'detail': str(approach.get('detail', ''))[:240],
-            'outcome': str(approach.get('outcome', ''))[:240],
-            'last_seen': timestamp,
-        }
 
-    updated_records = list(by_fingerprint.values())[-_MAX_FAILED_APPROACH_RECORDS:]
-    memory['_failed_approach_records'] = updated_records
-    memory['failed_approaches'] = _render_failed_approaches(updated_records)
-    return 'failed_approaches'
+def _upsert_failed_approach(
+    by_fingerprint: dict[str, dict[str, str]],
+    approach: dict[str, Any],
+    timestamp: str,
+) -> None:
+    fingerprint = _failed_approach_fingerprint(approach)
+    by_fingerprint.pop(fingerprint, None)
+    by_fingerprint[fingerprint] = {
+        'fingerprint': fingerprint,
+        'type': str(approach.get('type', '?'))[:80],
+        'detail': str(approach.get('detail', ''))[:240],
+        'outcome': str(approach.get('outcome', ''))[:240],
+        'last_seen': timestamp,
+    }
 
 
 def _failed_approach_fingerprint(approach: dict[str, Any]) -> str:
@@ -268,7 +278,7 @@ def _infer_next_action(
     return ''
 
 
-def _render_current_state(state: dict[str, Any]) -> str:
+def _render_state_header(state: dict[str, Any]) -> list[str]:
     lines = ['Canonical current state:']
     if state.get('objective'):
         lines.append(f'- Objective: {state["objective"]}')
@@ -276,20 +286,37 @@ def _render_current_state(state: dict[str, Any]) -> str:
         'objective'
     ):
         lines.append(f'- Latest directive: {state["latest_directive"]}')
+    return lines
+
+
+def _render_latest_verification(state: dict[str, Any]) -> list[str]:
     latest_test = state.get('latest_test')
-    if isinstance(latest_test, dict):
-        status = str(latest_test.get('status', '?')).upper()
-        exit_code = latest_test.get('exit_code')
-        command = str(latest_test.get('command', ''))[:160]
-        lines.append(f'- Latest verification: {status} (exit={exit_code}): {command}')
-    blockers = state.get('unresolved_blockers')
-    if isinstance(blockers, list) and blockers:
-        lines.append('- Unresolved blockers:')
-        lines.extend(f'  - {item}' for item in blockers)
-    invalidated = state.get('invalidated_assumptions')
-    if isinstance(invalidated, list) and invalidated:
-        lines.append('- Invalidated assumptions:')
-        lines.extend(f'  - {item}' for item in invalidated)
+    if not isinstance(latest_test, dict):
+        return []
+    status = str(latest_test.get('status', '?')).upper()
+    exit_code = latest_test.get('exit_code')
+    command = str(latest_test.get('command', ''))[:160]
+    return [f'- Latest verification: {status} (exit={exit_code}): {command}']
+
+
+def _render_state_list(state: dict[str, Any], key: str, header: str) -> list[str]:
+    values = state.get(key)
+    if not isinstance(values, list) or not values:
+        return []
+    return [header, *(f'  - {item}' for item in values)]
+
+
+def _render_current_state(state: dict[str, Any]) -> str:
+    lines = _render_state_header(state)
+    lines.extend(_render_latest_verification(state))
+    lines.extend(
+        _render_state_list(state, 'unresolved_blockers', '- Unresolved blockers:')
+    )
+    lines.extend(
+        _render_state_list(
+            state, 'invalidated_assumptions', '- Invalidated assumptions:'
+        )
+    )
     if state.get('next_action'):
         lines.append(f'- Next action: {state["next_action"]}')
     return '\n'.join(lines)
@@ -369,6 +396,84 @@ def _session_has_durable_artifacts(*, state: object | None = None) -> bool:
         return False
 
 
+def _history_task_parts(events: list[Event]) -> list[str]:
+    from backend.context.tool_result_storage import extract_latest_pytest_summary
+
+    parts: list[str] = []
+    first_user = _first_user_message(events)
+    last_user = _last_user_message(events)
+    if first_user:
+        parts.append(f'Task: {first_user[:600]}')
+    if last_user and last_user != first_user:
+        parts.append(f'Latest directive: {last_user[:400]}')
+    pytest_summary = extract_latest_pytest_summary(events)
+    if pytest_summary:
+        parts.append(f'Latest pytest: {pytest_summary}')
+    return parts
+
+
+def _canonical_durable_part(
+    events: list[Event] | None,
+    state: Any,
+    char_budget: int,
+) -> str:
+    try:
+        from backend.context.canonical_state import (
+            load_canonical_state,
+            reduce_events_into_state,
+            render_canonical_state_for_prompt,
+        )
+
+        canonical = load_canonical_state(state=state)
+        if events:
+            canonical = reduce_events_into_state(
+                events,
+                canonical,
+                state=state,
+                persist=state is not None,
+                source='durable_context',
+            )
+        return render_canonical_state_for_prompt(
+            canonical,
+            char_budget=max(1200, char_budget // 2),
+        )
+    except Exception:
+        logger.debug('Canonical durable context assembly failed', exc_info=True)
+        return ''
+
+
+def _snapshot_durable_parts(state: Any, char_budget: int) -> list[str]:
+    parts: list[str] = []
+    try:
+        from backend.context.compactor.pre_condensation_snapshot import (
+            format_snapshot_for_injection,
+            load_snapshot,
+        )
+        from backend.engine.tools.working_memory import get_working_memory_prompt_block
+
+        snapshot = load_snapshot(state=state)
+        if snapshot:
+            snapshot_block = format_snapshot_for_injection(snapshot)
+            if snapshot_block:
+                parts.append(snapshot_block)
+        wm_block = get_working_memory_prompt_block(char_budget=char_budget // 2)
+        if wm_block:
+            parts.append(wm_block)
+    except Exception:
+        logger.debug('Durable context assembly failed', exc_info=True)
+    return parts
+
+
+def _truncate_durable_block(parts: list[str], char_budget: int) -> str:
+    inner_marker = '\n... (working set truncated)\n'
+    inner = '\n'.join(parts[1:-1])
+    framing = f'{parts[0]}\n{parts[-1]}'
+    framing_len = len(framing) + len(inner_marker) + 2
+    budget = max(80, char_budget - framing_len)
+    cut = _safe_truncate(inner, budget)
+    return f'{parts[0]}\n{cut}{inner_marker}{parts[-1]}'
+
+
 def get_durable_context_block(
     events: list[Event] | None = None,
     *,
@@ -380,60 +485,13 @@ def get_durable_context_block(
     parts: list[str] = [_WORKING_SET_MARKER]
 
     if events and include_task_from_history:
-        from backend.context.tool_result_storage import extract_latest_pytest_summary
+        parts.extend(_history_task_parts(events))
 
-        first_user = _first_user_message(events)
-        last_user = _last_user_message(events)
-        if first_user:
-            parts.append(f'Task: {first_user[:600]}')
-        if last_user and last_user != first_user:
-            parts.append(f'Latest directive: {last_user[:400]}')
-        pytest_summary = extract_latest_pytest_summary(events)
-        if pytest_summary:
-            parts.append(f'Latest pytest: {pytest_summary}')
+    canonical_block = _canonical_durable_part(events, state, char_budget)
+    if canonical_block:
+        parts.append(canonical_block)
 
-    try:
-        from backend.context.canonical_state import (
-            load_canonical_state,
-            reduce_events_into_state,
-            render_canonical_state_for_prompt,
-        )
-
-        canonical = load_canonical_state(state=state)  # type: ignore[arg-type]
-        if events:
-            canonical = reduce_events_into_state(
-                events,
-                canonical,
-                state=state,  # type: ignore[arg-type]
-                persist=state is not None,
-                source='durable_context',
-            )
-        canonical_block = render_canonical_state_for_prompt(
-            canonical,
-            char_budget=max(1200, char_budget // 2),
-        )
-        if canonical_block:
-            parts.append(canonical_block)
-    except Exception:
-        logger.debug('Canonical durable context assembly failed', exc_info=True)
-
-    try:
-        from backend.context.compactor.pre_condensation_snapshot import (
-            format_snapshot_for_injection,
-            load_snapshot,
-        )
-        from backend.engine.tools.working_memory import get_working_memory_prompt_block
-
-        snapshot = load_snapshot(state=state)  # type: ignore[arg-type]
-        if snapshot:
-            snapshot_block = format_snapshot_for_injection(snapshot)
-            if snapshot_block:
-                parts.append(snapshot_block)
-        wm_block = get_working_memory_prompt_block(char_budget=char_budget // 2)
-        if wm_block:
-            parts.append(wm_block)
-    except Exception:
-        logger.debug('Durable context assembly failed', exc_info=True)
+    parts.extend(_snapshot_durable_parts(state, char_budget))
 
     if len(parts) <= 1:  # Only the opening marker is present.
         return ''
@@ -446,13 +504,7 @@ def get_durable_context_block(
     # working-set markers intact. Cutting the closing marker would
     # leave the LLM with an unterminated block, so we re-render the
     # packet after computing a safe cut point.
-    inner_marker = '\n... (working set truncated)\n'
-    inner = '\n'.join(parts[1:-1])
-    framing = f'{parts[0]}\n{parts[-1]}'
-    framing_len = len(framing) + len(inner_marker) + 2  # newlines
-    budget = max(80, char_budget - framing_len)
-    cut = _safe_truncate(inner, budget)
-    return f'{parts[0]}\n{cut}{inner_marker}{parts[-1]}'
+    return _truncate_durable_block(parts, char_budget)
 
 
 def _safe_truncate(text: str, max_chars: int) -> str:

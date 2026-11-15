@@ -28,6 +28,15 @@ _GATEWAY_PROVIDERS: frozenset[str] = frozenset(
 )
 
 
+def _cache_catalog_candidates(model: str, provider: str) -> list[str]:
+    candidates = [model]
+    if model.startswith(f'{provider}/'):
+        candidates.append(model[len(provider) + 1 :])
+    elif '/' in model:
+        candidates.append(model.split('/')[-1])
+    return candidates
+
+
 def _resolve_cache_catalog_entry(
     model: str,
     *,
@@ -45,13 +54,8 @@ def _resolve_cache_catalog_entry(
     normalized = provider.strip().lower()
     if not normalized:
         return None
-    candidates = [m]
-    if m.startswith(f'{normalized}/'):
-        candidates.append(m[len(normalized) + 1 :])
-    elif '/' in m:
-        candidates.append(m.split('/')[-1])
     seen: set[str] = set()
-    for candidate in candidates:
+    for candidate in _cache_catalog_candidates(m, normalized):
         key = candidate.strip()
         if not key or key in seen:
             continue
@@ -62,26 +66,20 @@ def _resolve_cache_catalog_entry(
     return None
 
 
-def resolve_prompt_cache_mode_from_runtime(
-    *,
-    provider: str,
-    name: str,
-    runtime: dict,
-    client: str | None,
-) -> str:
-    """Derive catalog ``prompt_cache_mode`` from runtime metadata and provider."""
+def _explicit_prompt_cache_mode(runtime: dict) -> str | None:
     raw = runtime.get('prompt_cache_mode')
     if isinstance(raw, str):
         normalized = raw.strip().lower()
         if normalized in VALID_PROMPT_CACHE_MODES:
             return normalized
+    return None
 
-    provider_l = provider.strip().lower()
-    client_l = str(client or runtime.get('client') or '').strip().lower()
-    name_l = name.lower()
-    cached_price = runtime.get('cached_input_price_per_m')
-    has_cached_pricing = isinstance(cached_price, (int, float)) and cached_price > 0
 
+def _explicit_hints_cache_mode(
+    provider_l: str,
+    client_l: str,
+    name_l: str,
+) -> str | None:
     if provider_l == 'google' or client_l == 'google_native':
         return PROMPT_CACHE_EXPLICIT_RESOURCE
 
@@ -94,6 +92,31 @@ def resolve_prompt_cache_mode_from_runtime(
     if name_l.startswith('anthropic/') or 'claude' in name_l:
         if provider_l in _GATEWAY_PROVIDERS or client_l == 'anthropic_compatible':
             return PROMPT_CACHE_EXPLICIT_HINTS
+
+    return None
+
+
+def resolve_prompt_cache_mode_from_runtime(
+    *,
+    provider: str,
+    name: str,
+    runtime: dict,
+    client: str | None,
+) -> str:
+    """Derive catalog ``prompt_cache_mode`` from runtime metadata and provider."""
+    explicit = _explicit_prompt_cache_mode(runtime)
+    if explicit is not None:
+        return explicit
+
+    provider_l = provider.strip().lower()
+    client_l = str(client or runtime.get('client') or '').strip().lower()
+    name_l = name.lower()
+    cached_price = runtime.get('cached_input_price_per_m')
+    has_cached_pricing = isinstance(cached_price, (int, float)) and cached_price > 0
+
+    explicit_hints = _explicit_hints_cache_mode(provider_l, client_l, name_l)
+    if explicit_hints is not None:
+        return explicit_hints
 
     # A generic capability flag means "caching exists", not that the wire
     # protocol accepts Anthropic cache_control markers. Non-Anthropic models

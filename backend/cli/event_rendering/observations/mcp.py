@@ -34,6 +34,27 @@ from backend.ledger.observation import (
 logger = logging.getLogger(__name__)
 
 
+def _mcp_count_result(count: int) -> str:
+    if count == 0:
+        return 'no results'
+    return f'{count} results'
+
+
+def _mcp_dict_result(data: dict[str, Any]) -> str | None:
+    error = data.get('error') or data.get('isError')
+    if error:
+        return 'failed'
+    for key in ('total_count', 'count', 'matches', 'total'):
+        value = data.get(key)
+        if isinstance(value, int):
+            return _mcp_count_result(value)
+    for key in ('items', 'results', 'entries', 'documents', 'content'):
+        items = data.get(key)
+        if isinstance(items, list):
+            return _mcp_count_result(len(items))
+    return None
+
+
 class _ObsMcpMixin(_ObservationRenderersBase):
     def _render_mcp_observation(self, obs: MCPObservation) -> None:
         self._stop_reasoning()
@@ -73,28 +94,7 @@ class _ObsMcpMixin(_ObservationRenderersBase):
         except (json.JSONDecodeError, TypeError, ValueError):
             return None
         if isinstance(data, dict):
-            # Check for error payload
-            error = data.get('error') or data.get('isError')
-            if error:
-                return 'failed'
-            # Try to extract count from various payload shapes
-            for key in ('total_count', 'count', 'matches', 'total'):
-                v = data.get(key)
-                if isinstance(v, int):
-                    if v == 0:
-                        return 'no results' if name in ('web_search',) else 'no results'
-                    return f'{v} results'
-            # Check items/results array
-            for key in ('items', 'results', 'entries', 'documents', 'content'):
-                items = data.get(key)
-                if isinstance(items, list):
-                    count = len(items)
-                    if count == 0:
-                        return 'no results'
-                    return f'{count} results'
+            return _mcp_dict_result(data)
         if isinstance(data, list):
-            count = len(data)
-            if count == 0:
-                return 'no results'
-            return f'{count} results'
+            return _mcp_count_result(len(data))
         return None

@@ -132,6 +132,42 @@ def _analyze_symbols_result(lines: list[str]) -> str:
     return f'{len(symbol_lines)} symbols' if symbol_lines else 'completed'
 
 
+def _grep_match_phrase(count: int) -> str:
+    return f'{count} match{"es" if count != 1 else ""}'
+
+
+def _grep_file_phrase(count: int) -> str:
+    return f'{count} file{"s" if count != 1 else ""}'
+
+
+def _orient_grep_files_with_matches(file_count: int) -> str:
+    if file_count == 0:
+        return 'no matches'
+    return _grep_file_phrase(file_count)
+
+
+def _orient_grep_count(match_count: int) -> str:
+    if match_count == 0:
+        return 'no matches'
+    return _grep_match_phrase(match_count)
+
+
+def _orient_grep_content(match_count: int, file_count: int) -> str:
+    if match_count == 0 and file_count == 0:
+        return 'no matches'
+    if file_count:
+        return f'{_grep_match_phrase(match_count)} · {_grep_file_phrase(file_count)}'
+    return _grep_match_phrase(match_count)
+
+
+def _orient_grep_default(match_count: int, file_count: int) -> str:
+    if match_count == 0 and file_count == 0:
+        return 'no matches'
+    if file_count:
+        return _grep_file_phrase(file_count)
+    return _grep_match_phrase(match_count)
+
+
 class _ObsExplorationMixin(_ObservationRenderersBase):
     def _render_lsp_query_observation(self, obs: LspQueryObservation) -> None:
         self._stop_reasoning()
@@ -173,25 +209,12 @@ class _ObsExplorationMixin(_ObservationRenderersBase):
         if error:
             return f'failed · {error[:60]}'
         if output_mode == 'files_with_matches':
-            if file_count == 0:
-                return 'no matches'
-            return f'{file_count} file{"s" if file_count != 1 else ""}'
+            return _orient_grep_files_with_matches(file_count)
         if output_mode == 'count':
-            if match_count == 0:
-                return 'no matches'
-            return f'{match_count} match{"es" if match_count != 1 else ""}'
+            return _orient_grep_count(match_count)
         if output_mode == 'content':
-            if match_count == 0 and file_count == 0:
-                return 'no matches'
-            if file_count:
-                return f'{match_count} match{"es" if match_count != 1 else ""} · {file_count} file{"s" if file_count != 1 else ""}'
-            return f'{match_count} match{"es" if match_count != 1 else ""}'
-        # Default
-        if match_count == 0 and file_count == 0:
-            return 'no matches'
-        if file_count:
-            return f'{file_count} file{"s" if file_count != 1 else ""}'
-        return f'{match_count} match{"es" if match_count != 1 else ""}'
+            return _orient_grep_content(match_count, file_count)
+        return _orient_grep_default(match_count, file_count)
 
     def _render_glob_observation(self, obs: GlobObservation) -> None:
         self._stop_reasoning()

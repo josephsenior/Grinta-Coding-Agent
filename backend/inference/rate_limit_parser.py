@@ -128,23 +128,22 @@ def _parse_reset_seconds(value: str | None) -> float | None:
     return _parse_duration_string(s)
 
 
+def _contains_hint(text: str, hints: tuple[str, ...]) -> bool:
+    return any(hint in text for hint in hints)
+
+
 def _classify_message(text: str) -> RateLimitKind:
     lowered = text.lower()
-    for hint in _USAGE_QUOTA_HINTS:
-        if hint in lowered:
-            return RateLimitKind.USAGE_QUOTA
-    for hint in _TPM_HINTS:
-        if hint in lowered:
-            return RateLimitKind.TPM
-    for hint in _RPD_HINTS:
-        if hint in lowered:
-            return RateLimitKind.RPD
-    for hint in _CONCURRENCY_HINTS:
-        if hint in lowered:
-            return RateLimitKind.CONCURRENCY
-    for hint in _RPM_HINTS:
-        if hint in lowered:
-            return RateLimitKind.RPM
+    if _contains_hint(lowered, _USAGE_QUOTA_HINTS):
+        return RateLimitKind.USAGE_QUOTA
+    if _contains_hint(lowered, _TPM_HINTS):
+        return RateLimitKind.TPM
+    if _contains_hint(lowered, _RPD_HINTS):
+        return RateLimitKind.RPD
+    if _contains_hint(lowered, _CONCURRENCY_HINTS):
+        return RateLimitKind.CONCURRENCY
+    if _contains_hint(lowered, _RPM_HINTS):
+        return RateLimitKind.RPM
     return RateLimitKind.UNKNOWN
 
 

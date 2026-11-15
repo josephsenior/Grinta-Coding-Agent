@@ -81,76 +81,108 @@ class _EventRouterActionsMixin(EventRouterService if TYPE_CHECKING else object):
 
     @staticmethod
     def _record_agent_transcript(event: Event) -> None:
-        from backend.core.logging.session_event_logger import emit_session_event
-
         event_id = getattr(event, 'id', None)
         eid = event_id if isinstance(event_id, int) else None
 
         if isinstance(event, StreamingChunkAction):
             if event.is_final:
-                emit_session_event(
-                    'AGENT_STEP',
-                    {
-                        'text': str(getattr(event, 'accumulated', '') or ''),
-                        'thinking': str(
-                            getattr(event, 'thinking_accumulated', '') or ''
-                        ),
-                        'event_id': eid,
-                        'stream_final': True,
-                        'suppress_live_response': bool(
-                            getattr(event, 'suppress_live_response', False)
-                        ),
-                    },
-                )
+                _EventRouterActionsMixin._emit_streaming_transcript(event, eid)
             return
 
         if isinstance(event, (AgentThinkAction, SystemHintAction)):
-            thought = str(getattr(event, 'thought', '') or '')
-            if thought.strip():
-                emit_session_event(
-                    'AGENT_THINK',
-                    {'thought': thought, 'event_id': eid},
-                )
+            _EventRouterActionsMixin._emit_think_transcript(event, eid)
             return
 
         if isinstance(event, MessageAction):
-            content = str(getattr(event, 'content', '') or '')
-            if not content.strip():
-                return
-            if event.source == EventSource.USER:
-                emit_session_event(
-                    'USER_TURN',
-                    {'text': content, 'event_id': eid},
-                )
-                try:
-                    from backend.telemetry.evidence import (
-                        EvidenceKind,
-                        emit_execution_evidence,
-                    )
-                    from backend.telemetry.evidence.fingerprint import fingerprint_text
+            _EventRouterActionsMixin._emit_message_transcript(event, eid)
 
-                    emit_execution_evidence(
-                        EvidenceKind.USER_INPUT,
-                        {
-                            'content_fingerprint': fingerprint_text(content),
-                            'content_length': len(content),
-                            'agent_state': None,
-                            'during_active_run': True,
-                        },
-                    )
-                except Exception:
-                    pass
-            elif event.source == EventSource.AGENT:
-                emit_session_event(
-                    'AGENT_STEP',
-                    {
-                        'text': content,
-                        'thinking': str(getattr(event, 'thought', '') or ''),
-                        'event_id': eid,
-                        'final_response': bool(getattr(event, 'final_response', False)),
-                        'tool_step': bool(getattr(event, 'transcript_only', False)),
-                    },
-                )
+    @staticmethod
+    def _emit_streaming_transcript(
+        event: StreamingChunkAction, eid: int | None
+    ) -> None:
+        from backend.core.logging.session_event_logger import emit_session_event
+
+        emit_session_event(
+            'AGENT_STEP',
+            {
+                'text': str(getattr(event, 'accumulated', '') or ''),
+                'thinking': str(getattr(event, 'thinking_accumulated', '') or ''),
+                'event_id': eid,
+                'stream_final': True,
+                'suppress_live_response': bool(
+                    getattr(event, 'suppress_live_response', False)
+                ),
+            },
+        )
+
+    @staticmethod
+    def _emit_think_transcript(event: Event, eid: int | None) -> None:
+        from backend.core.logging.session_event_logger import emit_session_event
+
+        thought = str(getattr(event, 'thought', '') or '')
+        if thought.strip():
+            emit_session_event(
+                'AGENT_THINK',
+                {'thought': thought, 'event_id': eid},
+            )
+
+    @staticmethod
+    def _emit_message_transcript(event: MessageAction, eid: int | None) -> None:
+        content = str(getattr(event, 'content', '') or '')
+        if not content.strip():
+            return
+        if event.source == EventSource.USER:
+            _EventRouterActionsMixin._emit_user_turn_transcript(content, eid)
+        elif event.source == EventSource.AGENT:
+            _EventRouterActionsMixin._emit_agent_step_transcript(event, content, eid)
+
+    @staticmethod
+    def _emit_user_turn_transcript(content: str, eid: int | None) -> None:
+        from backend.core.logging.session_event_logger import emit_session_event
+
+        emit_session_event(
+            'USER_TURN',
+            {'text': content, 'event_id': eid},
+        )
+        _EventRouterActionsMixin._emit_user_input_evidence(content)
+
+    @staticmethod
+    def _emit_user_input_evidence(content: str) -> None:
+        try:
+            from backend.telemetry.evidence import (
+                EvidenceKind,
+                emit_execution_evidence,
+            )
+            from backend.telemetry.evidence.fingerprint import fingerprint_text
+
+            emit_execution_evidence(
+                EvidenceKind.USER_INPUT,
+                {
+                    'content_fingerprint': fingerprint_text(content),
+                    'content_length': len(content),
+                    'agent_state': None,
+                    'during_active_run': True,
+                },
+            )
+        except Exception:
+            pass
+
+    @staticmethod
+    def _emit_agent_step_transcript(
+        event: MessageAction, content: str, eid: int | None
+    ) -> None:
+        from backend.core.logging.session_event_logger import emit_session_event
+
+        emit_session_event(
+            'AGENT_STEP',
+            {
+                'text': content,
+                'thinking': str(getattr(event, 'thought', '') or ''),
+                'event_id': eid,
+                'final_response': bool(getattr(event, 'final_response', False)),
+                'tool_step': bool(getattr(event, 'transcript_only', False)),
+            },
+        )
 
     async def route_event(self, event: Event) -> None:
         """Dispatch a single event to the appropriate handler.

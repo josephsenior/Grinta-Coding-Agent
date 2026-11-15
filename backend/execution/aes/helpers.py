@@ -788,36 +788,47 @@ def describe_terminal_sessions(executor: Any) -> list[dict[str, Any]]:
     if session_manager is None:
         return []
 
-    rows: list[dict[str, Any]] = []
-    for session_id, session in list(getattr(session_manager, 'sessions', {}).items()):
-        if session_id == 'default':
-            continue
-        proc = getattr(session, '_process', None)
-        running = True
-        exit_code: int | None = None
-        if proc is not None and hasattr(proc, 'poll'):
-            code = proc.poll()
-            running = code is None
-            if code is not None:
-                exit_code = int(code)
-        if exit_code is not None:
-            status = 'completed' if exit_code == 0 else 'failed'
-        elif proc is not None and hasattr(proc, 'poll'):
-            status = 'running'
-        else:
-            status = 'unknown'
-        rows.append(
-            {
-                'session_id': session_id,
-                'running': running,
-                'status': status,
-                'exit_code': exit_code,
-                'shell_kind': terminal_shell_kind(session),
-                'cwd': str(getattr(session, 'cwd', '') or ''),
-            }
+    rows = [
+        _describe_terminal_session(session_id, session)
+        for session_id, session in list(
+            getattr(session_manager, 'sessions', {}).items()
         )
+        if session_id != 'default'
+    ]
     rows.sort(key=lambda row: str(row.get('session_id', '')))
     return rows
+
+
+def _terminal_session_state(
+    session: Any,
+) -> tuple[bool, int | None, str]:
+    proc = getattr(session, '_process', None)
+    running = True
+    exit_code: int | None = None
+    if proc is not None and hasattr(proc, 'poll'):
+        code = proc.poll()
+        running = code is None
+        if code is not None:
+            exit_code = int(code)
+    if exit_code is not None:
+        status = 'completed' if exit_code == 0 else 'failed'
+    elif proc is not None and hasattr(proc, 'poll'):
+        status = 'running'
+    else:
+        status = 'unknown'
+    return running, exit_code, status
+
+
+def _describe_terminal_session(session_id: str, session: Any) -> dict[str, Any]:
+    running, exit_code, status = _terminal_session_state(session)
+    return {
+        'session_id': session_id,
+        'running': running,
+        'status': status,
+        'exit_code': exit_code,
+        'shell_kind': terminal_shell_kind(session),
+        'cwd': str(getattr(session, 'cwd', '') or ''),
+    }
 
 
 def compile_terminal_wait_pattern(pattern: str) -> Any:
@@ -863,11 +874,7 @@ def close_interactive_terminal_sessions(executor: Any) -> list[str]:
     for session_id in list(getattr(session_manager, 'sessions', {}).keys()):
         if session_id == 'default':
             continue
-        if not (
-            session_id.startswith('terminal_')
-            or session_id
-            in getattr(executor, '_terminal_sessions_awaiting_interaction', [])
-        ):
+        if not _is_interactive_terminal_session(executor, session_id):
             continue
         try:
             session_manager.close_session(session_id)
@@ -875,13 +882,23 @@ def close_interactive_terminal_sessions(executor: Any) -> list[str]:
             pass
         clear_terminal_read_cursor(executor, session_id)
         reset_terminal_empty_read_streak(executor, session_id)
-        pending = getattr(executor, '_terminal_sessions_awaiting_interaction', None)
-        if isinstance(pending, list) and session_id in pending:
-            executor._terminal_sessions_awaiting_interaction = [
-                sid for sid in pending if sid != session_id
-            ]
+        _forget_pending_interactive_session(executor, session_id)
         closed.append(session_id)
     return closed
+
+
+def _is_interactive_terminal_session(executor: Any, session_id: str) -> bool:
+    return session_id.startswith('terminal_') or session_id in getattr(
+        executor, '_terminal_sessions_awaiting_interaction', []
+    )
+
+
+def _forget_pending_interactive_session(executor: Any, session_id: str) -> None:
+    pending = getattr(executor, '_terminal_sessions_awaiting_interaction', None)
+    if isinstance(pending, list) and session_id in pending:
+        executor._terminal_sessions_awaiting_interaction = [
+            sid for sid in pending if sid != session_id
+        ]
 
 
 def resolve_path(executor: Any, path: str, working_dir: str) -> str:
@@ -919,15 +936,48 @@ def edit_try_directory_view(
     return None
 
 
-def edit_via_file_editor(executor: Any, action: Any) -> Any:
-    import hashlib
-
+def _present_edit_result(
+    result_str: str,
+    *,
+    path: str,
+    command: str,
+    old_content: str | None,
+    new_content: str | None,
+    is_range_edit: bool,
+) -> str:
     from backend.execution.aes.file_operations import (
-        execute_file_editor,
         get_max_edit_observation_chars,
         truncate_diff,
         truncate_large_text,
     )
+
+    if not is_range_edit:
+        max_chars = get_max_edit_observation_chars()
+        result_str = truncate_large_text(result_str, max_chars, label='edit')
+
+    if old_content is None or new_content is None or command == 'read_file':
+        return result_str
+
+    try:
+        diff = get_diff(old_content, new_content, path)
+        if diff:
+            diff = truncate_diff(diff, path=path)
+            result_str = result_str + '\n\n[EDIT_DIFF]\n' + diff
+    except Exception:
+        pass
+    return result_str
+
+
+def _edit_operation(tool_result: Any, command: str) -> Any:
+    if isinstance(tool_result, dict):
+        return tool_result.get('operation')
+    return command or None
+
+
+def edit_via_file_editor(executor: Any, action: Any) -> Any:
+    import hashlib
+
+    from backend.execution.aes.file_operations import execute_file_editor
     from backend.ledger.observation.files import resolve_file_edit_outcome
 
     command = action.command or ''
@@ -966,24 +1016,16 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
     # For edit_mode=range, skip truncation entirely — range edits produce
     # small, structured diffs proportional to the change size, not the file size.
     # Truncation here only causes corruption (mid-hunk cuts, merged lines).
-    if not is_range_edit:
-        max_chars = get_max_edit_observation_chars()
-        result_str = truncate_large_text(result_str, max_chars, label='edit')
-
-    if old_content is not None and new_content is not None and command != 'read_file':
-        try:
-            diff = get_diff(old_content, new_content, action.path)
-            if diff:
-                diff = truncate_diff(diff, path=action.path)
-                result_str = result_str + '\n\n[EDIT_DIFF]\n' + diff
-        except Exception:
-            pass
-
-    operation = (
-        tool_result.get('operation')
-        if isinstance(tool_result, dict)
-        else command or None
+    result_str = _present_edit_result(
+        result_str,
+        path=action.path,
+        command=command,
+        old_content=old_content,
+        new_content=new_content,
+        is_range_edit=is_range_edit,
     )
+
+    operation = _edit_operation(tool_result, command)
     edit_obs = FileEditObservation(
         content=result_str,
         path=action.path,
@@ -1035,6 +1077,75 @@ def _count_structured_edit_line_changes(
     return added, removed
 
 
+def _structured_edit_diff_details(
+    old_content: str | None,
+    new_content: str,
+    display_path: str,
+    truncate_diff: Any,
+) -> tuple[str | None, int, int]:
+    file_diff = get_diff(old_content or '', new_content or '', display_path)
+    if not file_diff:
+        added, removed = _count_structured_edit_line_changes(old_content, new_content)
+        return None, added, removed
+    file_diff = truncate_diff(file_diff, path=display_path)
+    stats = get_diff_stats(file_diff)
+    return (
+        file_diff,
+        int(stats.get('lines_added') or 0),
+        int(stats.get('lines_removed') or 0),
+    )
+
+
+def _structured_edit_syntax_status(
+    display_path: str,
+    new_content: str | None,
+    check_syntax: Any,
+) -> tuple[str, str]:
+    if new_content is None:
+        return 'skipped', ''
+    syntax_result = check_syntax(display_path, new_content)
+    return syntax_result.status, syntax_result.detail
+
+
+def _structured_edit_outcome(
+    resolved_path: Path,
+    old_content: str | None,
+    display_path: str,
+    *,
+    truncate_diff: Any,
+    check_syntax: Any,
+) -> dict[str, Any]:
+    new_content = _read_existing_text(resolved_path)
+    changed = old_content != new_content
+    file_diff: str | None = None
+    added = 0
+    removed = 0
+
+    if changed and new_content is not None:
+        file_diff, added, removed = _structured_edit_diff_details(
+            old_content, new_content, display_path, truncate_diff
+        )
+
+    syntax_status, syntax_detail = _structured_edit_syntax_status(
+        display_path, new_content, check_syntax
+    )
+
+    outcome: dict[str, Any] = {
+        'path': display_path,
+        'absolute_path': str(resolved_path),
+        'disk_write': 'passed' if new_content is not None else 'failed',
+        'changed': changed,
+        'syntax': syntax_status,
+        'added': added,
+        'removed': removed,
+    }
+    if file_diff:
+        outcome['diff'] = file_diff
+    if syntax_detail:
+        outcome['syntax_detail'] = syntax_detail[:1000]
+    return outcome
+
+
 def _structured_edit_file_outcomes(
     snapshots: dict[Path, tuple[str | None, str]],
 ) -> list[dict[str, Any]]:
@@ -1042,49 +1153,16 @@ def _structured_edit_file_outcomes(
     from backend.execution.aes.file_operations import truncate_diff
     from backend.utils.treesitter.syntax_check import check_syntax
 
-    outcomes: list[dict[str, Any]] = []
-    for resolved_path, (old_content, display_path) in snapshots.items():
-        new_content = _read_existing_text(resolved_path)
-        disk_ok = new_content is not None
-        changed = old_content != new_content
-        file_diff: str | None = None
-        added = 0
-        removed = 0
-
-        if changed and new_content is not None:
-            file_diff = get_diff(old_content or '', new_content or '', display_path)
-            if file_diff:
-                file_diff = truncate_diff(file_diff, path=display_path)
-                stats = get_diff_stats(file_diff)
-                added = int(stats.get('lines_added') or 0)
-                removed = int(stats.get('lines_removed') or 0)
-            else:
-                added, removed = _count_structured_edit_line_changes(
-                    old_content, new_content
-                )
-
-        syntax_status = 'skipped'
-        syntax_detail = ''
-        if new_content is not None:
-            syntax_result = check_syntax(display_path, new_content)
-            syntax_status = syntax_result.status
-            syntax_detail = syntax_result.detail
-
-        outcome: dict[str, Any] = {
-            'path': display_path,
-            'absolute_path': str(resolved_path),
-            'disk_write': 'passed' if disk_ok else 'failed',
-            'changed': changed,
-            'syntax': syntax_status,
-            'added': added,
-            'removed': removed,
-        }
-        if file_diff:
-            outcome['diff'] = file_diff
-        if syntax_detail:
-            outcome['syntax_detail'] = syntax_detail[:1000]
-        outcomes.append(outcome)
-    return outcomes
+    return [
+        _structured_edit_outcome(
+            resolved_path,
+            old_content,
+            display_path,
+            truncate_diff=truncate_diff,
+            check_syntax=check_syntax,
+        )
+        for resolved_path, (old_content, display_path) in snapshots.items()
+    ]
 
 
 def _join_structured_file_outcome_diffs(
@@ -1126,6 +1204,34 @@ def _structured_edit_verification_text(
     return '\n'.join(lines), all_ok
 
 
+def _format_structured_edit_display_paths(
+    candidates: list[dict[str, Any]],
+) -> str | None:
+    if len(candidates) == 1:
+        return str(candidates[0].get('path') or '')
+    if not candidates:
+        return None
+    paths = [
+        str(outcome.get('path') or '') for outcome in candidates if outcome.get('path')
+    ]
+    if len(paths) == 1:
+        return paths[0]
+    if not paths:
+        return None
+    if len(paths) <= 3:
+        return ', '.join(paths)
+    return f'{paths[0]}, ... (+{len(paths) - 1} more)'
+
+
+def _first_structured_edit_payload_path(payload: dict[str, Any]) -> str | None:
+    for item in payload.get('file_edits') or []:
+        if isinstance(item, dict):
+            item_path = str(item.get('path') or '').strip()
+            if item_path:
+                return item_path
+    return None
+
+
 def _resolve_structured_edit_display_path(
     action: Any,
     payload: dict[str, Any],
@@ -1133,25 +1239,13 @@ def _resolve_structured_edit_display_path(
 ) -> str:
     changed = [outcome for outcome in file_outcomes if outcome.get('changed')]
     candidates = changed or file_outcomes
-    if len(candidates) == 1:
-        return str(candidates[0].get('path') or '')
-    if len(candidates) > 1:
-        paths = [
-            str(outcome.get('path') or '')
-            for outcome in candidates
-            if outcome.get('path')
-        ]
-        if len(paths) == 1:
-            return paths[0]
-        if len(paths) <= 3:
-            return ', '.join(paths)
-        return f'{paths[0]}, ... (+{len(paths) - 1} more)'
+    candidate_path = _format_structured_edit_display_paths(candidates)
+    if candidate_path is not None:
+        return candidate_path
 
-    for item in payload.get('file_edits') or []:
-        if isinstance(item, dict):
-            item_path = str(item.get('path') or '').strip()
-            if item_path:
-                return item_path
+    payload_path = _first_structured_edit_payload_path(payload)
+    if payload_path is not None:
+        return payload_path
 
     action_path = str(getattr(action, 'path', '') or '').strip()
     if action_path and action_path != '.':

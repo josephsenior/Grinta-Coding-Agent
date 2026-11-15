@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from backend.context.symbol_index.store import (
+    StoredSymbol,
     get_symbol_index_store,
     symbol_index_enabled,
 )
@@ -25,6 +26,17 @@ def _store_for_path(path: str):
     return None
 
 
+def _tree_symbol_line(symbol: StoredSymbol) -> str | None:
+    if symbol.name.startswith('_') and symbol.kind != 'method':
+        return None
+    preview = (symbol.signature_preview or '').strip()
+    if preview:
+        return f'      {preview.splitlines()[0].strip()}'
+    if symbol.kind == 'class':
+        return f'      class {symbol.name}'
+    return f'      def {symbol.name}'
+
+
 def tree_symbol_lines_for_file(path: str) -> list[str] | None:
     store = _store_for_path(path)
     if store is None:
@@ -35,16 +47,9 @@ def tree_symbol_lines_for_file(path: str) -> list[str] | None:
         return None
     lines: list[str] = []
     for symbol in symbols:
-        if symbol.name.startswith('_') and symbol.kind != 'method':
-            continue
-        preview = (symbol.signature_preview or '').strip()
-        if preview:
-            lines.append(f'      {preview.splitlines()[0].strip()}')
-            continue
-        if symbol.kind == 'class':
-            lines.append(f'      class {symbol.name}')
-        else:
-            lines.append(f'      def {symbol.name}')
+        line = _tree_symbol_line(symbol)
+        if line is not None:
+            lines.append(line)
         if len(lines) >= 6:
             break
     return lines or None

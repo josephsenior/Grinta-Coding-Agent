@@ -65,6 +65,21 @@ def _validate_mcp_url(url: str) -> str:
         raise ValueError(msg) from e
 
 
+def _server_config_equality_key(config: MCPServerConfig) -> tuple[object, ...]:
+    return (
+        config.name,
+        config.type,
+        config.command,
+        config.args,
+        set(config.env.items()),
+        config.url,
+        config.api_key,
+        config.transport,
+        config.usage_hint,
+        config.enabled,
+    )
+
+
 class MCPServerConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     """Unified configuration for MCP servers (stdio, SSE, or sHTTP).
 
@@ -232,18 +247,7 @@ class MCPServerConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         """Override equality operator to compare server configurations."""
         if not isinstance(other, MCPServerConfig):
             return False
-        return (
-            self.name == other.name
-            and self.type == other.type
-            and self.command == other.command
-            and self.args == other.args
-            and set(self.env.items()) == set(other.env.items())
-            and self.url == other.url
-            and self.api_key == other.api_key
-            and self.transport == other.transport
-            and self.usage_hint == other.usage_hint
-            and self.enabled == other.enabled
-        )
+        return _server_config_equality_key(self) == _server_config_equality_key(other)
 
 
 class MCPConfig(BaseModel, metaclass=CanonicalModelMetaclass):

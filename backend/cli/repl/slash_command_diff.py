@@ -68,13 +68,46 @@ def run_git_diff(
     return body
 
 
+def _make_diff_file(
+    path: str,
+    lines: list[str],
+    added: int,
+    removed: int,
+) -> dict:
+    return {'path': path, 'lines': lines, 'added': added, 'removed': removed}
+
+
+def _diff_file_path(line: str) -> str:
+    import re
+
+    match = re.match(r'diff --git a/(.*) b/.*', line)
+    return match.group(1) if match else ''
+
+
+def _diff_line_delta(line: str) -> tuple[int, int]:
+    if line.startswith('+') and not line.startswith('+++'):
+        return 1, 0
+    if line.startswith('-') and not line.startswith('---'):
+        return 0, 1
+    return 0, 0
+
+
+def _append_diff_file(
+    files: list[dict],
+    path: str,
+    lines: list[str],
+    added: int,
+    removed: int,
+) -> None:
+    if path and lines:
+        files.append(_make_diff_file(path, lines, added, removed))
+
+
 def parse_diff_files(diff_body: str) -> list[dict]:
     """Split a unified diff into per-file sections.
 
     Returns a list of dicts with keys: ``path``, ``lines``, ``added``, ``removed``.
     """
-    import re
-
     files: list[dict] = []
     current: list[str] = []
     current_path = ''
@@ -83,39 +116,18 @@ def parse_diff_files(diff_body: str) -> list[dict]:
 
     for line in diff_body.split('\n'):
         if line.startswith('diff --git'):
-            if current and current_path:
-                files.append(
-                    {
-                        'path': current_path,
-                        'lines': current,
-                        'added': added,
-                        'removed': removed,
-                    }
-                )
+            _append_diff_file(files, current_path, current, added, removed)
             current = [line]
-            current_path = ''
+            current_path = _diff_file_path(line)
             added = 0
             removed = 0
-            m = re.match(r'diff --git a/(.*) b/.*', line)
-            if m:
-                current_path = m.group(1)
-        else:
-            current.append(line)
-            if line.startswith('+') and not line.startswith('+++'):
-                added += 1
-            elif line.startswith('-') and not line.startswith('---'):
-                removed += 1
+            continue
+        current.append(line)
+        line_added, line_removed = _diff_line_delta(line)
+        added += line_added
+        removed += line_removed
 
-    if current and current_path:
-        files.append(
-            {
-                'path': current_path,
-                'lines': current,
-                'added': added,
-                'removed': removed,
-            }
-        )
-
+    _append_diff_file(files, current_path, current, added, removed)
     return files
 
 

@@ -51,15 +51,58 @@ def notify_no_rollback_manager(host: Any, message: str) -> None:
         host._renderer.add_system_message(message, title='checkpoint')
 
 
+def _parse_checkpoint_list_request(
+    host: Any, args: list[str]
+) -> tuple[bool, int | None]:
+    show_all = bool(args and args[0] == '--all')
+    remaining = args[1:] if show_all else args
+    return show_all, parse_checkpoint_limit(host, remaining)
+
+
+def _load_checkpoint_entries(
+    host: Any,
+    manager: Any,
+    *,
+    show_all: bool,
+) -> list[Any] | None:
+    try:
+        # Show all tiers when --all is requested; otherwise only tier-2 user checkpoints.
+        return manager.list_checkpoints(tier=None if show_all else 2)
+    except Exception as exc:
+        host._warn(f'Failed to list checkpoints: {exc}')
+        return None
+
+
+def _notify_empty_checkpoint_list(host: Any, *, show_all: bool) -> None:
+    msg = 'No checkpoints recorded yet.'
+    if not show_all:
+        msg += ' (system transactions hidden; use /checkpoint list --all to see them)'
+    if host._renderer is not None:
+        host._renderer.add_system_message(msg, title='checkpoint')
+
+
+def _format_checkpoint_list_body(
+    host: Any,
+    entries: list[Any],
+    *,
+    limit: int,
+    show_all: bool,
+) -> str:
+    # Newest first.
+    entries = sorted(entries, key=lambda e: e.get('timestamp', 0), reverse=True)[:limit]
+    body = '\n'.join(host._format_checkpoint_entry(e) for e in entries)
+    if not show_all:
+        body += '\n(system transactions hidden — use /checkpoint list --all to see all)'
+    return body
+
+
 def handle_checkpoint_list(host: Any, args: list[str]) -> None:
     """Render up to ``limit`` checkpoints (default 10, newest first).
 
     By default only user-visible (tier 2) checkpoints are shown.  Pass
     ``--all`` as the first argument to include system transactions (tier 1).
     """
-    show_all = bool(args and args[0] == '--all')
-    remaining = args[1:] if show_all else args
-    limit = parse_checkpoint_limit(host, remaining)
+    show_all, limit = _parse_checkpoint_list_request(host, args)
     if limit is None:
         return
     manager = host._resolve_rollback_manager()
@@ -69,26 +112,18 @@ def handle_checkpoint_list(host: Any, args: list[str]) -> None:
             'No active rollback manager (workspace may not be initialised yet).',
         )
         return
-    try:
-        # Show all tiers when --all is requested; otherwise only tier-2 user checkpoints.
-        entries = manager.list_checkpoints(tier=None if show_all else 2)
-    except Exception as exc:
-        host._warn(f'Failed to list checkpoints: {exc}')
+    entries = _load_checkpoint_entries(host, manager, show_all=show_all)
+    if entries is None:
         return
     if not entries:
-        msg = 'No checkpoints recorded yet.'
-        if not show_all:
-            msg += (
-                ' (system transactions hidden; use /checkpoint list --all to see them)'
-            )
-        if host._renderer is not None:
-            host._renderer.add_system_message(msg, title='checkpoint')
+        _notify_empty_checkpoint_list(host, show_all=show_all)
         return
-    # Newest first.
-    entries = sorted(entries, key=lambda e: e.get('timestamp', 0), reverse=True)[:limit]
-    body = '\n'.join(host._format_checkpoint_entry(e) for e in entries)
-    if not show_all:
-        body += '\n(system transactions hidden — use /checkpoint list --all to see all)'
+    body = _format_checkpoint_list_body(
+        host,
+        entries,
+        limit=limit,
+        show_all=show_all,
+    )
     if host._renderer is not None:
         host._renderer.add_system_message(body, title='checkpoint list')
 

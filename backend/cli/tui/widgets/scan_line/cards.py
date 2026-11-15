@@ -69,6 +69,26 @@ def _format_diff_delta(added: int, removed: int) -> str:
     return ' '.join(parts) if parts else '0'
 
 
+def _task_description(task: dict[str, Any]) -> str:
+    return str(
+        task.get('description')
+        or task.get('title')
+        or task.get('task')
+        or task.get('id')
+        or 'Untitled task'
+    ).strip()
+
+
+def _task_blocked_reason(task: dict[str, Any]) -> str:
+    return str(task.get('blocked_reason') or task.get('reason') or '').strip()
+
+
+def _criterion_assertion(item: dict[str, Any]) -> str:
+    return str(
+        item.get('assertion') or item.get('description') or item.get('criterion') or ''
+    ).strip()
+
+
 _INLINE_PAYLOAD_LINES = 8
 
 
@@ -1378,13 +1398,7 @@ class TaskStateCard(ScanLineCard):
             'blocked': _glyph('⚠'),
             'skipped': _glyph('·'),
         }
-        description = str(
-            task.get('description')
-            or task.get('title')
-            or task.get('task')
-            or task.get('id')
-            or 'Untitled task'
-        ).strip()
+        description = _task_description(task)
         task_id = str(task.get('id') or '').strip()
         rendered = Text()
         rendered.append(f'{icons.get(status, _glyph("•"))} ', style=colors.get(status))
@@ -1392,7 +1406,7 @@ class TaskStateCard(ScanLineCard):
             rendered.append(f'{task_id} ', style='#6f83aa')
         rendered.append(description, style='#c8d4e8')
         if status == 'blocked':
-            reason = str(task.get('blocked_reason') or task.get('reason') or '').strip()
+            reason = _task_blocked_reason(task)
             if reason:
                 rendered.append(f' — {reason}', style='#eacb8a')
         return rendered
@@ -1507,23 +1521,23 @@ class AcceptanceCriteriaCard(ScanLineCard):
     def _delta_text(self) -> str:
         return _status_indicator_markup(self._state)
 
+    def _criterion_row(self, item: dict[str, Any]) -> Text | None:
+        assertion = _criterion_assertion(item)
+        if not assertion:
+            return None
+        satisfied = item.get('satisfied')
+        icon = _glyph('✓') if satisfied is True else _glyph('○')
+        color = '#639922' if satisfied is True else '#c8d4e8'
+        return Text(f'{icon} {assertion}', style=color)
+
     def _inline_renderable(self) -> Group:
         from backend.cli.tui.transcript_typography import TX_BODY_DIM
 
-        renderables: list[Any] = []
-        for item in self._criteria_list[:8]:
-            assertion = str(
-                item.get('assertion')
-                or item.get('description')
-                or item.get('criterion')
-                or ''
-            ).strip()
-            if not assertion:
-                continue
-            satisfied = item.get('satisfied')
-            icon = _glyph('✓') if satisfied is True else _glyph('○')
-            color = '#639922' if satisfied is True else '#c8d4e8'
-            renderables.append(Text(f'{icon} {assertion}', style=color))
+        renderables: list[Any] = [
+            row
+            for item in self._criteria_list[:8]
+            if (row := self._criterion_row(item)) is not None
+        ]
         hidden = len(self._criteria_list) - min(len(self._criteria_list), 8)
         if hidden:
             renderables.append(

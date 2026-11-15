@@ -173,35 +173,49 @@ class PromptTextArea(TextArea):
             return super().action_paste()
         self._paste_text_from_clipboard()
 
-    def on_key(self, event: events.Key) -> None:
+    def _consume_pending_image_delete(self, event: events.Key) -> bool:
         if (
-            event.key in {'backspace', 'delete'}
-            and self._try_remove_pending_image_attachment()
+            event.key not in {'backspace', 'delete'}
+            or not self._try_remove_pending_image_attachment()
         ):
+            return False
+        event.prevent_default()
+        event.stop()
+        return True
+
+    def _handle_page_scroll(self, event: events.Key, screen: Any | None) -> bool:
+        if event.key not in {'pageup', 'pagedown'} or screen is None:
+            return False
+        if event.key == 'pageup' and hasattr(screen, 'action_scroll_up'):
+            screen.action_scroll_up()
+        elif event.key == 'pagedown' and hasattr(screen, 'action_scroll_down'):
+            screen.action_scroll_down()
+        event.prevent_default()
+        event.stop()
+        return True
+
+    def _handle_idle_arrow_navigation(self, event: events.Key, screen: Any) -> bool:
+        if getattr(screen, '_welcome_visible', False):
+            if event.key == 'up' and hasattr(screen, 'action_focus_prev_card'):
+                screen.action_focus_prev_card()
+            elif event.key == 'down' and hasattr(screen, 'action_focus_next_card'):
+                screen.action_focus_next_card()
             event.prevent_default()
             event.stop()
+            return True
+        if hasattr(
+            screen, '_handle_communicate_navigation'
+        ) and screen._handle_communicate_navigation(event.key):
+            event.prevent_default()
+            event.stop()
+            return True
+        return False
+
+    def on_key(self, event: events.Key) -> None:
+        if self._consume_pending_image_delete(event):
             return
         screen = getattr(self, 'screen', None)
-        if event.key in {'pageup', 'pagedown'} and screen is not None:
-            if event.key == 'pageup' and hasattr(screen, 'action_scroll_up'):
-                screen.action_scroll_up()
-            elif event.key == 'pagedown' and hasattr(screen, 'action_scroll_down'):
-                screen.action_scroll_down()
-            event.prevent_default()
-            event.stop()
+        if self._handle_page_scroll(event, screen):
             return
         if event.key in {'up', 'down'} and bool(screen) and not self.text.strip():
-            if getattr(screen, '_welcome_visible', False):
-                if event.key == 'up' and hasattr(screen, 'action_focus_prev_card'):
-                    screen.action_focus_prev_card()
-                elif event.key == 'down' and hasattr(screen, 'action_focus_next_card'):
-                    screen.action_focus_next_card()
-                event.prevent_default()
-                event.stop()
-                return
-            if hasattr(
-                screen, '_handle_communicate_navigation'
-            ) and screen._handle_communicate_navigation(event.key):
-                event.prevent_default()
-                event.stop()
-                return
+            self._handle_idle_arrow_navigation(event, screen)

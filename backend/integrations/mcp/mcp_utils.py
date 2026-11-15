@@ -62,6 +62,43 @@ def _get_mcp_connect_timeout_sec() -> float:
 _ENV_VAR_PATTERN = re.compile(r'^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$')
 
 
+def _resolve_env_entry(key: str, value: Any) -> tuple[bool, str]:
+    if not isinstance(value, str):
+        return True, str(value)
+
+    if value == '':
+        from_env = os.environ.get(key)
+        if from_env:
+            return True, from_env
+        return False, ''
+
+    match = _ENV_VAR_PATTERN.match(value.strip())
+    if match is None:
+        return True, value
+
+    var_name = match.group(1)
+    from_env = os.environ.get(var_name)
+    if from_env:
+        return True, from_env
+    if var_name == 'PROJECT_ROOT':
+        return _resolve_project_root_env()
+    return False, ''
+
+
+def _resolve_project_root_env() -> tuple[bool, str]:
+    from backend.core.workspace_resolution import (
+        get_effective_workspace_root,
+    )
+
+    eff = get_effective_workspace_root()
+    if eff is not None:
+        return True, str(eff.resolve())
+    try:
+        return True, str(Path.cwd().resolve())
+    except OSError:
+        return False, ''
+
+
 def _resolve_server_env(raw_env: dict[str, Any] | None) -> dict[str, str] | None:
     """Resolve MCP server env values against ``os.environ``.
 
@@ -92,40 +129,9 @@ def _resolve_server_env(raw_env: dict[str, Any] | None) -> dict[str, str] | None
 
     resolved: dict[str, str] = {}
     for key, value in raw_env.items():
-        if not isinstance(value, str):
-            resolved[key] = str(value)
-            continue
-
-        if value == '':
-            from_env = os.environ.get(key)
-            if from_env:
-                resolved[key] = from_env
-            continue
-
-        match = _ENV_VAR_PATTERN.match(value.strip())
-        if match is None:
-            resolved[key] = value
-            continue
-
-        var_name = match.group(1)
-        from_env = os.environ.get(var_name)
-        if from_env:
-            resolved[key] = from_env
-            continue
-        if var_name == 'PROJECT_ROOT':
-            from backend.core.workspace_resolution import (
-                get_effective_workspace_root,
-            )
-
-            eff = get_effective_workspace_root()
-            if eff is not None:
-                resolved[key] = str(eff.resolve())
-            else:
-                try:
-                    resolved[key] = str(Path.cwd().resolve())
-                except OSError:
-                    pass
-        continue
+        keep, resolved_value = _resolve_env_entry(key, value)
+        if keep:
+            resolved[key] = resolved_value
 
     return resolved
 
@@ -446,6 +452,55 @@ async def _disconnect_probe_mcps(mcps: list[MCPClient]) -> None:
     await asyncio.sleep(0.05)
 
 
+def _handle_mcp_disabled(mcp_config: MCPConfig) -> list[dict]:
+    _set_mcp_bootstrap(
+        state='mcp_disabled',
+        mcp_enabled=False,
+        configured_server_count=len(mcp_config.servers or []),
+    )
+    return []
+
+
+def _handle_no_mcp_clients(configured_n: int, attempted_n: int) -> list[dict]:
+    logger.warning(
+        'No MCP clients were successfully connected; exposing degraded capability status tool only'
+    )
+    _set_mcp_bootstrap(
+        state='no_clients_connected',
+        mcp_enabled=True,
+        configured_server_count=configured_n,
+        attempted_server_count=attempted_n,
+        connected_client_count=0,
+        remote_tool_param_count=0,
+    )
+    return wrapper_tool_params([])
+
+
+def _handle_fetch_mcp_failure(
+    error: Exception,
+    configured_n: int,
+    attempted_n: int,
+) -> list[dict]:
+    error_msg = f'Error fetching MCP tools: {error!s}'
+    logger.error(error_msg)
+    mcp_error_collector.add_error(
+        server_name='general',
+        server_type='fetch',
+        error_message=error_msg,
+        exception_details=str(error),
+    )
+    _set_mcp_bootstrap(
+        state='fetch_failed',
+        mcp_enabled=True,
+        configured_server_count=configured_n,
+        attempted_server_count=attempted_n,
+        connected_client_count=0,
+        last_error=str(error),
+    )
+    # Degraded but explicit: keep diagnostics wrapper tools so the agent/UI can see state.
+    return wrapper_tool_params([])
+
+
 async def fetch_mcp_tools_from_config(
     mcp_config: MCPConfig,
     conversation_id: str | None = None,
@@ -468,12 +523,7 @@ async def fetch_mcp_tools_from_config(
     _last_mcp_conversion_errors = []
 
     if not getattr(mcp_config, 'enabled', False):
-        _set_mcp_bootstrap(
-            state='mcp_disabled',
-            mcp_enabled=False,
-            configured_server_count=len(mcp_config.servers or []),
-        )
-        return []
+        return _handle_mcp_disabled(mcp_config)
 
     # Filter servers: only include stdio if use_stdio is True
     active_servers = [s for s in mcp_config.servers if getattr(s, 'enabled', True)]
@@ -501,18 +551,7 @@ async def fetch_mcp_tools_from_config(
 
         mcps = await create_mcps(servers_to_connect, conversation_id)
         if not mcps:
-            logger.warning(
-                'No MCP clients were successfully connected; exposing degraded capability status tool only'
-            )
-            _set_mcp_bootstrap(
-                state='no_clients_connected',
-                mcp_enabled=True,
-                configured_server_count=configured_n,
-                attempted_server_count=attempted_n,
-                connected_client_count=0,
-                remote_tool_param_count=0,
-            )
-            return wrapper_tool_params([])
+            return _handle_no_mcp_clients(configured_n, attempted_n)
         mcp_tools = _prepare_connected_mcp_tools(
             mcps,
             mcp_config,
@@ -521,24 +560,7 @@ async def fetch_mcp_tools_from_config(
             attempted_n=attempted_n,
         )
     except Exception as e:
-        error_msg = f'Error fetching MCP tools: {e!s}'
-        logger.error(error_msg)
-        mcp_error_collector.add_error(
-            server_name='general',
-            server_type='fetch',
-            error_message=error_msg,
-            exception_details=str(e),
-        )
-        _set_mcp_bootstrap(
-            state='fetch_failed',
-            mcp_enabled=True,
-            configured_server_count=configured_n,
-            attempted_server_count=attempted_n,
-            connected_client_count=0,
-            last_error=str(e),
-        )
-        # Degraded but explicit: keep diagnostics wrapper tools so the agent/UI can see state.
-        return wrapper_tool_params([])
+        return _handle_fetch_mcp_failure(e, configured_n, attempted_n)
     finally:
         # Probe clients are only used to list tools; keeping them alive orphans fastmcp tasks
         # (stdio/session runners) and triggers "Task was destroyed but it is pending".
@@ -885,6 +907,107 @@ def _resolve_exposed_tool_name(client: MCPClient, action_name: str) -> str | Non
     return None
 
 
+async def _call_mcp_tool_and_cache(
+    action: MCPAction, matching_client: MCPClient
+) -> dict:
+    """Call the MCP tool and cache its serialized result."""
+    response = await matching_client.call_tool(action.name, action.arguments)
+    logger.debug('MCP response: %s', response)
+    result_dict = response.model_dump(mode='json')
+    try:
+        set_cache(action.name, action.arguments, result_dict)
+    except Exception as cache_exc:
+        logger.debug('Cache set skipped for %s: %s', action.name, cache_exc)
+    return result_dict
+
+
+def _resolve_repair_schema(
+    matching_client: MCPClient, action_name: str
+) -> dict[str, Any] | None:
+    resolved_name = (
+        _resolve_exposed_tool_name(matching_client, action_name) or action_name
+    )
+    tool_obj = getattr(matching_client, 'tool_map', {}).get(resolved_name)
+    if tool_obj is None:
+        return None
+    return getattr(tool_obj, 'input_schema', None)
+
+
+async def _retry_mcp_call_with_repaired_args(
+    action: MCPAction, matching_client: MCPClient, err_text: str
+) -> MCPObservation | None:
+    if not _looks_like_mcp_validation_error(err_text):
+        return None
+    if not _mcp_arg_repair_enabled():
+        logger.debug(
+            'MCP validation failed for %s; mcp_arg_repair disabled, '
+            'returning raw error to caller',
+            action.name,
+        )
+        return None
+
+    schema = _resolve_repair_schema(matching_client, action.name)
+    repaired_args, changed = _repair_args_with_schema(action.arguments, schema)
+    if not changed:
+        return None
+
+    logger.warning(
+        'MCP validation failed for %s; retrying once with schema-repaired args',
+        action.name,
+    )
+    try:
+        response = await matching_client.call_tool(action.name, repaired_args)
+        result_dict = response.model_dump(mode='json')
+        payload = _normalize_mcp_success_payload(result_dict)
+        payload['mcp_arg_repair_applied'] = True
+        payload['repaired_arguments'] = repaired_args
+        return _make_mcp_observation(action, payload)
+    except Exception as retry_exc:
+        logger.error(
+            'MCP validation retry failed for %s: %s',
+            action.name,
+            retry_exc,
+        )
+        return None
+
+
+async def _build_mcp_failure_observation(
+    action: MCPAction, matching_client: MCPClient, err_text: str
+) -> MCPObservation:
+    logger.error('MCP error when calling tool %s: %s', action.name, err_text)
+    repaired = await _retry_mcp_call_with_repaired_args(
+        action, matching_client, err_text
+    )
+    if repaired is not None:
+        return repaired
+
+    if _looks_like_mcp_validation_error(err_text):
+        code = _extract_mcp_jsonrpc_error_code(err_text) or '-32602'
+        return _make_mcp_observation(
+            action,
+            _build_mcp_error_payload(
+                action_name=action.name,
+                message=(
+                    f"MCP tool '{action.name}' argument validation failed ({code})."
+                ),
+                code='MCP_TOOL_VALIDATION_ERROR',
+                retryable=True,
+                category='bad_args',
+            ),
+        )
+
+    return _make_mcp_observation(
+        action,
+        _build_mcp_error_payload(
+            action_name=action.name,
+            message=f"MCP tool '{action.name}' failed: {err_text}",
+            code='MCP_TOOL_ERROR',
+            retryable=False,
+            category='tool_bug',
+        ),
+    )
+
+
 async def _execute_direct_tool(
     action: MCPAction, matching_client: MCPClient
 ) -> MCPObservation:
@@ -894,93 +1017,12 @@ async def _execute_direct_tool(
             logger.debug('Cache hit for MCP tool %s', action.name)
             return _make_mcp_observation(action, _normalize_mcp_success_payload(cached))
 
-        # Call tool
-        response = await matching_client.call_tool(action.name, action.arguments)
-        logger.debug('MCP response: %s', response)
-        result_dict = response.model_dump(mode='json')
-
-        # Cache result
-        try:
-            set_cache(action.name, action.arguments, result_dict)
-        except Exception as cache_exc:
-            logger.debug('Cache set skipped for %s: %s', action.name, cache_exc)
-
-        # Serialize and return
+        result_dict = await _call_mcp_tool_and_cache(action, matching_client)
         return _make_mcp_observation(
             action, _normalize_mcp_success_payload(result_dict)
         )
     except MCPError as e:
-        err_text = str(e)
-        logger.error('MCP error when calling tool %s: %s', action.name, err_text)
-
-        if _looks_like_mcp_validation_error(err_text) and _mcp_arg_repair_enabled():
-            resolved_name = (
-                _resolve_exposed_tool_name(matching_client, action.name) or action.name
-            )
-            tool_obj = getattr(matching_client, 'tool_map', {}).get(resolved_name)
-            schema = (
-                getattr(tool_obj, 'input_schema', None)
-                if tool_obj is not None
-                else None
-            )
-            repaired_args, changed = _repair_args_with_schema(action.arguments, schema)
-
-            if changed:
-                logger.warning(
-                    'MCP validation failed for %s; retrying once with schema-repaired args',
-                    action.name,
-                )
-                try:
-                    response = await matching_client.call_tool(
-                        action.name, repaired_args
-                    )
-                    result_dict = response.model_dump(mode='json')
-                    payload = _normalize_mcp_success_payload(result_dict)
-                    payload['mcp_arg_repair_applied'] = True
-                    payload['repaired_arguments'] = repaired_args
-                    return _make_mcp_observation(action, payload)
-                except Exception as retry_exc:
-                    logger.error(
-                        'MCP validation retry failed for %s: %s',
-                        action.name,
-                        retry_exc,
-                    )
-        elif _looks_like_mcp_validation_error(err_text):
-            # Repair is disabled (security.allow_mcp_arg_repair=False):
-            # surface the validation error to the caller so the model can
-            # self-correct on the next turn instead of us silently mutating
-            # arguments.
-            logger.debug(
-                'MCP validation failed for %s; mcp_arg_repair disabled, '
-                'returning raw error to caller',
-                action.name,
-            )
-
-        code = _extract_mcp_jsonrpc_error_code(err_text) or '-32602'
-        if _looks_like_mcp_validation_error(err_text):
-            return _make_mcp_observation(
-                action,
-                _build_mcp_error_payload(
-                    action_name=action.name,
-                    message=(
-                        f"MCP tool '{action.name}' argument validation failed ({code})."
-                    ),
-                    code='MCP_TOOL_VALIDATION_ERROR',
-                    retryable=True,
-                    category='bad_args',
-                ),
-            )
-
-        return _make_mcp_observation(
-            action,
-            _build_mcp_error_payload(
-                action_name=action.name,
-                message=f"MCP tool '{action.name}' failed: {err_text}",
-                code='MCP_TOOL_ERROR',
-                retryable=False,
-                category='tool_bug',
-            ),
-        )
+        return await _build_mcp_failure_observation(action, matching_client, str(e))
     except asyncio.TimeoutError as e:
         logger.error('MCP tool %s timed out: %s', action.name, e)
         return _make_mcp_observation(
@@ -994,7 +1036,6 @@ async def _execute_direct_tool(
             ),
         )
     except Exception as e:
-        # Catch-all for connection failures, timeouts, and unexpected errors
         logger.error(
             "MCP tool '%s' failed unexpectedly: %s", action.name, e, exc_info=True
         )
@@ -1084,6 +1125,86 @@ async def _call_mcp_raw(mcps: list[MCPClient], action) -> dict:
     return result_dict
 
 
+def _collect_playbook_servers(memory: Memory) -> list:
+    """Collect unique MCP servers contributed by loaded playbooks."""
+    extra_servers = []
+    for mcp_config in memory.get_playbook_mcp_tools():
+        for server in mcp_config.servers:
+            if server not in extra_servers:
+                extra_servers.append(server)
+                logger.warning(
+                    'Added playbook MCP server: %s (%s)', server.name, server.type
+                )
+    return extra_servers
+
+
+def _apply_reserved_tool_names(
+    agent: Agent, updated_mcp_config: MCPConfig | None
+) -> frozenset[str]:
+    from backend.engine.tool_registry import _extract_tool_names
+
+    reserved = frozenset(_extract_tool_names(agent.tools))
+    if updated_mcp_config is not None:
+        updated_mcp_config.mcp_exposed_name_reserved = reserved
+    return reserved
+
+
+async def _fetch_mcp_tools_for_runtime(
+    updated_mcp_config: MCPConfig,
+    runtime: Runtime,
+    reserved: frozenset[str],
+) -> list:
+    from backend.integrations.mcp.mcp_bootstrap_status import (
+        reset_mcp_bootstrap_status,
+    )
+
+    reset_mcp_bootstrap_status()
+    mcp_tools = await fetch_mcp_tools_from_config(
+        updated_mcp_config,
+        use_stdio=isinstance(runtime, LocalRuntimeInProcess),
+        reserved_tool_names=reserved,
+    )
+    tool_names = [tool['function']['name'] for tool in mcp_tools]
+    logger.info('Loaded %s MCP tools: %s', len(mcp_tools), tool_names)
+    return mcp_tools
+
+
+def _collect_exposed_server_names(runtime: Runtime) -> dict[str, str]:
+    names: dict[str, str] = {}
+    for client in getattr(runtime, '_mcp_clients', None) or []:
+        srv_cfg = getattr(client, '_server_config', None)
+        srv_name = (getattr(srv_cfg, 'name', None) or '').strip()
+        if not srv_name:
+            continue
+        exposed_map = getattr(client, 'exposed_to_protocol', {}) or {}
+        for exposed_name in exposed_map.keys():
+            names[exposed_name] = srv_name
+    return names
+
+
+def _drop_removed_exposed_tools(names: dict[str, str], agent: Agent) -> None:
+    current_exposed = set(agent.mcp_tools.keys())
+    for exposed_name in list(names.keys()):
+        if exposed_name not in current_exposed:
+            names.pop(exposed_name, None)
+
+
+def _rebuild_prompt_mcp_server_map(agent: Agent, runtime: Runtime) -> None:
+    pm = getattr(agent, '_prompt_manager', None)
+    if pm is None or not hasattr(pm, 'mcp_tool_server_map'):
+        return
+    new_map = _collect_exposed_server_names(runtime)
+    _drop_removed_exposed_tools(new_map, agent)
+    pm.mcp_tool_server_map = new_map
+
+
+def _log_mcp_tool_diff(diff: dict[str, list[str]]) -> None:
+    if diff.get('removed'):
+        logger.info('MCP tools removed mid-session: %s', diff['removed'])
+    if diff.get('added'):
+        logger.info('MCP tools added mid-session: %s', diff['added'])
+
+
 async def add_mcp_tools_to_agent(
     agent: Agent, runtime: Runtime, memory: Memory
 ) -> tuple[MCPConfig | None, dict[str, list[str]]]:
@@ -1101,67 +1222,14 @@ async def add_mcp_tools_to_agent(
     assert runtime.runtime_initialized, (
         'Runtime must be initialized before adding MCP tools'
     )
-    extra_servers = []
-    playbook_mcp_configs = memory.get_playbook_mcp_tools()
-    for mcp_config in playbook_mcp_configs:
-        for server in mcp_config.servers:
-            if server not in extra_servers:
-                extra_servers.append(server)
-                logger.warning(
-                    'Added playbook MCP server: %s (%s)', server.name, server.type
-                )
-
+    extra_servers = _collect_playbook_servers(memory)
     updated_mcp_config = runtime.get_mcp_config(extra_servers)
-
-    from backend.engine.tool_registry import _extract_tool_names
-
-    reserved = frozenset(_extract_tool_names(agent.tools))
-    if updated_mcp_config is not None:
-        updated_mcp_config.mcp_exposed_name_reserved = reserved
-
-    # Reset the bootstrap status before re-fetching so any TUI widget
-    # reading ``get_mcp_bootstrap_status()`` between the call and the
-    # fetch sees a stale-but-not-leaked snapshot from the previous
-    # connection. ``fetch_mcp_tools_from_config`` re-sets it.
-    from backend.integrations.mcp.mcp_bootstrap_status import (
-        reset_mcp_bootstrap_status,
+    reserved = _apply_reserved_tool_names(agent, updated_mcp_config)
+    mcp_tools = await _fetch_mcp_tools_for_runtime(
+        updated_mcp_config, runtime, reserved
     )
-
-    reset_mcp_bootstrap_status()
-
-    mcp_tools = await fetch_mcp_tools_from_config(
-        updated_mcp_config,
-        use_stdio=isinstance(runtime, LocalRuntimeInProcess),
-        reserved_tool_names=reserved,
-    )
-    tool_names = [tool['function']['name'] for tool in mcp_tools]
-    logger.info('Loaded %s MCP tools: %s', len(mcp_tools), tool_names)
     diff = agent.set_mcp_tools(mcp_tools)
     agent.mcp_capability_status = get_mcp_bootstrap_status()
-
-    # Rebuild the prompt manager's exposed-name → server map so the
-    # renderer can hide any tool from a native server (context7, exa,
-    # fetch) regardless of how the alias preparer renamed the tool.
-    pm = getattr(agent, '_prompt_manager', None)
-    if pm is not None and hasattr(pm, 'mcp_tool_server_map'):
-        new_map: dict[str, str] = {}
-        for client in getattr(runtime, '_mcp_clients', None) or []:
-            srv_cfg = getattr(client, '_server_config', None)
-            srv_name = (getattr(srv_cfg, 'name', None) or '').strip()
-            if not srv_name:
-                continue
-            exposed_map = getattr(client, 'exposed_to_protocol', {}) or {}
-            for exposed_name in exposed_map.keys():
-                new_map[exposed_name] = srv_name
-        # Drop entries for tools that are no longer in the agent's set.
-        current_exposed = set(agent.mcp_tools.keys())
-        for exposed_name in list(new_map.keys()):
-            if exposed_name not in current_exposed:
-                new_map.pop(exposed_name, None)
-        pm.mcp_tool_server_map = new_map
-
-    if diff.get('removed'):
-        logger.info('MCP tools removed mid-session: %s', diff['removed'])
-    if diff.get('added'):
-        logger.info('MCP tools added mid-session: %s', diff['added'])
+    _rebuild_prompt_mcp_server_map(agent, runtime)
+    _log_mcp_tool_diff(diff)
     return updated_mcp_config, diff

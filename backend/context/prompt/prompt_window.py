@@ -281,28 +281,40 @@ def _enforce_max_event_count(
     if len(selected) <= max_events:
         return selected
     protected_ids = _event_id_set(protected)
-    required_ids: set[int] = set()
-    if min_tool_loops > 0:
-        chunks = _non_protected_chunks(all_events, protected_ids)
-        if len(chunks) >= min_tool_loops:
-            required_ids = _required_tail_ids(chunks, min_tool_loops)
+    required_ids = _required_event_ids(all_events, protected_ids, min_tool_loops)
     keep_ids = protected_ids | required_ids
     protected_events = [event for event in selected if id(event) in keep_ids]
     removable = [event for event in selected if id(event) not in keep_ids]
     if len(protected_events) >= max_events:
         return selected
     slots = max_events - len(protected_events)
+    kept_removable = _keep_recent_chunks(removable, slots)
+    return _dedupe_events_preserve_order(protected_events + kept_removable)
+
+
+def _required_event_ids(
+    all_events: list[Event],
+    protected_ids: set[int],
+    min_tool_loops: int,
+) -> set[int]:
+    if min_tool_loops <= 0:
+        return set()
+    chunks = _non_protected_chunks(all_events, protected_ids)
+    if len(chunks) < min_tool_loops:
+        return set()
+    return _required_tail_ids(chunks, min_tool_loops)
+
+
+def _keep_recent_chunks(removable: list[Event], slots: int) -> list[Event]:
     # Drop at causal-chunk granularity to preserve tool_call/tool_result pairs.
-    removable_chunks = _causal_chunks(removable)
     kept_chunks: list[list[Event]] = []
     total = 0
-    for chunk in reversed(removable_chunks):
+    for chunk in reversed(_causal_chunks(removable)):
         if total + len(chunk) > slots:
             break
         kept_chunks.insert(0, chunk)
         total += len(chunk)
-    kept_removable = [e for chunk in kept_chunks for e in chunk]
-    return _dedupe_events_preserve_order(protected_events + kept_removable)
+    return [e for chunk in kept_chunks for e in chunk]
 
 
 def _build_windowed_result(ctx, protected, selected_chunks, llm_config):
@@ -733,17 +745,34 @@ def _is_test_observation(event: Event) -> bool:
 
 
 def _collect_operational_anchor_events(events: list[Event], seen_ids: set[int]):
+    latest_task_tracker, latest_test, file_mutations = _find_operational_anchors(events)
     anchors: list[Event] = []
+    for event in [latest_task_tracker, latest_test, *reversed(file_mutations)]:
+        _add_key_event(anchors, seen_ids, event)
+    return anchors
+
+
+def _is_task_tracker_anchor(
+    event: Event,
+    name: str,
+    latest_task_tracker: Event | None,
+) -> bool:
+    return (
+        latest_task_tracker is None
+        and name in ('TaskTrackingAction', 'TaskTrackingObservation')
+        and _has_task_plan(event)
+    )
+
+
+def _find_operational_anchors(
+    events: list[Event],
+) -> tuple[Event | None, Event | None, list[Event]]:
     latest_task_tracker: Event | None = None
     latest_test: Event | None = None
     file_mutations: list[Event] = []
     for event in reversed(events):
         name = _event_type_name(event)
-        if (
-            latest_task_tracker is None
-            and name in ('TaskTrackingAction', 'TaskTrackingObservation')
-            and _has_task_plan(event)
-        ):
+        if _is_task_tracker_anchor(event, name, latest_task_tracker):
             latest_task_tracker = event
         if latest_test is None and _is_test_observation(event):
             latest_test = event
@@ -751,9 +780,7 @@ def _collect_operational_anchor_events(events: list[Event], seen_ids: set[int]):
             file_mutations.append(event)
         if latest_task_tracker and latest_test and len(file_mutations) >= 8:
             break
-    for event in [latest_task_tracker, latest_test, *reversed(file_mutations)]:
-        _add_key_event(anchors, seen_ids, event)
-    return anchors
+    return latest_task_tracker, latest_test, file_mutations
 
 
 def _protected_summary_events(events: list[Event]) -> list[Event]:
@@ -1195,43 +1222,23 @@ def _event_payload_text(event: Event) -> str:
         )
 
 
-def _event_prompt_payload_text(event: Event) -> str:
-    parts: list[str] = []
-    event_id = getattr(event, 'id', None)
-    if event_id is not None:
-        parts.append(f'{type(event).__name__} id={event_id}')
-    else:
-        parts.append(type(event).__name__)
+_PROMPT_PAYLOAD_ATTRS = (
+    'message',
+    'content',
+    'thought',
+    'command',
+    'path',
+    'query',
+    'code',
+    'task_list',
+    'tool_result',
+)
 
-    for attr in (
-        'message',
-        'content',
-        'thought',
-        'command',
-        'path',
-        'query',
-        'code',
-        'task_list',
-        'tool_result',
-    ):
-        try:
-            value = getattr(event, attr, None)
-        except Exception:
-            continue
-        if callable(value):
-            try:
-                value = value()
-            except Exception:
-                value = None
-        if value is None:
-            continue
-        if isinstance(value, str):
-            text = value.strip()
-        else:
-            try:
-                text = json.dumps(value, default=str, sort_keys=True)
-            except Exception:
-                text = str(value)
+
+def _event_prompt_payload_text(event: Event) -> str:
+    parts: list[str] = [_event_payload_header(event)]
+    for attr in _PROMPT_PAYLOAD_ATTRS:
+        text = _prompt_payload_attr_text(event, attr)
         if text and text not in parts:
             parts.append(text)
 
@@ -1240,6 +1247,33 @@ def _event_prompt_payload_text(event: Event) -> str:
         if fallback:
             parts.append(fallback)
     return '\n'.join(parts)
+
+
+def _event_payload_header(event: Event) -> str:
+    event_id = getattr(event, 'id', None)
+    if event_id is not None:
+        return f'{type(event).__name__} id={event_id}'
+    return type(event).__name__
+
+
+def _prompt_payload_attr_text(event: Event, attr: str) -> str | None:
+    try:
+        value = getattr(event, attr, None)
+    except Exception:
+        return None
+    if callable(value):
+        try:
+            value = value()
+        except Exception:
+            value = None
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value.strip()
+    try:
+        return json.dumps(value, default=str, sort_keys=True)
+    except Exception:
+        return str(value)
 
 
 def _result(

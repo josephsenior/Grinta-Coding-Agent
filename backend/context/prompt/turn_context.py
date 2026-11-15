@@ -57,6 +57,37 @@ def _prepend_context(message: dict[str, Any], context: str) -> dict[str, Any]:
     return merged
 
 
+def _is_stable_system_message(role: object, text: str, leading: bool) -> bool:
+    return leading and role == 'system' and not is_turn_context_text(text)
+
+
+def _append_provider_system_context(
+    message: dict[str, Any],
+    text: str,
+    pending_context: list[str],
+) -> bool:
+    if message.get('role') != 'system':
+        return False
+    if text:
+        pending_context.append(wrap_turn_context(text, kind='provider-system'))
+    return True
+
+
+def _append_message_with_pending_context(
+    message: dict[str, Any],
+    pending_context: list[str],
+    body: list[dict[str, Any]],
+) -> None:
+    if pending_context:
+        context = '\n\n'.join(pending_context)
+        pending_context.clear()
+        if message.get('role') == 'user':
+            body.append(_prepend_context(message, context))
+            return
+        body.append({'role': 'user', 'content': context})
+    body.append(message)
+
+
 def split_stable_system_prefix(
     messages: list[dict[str, Any]],
 ) -> tuple[list[str], list[dict[str, Any]]]:
@@ -77,25 +108,16 @@ def split_stable_system_prefix(
             continue
         role = message.get('role')
         text = _content_to_text(message.get('content')).strip()
-        if leading and role == 'system' and not is_turn_context_text(text):
+        if _is_stable_system_message(role, text, leading):
             if text:
                 stable_system.append(text)
             continue
 
         leading = False
-        if role == 'system':
-            if text:
-                pending_context.append(wrap_turn_context(text, kind='provider-system'))
+        if _append_provider_system_context(message, text, pending_context):
             continue
 
-        if pending_context:
-            context = '\n\n'.join(pending_context)
-            pending_context.clear()
-            if role == 'user':
-                body.append(_prepend_context(message, context))
-                continue
-            body.append({'role': 'user', 'content': context})
-        body.append(message)
+        _append_message_with_pending_context(message, pending_context, body)
 
     if pending_context:
         body.append({'role': 'user', 'content': '\n\n'.join(pending_context)})

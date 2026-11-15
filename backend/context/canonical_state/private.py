@@ -265,32 +265,54 @@ def _merge_acceptance_criteria(
     event_id: int | None,
     source: str,
 ) -> None:
-    raw = snapshot.get('acceptance_criteria')
-    criteria_event_id = event_id
-    items: list[dict[str, Any]] = []
-    if isinstance(raw, dict):
-        criteria_event_id = raw.get('event_id')
-        if not isinstance(criteria_event_id, int):
-            criteria_event_id = event_id
-        raw_items = raw.get('criteria')
-        if isinstance(raw_items, list):
-            items = [item for item in raw_items if isinstance(item, dict)]
-    if not items:
-        try:
-            from backend.core.criteria.acceptance_criteria_store import (
-                AcceptanceCriteriaStore,
-            )
-
-            items = AcceptanceCriteriaStore().load_from_file()
-            source = 'persisted_store'
-        except Exception:
-            items = []
-
+    criteria_event_id, items, source = _acceptance_criteria_inputs(
+        snapshot, event_id, source
+    )
     if not items:
         return
     if not _can_update(canonical, 'acceptance_criteria', criteria_event_id):
         return
+    summaries = _criterion_summaries(items, criteria_event_id)
+    if not summaries:
+        return
+    canonical.acceptance_criteria = summaries
+    _touch_field(canonical, 'acceptance_criteria', criteria_event_id, source)
 
+
+def _acceptance_criteria_inputs(
+    snapshot: dict[str, Any],
+    event_id: int | None,
+    source: str,
+) -> tuple[int | None, list[dict[str, Any]], str]:
+    raw = snapshot.get('acceptance_criteria')
+    criteria_event_id = event_id
+    items: list[dict[str, Any]] = []
+    if isinstance(raw, dict):
+        raw_event_id = raw.get('event_id')
+        criteria_event_id = raw_event_id if isinstance(raw_event_id, int) else event_id
+        raw_items = raw.get('criteria')
+        if isinstance(raw_items, list):
+            items = [item for item in raw_items if isinstance(item, dict)]
+    if items:
+        return criteria_event_id, items, source
+    return criteria_event_id, _load_persisted_criteria(), 'persisted_store'
+
+
+def _load_persisted_criteria() -> list[dict[str, Any]]:
+    try:
+        from backend.core.criteria.acceptance_criteria_store import (
+            AcceptanceCriteriaStore,
+        )
+
+        return AcceptanceCriteriaStore().load_from_file()
+    except Exception:
+        return []
+
+
+def _criterion_summaries(
+    items: list[dict[str, Any]],
+    criteria_event_id: int | None,
+) -> list[CriterionSummary]:
     summaries: list[CriterionSummary] = []
     for item in items[:_MAX_ACCEPTANCE_CRITERIA]:
         assertion = _clean(item.get('assertion'))[:240]
@@ -306,10 +328,7 @@ def _merge_acceptance_criteria(
                 updated_at=_now(),
             )
         )
-    if not summaries:
-        return
-    canonical.acceptance_criteria = summaries
-    _touch_field(canonical, 'acceptance_criteria', criteria_event_id, source)
+    return summaries
 
 
 def _blocked_task_blockers(snapshot: dict[str, Any]) -> list[str]:
@@ -393,12 +412,16 @@ def _next_action_from_task_plan(tasks: list[TaskPlanItem]) -> str:
     return ''
 
 
+def _task_descriptions_by_status(
+    tasks: list[TaskPlanItem], statuses: set[str]
+) -> list[str]:
+    return [task.description for task in tasks if task.status in statuses]
+
+
 def _implementation_checkpoint_from_task_plan(tasks: list[TaskPlanItem]) -> str:
-    done = [task.description for task in tasks if task.status == 'done']
-    current = [
-        task.description for task in tasks if task.status in {'in_progress', 'blocked'}
-    ]
-    remaining = [task.description for task in tasks if task.status == 'todo']
+    done = _task_descriptions_by_status(tasks, {'done'})
+    current = _task_descriptions_by_status(tasks, {'in_progress', 'blocked'})
+    remaining = _task_descriptions_by_status(tasks, {'todo'})
     pieces: list[str] = []
     if done:
         pieces.append('done: ' + ', '.join(done[-5:]))
@@ -411,39 +434,58 @@ def _implementation_checkpoint_from_task_plan(tasks: list[TaskPlanItem]) -> str:
     return ' | '.join(pieces)[:900]
 
 
+def _terminal_observation_finished(event: Event) -> bool:
+    state = str(getattr(event, 'state', '') or '').lower()
+    payload = getattr(event, 'tool_result', {}) or {}
+    execution = payload.get('execution', {}) if isinstance(payload, dict) else {}
+    execution_status = str(execution.get('status', '') or '').lower()
+    content = str(getattr(event, 'content', '') or '').lower()
+    return (
+        execution_status in {'completed', 'failed'}
+        or state in {'done', 'exited', 'finished', 'closed', 'session_wait_exited'}
+        or 'process exited' in content
+        or 'exit code' in content
+    )
+
+
+def _terminal_observation_session_id(event: Event) -> str:
+    if type(event).__name__ != 'TerminalObservation':
+        return ''
+    session_id = str(getattr(event, 'session_id', '')).strip()
+    if not session_id or not _terminal_observation_finished(event):
+        return ''
+    return session_id
+
+
+def _mark_background_tasks_resolved(
+    canonical: CanonicalTaskState,
+    resolved: set[str],
+) -> None:
+    for task in canonical.background_tasks:
+        if task.session_id in resolved:
+            task.outcome_known = True
+
+
 def _resolve_background_tasks_from_events(
     canonical: CanonicalTaskState,
     events: list[Event],
 ) -> None:
-    resolved: set[str] = set()
-    for event in events:
-        if type(event).__name__ != 'TerminalObservation':
-            continue
-        session_id = str(getattr(event, 'session_id', '')).strip()
-        state = str(getattr(event, 'state', '') or '').lower()
-        payload = getattr(event, 'tool_result', {}) or {}
-        execution = payload.get('execution', {}) if isinstance(payload, dict) else {}
-        execution_status = str(execution.get('status', '') or '').lower()
-        content = str(getattr(event, 'content', '') or '').lower()
-        if session_id and (
-            execution_status in {'completed', 'failed'}
-            or state in {'done', 'exited', 'finished', 'closed', 'session_wait_exited'}
-            or 'process exited' in content
-            or 'exit code' in content
-        ):
-            resolved.add(session_id)
-    if resolved:
-        # Keep a compact final execution record. It is deliberately separate
-        # from task-state evidence and no longer blocks subsequent work.
-        for task in canonical.background_tasks:
-            if task.session_id in resolved:
-                task.outcome_known = True
-        _touch_field(
-            canonical,
-            'background_tasks',
-            _latest_event_id(events),
-            'terminal_observation',
-        )
+    resolved = {
+        session_id
+        for event in events
+        if (session_id := _terminal_observation_session_id(event))
+    }
+    if not resolved:
+        return
+    # Keep a compact final execution record. It is deliberately separate
+    # from task-state evidence and no longer blocks subsequent work.
+    _mark_background_tasks_resolved(canonical, resolved)
+    _touch_field(
+        canonical,
+        'background_tasks',
+        _latest_event_id(events),
+        'terminal_observation',
+    )
 
 
 def _merge_recent_work(
@@ -626,19 +668,33 @@ def _update_vcs_status(
                 return
 
 
+def _pending_background_next_action(canonical: CanonicalTaskState) -> str:
+    pending_background = [
+        task for task in canonical.background_tasks if not task.outcome_known
+    ]
+    if not pending_background:
+        return ''
+    task = pending_background[-1]
+    return task.next_action or f'Read background terminal {task.session_id}.'
+
+
+def _failing_verification_next_action(canonical: CanonicalTaskState) -> str:
+    if not canonical.verification.command or canonical.verification.status == 'passed':
+        return ''
+    return f'Use the latest failing output from {canonical.verification.command} to make the next fix.'
+
+
 def _infer_next_action(canonical: CanonicalTaskState) -> str:
     if canonical.task_plan:
         next_action = _next_action_from_task_plan(canonical.task_plan)
         if next_action:
             return next_action
-    pending_background = [
-        task for task in canonical.background_tasks if not task.outcome_known
-    ]
-    if pending_background:
-        task = pending_background[-1]
-        return task.next_action or f'Read background terminal {task.session_id}.'
-    if canonical.verification.command and canonical.verification.status != 'passed':
-        return f'Use the latest failing output from {canonical.verification.command} to make the next fix.'
+    background_action = _pending_background_next_action(canonical)
+    if background_action:
+        return background_action
+    verification_action = _failing_verification_next_action(canonical)
+    if verification_action:
+        return verification_action
     if canonical.superseding_directive:
         return (
             f'Switch to the superseding directive: {canonical.superseding_directive}'[

@@ -109,33 +109,50 @@ def _shrink_observation_batch(
     """Persist or trim observations in *batch* until under budget."""
     if not batch:
         return
-    total = sum(len(content) for _, _, content in batch)
+    total = _batch_content_size(batch)
     if total <= per_message_chars:
-        for idx, event, content in batch:
-            result[idx] = _copy_event_with_content(event, content)
+        _copy_batch_to_result(result, batch)
         return
 
     remaining = list(batch)
     for _, event, content in sorted(
         remaining, key=lambda item: len(item[2]), reverse=True
     ):
-        if sum(len(c) for _, _, c in remaining) <= per_message_chars:
+        if _batch_content_size(remaining) <= per_message_chars:
             break
-        replacement = content
-        if _should_persist_observation(event, content, persist_threshold // 2):
-            try:
-                _, replacement = persist_tool_output(content, event)
-            except OSError:
-                logger.debug('Tool result persistence failed', exc_info=True)
-                replacement = (
-                    content[:2000] + '\n[... output truncated ...]\n' + content[-1000:]
-                )
+        replacement = _shrink_observation_content(event, content, persist_threshold)
         remaining = [
             (idx, ev, replacement if ev is event else cont)
             for idx, ev, cont in remaining
         ]
-    for idx, event, content in remaining:
+    _copy_batch_to_result(result, remaining)
+
+
+def _batch_content_size(batch: list[tuple[int, Event, str]]) -> int:
+    return sum(len(content) for _, _, content in batch)
+
+
+def _copy_batch_to_result(
+    result: list[Event],
+    batch: list[tuple[int, Event, str]],
+) -> None:
+    for idx, event, content in batch:
         result[idx] = _copy_event_with_content(event, content)
+
+
+def _shrink_observation_content(
+    event: Event,
+    content: str,
+    persist_threshold: int,
+) -> str:
+    if not _should_persist_observation(event, content, persist_threshold // 2):
+        return content
+    try:
+        _, replacement = persist_tool_output(content, event)
+        return replacement
+    except OSError:
+        logger.debug('Tool result persistence failed', exc_info=True)
+        return content[:2000] + '\n[... output truncated ...]\n' + content[-1000:]
 
 
 def _get_replacement_map(state: object | None) -> dict[str, str]:

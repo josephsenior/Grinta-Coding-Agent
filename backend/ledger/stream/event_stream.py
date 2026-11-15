@@ -376,6 +376,42 @@ class EventStream(EventStore):
         except Exception as exc:  # pragma: no cover - defensive: already-closed path
             logger.debug('EventStore close raised during teardown: %s', exc)
 
+    def _release_session_lock(self) -> None:
+        if self._session_lock_handle is None:
+            return
+        try:
+            if not OS_CAPS.is_windows:
+                import fcntl  # type: ignore[import-not-found]
+
+                fcntl.flock(  # type: ignore[attr-defined]
+                    self._session_lock_handle.fileno(),
+                    fcntl.LOCK_UN,  # type: ignore[attr-defined]
+                )
+            else:
+                import msvcrt  # type: ignore[import-not-found]
+
+                try:
+                    self._session_lock_handle.seek(0)
+                    msvcrt.locking(  # type: ignore[attr-defined]
+                        self._session_lock_handle.fileno(),
+                        msvcrt.LK_UNLCK,  # type: ignore[attr-defined]
+                        1,
+                    )
+                except OSError:
+                    pass
+            self._session_lock_handle.close()
+        except Exception:
+            pass
+        self._session_lock_handle = None
+
+    def _remove_session_lock_file(self) -> None:
+        if not self._session_lock_path:
+            return
+        try:
+            os.unlink(self._session_lock_path)
+        except OSError:
+            pass
+
     def close(self) -> None:
         """Close event stream, stopping queue processing and cleaning up subscribers.
 
@@ -399,36 +435,8 @@ class EventStream(EventStore):
         with self._lock:
             self._subscribers.clear()
             self._activity_listeners.clear()
-        if self._session_lock_handle is not None:
-            try:
-                if not OS_CAPS.is_windows:
-                    import fcntl  # type: ignore[import-not-found]
-
-                    fcntl.flock(  # type: ignore[attr-defined]
-                        self._session_lock_handle.fileno(),
-                        fcntl.LOCK_UN,  # type: ignore[attr-defined]
-                    )
-                else:
-                    import msvcrt  # type: ignore[import-not-found]
-
-                    try:
-                        self._session_lock_handle.seek(0)
-                        msvcrt.locking(  # type: ignore[attr-defined]
-                            self._session_lock_handle.fileno(),
-                            msvcrt.LK_UNLCK,  # type: ignore[attr-defined]
-                            1,
-                        )
-                    except OSError:
-                        pass
-                self._session_lock_handle.close()
-            except Exception:
-                pass
-            self._session_lock_handle = None
-        if self._session_lock_path:
-            try:
-                os.unlink(self._session_lock_path)
-            except OSError:
-                pass
+        self._release_session_lock()
+        self._remove_session_lock_file()
         self._close_persist_and_super()
 
     def get_backpressure_snapshot(self) -> dict[str, int]:
@@ -1088,6 +1096,43 @@ class EventStream(EventStore):
             return
         await self._bp.enqueue_event(event, self._async_queue)
 
+    def _cancel_shutdown_workers(self) -> None:
+        for worker in list(self._workers):
+            try:
+                worker.cancel()
+            except Exception:
+                pass
+
+    async def _deliver_shutdown_event(
+        self,
+        event: Any,
+        remaining: float,
+    ) -> None:
+        if remaining <= 0 or event is self._stop_sentinel:
+            return
+        try:
+            if isinstance(event, Event):
+                await asyncio.wait_for(
+                    self._dispatch_event(event),
+                    timeout=remaining,
+                )
+        except (asyncio.TimeoutError, Exception):
+            pass
+
+    async def _deliver_queued_events(self) -> None:
+        if not self._async_queue:
+            return
+        deliver_deadline = asyncio.get_event_loop().time() + 2.0
+        while True:
+            try:
+                event = self._async_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+            else:
+                remaining = deliver_deadline - asyncio.get_event_loop().time()
+                await self._deliver_shutdown_event(event, remaining)
+                self._async_queue.task_done()
+
     async def _initiate_shutdown(self) -> None:
         """Best-effort shutdown of queue loop.
 
@@ -1099,34 +1144,11 @@ class EventStream(EventStore):
             return
 
         # Cancel workers so they promptly unwind.
-        for worker in list(self._workers):
-            try:
-                worker.cancel()
-            except Exception:
-                pass
+        self._cancel_shutdown_workers()
 
         # Best-effort delivery of remaining queued events with a short timeout.
         # This prevents event loss during clean shutdown while avoiding deadlock
         # if subscribers are stalled.
-        if self._async_queue:
-            deliver_deadline = asyncio.get_event_loop().time() + 2.0
-            while True:
-                try:
-                    event = self._async_queue.get_nowait()
-                except asyncio.QueueEmpty:
-                    break
-                else:
-                    # Attempt delivery with remaining budget.
-                    remaining = deliver_deadline - asyncio.get_event_loop().time()
-                    if remaining > 0 and event is not self._stop_sentinel:
-                        try:
-                            if isinstance(event, Event):
-                                await asyncio.wait_for(
-                                    self._dispatch_event(event),
-                                    timeout=remaining,
-                                )
-                        except (asyncio.TimeoutError, Exception):
-                            pass
-                    self._async_queue.task_done()
+        await self._deliver_queued_events()
 
         self._stop_event.set()

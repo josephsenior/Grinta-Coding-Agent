@@ -30,19 +30,25 @@ def _tail_lines(text: str, n: int = 8) -> str:
     return '\n'.join(lines[-n:]) if lines else ''
 
 
+def _search_tail_or_body(
+    pattern: re.Pattern[str], tail: str, body: str
+) -> re.Match[str] | None:
+    return pattern.search(tail) or pattern.search(body)
+
+
 def detect_shell_stall_reason(content: str, command: str = '') -> str | None:
     """Return a short agent-directed explanation for a stalled/detached command."""
     body = content or ''
     tail = _tail_lines(body, 8)
     cmd = (command or '').strip()
 
-    if _SUDO_PASSWORD_RE.search(tail) or _SUDO_PASSWORD_RE.search(body):
+    if _search_tail_or_body(_SUDO_PASSWORD_RE, tail, body):
         return (
             'Terminal output shows a sudo password prompt. Grinta cannot supply '
             'your password. Ask the user to run this elevated step, use sudo -n '
             'to fail fast without prompting, or avoid sudo.'
         )
-    if _DPKG_APT_LOCK_RE.search(tail) or _DPKG_APT_LOCK_RE.search(body):
+    if _search_tail_or_body(_DPKG_APT_LOCK_RE, tail, body):
         return (
             'Package manager lock detected (dpkg/apt). Another install may be '
             'running, or a stale lock remains. Poll with terminal_read or check '

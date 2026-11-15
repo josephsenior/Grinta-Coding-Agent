@@ -243,6 +243,98 @@ class RetryService:
             EventSource.ENVIRONMENT,
         )
 
+    def _ensure_retry_worker(self, queue: RetryQueue) -> None:
+        if self._retry_worker_task and not self._retry_worker_task.done():
+            return
+        self._retry_queue = queue
+        self.initialize()
+
+    def _handle_retry_exhaustion(
+        self,
+        controller: SessionOrchestrator,
+        exc: Exception,
+        next_attempt: int,
+        max_retries: int,
+    ) -> bool:
+        if next_attempt <= max_retries:
+            return False
+        logger.warning(
+            'Autonomous recovery exhausted for controller %s (%d/%d)',
+            controller.id,
+            next_attempt - 1,
+            max_retries,
+        )
+        try:
+            from backend.telemetry.evidence.emitter import emit_control_intervention
+
+            emit_control_intervention(
+                'retry_exhausted',
+                exception=exc,
+                attempt=next_attempt - 1,
+                strategy='queued_retry',
+                outcome='exhausted',
+            )
+        except Exception:
+            logger.debug('Retry exhaustion evidence failed', exc_info=True)
+        return True
+
+    @staticmethod
+    def _build_retry_metadata(
+        controller: SessionOrchestrator,
+        exc: Exception,
+        tool_telemetry: Any,
+    ) -> dict[str, Any]:
+        metadata: dict[str, Any] = {
+            'error': str(exc),
+            'retry_reason': type(exc).__name__,
+        }
+        pending_svc = getattr(
+            getattr(controller, 'services', None), 'pending_action', None
+        )
+        pending = pending_svc.get_primary() if pending_svc is not None else None
+        if pending is None:
+            pending = getattr(controller, '_pending_action', None)
+        if pending is not None:
+            metadata['pending_action'] = tool_telemetry.action_to_dict(pending)
+        return metadata
+
+    @staticmethod
+    def _retry_status_extras(
+        exc: Exception,
+        next_attempt: int,
+        task: RetryTask,
+        initial_delay: float,
+    ) -> dict[str, Any]:
+        return {
+            'attempt': next_attempt,
+            'max_attempts': task.max_attempts,
+            'delay_seconds': initial_delay,
+            'reason': type(exc).__name__,
+            'rate_limit_kind': getattr(getattr(exc, 'kind', None), 'value', None),
+            'retry_after': getattr(exc, 'retry_after', None),
+            'provider': getattr(exc, 'llm_provider', None),
+        }
+
+    @staticmethod
+    def _emit_retry_scheduled_evidence(
+        exc: Exception,
+        next_attempt: int,
+        initial_delay: float,
+    ) -> None:
+        try:
+            from backend.telemetry.evidence.emitter import emit_control_intervention
+
+            emit_control_intervention(
+                'retry_scheduled',
+                exception=exc,
+                attempt=next_attempt,
+                delay_ms=int(initial_delay * 1000),
+                strategy='queued_retry',
+                outcome='scheduled',
+            )
+        except Exception:
+            logger.debug('Retry scheduling evidence failed', exc_info=True)
+
     async def schedule_retry_after_failure(self, exc: Exception) -> bool:
         """Schedule an automatic retry for transient failures."""
         from backend.orchestration.telemetry.tool_telemetry import ToolTelemetry
@@ -256,48 +348,17 @@ class RetryService:
             logger.debug('Retry already pending for controller %s', controller.id)
             return True
 
-        if not self._retry_worker_task or self._retry_worker_task.done():
-            self._retry_queue = queue
-            self.initialize()
+        self._ensure_retry_worker(queue)
 
         max_retries = max(1, int(getattr(queue, 'max_retries', 3)))
         # Keep retry attempts monotonic across queue-task IDs for the same
         # recovery episode. This prevents repeated "retry 1/N" loops when each
         # resumed step fails quickly and schedules a fresh queue task.
         next_attempt = self.increment_retry_count()
-        if next_attempt > max_retries:
-            logger.warning(
-                'Autonomous recovery exhausted for controller %s (%d/%d)',
-                controller.id,
-                next_attempt - 1,
-                max_retries,
-            )
-            try:
-                from backend.telemetry.evidence.emitter import emit_control_intervention
-
-                emit_control_intervention(
-                    'retry_exhausted',
-                    exception=exc,
-                    attempt=next_attempt - 1,
-                    strategy='queued_retry',
-                    outcome='exhausted',
-                )
-            except Exception:
-                logger.debug('Retry exhaustion evidence failed', exc_info=True)
+        if self._handle_retry_exhaustion(controller, exc, next_attempt, max_retries):
             return False
 
-        metadata: dict[str, Any] = {
-            'error': str(exc),
-            'retry_reason': type(exc).__name__,
-        }
-        pending_svc = getattr(
-            getattr(controller, 'services', None), 'pending_action', None
-        )
-        pending = pending_svc.get_primary() if pending_svc is not None else None
-        if pending is None:
-            pending = getattr(controller, '_pending_action', None)
-        if pending is not None:
-            metadata['pending_action'] = ToolTelemetry.action_to_dict(pending)
+        metadata = self._build_retry_metadata(controller, exc, ToolTelemetry)
         initial_delay = self._compute_initial_delay(
             exc, queue, attempt=next_attempt - 1
         )
@@ -323,29 +384,9 @@ class RetryService:
         self._emit_retry_status(
             status_type='retry_pending',
             content='',
-            extras={
-                'attempt': next_attempt,
-                'max_attempts': task.max_attempts,
-                'delay_seconds': initial_delay,
-                'reason': type(exc).__name__,
-                'rate_limit_kind': getattr(getattr(exc, 'kind', None), 'value', None),
-                'retry_after': getattr(exc, 'retry_after', None),
-                'provider': getattr(exc, 'llm_provider', None),
-            },
+            extras=self._retry_status_extras(exc, next_attempt, task, initial_delay),
         )
-        try:
-            from backend.telemetry.evidence.emitter import emit_control_intervention
-
-            emit_control_intervention(
-                'retry_scheduled',
-                exception=exc,
-                attempt=next_attempt,
-                delay_ms=int(initial_delay * 1000),
-                strategy='queued_retry',
-                outcome='scheduled',
-            )
-        except Exception:
-            logger.debug('Retry scheduling evidence failed', exc_info=True)
+        self._emit_retry_scheduled_evidence(exc, next_attempt, initial_delay)
         logger.warning(
             'Scheduled retry task %s for controller %s due to %s (delay=%.1fs)',
             task.id,

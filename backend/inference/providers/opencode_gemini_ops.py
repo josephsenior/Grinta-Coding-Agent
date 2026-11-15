@@ -49,6 +49,28 @@ def _messages_to_gemini_contents(
     return ('\n\n'.join(system_parts) or None, contents)
 
 
+def _candidate_text_parts(data: dict[str, Any]) -> list[str]:
+    text_parts: list[str] = []
+    for candidate in data.get('candidates') or []:
+        content = candidate.get('content') if isinstance(candidate, dict) else None
+        if not isinstance(content, dict):
+            continue
+        for part in content.get('parts') or []:
+            if isinstance(part, dict) and isinstance(part.get('text'), str):
+                text_parts.append(part['text'])
+    return text_parts
+
+
+def _usage_counts(data: dict[str, Any]) -> tuple[int, int, int]:
+    usage_meta = data.get('usageMetadata')
+    if not isinstance(usage_meta, dict):
+        usage_meta = {}
+    prompt = int(usage_meta.get('promptTokenCount') or 0)
+    completion = int(usage_meta.get('candidatesTokenCount') or 0)
+    total = int(usage_meta.get('totalTokenCount') or prompt + completion)
+    return prompt, completion, total
+
+
 class OpenCodeGeminiClient(DirectLLMClient):
     """Call OpenCode Zen Gemini-native ``models/{model}:generateContent`` endpoints."""
 
@@ -103,22 +125,8 @@ class OpenCodeGeminiClient(DirectLLMClient):
 
     @staticmethod
     def _parse_response(data: dict[str, Any], model_name: str) -> LLMResponse:
-        text_parts: list[str] = []
-        for candidate in data.get('candidates') or []:
-            content = candidate.get('content') if isinstance(candidate, dict) else None
-            if not isinstance(content, dict):
-                continue
-            for part in content.get('parts') or []:
-                if isinstance(part, dict) and isinstance(part.get('text'), str):
-                    text_parts.append(part['text'])
-        usage_meta = (
-            data.get('usageMetadata')
-            if isinstance(data.get('usageMetadata'), dict)
-            else {}
-        )
-        prompt = int(usage_meta.get('promptTokenCount') or 0)
-        completion = int(usage_meta.get('candidatesTokenCount') or 0)
-        total = int(usage_meta.get('totalTokenCount') or prompt + completion)
+        text_parts = _candidate_text_parts(data)
+        prompt, completion, total = _usage_counts(data)
         return LLMResponse(
             content='\n'.join(text_parts),
             model=model_name,

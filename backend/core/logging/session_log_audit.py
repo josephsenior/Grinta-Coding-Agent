@@ -222,10 +222,9 @@ def _process_event(
     _record_issue(event, level, payload, model, record, line_no, acc)
 
 
-def _compute_verdict(acc: _AuditAccumulator) -> tuple[str, list[str]]:
+def _end_state_verdict(acc: _AuditAccumulator) -> tuple[str, list[str]]:
     verdict = 'CLEAN'
     notes: list[str] = []
-
     if acc.end_state == 'FINISHED':
         notes.append('Session ended in FINISHED (success).')
     elif acc.end_state == 'AWAITING_USER_INPUT':
@@ -233,6 +232,22 @@ def _compute_verdict(acc: _AuditAccumulator) -> tuple[str, list[str]]:
     elif acc.end_state in {'ERROR', 'STOPPED'}:
         verdict = 'ISSUES FOUND'
         notes.append(f'Session ended in {acc.end_state}.')
+    return verdict, notes
+
+
+def _level_verdict(acc: _AuditAccumulator) -> tuple[str, list[str]]:
+    err_count = acc.levels.get('ERROR', 0) + acc.levels.get('CRITICAL', 0)
+    if err_count:
+        return 'ISSUES FOUND', [f'{err_count} ERROR/CRITICAL event(s).']
+    if acc.levels.get('WARNING', 0) > 5:
+        return 'REVIEW', [
+            f'{acc.levels.get("WARNING", 0)} WARNING(s) — worth scanning.'
+        ]
+    return 'CLEAN', []
+
+
+def _compute_verdict(acc: _AuditAccumulator) -> tuple[str, list[str]]:
+    verdict, notes = _end_state_verdict(acc)
 
     if acc.pending_timeouts:
         verdict = 'ISSUES FOUND'
@@ -245,13 +260,10 @@ def _compute_verdict(acc: _AuditAccumulator) -> tuple[str, list[str]]:
         verdict = 'ISSUES FOUND'
         notes.append(f'{len(suspicious)} error/stop state transition(s).')
 
-    err_count = acc.levels.get('ERROR', 0) + acc.levels.get('CRITICAL', 0)
-    if err_count:
-        verdict = 'ISSUES FOUND'
-        notes.append(f'{err_count} ERROR/CRITICAL event(s).')
-    elif acc.levels.get('WARNING', 0) > 5:
-        verdict = 'REVIEW'
-        notes.append(f'{acc.levels.get("WARNING", 0)} WARNING(s) — worth scanning.')
+    level_verdict, level_notes = _level_verdict(acc)
+    if level_verdict != 'CLEAN':
+        verdict = level_verdict
+        notes.extend(level_notes)
 
     if acc.compaction_fallbacks:
         if verdict == 'CLEAN':
@@ -469,9 +481,8 @@ def _write_metadata_breakdowns_to_lines(
     lines.append('')
 
 
-def load_session_events(log_path: Path) -> list[dict[str, Any]]:
-    events: list[dict[str, Any]] = []
-    rotated_paths = sorted(
+def _rotated_session_log_paths(log_path: Path) -> list[Path]:
+    return sorted(
         (
             path
             for path in log_path.parent.glob(f'{log_path.name}.*')
@@ -480,23 +491,33 @@ def load_session_events(log_path: Path) -> list[dict[str, Any]]:
         key=lambda path: int(path.name.rsplit('.', 1)[-1]),
         reverse=True,
     )
-    paths = [*rotated_paths, log_path]
+
+
+def _read_session_events(path: Path) -> list[dict[str, Any]]:
+    events: list[dict[str, Any]] = []
+    with path.open(encoding='utf-8', errors='replace') as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(obj, dict):
+                events.append(obj)
+    return events
+
+
+def load_session_events(log_path: Path) -> list[dict[str, Any]]:
+    events: list[dict[str, Any]] = []
+    paths = [*_rotated_session_log_paths(log_path), log_path]
     if not any(path.is_file() for path in paths):
         return events
     for path in paths:
         if not path.is_file():
             continue
-        with path.open(encoding='utf-8', errors='replace') as handle:
-            for line in handle:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    obj = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if isinstance(obj, dict):
-                    events.append(obj)
+        events.extend(_read_session_events(path))
     return events
 
 
@@ -541,6 +562,29 @@ def analyze_session(
     )
 
 
+def _evidence_duration_text(run: dict[str, Any]) -> str:
+    duration = run.get('duration_ms')
+    return 'not recorded' if duration is None else f'{int(duration) // 1000}s'
+
+
+def _evidence_validator_text(completion: dict[str, Any]) -> str:
+    validator = completion.get('completion_validator') or {}
+    if not isinstance(validator, dict):
+        return 'not run'
+    if validator.get('enabled') is False:
+        return 'disabled (advisory)'
+    if validator.get('passed') is not None:
+        return f'{"PASS" if validator["passed"] else "FAIL"} (advisory)'
+    return 'not run'
+
+
+def _evidence_last_test_text(verification: dict[str, Any]) -> str:
+    last_test = verification.get('last_test_exit_code')
+    if last_test is None:
+        return 'not recorded'
+    return 'PASS' if last_test == 0 else f'FAIL ({last_test})'
+
+
 def _write_execution_evidence_section(summary: dict[str, Any] | None) -> str:
     if not isinstance(summary, dict):
         return ''
@@ -550,21 +594,9 @@ def _write_execution_evidence_section(summary: dict[str, Any] | None) -> str:
     reliability = summary.get('reliability', {})
     verification = summary.get('verification_activity', {})
     completion = summary.get('completion', {})
-    duration = run.get('duration_ms')
-    duration_text = 'not recorded' if duration is None else f'{int(duration) // 1000}s'
-    validator = completion.get('completion_validator') or {}
-    validator_text = 'not run'
-    if isinstance(validator, dict):
-        if validator.get('enabled') is False:
-            validator_text = 'disabled (advisory)'
-        elif validator.get('passed') is not None:
-            validator_text = f'{"PASS" if validator["passed"] else "FAIL"} (advisory)'
-    last_test = verification.get('last_test_exit_code')
-    last_test_text = (
-        'not recorded'
-        if last_test is None
-        else ('PASS' if last_test == 0 else f'FAIL ({last_test})')
-    )
+    duration_text = _evidence_duration_text(run)
+    validator_text = _evidence_validator_text(completion)
+    last_test_text = _evidence_last_test_text(verification)
     return (
         '\n\nEXECUTION EVIDENCE\n==================\n\n'
         f'Duration:                  {duration_text}\n'

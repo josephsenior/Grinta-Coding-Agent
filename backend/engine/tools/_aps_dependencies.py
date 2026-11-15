@@ -48,6 +48,30 @@ def _module_to_candidate_paths(module: str, root: str) -> list[str]:
     return candidates
 
 
+def _modules_imported_by_node(node: ast.AST) -> list[str]:
+    if isinstance(node, ast.Import):
+        return [alias.name for alias in node.names]
+    if isinstance(node, ast.ImportFrom) and node.module and not node.level:
+        modules = [node.module]
+        modules.extend(f'{node.module}.{alias.name}' for alias in node.names)
+        return modules
+    return []
+
+
+def _append_module_candidates(targets: list[str], module: str, root: str) -> None:
+    for cand in _module_to_candidate_paths(module, root):
+        if cand not in targets:
+            targets.append(cand)
+
+
+def _import_targets(tree: ast.AST, root: str) -> list[str]:
+    targets: list[str] = []
+    for node in ast.walk(tree):
+        for module in _modules_imported_by_node(node):
+            _append_module_candidates(targets, module, root)
+    return targets
+
+
 def _downstream_imports(file_path: str, root: str) -> list[str]:
     """Return workspace-relative paths that ``file_path`` imports (best-effort).
 
@@ -62,19 +86,7 @@ def _downstream_imports(file_path: str, root: str) -> list[str]:
         tree = ast.parse(src)
     except (OSError, SyntaxError, ValueError):
         return []
-    targets: list[str] = []
-    for node in ast.walk(tree):
-        modules: list[str] = []
-        if isinstance(node, ast.Import):
-            modules = [alias.name for alias in node.names]
-        elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
-            modules = [node.module]
-            modules.extend(f'{node.module}.{alias.name}' for alias in node.names)
-        for module in modules:
-            for cand in _module_to_candidate_paths(module, root):
-                if cand not in targets:
-                    targets.append(cand)
-    return targets
+    return _import_targets(tree, root)
 
 
 def _upstream_importers(file_path: str, root: str) -> list[str]:

@@ -58,6 +58,23 @@ def _compact_log_preview(value: object, *, limit: int = 300) -> str:
     return text[: limit - 3].rstrip() + '...'
 
 
+def _is_stale_format_error_event(event: Any, successful_tool_name: str) -> bool:
+    event_type = type(event).__name__
+    if event_type not in (
+        'AgentThinkObservation',
+        'AgentThinkAction',
+        'SystemHintAction',
+    ):
+        return False
+    content = getattr(event, 'content', '') or ''
+    thought = getattr(event, 'thought', '') or ''
+    combined = f'{content} {thought}'
+    if '[FORMAT_ERROR]' not in combined:
+        return False
+    tool_match = re.search(r"Tool [`'](\w+)[`']?", combined)
+    return bool(tool_match and tool_match.group(1) == successful_tool_name)
+
+
 def _cleanup_stale_format_error_observations(
     history: list,
     successful_tool_name: str,
@@ -74,23 +91,11 @@ def _cleanup_stale_format_error_observations(
         return 0
 
     removed = 0
-    to_remove = []
-    for i, event in enumerate(history):
-        event_type = type(event).__name__
-        if event_type not in (
-            'AgentThinkObservation',
-            'AgentThinkAction',
-            'SystemHintAction',
-        ):
-            continue
-        content = getattr(event, 'content', '') or ''
-        thought = getattr(event, 'thought', '') or ''
-        combined = f'{content} {thought}'
-        if '[FORMAT_ERROR]' not in combined:
-            continue
-        tool_match = re.search(r"Tool [`'](\w+)[`']?", combined)
-        if tool_match and tool_match.group(1) == successful_tool_name:
-            to_remove.append(i)
+    to_remove = [
+        i
+        for i, event in enumerate(history)
+        if _is_stale_format_error_event(event, successful_tool_name)
+    ]
 
     for i in reversed(to_remove):
         history.pop(i)
@@ -332,61 +337,122 @@ class ObservationService:
             or type(pending_action).__name__
         )
         try:
-            from backend.core.logging.session_event_logger import emit_session_event
-
-            tool_result = getattr(observation, 'tool_result', None)
-            ok = tool_result.get('ok') if isinstance(tool_result, dict) else None
-            if ok is None:
-                ok = not isinstance(observation, ErrorObservation)
-            call_id = getattr(meta, 'tool_call_id', '') or getattr(
-                obs_meta, 'tool_call_id', ''
+            fields = ObservationService._tool_observation_log_fields(
+                pending_action, observation, meta, obs_meta
             )
-            preview = _compact_log_preview(getattr(observation, 'content', '') or '')
-            emit_session_event(
-                'TOOL_RESULT',
-                {
-                    'tool': tool_name,
-                    'ok': ok,
-                    'latency_ms': latency_ms,
-                    'action_id': getattr(pending_action, 'id', None),
-                    'call_id': call_id or None,
-                    'observation': type(observation).__name__,
-                    'preview': preview,
-                    'content_chars': len(
-                        str(getattr(observation, 'content', '') or '')
-                    ),
-                    'action_type': type(pending_action).__name__,
-                },
-                ctx={'astep_id': current_astep_id() or None},
+            astep_id = current_astep_id() or None
+            ObservationService._emit_tool_result_event(
+                pending_action,
+                observation,
+                tool_name=tool_name,
+                latency_ms=latency_ms,
+                astep_id=astep_id,
+                **fields,
             )
-            if ok:
+            if fields['ok']:
                 ObservationService._emit_file_event_if_applicable(
                     observation,
                     tool_name=tool_name,
                 )
-            logger.info(
-                'Tool observation resolved: action=%s action_id=%s tool=%s call_id=%s observation=%s ok=%s content_chars=%d preview=%r',
-                type(pending_action).__name__,
-                getattr(pending_action, 'id', None),
-                tool_name,
-                call_id,
-                type(observation).__name__,
-                ok,
-                len(str(getattr(observation, 'content', '') or '')),
-                preview,
-                extra={
-                    'msg_type': 'TOOL_OBSERVATION_RESOLVED',
-                    'astep_id': current_astep_id() or None,
-                    'tool': tool_name,
-                    'ok': ok,
-                    'latency_ms': latency_ms,
-                    'action_id': getattr(pending_action, 'id', None),
-                    'call_id': call_id or None,
-                    'observation': type(observation).__name__,
-                },
+            ObservationService._log_resolved_tool_observation(
+                pending_action,
+                observation,
+                tool_name=tool_name,
+                latency_ms=latency_ms,
+                astep_id=astep_id,
+                **fields,
             )
         except Exception:
             logger.debug('Failed to log resolved tool observation', exc_info=True)
+
+    @staticmethod
+    def _tool_observation_log_fields(
+        pending_action,
+        observation: Observation,
+        meta,
+        obs_meta,
+    ) -> dict[str, Any]:
+        tool_result = getattr(observation, 'tool_result', None)
+        ok = tool_result.get('ok') if isinstance(tool_result, dict) else None
+        if ok is None:
+            ok = not isinstance(observation, ErrorObservation)
+        call_id = getattr(meta, 'tool_call_id', '') or getattr(
+            obs_meta, 'tool_call_id', ''
+        )
+        preview = _compact_log_preview(getattr(observation, 'content', '') or '')
+        content_chars = len(str(getattr(observation, 'content', '') or ''))
+        return {
+            'ok': ok,
+            'call_id': call_id,
+            'preview': preview,
+            'content_chars': content_chars,
+        }
+
+    @staticmethod
+    def _emit_tool_result_event(
+        pending_action,
+        observation: Observation,
+        *,
+        tool_name: str,
+        latency_ms: int | None,
+        astep_id: int | None,
+        ok,
+        call_id: str,
+        preview: str,
+        content_chars: int,
+    ) -> None:
+        from backend.core.logging.session_event_logger import emit_session_event
+
+        emit_session_event(
+            'TOOL_RESULT',
+            {
+                'tool': tool_name,
+                'ok': ok,
+                'latency_ms': latency_ms,
+                'action_id': getattr(pending_action, 'id', None),
+                'call_id': call_id or None,
+                'observation': type(observation).__name__,
+                'preview': preview,
+                'content_chars': content_chars,
+                'action_type': type(pending_action).__name__,
+            },
+            ctx={'astep_id': astep_id},
+        )
+
+    @staticmethod
+    def _log_resolved_tool_observation(
+        pending_action,
+        observation: Observation,
+        *,
+        tool_name: str,
+        latency_ms: int | None,
+        astep_id: int | None,
+        ok,
+        call_id: str,
+        preview: str,
+        content_chars: int,
+    ) -> None:
+        logger.info(
+            'Tool observation resolved: action=%s action_id=%s tool=%s call_id=%s observation=%s ok=%s content_chars=%d preview=%r',
+            type(pending_action).__name__,
+            getattr(pending_action, 'id', None),
+            tool_name,
+            call_id,
+            type(observation).__name__,
+            ok,
+            content_chars,
+            preview,
+            extra={
+                'msg_type': 'TOOL_OBSERVATION_RESOLVED',
+                'astep_id': astep_id,
+                'tool': tool_name,
+                'ok': ok,
+                'latency_ms': latency_ms,
+                'action_id': getattr(pending_action, 'id', None),
+                'call_id': call_id or None,
+                'observation': type(observation).__name__,
+            },
+        )
 
     @staticmethod
     def _emit_file_event_if_applicable(

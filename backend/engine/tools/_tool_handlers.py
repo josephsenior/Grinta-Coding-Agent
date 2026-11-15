@@ -132,98 +132,108 @@ def _handle_docs_query_tool(arguments: Mapping[str, Any]) -> MCPAction:
     return build_docs_query_action(dict(arguments))
 
 
+def _terminal_glue_hint(command: str) -> str:
+    if command and len(command) > 2 and command[0].isalpha() and command[1:3] == ':\\':
+        return 'Windows drive glued in command. Make sure to use spaces.'
+    return ''
+
+
+def _build_terminal_run_action(arguments: Mapping[str, Any]) -> Action:
+    command = require_tool_argument(arguments, 'command', TERMINAL_TOOL_NAME)
+    action: Action = CmdRunAction(
+        command=command,
+        is_input=parse_bool_argument(arguments.get('is_input', False)),
+        is_background=parse_bool_argument(arguments.get('is_background', False)),
+        grep_pattern=arguments.get('grep_pattern'),
+        truncation_strategy=cast(Any, arguments.get('truncation_strategy')),
+        thought=_terminal_glue_hint(command),
+    )
+    if 'timeout' in arguments:
+        try:
+            action.set_hard_timeout(float(arguments['timeout']))
+        except ValueError as e:
+            msg = f"Invalid float passed to 'timeout' argument: {arguments['timeout']}"
+            raise FunctionCallValidationError(msg) from e
+    set_security_risk(action, arguments)
+    return action
+
+
+def _build_terminal_start_action(arguments: Mapping[str, Any]) -> Action:
+    command = require_tool_argument(arguments, 'command', TERMINAL_TOOL_NAME)
+    action = TerminalRunAction(
+        command=command,
+        cwd=arguments.get('cwd'),
+        rows=arguments.get('rows'),
+        cols=arguments.get('cols'),
+    )
+    set_security_risk(action, arguments)
+    return action
+
+
+def _build_terminal_input_action(arguments: Mapping[str, Any]) -> Action:
+    session_id = require_tool_argument(arguments, 'session_id', TERMINAL_TOOL_NAME)
+    action = TerminalInputAction(
+        session_id=session_id,
+        input=str(arguments.get('input', '')),
+        is_control=parse_bool_argument(arguments.get('is_control', False)),
+        control=arguments.get('control'),
+        submit=parse_bool_argument(arguments.get('submit', True)),
+        rows=arguments.get('rows'),
+        cols=arguments.get('cols'),
+    )
+    set_security_risk(action, arguments)
+    return action
+
+
+def _build_terminal_read_action(arguments: Mapping[str, Any]) -> Action:
+    session_id = require_tool_argument(arguments, 'session_id', TERMINAL_TOOL_NAME)
+    action = TerminalReadAction(
+        session_id=session_id,
+        offset=arguments.get('offset'),
+        mode=str(arguments.get('mode', 'delta')),
+        rows=arguments.get('rows'),
+        cols=arguments.get('cols'),
+    )
+    set_security_risk(action, arguments)
+    return action
+
+
+def _build_terminal_wait_action(arguments: Mapping[str, Any]) -> Action:
+    session_id = require_tool_argument(arguments, 'session_id', TERMINAL_TOOL_NAME)
+    pattern = require_tool_argument(arguments, 'pattern', TERMINAL_TOOL_NAME)
+    action = TerminalWaitAction(
+        session_id=session_id,
+        pattern=str(pattern),
+        timeout=int(arguments.get('timeout', 30)),
+    )
+    set_security_risk(action, arguments)
+    return action
+
+
+def _build_terminal_kill_action(arguments: Mapping[str, Any]) -> Action:
+    session_id = require_tool_argument(arguments, 'session_id', TERMINAL_TOOL_NAME)
+    action = TerminalCloseAction(session_id=session_id)
+    set_security_risk(action, arguments)
+    return action
+
+
 def _handle_terminal_tool(arguments: Mapping[str, Any]) -> Action:
     """Handle unified Terminal tool call."""
     action_type = require_tool_argument(arguments, 'action', TERMINAL_TOOL_NAME)
     validate_security_risk(arguments, TERMINAL_TOOL_NAME)
 
     if action_type == 'run':
-        command = require_tool_argument(arguments, 'command', TERMINAL_TOOL_NAME)
-        raw_is_input = arguments.get('is_input', False)
-        is_input = parse_bool_argument(raw_is_input)
-        is_background = parse_bool_argument(arguments.get('is_background', False))
-        grep_pattern = arguments.get('grep_pattern')
-
-        # Logic from previous cmd run handler: checking for drive letter missing space
-        glue_hint = ''
-        if (
-            command
-            and len(command) > 2
-            and command[0].isalpha()
-            and command[1:3] == ':\\'
-        ):
-            glue_hint = 'Windows drive glued in command. Make sure to use spaces.'
-
-        action: Action = CmdRunAction(
-            command=command,
-            is_input=is_input,
-            is_background=is_background,
-            grep_pattern=grep_pattern,
-            truncation_strategy=cast(Any, arguments.get('truncation_strategy')),
-            thought=glue_hint,
-        )
-        if 'timeout' in arguments:
-            try:
-                action.set_hard_timeout(float(arguments['timeout']))
-            except ValueError as e:
-                msg = f"Invalid float passed to 'timeout' argument: {arguments['timeout']}"
-                raise FunctionCallValidationError(msg) from e
-        set_security_risk(action, arguments)
-        return action
-
-    elif action_type == 'start':
-        command = require_tool_argument(arguments, 'command', TERMINAL_TOOL_NAME)
-        action = TerminalRunAction(
-            command=command,
-            cwd=arguments.get('cwd'),
-            rows=arguments.get('rows'),
-            cols=arguments.get('cols'),
-        )
-        set_security_risk(action, arguments)
-        return action
-
-    elif action_type == 'input':
-        session_id = require_tool_argument(arguments, 'session_id', TERMINAL_TOOL_NAME)
-        action = TerminalInputAction(
-            session_id=session_id,
-            input=str(arguments.get('input', '')),
-            is_control=parse_bool_argument(arguments.get('is_control', False)),
-            control=arguments.get('control'),
-            submit=parse_bool_argument(arguments.get('submit', True)),
-            rows=arguments.get('rows'),
-            cols=arguments.get('cols'),
-        )
-        set_security_risk(action, arguments)
-        return action
-
-    elif action_type == 'read':
-        session_id = require_tool_argument(arguments, 'session_id', TERMINAL_TOOL_NAME)
-        action = TerminalReadAction(
-            session_id=session_id,
-            offset=arguments.get('offset'),
-            mode=str(arguments.get('mode', 'delta')),
-            rows=arguments.get('rows'),
-            cols=arguments.get('cols'),
-        )
-        set_security_risk(action, arguments)
-        return action
-
-    elif action_type == 'wait':
-        session_id = require_tool_argument(arguments, 'session_id', TERMINAL_TOOL_NAME)
-        pattern = require_tool_argument(arguments, 'pattern', TERMINAL_TOOL_NAME)
-        action = TerminalWaitAction(
-            session_id=session_id,
-            pattern=str(pattern),
-            timeout=int(arguments.get('timeout', 30)),
-        )
-        set_security_risk(action, arguments)
-        return action
-
-    elif action_type == 'kill':
-        session_id = require_tool_argument(arguments, 'session_id', TERMINAL_TOOL_NAME)
-        action = TerminalCloseAction(session_id=session_id)
-        set_security_risk(action, arguments)
-        return action
+        return _build_terminal_run_action(arguments)
+    if action_type == 'start':
+        return _build_terminal_start_action(arguments)
+    if action_type == 'input':
+        return _build_terminal_input_action(arguments)
+    if action_type == 'read':
+        return _build_terminal_read_action(arguments)
+    if action_type == 'wait':
+        return _build_terminal_wait_action(arguments)
+    if action_type == 'kill':
+        return _build_terminal_kill_action(arguments)
 
     raise FunctionCallValidationError(
         f'Unknown terminal action: {action_type!r}. '
@@ -654,6 +664,44 @@ def _normalize_audit_entry(entry: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _normalize_audit_entries(raw_entries: Sequence[Any]) -> list[dict[str, Any]]:
+    normalized_entries = [
+        _normalize_audit_entry(cast(Mapping[str, Any], item))
+        for item in raw_entries
+        if isinstance(item, Mapping)
+    ]
+    if len(normalized_entries) != len(raw_entries):
+        raise FunctionCallValidationError(
+            'Each audit_entries item must be an object with criterion_id.'
+        )
+    return normalized_entries
+
+
+def _existing_audit_criterion_ids(existing: list[dict[str, Any]]) -> set[str]:
+    return {
+        str(item.get('id') or '').strip()
+        for item in existing
+        if str(item.get('id') or '').strip()
+    }
+
+
+def _require_audit_coverage(entry_ids: list[str], existing_ids: set[str]) -> None:
+    entry_id_set = set(entry_ids)
+    if entry_id_set == existing_ids:
+        return
+    missing = sorted(existing_ids - entry_id_set)
+    extra = sorted(entry_id_set - existing_ids)
+    parts: list[str] = []
+    if missing:
+        parts.append(f'missing: {", ".join(missing)}')
+    if extra:
+        parts.append(f'unknown: {", ".join(extra)}')
+    raise FunctionCallValidationError(
+        'audit_entries must cover every current criterion exactly once'
+        + (f' ({"; ".join(parts)})' if parts else '')
+    )
+
+
 def _validate_audit_entries(
     raw_entries: Any,
     existing: list[dict[str, Any]],
@@ -666,38 +714,15 @@ def _validate_audit_entries(
         raise FunctionCallValidationError(
             'Audit requires existing acceptance criteria. Call update first.'
         )
-    normalized_entries = [
-        _normalize_audit_entry(cast(Mapping[str, Any], item))
-        for item in raw_entries
-        if isinstance(item, Mapping)
-    ]
-    if len(normalized_entries) != len(raw_entries):
-        raise FunctionCallValidationError(
-            'Each audit_entries item must be an object with criterion_id.'
-        )
+    normalized_entries = _normalize_audit_entries(raw_entries)
 
-    existing_ids = {
-        str(item.get('id') or '').strip()
-        for item in existing
-        if str(item.get('id') or '').strip()
-    }
+    existing_ids = _existing_audit_criterion_ids(existing)
     entry_ids = [entry['criterion_id'] for entry in normalized_entries]
     if len(set(entry_ids)) != len(entry_ids):
         raise FunctionCallValidationError(
             'audit_entries must include each criterion_id at most once.'
         )
-    if set(entry_ids) != existing_ids:
-        missing = sorted(existing_ids - set(entry_ids))
-        extra = sorted(set(entry_ids) - existing_ids)
-        parts: list[str] = []
-        if missing:
-            parts.append(f'missing: {", ".join(missing)}')
-        if extra:
-            parts.append(f'unknown: {", ".join(extra)}')
-        raise FunctionCallValidationError(
-            'audit_entries must cover every current criterion exactly once'
-            + (f' ({"; ".join(parts)})' if parts else '')
-        )
+    _require_audit_coverage(entry_ids, existing_ids)
     return normalized_entries
 
 
@@ -708,13 +733,11 @@ def _handle_acceptance_criteria_view(
     return AcceptanceCriteriaAction(command='view', criteria_list=raw_list)
 
 
-def _handle_acceptance_criteria_refine(
-    arguments: Mapping[str, Any],
-    store: AcceptanceCriteriaStore,
-) -> AcceptanceCriteriaAction:
-    criterion_id = str(arguments.get('criterion_id') or '').strip()
-    new_assertion = str(arguments.get('new_assertion') or '').strip()
-    reason = str(arguments.get('reason') or '').strip()
+def _validate_refine_arguments(
+    criterion_id: str,
+    new_assertion: str,
+    reason: str,
+) -> None:
     if not criterion_id:
         raise FunctionCallValidationError(
             'refine requires non-empty criterion_id (from view).'
@@ -725,7 +748,12 @@ def _handle_acceptance_criteria_refine(
         raise FunctionCallValidationError(
             'refine requires non-empty reason explaining the change.'
         )
-    existing = _criteria_existing_normalized(store)
+
+
+def _require_known_criterion_id(
+    criterion_id: str,
+    existing: list[dict[str, Any]],
+) -> None:
     known_ids = {
         str(item.get('id') or '').strip()
         for item in existing
@@ -735,6 +763,18 @@ def _handle_acceptance_criteria_refine(
         raise FunctionCallValidationError(
             f'Unknown criterion_id {criterion_id!r}. Call view for current ids.'
         )
+
+
+def _handle_acceptance_criteria_refine(
+    arguments: Mapping[str, Any],
+    store: AcceptanceCriteriaStore,
+) -> AcceptanceCriteriaAction:
+    criterion_id = str(arguments.get('criterion_id') or '').strip()
+    new_assertion = str(arguments.get('new_assertion') or '').strip()
+    reason = str(arguments.get('reason') or '').strip()
+    _validate_refine_arguments(criterion_id, new_assertion, reason)
+    existing = _criteria_existing_normalized(store)
+    _require_known_criterion_id(criterion_id, existing)
     return AcceptanceCriteriaAction(
         command='refine',
         criterion_id=criterion_id,

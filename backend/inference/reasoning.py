@@ -147,41 +147,55 @@ def _model_name_supports_reasoning(entry: ModelEntry) -> bool:
     return False
 
 
+def _claude_family(name: str) -> str:
+    if 'haiku' in name:
+        return 'claude-haiku'
+    if 'sonnet' in name:
+        return 'claude-sonnet'
+    if 'opus' in name:
+        return 'claude-opus'
+    return 'claude'
+
+
+def _deepseek_family(name: str) -> str:
+    if any(token in name for token in ('pro', 'reasoner', 'r1')):
+        return 'deepseek-thinking'
+    return 'deepseek-flash'
+
+
+_NAME_FAMILY_MARKERS: tuple[tuple[str, str], ...] = (
+    ('kimi', 'kimi'),
+    ('qwen', 'qwen'),
+    ('glm', 'glm'),
+    ('minimax', 'minimax'),
+    ('grok', 'grok'),
+)
+
+
+def _family_from_logical_name(name: str) -> str | None:
+    if name.startswith('gpt-') or 'codex' in name:
+        return 'gpt'
+    if name.startswith('claude-'):
+        return _claude_family(name)
+    if 'deepseek' in name:
+        return _deepseek_family(name)
+    if 'gemini' in name:
+        return 'gemini-flash' if 'flash' in name else 'gemini-pro'
+    for marker, family in _NAME_FAMILY_MARKERS:
+        if marker in name:
+            return family
+    return None
+
+
 def infer_family(entry: ModelEntry) -> str:
     """Return a normalized family id for wire selection."""
     family = _metadata_dict(entry).get('family')
     if isinstance(family, str) and family.strip():
         return family.strip().lower()
 
-    name = _logical_model_name(entry).lower()
-    if name.startswith('gpt-') or 'codex' in name:
-        return 'gpt'
-    if name.startswith('claude-'):
-        if 'haiku' in name:
-            return 'claude-haiku'
-        if 'sonnet' in name:
-            return 'claude-sonnet'
-        if 'opus' in name:
-            return 'claude-opus'
-        return 'claude'
-    if 'deepseek' in name:
-        return (
-            'deepseek-thinking'
-            if any(token in name for token in ('pro', 'reasoner', 'r1'))
-            else 'deepseek-flash'
-        )
-    if 'gemini' in name:
-        return 'gemini-flash' if 'flash' in name else 'gemini-pro'
-    if 'kimi' in name:
-        return 'kimi'
-    if 'qwen' in name:
-        return 'qwen'
-    if 'glm' in name:
-        return 'glm'
-    if 'minimax' in name:
-        return 'minimax'
-    if 'grok' in name:
-        return 'grok'
+    inferred = _family_from_logical_name(_logical_model_name(entry).lower())
+    if inferred is not None:
+        return inferred
     return entry.provider.lower()
 
 
@@ -201,21 +215,31 @@ def _provider_supports_reasoning(entry: ModelEntry) -> bool | None:
     return None
 
 
+_GEMINI_REASONING_TOKENS: tuple[str, ...] = ('2.5', '2-', '3', '3.')
+_DEEPSEEK_REASONING_TOKENS: tuple[str, ...] = ('reasoner', 'r1', 'thinking')
+
+
+def _contains_any(text: str, tokens: tuple[str, ...]) -> bool:
+    return any(token in text for token in tokens)
+
+
 def _vendor_supports_reasoning(entry: ModelEntry) -> bool | None:
     vendor, logical = _split_upstream_model_id(entry.name)
     logical_lower = logical.lower()
-    if vendor == 'anthropic' and logical_lower.startswith('claude'):
-        return True
+    if vendor == 'anthropic':
+        return True if logical_lower.startswith('claude') else None
     if vendor == 'openai':
         return _openai_logical_supports_reasoning(logical_lower)
-    if vendor == 'google' and 'gemini' in logical_lower:
-        return any(token in logical_lower for token in ('2.5', '2-', '3', '3.'))
-    if vendor == 'xai' and logical_lower.startswith('grok-4'):
-        return True
-    if vendor == 'deepseek' and any(
-        token in logical_lower for token in ('reasoner', 'r1', 'thinking')
-    ):
-        return True
+    if vendor == 'google':
+        if 'gemini' not in logical_lower:
+            return None
+        return _contains_any(logical_lower, _GEMINI_REASONING_TOKENS)
+    if vendor == 'xai':
+        return True if logical_lower.startswith('grok-4') else None
+    if vendor == 'deepseek':
+        return (
+            True if _contains_any(logical_lower, _DEEPSEEK_REASONING_TOKENS) else None
+        )
     return None
 
 
@@ -543,30 +567,55 @@ def _vercel_gateway_provider_passthrough(entry: ModelEntry) -> dict[str, Any]:
     return {}
 
 
+def _vercel_gateway_wire_kwargs(
+    effort: str, entry: ModelEntry, family: str
+) -> dict[str, Any]:
+    api_effort = _map_vercel_gateway_effort(effort)
+    if api_effort == 'none':
+        name_lower = _logical_model_name(entry).lower()
+        if family == 'minimax' and (
+            'minimax-m3' in name_lower or name_lower.endswith('/m3')
+        ):
+            return {'thinking': {'type': 'disabled'}}
+        return {}
+    # Vercel AI Gateway (OpenAI Chat Completions advanced):
+    # https://vercel.com/docs/ai-gateway/sdks-and-apis/openai-chat-completions/advanced
+    patch: dict[str, Any] = {
+        'reasoning': {'effort': api_effort, 'enabled': True},
+    }
+    patch.update(_vercel_gateway_provider_passthrough(entry))
+    return patch
+
+
+def _openai_thinking_enabled_kwargs(family: str) -> dict[str, Any]:
+    thinking: dict[str, Any] = {'type': 'enabled'}
+    if family.startswith('kimi'):
+        thinking['keep'] = None
+    patch = {'thinking': thinking}
+    if family.startswith('qwen'):
+        patch['enable_thinking'] = True
+    return patch
+
+
+def _gemini_wire_kwargs(wire: str, effort: str) -> dict[str, Any]:
+    level = _EFFORT_TO_GEMINI_LEVEL.get(effort, 'medium')
+    if wire == WIRE_GEMINI_NATIVE:
+        return {'thinking_config': {'thinking_level': level}}
+    return {
+        'reasoning_effort': effort,
+        'extra_body': {'google': {'thinking_config': {'thinking_level': level}}},
+    }
+
+
 def _build_wire_kwargs(wire: str, effort: str, entry: ModelEntry) -> dict[str, Any]:
     family = infer_family(entry)
     if wire == WIRE_VERCEL_GATEWAY_REASONING:
-        api_effort = _map_vercel_gateway_effort(effort)
-        if api_effort == 'none':
-            name_lower = _logical_model_name(entry).lower()
-            if family == 'minimax' and (
-                'minimax-m3' in name_lower or name_lower.endswith('/m3')
-            ):
-                return {'thinking': {'type': 'disabled'}}
-            return {}
-        # Vercel AI Gateway (OpenAI Chat Completions advanced):
-        # https://vercel.com/docs/ai-gateway/sdks-and-apis/openai-chat-completions/advanced
-        patch: dict[str, Any] = {
-            'reasoning': {'effort': api_effort, 'enabled': True},
-        }
-        patch.update(_vercel_gateway_provider_passthrough(entry))
-        return patch
+        return _vercel_gateway_wire_kwargs(effort, entry, family)
 
     if wire == WIRE_OPENAI_REASONING_EFFORT:
-        res_patch: dict[str, Any] = {'reasoning_effort': effort}
         if effort == 'none':
-            res_patch = {}
-        return res_patch
+            return {}
+        return {'reasoning_effort': effort}
 
     if wire == WIRE_OPENAI_THINKING_AND_EFFORT:
         return {
@@ -575,30 +624,13 @@ def _build_wire_kwargs(wire: str, effort: str, entry: ModelEntry) -> dict[str, A
         }
 
     if wire == WIRE_OPENAI_THINKING_ENABLED:
-        thinking: dict[str, Any] = {'type': 'enabled'}
-        if family.startswith('kimi'):
-            thinking['keep'] = None
-        patch = {'thinking': thinking}
-        if family.startswith('qwen'):
-            patch['enable_thinking'] = True
-        return patch
+        return _openai_thinking_enabled_kwargs(family)
 
-    if wire == WIRE_ANTHROPIC_ADAPTIVE:
+    if wire in {WIRE_ANTHROPIC_ADAPTIVE, WIRE_ANTHROPIC_EXTENDED}:
         return {'thinking': _anthropic_thinking_for_effort(effort, entry)}
 
-    if wire == WIRE_ANTHROPIC_EXTENDED:
-        return {'thinking': _anthropic_thinking_for_effort(effort, entry)}
-
-    if wire == WIRE_GEMINI_NATIVE:
-        level = _EFFORT_TO_GEMINI_LEVEL.get(effort, 'medium')
-        return {'thinking_config': {'thinking_level': level}}
-
-    if wire == WIRE_GEMINI_OPENAI_COMPAT:
-        level = _EFFORT_TO_GEMINI_LEVEL.get(effort, 'medium')
-        return {
-            'reasoning_effort': effort,
-            'extra_body': {'google': {'thinking_config': {'thinking_level': level}}},
-        }
+    if wire in {WIRE_GEMINI_NATIVE, WIRE_GEMINI_OPENAI_COMPAT}:
+        return _gemini_wire_kwargs(wire, effort)
 
     if wire == WIRE_GLM_THINKING:
         return {'thinking': {'type': 'enabled'}, 'reasoning_effort': effort}
@@ -623,6 +655,59 @@ def _sampling_strips(wire: str, entry: ModelEntry) -> frozenset[str]:
     return frozenset(strips)
 
 
+def _resolve_plan_effort(
+    reasoning_effort: str | None,
+    wire: str,
+    allowed: tuple[str, ...],
+) -> str | None:
+    resolved = _normalize_effort(reasoning_effort, allowed)
+    if wire == WIRE_VERCEL_GATEWAY_REASONING and resolved == 'max':
+        return 'xhigh' if 'xhigh' in allowed else resolved
+    return resolved
+
+
+def _disabled_plan(
+    wire: str,
+    family: str,
+    allowed: tuple[str, ...],
+) -> ReasoningPlan:
+    if wire == WIRE_OPENAI_THINKING_ENABLED and family.startswith('qwen'):
+        return ReasoningPlan(
+            enabled=True,
+            wire=wire,
+            resolved_effort='none',
+            allowed_efforts=allowed,
+            kwargs_patch={'enable_thinking': False},
+        )
+    return ReasoningPlan(
+        enabled=False,
+        wire=wire,
+        allowed_efforts=allowed,
+    )
+
+
+def _plan_kwargs_patch(
+    entry: ModelEntry,
+    wire: str,
+    resolved: str,
+) -> dict[str, Any]:
+    variant = _variants(entry).get(resolved)
+    if not isinstance(variant, dict):
+        return _build_wire_kwargs(wire, resolved, entry)
+
+    kwargs_patch = _variant_to_kwargs(variant)
+    wire_patch = _build_wire_kwargs(wire, resolved, entry)
+    if wire not in {WIRE_ANTHROPIC_ADAPTIVE, WIRE_ANTHROPIC_EXTENDED}:
+        for key, value in wire_patch.items():
+            kwargs_patch.setdefault(key, value)
+        return kwargs_patch
+
+    merged = {**kwargs_patch, **wire_patch}
+    merged.pop('output_config', None)
+    merged.pop('effort', None)
+    return merged
+
+
 def resolve_reasoning_plan(
     entry: ModelEntry,
     reasoning_effort: str | None,
@@ -637,44 +722,16 @@ def resolve_reasoning_plan(
 
     family = infer_family(entry)
     allowed = _allowed_efforts(entry, wire, family)
-    resolved = _normalize_effort(reasoning_effort, allowed)
-    if wire == WIRE_VERCEL_GATEWAY_REASONING and resolved == 'max':
-        resolved = 'xhigh' if 'xhigh' in allowed else resolved
+    resolved = _resolve_plan_effort(reasoning_effort, wire, allowed)
     if resolved is None:
-        if wire == WIRE_OPENAI_THINKING_ENABLED and family.startswith('qwen'):
-            return ReasoningPlan(
-                enabled=True,
-                wire=wire,
-                resolved_effort='none',
-                allowed_efforts=allowed,
-                kwargs_patch={'enable_thinking': False},
-            )
-        return ReasoningPlan(
-            enabled=False,
-            wire=wire,
-            allowed_efforts=allowed,
-        )
-
-    variants = _variants(entry)
-    if resolved in variants and isinstance(variants[resolved], dict):
-        kwargs_patch = _variant_to_kwargs(variants[resolved])
-        wire_patch = _build_wire_kwargs(wire, resolved, entry)
-        if wire in {WIRE_ANTHROPIC_ADAPTIVE, WIRE_ANTHROPIC_EXTENDED}:
-            kwargs_patch = {**kwargs_patch, **wire_patch}
-            kwargs_patch.pop('output_config', None)
-            kwargs_patch.pop('effort', None)
-        else:
-            for key, value in wire_patch.items():
-                kwargs_patch.setdefault(key, value)
-    else:
-        kwargs_patch = _build_wire_kwargs(wire, resolved, entry)
+        return _disabled_plan(wire, family, allowed)
 
     return ReasoningPlan(
         enabled=True,
         wire=wire,
         resolved_effort=resolved,
         allowed_efforts=allowed,
-        kwargs_patch=kwargs_patch,
+        kwargs_patch=_plan_kwargs_patch(entry, wire, resolved),
         keys_to_strip=_sampling_strips(wire, entry),
     )
 

@@ -134,6 +134,15 @@ def _encode_diff_view_from_contents(
     )
 
 
+def _diff_header_path(line: str) -> str | None:
+    raw = line[4:].strip()
+    if raw.startswith('b/'):
+        raw = raw[2:]
+    if raw and raw != '/dev/null':
+        return raw
+    return None
+
+
 def _split_combined_diff(diff_text: str) -> list[tuple[str, str]]:
     """Split a combined unified diff (multi-file) into per-file (path, diff_text) pairs.
 
@@ -151,11 +160,7 @@ def _split_combined_diff(diff_text: str) -> list[tuple[str, str]]:
             current_lines = [line]
             current_path = None
         elif line.startswith('+++ ') and current_path is None:
-            raw = line[4:].strip()
-            if raw.startswith('b/'):
-                raw = raw[2:]
-            if raw and raw != '/dev/null':
-                current_path = raw
+            current_path = _diff_header_path(line)
             current_lines.append(line)
         else:
             current_lines.append(line)

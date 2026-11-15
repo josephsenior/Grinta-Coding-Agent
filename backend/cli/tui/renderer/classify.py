@@ -24,35 +24,58 @@ if TYPE_CHECKING:
     )
 
 
+def _thinking_intent_matches(
+    orch: 'RendererEventProcessorMixin',
+    event: Any,
+    *,
+    use_source_tool: bool,
+    check_suppress: bool,
+    use_content_fallback: bool,
+) -> bool:
+    if check_suppress and bool(getattr(event, 'suppress_cli', False)):
+        return False
+    thought = getattr(event, 'thought', '') or ''
+    if use_content_fallback:
+        thought = thought or getattr(event, 'content', '')
+    kind = getattr(event, 'kind', '') or ''
+    if use_source_tool:
+        source_tool = getattr(event, 'source_tool', '') or ''
+        intent = orch._classify_thinking_text(
+            thought, source_tool=source_tool, kind=kind
+        )
+    else:
+        intent = orch._classify_thinking_text(thought, kind=kind)
+    return intent.kind == 'thinking'
+
+
 def _is_live_thinking_event(
     orch: 'RendererEventProcessorMixin',
     event: Any,
 ) -> bool:
     if isinstance(event, AgentThinkAction):
-        if bool(getattr(event, 'suppress_cli', False)):
-            return False
-        thought = getattr(event, 'thought', '') or getattr(event, 'content', '')
-        source_tool = getattr(event, 'source_tool', '') or ''
-        kind = getattr(event, 'kind', '') or ''
-        intent = orch._classify_thinking_text(
-            thought, source_tool=source_tool, kind=kind
+        return _thinking_intent_matches(
+            orch,
+            event,
+            use_source_tool=True,
+            check_suppress=True,
+            use_content_fallback=True,
         )
-        return intent.kind == 'thinking'
     if isinstance(event, SystemHintAction):
-        if bool(getattr(event, 'suppress_cli', False)):
-            return False
-        thought = getattr(event, 'thought', '') or ''
-        source_tool = getattr(event, 'source_tool', '') or ''
-        kind = getattr(event, 'kind', '') or ''
-        intent = orch._classify_thinking_text(
-            thought, source_tool=source_tool, kind=kind
+        return _thinking_intent_matches(
+            orch,
+            event,
+            use_source_tool=True,
+            check_suppress=True,
+            use_content_fallback=False,
         )
-        return intent.kind == 'thinking'
     if isinstance(event, AgentThinkObservation):
-        thought = getattr(event, 'thought', '') or getattr(event, 'content', '')
-        kind = getattr(event, 'kind', '') or ''
-        intent = orch._classify_thinking_text(thought, kind=kind)
-        return intent.kind == 'thinking'
+        return _thinking_intent_matches(
+            orch,
+            event,
+            use_source_tool=False,
+            check_suppress=False,
+            use_content_fallback=True,
+        )
     return isinstance(event, StreamingChunkAction)
 
 

@@ -498,58 +498,69 @@ class SecurityEnforcementMixin:
         from backend.core.enums import ActionSecurityRisk
         from backend.ledger.action.debugger import is_debugger_action
 
-        declared = getattr(action, 'security_risk', ActionSecurityRisk.UNKNOWN)
-        if not isinstance(declared, ActionSecurityRisk):
-            declared = ActionSecurityRisk.UNKNOWN
-
+        declared = self._declared_security_risk(action, ActionSecurityRisk)
         if is_debugger_action(action):
-            # Do not call ``call_async_from_sync`` (async security analyzer) here.
-            # ``run_action`` can run on ``DEBUGGER_SYNC_EXECUTOR``; that nested
-            # wait on the shared ``EXECUTOR`` may not start until the pool is free,
-            # so the controller logs ``_handle_action START DebuggerAction`` while
-            # ``DAPDebugManager.handle`` (and ``DEBUGGER_DISPATCH``) never runs.
-            # The debugger tool is a vetted, typed action — use declared risk with
-            # a LOW default when the agent omitted it.
-            effective: ActionSecurityRisk = (
-                ActionSecurityRisk.LOW
-                if declared == ActionSecurityRisk.UNKNOWN
-                else declared
-            )
-            if hasattr(action, 'security_risk'):
-                action.security_risk = effective
-            return effective
+            return self._debugger_security_risk(action, declared, ActionSecurityRisk)
 
-        analyzer_risk: ActionSecurityRisk | None = None
-        if self.security_analyzer is not None:  # type: ignore[attr-defined]
-            try:
-                analyzer_risk = _invoke_security_analyzer(
-                    self.security_analyzer, action
-                )
-            except Exception:
-                logger.warning(
-                    'Security analysis failed for %s, falling back to declared risk',
-                    action.action,
-                    exc_info=True,
-                )
-                analyzer_risk = None
-
-        if declared == ActionSecurityRisk.UNKNOWN:
-            effective = (
-                analyzer_risk if analyzer_risk is not None else ActionSecurityRisk.LOW
-            )
-        else:
-            effective = declared
-            if analyzer_risk is not None and analyzer_risk > declared:
-                logger.warning(
-                    'Security risk escalated from %s to %s by analyzer for %s',
-                    declared.name,
-                    analyzer_risk.name,
-                    action.action,
-                )
-                effective = analyzer_risk
-
+        analyzer_risk = self._analyzer_security_risk(action)
+        effective = self._merge_security_risk(
+            declared, analyzer_risk, action, ActionSecurityRisk
+        )
         if hasattr(action, 'security_risk'):
             action.security_risk = effective
+        return effective
+
+    @staticmethod
+    def _declared_security_risk(action: Action, risk_enum: Any) -> Any:
+        declared = getattr(action, 'security_risk', risk_enum.UNKNOWN)
+        if not isinstance(declared, risk_enum):
+            return risk_enum.UNKNOWN
+        return declared
+
+    @staticmethod
+    def _debugger_security_risk(action: Action, declared: Any, risk_enum: Any) -> Any:
+        # Do not call ``call_async_from_sync`` (async security analyzer) here.
+        # ``run_action`` can run on ``DEBUGGER_SYNC_EXECUTOR``; that nested
+        # wait on the shared ``EXECUTOR`` may not start until the pool is free,
+        # so the controller logs ``_handle_action START DebuggerAction`` while
+        # ``DAPDebugManager.handle`` (and ``DEBUGGER_DISPATCH``) never runs.
+        # The debugger tool is a vetted, typed action — use declared risk with
+        # a LOW default when the agent omitted it.
+        effective = risk_enum.LOW if declared == risk_enum.UNKNOWN else declared
+        if hasattr(action, 'security_risk'):
+            action.security_risk = effective
+        return effective
+
+    def _analyzer_security_risk(self, action: Action) -> Any:
+        analyzer = self.security_analyzer  # type: ignore[attr-defined]
+        if analyzer is None:
+            return None
+        try:
+            return _invoke_security_analyzer(analyzer, action)
+        except Exception:
+            logger.warning(
+                'Security analysis failed for %s, falling back to declared risk',
+                action.action,
+                exc_info=True,
+            )
+            return None
+
+    @staticmethod
+    def _merge_security_risk(
+        declared: Any, analyzer_risk: Any, action: Action, risk_enum: Any
+    ) -> Any:
+        if declared == risk_enum.UNKNOWN:
+            return analyzer_risk if analyzer_risk is not None else risk_enum.LOW
+
+        effective = declared
+        if analyzer_risk is not None and analyzer_risk > declared:
+            logger.warning(
+                'Security risk escalated from %s to %s by analyzer for %s',
+                declared.name,
+                analyzer_risk.name,
+                action.action,
+            )
+            effective = analyzer_risk
         return effective
 
     def _enforce_editor_only_shell_writes(self, action: Action) -> str | None:

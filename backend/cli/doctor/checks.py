@@ -114,19 +114,47 @@ def check_settings_schema() -> DoctorCheck:
     )
 
 
+def _model_hint_check(model_hint: str | None) -> DoctorCheck | None:
+    text = str(model_hint).strip() if model_hint else ''
+    if not text or text == '(not set)':
+        return None
+    return DoctorCheck('model', True, text, critical=False)
+
+
+def _resolved_llm_check(llm_cfg: Any, model: str) -> DoctorCheck:
+    from backend.core.config.api_key_manager import api_key_manager
+
+    key = api_key_manager.get_api_key_for_model(model, llm_cfg.api_key)
+    if key is not None and key.get_secret_value().strip():
+        provider = api_key_manager.extract_provider(model)
+        return DoctorCheck(
+            'llm', True, f'provider={provider} model={model} key=resolved'
+        )
+    from backend.inference.local_model import is_local_llm_config
+
+    if is_local_llm_config(llm_cfg):
+        provider = api_key_manager.extract_provider(model)
+        return DoctorCheck(
+            'llm',
+            True,
+            f'provider={provider} model={model} key=not required (local)',
+        )
+    return DoctorCheck(
+        'llm',
+        False,
+        f'model={model} but no API key resolved (set LLM_API_KEY or provider env var)',
+    )
+
+
 def check_llm_config(*, model_hint: str | None = None) -> DoctorCheck:
     from backend.core.app_paths import get_canonical_settings_path
     from backend.core.config import AppConfig
     from backend.core.config.api_key_manager import api_key_manager
     from backend.core.config.config_loader import load_from_json
 
-    if (
-        model_hint
-        and str(model_hint).strip()
-        and str(model_hint).strip() != '(not set)'
-    ):
-        model = str(model_hint).strip()
-        return DoctorCheck('model', True, model, critical=False)
+    hint = _model_hint_check(model_hint)
+    if hint is not None:
+        return hint
 
     path = get_canonical_settings_path()
     if not Path(path).is_file():
@@ -148,25 +176,7 @@ def check_llm_config(*, model_hint: str | None = None) -> DoctorCheck:
             'llm_model not set (run `grinta init` or edit settings.json)',
         )
 
-    key = api_key_manager.get_api_key_for_model(model, llm_cfg.api_key)
-    if key is None or not key.get_secret_value().strip():
-        from backend.inference.local_model import is_local_llm_config
-
-        if is_local_llm_config(llm_cfg):
-            provider = api_key_manager.extract_provider(model)
-            return DoctorCheck(
-                'llm',
-                True,
-                f'provider={provider} model={model} key=not required (local)',
-            )
-        return DoctorCheck(
-            'llm',
-            False,
-            f'model={model} but no API key resolved (set LLM_API_KEY or provider env var)',
-        )
-
-    provider = api_key_manager.extract_provider(model)
-    return DoctorCheck('llm', True, f'provider={provider} model={model} key=resolved')
+    return _resolved_llm_check(llm_cfg, model)
 
 
 def check_security_settings_values() -> DoctorCheck:

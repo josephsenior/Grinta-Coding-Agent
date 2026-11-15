@@ -471,16 +471,23 @@ class PtyInteractiveShellSession(BaseShellSession):
 
         command = (action.command or '').strip()
         if command and self._want_ps1_metadata() and self._ps1_ready:
-            buffer = pty.peek()
-            n_before = len(
-                CmdOutputMetadata.matches_ps1_metadata(_norm_tty_text(buffer))
-            )
-            try:
-                pty.send_line(command)
-            except InteractiveSessionError as exc:
-                return ErrorObservation(content=f'Failed to send command: {exc}')
-            return self._execute_with_ps1_after_send(pty, command, n_before)
+            return self._execute_with_ps1(pty, command)
+        return self._execute_without_ps1(pty, command)
 
+    def _execute_with_ps1(
+        self, pty: InteractiveSession, command: str
+    ) -> CmdOutputObservation | ErrorObservation:
+        buffer = pty.peek()
+        n_before = len(CmdOutputMetadata.matches_ps1_metadata(_norm_tty_text(buffer)))
+        try:
+            pty.send_line(command)
+        except InteractiveSessionError as exc:
+            return ErrorObservation(content=f'Failed to send command: {exc}')
+        return self._execute_with_ps1_after_send(pty, command, n_before)
+
+    def _execute_without_ps1(
+        self, pty: InteractiveSession, command: str
+    ) -> CmdOutputObservation | ErrorObservation:
         if command:
             # Snapshot the current buffer position so we can return only the
             # delta produced by this command rather than the entire accumulated

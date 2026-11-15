@@ -369,14 +369,55 @@ def _process_event_commit_response(
             orch.clear_live_response()
 
 
+def _is_replayed_event(
+    orch: 'RendererEventProcessorMixin',
+    event_id: int,
+    replay_mode: bool,
+) -> bool:
+    if not replay_mode or event_id < 0:
+        return False
+    return event_id in getattr(orch, '_mounted_event_ids', set())
+
+
+def _process_event_pre_dispatch(
+    orch: 'RendererEventProcessorMixin', event: Any
+) -> None:
+    _process_event_check_user_message(orch, event)
+    _process_event_maybe_start_turn(orch, event)
+    is_tool = isinstance(event, _TOOL_EXECUTION_TYPES)
+    if orch._in_agent_turn and is_tool:
+        orch._tools_in_turn += 1
+    _process_event_finalize_thinking(orch, event)
+    _process_event_commit_response(orch, event, is_tool)
+
+
+def _remember_mounted_event_id(
+    orch: 'RendererEventProcessorMixin', event_id: int
+) -> None:
+    mounted = getattr(orch, '_mounted_event_ids', None)
+    if mounted is None:
+        return
+    mounted.add(event_id)
+    if len(mounted) > _MOUNTED_EVENT_ID_CAP:
+        # Event ids are monotonic — drop the oldest without sorting.
+        threshold = max(mounted) - _MOUNTED_EVENT_ID_RETAIN
+        mounted -= {eid for eid in mounted if eid < threshold}
+
+
+def _flush_pending_final_commits_if_sync(
+    orch: 'RendererEventProcessorMixin',
+) -> None:
+    if getattr(orch, '_async_drain_active', False):
+        return
+    flush_sync = getattr(orch, 'flush_pending_final_commits_sync', None)
+    if callable(flush_sync):
+        flush_sync()
+
+
 def _process_event(orch: 'RendererEventProcessorMixin', event: Any) -> None:
     event_id = getattr(event, 'id', -1)
     replay_mode = getattr(orch, '_replay_mode', False)
-    if (
-        replay_mode
-        and event_id >= 0
-        and event_id in getattr(orch, '_mounted_event_ids', set())
-    ):
+    if _is_replayed_event(orch, event_id, replay_mode):
         return
     orch._current_event_id = event_id
     if not replay_mode:
@@ -384,29 +425,14 @@ def _process_event(orch: 'RendererEventProcessorMixin', event: Any) -> None:
     if _process_event_is_noop(event):
         return
     if not replay_mode:
-        _process_event_check_user_message(orch, event)
-        _process_event_maybe_start_turn(orch, event)
-        is_tool = isinstance(event, _TOOL_EXECUTION_TYPES)
-        if orch._in_agent_turn and is_tool:
-            orch._tools_in_turn += 1
-        _process_event_finalize_thinking(orch, event)
-        _process_event_commit_response(orch, event, is_tool)
+        _process_event_pre_dispatch(orch, event)
     _maybe_flush_orient_burst(orch, event)
     _dispatch_event(orch, event)
     maybe_restore_running_hud_after_backoff(orch, event)
     if event_id >= 0:
-        mounted = getattr(orch, '_mounted_event_ids', None)
-        if mounted is not None:
-            mounted.add(event_id)
-            if len(mounted) > _MOUNTED_EVENT_ID_CAP:
-                # Event ids are monotonic — drop the oldest without sorting.
-                threshold = max(mounted) - _MOUNTED_EVENT_ID_RETAIN
-                mounted -= {eid for eid in mounted if eid < threshold}
+        _remember_mounted_event_id(orch, event_id)
     orch._current_event_id = -1
-    if not getattr(orch, '_async_drain_active', False):
-        flush_sync = getattr(orch, 'flush_pending_final_commits_sync', None)
-        if callable(flush_sync):
-            flush_sync()
+    _flush_pending_final_commits_if_sync(orch)
 
 
 def _dispatch_event(orch: 'RendererEventProcessorMixin', event: Any) -> None:

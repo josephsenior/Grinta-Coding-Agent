@@ -143,40 +143,11 @@ def format_history_for_reflection(history: list[Any]) -> str:
     return '\n'.join(summary_lines)
 
 
-async def persist_finish_lessons(
-    *,
+def _reflection_prompt_messages(
     summary: str,
-    session_id: str | None = None,
-    state: Any | None = None,
-    controller: Any | None = None,
-) -> None:
-    """Trigger targeted reflection to extract durable project memories."""
-    if not state or not controller:
-        return
-
-    # Check unresolved tasks
-    if _has_unresolved_tasks(state):
-        logger.info('Unresolved tasks exist. Skipping memory reflection.')
-        return
-
-    history = getattr(state, 'history', [])
-    signals = detect_reflection_signals(history)
-    if not signals:
-        logger.info('No reflection signals detected. Skipping memory reflection.')
-        return
-
-    logger.info(
-        'Memory reflection signals detected: %s. Starting targeted reflection.', signals
-    )
-
-    agent = getattr(controller, 'agent', None)
-    llm = getattr(agent, 'llm', None)
-    if not llm:
-        logger.info('No LLM configured on agent. Skipping memory reflection.')
-        return
-
-    history_summary = format_history_for_reflection(history)
-    prompt_messages = [
+    history_summary: str,
+) -> list[dict[str, str]]:
+    return [
         {
             'role': 'system',
             'content': (
@@ -222,48 +193,94 @@ async def persist_finish_lessons(
         },
     ]
 
+
+def _strip_json_fence(raw_content: str) -> str:
+    if not raw_content.startswith('```'):
+        return raw_content
+    start = raw_content.find('{')
+    end = raw_content.rfind('}')
+    if start == -1 or end == -1:
+        return raw_content
+    return raw_content[start : end + 1]
+
+
+def _persist_reflection_candidates(
+    candidates: list[Any],
+    session_id: str | None,
+) -> None:
+    service = ProjectMemoryService()
+    for cand in candidates:
+        confidence = cand.get('confidence', 1.0)
+        if confidence < 0.85:
+            continue
+        entry_id = service.upsert_candidate(
+            kind=cand.get('kind', 'lesson'),
+            fact=cand.get('fact', ''),
+            evidence=cand.get('evidence', []),
+            confidence=confidence,
+            source_session=session_id,
+        )
+        logger.info(
+            'Upserted project memory candidate: %s -> %s',
+            cand.get('fact', ''),
+            entry_id,
+        )
+        for superseded_id in cand.get('superseded_ids', []):
+            if service.supersede_entry(superseded_id, entry_id):
+                logger.info(
+                    'Project memory %s superseded by %s',
+                    superseded_id,
+                    entry_id,
+                )
+
+
+async def persist_finish_lessons(
+    *,
+    summary: str,
+    session_id: str | None = None,
+    state: Any | None = None,
+    controller: Any | None = None,
+) -> None:
+    """Trigger targeted reflection to extract durable project memories."""
+    if not state or not controller:
+        return
+
+    # Check unresolved tasks
+    if _has_unresolved_tasks(state):
+        logger.info('Unresolved tasks exist. Skipping memory reflection.')
+        return
+
+    history = getattr(state, 'history', [])
+    signals = detect_reflection_signals(history)
+    if not signals:
+        logger.info('No reflection signals detected. Skipping memory reflection.')
+        return
+
+    logger.info(
+        'Memory reflection signals detected: %s. Starting targeted reflection.', signals
+    )
+
+    agent = getattr(controller, 'agent', None)
+    llm = getattr(agent, 'llm', None)
+    if not llm:
+        logger.info('No LLM configured on agent. Skipping memory reflection.')
+        return
+
+    history_summary = format_history_for_reflection(history)
+    prompt_messages = _reflection_prompt_messages(summary, history_summary)
+
     try:
         # Reflection runs after the interactive turn has already finished.  It
         # must use the asynchronous transport: ``completion`` is deliberately
         # synchronous and would block the TUI event loop until the provider
         # responds, delaying the visible RUNNING -> READY transition.
         response = await llm.acompletion(messages=prompt_messages, temperature=0.1)
-        raw_content = response.content.strip()
-        if raw_content.startswith('```'):
-            start = raw_content.find('{')
-            end = raw_content.rfind('}')
-            if start != -1 and end != -1:
-                raw_content = raw_content[start : end + 1]
+        raw_content = _strip_json_fence(response.content.strip())
 
         data = json.loads(raw_content)
         candidates = data.get('candidates', [])
-        if not candidates:
-            return
-
-        service = ProjectMemoryService()
-        for cand in candidates:
-            confidence = cand.get('confidence', 1.0)
-            if confidence >= 0.85:
-                entry_id = service.upsert_candidate(
-                    kind=cand.get('kind', 'lesson'),
-                    fact=cand.get('fact', ''),
-                    evidence=cand.get('evidence', []),
-                    confidence=confidence,
-                    source_session=session_id,
-                )
-                logger.info(
-                    'Upserted project memory candidate: %s -> %s',
-                    cand.get('fact', ''),
-                    entry_id,
-                )
-                # handle supersession
-                for superseded_id in cand.get('superseded_ids', []):
-                    if service.supersede_entry(superseded_id, entry_id):
-                        logger.info(
-                            'Project memory %s superseded by %s',
-                            superseded_id,
-                            entry_id,
-                        )
+        if candidates:
+            _persist_reflection_candidates(candidates, session_id)
     except Exception as exc:
         logger.warning(
             'Failed to run post-session reflection candidate extraction: %s',

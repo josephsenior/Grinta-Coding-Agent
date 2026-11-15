@@ -148,6 +148,47 @@ def insert_lines(
     return new_lines
 
 
+def _write_file_contents(
+    whole_path: Path,
+    insert: list[str],
+    start: int,
+    end: int,
+    file_existed: bool,
+    path: str,
+) -> tuple[str | None, ErrorObservation | None]:
+    old_content: str | None = None
+    mode = 'r+' if file_existed else 'w'
+    try:
+        # newline='' suppresses universal-newline translation so that
+        # detect_line_ending can observe the file's actual \r\n endings
+        # on every platform (default text mode converts \r\n → \n on read).
+        with open(whole_path, mode, encoding='utf-8', newline='') as file:  # noqa: ASYNC230
+            if mode != 'w':
+                all_lines = file.readlines()
+                old_content = ''.join(all_lines)
+                new_file = insert_lines(
+                    insert,
+                    all_lines,
+                    start,
+                    end,
+                    newline=detect_line_ending(all_lines),
+                )
+            else:
+                new_file = [i + '\n' for i in insert]
+            file.seek(0)
+            file.writelines(new_file)
+            file.truncate()
+    except FileNotFoundError:
+        return None, ErrorObservation(f'File not found: {path}')
+    except IsADirectoryError:
+        return None, ErrorObservation(
+            f'Path is a directory: {path}. You can only write to files'
+        )
+    except UnicodeDecodeError:
+        return None, ErrorObservation(f'File could not be decoded as utf-8: {path}')
+    return old_content, None
+
+
 async def write_file(
     path: str,
     workdir: str,
@@ -178,36 +219,11 @@ async def write_file(
         if not os.path.exists(os.path.dirname(whole_path)):  # noqa: ASYNC240
             os.makedirs(os.path.dirname(whole_path))
         file_existed = whole_path.exists()
-        old_content: str | None = None
-        mode = 'r+' if file_existed else 'w'
-        try:
-            # newline='' suppresses universal-newline translation so that
-            # detect_line_ending can observe the file's actual \r\n endings
-            # on every platform (default text mode converts \r\n → \n on read).
-            with open(whole_path, mode, encoding='utf-8', newline='') as file:  # noqa: ASYNC230
-                if mode != 'w':
-                    all_lines = file.readlines()
-                    old_content = ''.join(all_lines)
-                    new_file = insert_lines(
-                        insert,
-                        all_lines,
-                        start,
-                        end,
-                        newline=detect_line_ending(all_lines),
-                    )
-                else:
-                    new_file = [i + '\n' for i in insert]
-                file.seek(0)
-                file.writelines(new_file)
-                file.truncate()
-        except FileNotFoundError:
-            return ErrorObservation(f'File not found: {path}')
-        except IsADirectoryError:
-            return ErrorObservation(
-                f'Path is a directory: {path}. You can only write to files'
-            )
-        except UnicodeDecodeError:
-            return ErrorObservation(f'File could not be decoded as utf-8: {path}')
+        old_content, write_error = _write_file_contents(
+            whole_path, insert, start, end, file_existed, path
+        )
+        if write_error is not None:
+            return write_error
     except PermissionError as e:
         return ErrorObservation(f'Permission error on {path}: {e}')
     try:

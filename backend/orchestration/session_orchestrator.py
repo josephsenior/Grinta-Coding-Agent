@@ -531,6 +531,37 @@ class SessionOrchestrator(
         finally:
             clear_step_phase()
 
+    def _create_closing_checkpoint(self) -> None:
+        try:
+            self._create_phase_boundary_checkpoint('active_to_closing')
+        except Exception:
+            pass
+
+    async def _cancel_step_task_for_close(self) -> None:
+        if self._step_task is None or self._step_task.done():
+            return
+        self._step_task.cancel()
+        try:
+            await asyncio.wait_for(self._step_task, timeout=10.0)
+        except (asyncio.CancelledError, asyncio.TimeoutError):
+            pass
+
+    def _shutdown_pending_service_on_close(self) -> None:
+        pending_service = self.services.pending_action
+        if pending_service is not None:
+            pending_service.shutdown()
+
+    def _cancel_executor_step_on_close(self) -> None:
+        agent = getattr(self, 'agent', None)
+        if agent is None:
+            return
+        executor = getattr(agent, 'executor', None)
+        if executor is None:
+            return
+        cancel_fn = getattr(executor, 'cancel_step', None)
+        if cancel_fn is not None:
+            cancel_fn()
+
     async def close(self, set_stop_state: bool = True) -> None:
         """Closes the agent controller, canceling any ongoing tasks and unsubscribing from the event stream.
 
@@ -539,31 +570,15 @@ class SessionOrchestrator(
         self._lifecycle = LifecyclePhase.CLOSING
         self._stop_watchdog()
         # C-P1-1: snapshot final state for post-mortem rollback.
-        try:
-            self._create_phase_boundary_checkpoint('active_to_closing')
-        except Exception:
-            pass
+        self._create_closing_checkpoint()
         stream = self.event_stream
         try:
             self._step_request_count = 0
-            if self._step_task is not None and not self._step_task.done():
-                self._step_task.cancel()
-                try:
-                    await asyncio.wait_for(self._step_task, timeout=10.0)
-                except (asyncio.CancelledError, asyncio.TimeoutError):
-                    pass
-            pending_service = self.services.pending_action
-            if pending_service is not None:
-                pending_service.shutdown()
+            await self._cancel_step_task_for_close()
+            self._shutdown_pending_service_on_close()
             # Signal the executor to stop streaming immediately so no more
             # StreamingChunkAction events are emitted after agent stop.
-            agent = getattr(self, 'agent', None)
-            if agent is not None:
-                executor = getattr(agent, 'executor', None)
-                if executor is not None:
-                    cancel_fn = getattr(executor, 'cancel_step', None)
-                    if cancel_fn is not None:
-                        cancel_fn()
+            self._cancel_executor_step_on_close()
             if set_stop_state:
                 await self.set_agent_state_to(AgentState.STOPPED)
             self.state_tracker.close(stream)

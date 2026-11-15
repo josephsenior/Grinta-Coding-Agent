@@ -68,6 +68,14 @@ class StoredSymbol:
     signature_preview: str
 
 
+def _first_symbol_text(symbol: dict[str, Any], *keys: str) -> str:
+    for key in keys:
+        value = symbol.get(key)
+        if value:
+            return str(value)
+    return ''
+
+
 class SymbolIndexStore:
     """Workspace-scoped symbol index with lazy per-file updates."""
 
@@ -169,12 +177,12 @@ class SymbolIndexStore:
                 """,
                 (
                     indexed.path,
-                    str(symbol.get('name') or ''),
-                    str(symbol.get('qualified_name') or symbol.get('name') or ''),
-                    str(symbol.get('symbol_kind') or symbol.get('kind') or ''),
+                    _first_symbol_text(symbol, 'name'),
+                    _first_symbol_text(symbol, 'qualified_name', 'name'),
+                    _first_symbol_text(symbol, 'symbol_kind', 'kind'),
                     int(symbol.get('start_line') or 0),
                     int(symbol.get('end_line') or 0),
-                    str(symbol.get('signature') or symbol.get('preview') or '')[:240],
+                    _first_symbol_text(symbol, 'signature', 'preview')[:240],
                 ),
             )
         for dst in indexed.import_targets:

@@ -91,21 +91,97 @@ def limits_from_catalog(model: str | None) -> ModelContextLimits:
     )
 
 
+def _attached_context_limits(llm_config: object | None) -> ModelContextLimits | None:
+    from backend.inference.runtime_profile import get_attached_runtime_profile
+
+    attached = get_attached_runtime_profile(llm_config)
+    if attached is None:
+        return None
+    if _positive_int(getattr(llm_config, 'context_window_tokens', None)) is None:
+        return attached.context_limits
+    return None
+
+
+def _config_context_limits(
+    configured_context: int,
+    configured_output: int | None,
+    configured_input: int | None,
+) -> ModelContextLimits:
+    usable = derive_usable_input_tokens(
+        context_window_tokens=configured_context,
+        max_output_tokens=configured_output,
+        fallback_input_tokens=configured_input,
+    )
+    return ModelContextLimits(
+        configured_context,
+        configured_output,
+        usable,
+        'config_context_window',
+    )
+
+
+def _catalog_config_limits(
+    catalog: ModelContextLimits,
+    configured_output: int | None,
+    configured_input: int | None,
+) -> ModelContextLimits:
+    max_output = configured_output or catalog.max_output_tokens
+    usable = derive_usable_input_tokens(
+        context_window_tokens=catalog.context_window_tokens,
+        max_output_tokens=max_output,
+        fallback_input_tokens=configured_input or catalog.usable_input_tokens,
+    )
+    return ModelContextLimits(
+        catalog.context_window_tokens,
+        max_output,
+        usable,
+        catalog.source,
+    )
+
+
+def _config_max_input_limits(
+    configured_input: int,
+    configured_output: int | None,
+) -> ModelContextLimits:
+    context = configured_input + (configured_output or 0)
+    return ModelContextLimits(
+        context,
+        configured_output,
+        configured_input,
+        'config_max_input',
+    )
+
+
+def _unknown_default_limits(
+    llm_config: object | None,
+    configured_output: int | None,
+) -> ModelContextLimits:
+    from backend.inference.runtime_profile import resolve_runtime_profile
+
+    profile = resolve_runtime_profile(llm_config)
+    if profile.context_limits.usable_input_tokens is not None:
+        return profile.context_limits
+    usable = derive_usable_input_tokens(
+        context_window_tokens=DEFAULT_UNKNOWN_CONTEXT_WINDOW_TOKENS,
+        max_output_tokens=configured_output,
+    )
+    return ModelContextLimits(
+        DEFAULT_UNKNOWN_CONTEXT_WINDOW_TOKENS,
+        configured_output,
+        usable,
+        'unknown_default',
+    )
+
+
 def limits_from_config(
     llm_config: object | None,
     *,
     unknown_default: bool = False,
 ) -> ModelContextLimits:
     """Resolve context limits from config first, then catalog, then fallback."""
-    from backend.inference.runtime_profile import get_attached_runtime_profile
-
-    attached = get_attached_runtime_profile(llm_config)
+    attached = _attached_context_limits(llm_config)
     if attached is not None:
-        configured_context = _positive_int(
-            getattr(llm_config, 'context_window_tokens', None)
-        )
-        if configured_context is None:
-            return attached.context_limits
+        return attached
 
     model = str(getattr(llm_config, 'model', '') or '')
     configured_context = _positive_int(
@@ -114,16 +190,10 @@ def limits_from_config(
     configured_output = _positive_int(getattr(llm_config, 'max_output_tokens', None))
     configured_input = _positive_int(getattr(llm_config, 'max_input_tokens', None))
     if configured_context is not None:
-        usable = derive_usable_input_tokens(
-            context_window_tokens=configured_context,
-            max_output_tokens=configured_output,
-            fallback_input_tokens=configured_input,
-        )
-        return ModelContextLimits(
+        return _config_context_limits(
             configured_context,
             configured_output,
-            usable,
-            'config_context_window',
+            configured_input,
         )
 
     catalog = limits_from_catalog(model)
@@ -131,44 +201,17 @@ def limits_from_config(
         catalog.context_window_tokens is not None
         or catalog.usable_input_tokens is not None
     ):
-        max_output = configured_output or catalog.max_output_tokens
-        usable = derive_usable_input_tokens(
-            context_window_tokens=catalog.context_window_tokens,
-            max_output_tokens=max_output,
-            fallback_input_tokens=configured_input or catalog.usable_input_tokens,
-        )
-        return ModelContextLimits(
-            catalog.context_window_tokens,
-            max_output,
-            usable,
-            catalog.source,
+        return _catalog_config_limits(
+            catalog,
+            configured_output,
+            configured_input,
         )
 
     if configured_input is not None:
-        context = configured_input + (configured_output or 0)
-        return ModelContextLimits(
-            context,
-            configured_output,
-            configured_input,
-            'config_max_input',
-        )
+        return _config_max_input_limits(configured_input, configured_output)
 
     if unknown_default:
-        from backend.inference.runtime_profile import resolve_runtime_profile
-
-        profile = resolve_runtime_profile(llm_config)
-        if profile.context_limits.usable_input_tokens is not None:
-            return profile.context_limits
-        usable = derive_usable_input_tokens(
-            context_window_tokens=DEFAULT_UNKNOWN_CONTEXT_WINDOW_TOKENS,
-            max_output_tokens=configured_output,
-        )
-        return ModelContextLimits(
-            DEFAULT_UNKNOWN_CONTEXT_WINDOW_TOKENS,
-            configured_output,
-            usable,
-            'unknown_default',
-        )
+        return _unknown_default_limits(llm_config, configured_output)
     return ModelContextLimits(None, configured_output, None, 'unknown')
 
 

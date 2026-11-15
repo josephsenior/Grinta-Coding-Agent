@@ -195,16 +195,31 @@ def _drop_one_pending_event_for_backpressure(pending: Any) -> bool:
     return False
 
 
+def _backpressure_scan_deferred(
+    orch: 'RendererEventProcessorMixin', pending: Any, limit: int
+) -> bool:
+    if limit <= 0 or len(pending) < limit:
+        return True
+    next_scan = getattr(orch, '_next_backpressure_scan_depth', 0)
+    return isinstance(next_scan, int) and len(pending) < next_scan
+
+
+def _drop_pending_for_backpressure(pending: Any, limit: int) -> int:
+    dropped = 0
+    while len(pending) >= limit:
+        if not _drop_one_pending_event_for_backpressure(pending):
+            break
+        dropped += 1
+    return dropped
+
+
 def _make_backpressure_room(
     orch: 'RendererEventProcessorMixin',
     pending: Any,
     limit: int,
 ) -> bool:
     """Bound disposable progress; retain milestones even above the soft limit."""
-    if limit <= 0 or len(pending) < limit:
-        return False
-    next_scan = getattr(orch, '_next_backpressure_scan_depth', 0)
-    if isinstance(next_scan, int) and len(pending) < next_scan:
+    if _backpressure_scan_deferred(orch, pending, limit):
         return False
 
     reclaimed = _coalesce_pending_backlog(pending)
@@ -215,11 +230,7 @@ def _make_backpressure_room(
         if len(pending) < limit:
             return True
 
-    dropped = 0
-    while len(pending) >= limit:
-        if not _drop_one_pending_event_for_backpressure(pending):
-            break
-        dropped += 1
+    dropped = _drop_pending_for_backpressure(pending, limit)
 
     if dropped:
         orch._pending_events_dropped += dropped
@@ -364,27 +375,23 @@ def _flush_and_refresh(
         orch._refresh_display(skip_sidebar=skip_sidebar)
 
 
-async def _preprocess_event_async(
+async def _preprocess_streaming_chunk_async(
     orch: 'RendererEventProcessorMixin', event: Any
 ) -> None:
-    """Run heavy prep off the UI thread before synchronous dispatch."""
-    from backend.ledger.action.message import StreamingChunkAction
-
-    # Streaming-response markdown/syntax highlighting is CPU-heavy; prepare it
-    # off-thread so _apply_live_response_render can reuse the result instead of
-    # running Pygments/Markdown on the Textual event loop.
-    if isinstance(event, StreamingChunkAction):
-        if getattr(event, 'is_tool_call', False):
-            return
-        normalize = getattr(orch, '_normalize_final_response_text', None)
-        raw = getattr(event, 'accumulated', '') or ''
-        text = normalize(raw) if callable(normalize) else raw
-        if text.strip():
-            from backend.cli.tui.renderer.prep import prep_streaming_response_async
-
-            await prep_streaming_response_async(orch, text)
+    if getattr(event, 'is_tool_call', False):
         return
+    normalize = getattr(orch, '_normalize_final_response_text', None)
+    raw = getattr(event, 'accumulated', '') or ''
+    text = normalize(raw) if callable(normalize) else raw
+    if text.strip():
+        from backend.cli.tui.renderer.prep import prep_streaming_response_async
 
+        await prep_streaming_response_async(orch, text)
+
+
+async def _preprocess_file_edit_event_async(
+    orch: 'RendererEventProcessorMixin', event: Any
+) -> None:
     event_id = getattr(event, 'id', -1)
     if event_id < 0:
         return
@@ -405,6 +412,21 @@ async def _preprocess_event_async(
         bound = getattr(orch, '_bound_event_id_cache', None)
         if callable(bound):
             bound(cache)
+
+
+async def _preprocess_event_async(
+    orch: 'RendererEventProcessorMixin', event: Any
+) -> None:
+    """Run heavy prep off the UI thread before synchronous dispatch."""
+    from backend.ledger.action.message import StreamingChunkAction
+
+    # Streaming-response markdown/syntax highlighting is CPU-heavy; prepare it
+    # off-thread so _apply_live_response_render can reuse the result instead of
+    # running Pygments/Markdown on the Textual event loop.
+    if isinstance(event, StreamingChunkAction):
+        await _preprocess_streaming_chunk_async(orch, event)
+        return
+    await _preprocess_file_edit_event_async(orch, event)
 
 
 async def _process_events_with_frame_budget(
@@ -454,6 +476,80 @@ async def _finalize_drain_pass(orch: 'RendererEventProcessorMixin') -> None:
     orch._refresh_display()
 
 
+def _requeue_unprocessed_events(
+    orch: 'RendererEventProcessorMixin',
+    events: list[Any],
+    processed: int,
+) -> None:
+    if processed < len(events):
+        remainder = events[processed:]
+        with orch._pending_lock:
+            orch._pending_events.extendleft(reversed(remainder))
+
+
+def _mark_pending_drain_scheduled(
+    orch: 'RendererEventProcessorMixin',
+) -> bool:
+    with orch._pending_lock:
+        has_pending = bool(orch._pending_events)
+        if has_pending:
+            orch._drain_scheduled = True
+    return has_pending
+
+
+async def _flush_pending_final_commits_async(
+    orch: 'RendererEventProcessorMixin',
+) -> None:
+    flush_commits = getattr(orch, 'flush_pending_final_commits', None)
+    if callable(flush_commits):
+        await flush_commits()
+
+
+def _pause_for_tool_preamble_paint(
+    orch: 'RendererEventProcessorMixin',
+) -> bool:
+    if getattr(orch, '_tool_preamble_paint_pending', False) is not True:
+        return False
+    # ``call_after_refresh`` is the actual paint boundary.  A bare event-loop
+    # yield is insufficient because Textual can process another drain message
+    # before composing the next frame.
+    _schedule_resume_after_tool_preamble_paint(orch)
+    return True
+
+
+def _reset_drain_activity_state(
+    orch: 'RendererEventProcessorMixin',
+) -> tuple[bool, int]:
+    with orch._pending_lock:
+        orch._drain_requested_while_active = False
+        has_pending = bool(orch._pending_events)
+        pending_depth = len(orch._pending_events)
+    return has_pending, pending_depth
+
+
+def _finish_drain_pass(
+    orch: 'RendererEventProcessorMixin',
+    invocation_started: float,
+    last_batch: list[Any],
+    last_streaming_only: bool,
+) -> None:
+    has_pending, pending_depth = _reset_drain_activity_state(orch)
+    _set_display_backpressure(orch, has_pending)
+    _tui_logger.debug(
+        'tui_drain_ms=%.1f tui_pending_depth=%d tui_last_batch=%d streaming_only=%s',
+        (time.monotonic() - invocation_started) * 1000,
+        pending_depth,
+        len(last_batch),
+        last_streaming_only,
+    )
+    if not has_pending:
+        return
+    if getattr(orch, '_tool_preamble_paint_pending', False) is True:
+        _schedule_resume_after_tool_preamble_paint(orch)
+    else:
+        _force_immediate_drain(orch)
+
+
 async def drain_events_async(orch: 'RendererEventProcessorMixin') -> None:
     """Async drain that yields control to the event loop periodically.
 
@@ -488,16 +584,9 @@ async def drain_events_async(orch: 'RendererEventProcessorMixin') -> None:
             last_streaming_only = streaming_only
 
             processed = await _process_events_with_frame_budget(orch, events)
-            if processed < len(events):
-                remainder = events[processed:]
-                with orch._pending_lock:
-                    orch._pending_events.extendleft(reversed(remainder))
+            _requeue_unprocessed_events(orch, events, processed)
 
-            has_pending = False
-            with orch._pending_lock:
-                has_pending = bool(orch._pending_events)
-                if has_pending:
-                    orch._drain_scheduled = True
+            has_pending = _mark_pending_drain_scheduled(orch)
 
             _set_display_backpressure(orch, has_pending)
 
@@ -508,46 +597,29 @@ async def drain_events_async(orch: 'RendererEventProcessorMixin') -> None:
                 skip_sidebar=streaming_only or has_pending,
             )
 
-            flush_commits = getattr(orch, 'flush_pending_final_commits', None)
-            if callable(flush_commits):
-                await flush_commits()
+            await _flush_pending_final_commits_async(orch)
 
-            if getattr(orch, '_tool_preamble_paint_pending', False) is True:
-                # ``call_after_refresh`` is the actual paint boundary.  A bare
-                # event-loop yield is insufficient because Textual can process
-                # another drain message before composing the next frame.
-                _schedule_resume_after_tool_preamble_paint(orch)
+            if _pause_for_tool_preamble_paint(orch):
                 break
 
             if not has_pending:
                 break
 
-            elapsed = time.monotonic() - invocation_started
-            if elapsed >= _TUI_DRAIN_INVOCATION_BUDGET_SECONDS:
+            if (
+                time.monotonic() - invocation_started
+                >= _TUI_DRAIN_INVOCATION_BUDGET_SECONDS
+            ):
                 break
 
             await asyncio.sleep(0)
     finally:
         orch._async_drain_active = False
-        has_pending_after_drain = False
-        with orch._pending_lock:
-            orch._drain_requested_while_active = False
-            has_pending_after_drain = bool(orch._pending_events)
-            pending_depth = len(orch._pending_events)
-        _set_display_backpressure(orch, has_pending_after_drain)
-        _tui_logger.debug(
-            'tui_drain_ms=%.1f tui_pending_depth=%d tui_last_batch=%d '
-            'streaming_only=%s',
-            (time.monotonic() - invocation_started) * 1000,
-            pending_depth,
-            len(last_batch),
+        _finish_drain_pass(
+            orch,
+            invocation_started,
+            last_batch,
             last_streaming_only,
         )
-        if has_pending_after_drain:
-            if getattr(orch, '_tool_preamble_paint_pending', False) is True:
-                _schedule_resume_after_tool_preamble_paint(orch)
-            else:
-                _force_immediate_drain(orch)
 
 
 async def wait_for_activity(
@@ -573,6 +645,44 @@ async def wait_for_activity(
 _LOAD_EARLIER_BATCH_SIZE = 100
 
 
+def _hydration_event_stream(
+    orch: 'RendererEventProcessorMixin',
+    limit: int,
+) -> Any | None:
+    event_stream = getattr(orch, '_event_stream', None)
+    if event_stream is None or limit <= 0:
+        return None
+    try:
+        display = orch._tui._get_display()
+    except Exception:
+        return None
+    if getattr(orch._tui, '_welcome_visible', False):
+        return None
+    get_welcome = getattr(orch._tui, '_get_welcome_widget', None)
+    if callable(get_welcome) and get_welcome() is not None:
+        return None
+    count = getattr(display, 'child_widget_count', 0)
+    if (count() if callable(count) else count) > 0:
+        return None
+    return event_stream
+
+
+async def _replay_event_chunks(
+    orch: 'RendererEventProcessorMixin',
+    events: list[Any],
+    generation: int,
+) -> bool:
+    idx = 0
+    while idx < len(events):
+        if generation != getattr(orch, '_render_generation', 0):
+            return False
+        chunk = events[idx : idx + 25]
+        processed = await _process_events_with_frame_budget(orch, chunk)
+        idx += max(processed, 1)
+        await asyncio.sleep(0)
+    return generation == getattr(orch, '_render_generation', 0)
+
+
 async def hydrate_recent_transcript(
     orch: 'RendererEventProcessorMixin',
     *,
@@ -583,20 +693,8 @@ async def hydrate_recent_transcript(
 
     if limit is None:
         limit = _TUI_RESUME_HYDRATE_EVENTS
-    event_stream = getattr(orch, '_event_stream', None)
-    if event_stream is None or limit <= 0:
-        return 0
-    try:
-        display = orch._tui._get_display()
-    except Exception:
-        return 0
-    if getattr(orch._tui, '_welcome_visible', False):
-        return 0
-    get_welcome = getattr(orch._tui, '_get_welcome_widget', None)
-    if callable(get_welcome) and get_welcome() is not None:
-        return 0
-    count = getattr(display, 'child_widget_count', 0)
-    if (count() if callable(count) else count) > 0:
+    event_stream = _hydration_event_stream(orch, limit)
+    if event_stream is None:
         return 0
     generation = getattr(orch, '_render_generation', 0)
     try:
@@ -610,15 +708,7 @@ async def hydrate_recent_transcript(
     events.reverse()
     orch._replay_mode = True
     try:
-        idx = 0
-        while idx < len(events):
-            if generation != getattr(orch, '_render_generation', 0):
-                return 0
-            chunk = events[idx : idx + 25]
-            processed = await _process_events_with_frame_budget(orch, chunk)
-            idx += max(processed, 1)
-            await asyncio.sleep(0)
-        if generation != getattr(orch, '_render_generation', 0):
+        if not await _replay_event_chunks(orch, events, generation):
             return 0
     finally:
         orch._replay_mode = False
@@ -664,15 +754,7 @@ async def load_earlier_messages(
     orch._replay_mode = True
     orch._prepend_mode = True
     try:
-        idx = 0
-        while idx < len(events):
-            if generation != getattr(orch, '_render_generation', 0):
-                return 0
-            chunk = events[idx : idx + 25]
-            processed = await _process_events_with_frame_budget(orch, chunk)
-            idx += max(processed, 1)
-            await asyncio.sleep(0)
-        if generation != getattr(orch, '_render_generation', 0):
+        if not await _replay_event_chunks(orch, events, generation):
             return 0
         flush = getattr(orch, 'flush_live_ui', None)
         if callable(flush):
@@ -690,6 +772,63 @@ async def load_earlier_messages(
     return len(events)
 
 
+def _update_event_id_bounds(orch: 'RendererEventProcessorMixin', event_id: int) -> None:
+    if orch._min_rendered_event_id < 0 or event_id < orch._min_rendered_event_id:
+        orch._min_rendered_event_id = event_id
+    orch._max_rendered_event_id = max(orch._max_rendered_event_id, event_id)
+
+
+def _enqueue_pending_event(
+    orch: 'RendererEventProcessorMixin',
+    event: Any,
+    *,
+    priority_event: bool,
+    limit: int,
+) -> tuple[bool, bool]:
+    coalesced = _try_coalesce_streaming_enqueue(orch._pending_events, event)
+    should_schedule_drain = False
+    if not coalesced:
+        if _make_backpressure_room(orch, orch._pending_events, limit):
+            should_schedule_drain = True
+        if priority_event:
+            orch._pending_events.appendleft(event)
+        else:
+            orch._pending_events.append(event)
+        if getattr(orch, '_pending_backpressure', False):
+            should_schedule_drain = True
+        if not orch._drain_scheduled:
+            orch._drain_scheduled = True
+            should_schedule_drain = True
+    elif not orch._drain_scheduled and not getattr(orch, '_async_drain_active', False):
+        orch._drain_scheduled = True
+        should_schedule_drain = True
+    return coalesced, should_schedule_drain
+
+
+def _request_display_backpressure(
+    orch: 'RendererEventProcessorMixin',
+) -> None:
+    try:
+        orch._loop.call_soon_threadsafe(
+            partial(_set_display_backpressure, orch, True),
+        )
+    except RuntimeError:
+        pass
+
+
+def _schedule_activity_signal(
+    orch: 'RendererEventProcessorMixin',
+    should_schedule_drain: bool,
+) -> None:
+    try:
+        orch._loop.call_soon_threadsafe(
+            partial(_signal_activity, orch),
+            should_schedule_drain,
+        )
+    except RuntimeError:
+        pass
+
+
 def _on_event(orch: 'RendererEventProcessorMixin', event: Any) -> None:
     # Deferred import: the test suite monkey-patches this constant on the
     # mixin module (``monkeypatch.setattr(_ep_mod, '_TUI_PENDING_EVENT_LIMIT', N)``).
@@ -698,40 +837,16 @@ def _on_event(orch: 'RendererEventProcessorMixin', event: Any) -> None:
     )
 
     event_id = getattr(event, 'id', -1)
-    should_schedule_drain = False
-    coalesced = False
-    pending_backpressure = False
     priority_event = _is_task_tracking_event(event)
     with orch._pending_lock:
         if event_id >= 0:
-            if (
-                orch._min_rendered_event_id < 0
-                or event_id < orch._min_rendered_event_id
-            ):
-                orch._min_rendered_event_id = event_id
-            orch._max_rendered_event_id = max(orch._max_rendered_event_id, event_id)
-        coalesced = _try_coalesce_streaming_enqueue(orch._pending_events, event)
-        if not coalesced:
-            if _make_backpressure_room(
-                orch,
-                orch._pending_events,
-                _TUI_PENDING_EVENT_LIMIT,
-            ):
-                should_schedule_drain = True
-            if priority_event:
-                orch._pending_events.appendleft(event)
-            else:
-                orch._pending_events.append(event)
-            if getattr(orch, '_pending_backpressure', False):
-                should_schedule_drain = True
-            if not orch._drain_scheduled:
-                orch._drain_scheduled = True
-                should_schedule_drain = True
-        elif not orch._drain_scheduled and not getattr(
-            orch, '_async_drain_active', False
-        ):
-            orch._drain_scheduled = True
-            should_schedule_drain = True
+            _update_event_id_bounds(orch, event_id)
+        coalesced, should_schedule_drain = _enqueue_pending_event(
+            orch,
+            event,
+            priority_event=priority_event,
+            limit=_TUI_PENDING_EVENT_LIMIT,
+        )
         # Predictive backpressure: flag the display as soon as the queue starts
         # backing up so the very first burst card mounts without animation,
         # rather than waiting for a drain pass to observe leftover events.
@@ -746,29 +861,13 @@ def _on_event(orch: 'RendererEventProcessorMixin', event: Any) -> None:
     )
     if skip_signal:
         if pending_backpressure:
-            try:
-                orch._loop.call_soon_threadsafe(
-                    partial(_set_display_backpressure, orch, True),
-                )
-            except RuntimeError:
-                pass
+            _request_display_backpressure(orch)
         return
-    try:
-        orch._loop.call_soon_threadsafe(
-            partial(_signal_activity, orch),
-            should_schedule_drain,
-        )
-    except RuntimeError:
-        pass
+    _schedule_activity_signal(orch, should_schedule_drain)
     # _on_event runs on a background thread; never touch Textual widgets here.
     # Hop onto the event loop to toggle display backpressure.
     if pending_backpressure:
-        try:
-            orch._loop.call_soon_threadsafe(
-                partial(_set_display_backpressure, orch, True),
-            )
-        except RuntimeError:
-            pass
+        _request_display_backpressure(orch)
 
 
 def _post_drain_message(orch: 'RendererEventProcessorMixin') -> None:

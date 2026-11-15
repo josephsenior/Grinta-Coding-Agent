@@ -68,36 +68,39 @@ def _prompt_model_change(console: Console) -> bool:
     return True
 
 
-def _prompt_provider_model(console: Console, provider_key: str | None) -> str:
-    options: list[str] = []
-    if provider_key:
-        try:
-            from backend.inference.catalog.provider_catalog import (
-                build_model_entries_by_provider,
-            )
+def _provider_model_options(provider_key: str | None) -> list[str]:
+    if not provider_key:
+        return []
+    try:
+        from backend.inference.catalog.provider_catalog import (
+            build_model_entries_by_provider,
+        )
 
-            entries = build_model_entries_by_provider(
-                provider=provider_key,
-            ).get(provider_key, [])
-            options = [entry.name for entry in entries]
-        except Exception:
-            options = []
-    if not options:
-        return Prompt.ask('  Model name', console=console).strip()
+        entries = build_model_entries_by_provider(
+            provider=provider_key,
+        ).get(provider_key, [])
+        return [entry.name for entry in entries]
+    except Exception:
+        return []
 
+
+def _print_model_menu(console: Console, options: list[str]) -> int:
     console.print()
     console.print('[bold]Select model:[/bold]')
     for idx, model_id in enumerate(options, 1):
         console.print(f'  [{CLR_BRAND}]{idx:>2}[/]  {model_id}')
     custom_idx = len(options) + 1
     console.print(f'  [{CLR_BRAND}]{custom_idx:>2}[/]  Custom model id')
-    choice = Prompt.ask(
-        '  Model number [dim](Enter to cancel)[/dim]',
-        default='',
-        console=console,
-    ).strip()
-    if not choice:
-        return ''
+    return custom_idx
+
+
+def _resolve_model_choice(
+    console: Console,
+    provider_key: str,
+    choice: str,
+    options: list[str],
+    custom_idx: int,
+) -> str:
     try:
         selected = int(choice)
     except ValueError:
@@ -111,6 +114,24 @@ def _prompt_provider_model(console: Console, provider_key: str | None) -> str:
         )
     console.print(f'[{CLR_STATUS_ERR}]  ✗ Invalid selection.[/]')
     return ''
+
+
+def _prompt_provider_model(console: Console, provider_key: str | None) -> str:
+    options = _provider_model_options(provider_key)
+    if not options:
+        return Prompt.ask('  Model name', console=console).strip()
+
+    custom_idx = _print_model_menu(console, options)
+    choice = Prompt.ask(
+        '  Model number [dim](Enter to cancel)[/dim]',
+        default='',
+        console=console,
+    ).strip()
+    if not choice:
+        return ''
+    return _resolve_model_choice(
+        console, provider_key or '', choice, options, custom_idx
+    )
 
 
 def _print_provider_menu(

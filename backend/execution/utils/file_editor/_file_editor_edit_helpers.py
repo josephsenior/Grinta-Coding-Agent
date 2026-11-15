@@ -98,6 +98,32 @@ def _validate_replace_string_old_string(old_string: str | None) -> ToolResult | 
     return None
 
 
+def _is_identifier_character(char: str) -> bool:
+    return char.isalnum() or char == '_'
+
+
+def _is_partial_identifier_match(
+    content: str,
+    start: int,
+    end: int,
+    old_starts_with_id: bool,
+    old_ends_with_id: bool,
+) -> bool:
+    # Guard: skip matches that are substrings of an identifier.
+    # An "identifier continuation" character is alnum or '_'.
+    if (
+        old_starts_with_id
+        and start > 0
+        and _is_identifier_character(content[start - 1])
+    ):
+        return True
+    return (
+        old_ends_with_id
+        and end < len(content)
+        and _is_identifier_character(content[end])
+    )
+
+
 def _replace_all_with_boundary_check(content: str, old: str, new: str) -> str:
     """Replace all occurrences of *old* with *new* in *content*.
 
@@ -118,24 +144,13 @@ def _replace_all_with_boundary_check(content: str, old: str, new: str) -> str:
     result_parts: list[str] = []
     last_end = 0
 
-    old_starts_with_id = bool(old and (old[0].isalnum() or old[0] == '_'))
-    old_ends_with_id = bool(old and (old[-1].isalnum() or old[-1] == '_'))
+    old_starts_with_id = bool(old and _is_identifier_character(old[0]))
+    old_ends_with_id = bool(old and _is_identifier_character(old[-1]))
 
-    for idx in _re.finditer(_re.escape(old), content):
-        start, end = idx.start(), idx.end()
-
-        # Guard: skip matches that are substrings of an identifier.
-        # An "identifier continuation" character is alnum or '_'.
-        if (
-            old_starts_with_id
-            and start > 0
-            and (content[start - 1].isalnum() or content[start - 1] == '_')
-        ):
-            continue
-        if (
-            old_ends_with_id
-            and end < len(content)
-            and (content[end].isalnum() or content[end] == '_')
+    for match in _re.finditer(_re.escape(old), content):
+        start, end = match.start(), match.end()
+        if _is_partial_identifier_match(
+            content, start, end, old_starts_with_id, old_ends_with_id
         ):
             continue
 

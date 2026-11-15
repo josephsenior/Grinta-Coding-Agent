@@ -402,6 +402,37 @@ class EventPersistence:
             return True
         return self._checksum_repair_done.wait(timeout=timeout)
 
+    def _collect_legacy_event_files(
+        self, all_files: list[str], events_dir: str
+    ) -> list[tuple[int, str]]:
+        legacy_files: list[tuple[int, str]] = []
+        for entry in all_files:
+            normalized = self._normalize_event_path(entry, events_dir)
+            if not normalized.endswith('.json'):
+                continue
+            if normalized.endswith('.pending') or '/event_cache/' in normalized:
+                continue
+            try:
+                legacy_files.append(
+                    (self._event_id_from_event_path(normalized), normalized)
+                )
+            except ValueError:
+                continue
+        return legacy_files
+
+    def _import_legacy_event_files(self, legacy_files: list[tuple[int, str]]) -> int:
+        migrated = 0
+        for event_id, path in sorted(legacy_files):
+            if self._sqlite_store.read_event(event_id) is not None:
+                continue
+            raw = self.file_store.read(path)
+            payload = json.loads(raw)
+            if not isinstance(payload, dict):
+                raise ValueError(f'Legacy event file {path} is not a JSON object')
+            self._sqlite_store.write_event(event_id, payload)
+            migrated += 1
+        return migrated
+
     def _migrate_legacy_event_files_to_sqlite(self) -> None:
         """Import legacy per-event JSON files into the authoritative SQLite ledger."""
         try:
@@ -417,34 +448,11 @@ class EventPersistence:
             )
             return
 
-        legacy_files: list[tuple[int, str]] = []
-        for entry in all_files:
-            normalized = self._normalize_event_path(entry, events_dir)
-            if not normalized.endswith('.json'):
-                continue
-            if normalized.endswith('.pending') or '/event_cache/' in normalized:
-                continue
-            try:
-                legacy_files.append(
-                    (self._event_id_from_event_path(normalized), normalized)
-                )
-            except ValueError:
-                continue
-
+        legacy_files = self._collect_legacy_event_files(all_files, events_dir)
         if not legacy_files:
             return
 
-        migrated = 0
-        for event_id, path in sorted(legacy_files):
-            if self._sqlite_store.read_event(event_id) is not None:
-                continue
-            raw = self.file_store.read(path)
-            payload = json.loads(raw)
-            if not isinstance(payload, dict):
-                raise ValueError(f'Legacy event file {path} is not a JSON object')
-            self._sqlite_store.write_event(event_id, payload)
-            migrated += 1
-
+        migrated = self._import_legacy_event_files(legacy_files)
         if migrated:
             logger.info(
                 'Migrated %d legacy JSON event(s) into SQLite ledger for session %s',
@@ -512,30 +520,22 @@ class EventPersistence:
                 quarantine_exc,
             )
 
-    def replay_pending_events(self) -> int:
-        """Scan the events directory for ``.pending`` WAL markers.
-
-        Recovers any events left as ``.pending`` after a crash and cleans
-        up stale markers whose canonical event files already exist.
-
-        Returns:
-            int: Number of events recovered from pending files.
-        """
+    def _list_pending_event_files(self) -> tuple[str, list[str]] | None:
         try:
             events_dir = get_conversation_events_dir(self.sid, self.user_id)
             all_files = self.file_store.list(events_dir)
         except FileNotFoundError:
-            return 0
+            return None
         except Exception:
             logger.debug(
                 'WAL replay: could not list events dir for %s', self.sid, exc_info=True
             )
-            return 0
+            return None
+        return events_dir, [f for f in all_files if f.endswith('.pending')]
 
-        pending_files = [f for f in all_files if f.endswith('.pending')]
-        if not pending_files:
-            return 0
-
+    def _replay_pending_file_list(
+        self, pending_files: list[str], events_dir: str
+    ) -> tuple[int, int, int]:
         recovered, cleaned, failed = 0, 0, 0
         for pending_name in pending_files:
             pending_path = self._normalize_event_path(pending_name, events_dir)
@@ -545,17 +545,41 @@ class EventPersistence:
             cleaned += c
             if r == 0 and c == 0:
                 failed += 1
+        return recovered, cleaned, failed
 
-        if recovered or cleaned or failed:
-            level = logger.error if failed else logger.info
-            level(
-                'WAL replay for session %s: recovered=%d, cleaned=%d stale markers, failed=%d',
-                self.sid,
-                recovered,
-                cleaned,
-                failed,
-                extra={'session_id': self.sid, 'user_id': self.user_id},
-            )
+    def _log_replay_summary(self, recovered: int, cleaned: int, failed: int) -> None:
+        if not (recovered or cleaned or failed):
+            return
+        level = logger.error if failed else logger.info
+        level(
+            'WAL replay for session %s: recovered=%d, cleaned=%d stale markers, failed=%d',
+            self.sid,
+            recovered,
+            cleaned,
+            failed,
+            extra={'session_id': self.sid, 'user_id': self.user_id},
+        )
+
+    def replay_pending_events(self) -> int:
+        """Scan the events directory for ``.pending`` WAL markers.
+
+        Recovers any events left as ``.pending`` after a crash and cleans
+        up stale markers whose canonical event files already exist.
+
+        Returns:
+            int: Number of events recovered from pending files.
+        """
+        listed = self._list_pending_event_files()
+        if listed is None:
+            return 0
+        events_dir, pending_files = listed
+        if not pending_files:
+            return 0
+
+        recovered, cleaned, failed = self._replay_pending_file_list(
+            pending_files, events_dir
+        )
+        self._log_replay_summary(recovered, cleaned, failed)
         return recovered
 
     def close(self) -> None:

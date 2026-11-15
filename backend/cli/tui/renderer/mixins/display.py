@@ -28,6 +28,129 @@ from backend.cli.tui.constants import (
 from backend.cli.tui.renderer.mixins.terminal import RendererTerminalMixin
 
 
+def _detection_disabled_flags(renderer: Any) -> tuple[bool, bool]:
+    import os
+
+    disable_lsp = (
+        os.getenv('GRINTA_DISABLE_LSP_DETECTION') == '1'
+        or not renderer._sidebar_lsp_enabled()
+    )
+    disable_dap = (
+        os.getenv('GRINTA_DISABLE_DEBUGGER_DETECTION') == '1'
+        or not renderer._sidebar_debugger_enabled()
+    )
+    return disable_lsp, disable_dap
+
+
+def _apply_disabled_detection_caches(
+    renderer: Any, *, disable_lsp: bool, disable_dap: bool
+) -> None:
+    if disable_lsp:
+        renderer._lsp_servers_cache = {}
+    if disable_dap:
+        renderer._dap_adapters_cache = []
+
+
+def _build_detection_probes(
+    *, disable_lsp: bool, disable_dap: bool
+) -> list[tuple[str, Any]]:
+    import asyncio
+
+    from backend.utils.runtime_detect import (
+        detect_debug_adapters_summary,
+        detect_lsp_servers,
+    )
+
+    probes: list[tuple[str, Any]] = []
+    if not disable_lsp:
+        probes.append(('lsp', asyncio.to_thread(detect_lsp_servers)))
+    if not disable_dap:
+        probes.append(('dap', asyncio.to_thread(detect_debug_adapters_summary)))
+    return probes
+
+
+def _apply_detection_results(
+    renderer: Any, probes: list[tuple[str, Any]], results: list[Any]
+) -> None:
+    for (kind, _), result in zip(probes, results, strict=True):
+        if kind == 'lsp':
+            renderer._lsp_servers_cache = result
+        else:
+            renderer._dap_adapters_cache = result
+
+
+def _apply_detection_fallbacks(
+    renderer: Any, *, disable_lsp: bool, disable_dap: bool
+) -> None:
+    if not disable_lsp and getattr(renderer, '_lsp_servers_cache', None) is None:
+        renderer._lsp_servers_cache = {}
+    if not disable_dap and getattr(renderer, '_dap_adapters_cache', None) is None:
+        renderer._dap_adapters_cache = []
+
+
+async def _run_detection_probes(
+    renderer: Any, *, disable_lsp: bool, disable_dap: bool
+) -> None:
+    import asyncio
+
+    try:
+        probes = _build_detection_probes(
+            disable_lsp=disable_lsp, disable_dap=disable_dap
+        )
+        if probes:
+            results = await asyncio.gather(*(coro for _, coro in probes))
+            _apply_detection_results(renderer, probes, results)
+    except Exception:
+        _apply_detection_fallbacks(
+            renderer, disable_lsp=disable_lsp, disable_dap=disable_dap
+        )
+
+
+def _refresh_detection_sidebars(renderer: Any) -> None:
+    renderer._last_lsp_sidebar_signature = None
+    renderer._last_dap_sidebar_signature = None
+    renderer._refresh_lsp_sidebar()
+    renderer._refresh_dap_sidebar()
+
+
+def _task_sidebar_title(total: int, done: int) -> str:
+    return 'Tasks' if total == 0 else f'Tasks · {done}/{total} done'
+
+
+def _count_done_tasks(task_signature: Any) -> int:
+    from backend.core.tasks.task_status import TASK_STATUS_DONE
+
+    return sum(
+        1 for _tid, status, _desc in task_signature if status == TASK_STATUS_DONE
+    )
+
+
+def _active_task_id(task_signature: Any) -> str | None:
+    for task_id, status, _desc in task_signature:
+        if status == 'in_progress':
+            return task_id
+    return None
+
+
+def _sync_task_sidebar_rows(renderer: Any, active_task_id: str | None) -> None:
+    from backend.cli.tui.widgets.collapsible import SidebarRow
+
+    try:
+        section = renderer._get_sidebar_section('#sidebar-tasks')
+        if section is None:
+            return
+        if active_task_id:
+            section.expand()
+        for row in section.query(SidebarRow):
+            if active_task_id and row.item_id == f'task:{active_task_id}':
+                row.add_class('-active-task')
+            else:
+                row.remove_class('-active-task')
+        renderer._schedule_tasks_sidebar_relayout(section)
+    except Exception:
+        pass
+
+
 class RendererDisplayMixin:
     """history refresh, display writes, retry/runtime strips, cards."""
 
@@ -210,28 +333,35 @@ class RendererDisplayMixin:
         mcp_count = self._hud.state.mcp_servers
 
         if not mcp_enabled:
-            skill_items = self._build_skills_sidebar_items()
-            skills_loading = self._skills_sidebar_is_loading(skill_items)
-            current_state = (
-                (),
-                tuple(item[0] for item in skill_items),
-                False,
-                skills_loading,
-                False,
-            )
-            if current_state != self._last_sidebar_state:
-                self._sync_mcp_sidebar_disabled()
-                self._update_sidebar_section(
-                    '#sidebar-skills',
-                    'Skills' if skills_loading else f'Skills ({len(skill_items)})',
-                    skill_items,
-                    empty_message=(
-                        'Loading skills...' if skills_loading else 'No custom skills'
-                    ),
-                )
-                self._last_sidebar_state = current_state
+            self._refresh_skills_sidebar_without_mcp()
             return
 
+        self._refresh_mcp_and_skills_sidebar(mcp_count)
+
+    def _refresh_skills_sidebar_without_mcp(self) -> None:
+        skill_items = self._build_skills_sidebar_items()
+        skills_loading = self._skills_sidebar_is_loading(skill_items)
+        current_state = (
+            (),
+            tuple(item[0] for item in skill_items),
+            False,
+            skills_loading,
+            False,
+        )
+        if current_state == self._last_sidebar_state:
+            return
+        self._sync_mcp_sidebar_disabled()
+        self._update_sidebar_section(
+            '#sidebar-skills',
+            'Skills' if skills_loading else f'Skills ({len(skill_items)})',
+            skill_items,
+            empty_message=(
+                'Loading skills...' if skills_loading else 'No custom skills'
+            ),
+        )
+        self._last_sidebar_state = current_state
+
+    def _refresh_mcp_and_skills_sidebar(self, mcp_count: int) -> None:
         mcp_servers = self._resolve_mcp_server_list(mcp_count)
 
         mcp_items = self._build_mcp_sidebar_items(mcp_servers)
@@ -245,30 +375,31 @@ class RendererDisplayMixin:
             tuple(item[0] for item in skill_items),
             mcp_loading,
             skills_loading,
-            mcp_enabled,
+            True,
         )
-        if current_state != self._last_sidebar_state:
-            self._update_sidebar_section(
-                '#sidebar-mcp',
-                'MCP Servers'
-                if mcp_loading
-                else f'MCP Servers ({len(mcp_servers) if mcp_servers else 0})',
-                mcp_items,
-                empty_message=(
-                    'Loading MCP servers...' if mcp_loading else 'No servers configured'
-                ),
-            )
-            self._sync_sidebar_feature_switch('#sidebar-mcp', True)
-            self._update_sidebar_section(
-                '#sidebar-skills',
-                'Skills' if skills_loading else f'Skills ({len(skill_items)})',
-                skill_items,
-                empty_message=(
-                    'Loading skills...' if skills_loading else 'No custom skills'
-                ),
-            )
+        if current_state == self._last_sidebar_state:
+            return
+        self._update_sidebar_section(
+            '#sidebar-mcp',
+            'MCP Servers'
+            if mcp_loading
+            else f'MCP Servers ({len(mcp_servers) if mcp_servers else 0})',
+            mcp_items,
+            empty_message=(
+                'Loading MCP servers...' if mcp_loading else 'No servers configured'
+            ),
+        )
+        self._sync_sidebar_feature_switch('#sidebar-mcp', True)
+        self._update_sidebar_section(
+            '#sidebar-skills',
+            'Skills' if skills_loading else f'Skills ({len(skill_items)})',
+            skill_items,
+            empty_message=(
+                'Loading skills...' if skills_loading else 'No custom skills'
+            ),
+        )
 
-            self._last_sidebar_state = current_state
+        self._last_sidebar_state = current_state
 
     def invalidate_sidebar(self) -> None:
         """Force MCP/skills sidebar panels to rebuild on next refresh."""
@@ -299,49 +430,14 @@ class RendererDisplayMixin:
             self._lsp_detection_scheduled = False
 
     async def _detect_lsp_servers_async(self) -> None:
-        import asyncio
-        import os
-
-        disable_lsp = (
-            os.getenv('GRINTA_DISABLE_LSP_DETECTION') == '1'
-            or not self._sidebar_lsp_enabled()
+        disable_lsp, disable_dap = _detection_disabled_flags(self)
+        _apply_disabled_detection_caches(
+            self, disable_lsp=disable_lsp, disable_dap=disable_dap
         )
-        disable_dap = (
-            os.getenv('GRINTA_DISABLE_DEBUGGER_DETECTION') == '1'
-            or not self._sidebar_debugger_enabled()
+        await _run_detection_probes(
+            self, disable_lsp=disable_lsp, disable_dap=disable_dap
         )
-        if disable_lsp:
-            self._lsp_servers_cache = {}
-        if disable_dap:
-            self._dap_adapters_cache = []
-
-        try:
-            from backend.utils.runtime_detect import (
-                detect_debug_adapters_summary,
-                detect_lsp_servers,
-            )
-
-            probes: list[tuple[str, Any]] = []
-            if not disable_lsp:
-                probes.append(('lsp', asyncio.to_thread(detect_lsp_servers)))
-            if not disable_dap:
-                probes.append(('dap', asyncio.to_thread(detect_debug_adapters_summary)))
-            if probes:
-                results = await asyncio.gather(*(coro for _, coro in probes))
-                for (kind, _), result in zip(probes, results, strict=True):
-                    if kind == 'lsp':
-                        self._lsp_servers_cache = result
-                    else:
-                        self._dap_adapters_cache = result
-        except Exception:
-            if not disable_lsp and getattr(self, '_lsp_servers_cache', None) is None:
-                self._lsp_servers_cache = {}
-            if not disable_dap and getattr(self, '_dap_adapters_cache', None) is None:
-                self._dap_adapters_cache = []
-        self._last_lsp_sidebar_signature = None
-        self._last_dap_sidebar_signature = None
-        self._refresh_lsp_sidebar()
-        self._refresh_dap_sidebar()
+        _refresh_detection_sidebars(self)
 
     def _lsp_sidebar_signature(self) -> tuple[Any, ...]:
         cache = getattr(self, '_lsp_servers_cache', None)
@@ -349,24 +445,48 @@ class RendererDisplayMixin:
             return ('pending',)
         return tuple(sorted(name for name, tool in cache.items() if tool.available))
 
-    def _refresh_lsp_sidebar(self) -> None:
+    def _set_sidebar_message(self, section: Any, message: str) -> None:
         from textual.widgets import Static
 
+        try:
+            empty = section.query_one('#empty-text', Static)
+            empty.update(section._empty_markup(message))
+        except Exception:
+            section.set_content(message)
+
+    def _refresh_disabled_sidebar(
+        self, selector: str, title: str, signature_attr: str
+    ) -> None:
+        signature = ('disabled',)
+        if signature == getattr(self, signature_attr, None):
+            return
+        setattr(self, signature_attr, signature)
+        section = self._get_sidebar_section(selector)
+        if section is None:
+            return
+        section.set_title(title)
+        self._set_sidebar_message(section, 'Disabled')
+        self._sync_sidebar_feature_switch(selector, False)
+
+    def _set_sidebar_placeholder(self, section: Any, title: str, message: str) -> None:
+        section.set_title(title)
+        self._set_sidebar_message(section, message)
+
+    def _set_sidebar_items(
+        self, section: Any, selector: str, items: list[tuple], message: str
+    ) -> None:
+        self._sync_sidebar_feature_switch(selector, True)
+        if items:
+            section.set_items(items)
+            return
+        section._content = message
+        self._set_sidebar_message(section, message)
+
+    def _refresh_lsp_sidebar(self) -> None:
         if not self._sidebar_lsp_enabled():
-            signature = ('disabled',)
-            if signature == getattr(self, '_last_lsp_sidebar_signature', None):
-                return
-            self._last_lsp_sidebar_signature = signature
-            section = self._get_sidebar_section('#sidebar-lsp')
-            if section is None:
-                return
-            section.set_title('LSP Servers')
-            try:
-                empty = section.query_one('#empty-text', Static)
-                empty.update(section._empty_markup('Disabled'))
-            except Exception:
-                section.set_content('Disabled')
-            self._sync_sidebar_feature_switch('#sidebar-lsp', False)
+            self._refresh_disabled_sidebar(
+                '#sidebar-lsp', 'LSP Servers', '_last_lsp_sidebar_signature'
+            )
             return
 
         signature = self._lsp_sidebar_signature()
@@ -380,12 +500,9 @@ class RendererDisplayMixin:
 
         cache = getattr(self, '_lsp_servers_cache', None)
         if cache is None:
-            section.set_title('LSP Servers')
-            try:
-                empty = section.query_one('#empty-text', Static)
-                empty.update(section._empty_markup('Scanning local PATH...'))
-            except Exception:
-                section.set_content('Scanning local PATH...')
+            self._set_sidebar_placeholder(
+                section, 'LSP Servers', 'Scanning local PATH...'
+            )
             return
 
         items = self._build_lsp_sidebar_items(cache)
@@ -394,17 +511,12 @@ class RendererDisplayMixin:
             f'LSP Servers ({available_count})' if available_count else 'LSP Servers (0)'
         )
         section.set_title(title)
-        self._sync_sidebar_feature_switch('#sidebar-lsp', True)
-        if items:
-            section.set_items(items)
-        else:
-            message = 'No language servers detected on PATH'
-            section._content = message
-            try:
-                empty = section.query_one('#empty-text', Static)
-                empty.update(section._empty_markup(message))
-            except Exception:
-                section.set_content(message)
+        self._set_sidebar_items(
+            section,
+            '#sidebar-lsp',
+            items,
+            'No language servers detected on PATH',
+        )
 
     def _build_lsp_sidebar_items(self, servers: dict[str, Any]) -> list[tuple]:
         from backend.utils.runtime_detect import CANONICAL_LSP_SERVERS
@@ -435,23 +547,10 @@ class RendererDisplayMixin:
         )
 
     def _refresh_dap_sidebar(self) -> None:
-        from textual.widgets import Static
-
         if not self._sidebar_debugger_enabled():
-            signature = ('disabled',)
-            if signature == getattr(self, '_last_dap_sidebar_signature', None):
-                return
-            self._last_dap_sidebar_signature = signature
-            section = self._get_sidebar_section('#sidebar-dap')
-            if section is None:
-                return
-            section.set_title('Debug Adapters')
-            try:
-                empty = section.query_one('#empty-text', Static)
-                empty.update(section._empty_markup('Disabled'))
-            except Exception:
-                section.set_content('Disabled')
-            self._sync_sidebar_feature_switch('#sidebar-dap', False)
+            self._refresh_disabled_sidebar(
+                '#sidebar-dap', 'Debug Adapters', '_last_dap_sidebar_signature'
+            )
             return
 
         signature = self._dap_sidebar_signature()
@@ -465,12 +564,9 @@ class RendererDisplayMixin:
 
         cache = getattr(self, '_dap_adapters_cache', None)
         if cache is None:
-            section.set_title('Debug Adapters')
-            try:
-                empty = section.query_one('#empty-text', Static)
-                empty.update(section._empty_markup('Scanning local PATH...'))
-            except Exception:
-                section.set_content('Scanning local PATH...')
+            self._set_sidebar_placeholder(
+                section, 'Debug Adapters', 'Scanning local PATH...'
+            )
             return
 
         items = self._build_dap_sidebar_items(cache)
@@ -481,17 +577,12 @@ class RendererDisplayMixin:
             else 'Debug Adapters (0)'
         )
         section.set_title(title)
-        self._sync_sidebar_feature_switch('#sidebar-dap', True)
-        if items:
-            section.set_items(items)
-        else:
-            message = 'No debug adapters detected on PATH'
-            section._content = message
-            try:
-                empty = section.query_one('#empty-text', Static)
-                empty.update(section._empty_markup(message))
-            except Exception:
-                section.set_content(message)
+        self._set_sidebar_items(
+            section,
+            '#sidebar-dap',
+            items,
+            'No debug adapters detected on PATH',
+        )
 
     def _build_dap_sidebar_items(self, adapters: list[dict[str, Any]]) -> list[tuple]:
         items: list[tuple] = []
@@ -514,9 +605,6 @@ class RendererDisplayMixin:
 
     def _refresh_tasks_sidebar(self) -> None:
         """Keep task rows live even while transcript streaming is throttled."""
-        from backend.cli.tui.widgets.collapsible import SidebarRow
-        from backend.core.tasks.task_status import TASK_STATUS_DONE
-
         task_signature = task_panel_signature(self._task_list)
         signature_key = tuple(task_signature)
         if signature_key == getattr(self, '_last_task_sidebar_signature', None):
@@ -524,15 +612,8 @@ class RendererDisplayMixin:
 
         task_items = self._build_task_sidebar_items(task_signature)
         total = len(task_signature)
-        done = sum(
-            1 for _tid, status, _desc in task_signature if status == TASK_STATUS_DONE
-        )
-        if total == 0:
-            title = 'Tasks'
-        elif done >= total:
-            title = f'Tasks · {done}/{total} done'
-        else:
-            title = f'Tasks · {done}/{total} done'
+        done = _count_done_tasks(task_signature)
+        title = _task_sidebar_title(total, done)
         if not self._update_sidebar_section(
             '#sidebar-tasks',
             title,
@@ -541,26 +622,7 @@ class RendererDisplayMixin:
             return
         self._last_task_sidebar_signature = signature_key
 
-        active_task_id: str | None = None
-        for task_id, status, _desc in task_signature:
-            if status == 'in_progress':
-                active_task_id = task_id
-                break
-
-        try:
-            section = self._get_sidebar_section('#sidebar-tasks')
-            if section is None:
-                return
-            if active_task_id:
-                section.expand()
-            for row in section.query(SidebarRow):
-                if active_task_id and row.item_id == f'task:{active_task_id}':
-                    row.add_class('-active-task')
-                else:
-                    row.remove_class('-active-task')
-            self._schedule_tasks_sidebar_relayout(section)
-        except Exception:
-            pass
+        _sync_task_sidebar_rows(self, _active_task_id(task_signature))
 
     def _schedule_tasks_sidebar_relayout(self, section: Any) -> None:
         """Second-pass layout after dynamic task rows mount."""

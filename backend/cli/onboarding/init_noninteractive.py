@@ -99,22 +99,12 @@ def _validate_provider(provider: str) -> str | None:
     )
 
 
-def run_noninteractive_init(
+def _check_existing_settings(
+    console: Console,
+    settings_file: Path,
     *,
-    project_root: Path | None = None,
-    provider: str | None = None,
-    model: str | None = None,
-    base_url: str | None = None,
-    api_key: str | None = None,
-    force: bool = False,
-    console: Console | None = None,
-) -> int:
-    """Write ``settings.json`` from flags/env without the interactive wizard."""
-    console = console or Console(no_color=no_color_enabled())
-    if project_root is not None:
-        project_root = project_root.resolve()
-
-    settings_file = _settings_path()
+    force: bool,
+) -> int | None:
     existing = _load_existing(settings_file)
     if existing and not force:
         console.print(
@@ -131,7 +121,17 @@ def run_noninteractive_init(
             style=CLR_STATUS_WARN,
         )
         return 2
+    return None
 
+
+def _resolve_connection_settings(
+    console: Console,
+    *,
+    provider: str | None,
+    model: str | None,
+    base_url: str | None,
+    api_key: str | None,
+) -> tuple[str, str, str, str] | int:
     resolved_key = _resolve_api_key(api_key)
     resolved_model = _resolve_model(model, provider=None, api_key=resolved_key)
     resolved_provider = _resolve_provider(
@@ -166,6 +166,39 @@ def run_noninteractive_init(
             style=CLR_STATUS_WARN,
         )
         return 3
+    return resolved_key, resolved_model, resolved_provider, resolved_base_url
+
+
+def run_noninteractive_init(
+    *,
+    project_root: Path | None = None,
+    provider: str | None = None,
+    model: str | None = None,
+    base_url: str | None = None,
+    api_key: str | None = None,
+    force: bool = False,
+    console: Console | None = None,
+) -> int:
+    """Write ``settings.json`` from flags/env without the interactive wizard."""
+    console = console or Console(no_color=no_color_enabled())
+    if project_root is not None:
+        project_root = project_root.resolve()
+
+    settings_file = _settings_path()
+    guard_error = _check_existing_settings(console, settings_file, force=force)
+    if guard_error is not None:
+        return guard_error
+
+    resolved = _resolve_connection_settings(
+        console,
+        provider=provider,
+        model=model,
+        base_url=base_url,
+        api_key=api_key,
+    )
+    if isinstance(resolved, int):
+        return resolved
+    resolved_key, resolved_model, resolved_provider, resolved_base_url = resolved
 
     err = _write_settings_file(
         console,

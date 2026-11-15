@@ -618,29 +618,42 @@ def _filter_native_tool_calls_superseded_by_xml(
     return filtered
 
 
+def _has_text_tool_markers(content_text: str, lowered: str) -> bool:
+    if not content_text:
+        return False
+    return 'tool_call' in lowered or '[tool call]' in lowered or '<invoke' in lowered
+
+
+def _synthetic_tool_call_from_marker(
+    index: int,
+    tool_call: dict[str, Any],
+) -> _SyntheticToolCall | None:
+    function = tool_call.get('function') or {}
+    name = str(function.get('name') or '')
+    if not name:
+        return None
+    return _SyntheticToolCall(
+        str(tool_call.get('id') or f'text_toolu_{index:02d}'),
+        name,
+        str(function.get('arguments') or '{}'),
+    )
+
+
 def _extract_text_marker_tool_calls_from_content(content_text: str) -> list[Any]:
     lowered = content_text.lower()
-    if (
-        not content_text
-        or 'tool_call' not in lowered
-        and '[tool call]' not in lowered
-        and '<invoke' not in lowered
-    ):
+    if not _has_text_tool_markers(content_text, lowered):
         return []
     from backend.cli.display.tool_call_display import (
         extract_tool_calls_from_text_markers,
     )
 
     tool_calls = extract_tool_calls_from_text_markers(content_text)
-    return [
-        _SyntheticToolCall(
-            str(tool_call.get('id') or f'text_toolu_{index:02d}'),
-            str((tool_call.get('function') or {}).get('name') or ''),
-            str((tool_call.get('function') or {}).get('arguments') or '{}'),
-        )
-        for index, tool_call in enumerate(tool_calls)
-        if (tool_call.get('function') or {}).get('name')
-    ]
+    extracted: list[Any] = []
+    for index, tool_call in enumerate(tool_calls):
+        synthetic = _synthetic_tool_call_from_marker(index, tool_call)
+        if synthetic is not None:
+            extracted.append(synthetic)
+    return extracted
 
 
 def _enforce_xml_compliance(

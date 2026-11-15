@@ -273,6 +273,59 @@ class _SessionOrchestratorLifecycleMixin(SessionOrchestratorAccessorsMixin):
 
         self.services.pending_action.clear_for_action(action)
 
+    def _signal_executor_cancel(self) -> None:
+        agent = getattr(self, 'agent', None)
+
+        if agent is None:
+            return
+
+        executor = getattr(agent, 'executor', None)
+
+        if executor is None:
+            return
+
+        cancel_fn = getattr(executor, 'cancel_step', None)
+
+        if cancel_fn is not None:
+            cancel_fn()
+
+    async def _cancel_step_task_on_stop(self) -> None:
+        current_task = asyncio.current_task()
+        step_task = self._step_task
+
+        if step_task is None or step_task.done() or step_task is current_task:
+            return
+
+        step_task.cancel()
+
+        with contextlib.suppress(asyncio.CancelledError, asyncio.TimeoutError):
+            await asyncio.wait_for(step_task, timeout=5.0)
+
+    async def _hard_kill_runtime_on_stop(self) -> None:
+        runtime = getattr(self, 'runtime', None)
+        hard_kill = getattr(runtime, 'hard_kill', None)
+
+        if not callable(hard_kill):
+            return
+
+        try:
+            hard_kill_result = _invoke_zero_arg_callback(
+                cast(Callable[[], object], hard_kill)
+            )
+
+            if inspect.isawaitable(hard_kill_result):
+                await hard_kill_result
+
+        except Exception:
+            logger.warning('Runtime hard_kill failed during stop()', exc_info=True)
+
+    def _clear_pending_actions_on_stop(self) -> None:
+        pending_service = getattr(
+            getattr(self, 'services', None), 'pending_action', None
+        )
+        if pending_service is not None:
+            pending_service.clear_all()
+
     async def stop(self) -> None:
         """Stop the agent, best-effort kill runtime processes, and clear pending actions."""
         logger.info('Stopping agent...')
@@ -281,44 +334,11 @@ class _SessionOrchestratorLifecycleMixin(SessionOrchestratorAccessorsMixin):
 
         # Signal the executor to stop streaming immediately.
 
-        agent = getattr(self, 'agent', None)
+        self._signal_executor_cancel()
 
-        if agent is not None:
-            executor = getattr(agent, 'executor', None)
+        await self._cancel_step_task_on_stop()
 
-            if executor is not None:
-                cancel_fn = getattr(executor, 'cancel_step', None)
-
-                if cancel_fn is not None:
-                    cancel_fn()
-
-        current_task = asyncio.current_task()
-
-        if (
-            self._step_task is not None
-            and not self._step_task.done()
-            and self._step_task is not current_task
-        ):
-            self._step_task.cancel()
-
-            with contextlib.suppress(asyncio.CancelledError, asyncio.TimeoutError):
-                await asyncio.wait_for(self._step_task, timeout=5.0)
-
-        runtime = getattr(self, 'runtime', None)
-
-        hard_kill = getattr(runtime, 'hard_kill', None)
-
-        if callable(hard_kill):
-            try:
-                hard_kill_result = _invoke_zero_arg_callback(
-                    cast(Callable[[], object], hard_kill)
-                )
-
-                if inspect.isawaitable(hard_kill_result):
-                    await hard_kill_result
-
-            except Exception:
-                logger.warning('Runtime hard_kill failed during stop()', exc_info=True)
+        await self._hard_kill_runtime_on_stop()
 
         # 2. Update state to STOPPED
 
@@ -326,11 +346,7 @@ class _SessionOrchestratorLifecycleMixin(SessionOrchestratorAccessorsMixin):
 
         # 3. Ensure any pending actions are cleared or marked as cancelled?
 
-        pending_service = getattr(
-            getattr(self, 'services', None), 'pending_action', None
-        )
-        if pending_service is not None:
-            pending_service.clear_all()
+        self._clear_pending_actions_on_stop()
 
     async def _ensure_runtime_connected(self) -> None:
         """Restore execution backend if disconnected (e.g. after hard_kill/interrupt)."""

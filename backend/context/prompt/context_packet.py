@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from backend.context.canonical_state import (
     CANONICAL_STATE_MARKER,
+    BackgroundTaskState,
     CanonicalTaskState,
     load_canonical_state,
     reduce_events_into_state,
@@ -105,6 +106,35 @@ def build_context_packet(
     canonical = _canonical_for_packet(history, state=state)
     sections: list[tuple[str, str]] = []
     snapshot = snapshot or _load_snapshot_for_request_context(state=state)
+    _append_user_request_section(sections, history, events, snapshot, char_budget)
+    _append_execution_contract_section(
+        sections, state, snapshot, canonical, char_budget
+    )
+    if just_compacted:
+        _append_compact_snapshot_section(sections, state, history, char_budget)
+    _append_checkpoint_section(sections, canonical, char_budget)
+    _append_canonical_state_section(sections, canonical, char_budget)
+    _append_active_status_section(sections, canonical, state, char_budget)
+    _append_summary_section(sections, history, char_budget)
+    _append_tail_section(sections, events, char_budget)
+    if not sections:
+        return None
+    content, lengths = _assemble_sections(sections, char_budget)
+    if just_compacted:
+        content = _POST_COMPACT_FRAMING + content
+        lengths['_post_compact_framing'] = len(_POST_COMPACT_FRAMING)
+    packet = ContextPacket(content=content, section_lengths=lengths)
+    store_context_packet_cache(state, cache_key, packet)
+    return packet
+
+
+def _append_user_request_section(
+    sections: list[tuple[str, str]],
+    history: list[Event],
+    events: list[Event],
+    snapshot: dict | None,
+    char_budget: int,
+) -> None:
     user_context = _user_request_context(
         history,
         prompt_events=events,
@@ -121,6 +151,15 @@ def build_context_packet(
                 ),
             )
         )
+
+
+def _append_execution_contract_section(
+    sections: list[tuple[str, str]],
+    state: State | None,
+    snapshot: dict | None,
+    canonical: CanonicalTaskState,
+    char_budget: int,
+) -> None:
     execution_contract = build_execution_contract(
         state=state,
         snapshot=snapshot,
@@ -143,19 +182,33 @@ def build_context_packet(
             ),
         )
     )
-    if just_compacted:
-        compact_snapshot = build_compact_snapshot_body(state, history)
-        if compact_snapshot:
-            sections.append(
-                (
-                    'compact_snapshot',
-                    _bounded_section(
-                        'COMPACT_SNAPSHOT',
-                        compact_snapshot,
-                        max(2400, int(char_budget * 0.22)),
-                    ),
-                )
+
+
+def _append_compact_snapshot_section(
+    sections: list[tuple[str, str]],
+    state: State | None,
+    history: list[Event],
+    char_budget: int,
+) -> None:
+    compact_snapshot = build_compact_snapshot_body(state, history)
+    if compact_snapshot:
+        sections.append(
+            (
+                'compact_snapshot',
+                _bounded_section(
+                    'COMPACT_SNAPSHOT',
+                    compact_snapshot,
+                    max(2400, int(char_budget * 0.22)),
+                ),
             )
+        )
+
+
+def _append_checkpoint_section(
+    sections: list[tuple[str, str]],
+    canonical: CanonicalTaskState,
+    char_budget: int,
+) -> None:
     checkpoint = _operational_checkpoint(canonical)
     if checkpoint:
         sections.append(
@@ -168,17 +221,33 @@ def build_context_packet(
                 ),
             )
         )
-    if _canonical_has_packet_details(canonical):
-        canonical_block = render_canonical_state_for_prompt(
-            canonical,
-            char_budget=max(4200, int(char_budget * 0.41)),
-            include_objective=False,
-            include_latest_directive=False,
-            include_next_action=False,
-            include_task_plan_and_criteria=False,
-        )
-        if canonical_block:
-            sections.append(('canonical_state', canonical_block))
+
+
+def _append_canonical_state_section(
+    sections: list[tuple[str, str]],
+    canonical: CanonicalTaskState,
+    char_budget: int,
+) -> None:
+    if not _canonical_has_packet_details(canonical):
+        return
+    canonical_block = render_canonical_state_for_prompt(
+        canonical,
+        char_budget=max(4200, int(char_budget * 0.41)),
+        include_objective=False,
+        include_latest_directive=False,
+        include_next_action=False,
+        include_task_plan_and_criteria=False,
+    )
+    if canonical_block:
+        sections.append(('canonical_state', canonical_block))
+
+
+def _append_active_status_section(
+    sections: list[tuple[str, str]],
+    canonical: CanonicalTaskState,
+    state: State | None,
+    char_budget: int,
+) -> None:
     active_status = _active_status(canonical, state=state)
     if active_status:
         sections.append(
@@ -191,6 +260,13 @@ def build_context_packet(
                 ),
             )
         )
+
+
+def _append_summary_section(
+    sections: list[tuple[str, str]],
+    history: list[Event],
+    char_budget: int,
+) -> None:
     summary = _latest_summary(history)
     if summary:
         sections.append(
@@ -203,6 +279,13 @@ def build_context_packet(
                 ),
             )
         )
+
+
+def _append_tail_section(
+    sections: list[tuple[str, str]],
+    events: list[Event],
+    char_budget: int,
+) -> None:
     tail = _recent_tail_summary(events)
     if tail:
         sections.append(
@@ -215,15 +298,6 @@ def build_context_packet(
                 ),
             )
         )
-    if not sections:
-        return None
-    content, lengths = _assemble_sections(sections, char_budget)
-    if just_compacted:
-        content = _POST_COMPACT_FRAMING + content
-        lengths['_post_compact_framing'] = len(_POST_COMPACT_FRAMING)
-    packet = ContextPacket(content=content, section_lengths=lengths)
-    store_context_packet_cache(state, cache_key, packet)
-    return packet
 
 
 def _resolve_packet_char_budget(llm_config: object | None, configured: int) -> int:
@@ -259,26 +333,44 @@ def _canonical_for_packet(
     return canonical
 
 
-def _canonical_has_packet_details(canonical: CanonicalTaskState) -> bool:
-    """True when canonical state adds facts not already covered by packet sections."""
+def _canonical_has_plan_details(canonical: CanonicalTaskState) -> bool:
     return bool(
         canonical.superseding_directive
         or canonical.active_plan
         or canonical.implementation_checkpoint
         or canonical.verification.command
-        or canonical.blockers
+    )
+
+
+def _canonical_has_progress_details(canonical: CanonicalTaskState) -> bool:
+    return bool(
+        canonical.blockers
         or canonical.failed_approaches
         or canonical.background_tasks
         or canonical.recent_work
         or canonical.invalidated_assumptions
         or canonical.decisions
-        or canonical.vcs_status
+    )
+
+
+def _canonical_has_session_details(canonical: CanonicalTaskState) -> bool:
+    return bool(
+        canonical.vcs_status
         or canonical.narrative_summary
         or canonical.open_questions
         or canonical.dependencies
         or canonical.test_summary.overall
         or canonical.session_metadata.compaction_timestamp
         or canonical.environment_state.running_processes
+    )
+
+
+def _canonical_has_packet_details(canonical: CanonicalTaskState) -> bool:
+    """True when canonical state adds facts not already covered by packet sections."""
+    return (
+        _canonical_has_plan_details(canonical)
+        or _canonical_has_progress_details(canonical)
+        or _canonical_has_session_details(canonical)
     )
 
 
@@ -370,38 +462,23 @@ def _user_turns_from_events(events: list[Event]) -> list[_UserTurn]:
     return turns
 
 
-def _user_turns_from_snapshot(snapshot: dict | None) -> list[_UserTurn]:
-    if not isinstance(snapshot, dict):
+def _snapshot_item_turns(snapshot: dict, key: str) -> list[_UserTurn]:
+    raw_turns = snapshot.get(key)
+    if not isinstance(raw_turns, list):
         return []
     turns: list[_UserTurn] = []
+    for item in raw_turns:
+        if not isinstance(item, dict):
+            continue
+        text = _clean_user_text(item.get('text', ''))
+        if not text:
+            continue
+        turns.append((_clean_event_id(item.get('event_id')), text, 'snapshot'))
+    return turns
 
-    # Primary source: user_messages (all user messages, untruncated)
-    raw_turns = snapshot.get('user_messages')
-    if isinstance(raw_turns, list):
-        for item in raw_turns:
-            if not isinstance(item, dict):
-                continue
-            text = _clean_user_text(item.get('text', ''))
-            if not text:
-                continue
-            turns.append((_clean_event_id(item.get('event_id')), text, 'snapshot'))
-    if turns:
-        return turns
 
-    # Backward compat: old snapshots may have recent_user_messages or
-    # objective/latest_directive instead of user_messages.
-    raw_turns = snapshot.get('recent_user_messages')
-    if isinstance(raw_turns, list):
-        for item in raw_turns:
-            if not isinstance(item, dict):
-                continue
-            text = _clean_user_text(item.get('text', ''))
-            if not text:
-                continue
-            turns.append((_clean_event_id(item.get('event_id')), text, 'snapshot'))
-    if turns:
-        return turns
-
+def _snapshot_directive_turns(snapshot: dict) -> list[_UserTurn]:
+    turns: list[_UserTurn] = []
     latest = _clean_user_text(snapshot.get('latest_directive', ''))
     if latest:
         turns.append(('snapshot:latest', latest, 'snapshot'))
@@ -409,6 +486,16 @@ def _user_turns_from_snapshot(snapshot: dict | None) -> list[_UserTurn]:
     if objective and objective != latest:
         turns.insert(0, ('snapshot:objective', objective, 'snapshot'))
     return turns
+
+
+def _user_turns_from_snapshot(snapshot: dict | None) -> list[_UserTurn]:
+    if not isinstance(snapshot, dict):
+        return []
+    for key in ('user_messages', 'recent_user_messages'):
+        turns = _snapshot_item_turns(snapshot, key)
+        if turns:
+            return turns
+    return _snapshot_directive_turns(snapshot)
 
 
 def _dedupe_user_turns(turns: list[_UserTurn]) -> list[_UserTurn]:
@@ -488,39 +575,62 @@ def _event_detail(event: Event) -> str:
     return ''
 
 
-def _active_status(canonical: CanonicalTaskState, state: State | None = None) -> str:
-    lines: list[str] = []
-    pending = [
+def _pending_background_tasks(
+    canonical: CanonicalTaskState,
+) -> list[BackgroundTaskState]:
+    return [
         task
         for task in canonical.background_tasks
         if not task.outcome_known
         and task.status in {'still running', 'running', 'unknown'}
     ]
-    completed = [task for task in canonical.background_tasks if task.outcome_known]
-    if pending:
-        lines.append('Background commands awaiting a known outcome:')
-        for task in pending[-4:]:
-            session = task.session_id or 'unknown session'
-            lines.append(f'- {session}: {task.command} -> {task.next_action}')
-            if task.recent_output:
-                lines.append(
-                    f'  Recent output ({session}):\n'
-                    f'{_safe_truncate(task.recent_output, 1200)}'
-                )
-    if completed:
-        lines.append('Recent resolved background commands:')
-        for task in completed[-4:]:
-            session = task.session_id or 'unknown session'
-            suffix = f' (exit {task.exit_code})' if task.exit_code is not None else ''
+
+
+def _completed_background_tasks(
+    canonical: CanonicalTaskState,
+) -> list[BackgroundTaskState]:
+    return [task for task in canonical.background_tasks if task.outcome_known]
+
+
+def _pending_background_lines(pending: list[BackgroundTaskState]) -> list[str]:
+    if not pending:
+        return []
+    lines = ['Background commands awaiting a known outcome:']
+    for task in pending[-4:]:
+        session = task.session_id or 'unknown session'
+        lines.append(f'- {session}: {task.command} -> {task.next_action}')
+        if task.recent_output:
             lines.append(
-                f'- {session}: {task.status}{suffix}; inspect output before claiming verification.'
+                f'  Recent output ({session}):\n'
+                f'{_safe_truncate(task.recent_output, 1200)}'
             )
+    return lines
+
+
+def _completed_background_lines(completed: list[BackgroundTaskState]) -> list[str]:
+    if not completed:
+        return []
+    lines = ['Recent resolved background commands:']
+    for task in completed[-4:]:
+        session = task.session_id or 'unknown session'
+        suffix = f' (exit {task.exit_code})' if task.exit_code is not None else ''
+        lines.append(
+            f'- {session}: {task.status}{suffix}; inspect output before claiming verification.'
+        )
+    return lines
+
+
+def _turn_drain_extra_lines(
+    canonical: CanonicalTaskState,
+    state: State | None,
+) -> list[str]:
     from backend.execution.utils.shell.background_turn_sync import (
         read_turn_drain_extras,
     )
 
     extras = read_turn_drain_extras(state)
     known = {task.session_id for task in canonical.background_tasks if task.session_id}
+    lines: list[str] = []
     for session_id, content in extras.items():
         if session_id in known:
             continue
@@ -528,6 +638,13 @@ def _active_status(canonical: CanonicalTaskState, state: State | None = None) ->
             f'- {session_id}: background output since last turn:\n'
             f'{_safe_truncate(content, 1200)}'
         )
+    return lines
+
+
+def _active_status(canonical: CanonicalTaskState, state: State | None = None) -> str:
+    lines = _pending_background_lines(_pending_background_tasks(canonical))
+    lines.extend(_completed_background_lines(_completed_background_tasks(canonical)))
+    lines.extend(_turn_drain_extra_lines(canonical, state))
     return '\n'.join(lines)
 
 

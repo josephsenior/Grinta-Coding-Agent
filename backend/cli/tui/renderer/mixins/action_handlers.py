@@ -115,10 +115,41 @@ class RendererActionHandlersMixin:
             self._append_history_items(widget)
         self._pending_final_commits.clear()
 
-    def _handle_message_action(self, action: MessageAction) -> None:
-        if bool(getattr(action, 'suppress_cli', False)):
+    def _handle_suppressed_message_action(self) -> None:
+        self._tui.finalize_thinking()
+        self.clear_live_response()
+
+    def _render_message_action_thought(self, action: MessageAction) -> None:
+        thought = (getattr(action, 'thought', '') or '').strip()
+        if thought and self._step_draft.should_render_thought():
+            kind = getattr(action, 'kind', '') or ''
+            self._render_thinking_payload(thought, finalize=True, kind=kind)
+
+    def _handle_protocol_status_message(self, content: str) -> None:
+        self._tui.add_protocol_status(content)
+        self.clear_live_response()
+
+    def _handle_transcript_only_message(
+        self,
+        content: str,
+        normalized_content: str,
+    ) -> None:
+        if not self._step_draft.should_commit_content(
+            normalized_content, transcript_only=True
+        ):
             self._tui.finalize_thinking()
             self.clear_live_response()
+            return
+        self._append_plain_agent_message(content)
+        if normalized_content:
+            self._step_draft.note_content_committed(
+                normalized_content, transcript_only=True
+            )
+            self._last_streamed_preamble_text = normalized_content
+
+    def _handle_message_action(self, action: MessageAction) -> None:
+        if bool(getattr(action, 'suppress_cli', False)):
+            self._handle_suppressed_message_action()
             return
 
         content = (getattr(action, 'content', '') or '').strip()
@@ -126,10 +157,7 @@ class RendererActionHandlersMixin:
             self._normalize_final_response_text(content) if content else ''
         )
 
-        thought = (getattr(action, 'thought', '') or '').strip()
-        if thought and self._step_draft.should_render_thought():
-            kind = getattr(action, 'kind', '') or ''
-            self._render_thinking_payload(thought, finalize=True, kind=kind)
+        self._render_message_action_thought(action)
 
         if not content:
             self._tui.finalize_thinking()
@@ -137,23 +165,11 @@ class RendererActionHandlersMixin:
             return
 
         if bool(getattr(action, 'protocol_status', False)):
-            self._tui.add_protocol_status(content)
-            self.clear_live_response()
+            self._handle_protocol_status_message(content)
             return
 
         if bool(getattr(action, 'transcript_only', False)):
-            if not self._step_draft.should_commit_content(
-                normalized_content, transcript_only=True
-            ):
-                self._tui.finalize_thinking()
-                self.clear_live_response()
-                return
-            self._append_plain_agent_message(content)
-            if normalized_content:
-                self._step_draft.note_content_committed(
-                    normalized_content, transcript_only=True
-                )
-                self._last_streamed_preamble_text = normalized_content
+            self._handle_transcript_only_message(content, normalized_content)
             return
 
         self._commit_final_response(content)

@@ -243,6 +243,66 @@ def _candidate_paths_for_symbol_search(
     return paths, scope_capped
 
 
+def _filter_candidates_by_qualified_name(
+    query: str,
+    candidates: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    query_lower = query.lower()
+    return [
+        candidate
+        for candidate in candidates
+        if query_lower in str(candidate.get('qualified_name') or '').lower()
+    ]
+
+
+def _indexed_symbol_candidates(
+    query: str,
+    *,
+    path: str | None,
+    symbol_kind: str | None,
+    include_private: bool,
+) -> list[dict[str, Any]] | None:
+    from backend.context.symbol_index.query import find_symbols_via_index
+    from backend.context.symbol_index.store import (
+        get_symbol_index_store,
+        symbol_index_enabled,
+    )
+
+    if not symbol_index_enabled():
+        return None
+    store = get_symbol_index_store()
+    if store is None:
+        return None
+    if path:
+        store.ensure_indexed(path)
+    indexed = find_symbols_via_index(
+        query,
+        path=path,
+        symbol_kind=symbol_kind,
+        include_private=include_private,
+    )
+    if indexed is None or not (path or store.is_warm()):
+        return None
+    if query.rsplit('.', 1)[-1] == query:
+        return indexed
+    return _filter_candidates_by_qualified_name(query, indexed)
+
+
+def _ensure_symbol_paths_indexed(paths: list[Path]) -> None:
+    from backend.context.symbol_index.store import (
+        get_symbol_index_store,
+        symbol_index_enabled,
+    )
+
+    if not symbol_index_enabled():
+        return
+    store = get_symbol_index_store()
+    if store is None:
+        return
+    for candidate_path in paths:
+        store.ensure_indexed(_relative_display_path(candidate_path))
+
+
 def _find_symbol_candidates(
     query: str,
     *,
@@ -255,43 +315,19 @@ def _find_symbol_candidates(
     ``scope_capped`` is True when the file-scan limit was reached and
     not all source files were searched.
     """
-    from backend.context.symbol_index.query import find_symbols_via_index
-    from backend.context.symbol_index.store import (
-        get_symbol_index_store,
-        symbol_index_enabled,
+    indexed = _indexed_symbol_candidates(
+        query,
+        path=path,
+        symbol_kind=symbol_kind,
+        include_private=include_private,
     )
-
-    if symbol_index_enabled():
-        store = get_symbol_index_store()
-        if store is not None:
-            if path:
-                store.ensure_indexed(path)
-            indexed = find_symbols_via_index(
-                query,
-                path=path,
-                symbol_kind=symbol_kind,
-                include_private=include_private,
-            )
-            if indexed is not None and (path or store.is_warm()):
-                lookup_query = query.rsplit('.', 1)[-1]
-                if lookup_query != query:
-                    query_lower = query.lower()
-                    indexed = [
-                        candidate
-                        for candidate in indexed
-                        if query_lower
-                        in str(candidate.get('qualified_name') or '').lower()
-                    ]
-                return indexed, False
+    if indexed is not None:
+        return indexed, False
 
     lookup_query = query.rsplit('.', 1)[-1]
     candidates: list[dict[str, Any]] = []
     paths, scope_capped = _candidate_paths_for_symbol_search(path)
-    if symbol_index_enabled():
-        store = get_symbol_index_store()
-        if store is not None:
-            for candidate_path in paths:
-                store.ensure_indexed(_relative_display_path(candidate_path))
+    _ensure_symbol_paths_indexed(paths)
     for candidate_path in paths:
         candidates.extend(
             _find_symbol_candidates_in_file(
@@ -302,12 +338,7 @@ def _find_symbol_candidates(
             )
         )
     if '.' in query:
-        query_lower = query.lower()
-        candidates = [
-            candidate
-            for candidate in candidates
-            if query_lower in str(candidate.get('qualified_name') or '').lower()
-        ]
+        candidates = _filter_candidates_by_qualified_name(query, candidates)
     return candidates, scope_capped
 
 
@@ -337,6 +368,31 @@ def _coerce_optional_int(value: object, field_name: str) -> int | None:
         raise FunctionCallValidationError(f'{field_name} must be an integer.') from exc
 
 
+def _symbol_candidate_matches_parent(
+    candidate: dict[str, Any],
+    parent_symbol: str,
+) -> bool:
+    return candidate.get('parent') == parent_symbol or str(
+        candidate.get('qualified_name') or ''
+    ).startswith(f'{parent_symbol}.')
+
+
+def _select_symbol_occurrence(
+    filtered: list[dict[str, Any]],
+    *,
+    symbol_name: str,
+    occurrence: int | None,
+) -> list[dict[str, Any]]:
+    if occurrence is None:
+        return filtered
+    if occurrence < 1 or occurrence > len(filtered):
+        raise FunctionCallValidationError(
+            f'Occurrence {occurrence} is out of range for {symbol_name}; '
+            f'{len(filtered)} candidate(s) found.'
+        )
+    return [filtered[occurrence - 1]]
+
+
 def _filter_symbol_candidates(
     candidates: list[dict[str, Any]],
     *,
@@ -351,19 +407,13 @@ def _filter_symbol_candidates(
     ]
     if parent_symbol:
         filtered = [
-            c
-            for c in filtered
-            if c.get('parent') == parent_symbol
-            or str(c.get('qualified_name') or '').startswith(f'{parent_symbol}.')
+            c for c in filtered if _symbol_candidate_matches_parent(c, parent_symbol)
         ]
-    if occurrence is not None:
-        if occurrence < 1 or occurrence > len(filtered):
-            raise FunctionCallValidationError(
-                f'Occurrence {occurrence} is out of range for {symbol_name}; '
-                f'{len(filtered)} candidate(s) found.'
-            )
-        filtered = [filtered[occurrence - 1]]
-    return filtered
+    return _select_symbol_occurrence(
+        filtered,
+        symbol_name=symbol_name,
+        occurrence=occurrence,
+    )
 
 
 def _resolve_symbol_candidates(
